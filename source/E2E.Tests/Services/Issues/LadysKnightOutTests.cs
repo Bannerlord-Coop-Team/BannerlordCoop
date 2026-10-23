@@ -1093,9 +1093,14 @@ public class LadysKnightOutTests : IDisposable
                 scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(
                     current => current.CriminalActionPerformedTowardsSettlement());
             else
+            {
+                scenario.Server.Resolve<IMessageBroker>().Publish(this,
+                    new TournamentSessionUpdated(Snapshot(ending == 2 ? 1 : 0, false, ending == 2)));
                 scenario.Server.Resolve<IMessageBroker>().Publish(this,
                     new TournamentSessionUpdated(Snapshot(ending == 2 ? 1 : 0, true, ending == 2)));
+            }
         });
+        scenario.ClientA.Call(() => Assert.Equal(2, quest.JournalEntries.Count));
         QuestJournalHistoryAssertions.AssertLateJoinHistory(scenario.Server, scenario.ClientA, scenario.ClientB,
             QuestScenario.IssueId, quest, outcome);
     }

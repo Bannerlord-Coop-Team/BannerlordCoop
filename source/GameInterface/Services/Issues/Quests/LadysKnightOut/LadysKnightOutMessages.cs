@@ -75,13 +75,6 @@ public readonly struct NetworkLadysKnightOutLordAccepted : IServerToClientComman
     }
 }
 
-public readonly struct LadysKnightOutLogAdded : IEvent
-{
-    public QuestBase Quest { get; }
-    public JournalLog Log { get; }
-    public LadysKnightOutLogAdded(QuestBase quest, JournalLog log) { Quest = quest; Log = log; }
-}
-
 public readonly struct LadysKnightOutIssueLogAdded : IEvent
 {
     public IssueBase Issue { get; }
@@ -95,14 +88,11 @@ public readonly struct NetworkLadysKnightOutLog : IServerToClientCommand
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly string ControllerId;
     [ProtoMember(4)] public readonly string Text;
-    [ProtoMember(5)] public readonly bool IsIssueLog;
-
-    public NetworkLadysKnightOutLog(string giverId, string issueId, string controllerId, string text, bool isIssueLog)
+    public NetworkLadysKnightOutLog(string giverId, string issueId, string controllerId, string text)
     {
         GiverId = giverId;
         IssueId = issueId;
         ControllerId = controllerId;
         Text = text;
-        IsIssueLog = isIssueLog;
     }
 }

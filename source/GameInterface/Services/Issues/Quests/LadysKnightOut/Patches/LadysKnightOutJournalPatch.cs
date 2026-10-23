@@ -4,21 +4,12 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
-using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut.Patches;
 
 [HarmonyPatch]
 internal class LadysKnightOutJournalPatch
 {
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnQuestLogAdded))]
-    [HarmonyPostfix]
-    private static void Postfix(QuestBase quest)
-    {
-        if (ModInformation.IsServer && quest is Quest && quest.JournalEntries.Count > 0)
-            MessageBroker.Instance.Publish(quest, new LadysKnightOutLogAdded(quest, quest.JournalEntries[quest.JournalEntries.Count - 1]));
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueLogAdded))]
     [HarmonyPostfix]
     private static void IssueLogPostfix(IssueBase issue)

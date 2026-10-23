@@ -8,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
-using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut;
 
@@ -20,9 +19,10 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
     private readonly IIssueOwnerResolver owners;
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
+    private readonly IPlayerManager players;
 
     public LadysKnightOutJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueOwnerResolver owners, IIssueResolver issues, IControllerIdProvider controller)
+        IIssueOwnerResolver owners, IIssueResolver issues, IControllerIdProvider controller, IPlayerManager players)
     {
         this.broker = broker;
         this.network = network;
@@ -30,14 +30,13 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
         this.owners = owners;
         this.issues = issues;
         this.controller = controller;
-        broker.Subscribe<LadysKnightOutLogAdded>(HandleAdded);
+        this.players = players;
         broker.Subscribe<LadysKnightOutIssueLogAdded>(HandleIssueAdded);
         broker.Subscribe<NetworkLadysKnightOutLog>(HandleLog);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<LadysKnightOutLogAdded>(HandleAdded);
         broker.Unsubscribe<LadysKnightOutIssueLogAdded>(HandleIssueAdded);
         broker.Unsubscribe<NetworkLadysKnightOutLog>(HandleLog);
     }
@@ -46,28 +45,12 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
     {
         var issue = payload.What.Issue;
         if (ModInformation.IsClient || !owners.TryGetOwnerControllerId(issue, out var owner) ||
-            !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
-        network.SendAll(new NetworkLadysKnightOutLog(
+            !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId) || !players.TryGetPeer(owner, out var peer)) return;
+        network.Send(peer, new NetworkLadysKnightOutLog(
             giverId,
             issue.StringId,
             owner,
-            issue.JournalEntries[issue.JournalEntries.Count - 1].LogText.ToString(),
-            true));
-    }
-
-    private void HandleAdded(MessagePayload<LadysKnightOutLogAdded> payload)
-    {
-        if (ModInformation.IsClient) return;
-        var quest = payload.What.Quest;
-        var issue = quest.QuestGiver.Issue;
-        if (issue == null || !owners.TryGetOwnerControllerId(issue, out var owner) ||
-            !objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
-        network.SendAll(new NetworkLadysKnightOutLog(
-            giverId,
-            issue.StringId,
-            owner,
-            payload.What.Log.LogText.ToString(),
-            false));
+            issue.JournalEntries[issue.JournalEntries.Count - 1].LogText.ToString()));
     }
 
     private void HandleLog(MessagePayload<NetworkLadysKnightOutLog> payload)
@@ -80,8 +63,7 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)) return;
             using (new AllowedThread())
             {
-                if (data.IsIssueLog) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(data.Text)));
-                else if (issue.IssueQuest is Quest quest) quest.AddLog(new TextObject(data.Text));
+                issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(data.Text)));
             }
         }, context: nameof(LadysKnightOutJournalHandler));
     }
