@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -65,6 +66,11 @@ internal class AlternativeSolutionJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (!IsEnding(payload.What.Ending) || !issue.IsSolvingWithAlternative ||
             !registry.IsRegistered(issue.GetType()) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
+        var report = issue.JournalEntries.LastOrDefault()?.LogText;
+        // Vanilla failure binds the companion globally instead of saving it on the report.
+        if (payload.What.Ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest &&
+            report != null && issue.AlternativeSolutionHero != null)
+            StringHelpers.SetCharacterProperties("COMPANION", issue.AlternativeSolutionHero.CharacterObject, report);
         if (!owners.TryGetOwnerControllerId(issue, out var owner) || !players.TryGetPeer(owner, out var peer)) return;
 
         var entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
