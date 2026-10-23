@@ -35,6 +35,7 @@ public class DeployTargetsTests : IDisposable
     public void MainCheckoutDeploys()
     {
         Directory.CreateDirectory(Path.Combine(root, ".git"));
+        File.WriteAllText(Path.Combine(root, ".git", "HEAD"), "ref: refs/heads/development");
 
         Build();
 
@@ -73,8 +74,10 @@ public class DeployTargetsTests : IDisposable
             info.Environment.Remove(variable);
 
         using var process = Process.Start(info)!;
-        string output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        Assert.True(process.WaitForExit(120000), "dotnet msbuild did not finish within two minutes");
+        string output = stdout.Result + stderr.Result;
         Assert.True(process.ExitCode == 0, output);
         return output;
     }

@@ -33,14 +33,27 @@ function Save-GameDirectory([string] $gameDirectory)
     [Environment]::SetEnvironmentVariable('WSLENV', $updatedWslEnv, [System.EnvironmentVariableTarget]::User)
 }
 
-# Removes the old mb2 link from this checkout; rmdir without /s deletes only the link, never the game files behind it.
-function Remove-OldGameLink
+# Lists the main checkout and every linked worktree, since each one may still hold an mb2 link from the old setup.
+function Get-CheckoutPaths
 {
-    $link = Join-Path $PSScriptRoot 'mb2'
+    try { $worktrees = @(git -C $PSScriptRoot worktree list --porcelain) } catch { return @($PSScriptRoot) }
+    if ($LASTEXITCODE -ne 0) { return @($PSScriptRoot) }
+    return @($worktrees | Where-Object { $_ -like 'worktree *' } | ForEach-Object { $_.Substring('worktree '.Length) })
+}
+
+# Removes an old mb2 link from one checkout; rmdir without /s deletes only the link, never the game files behind it.
+function Remove-OldGameLink([string] $checkout)
+{
+    $link = Join-Path $checkout 'mb2'
     $item = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
     if ($null -eq $item -or $item.LinkType -notin @('Junction', 'SymbolicLink')) { return }
     cmd /c rmdir "$link"
-    Write-Output "*** Removed the old mb2 link, the game install is untouched ***" | Green
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Output "*** Could not remove $link, remove it with: cmd /c rmdir `"$link`" ***" | Red
+        return
+    }
+    Write-Output "*** Removed old link $link, the game install is untouched ***" | Green
 }
 
 #ask for run the game
@@ -78,7 +91,7 @@ While ($key -eq 0)
 		}
 		#remember the game path for builds, tools and WSL
 		Save-GameDirectory $path
-		Remove-OldGameLink
+		Get-CheckoutPaths | ForEach-Object { Remove-OldGameLink $_ }
 		$COOPLOGdir = $PSScriptRoot + "\COOP_LOG"
 		New-Item -ItemType "directory" -Path $COOPLOGdir -Force
 		[Environment]::SetEnvironmentVariable('COOP_LOG',$COOPLOGdir,[System.EnvironmentVariableTarget]::User)

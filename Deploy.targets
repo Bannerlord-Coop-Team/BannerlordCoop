@@ -38,7 +38,8 @@
     <!-- This file lives at the repo root; locate everything relative to it. -->
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
     <ModsRoot>$(BannerlordDir)Modules</ModsRoot>
-    <IsMainCheckout>$([System.IO.Directory]::Exists('$(RepoRoot).git'))</IsMainCheckout>
+    <!-- A linked worktree's .git is a file, so only the main checkout has .git\HEAD. -->
+    <IsMainCheckout Condition="Exists('$(RepoRoot).git\HEAD')">true</IsMainCheckout>
     <DeploySourceDir>$(RepoRoot)deploy</DeploySourceDir>
     <UIMoviesDir>$(RepoRoot)UIMovies</UIMoviesDir>
     <SubModuleTemplate>$(DeploySourceDir)\SubModule.xml</SubModuleTemplate>

@@ -42,6 +42,7 @@ public sealed class ModBuildService : IModBuildService
             RedirectStandardOutput = true, RedirectStandardError = true,
         };
         string scratch = Path.Combine(artifacts, "disabled-deploy");
+        // BannerlordDir pins the compile to the profile's install, not whatever BANNERLORD_DIR the server inherited.
         // Rebuild the optional plugin after shared references, without rebuilding those references again.
         foreach (string argument in new[] { Path.Combine(repository, "source", project, project + ".csproj"),
             "-t:Rebuild", "-restore", "-p:RestorePackagesConfig=true", "-nr:false", "-m:1", "-nologo",
@@ -53,7 +54,7 @@ public sealed class ModBuildService : IModBuildService
         return info;
     }
 
-    // Compile against the profile's install, not whatever BANNERLORD_DIR the server inherited; MSBuild expects a trailing slash.
+    // MSBuild expects BannerlordDir to end in a separator.
     private static string WithTrailingSeparator(string path) => Path.TrimEndingDirectorySeparator(path) + Path.DirectorySeparatorChar;
 
     private static string EscapeProperty(string value)
