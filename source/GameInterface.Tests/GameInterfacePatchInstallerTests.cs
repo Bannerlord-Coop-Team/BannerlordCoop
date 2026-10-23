@@ -36,7 +36,7 @@ public class GameInterfacePatchInstallerTests
             new GameInterfacePatchInstaller(new TestQuestFeatureFlag(questsOn)).Install(harmony);
 
             Assert.NotEmpty(harmony.GetPatchedMethods());
-            Assert.Equal(questsOn, QuestPatchesOwnedBy(harmony).Any());
+            Assert.Equal(questsOn, QuestPatchesOwnedBy(harmony).Count > 0);
         }
         finally
         {
