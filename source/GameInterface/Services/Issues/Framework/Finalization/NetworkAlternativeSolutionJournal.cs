@@ -39,7 +39,7 @@ public readonly struct AlternativeSolutionJournalEntry
     {
         LogTimeTicks = log.LogTime.NumTicks;
         // Resolve companion variables while the server still runs as the owner.
-        Text = log.LogText.ToString();
+        Text = log.LogText?.ToString();
         TaskName = log.TaskName?.ToString();
         Progress = log.CurrentProgress;
         Range = log.Range;
@@ -47,5 +47,5 @@ public readonly struct AlternativeSolutionJournalEntry
     }
 
     public JournalLog ToJournalLog() => new JournalLog(new CampaignTime(LogTimeTicks),
-        new TextObject(Text), TaskName == null ? null : new TextObject(TaskName), Progress, Range, Type);
+        Text == null ? null : new TextObject(Text), TaskName == null ? null : new TextObject(TaskName), Progress, Range, Type);
 }

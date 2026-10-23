@@ -106,6 +106,28 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     }
 
     [Fact]
+    public void AlternativeCompletion_PreservesTextlessEntries()
+    {
+        scenario.Server.Call(() => issues[scenario.Server].AddLog(new JournalLog(
+            CampaignTime.Now, null!, null!, 3, 4)));
+        EndOnServer(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest);
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        scenario.ClientA.Call(() =>
+        {
+            var archive = archives[scenario.ClientA];
+            Assert.True(archive.IsEnded());
+            var entries = archive.GetEntries().ToArray();
+            Assert.Equal(2, entries.Length);
+            Assert.Null(entries[0].LogText);
+            Assert.Null(entries[0].TaskName);
+            Assert.Equal(3, entries[0].CurrentProgress);
+            Assert.Equal(4, entries[0].Range);
+            Assert.Equal(EndingText(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest).ToString(), entries[1].LogText.ToString());
+        });
+        AssertObserverHasNoArchive();
+    }
+
+    [Fact]
     public void AlternativeCompletion_RefusesStaleIdentityAndNonEndingStatus()
     {
         foreach (var message in new[]
