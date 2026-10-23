@@ -4,11 +4,14 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -237,6 +240,92 @@ public class EndingJournalTests : IDisposable
     private static JournalLog Stage(long ticks, string settlement) => new(new CampaignTime(ticks),
         new TextObject("Collected troops for {TARGET}").SetTextVariable("TARGET", new TextObject(settlement)),
         new TextObject("Troops"), 0, 5, LogType.Discreate);
+
+    [Fact]
+    public void ReceivedRosterMirrorsNativeDerivedProgressBeforeAnEqualTickAndSavedEnding()
+    {
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var rosterId = environment.CreateRegisteredObject<TroopRoster>();
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        ProgressGarrisonQuest ownerQuest = null!;
+        JournalLog serverProgress = null!;
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var party = scenario.ClientA.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            var roster = scenario.ClientA.GetRegisteredObject<TroopRoster>(rosterId);
+            var previous = scenario.QuestOf(scenario.ClientA);
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.Party.MobileParty = party;
+                party.Party.MemberRoster = roster;
+                roster.OwnerParty = party.Party;
+                Campaign.Current.QuestManager._quests.Remove(previous);
+                ownerQuest = new ProgressGarrisonQuest(previous.StringId,
+                    scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId),
+                    scenario.ClientA.GetRegisteredObject<Settlement>(settlementId),
+                    scenario.ClientA.GetRegisteredObject<CharacterObject>(troopId));
+                ownerQuest.QuestGiver.Issue.IssueQuest = ownerQuest;
+                ownerQuest.StartQuest();
+            }
+            ownerQuest._playerStartsQuestLog = ownerQuest.AddDiscreteLog(
+                new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+            Assert.True(ownerQuest.IsOngoing);
+            Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
+            Assert.Equal(0, ownerQuest._playerStartsQuestLog.CurrentProgress);
+        });
+        environment.FlushCoalescer();
+        var before = scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        Assert.Equal(1, before);
+        uint rosterHandle = 0;
+        uint troopHandle = 0;
+        scenario.Server.Call(() =>
+        {
+            rosterHandle = scenario.Server.GetHandle<TroopRoster>(rosterId);
+            troopHandle = scenario.Server.GetHandle<CharacterObject>(troopId);
+        });
+        var batch = new NetworkTroopRosterElementBatch(rosterHandle, troopHandle,
+            new[] { TroopRosterElementOperation.AddCounts(3, 0, 0, false) });
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(batch));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Equal(3, Campaign.Current.MainParty.MemberRoster.GetTroopCount(ownerQuest._requestedTroopType));
+            Assert.Equal(3, ownerQuest._playerStartsQuestLog.CurrentProgress);
+            ownerQuest.HourlyTick();
+            Assert.Equal(3, ownerQuest._playerStartsQuestLog.CurrentProgress);
+        });
+        environment.FlushCoalescer();
+        var derived = scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before).ToArray();
+        var request = Assert.Single(derived);
+        Assert.Equal(3, Assert.Single(request.Entries).Progress);
+        scenario.Server.Call(() =>
+        {
+            Assert.Equal(3, serverProgress.CurrentProgress);
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    // Only presentation is stubbed; roster events and hourly progress use the native quest bodies.
+    private sealed class ProgressGarrisonQuest : LordNeedsGarrisonTroopsIssueBehavior.LordNeedsGarrisonTroopsIssueQuest
+    {
+        public ProgressGarrisonQuest(string questId, Hero giver, Settlement settlement, CharacterObject troop)
+            : base(questId, giver, CampaignTime.Never, 0, settlement, 5, troop)
+        {
+        }
+
+        public override TextObject Title => new("Collected troops");
+
+        public override void SetDialogs() => IsTrackEnabled = false;
+    }
 
     private void AssertSavedHistoryMatches(QuestBase ownerQuest, QuestBase serverQuest)
     {
