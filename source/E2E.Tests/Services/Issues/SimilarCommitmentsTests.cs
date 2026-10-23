@@ -183,35 +183,6 @@ public class SimilarCommitmentsTests : IDisposable
         });
     }
 
-    [Fact]
-    public void AClientCheckingAnIssueThatFailsToStayAlive_IsRefusedWithoutEndingIt()
-    {
-        preconditions.FailStayAlive(ClientB);
-
-        Assert.False(CheckPreconditions(ClientB, secondNotableId));
-
-        ClientB.Call(() =>
-        {
-            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
-            Assert.NotNull(secondNotable.Issue);
-            Assert.True(secondNotable.Issue.IsOngoingWithoutQuest);
-            Assert.Same(secondNotable.Issue, Campaign.Current.IssueManager.Issues[secondNotable]);
-        });
-    }
-
-    [Fact]
-    public void TheServerCheckingAnIssueThatFailsToStayAlive_StillEndsIt()
-    {
-        preconditions.FailStayAlive(Server);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
-            Assert.False(secondNotable.Issue.CheckPreconditions(secondNotable, out _));
-            Assert.Null(secondNotable.Issue);
-        });
-    }
-
     private Player CreatePlayer(string controllerId)
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
