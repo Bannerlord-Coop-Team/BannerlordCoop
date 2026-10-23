@@ -79,7 +79,7 @@ public class EndingJournalTests : IDisposable
         var snapshot = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         var sent = scenario.Server.NetworkSentMessages.ToList();
         Assert.True(sent.FindIndex(message => message is NetworkIssueJournal) < sent.FindIndex(message => message is NetworkIssueFinalized));
-        Assert.Equal(Ending().Value, snapshot.Logs.Single().Text.Value);
+        Assert.Equal(Ending().Value, Assert.Single(snapshot.Logs, log => log.Text.Value == Ending().Value).Text.Value);
         Assert.Equal(outcome, finalized.Outcome);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, finalized);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
@@ -303,7 +303,7 @@ public class EndingJournalTests : IDisposable
     }
 
     [Fact]
-    public void ProgressUpdatesRejectForeignStaleAndCompletedIssues()
+    public void JournalUpdatesRejectForeignStaleCompletedAndAmbiguousStages()
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
@@ -320,31 +320,51 @@ public class EndingJournalTests : IDisposable
             progress.UpdateCurrentProgress(4);
         });
         environment.FlushCoalescer();
-        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournalProgress>());
-        var invalidProgress = new JournalLog(CampaignTime.Zero, new TextObject("Collected troops"),
-            new TextObject("Troops"), 99, 5, LogType.Discreate);
+        var requests = scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().ToArray();
+        Assert.Equal(2, requests.Length);
+        Assert.Equal(4, requests.Last().Entries.Single().Progress);
+        var invalidProgress = new IssueJournalEntry(new JournalLog(new CampaignTime(999L), new TextObject("Collected troops"),
+            new TextObject("Troops"), 99, 5, LogType.Discreate));
         scenario.Server.SimulateMessage(scenario.ClientB.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0, invalidProgress));
+            new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, "previous_issue", 0, invalidProgress));
-        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 1, invalidProgress));
-        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0,
-                new JournalLog(CampaignTime.Zero, Ending(), null, 99, 7)));
-        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0,
-                new JournalLog(CampaignTime.Zero, new TextObject("Different stage"),
-                    new TextObject("Troops"), 99, 5, LogType.Discreate)));
+            new RequestQuestJournal(scenario.NotableId, "previous_issue", new[] { invalidProgress }));
         scenario.Server.Call(() =>
         {
             Assert.Equal(4, serverProgress.CurrentProgress);
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(456L), serverProgress.LogText,
+                serverProgress.TaskName, 2, 5, LogType.Discreate));
+        });
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
+        scenario.Server.Call(() =>
+        {
+            Assert.Equal(new[] { 4, 2 }, serverQuest.JournalEntries.Select(log => log.CurrentProgress));
             using var owner = OwnerScope();
             serverQuest.CompleteQuestWithCancel(Ending());
         });
+        environment.FlushCoalescer();
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
-            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0, invalidProgress));
+            new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
         scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
+    }
+
+    [Fact]
+    public void ReceivedProgressAndTerminalSnapshotsNeverSendJournalRequestsBack()
+    {
+        var quest = scenario.QuestOf(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            using var replay = new AllowedThread();
+            quest.AddDiscreteLog(new TextObject("server progress"), new TextObject("Troops"), 0, 5).UpdateCurrentProgress(3);
+        });
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>());
+        var snapshot = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true,
+            new[] { Entry(Ending()) });
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>());
+        scenario.ClientA.Call(() => Assert.Single(quest.JournalEntries));
     }
 
     private MainHeroSubstitutionScope OwnerScope() => new(
@@ -385,7 +405,10 @@ public class EndingJournalTests : IDisposable
         scenario.ClientB.SimulateMessage(scenario.Server.NetPeer, wire);
         scenario.ClientA.Call(() =>
         {
-            Assert.Equal(5, quest.JournalEntries.Count);
+            Assert.Equal(3, quest.JournalEntries.Count);
+            Assert.Equal(journal.Logs.Select(log => (log.Time.NumTicks, log.Text?.ToString(), log.TaskName?.ToString(),
+                log.Progress, log.Range, log.Type)), quest.JournalEntries.Select(log => (log.LogTime.NumTicks,
+                log.LogText?.ToString(), log.TaskName?.ToString(), log.CurrentProgress, log.Range, log.Type)));
             Assert.Equal(2, quest.JournalEntries.Count(log => log.LogText.ToString() == Ending().ToString()));
         });
         scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IssueQuest));

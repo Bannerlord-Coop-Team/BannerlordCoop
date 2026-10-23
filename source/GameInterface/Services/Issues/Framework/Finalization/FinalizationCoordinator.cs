@@ -12,7 +12,6 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -208,23 +207,15 @@ internal class FinalizationCoordinator : IHandler
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
             if (!data.IsQuestJournal && quest != null) return;
 
-            var entries = quest?._journalEntries ?? issue._journalEntries;
-            var existing = entries.Select((log, index) => new { Log = log, Index = index })
-                .Where(entry => entry.Log.LogText != null).GroupBy(entry => entry.Log.LogText.ToString())
-                .ToDictionary(group => group.Key, group => new Queue<int>(group.Select(entry => entry.Index)));
-            foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+            using (new AllowedThread())
             {
-                if (log.Text == null) continue;
-                var key = log.Text.ToString();
-                if (existing.TryGetValue(key, out var matches) && matches.Count > 0)
-                {
-                    entries[matches.Dequeue()] = log.ToJournalLog();
-                    continue;
-                }
-                if (quest != null) entries.Add(log.ToJournalLog());
-                else issue.AddLog(log.ToJournalLog());
+                var entries = quest?._journalEntries ?? issue._journalEntries;
+                entries.Clear();
+                foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    entries.Add(log.ToJournalLog());
+                if (quest != null) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
+                else CampaignEventDispatcher.Instance.OnIssueLogAdded(issue, false);
             }
-            if (quest != null) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
         }, context: nameof(FinalizationCoordinator));
     }
 
