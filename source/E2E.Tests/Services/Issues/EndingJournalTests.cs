@@ -153,6 +153,129 @@ public class EndingJournalTests : IDisposable
     }
 
     [Fact]
+    public void OwnerOnlyHistoryIsMirroredBeforeTheAuthoritativeEndingAndSavedWithIt()
+    {
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        scenario.ClientA.Call(() =>
+        {
+            ownerQuest.AddLog(new TextObject("local progress one"));
+            ownerQuest.AddLog(new TextObject("local progress two"));
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() => Assert.Equal(new[] { "local progress one", "local progress two" },
+            serverQuest.JournalEntries.Select(log => log.LogText.ToString())));
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReorderedStagesWithSharedTemplatesKeepTheirOwnProgress(bool identicalVariables)
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        JournalLog target = null!;
+        JournalLog other = null!;
+        scenario.Server.Call(() =>
+        {
+            other = Stage(456L, identicalVariables ? "Danustica" : "Amitatys");
+            target = Stage(123L, "Danustica");
+            serverQuest._journalEntries.Add(other);
+            serverQuest._journalEntries.Add(target);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var progress = Stage(123L, "Danustica");
+            ownerQuest._journalEntries.Add(progress);
+            ownerQuest._journalEntries.Add(Stage(456L, identicalVariables ? "Danustica" : "Amitatys"));
+            progress.UpdateCurrentProgress(4);
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            Assert.Equal(4, target.CurrentProgress);
+            Assert.Equal(0, other.CurrentProgress);
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Fact]
+    public void EndingSnapshotUsesTheServerOrderForRepeatedAndMissingEarlierEntries()
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        scenario.Server.Call(() =>
+        {
+            serverQuest._journalEntries.Add(Stage(123L, "Danustica"));
+            serverQuest._journalEntries.Add(Stage(456L, "Danustica"));
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(789L), new TextObject("late entry")));
+        });
+        scenario.ClientA.Call(() =>
+        {
+            ownerQuest._journalEntries.Add(new JournalLog(new CampaignTime(789L), new TextObject("late entry")));
+            ownerQuest._journalEntries.Add(Stage(456L, "Danustica"));
+        });
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    private static JournalLog Stage(long ticks, string settlement) => new(new CampaignTime(ticks),
+        new TextObject("Collected troops for {TARGET}").SetTextVariable("TARGET", new TextObject(settlement)),
+        new TextObject("Troops"), 0, 5, LogType.Discreate);
+
+    private void AssertSavedHistoryMatches(QuestBase ownerQuest, QuestBase serverQuest)
+    {
+        JournalLogEntry serverArchive = null!;
+        LogEntryHistory loaded = null!;
+        scenario.Server.Call(() =>
+        {
+            serverArchive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(serverQuest));
+            Assert.NotNull(serverArchive);
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("ordered_history", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("ordered_history"), loadAsLateInitialize: true));
+            loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Equal(EntryFields(serverArchive), EntryFields(archive));
+            var saved = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.NotSame(serverArchive, saved);
+            Assert.Equal(EntryFields(archive), EntryFields(saved));
+        });
+        scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => entry.IsRelatedTo(ownerQuest))));
+    }
+
+    [Fact]
     public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding()
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
