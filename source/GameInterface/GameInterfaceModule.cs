@@ -59,6 +59,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
+using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
 using GameInterface.Utils.Commands;
@@ -107,6 +108,7 @@ public class GameInterfaceModule : Module
             .AutoActivate();
 
         builder.RegisterType<GameInterfacePatchInstaller>().As<IGameInterfacePatchInstaller>().InstancePerDependency();
+        builder.RegisterType<QuestJournalOwnerResolver>().As<IQuestJournalOwnerResolver>().InstancePerDependency();
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
         builder.RegisterType<ModConfig>().As<IModConfig>().InstancePerLifetimeScope();
