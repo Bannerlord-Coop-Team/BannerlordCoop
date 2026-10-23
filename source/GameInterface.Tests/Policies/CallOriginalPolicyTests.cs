@@ -1,12 +1,54 @@
-﻿using GameInterface.Policies;
+﻿using Autofac;
+using GameInterface.Policies;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace GameInterface.Tests.Policies;
 
+/// <summary>
+/// Covers when <see cref="CallOriginalPolicy"/> lets patched vanilla methods run.
+/// </summary>
+[Collection(ContainerProviderCollection.Name)]
 public class CallOriginalPolicyTests
 {
+    [Fact]
+    public void NoActiveContainer_AllowsOriginals()
+    {
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        try
+        {
+            using (ContainerProvider.UseContainerThreadSafe(null))
+            {
+                Assert.True(CallOriginalPolicy.IsOriginalAllowed());
+                Assert.True(CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+            }
+        }
+        finally
+        {
+            RestoreContainer(hadPreviousContainer, previousContainer);
+        }
+    }
+
+    [Fact]
+    public void ContainerWithoutSyncPolicy_AllowsOriginals()
+    {
+        using var container = new ContainerBuilder().Build();
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        try
+        {
+            using (ContainerProvider.UseContainerThreadSafe(container))
+            {
+                Assert.True(CallOriginalPolicy.IsOriginalAllowed());
+                Assert.True(CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+            }
+        }
+        finally
+        {
+            RestoreContainer(hadPreviousContainer, previousContainer);
+        }
+    }
+
     [Fact]
     public async Task AllThreadsScope_IsVisibleOnWorkerThreadUntilDisposed()
     {
@@ -103,5 +145,19 @@ public class CallOriginalPolicyTests
         }
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+    }
+
+    /// <summary>
+    /// Puts back the scope that was active before the test so later tests see the same <see cref="ContainerProvider"/> state.
+    /// </summary>
+    private static void RestoreContainer(bool hadPreviousContainer, ILifetimeScope previousContainer)
+    {
+        if (!hadPreviousContainer)
+        {
+            ContainerProvider.Clear();
+            return;
+        }
+
+        ContainerProvider.SetContainer(previousContainer);
     }
 }
