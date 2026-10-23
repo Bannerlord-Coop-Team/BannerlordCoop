@@ -6,13 +6,17 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 using UnregisteredIssue = E2E.Tests.Services.Issues.NeverRegisteredIssue;
@@ -242,6 +246,59 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Equal(notableId, finalized.IssueOwnerId);
         Assert.Equal(IssueId, finalized.IssueId);
         Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Dismissal_EndsTheServerArchiveBeforeItIsDownloadedOnRejoin(bool serverStart)
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerHeroId = RegisterPlayer(ControllerId);
+        TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
+        var issue = AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        SetOwner(notableId, ControllerId);
+        JournalLogEntry archive = null!;
+        JournalLogEntry unrelated = null!;
+
+        Server.Call(() =>
+        {
+            var journals = new JournalLogsCampaignBehavior();
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { journals }));
+            journals.RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            using (new AllowedThread())
+                issue.IssueQuest = new UnstartedQuest("quest_dismiss_archive", issue.IssueOwner);
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                issue.IssueQuest.AddLog(new TextObject("Follow the caravan"));
+            archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
+            unrelated = new JournalLogEntry(new TextObject("Unrelated active quest"), null, null, false);
+            Campaign.Current.LogEntryHistory._logs.Add(unrelated);
+            Assert.False(archive.IsEnded());
+            Assert.DoesNotContain(issue.IssueQuest, Campaign.Current.QuestManager.Quests);
+            Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+        });
+
+        if (serverStart)
+            PublishServerStarted(Server);
+        else
+            PublishDisconnected(Server, Client);
+
+        Server.Call(() =>
+        {
+            var ended = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
+            Assert.Same(archive, ended);
+            Assert.True(ended.IsEnded());
+            Assert.True(ended.IsEndedUnsuccessfully());
+            Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
+            Assert.Equal("Follow the caravan", Assert.Single(ended.GetEntries()).LogText.ToString());
+            Assert.False(unrelated.IsEnded());
+            Assert.Null(issue.IssueOwner.Issue);
+        });
+        if (serverStart)
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        else
+            Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
     [Theory]
