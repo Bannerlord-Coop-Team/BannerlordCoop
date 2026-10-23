@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace GameInterface.Registry.Auto;
@@ -48,6 +50,33 @@ internal sealed class CallSiteLogLimiter
             lastSummary = now;
             return false;
         }
+    }
+
+    /// <summary>
+    /// Logs <paramref name="fullTemplate"/> with the stack trace appended for a new call site,
+    /// otherwise <paramref name="summaryTemplate"/> with the suppressed count appended.
+    /// </summary>
+    // call it straight from the patch, the site key skips this method and its caller
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public void Log(ILogger logger, string fullTemplate, object[] fullArgs, string summaryTemplate, params object[] summaryArgs)
+    {
+        var site = GetCallSite(2, 6);
+        if (ShouldLogFull(site, out int suppressedCount))
+        {
+            logger.Error(fullTemplate, Append(fullArgs, Environment.StackTrace));
+        }
+        else if (suppressedCount > 0)
+        {
+            logger.Warning(summaryTemplate, Append(summaryArgs, suppressedCount));
+        }
+    }
+
+    private static object[] Append(object[] args, object last)
+    {
+        var all = new object[args.Length + 1];
+        args.CopyTo(all, 0);
+        all[args.Length] = last;
+        return all;
     }
 
     /// <summary>

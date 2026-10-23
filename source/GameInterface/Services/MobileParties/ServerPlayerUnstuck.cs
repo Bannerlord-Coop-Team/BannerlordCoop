@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
@@ -47,6 +48,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly ISettlementInterface settlementInterface;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IPartyNavigationRepair partyNavigationRepair;
+    private readonly IMapEventLoadCleaner mapEventLoadCleaner;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -55,7 +57,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
         ISiegeEventInterface siegeEventInterface,
-        IPartyNavigationRepair partyNavigationRepair)
+        IPartyNavigationRepair partyNavigationRepair,
+        IMapEventLoadCleaner mapEventLoadCleaner)
     {
         this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
@@ -64,6 +67,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         this.playerManager = playerManager;
         this.settlementInterface = settlementInterface;
         this.siegeEventInterface = siegeEventInterface;
+        this.mapEventLoadCleaner = mapEventLoadCleaner;
     }
 
     public string[] Apply(Player player, bool includeCaptivity)
@@ -141,6 +145,22 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 return $"Removed the party from settlement {settlement.StringId}.";
             });
         }
+
+        // Nothing ends a battle again once it ended, so parties it kept linked never move. Release them
+        // all, lords and garrisons too, since they can block a town for everyone.
+        TryStep(actions, "ended battle release", () =>
+        {
+            var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks();
+            foreach (var releasedParty in releasedParties)
+            {
+                if (objectManager.TryGetId(releasedParty, out var releasedPartyId))
+                    network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+            }
+
+            return releasedParties.Length == 0
+                ? null
+                : $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
+        });
 
         if (party.Party?.MapEvent != null)
         {

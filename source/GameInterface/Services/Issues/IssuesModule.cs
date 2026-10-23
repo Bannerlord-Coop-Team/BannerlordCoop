@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using System;
 
@@ -33,6 +34,9 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<LesserNobleRevoltWorldEventService>()
+            .As<ILesserNobleRevoltWorldEventService>()
             .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();

@@ -1,0 +1,97 @@
+﻿using Common;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using System;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+
+namespace GameInterface.Services.Issues.Framework.Finalization;
+
+public readonly struct AlternativeSolutionEndingObserved : IEvent
+{
+    public readonly IssueBase Issue;
+    public readonly IssueBase.IssueUpdateDetails Ending;
+
+    public AlternativeSolutionEndingObserved(IssueBase issue, IssueBase.IssueUpdateDetails ending)
+    {
+        Issue = issue;
+        Ending = ending;
+    }
+}
+
+/// <summary>Replays the owner's alternative journal before the ordered finalization detaches the issue.</summary>
+internal class AlternativeSolutionJournalHandler : IHandler
+{
+    private readonly IMessageBroker broker;
+    private readonly INetwork network;
+    private readonly IObjectManager objects;
+    private readonly IIssueResolver resolver;
+    private readonly IIssueOwnerResolver owners;
+    private readonly IQuestTypeRegistry registry;
+    private readonly IControllerIdProvider controller;
+    private readonly IPlayerManager players;
+
+    public AlternativeSolutionJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
+        IIssueResolver resolver, IIssueOwnerResolver owners, IQuestTypeRegistry registry,
+        IControllerIdProvider controller, IPlayerManager players)
+    {
+        this.broker = broker;
+        this.network = network;
+        this.objects = objects;
+        this.resolver = resolver;
+        this.owners = owners;
+        this.registry = registry;
+        this.controller = controller;
+        this.players = players;
+        broker.Subscribe<AlternativeSolutionEndingObserved>(HandleObserved);
+        broker.Subscribe<NetworkAlternativeSolutionJournal>(HandleJournal);
+    }
+
+    public void Dispose()
+    {
+        broker.Unsubscribe<AlternativeSolutionEndingObserved>(HandleObserved);
+        broker.Unsubscribe<NetworkAlternativeSolutionJournal>(HandleJournal);
+    }
+
+    private void HandleObserved(MessagePayload<AlternativeSolutionEndingObserved> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var issue = payload.What.Issue;
+        if (!IsEnding(payload.What.Ending) || !issue.IsSolvingWithAlternative ||
+            !registry.IsRegistered(issue.GetType()) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
+        if (!owners.TryGetOwnerControllerId(issue, out var owner) || !players.TryGetPeer(owner, out var peer)) return;
+
+        var entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
+        network.Send(peer, new NetworkAlternativeSolutionJournal(giverId, issue.StringId, payload.What.Ending, entries));
+    }
+
+    private void HandleJournal(MessagePayload<NetworkAlternativeSolutionJournal> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!IsEnding(data.Ending) || !resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+                !issue.IsSolvingWithAlternative || !owners.TryGetOwnerControllerId(issue, out var owner) ||
+                owner != controller.ControllerId) return;
+
+            using (new AllowedThread())
+            {
+                issue._journalEntries.Clear();
+                foreach (var entry in data.Entries ?? Array.Empty<AlternativeSolutionJournalEntry>())
+                    issue._journalEntries.Add(entry.ToJournalLog());
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Ending, Hero.MainHero);
+            }
+        }, context: nameof(AlternativeSolutionJournalHandler));
+    }
+
+    private static bool IsEnding(IssueBase.IssueUpdateDetails ending) =>
+        ending == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest ||
+        ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest;
+}

@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.SiegeEvents.Patches;
+﻿using Common.Messaging;
+using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Messages;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -67,7 +69,8 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         Assert.True(SiegeAftermathPatches.PendingAftermaths.TryAdd(settlement, pending));
 
         bool applied = false;
-        bool resolved = SiegeAftermathPatches.ResolvePending(
+        bool resolved = false;
+        var discarded = CaptureDiscards(() => resolved = SiegeAftermathPatches.ResolvePending(
             CreateUninitialized<SiegeAftermathCampaignBehavior>(), settlement, "settlement ownership changed",
             (_, party, capturedSettlement) =>
             {
@@ -83,10 +86,41 @@ public sealed class SiegeAftermathPendingTests : IDisposable
                 Assert.Equal(SiegeAftermathAction.SiegeAftermath.ShowMercy, aftermath);
                 Assert.Same(previousOwner, oldOwner);
                 Assert.Same(pending.Contributions, contributions);
-            });
+            }));
 
         Assert.True(resolved);
         Assert.True(applied);
+        // the applied broadcast already releases the leader's choice
+        Assert.Empty(discarded);
+        Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
+    }
+
+    [Fact]
+    public void RecapturedPending_EvictionTellsTheLeaderClient()
+    {
+        // otherwise the leader keeps holding a choice the server no longer accepts
+        var recaptured = AddBoundPending();
+        recaptured.Settlement.Town.LastCapturedBy = CreateUninitialized<Clan>();
+
+        var discarded = CaptureDiscards(() =>
+            SiegeAftermathPatches.EvictStalePending(CreateUninitialized<SiegeAftermathCampaignBehavior>()));
+
+        Assert.Same(recaptured.Settlement, Assert.Single(discarded));
+        Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
+    }
+
+    [Fact]
+    public void RecapturedPending_ResolveTellsTheLeaderClientInsteadOfApplying()
+    {
+        var recaptured = AddBoundPending();
+        recaptured.Settlement.Town.LastCapturedBy = CreateUninitialized<Clan>();
+
+        var discarded = CaptureDiscards(() => Assert.False(SiegeAftermathPatches.ResolvePending(
+            CreateUninitialized<SiegeAftermathCampaignBehavior>(), recaptured.Settlement, "a newer settlement capture began",
+            (_, _, _) => throw new InvalidOperationException("a discarded aftermath must not be determined"),
+            (_, _, _, _, _) => throw new InvalidOperationException("a discarded aftermath must not be applied"))));
+
+        Assert.Same(recaptured.Settlement, Assert.Single(discarded));
         Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
     }
 
@@ -141,6 +175,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         var prompt = Assert.Single(prompts);
         Assert.Same(current.Settlement, prompt.Settlement);
         Assert.Same(current.Pending.LeaderParty, prompt.LeaderParty);
+        Assert.Same(current.Pending.PreviousOwnerClan, prompt.PreviousOwnerClan);
     }
 
     [Fact]
@@ -168,6 +203,25 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         {
             Campaign.Current = previousCampaign;
         }
+    }
+
+    // Runs the action and returns the settlements whose parked aftermath it told the clients was discarded.
+    private static List<Settlement> CaptureDiscards(Action action)
+    {
+        var discarded = new List<Settlement>();
+        void Handle(MessagePayload<SiegeAftermathDiscarded> payload) => discarded.Add(payload.What.Settlement);
+
+        MessageBroker.Instance.Subscribe<SiegeAftermathDiscarded>(Handle);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe<SiegeAftermathDiscarded>(Handle);
+        }
+
+        return discarded;
     }
 
     private static (Settlement Settlement, SiegeAftermathPatches.PendingAftermath Pending) AddBoundPending()

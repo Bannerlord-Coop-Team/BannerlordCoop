@@ -10,15 +10,15 @@ Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
   vanilla issue behavior, named without `IssueBehavior`. If `Framework/` needs a change for one quest, stop and ask.
 - A quest is registered only by having a descriptor. `IssuesModule` registers every class in
   `GameInterface.Services.Issues.Quests` that implements `IQuestTypeDescriptor` or a strategy interface, and
-  `Framework/Gating/IssueTypeAllowlistGate.cs` turns off `RegisterEvents` for every other issue behavior. Do not
-  add a per-quest "disable this behavior" patch, it will fight the gate.
+  `Framework/CreationCapture/UnregisteredIssueBehaviorPatches.cs` turns off `RegisterEvents` for every other issue
+  behavior. Do not add a per-quest "disable this behavior" patch, it will fight those patches.
 - Quests sit behind `IQuestFeatureFlag`, on only in builds compiled with `TESTER` (the nightly workflow and
-  local Debug builds of `GameInterface`). With it off `QuestTypeRegistry` stays empty, so the allowlist gate
-  keeps every issue behavior off, and `UnregisteredIssuePurger` ends taken issues on the server through
-  `IIssueDismisser`, not vanilla cancel, which sends troops to the host's missing `MobileParty.MainParty`. Every patch
-  in this folder carries `[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]`, which
-  `GameInterfacePatchInstaller` applies only with the flag on. The four always-on safety gates in
-  `Framework/Gating/` (`IssueTypeAllowlistGate`, `DisableIssuesCampaignBehavior`, `PlayerHeroIssueOwnerGate`,
+  local Debug builds of `GameInterface`). With it off `QuestTypeRegistry` stays empty, so
+  `UnregisteredIssueBehaviorPatches` keeps every issue behavior off, and `UnregisteredIssuePurger` ends taken issues on
+  the server through `IIssueDismisser`, not vanilla cancel, which sends troops to the host's missing
+  `MobileParty.MainParty`. Every patch in this folder carries `[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]`,
+  which `GameInterfacePatchInstaller` applies only with the flag on. The four always-on safety patches
+  (`UnregisteredIssueBehaviorPatches`, `PlayerHeroIssueOwnerPatch`, `DisableIssuesCampaignBehavior`,
   `IssuesCampaignBehaviorSettlementEnteredPatch`) stay uncategorized. A new quest patch needs the category.
   Tests turn the flag on in `E2E.Tests` `TestEnvironment` and `GameInterface.Tests` `PatchBootstrap`.
 - `IssuesLayoutTests` in `GameInterface.Tests` checks that `Framework/` interfaces sit in `Framework.Interface` and that
@@ -36,7 +36,7 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `QuestSuccess` for your descriptor.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
-   `NetworkIssueFinalized`. `Framework/Gating/SimilarCommitmentsGatePatch.cs` reads it inside
+   `NetworkIssueFinalized`. `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside
    `IssueBase.CheckPreconditions` so vanilla's one-issue-per-type check counts only the player's own issues, so a
    stale mirror changes whether a player can accept.
 4. A non-owner client ends with the issue marked taken (`_issueState` set) and nothing else: no quest, no
@@ -65,7 +65,7 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.
-11. Players and their clans never offer issues. `Framework/Gating/PlayerHeroIssueOwnerGate.cs` turns
+11. Players and their clans never offer issues. `Framework/CreationCapture/PlayerHeroIssueOwnerPatch.cs` turns
     `Hero.CanHaveCampaignIssues` off for them on the server, vanilla only excludes `Clan.PlayerClan`.
 
 ## Adding a quest type

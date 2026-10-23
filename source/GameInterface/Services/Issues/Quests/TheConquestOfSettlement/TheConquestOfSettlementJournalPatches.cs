@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
@@ -72,20 +71,6 @@ internal static class TheConquestOfSettlementDiscussionPatch
         if (__instance is Quest && !ModInformation.IsServer && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() &&
             ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service))
             __result = __result && service.IsVisible(__instance);
-    }
-}
-
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
-internal static class TheConquestOfSettlementHistoryPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(JournalLogEntry __instance, ref bool __result)
-    {
-        if (!__result || __instance.Title.GetID() != "mvzh0HVk" || ModInformation.IsServer ||
-            CallOriginalPolicy.IsOriginalAllowed() ||
-            !ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service)) return;
-        __result = service.IsVisible(__instance);
     }
 }
 

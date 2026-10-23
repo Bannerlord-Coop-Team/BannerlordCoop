@@ -29,7 +29,6 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
-    private readonly IChatVanillaLogGate vanillaLogGate;
     private readonly IChatEventLog eventLog;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
@@ -41,7 +40,6 @@ public sealed class ChatService : IChatService, IDisposable
         IControllerIdProvider controllerIdProvider,
         ICoopOptionsStore optionsStore,
         IMessageBroker messageBroker,
-        IChatVanillaLogGate vanillaLogGate,
         IChatEventLog eventLog,
         IPlayerKillFeedColorService killFeedColorService)
     {
@@ -51,7 +49,6 @@ public sealed class ChatService : IChatService, IDisposable
         if (controllerIdProvider == null) throw new ArgumentNullException(nameof(controllerIdProvider));
         if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
-        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
         if (eventLog == null) throw new ArgumentNullException(nameof(eventLog));
         if (killFeedColorService == null) throw new ArgumentNullException(nameof(killFeedColorService));
 
@@ -60,7 +57,6 @@ public sealed class ChatService : IChatService, IDisposable
         this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
-        this.vanillaLogGate = vanillaLogGate;
         this.eventLog = eventLog;
 
         viewModel = new ChatVM(
@@ -68,7 +64,7 @@ public sealed class ChatService : IChatService, IDisposable
             () => controllerIdProvider.ControllerId,
             killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
-        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat, vanillaLogGate);
+        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
@@ -109,7 +105,6 @@ public sealed class ChatService : IChatService, IDisposable
     {
         messageBroker.Unsubscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
         eventLog.Dispose();
-        vanillaLogGate.SetReplacementVisible(false);
         overlay.Dispose();
     }
 

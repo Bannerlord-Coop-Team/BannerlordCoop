@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Issues;
+using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -79,9 +80,9 @@ public class IssuesLayoutTests
     {
         var alwaysOn = new[]
         {
-            typeof(IssueTypeAllowlistGate),
+            typeof(UnregisteredIssueBehaviorPatches),
             typeof(DisableIssuesCampaignBehavior),
-            typeof(PlayerHeroIssueOwnerGate),
+            typeof(PlayerHeroIssueOwnerPatch),
             typeof(IssuesCampaignBehaviorSettlementEnteredPatch),
         };
 

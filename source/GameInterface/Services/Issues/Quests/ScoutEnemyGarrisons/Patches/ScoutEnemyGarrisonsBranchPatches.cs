@@ -1,9 +1,6 @@
-﻿using Common;
-using GameInterface.Policies;
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
 
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
@@ -31,17 +28,6 @@ internal class ScoutEnemyGarrisonsBranchPatches
 
         HandOff(__instance);
         return false;
-    }
-
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
-    [HarmonyPrefix]
-    private static void ReplayedSuccessPrefix(QuestBase __instance)
-    {
-        // The server ran AllScoutingDone, the owner's journal gets vanilla's success entry when the outcome is replayed
-        if (ModInformation.IsClient && __instance is Quest quest && CallOriginalPolicy.IsOriginalAllowed())
-        {
-            quest.AddLog(quest.QuestSuccess);
-        }
     }
 
     internal static bool IsHandedOff(Quest quest) => HandedOff.TryGetValue(quest, out _);
