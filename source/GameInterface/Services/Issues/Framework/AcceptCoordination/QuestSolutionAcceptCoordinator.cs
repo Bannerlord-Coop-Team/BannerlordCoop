@@ -38,11 +38,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
-<<<<<<< HEAD
-    private readonly HashSet<QuestBase> acceptingQuests = new();
-=======
     private readonly IQuestJournalOwnerResolver journal;
->>>>>>> origin/development
+    private readonly HashSet<QuestBase> acceptingQuests = new();
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
