@@ -315,7 +315,7 @@ public class EndingJournalTests : IDisposable
     }
 
     /// <summary>Stubs presentation while retaining native roster listeners and hourly progress.</summary>
-    private sealed class ProgressGarrisonQuest : LordNeedsGarrisonTroopsIssueBehavior.LordNeedsGarrisonTroopsIssueQuest
+    private sealed class ProgressGarrisonQuest : LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssueQuest
     {
         public ProgressGarrisonQuest(string questId, Hero giver, Settlement settlement, CharacterObject troop)
             : base(questId, giver, CampaignTime.Never, 0, settlement, 5, troop)
