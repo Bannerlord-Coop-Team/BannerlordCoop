@@ -214,7 +214,11 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
     save made after the fix has none. For an affected save, the server now runs a load repair at
     `CampaignReady` (`MapEventLoadCleaner.RepairOrphanedMapEvents`) that releases the parties of
     every half-finished event a party or settlement still links to, logging one Warning per event.
-    Live check on a damaged save owed.
+    Checked on 2026-10-22 on a dedicated server with a copy of the damaged save: it released 7
+    events (`Created_97`, 139, 141, 149, 171, 187 and 201), unregistered the 7 parties vanilla
+    destroyed while releasing them, then loaded, served and autosaved. Not yet checked: that no
+    `set_MapEventSide` exception follows once time runs, because the server keeps time stopped
+    until a client joins.
   - Both load passes (the player map event pass and the orphan pass) run before the server state
     that lets lifetime patches publish. Each pass therefore records the campaign's parties first and
     unregisters every one that left the campaign during the pass, including a party destroyed
