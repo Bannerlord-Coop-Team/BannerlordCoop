@@ -10,6 +10,7 @@ namespace GameInterface.Services.Issues.Framework.Gating;
 /// On a client that removes the issue only there, so the client refuses without cancelling and leaves the cancel
 /// to the server's daily stay-alive check.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CheckPreconditions))]
 internal class ClientStayAliveCancelGatePatch
 {
