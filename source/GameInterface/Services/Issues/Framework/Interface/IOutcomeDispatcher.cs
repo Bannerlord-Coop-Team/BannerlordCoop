@@ -25,6 +25,12 @@ public interface IOutcomeDispatcher
 
     void After(IssueBase observed, IssueOutcome outcome);
 
+    // Records vanilla's actual completion detail, which may differ from the method that began the ending.
+    void ObserveQuestCompletion(QuestBase quest, QuestBase.QuestCompleteDetails detail);
+
+    // Unwinds one quest completion call, announcing only after its outermost successful return.
+    void AfterQuestOutcome(QuestBase quest, IssueBase observed, Exception exception);
+
     void AfterAlternativeSolutionCompletion(IssueBase issue, IDisposable owner);
 
     // Server: runs a vanilla quest listener on every running quest of that type, as its owning player
