@@ -7,6 +7,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBe
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class HeadmanHerdWorldEventPatches
 {

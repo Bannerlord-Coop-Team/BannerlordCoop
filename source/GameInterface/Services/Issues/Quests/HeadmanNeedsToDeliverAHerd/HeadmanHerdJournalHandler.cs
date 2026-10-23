@@ -113,6 +113,7 @@ internal class HeadmanHerdJournalHandler : IHandler
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
 internal class HeadmanHerdJournalPatch
 {

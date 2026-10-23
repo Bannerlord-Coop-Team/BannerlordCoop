@@ -91,6 +91,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Behavior), nameof(Behavior.SyncData))]
 internal class HeadmanHerdCleanupSavePatch
 {
