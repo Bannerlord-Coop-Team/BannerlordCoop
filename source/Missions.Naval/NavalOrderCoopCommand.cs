@@ -2,6 +2,7 @@
 using Common.Commands;
 using NavalDLC.Missions;
 using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,8 +15,8 @@ namespace Missions.Naval;
 // coop.debug.naval.order charge
 // coop.debug.naval.order hold
 /// <summary>
-/// DEBUG: issues follow-me, charge or hold to the local main agent's formation through the player's order controller, as the
-/// order menu does, so orders from the deck or the water can be staged without key input.
+/// DEBUG: issues follow-me to every formation select-all picks, or charge or hold to the local main agent's formation, through
+/// the player's order controller as the order menu does, so orders from the deck or the water can be staged without key input.
 /// </summary>
 public sealed class NavalOrderCoopCommand : ICoopCommand
 {
@@ -25,8 +26,10 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
 
     public string Name => "order";
 
-    public string Description => "Selects the local main agent's formation in the player's order controller and issues follow-me, " +
-        "charge or hold to it (vanilla's NavalOrderController turns them into ship orders), then reports the formation and its ship.";
+    public string Description => "Issues follow-me to the formations vanilla's select-all picks (every selectable formation but the one " +
+        "whose hull the main agent captains, since a ship can't follow itself), or charge or hold to the main agent's formation alone, " +
+        "through the player's order controller (vanilla's NavalOrderController turns them into ship orders), then reports the main " +
+        "formation, its ship and each selected formation's ship order. Follow-me shows a ship follow order only with a second hull.";
 
     public CoopCommandSide Side => CoopCommandSide.Client;
 
@@ -35,7 +38,7 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
         new ExpectedArgs("order", "followme, charge or hold.", true),
     };
 
-    // Issues the order to the main agent's formation alone and reports what vanilla made of it.
+    // Issues the order to its formations and reports what vanilla made of it.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (args == null || args.Count != 1 || !TryParseOrder(args[0], out var orderType)) return Failed(Usage);
@@ -51,17 +54,35 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
 
         var orderController = mission.PlayerTeam?.PlayerOrderController;
         if (orderController == null) return Failed("The player team has no order controller.");
-        if (!orderController.IsFormationSelectable(formation))
+        if (orderType != OrderType.FollowMe && !orderController.IsFormationSelectable(formation))
             return Failed("The main agent's formation " + formation.FormationIndex + " can't be selected by the player.");
 
         var previousSelection = orderController.SelectedFormations.ToList();
-        orderController.ClearSelectedFormations();
-        orderController.SelectFormation(formation);
+        var selected = Select(orderController, formation, orderType);
+        if (selected.Count == 0)
+        {
+            RestoreSelection(orderController, previousSelection);
+            return Failed("The player can select no formation to order.");
+        }
+
         string thrown = Issue(orderController, orderType);
         RestoreSelection(orderController, previousSelection);
 
-        string report = Describe(mission, main, formation, orderType, thrown);
+        string report = Describe(mission, main, formation, selected, orderType, thrown);
         return thrown == null ? new CoopCommandResult(true, report) : Failed(report);
+    }
+
+    // Follow-me goes to vanilla's select-all, which leaves out the hull the main agent captains (it is the hull followed);
+    // charge and hold go to the main agent's formation alone.
+    private static List<Formation> Select(OrderController orderController, Formation mainFormation, OrderType orderType)
+    {
+        orderController.ClearSelectedFormations();
+        if (orderType == OrderType.FollowMe)
+            orderController.SelectAllFormations();
+        else
+            orderController.SelectFormation(mainFormation);
+
+        return orderController.SelectedFormations.ToList();
     }
 
     /// <summary>Reads followme, charge or hold, case-insensitively, as the order types the order menu issues for them.</summary>
@@ -100,20 +121,32 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
         }
     }
 
-    // The order, the formation's movement order and the ship order of the formation's hull after vanilla handled it.
-    private static string Describe(Mission mission, Agent main, Formation formation, OrderType orderType, string thrown)
+    // The order, the main formation's movement order and ship order, and each selected formation's ship order after vanilla.
+    private static string Describe(Mission mission, Agent main, Formation formation, IEnumerable<Formation> selected,
+        OrderType orderType, string thrown)
     {
         var shipsLogic = mission.GetMissionBehavior<NavalShipsLogic>();
-        var ship = shipsLogic != null && shipsLogic.GetShip(formation, out var formationHull) ? formationHull : null;
+        var ship = ShipOf(shipsLogic, formation);
         var mainShip = main.GetComponent<AgentNavalComponent>()?.FormationShip;
         return "NAVAL_ORDER issued=" + orderType + " formation=" + formation.FormationIndex + " units=" + formation.CountOfUnits +
             " movementOrder=" + formation.GetReadonlyMovementOrderReference().OrderType +
             " ship=" + (ship?.Index.ToString() ?? "none") +
-            " shipOrder=" + (ship != null && ship.IsShipOrderActive ? ship.ShipOrder.MovementOrderEnum.ToString() : "none") +
+            " shipOrder=" + ShipOrderOf(ship) +
             " mainFormationShip=" + (mainShip?.Index.ToString() ?? "none") +
             " mainSwimming=" + IsSwimming(main) +
+            " selected=[" + string.Join(",", selected.Select(other =>
+                other.FormationIndex + ":ship=" + (ShipOf(shipsLogic, other)?.Index.ToString() ?? "none") + ":shipOrder=" +
+                ShipOrderOf(ShipOf(shipsLogic, other)))) + "]" +
             (thrown == null ? "" : " threw=" + thrown);
     }
+
+    // The hull a formation sails, or null.
+    private static MissionShip ShipOf(NavalShipsLogic shipsLogic, Formation formation) =>
+        shipsLogic != null && shipsLogic.GetShip(formation, out var hull) ? hull : null;
+
+    // A hull's active ship order, or none.
+    private static string ShipOrderOf(MissionShip ship) =>
+        ship != null && ship.IsShipOrderActive ? ship.ShipOrder.MovementOrderEnum.ToString() : "none";
 
     // Swimming or diving, the movement modes vanilla's capture vacancy counts as off the deck.
     private static bool IsSwimming(Agent agent)
