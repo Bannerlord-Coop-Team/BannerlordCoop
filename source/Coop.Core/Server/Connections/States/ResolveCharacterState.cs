@@ -114,9 +114,15 @@ public class ResolveCharacterState : ConnectionStateBase
                     DisplayNames(clientModules, serverModules));
 
                 // Decisions are addressed by list index, so a player who can't rebuild a synced decision type
-                // (or proposes one the server can't) would shift every later vote.
-                if (result && !KingdomDecisionTypeRegistry.Matches(obj.What.KingdomDecisionTypes, out error))
+                // (or proposes one the server can't) would shift every later vote. This also replaces the lone Coop
+                // reason, which the client would otherwise join on.
+                if (!KingdomDecisionTypeRegistry.Matches(obj.What.KingdomDecisionTypes, out string decisionTypeError))
+                {
+                    error = (result || string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
+                        ? decisionTypeError
+                        : error + Environment.NewLine + decisionTypeError;
                     result = false;
+                }
 
                 // The client joins anyway on the lone Coop reason, so only log real refusals.
                 if (!result && !string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))

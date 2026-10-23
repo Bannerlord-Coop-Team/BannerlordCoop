@@ -123,13 +123,22 @@ internal class KingdomInterface : IKingdomInterface
         }
         // Votes and removals address decisions by list index, so a type clients cannot receive never enters
         // the list; it resolves here like a decision no player votes on.
-        bool hasEligiblePlayerClan = decisionDataConverter.IsSupported(kingdomDecision) &&
-            decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
+        bool isSupported = decisionDataConverter.IsSupported(kingdomDecision);
+        bool hasEligiblePlayerClan = isSupported && decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
         CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, hasEligiblePlayerClan);
         if (!hasEligiblePlayerClan)
         {
             CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
-            election.StartElectionCoop();
+            if (isSupported)
+            {
+                election.StartElectionCoop();
+            }
+            else
+            {
+                // An online player clan still counts as a supporter, which would leave the AI waiting for a vote
+                // that can never be cast.
+                election.StartElectionWithoutPlayerCoop();
+            }
             return election.RandomFloat;
         }
         kingdom._unresolvedDecisions.Add(kingdomDecision);

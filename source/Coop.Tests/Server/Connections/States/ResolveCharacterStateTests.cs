@@ -238,6 +238,28 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkModuleVersionsValidate_OnlyUnsupportedCoopButDecisionTypesDiffer_Denied()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            SetServerModules(new List<ModuleInfo>());
+
+            currentState.Handle_ModuleVersionsValidate(new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer,
+                new NetworkModuleVersionsValidate(
+                    new List<ModuleInfo> { new ModuleInfo("Coop", false, false, new ApplicationVersion()) })
+                    with { KingdomDecisionTypes = new[] { "SomeMod.CouncilSeatDecision" } }));
+
+            // The client joins on the lone Coop reason, so the decision type error has to replace it.
+            var reply = Assert.IsType<NetworkModuleVersionsValidated>(
+                Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer)));
+            Assert.False(reply.Matches);
+            Assert.NotEqual(NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, reply.Reason);
+            Assert.Contains("SomeMod.CouncilSeatDecision", reply.Reason);
+            DenialLog.Verify(log => log.Report(
+                IsPeer(playerPeer), JoinDenialKind.ModuleValidation, Common.ModInformation.BuildVersion, reply.Reason), Times.Once);
+        }
+
+        [Fact]
         public void NetworkModuleVersionsValidate_FromDifferentPeer_Ignored()
         {
             // Arrange

@@ -58,7 +58,7 @@ namespace GameInterface.Services.Kingdoms
             var errors = server.Where(name => !player.Contains(name))
                 .Select(name => $"The server syncs kingdom decision type '{name}', but this client does not. Install the same compat mod version as the server.")
                 .Concat(player.Where(name => !server.Contains(name))
-                    .Select(name => $"This client syncs kingdom decision type '{name}', but the server does not. Install the same compat mod version as the server."))
+                    .Select(name => $"This client syncs kingdom decision type '{name}', but the server does not. Use the same compat mods as the server."))
                 .OrderBy(error => error, StringComparer.Ordinal)
                 .ToList();
 

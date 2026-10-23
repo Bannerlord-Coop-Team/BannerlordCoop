@@ -1035,7 +1035,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void KingdomDecisionAdded_UnsupportedModType_ResolvesOnServerAndKeepsVoteIndexesAligned()
+    public void KingdomDecisionAdded_UnsupportedModTypeInPlayerKingdom_ServerAiAppliesItAndKeepsVoteIndexesAligned()
     {
         var (kingdomId, targetKingdomId) = AddModDecisionThenWar(proposerClan => new TestModKingdomDecision(proposerClan), out var modDecision);
 
@@ -1107,7 +1107,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         public RegisteredModKingdomDecision(Clan proposerClan) : base(proposerClan) { }
     }
 
-    // Two player clans in one kingdom; the server adds the mod's decision first, then a war decision.
+    // Two online player clans in one kingdom, each leading its party like in a live game, so they count as
+    // human players; the server adds the mod's decision first, then a war decision.
     private (string KingdomId, string TargetKingdomId) AddModDecisionThenWar<TDecision>(
         Func<Clan, TDecision> createModDecision,
         out TDecision modDecision) where TDecision : TestModKingdomDecision
@@ -1128,6 +1129,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        LeadPlayerPartiesEverywhere(player1, player2);
 
         TDecision added = null;
         Server.Call(() =>
