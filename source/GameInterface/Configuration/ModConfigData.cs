@@ -22,6 +22,13 @@ public sealed class ModConfigData
 
     public VoiceConfigData Voice { get; set; } = new VoiceConfigData();
 
+    /// <summary>True (the default when unset) limits joiners' extra community modules,
+    /// ones the server doesn't run, to <see cref="ModWhitelist"/>; false allows any.</summary>
+    public bool? ModWhitelistEnabled { get; set; }
+
+    /// <summary>Module ids a client may run even though the server doesn't.</summary>
+    public List<string> ModWhitelist { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
