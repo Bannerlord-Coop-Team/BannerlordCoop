@@ -7,8 +7,10 @@ ownership and finalization. Collection has its own server-side hourly progressio
 menu-state replay because vanilla collection rolls random incidents and gives gold
 before the quest ends. The server keeps an unstarted quest, and only the accepting
 client starts its quest and registers its listeners. There is no alternative or lord
-solution. Trait XP follows the framework's current policy: quest trait XP is skipped,
-so the campaign's shared XP store cannot reward a different player.
+solution. Trait XP uses the shared per-player store from #3918, under the accepting player's scope.
+Record the owner's server-side XP before and after success, betrayal and timeout;
+verify the outcome's XP change and that the other player's XP stays unchanged.
+Client legacy Campaign.PlayerTraitDeveloper XP is not authoritative for this check.
 
 Source inspected: Native v1.4.8, `TaleWorlds.CampaignSystem.dll` SHA-256
 `1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae`.
