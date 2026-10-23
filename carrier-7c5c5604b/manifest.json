@@ -1,0 +1,66 @@
+{
+  "ownHead": "5fd677c836ebae89bdc86b6c5ad05610546dfd4c",
+  "carrierHead": "7c5c5604be96810bff09fbc39e44ccaf0032f3fd",
+  "carrierJobIds": [
+    "live-3784-rl-7bb576ab3d29",
+    "live-3784-rl-d71675e19859"
+  ],
+  "immutableOriginalPngBytes": true,
+  "files": [
+    {
+      "path": "017-alternative-success-active-journal-before-return-testclient.png",
+      "bytes": 911518,
+      "sha256": "352b15a722b666b9bbc61037cf98822f7f4247befc930df11bd4afa69209349e"
+    },
+    {
+      "path": "018-alternative-success-active-journal-before-return-testclient2.png",
+      "bytes": 1141874,
+      "sha256": "55692d22b6615761f1fb59d6635c14dc4f896365de8bd12982481d47ddb6138d"
+    },
+    {
+      "path": "019-alternative-success-owner-and-other-journals-testclient.png",
+      "bytes": 1028672,
+      "sha256": "33c56fbe3fd64257a9e4e79ae0766244998f1d017e40a084d75470226e6dc3ab"
+    },
+    {
+      "path": "020-alternative-success-owner-and-other-journals-testclient2.png",
+      "bytes": 1160340,
+      "sha256": "ed955487326da05a52aea1984c649c20bfb2b7770c7472181034bff9bd2a7957"
+    },
+    {
+      "path": "025-alternative-failure-active-journal-before-return-testclient.png",
+      "bytes": 1065935,
+      "sha256": "1a30bac7f6b7e4bcd0ccc595a1f64adee1f94a0c93e95d530a3c9fc91383122d"
+    },
+    {
+      "path": "026-alternative-failure-active-journal-before-return-testclient2.png",
+      "bytes": 1221516,
+      "sha256": "d651ea9a1c714999f1bf9c67c524bfbaa3f9612b0fc071695783b88d0de679d9"
+    },
+    {
+      "path": "027-alternative-failure-owner-and-other-journals-testclient.png",
+      "bytes": 1087724,
+      "sha256": "f3a4f232428cac9b1c378f1d865aa314471ee98ea431500cbcd5e453c51e3b81"
+    },
+    {
+      "path": "028-alternative-failure-owner-and-other-journals-testclient2.png",
+      "bytes": 1178061,
+      "sha256": "c8e9e2c7a86c177cc35316825270055a492b57e6abc4c1238e4ec23e386a471b"
+    },
+    {
+      "path": "evidence.md",
+      "bytes": 4721,
+      "sha256": "6225a5dbf7b6d2900f3aacd231678646184d77e009df1f28d8199669f248abaf"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3165,
+      "sha256": "b25938b287cfc53b4e563658befacaf4bdaf3efd7e647a1e5962053873e61785"
+    },
+    {
+      "path": "source-equivalence.json",
+      "bytes": 3574,
+      "sha256": "83f4dcd7349d3b7af5be1c80c2be5f39eb1c016129d2e58657cc2e05ac802abb"
+    }
+  ]
+}

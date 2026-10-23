@@ -1,0 +1,68 @@
+{
+  "base": "b9469e0deba40671b838857d639de78e42005168",
+  "ownHead": "5fd677c836ebae89bdc86b6c5ad05610546dfd4c",
+  "ownTree": "980e597b50d060784e399a4b5c8cc93d6fd622b9",
+  "carrierHead": "7c5c5604be96810bff09fbc39e44ccaf0032f3fd",
+  "carrierTree": "0d4fff0d0d58192f01f3afc378bd17aa103b3b36",
+  "frameworkTree": "6be7baa0b70f5bf17714ee171ece3e7ec14b22ce",
+  "productionPaths": 3,
+  "allChangedPaths": 5,
+  "files": [
+    {
+      "path": "source/E2E.Tests/Services/Issues/AlternativeEndingJournalReplayTests.cs",
+      "production": false,
+      "ownBlob": "32c3e3dd1b1bba7b3453fe1228270e673165afc8",
+      "carrierBlob": "32c3e3dd1b1bba7b3453fe1228270e673165afc8",
+      "bytes": 8719,
+      "sha256": "9bcc61eb5d919a4d9cb4d7ec6f48c0a83e5f3d1f15c88f239ee06997268307b4",
+      "byteIdentical": true
+    },
+    {
+      "path": "source/E2E.Tests/Services/Issues/AlternativeEndingJournalTests.cs",
+      "production": false,
+      "ownBlob": "7175698953cc37ce8f5d453fa17e2cb2c3a4086c",
+      "carrierBlob": "7175698953cc37ce8f5d453fa17e2cb2c3a4086c",
+      "bytes": 5939,
+      "sha256": "0160cab99784069119d5708334fa27276e2bf16fba4a29e72cb16f619ae05862",
+      "byteIdentical": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/AlternativeSolutionJournalPatch.cs",
+      "production": true,
+      "ownBlob": "772777bcfb5a4069f202e42f25668282318e1b7c",
+      "carrierBlob": "772777bcfb5a4069f202e42f25668282318e1b7c",
+      "bytes": 808,
+      "sha256": "5360d9204d5170ea22e8e2f4e7bb4c92333a93e083c209c6c8f12ff49aed54fa",
+      "byteIdentical": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/AlternativeSolutionJournalHandler.cs",
+      "production": true,
+      "ownBlob": "2e5f95403701e226b12d879acc138aafda49100b",
+      "carrierBlob": "2e5f95403701e226b12d879acc138aafda49100b",
+      "bytes": 4134,
+      "sha256": "fc05f2b40bef0ffd9500f8683ee43a1eae3532958b46a3d4d02c62f27f1ed686",
+      "byteIdentical": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/NetworkAlternativeSolutionJournal.cs",
+      "production": true,
+      "ownBlob": "b0eba8b0ffdc075310fcf8fab482a0d71b59c9b4",
+      "carrierBlob": "b0eba8b0ffdc075310fcf8fab482a0d71b59c9b4",
+      "bytes": 1927,
+      "sha256": "209290abde312d7aa2f7e534113f1bcc31655f36af7fa6f4a3514b2601f95aff",
+      "byteIdentical": true
+    }
+  ],
+  "carrierOnlyPaths": [
+    "source/E2E.Tests/Services/Issues/LordNeedsGarrisonTroopsTests.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsAlternativeSolutionAcceptStrategy.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsBranch.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsCreationCaptureStrategy.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsDescriptor.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsFinalizationProofStrategy.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/LordNeedsGarrisonTroopsQuestSolutionAcceptStrategy.cs",
+    "source/GameInterface/Services/Issues/Quests/LordNeedsGarrisonTroops/Patches/LordNeedsGarrisonTroopsHandInPatch.cs"
+  ],
+  "scope": "Byte equality of all five PR additions and complete Framework tree; live evidence remains on the garrison carrier."
+}

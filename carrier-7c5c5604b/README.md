@@ -1,0 +1,15 @@
+# #4080 source and evidence scope
+
+Own source is `fix/alternative-completion-ends-owner-journal`, head `5fd677c836ebae89bdc86b6c5ad05610546dfd4c`, tree `980e597b50d060784e399a4b5c8cc93d6fd622b9`. Base is `b9469e0de`. The branch and source remain unchanged for #3797 adoption.
+
+`source-equivalence.json` records `git show` byte comparisons, Git blob identities and SHA-256 for every one of the five additions, including all three production paths. Complete Framework tree `6be7baa0b70f5bf17714ee171ece3e7ec14b22ce` is identical on own head and tested #3957 carrier `7c5c5604be96810bff09fbc39e44ccaf0032f3fd` (tree `0d4fff0d0d58192f01f3afc378bd17aa103b3b36`). The carrier differs by only eight garrison quest/test files, named in the receipt. This proves composition equality; it does not turn the carrier execution into an own-head live run.
+
+Parent accepted the carrier native companion success/failure archives, full server/owner equality and observer absence. The accepted result `live-3784-rl-7bb576ab3d29` passed 160/160 steps; success archive `issue_171` has three stages and failure archive `issue_172` has two. Native archive steps 108/109/111 and 154/155/157 identify the server snapshot, owner `testclient2` and observer `testclient`. `native-archive-checks.json` retains hashes and sanitized first-line outcomes. Eight original approved PNGs are copied without re-encoding, with hashes in `selected-images.json`.
+
+Related carrier job `live-3784-rl-d71675e19859` passed 102/102 for concurrent separate owners and accelerated native timeout. Both results were collected and terminal. Parent verified processes absent, saves restored and runtime not retained; the first stop race is retained and followed by verified absence. Parent accepted 46 unique screenshots via eight sheets plus full owner originals, and verified 1,193 manifest files across the carrier CI/live packages. These are retained parent receipts, not newly executed checks.
+
+Own-head full HIVE `docker-ci-98228e383edd477d9672`: 4,010 unit + 2,854 E2E passed, 3 skipped, 7 process-peer scenarios. Focused `docker-ci-73ff220fc8b54fcda920`: 39/39. Carrier full `docker-ci-16986d6d1c0c4278be20`: 4,010 unit + 2,859 E2E passed, 3 skipped, 7 process-peer scenarios. Carrier focused `docker-ci-1d5ad1b022bb41f49ae1`: 44/44. No duplicate CI, review panel or live run was started.
+
+Live scope is the generic framework exercised through garrison companion endings. Every registered quest, rejoin, detailed returned troop identity/wounds/XP and natural 30-day expiry are not claimed. Carrier client-authority diagnostics remain unresolved. The carrier's two P3 conformance findings belong to its garrison files, not #4080's five-file diff. Parent owns their disposition and remaining flows.
+
+Publication is restricted to approved UI PNGs and sanitized Markdown/source-hash receipts. Raw logs, credentials, save files and result payloads remain local. The canonical HTML export cannot validate missing retained `artifacts/screenshots/campaign-ready-batch.json`; the user explicitly accepts Markdown. No batch receipt was fabricated, no shared renderer changed and no alternate HTML exporter was added.
