@@ -30,7 +30,7 @@ internal class DefaultClanPoliticsModelPatches
         // Calculate influence change for AI led clans normally
         if (clan.Leader == null || !clan.Leader.IsPlayerHero()) return true;
 
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
 
         // Don't calculate influence change for disconnected players based on config
         if (ModInformation.IsServer

@@ -42,7 +42,7 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (party == null || !party.IsPlayerParty()) return true;
 
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
 
         if (!ShouldTickFoodChange(playerManager, party)) return false;
 
