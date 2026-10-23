@@ -123,5 +123,56 @@ public class NavalShiplessFormationPatchTests
             CoopNavalMissionScope.IsActive = wasActive;
         }
     }
+
+    // R48 re-review: what one weight evaluation does, by what is known about the hulls involved.
+    [Theory]
+    [InlineData(true, false, true, true, ShiplessFormationBehaviorWeightPatch.WeightCall.Weightless)]
+    [InlineData(true, true, true, false, ShiplessFormationBehaviorWeightPatch.WeightCall.Weightless)]
+    [InlineData(true, true, true, true, ShiplessFormationBehaviorWeightPatch.WeightCall.Vanilla)]
+    [InlineData(true, true, false, true, ShiplessFormationBehaviorWeightPatch.WeightCall.ReReadThenVanilla)]
+    [InlineData(false, false, false, true, ShiplessFormationBehaviorWeightPatch.WeightCall.Weightless)]
+    [InlineData(false, false, true, true, ShiplessFormationBehaviorWeightPatch.WeightCall.Vanilla)]
+    public void BehaviorWeight_Decide(bool known, bool formationHasShip, bool hasCachedShip, bool enemyHasShip,
+        ShiplessFormationBehaviorWeightPatch.WeightCall expected)
+    {
+        Assert.Equal(expected, ShiplessFormationBehaviorWeightPatch.Decide(known, formationHasShip, hasCachedShip, enemyHasShip));
+    }
+
+    // A skirmish order at a missing target is not given in a co-op battle; outside one vanilla runs.
+    [Fact]
+    public void SkirmishOrderPrefix_SkipsAMissingTargetOnlyInACoopBattle()
+    {
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        try
+        {
+            CoopNavalMissionScope.IsActive = true;
+            Assert.False(SkirmishOrderWithoutTargetPatch.Prefix(null!));
+            CoopNavalMissionScope.IsActive = false;
+            Assert.True(SkirmishOrderWithoutTargetPatch.Prefix(null!));
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
+
+    // Ramming and skirmish skip their ship orders while their own cached hull is missing.
+    [Fact]
+    public void ShipOrdersPrefix_SkipsWithoutTheBehavioursOwnHull()
+    {
+        var ramming = (BehaviorNavalRamming)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+            typeof(BehaviorNavalRamming));
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        CoopNavalMissionScope.IsActive = true;
+        try
+        {
+            Assert.False(ShiplessTargetShipOrdersPatch.Prefix(ramming));
+            Assert.Equal(2, ShiplessTargetShipOrdersPatch.TargetMethods().Count(method => method != null));
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
 }
 #endif

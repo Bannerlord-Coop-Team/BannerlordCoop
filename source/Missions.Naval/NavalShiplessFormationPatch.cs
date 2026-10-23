@@ -5,6 +5,7 @@ using NavalDLC.Missions.AI.Behaviors;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
+using NavalDLC.Missions.ShipControl;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -108,8 +109,9 @@ internal class NavalShiplessFormationPatch
 }
 
 /// <summary>
-/// The naval behaviours that read their formation's hull in GetAiWeight weigh nothing while that formation has no hull, the
-/// state a capture, a sinking hull's departure or a removal can leave a formation with units in, in a co-op naval battle.
+/// The naval behaviours that read their formation's hull, or the closest enemy formation's hull, in GetAiWeight weigh nothing
+/// in a co-op naval battle while that hull is missing: a capture, a sinking hull's departure or a removal can leave a
+/// formation with units (swimmers) and no hull, and the async team tick evaluates these weights every formation AI tick.
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
@@ -120,36 +122,40 @@ internal class ShiplessFormationBehaviorWeightPatch
         new[] { typeof(BehaviorNavalRemoveConnection), typeof(BehaviorNavalRamming), typeof(BehaviorNavalSkirmish) }
             .Select(type => AccessTools.DeclaredMethod(type, "GetAiWeight"));
 
-    // Answers 0 for a formation without a hull, or a behaviour with no cached hull, in a co-op battle; a behaviour whose
-    // cached hull is null while its formation has one again (a hull joined it) re-reads it, as vanilla's own refresh does.
+    // Answers 0 instead of dereferencing a missing hull; a behaviour whose cached hull is null while its formation has one
+    // again (a hull joined it) re-reads it, as vanilla's own refresh does.
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorComponent __instance, ref float __result)
     {
         if (!CoopNavalMissionScope.IsActive) return true;
 
-        var cached = MainShipOf(__instance);
-        var ship = ShipOf(__instance.Formation, out bool known);
-        if (known && ship == null) return Weightless(ref __result);
-        if (cached != null) return true;
-        return known ? SetMainShip(__instance, ship) : Weightless(ref __result);
+        var shipsLogic = NavalShiplessFormations.ShipsLogic;
+        var ship = NavalShiplessFormations.ShipOf(shipsLogic, __instance.Formation, out bool known);
+        bool enemyHasShip = __instance is not BehaviorNavalRamming
+            || NavalShiplessFormations.ClosestEnemyHasShip(shipsLogic, __instance.Formation);
+        switch (Decide(known, ship != null, MainShipOf(__instance) != null, enemyHasShip))
+        {
+            case WeightCall.Vanilla:
+                return true;
+            case WeightCall.ReReadThenVanilla:
+                SetMainShip(__instance, ship);
+                return true;
+            default:
+                __result = 0f;
+                return false;
+        }
     }
 
-    // Answers 0 in place of the vanilla weight.
-    private static bool Weightless(ref float result)
+    /// <summary>
+    /// What the weight prefix does: 0 for a formation known to have no hull, for a ramming target formation without a hull, or
+    /// for a missing cached hull it can't re-read; a re-read when the formation has a hull again; vanilla otherwise.
+    /// </summary>
+    internal static WeightCall Decide(bool known, bool formationHasShip, bool hasCachedShip, bool enemyHasShip)
     {
-        result = 0f;
-        return false;
-    }
-
-    // The formation's hull as vanilla finds it; unknown without the ships logic or a team.
-    private static MissionShip ShipOf(Formation formation, out bool known)
-    {
-        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
-        known = shipsLogic != null && formation?.Team != null;
-        if (!known) return null;
-
-        shipsLogic.GetShip(formation.Team.TeamSide, formation.FormationIndex, out var ship);
-        return ship;
+        if (known && !formationHasShip) return WeightCall.Weightless;
+        if (!enemyHasShip) return WeightCall.Weightless;
+        if (hasCachedShip) return WeightCall.Vanilla;
+        return known ? WeightCall.ReReadThenVanilla : WeightCall.Weightless;
     }
 
     /// <summary>The hull a patched behaviour cached for its formation, which vanilla's refresh leaves null after a capture.</summary>
@@ -161,12 +167,103 @@ internal class ShiplessFormationBehaviorWeightPatch
         _ => null,
     };
 
-    // Re-reads the formation's hull into a patched behaviour, then lets the vanilla weight run on it.
-    private static bool SetMainShip(BehaviorComponent behavior, MissionShip ship)
+    // Re-reads the formation's hull into a patched behaviour, before the vanilla weight runs on it.
+    private static void SetMainShip(BehaviorComponent behavior, MissionShip ship)
     {
         if (behavior is BehaviorNavalRemoveConnection removeConnection) removeConnection._formationMainShip = ship;
         else if (behavior is BehaviorNavalRamming ramming) ramming._formationMainShip = ship;
         else if (behavior is BehaviorNavalSkirmish skirmish) skirmish._formationMainShip = ship;
-        return true;
+    }
+
+    /// <summary>What the weight prefix does with one evaluation.</summary>
+    internal enum WeightCall
+    {
+        Vanilla,
+        ReReadThenVanilla,
+        Weightless,
+    }
+}
+
+/// <summary>
+/// Ramming and skirmish set ship orders toward the closest enemy formation's hull unchecked on the async team tick; in a co-op
+/// naval battle they skip while their own or that enemy formation has no hull (L6 swimmers are such an enemy formation).
+/// </summary>
+[HarmonyPatch]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ShiplessTargetShipOrdersPatch
+{
+    // The two private order setters that read both hulls.
+    internal static IEnumerable<MethodBase> TargetMethods() =>
+        new[] { typeof(BehaviorNavalRamming), typeof(BehaviorNavalSkirmish) }
+            .Select(type => AccessTools.DeclaredMethod(type, "CalculateAndSetShipOrders"));
+
+    // Runs vanilla only with both hulls present, or outside a co-op battle.
+    [HarmonyPrefix]
+    internal static bool Prefix(BehaviorComponent __instance)
+    {
+        if (!CoopNavalMissionScope.IsActive) return true;
+
+        return ShiplessFormationBehaviorWeightPatch.MainShipOf(__instance) != null
+            && NavalShiplessFormations.ClosestEnemyHasShip(NavalShiplessFormations.ShipsLogic, __instance.Formation);
+    }
+}
+
+/// <summary>
+/// A skirmish order at a formation without a hull (the player's order controller targeting swimmers, or a behaviour) would
+/// dereference the missing target in UpdateSkirmishOrder; in a co-op naval battle the order is not given.
+/// </summary>
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.SetShipSkirmishOrder), new[] { typeof(MissionShip) })]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class SkirmishOrderWithoutTargetPatch
+{
+    // Skips the order for a missing target in a co-op battle.
+    [HarmonyPrefix]
+    internal static bool Prefix(MissionShip shipToSkirmish) => !CoopNavalMissionScope.IsActive || shipToSkirmish != null;
+}
+
+/// <summary>
+/// A cancelled ramming hands its ignored target back to its hull's AI controller, which a capture or a player at the helm can
+/// have replaced (a null or player controller, which the vanilla cast and call fail on); in a co-op battle it just stops.
+/// </summary>
+[HarmonyPatch(typeof(BehaviorNavalRamming), nameof(BehaviorNavalRamming.OnBehaviorCanceled))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class RammingCancelWithoutAiControllerPatch
+{
+    // Clears the ramming state without the controller call when the hull has no AI controller.
+    [HarmonyPrefix]
+    internal static bool Prefix(BehaviorNavalRamming __instance)
+    {
+        if (!CoopNavalMissionScope.IsActive || __instance._ignoredShip == null) return true;
+        if (__instance._formationMainShip?.Controller is AIShipController) return true;
+
+        __instance._isRammingActive = false;
+        __instance._ignoredShip = null;
+        return false;
+    }
+}
+
+/// <summary>Reads, for the shipless-formation patches, whether a formation or its closest enemy formation holds a hull.</summary>
+internal static class NavalShiplessFormations
+{
+    /// <summary>The mission's naval ships logic, or null outside a naval mission.</summary>
+    public static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
+
+    /// <summary>The formation's hull as vanilla finds it; <paramref name="known"/> is false without the ships logic or a team.</summary>
+    public static MissionShip ShipOf(NavalShipsLogic shipsLogic, Formation formation, out bool known)
+    {
+        known = shipsLogic != null && formation?.Team != null;
+        if (!known) return null;
+
+        shipsLogic.GetShip(formation.Team.TeamSide, formation.FormationIndex, out var ship);
+        return ship;
+    }
+
+    /// <summary>Whether the closest enemy formation holds a hull; true when there is none or it can't be told.</summary>
+    public static bool ClosestEnemyHasShip(NavalShipsLogic shipsLogic, Formation formation)
+    {
+        var enemy = formation?.CachedClosestEnemyFormation?.Formation;
+        if (shipsLogic == null || enemy?.Team == null) return true;
+
+        return shipsLogic.GetShipAssignment(enemy.Team.TeamSide, enemy.FormationIndex)?.MissionShip != null;
     }
 }
