@@ -151,6 +151,7 @@ internal abstract class TestComponentBase
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
+        RegisterMock<IChatFactionMembership>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
