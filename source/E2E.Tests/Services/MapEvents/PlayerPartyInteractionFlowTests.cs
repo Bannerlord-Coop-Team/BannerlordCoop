@@ -3404,6 +3404,43 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPartyOutsideSettlement(Server, playerMobilePartyId);
     }
 
+    [Fact]
+    public void BreakIn_PaidReplyArrivesAfterANewerAttempt_TellsThePlayerOnceWithoutEntering()
+    {
+        var (client, playerMobilePartyId, _, troops) = PrepareBreakInMenu();
+
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>());
+        Assert.True(result.Approved);
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+
+        // The encounter moved on and a newer attempt replaced the old request before its reply came.
+        client.Call(() =>
+        {
+            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            client.Resolve<IMessageBroker>().Publish(this, new BreakInAttempted(MobileParty.MainParty, null));
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+        client.InternalMessages.Clear();
+        client.NetworkSentMessages.Clear();
+
+        client.SimulateMessage(Server.NetPeer, result);
+        client.SimulateMessage(Server.NetPeer, result);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        var message = Assert.Single(client.InternalMessages.GetMessages<SendInformationMessage>());
+        Assert.Equal("The siege changed before your break in went through. 40 troops were already lost getting there.", message.Text);
+        client.Call(() =>
+        {
+            Assert.NotEqual("break_in_debrief_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+        });
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+    }
+
     // A player outside a besieged town with 200 regulars, looking at a real break in menu that costs 40 troops.
     private (EnvironmentInstance client, string playerMobilePartyId, (string SiegeEventId, string SettlementId, string LeaderPartyId) siege, int troops) PrepareBreakInMenu()
     {

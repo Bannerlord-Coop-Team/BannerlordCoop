@@ -10,6 +10,7 @@ using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -27,7 +28,10 @@ internal class ClientSiegeBreakInHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeBreakOut breakOut;
+    private const int MaxSupersededRequests = 8;
     private Pending pending;
+    // Requests replaced before their reply came, so a late paid reply still tells the player what it cost.
+    private readonly List<string> supersededRequestIds = new List<string>();
 
     private sealed class Pending
     {
@@ -62,6 +66,7 @@ internal class ClientSiegeBreakInHandler : IHandler
             network.SendAll(pending.Request);
             return;
         }
+        Supersede(pending);
         SetPending(null);
         var party = payload.What.Party;
         var settlement = payload.What.Settlement;
@@ -90,14 +95,24 @@ internal class ClientSiegeBreakInHandler : IHandler
         breakOut.SetBreakInPending(attempt != null);
     }
 
+    private void Supersede(Pending attempt)
+    {
+        if (attempt == null) return;
+        if (supersededRequestIds.Count >= MaxSupersededRequests) supersededRequestIds.RemoveAt(0);
+        supersededRequestIds.Add(attempt.Request.RequestId);
+    }
+
     private void HandleResult(MessagePayload<NetworkBreakInResult> payload)
     {
         var result = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (pending == null || pending.Request.RequestId != result.RequestId) return;
-            var attempt = pending;
-            SetPending(null);
+            // Removing the id on first use drops duplicate replies.
+            bool superseded = supersededRequestIds.Remove(result.RequestId);
+            bool isPending = pending != null && pending.Request.RequestId == result.RequestId;
+            if (!superseded && !isPending) return;
+            var attempt = isPending ? pending : null;
+            if (isPending) SetPending(null);
             if (!result.Approved)
             {
                 Logger.Warning("Server rejected break in request {RequestId}", result.RequestId);
@@ -106,7 +121,7 @@ internal class ClientSiegeBreakInHandler : IHandler
             // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
             var ids = result.CharacterIds ?? Array.Empty<uint>();
             var counts = result.Counts ?? Array.Empty<int>();
-            if (!attempt.IsCurrent())
+            if (attempt == null || !attempt.IsCurrent())
             {
                 // The server already took the troops and the roster sync carries that, so say why nobody got in.
                 int lost = counts.Sum() + Math.Max(0, result.ArmyCasualties);
@@ -130,6 +145,7 @@ internal class ClientSiegeBreakInHandler : IHandler
     {
         messageBroker.Unsubscribe<BreakInAttempted>(HandleAttempt);
         messageBroker.Unsubscribe<NetworkBreakInResult>(HandleResult);
+        supersededRequestIds.Clear();
         SetPending(null);
     }
 }
