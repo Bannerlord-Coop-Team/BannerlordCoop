@@ -1199,5 +1199,4 @@ public sealed class LesserNobleRevoltTests : IDisposable
         Assert.Equal(payments, renown.CountFor(server));
         Assert.Equal(traitChanges, traits.CountFor(server));
     }
-
 }
