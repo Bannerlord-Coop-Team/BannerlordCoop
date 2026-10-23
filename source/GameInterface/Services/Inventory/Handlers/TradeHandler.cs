@@ -38,6 +38,7 @@ internal class TradeHandler : IHandler
     private readonly INetwork network;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly ISendCoalescer sendCoalescer;
+    private bool warnedMissingCoalescer;
 
     public TradeHandler(
         IInventoryLogicInterface inventoryLogicInterface,
@@ -166,7 +167,10 @@ internal class TradeHandler : IHandler
                 if (message.ForceTransferId != null)
                 {
                     if (!TryValidateForceTransfer(message, peer))
+                    {
+                        logger.Debug("Force transfer trade rejected, no inventory exchange event sent (Party={PartyId})", message.OwnerPartyId);
                         return;
+                    }
                 }
                 else if (villageHostileActionInterface.HasPendingForceTransferForParty(message.OwnerPartyId))
                 {
@@ -244,12 +248,25 @@ internal class TradeHandler : IHandler
         List<(ItemRosterElement, int)> soldItems,
         bool isTrading)
     {
-        if (peer == null) return;
+        if (peer == null)
+        {
+            logger.Warning("Trade applied without a sending peer, no inventory exchange event sent");
+            return;
+        }
 
-        if (sendCoalescer != null)
+        if (sendCoalescer == null)
+        {
+            if (!warnedMissingCoalescer)
+                logger.Warning("No send coalescer, the inventory exchange event may reach the trader before the roster update");
+            warnedMissingCoalescer = true;
+        }
+        else
         {
             if (objectManager.TryGetHandle(toRoster, out var rosterHandle)) sendCoalescer.FlushInstance(rosterHandle, network);
+            else logger.Debug("Trader roster has no network handle, its update was not flushed before the inventory exchange event");
+
             if (objectManager.TryGetHandle(hero, out var heroHandle)) sendCoalescer.FlushInstance(heroHandle, network);
+            else logger.Debug("Trader hero has no network handle, its gold was not flushed before the inventory exchange event");
         }
 
         network.Send(peer, new NetworkTradeCompleted(
