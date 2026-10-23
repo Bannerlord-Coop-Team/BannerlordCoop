@@ -7,7 +7,13 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -91,6 +97,81 @@ public class EndingJournalTests : IDisposable
             log => log.LogText.ToString() == Ending().ToString()));
         AssertOwnerJournal(ownerQuest);
     }
+
+    [Fact]
+    public void DirectEndingPreservesEveryJournalFieldThroughReplayAndTheSavedArchive()
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        JournalLogEntry serverArchive = null!;
+        LogEntryHistory loaded = null!;
+        scenario.Server.Call(() =>
+        {
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(123L), Ending(),
+                new TextObject("Collected troops"), 3, 5, LogType.Discreate));
+            serverQuest.CompleteQuestWithCancel();
+            serverArchive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(serverQuest));
+            Assert.NotNull(serverArchive);
+        });
+        environment.FlushCoalescer();
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.Equal(EntryFields(serverArchive), EntryFields(archive));
+        });
+        scenario.Server.Call(() =>
+        {
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("ending_metadata", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("ending_metadata"), loadAsLateInitialize: true));
+            loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.NotSame(serverArchive, archive);
+            Assert.Equal(EntryFields(serverArchive), EntryFields(archive));
+            Assert.True(archive.IsEnded());
+        });
+        scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => entry.IsRelatedTo(ownerQuest))));
+    }
+
+    [Fact]
+    public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding()
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        JournalLog serverProgress = null!;
+        scenario.Server.Call(() => serverProgress = serverQuest.AddDiscreteLog(
+            new TextObject("Collected troops"), new TextObject("Troops"), 0, 5));
+        scenario.ClientA.Call(() =>
+        {
+            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+            progress.UpdateCurrentProgress(4);
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() => serverQuest.CompleteQuestWithCancel(Ending()));
+        environment.FlushCoalescer();
+        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
+        scenario.ClientA.Call(() => Assert.Equal(4, ownerQuest.JournalEntries.First().CurrentProgress));
+    }
+
+    private static (long, string?, string?, int, int, LogType)[] EntryFields(JournalLogEntry archive) =>
+        archive.GetEntries().Select(log => (log.LogTime.NumTicks, log.LogText?.ToString(),
+            log.TaskName?.ToString(), log.CurrentProgress, log.Range, log.Type)).ToArray();
 
     [Fact]
     public void PollThreadSnapshots_AreAppliedBeforeTheEndingAndArchive()
