@@ -17,6 +17,9 @@ jobs:
     timeout-minutes: 90
     container:
       image: garrettluskey/bannerlordcoop:latest
+    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+    env:
+      BANNERLORD_DIR: /home/mb2
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,9 +28,6 @@ jobs:
       - name: Validate release tag
         run: |
           printf '%s' "$GITHUB_REF_NAME" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Restore .NET Framework build inputs
         run: |
@@ -128,15 +128,15 @@ jobs:
 
     container:
       image: garrettluskey/bannerlordcoop:latest
+    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+    env:
+      BANNERLORD_DIR: /home/mb2
 
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Download test build output
         uses: actions/download-artifact@v8
@@ -164,15 +164,15 @@ jobs:
 
     container:
       image: garrettluskey/bannerlordcoop:latest
+    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+    env:
+      BANNERLORD_DIR: /home/mb2
 
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Download test build output
         uses: actions/download-artifact@v8

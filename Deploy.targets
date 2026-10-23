@@ -2,9 +2,9 @@
 <!--
   Deploy.targets
 
-  Deploys a built module into the Bannerlord install via the `mb2` junction
-  (see memory: build-environment / deploy-wipes-module). Replaces the old
-  deploy.ps1 + config_*.json + PostBuildEvent pipeline.
+  Deploys a built module into the Bannerlord install at $(BannerlordDir)
+  (from the BANNERLORD_DIR env var, see source/Directory.Build.props).
+  Replaces the old deploy.ps1 + config_*.json + PostBuildEvent pipeline.
 
   A consuming .csproj must set these properties before importing this file:
 
@@ -17,15 +17,20 @@
     - Runs on every build (no Inputs/Outputs skip). Copy uses SkipUnchangedFiles
       so unchanged files still aren't re-copied. No more wipe-and-recreate of the
       module folder, so an empty build output can no longer delete the live module.
-    - No-ops cleanly when the mb2 junction is absent (CI / fresh checkout)
-      instead of throwing.
+    - Skips cleanly when BANNERLORD_DIR is unset or its Modules folder is
+      missing (CI / fresh checkout) instead of throwing.
+    - Only the main checkout deploys. Linked git worktrees (where .git is a
+      file) skip, so parallel worktrees can't overwrite the live module;
+      pass -p:DeployToGame=true to deploy from one anyway. -p:ModName=
+      turns deploy off everywhere.
 -->
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
   <PropertyGroup>
     <!-- This file lives at the repo root; locate everything relative to it. -->
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-    <ModsRoot>$(RepoRoot)mb2\Modules</ModsRoot>
+    <ModsRoot>$(BannerlordDir)Modules</ModsRoot>
+    <DeployToGame Condition="'$(DeployToGame)' == '' and $([System.IO.Directory]::Exists('$(RepoRoot).git'))">true</DeployToGame>
     <DeploySourceDir>$(RepoRoot)deploy</DeploySourceDir>
     <UIMoviesDir>$(RepoRoot)UIMovies</UIMoviesDir>
     <SubModuleTemplate>$(DeploySourceDir)\SubModule.xml</SubModuleTemplate>
@@ -37,7 +42,7 @@
 
   <Target Name="DeployToGame"
           AfterTargets="Build"
-          Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')">
+          Condition="'$(ModName)' != '' and '$(DeployToGame)' == 'true' and '$(BannerlordDir)' != '' and Exists('$(ModsRoot)')">
 
     <!-- Discover these at execution time so files added after Visual Studio evaluated the project are deployed. -->
     <ItemGroup>
