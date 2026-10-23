@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Issues.Framework.Gating;
+namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>
 /// Vanilla turns a player down when any issue of the same type is being solved, which in co-op counts
@@ -15,8 +15,10 @@ namespace GameInterface.Services.Issues.Framework.Gating;
 /// still waiting on the server.
 /// </summary>
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CheckPreconditions))]
-internal class SimilarCommitmentsGatePatch
+internal class SimilarCommitmentsPatch
 {
+    /// <summary>Hides same-type issues other players are solving, and shows this player's lord solutions as quest solutions,
+    /// for the check, keeping their states in __state.</summary>
     [HarmonyPrefix]
     private static void Prefix(IssueBase __instance, out List<(IssueBase Issue, IssueBase.IssueState State)> __state)
     {
@@ -53,6 +55,7 @@ internal class SimilarCommitmentsGatePatch
         }
     }
 
+    /// <summary>Puts back the issue states the prefix changed, even when the check throws.</summary>
     [HarmonyFinalizer]
     private static void Finalizer(List<(IssueBase Issue, IssueBase.IssueState State)> __state)
     {

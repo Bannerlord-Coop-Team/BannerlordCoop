@@ -9,19 +9,20 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Issues.Framework.Gating;
+namespace GameInterface.Services.Issues.Framework.CreationCapture;
 
 /// <summary>
 /// Keeps every vanilla issue behavior that has no registered quest type from registering its
 /// events, so an issue that is not synced can never be generated.
 /// </summary>
 [HarmonyPatch]
-internal class IssueTypeAllowlistGate
+internal class UnregisteredIssueBehaviorPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<IssueTypeAllowlistGate>();
+    private static readonly ILogger Logger = LogManager.GetLogger<UnregisteredIssueBehaviorPatches>();
 
     private static readonly string[] IssueAssemblyNames = { "TaleWorlds.CampaignSystem", "SandBox" };
 
+    /// <summary>Finds every concrete vanilla issue nested in a campaign behavior.</summary>
     private static IEnumerable<Type> FindIssueTypes()
     {
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -43,11 +44,13 @@ internal class IssueTypeAllowlistGate
         }
     }
 
+    /// <summary>Finds the campaign behaviors that declare a vanilla issue.</summary>
     private static IEnumerable<Type> FindIssueBehaviorTypes()
     {
         return FindIssueTypes().Select(issueType => issueType.DeclaringType).Distinct();
     }
 
+    /// <summary>Returns the types of an assembly, skipping any that fail to load.</summary>
     private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
     {
         try
@@ -60,6 +63,7 @@ internal class IssueTypeAllowlistGate
         }
     }
 
+    /// <summary>Targets the declared <c>RegisterEvents</c> of every issue behavior.</summary>
     [HarmonyTargetMethods]
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -74,11 +78,13 @@ internal class IssueTypeAllowlistGate
         }
     }
 
+    /// <summary>Lets a behavior register its events only when its issue type is registered.</summary>
     [HarmonyPrefix]
     private static bool Prefix(CampaignBehaviorBase __instance)
     {
         if (!ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry))
         {
+            // fails closed, otherwise unsynced issue behaviors would register events and generate issues
             return false;
         }
 
