@@ -21,6 +21,35 @@ namespace E2E.Tests.Services.PartyVisuals
         }
 
         [Fact]
+        public void HeadlessLifetime_UsesPartyHandleWithoutRegisteringVisualObjects()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            NetworkCreatePartyVisual? created = null;
+            NetworkDestroyPartyVisual? destroyed = null;
+            client.Resolve<IMessageBroker>().Subscribe<NetworkCreatePartyVisual>(payload => created = payload.What);
+            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed = payload.What);
+
+            server.Call(() =>
+            {
+                var party = new MobileParty();
+                var partyBase = new PartyBase(party);
+                Assert.True(server.ObjectManager.TryGetHandle(party, out var handle));
+                var before = server.ObjectManager.GetHandleMap();
+                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualCreated(null, partyBase));
+                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualDestroyed(null, party));
+                Assert.Equal(before.OrderBy(entry => entry.Key),
+                    server.ObjectManager.GetHandleMap().OrderBy(entry => entry.Key));
+            });
+
+            Assert.NotNull(created);
+            Assert.Null(created.PartyVisualId);
+            Assert.Equal(0u, created.PartyVisualHandle);
+            Assert.NotNull(destroyed);
+            Assert.Equal(created.MobilePartyHandle, destroyed.MobilePartyHandle);
+        }
+
+        [Fact]
         public void ServerCreatePartyVisual_RegistersServerSide_ClientsWithoutVisualManagerSkip()
         {
             // Arrange

@@ -1,5 +1,6 @@
-using Common;
+﻿using Common;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -20,12 +21,34 @@ internal class PartyIsSpottedServerPatch
             // banner (with 0 troops) after the destruction replicates.
             __result = __instance.IsActive;
         }
+        else
+        {
+            __result = __result && __instance.IsActive;
+        }
     }
 }
 
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyVisibilityOnServerPatch
 {
+    [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
+    [HarmonyPrefix]
+    internal static void PrefixIsActive(MobileParty __instance, out bool __state)
+    {
+        __state = __instance.IsActive;
+    }
+
+    [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
+    [HarmonyPostfix]
+    internal static void PostfixIsActive(MobileParty __instance, bool __state)
+    {
+        if (ModInformation.IsClient && __state != __instance.IsActive && __instance.Party != null)
+        {
+            // Nameplates must refresh when a replicated party is parked or reactivated.
+            CampaignEventDispatcher.Instance?.OnPartyVisibilityChanged(__instance.Party);
+        }
+    }
+
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
     [HarmonyPrefix]
     internal static void PrefixIsVisible(MobileParty __instance, ref bool value)
