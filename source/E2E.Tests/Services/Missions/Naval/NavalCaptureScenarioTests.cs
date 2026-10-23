@@ -287,6 +287,31 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.False(o.Hull(pirates[1]).IsCopy);
     }
 
+    // R47 bug B: a host migration right after a capture, with the captor as the successor (battle 3), leaves the captor's own
+    // crew alone: the departing host's hull and the inherited AI hulls swap without parking, moving or uncrewing the troops
+    // that crew the prize from the orphan's deck. Vanilla's own off-ship check is what drops them once the hulls part.
+    [Fact]
+    public void CaptureThenTheCaptorBecomesHost_TheCaptorsCrewOnTheOrphanStaysThePrizesCrew()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        h.Hull(pirates[0]).IsVacant = true;
+        c.ElapseCaptureTimer(pirates[0], captorHull);
+        var crew = c.RegisterAgent(Guid.NewGuid(), "C");
+        c.Call(() => c.Engine.PlaceAgent(crew, c.Ship(captorHull).Hull, c.Ship(pirates[0]).Hull));
+        int movedBefore = c.Engine.MovedAgents;
+
+        battle.MigrateHost(h, "C");
+        battle.TickAll(4);
+
+        Assert.Equal("C", c.Ship(pirates[1]).CurrentAuthority);
+        Assert.False(c.Hull(pirates[1]).IsCopy);
+        Assert.True(crew.IsActive());
+        Assert.Same(c.Ship(pirates[0]).Hull, c.Engine.CrewHullOf(crew));
+        Assert.Same(c.Hull(captorHull), c.Engine.DeckOf(crew));
+        Assert.Equal(movedBefore, c.Engine.MovedAgents);
+        Assert.Empty(c.Engine.ParkedAgents);
+    }
+
     // (e) The old host's confirm reaches the successor mid-swap and the captor after the old host left: both apply it, so
     // every client ends where the clients that heard it first did.
     [Fact]
