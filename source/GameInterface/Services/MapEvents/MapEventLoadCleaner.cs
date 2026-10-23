@@ -23,8 +23,9 @@ public interface IMapEventLoadCleaner
     // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
     void CleanUpLoadedMapEvents();
 
-    // Releases every party still linked to a battle that already ended. Also run live by coop.unstuck.
-    PartyBase[] ReleaseEndedMapEventLinks();
+    // Releases every party still linked to a battle that already ended, calling onReleased for each one
+    // as it is released. Also run live by coop.unstuck.
+    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -106,17 +107,14 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             }
         }
 
-        ReleaseEndedMapEventLinks();
+        ReleaseEndedMapEventLinks(_ => { });
     }
 
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    public PartyBase[] ReleaseEndedMapEventLinks()
+    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
     {
-        if (Campaign.Current?.MapEventManager == null)
-            return Array.Empty<PartyBase>();
-
         var releasedParties = new List<PartyBase>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
         var parties = Campaign.Current.CampaignObjectManager.MobileParties
@@ -166,6 +164,16 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     mobileParty.ResetNavigationToHold();
 
                 releasedParties.Add(party);
+
+                // A failed broadcast must not leave the rest of the parties linked to the ended battle.
+                try
+                {
+                    onReleased(party);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning(ex, "Could not report released party {PartyId} from ended map event {MapEventId}", party.Id, mapEvent.StringId);
+                }
             }
         }
 
