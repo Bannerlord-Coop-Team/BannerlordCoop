@@ -115,6 +115,41 @@ public class NestedQuestEndingTests : IDisposable
     }
 
     [Fact]
+    public void InnerFailureThenThrow_AnnouncesTheCompletedFailureAndPreservesTheException()
+    {
+        var failure = new InvalidOperationException("after inner completion");
+        serverQuest.DuringTimeout = () =>
+        {
+            serverQuest.CompleteQuestWithFail();
+            throw failure;
+        };
+        scenario.Server.Call(() =>
+        {
+            Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => serverQuest.CompleteQuestWithTimeOut()));
+            Assert.True(serverQuest.IsFinalized);
+            Assert.Null(IssueManager.GetIssueOfQuest(serverQuest));
+        });
+        Pump();
+
+        Assert.Equal(QuestBase.QuestCompleteDetails.Fail, Assert.Single(completions[scenario.Server]).Detail);
+        Assert.Equal(1, serverQuest.TimeoutCalls);
+        Assert.Equal(1, serverQuest.FailureCalls);
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        AssertOwnerEnding(scenario.ClientA, ownerQuest, QuestBase.QuestCompleteDetails.Fail, TimeoutText().ToString());
+
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(journal));
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(finalized));
+        Pump();
+        AssertOwnerEnding(scenario.ClientA, ownerQuest, QuestBase.QuestCompleteDetails.Fail, TimeoutText().ToString());
+        Assert.Equal(0, ownerQuest.TimeoutCalls);
+        Assert.Equal(0, ownerQuest.FailureCalls);
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Empty(completions[scenario.ClientB]);
+    }
+
+    [Fact]
     public void AnotherOwnersCancellationInsideTimeout_RemainsAnIndependentEnding()
     {
         var giverId = environment.CreateRegisteredObject<Hero>();
