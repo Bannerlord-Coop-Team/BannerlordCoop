@@ -1,7 +1,13 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Framework.Gating;
+using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
@@ -59,6 +65,32 @@ public class PlayerSwitchQuestCancelGatePatchTests : IDisposable
 
             Assert.Equal(playerSwitch, quest.IsOngoing);
         });
+    }
+
+    [Fact]
+    public void SwitchingToThePlayersHeroKeepsOngoingQuests()
+    {
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                quest.StartQuest();
+            }
+
+            using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+            {
+                scenario.ClientA.Resolve<IHeroInterface>().SwitchToPlayer(new Player(
+                    QuestScenario.ControllerA, scenario.OwnerHeroId, scenario.OwnerPartyId, "", ""));
+            }
+
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
+            Assert.Same(hero, Hero.MainHero);
+            Assert.True(quest.IsOngoing);
+            Assert.False(PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch);
+        }, new[] { AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }) });
     }
 
     [Fact]
