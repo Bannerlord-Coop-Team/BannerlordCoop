@@ -12,6 +12,15 @@ Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
   `GameInterface.Services.Issues.Quests` that implements `IQuestTypeDescriptor` or a strategy interface, and
   `Framework/CreationCapture/UnregisteredIssueBehaviorPatches.cs` turns off `RegisterEvents` for every other issue
   behavior. Do not add a per-quest "disable this behavior" patch, it will fight those patches.
+- Quests sit behind `IQuestFeatureFlag`, on only in builds compiled with `TESTER` (the nightly workflow and
+  local Debug builds of `GameInterface`). With it off `QuestTypeRegistry` stays empty, so
+  `UnregisteredIssueBehaviorPatches` keeps every issue behavior off, and `UnregisteredIssuePurger` ends taken issues on
+  the server through `IIssueDismisser`, not vanilla cancel, which sends troops to the host's missing
+  `MobileParty.MainParty`. Every patch in this folder carries `[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]`,
+  which `GameInterfacePatchInstaller` applies only with the flag on. The four always-on safety patches
+  (`UnregisteredIssueBehaviorPatches`, `PlayerHeroIssueOwnerPatch`, `DisableIssuesCampaignBehavior`,
+  `IssuesCampaignBehaviorSettlementEnteredPatch`) stay uncategorized. A new quest patch needs the category.
+  Tests turn the flag on in `E2E.Tests` `TestEnvironment` and `GameInterface.Tests` `PatchBootstrap`.
 - `IssuesLayoutTests` in `GameInterface.Tests` checks that `Framework/` interfaces sit in `Framework.Interface` and that
   messages are public readonly structs, with network commands as `[ProtoContract(SkipConstructor = true)]`.
 
