@@ -205,6 +205,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
     }
 
+    /// <summary>Opens the client socket on the configured bind address and connects to the configured server.</summary>
     public override void Start()
     {
         messageBroker.Publish(this, new SendInformationMessage("Connecting..."));
@@ -222,7 +223,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (!HasCompatibleLiteNetLib()) return;
 
-        netManager.Start();
+        netManager.Start(Config.BindAddressIPv4, Config.BindAddressIPv6, 0);
         StartNetworkPoller();
 
         Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);

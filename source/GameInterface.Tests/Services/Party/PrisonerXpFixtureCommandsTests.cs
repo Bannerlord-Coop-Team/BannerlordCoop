@@ -2,6 +2,8 @@
 using Common;
 using Common.Commands;
 using GameInterface.Services.Party.Commands;
+using GameInterface.Utils.Commands;
+using Moq;
 using Serilog;
 using System.Linq;
 using Xunit;
@@ -14,7 +16,7 @@ public class PrisonerXpFixtureCommandsTests
     [Fact]
     public void SetPrisonerXp_RegistersAsServerCommand()
     {
-        var command = new PrisonerXpFixtureCommands.SetPrisonerXpCoopCommand();
+        var command = new PrisonerXpFixtureCommands.SetPrisonerXpCoopCommand(Mock.Of<ICommandObjectResolver>());
         var registry = new CoopCommandRegistry(new ICoopCommand[] { command }, new LoggerConfiguration().CreateLogger());
 
         Assert.Single(registry.Commands);
@@ -33,7 +35,7 @@ public class PrisonerXpFixtureCommandsTests
         try
         {
             ModInformation.IsServer = isServer;
-            var result = new PrisonerXpFixtureCommands.SetPrisonerXpCoopCommand()
+            var result = new PrisonerXpFixtureCommands.SetPrisonerXpCoopCommand(Mock.Of<ICommandObjectResolver>())
                 .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "party", "character", xp }));
 
             Assert.False(result.Succeeded);

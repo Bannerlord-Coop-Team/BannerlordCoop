@@ -578,6 +578,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "CaptorControllerId");
 
         Server.Call(() =>
         {
@@ -632,6 +633,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "CaptorControllerId");
 
         Server.Call(() =>
         {

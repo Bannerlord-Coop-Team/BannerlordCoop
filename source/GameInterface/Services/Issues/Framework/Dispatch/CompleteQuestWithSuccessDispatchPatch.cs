@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -21,14 +22,14 @@ internal class CompleteQuestWithSuccessDispatchPatch
         return dispatcher.BeforeQuestOutcome(__instance, IssueOutcome.QuestSuccess, out __state);
     }
 
-    [HarmonyPostfix]
-    private static void Postfix(IssueBase __state)
+    [HarmonyFinalizer]
+    private static void Finalizer(QuestBase __instance, IssueBase __state, Exception __exception)
     {
         if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
 
-        dispatcher.After(__state, IssueOutcome.QuestSuccess);
+        dispatcher.AfterQuestOutcome(__instance, __state, __exception);
     }
 }
