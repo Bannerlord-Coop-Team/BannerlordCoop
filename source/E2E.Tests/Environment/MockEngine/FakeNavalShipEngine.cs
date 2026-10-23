@@ -25,6 +25,10 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     private readonly Dictionary<Agent, FakeHull> crews = new(ReferenceEqualityComparer.Instance);
     // Parking lifts an agent clear with its physics force-closed (NavalShipEngine.ParkHullAgents), so one entry is both.
     private readonly Dictionary<Agent, FakeHull> parkedFrom = new(ReferenceEqualityComparer.Instance);
+    // Every agent any parking lifted, kept after it is put back, so a park then unpark still shows.
+    private readonly HashSet<Agent> everParked = new(ReferenceEqualityComparer.Instance);
+    // The free ship assignment slots lent to hulls holding none, as NavalShipEngine.RemoveThroughLentAssignment lends them.
+    private readonly List<FakeHull> lentSlots = new();
     private readonly List<string> removalViolations = new();
 
     public FakeNavalShipEngine(string clientId)
@@ -259,6 +263,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         fake.Formation = captor.Formation;
         fake.Side = captor.Side;
         fake.FormationIndex = captor.FormationIndex;
+        // NavalShipsLogic.OnShipCaptured points the captor formation's assignment at the prize, so the orphan holds none.
+        fake.HoldsAssignment = true;
         Orphan(captor);
     }
 
@@ -277,6 +283,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         fake.Formation = null;
         fake.Side = BattleSideEnum.None;
         fake.IsOrphaned = true;
+        fake.HoldsAssignment = false;
     }
 
     public bool IsVacantForCapture(MissionObject hull) => Of(hull).IsVacant;
@@ -300,7 +307,10 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         }
 
         foreach (var moved in parked)
+        {
             parkedFrom[moved.Agent] = fake;
+            everParked.Add(moved.Agent);
+        }
         foreach (var agent in CrewOf(fake).Where(agent => parked.All(moved => moved.Agent != agent)))
             parked.Add(new HullSwapAgent(agent, isCrew: true, isParked: false, Vec3.Zero, Vec3.Zero));
 
@@ -319,6 +329,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     /// <summary>The agents a hull's parking lifted clear that nothing has put back or withdrawn yet.</summary>
     public IReadOnlyCollection<Agent> ParkedAgents => parkedFrom.Keys;
+
+    /// <summary>Every agent a parking lifted during the test, whether or not it was put back since.</summary>
+    public IReadOnlyCollection<Agent> AgentsEverParked => everParked;
+
+    /// <summary>Lent ship assignment slots still holding a hull; vanilla's removal clears each one again.</summary>
+    public int LentSlotsHeld => lentSlots.Count;
 
     public MissionObject ReplaceHull(MissionObject hull)
     {
@@ -420,9 +436,22 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         CheckClearForRemoval(fake, "removed");
         fake.CrewActiveAtRemoval = CrewOf(fake).Count();
         fake.ParkingsBeforeRemoval = fake.Parkings;
-        // The live engine removes a hull that holds no ship assignment (a capture's orphan) through a lent free one.
-        fake.RemovedWithoutAssignment = fake.IsOrphaned;
+        // As the live engine: a hull holding no ship assignment (a capture's orphan) is lent a free slot for the removal.
+        if (!fake.HoldsAssignment) lentSlots.Add(fake);
+        RemoveThroughAssignment(fake);
+    }
+
+    // Vanilla's NavalShipsLogic.RemoveShip: it finds a hull only through the assignment slot holding it, its own or a lent
+    // one, and RemoveShipAux clears that slot; a hull no slot holds stays where it is.
+    private void RemoveThroughAssignment(FakeHull fake)
+    {
+        bool throughLentSlot = lentSlots.Contains(fake);
+        if (!fake.HoldsAssignment && !throughLentSlot) return;
+
         fake.IsRemoved = true;
+        fake.HoldsAssignment = false;
+        fake.RemovedThroughLentSlot = throughLentSlot;
+        lentSlots.Remove(fake);
     }
 
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) => Of(hull).Ropes;
@@ -494,9 +523,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         var fake = Of(hull);
         Assert.False(fake.IsCopy, $"{Describe(fake)} is a copy; only an owner's own hull is exempt from the removal invariant");
         // NavalShipsLogic.RemoveShip acts only through the assignment holding the hull, and a capture's orphan holds none.
-        if (fake.IsOrphaned) return;
+        RemoveThroughAssignment(fake);
+        if (!fake.IsRemoved) return;
 
-        fake.IsRemoved = true;
         fake.RemovedByVanillaForTest = true;
     }
 
@@ -661,8 +690,10 @@ public sealed class FakeHull
     public bool IsRemoved { get; set; }
     /// <summary>Removed by <see cref="FakeNavalShipEngine.VanillaOwnerRemoveShipForTest"/>, which the removal invariant exempts.</summary>
     public bool RemovedByVanillaForTest { get; set; }
-    /// <summary>Removed by the code under test while it held no ship assignment, as a capture's orphan holds none.</summary>
-    public bool RemovedWithoutAssignment { get; set; }
+    /// <summary>Holds a ship assignment slot, as every spawned hull does until a capture orphans it.</summary>
+    public bool HoldsAssignment { get; set; } = true;
+    /// <summary>Removed through a lent slot, since it held no ship assignment of its own (a capture's orphan).</summary>
+    public bool RemovedThroughLentSlot { get; set; }
     /// <summary>How many of the hull's crew were still in the battle when it was removed.</summary>
     public int CrewActiveAtRemoval { get; set; }
     /// <summary>How many times <see cref="FakeNavalShipEngine.ParkHullAgents"/> parked the hull's agents.</summary>

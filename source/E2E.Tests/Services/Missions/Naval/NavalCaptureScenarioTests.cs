@@ -309,7 +309,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.Same(c.Ship(pirates[0]).Hull, c.Engine.CrewHullOf(crew));
         Assert.Same(c.Hull(captorHull), c.Engine.DeckOf(crew));
         Assert.Equal(movedBefore, c.Engine.MovedAgents);
-        Assert.Empty(c.Engine.ParkedAgents);
+        Assert.DoesNotContain(crew, c.Engine.AgentsEverParked);
     }
 
     // (e) The old host's confirm reaches the successor mid-swap and the captor after the old host left: both apply it, so
@@ -382,7 +382,8 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             Assert.False(peer.Has(prize));
             Assert.False(peer.Has(captorHull));
             Assert.True(orphans[peer].IsRemoved, $"{peer.Id} kept the captor's orphan in its scene");
-            Assert.True(orphans[peer].RemovedWithoutAssignment);
+            Assert.True(orphans[peer].RemovedThroughLentSlot);
+            Assert.Equal(0, peer.Engine.LentSlotsHeld);
             Assert.False(crewOnOrphan[peer].IsActive());
             Assert.Empty(peer.Engine.ParkedAgents);
             Assert.True(peer.Has(pirates[1]));
@@ -425,7 +426,8 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             Assert.False(peer.Has(prize));
             Assert.False(peer.Has(captorHull));
             Assert.True(orphans[peer].IsRemoved, $"{peer.Id} kept the captor's orphan in its scene");
-            Assert.True(orphans[peer].RemovedWithoutAssignment);
+            Assert.True(orphans[peer].RemovedThroughLentSlot);
+            Assert.Equal(0, peer.Engine.LentSlotsHeld);
             Assert.False(crewOnOrphan[peer].IsActive());
             Assert.Empty(peer.Engine.ParkedAgents);
             Assert.True(peer.Has(pirates[1]));
