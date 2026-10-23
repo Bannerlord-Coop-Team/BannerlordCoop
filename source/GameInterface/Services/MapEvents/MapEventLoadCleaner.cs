@@ -24,8 +24,9 @@ public interface IMapEventLoadCleaner
     void CleanUpLoadedMapEvents();
 
     // Releases every party still linked to a battle that already ended, calling onReleased for each one
-    // as it is released. Also run live by coop.unstuck.
-    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
+    // as it is released. Also run live by coop.unstuck, whose step reports a throw from onReleased; running it
+    // again releases the parties that were left.
+    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased = null);
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -107,13 +108,13 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             }
         }
 
-        ReleaseEndedMapEventLinks(_ => { });
+        ReleaseEndedMapEventLinks();
     }
 
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
+    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased = null)
     {
         var releasedParties = new List<PartyBase>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
@@ -165,15 +166,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
                 releasedParties.Add(party);
 
-                // A failed broadcast must not leave the rest of the parties linked to the ended battle.
-                try
-                {
-                    onReleased(party);
-                }
-                catch (Exception ex)
-                {
-                    logger.Warning(ex, "Could not report released party {PartyId} from ended map event {MapEventId}", party.Id, mapEvent.StringId);
-                }
+                onReleased?.Invoke(party);
             }
         }
 
