@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Arenas.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,17 +20,20 @@ internal class ArenaMasterHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public ArenaMasterHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<AddMetArenaMasterAndKnowTournaments>(Handle_AddMetArenaMasterAndKnowTournaments);
         messageBroker.Subscribe<NetworkAddMetArenaMasterAndKnowTournaments>(Handle_NetworkAddMetArenaMasterAndKnowTournaments);
@@ -67,6 +71,7 @@ internal class ArenaMasterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             // Validate hero and settlement ids before adding to CoopSession
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var _)) return;
@@ -96,6 +101,7 @@ internal class ArenaMasterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             // Validate hero and settlement ids before adding to CoopSession
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var _)) return;

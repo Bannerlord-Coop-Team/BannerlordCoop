@@ -324,7 +324,7 @@ internal sealed partial class LordBarterHandler : IHandler
         }
 
         if (joinTargetClan != null)
-            CompleteDefection(playerHero, request, joinTargetClan, previousTargetKingdom, targetKingdom);
+            CompleteDefection(playerHero, targetHero, request, joinTargetClan, previousTargetKingdom, targetKingdom);
 
         if (isSafePassage)
             ApplySafePassage(
@@ -355,6 +355,7 @@ internal sealed partial class LordBarterHandler : IHandler
     /// </remarks>
     private void CompleteDefection(
         Hero playerHero,
+        Hero targetHero,
         NetworkRequestLordBarter request,
         Clan joinTargetClan,
         Kingdom previousTargetKingdom,
@@ -375,7 +376,7 @@ internal sealed partial class LordBarterHandler : IHandler
                 targetKingdom.StringId);
         }
 
-        ApplyDefectionPersuasionXp(playerHero, request.PersuasionOutcomes);
+        ApplyDefectionPersuasionXp(playerHero, targetHero, request.PersuasionOutcomes);
     }
 
     private void ProcessAuthorization(NetPeer peer, NetworkAuthorizeLordBarter authorization)
