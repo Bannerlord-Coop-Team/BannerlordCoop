@@ -28,9 +28,10 @@ namespace GameInterface.Services.MobileParties;
 internal interface IServerPlayerUnstuck
 {
     /// <summary>
-    /// Force-applies every applicable exit for the player's registered party and hero, then moves a
-    /// free party off a map spot it cannot move from, each step guarded independently, and sends the
-    /// result to the player's connection when it has one. Runs on the game thread.
+    /// Force-applies every applicable exit for the player's registered party and hero, releases every
+    /// party (not only the player's) still linked to a battle that already ended, then moves a free
+    /// party off a map spot it cannot move from, each step guarded independently, and sends the result
+    /// to the player's connection when it has one. Runs on the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -150,12 +151,12 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
         {
-            var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks();
-            foreach (var releasedParty in releasedParties)
+            // Broadcast as each party is released, so a later group that throws can't swallow it.
+            var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks(releasedParty =>
             {
-                if (objectManager.TryGetId(releasedParty, out var releasedPartyId))
+                if (objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
                     network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
-            }
+            });
 
             return releasedParties.Length == 0
                 ? null
