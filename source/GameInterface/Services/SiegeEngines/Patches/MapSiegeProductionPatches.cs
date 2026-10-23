@@ -10,19 +10,18 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace GameInterface.Services.SiegeEngines.Patches;
 
 /// <summary>
-/// The player's siege production click constructs a SiegeEngineConstructionProgress locally before deploying it,
-/// which on a client makes a ghost engine with no network id that never receives hitpoint or destruction sync.
-/// Route the click to the server: its DeploySiegeEngine mirrors the construct-or-reuse-then-deploy and replicates
-/// the result, and the move-to-reserve branch reuses the removal request. Only the deploy branch builds the ghost,
-/// but gating the whole click keeps both actions on the single server-authoritative path.
+/// Routes the client's siege production click to the server, because the vanilla click builds an unregistered ghost engine.
 /// </summary>
-[HarmonyPatch(typeof(MapSiegeProductionVM), "OnPossibleMachineSelection")]
-internal class SiegeProductionClickClientGatePatch
+[HarmonyPatch(typeof(MapSiegeProductionVM))]
+internal class MapSiegeProductionPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SiegeProductionClickClientGatePatch>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapSiegeProductionPatches>();
 
+    // The server's DeploySiegeEngine mirrors the construct-or-reuse-then-deploy and the move-to-reserve branch reuses
+    // the removal request; only deploy builds the ghost, but routing both keeps the click on one server-authoritative path.
+    [HarmonyPatch(nameof(MapSiegeProductionVM.OnPossibleMachineSelection))]
     [HarmonyPrefix]
-    private static bool Prefix(MapSiegeProductionVM __instance, MapSiegeProductionMachineVM machine)
+    private static bool OnPossibleMachineSelectionPrefix(MapSiegeProductionVM __instance, MapSiegeProductionMachineVM machine)
     {
         if (ModInformation.IsServer) return true;
 
@@ -36,7 +35,7 @@ internal class SiegeProductionClickClientGatePatch
         }
 
         // Vanilla ends every machine click with IsEnabled = false, dismissing the selection popup; the
-        // skipped original never runs, so close it here on each gated path.
+        // skipped original never runs, so close it here on each routed path.
         if (poi.Machine != null && poi.Machine.SiegeEngine == machine.Engine)
         {
             // Vanilla no-ops when the slot already holds the clicked engine.
