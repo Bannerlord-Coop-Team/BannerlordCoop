@@ -108,6 +108,58 @@ public class BanditPartyComponentTests : SyncTestBase
     }
 
     [Fact]
+    public void ServerCreateLooterParty_NullTemplate_SyncInitArgsToAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var position = new CampaignVec2(new Vec2(2, 2), true);
+
+        // Act
+        string? partyId = null;
+        string? clanId = null;
+        string? settlementId = null;
+
+        server.Call(() =>
+        {
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+            // v1.5 deserter looters are created with a null PartyTemplate
+            var newParty = BanditPartyComponent.CreateLooterParty("TestNullTemplateLooterId", clan, settlement, false, null, position);
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
+            Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
+            Assert.True(server.ObjectManager.TryGetId(settlement, out settlementId));
+            Assert.Same(clan, newParty.ActualClan);
+        });
+
+        // Assert
+        Assert.NotNull(partyId);
+        Assert.NotNull(clanId);
+        Assert.NotNull(settlementId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(clanId, out var clientClan));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var clientSettlement));
+
+            // What players see: the clients never run the vanilla hook that consumes the init args,
+            // so the clan and home come from the party's own sync.
+            Assert.Same(clientClan, newParty.ActualClan);
+            Assert.Same(clientSettlement, newParty.HomeSettlement);
+
+            // The init args message is no longer dropped for a null template.
+            var component = Assert.IsType<BanditPartyComponent>(newParty.PartyComponent);
+            var initArgs = component._initializationArgs;
+            Assert.NotNull(initArgs);
+            Assert.Same(clientClan, initArgs.Clan);
+            Assert.Equal(position, initArgs.InitialPosition);
+            Assert.Null(initArgs.PartyTemplate);
+        }
+    }
+
+    [Fact]
     public void RepairMissingHomeSettlements_WhenLooterSaveIsCorrupted_UsesNearestTown()
     {
         var server = TestEnvironment.Server;

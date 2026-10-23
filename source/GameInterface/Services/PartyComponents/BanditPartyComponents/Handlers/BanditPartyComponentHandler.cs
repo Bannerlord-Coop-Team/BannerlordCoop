@@ -102,7 +102,9 @@ internal class BanditPartyComponentHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(instance, out var banditPartyComponentId)) return;
         if (!objectManager.TryGetIdWithLogging(initArgs.Clan, out var clanId)) return;
-        if (!objectManager.TryGetIdWithLogging(initArgs.PartyTemplate, out var partyTemplateId)) return;
+        // partyTemplate may legitimately be null: v1.5 deserters
+        string partyTemplateId = null;
+        if (initArgs.PartyTemplate != null && !objectManager.TryGetIdWithLogging(initArgs.PartyTemplate, out partyTemplateId)) return;
 
         network.SendAll(new NetworkUpdateBanditPartyComponentInitArgs(
             banditPartyComponentId,
@@ -122,7 +124,8 @@ internal class BanditPartyComponentHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<BanditPartyComponent>(message.BanditPartyComponentId, out var instance)) return;
                 if (!objectManager.TryGetObjectWithLogging<Clan>(message.ClanId, out var clan)) return;
-                if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateId, out var partyTemplate)) return;
+                PartyTemplateObject partyTemplate = null;
+                if (message.PartyTemplateId != null && !objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateId, out partyTemplate)) return;
 
                 using (new AllowedThread())
                 {

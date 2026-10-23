@@ -230,11 +230,16 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).
-- Open: v1.5 spawns deserter looter parties with a null `PartyTemplate`
-  (`BanditPartyComponent.CreateLooterParty(..., null, ...)` from `DesertersCampaignBehavior`).
-  `BanditPartyComponentHandler` logs a failed template lookup and returns, so those parties' setup
-  never reaches clients. The fix is to allow a null template on both the send and receive paths, as the
-  caravan handler does for a null leader. Needs its own issue; client-side effect unchecked.
+- v1.5 spawns deserter looter parties with a null `PartyTemplate` (co-op's own
+  `DesertersCampaignBehaviorPatches` calls `CreateLooterParty(..., null, ...)`). The bandit init
+  args handler now accepts a null template on the send and receive paths, as the caravan handler does
+  for a null leader, so the server no longer logs a failed id lookup on every deserter spawn. Players
+  saw no difference before: clients never run the vanilla hook that reads those init args, and the
+  party's clan and home settlement reach them through the party's own sync.
+- Open: in the E2E harness a client's new looter party sits at (0, 0) instead of its spawn position,
+  with or without a template. Unchecked whether a live client corrects it through later movement
+  sync. Also unguarded: a bandit component created with no init args at all (vanilla's party
+  conversion actions) makes the send handler throw; the broker logs it. No caller in co-op found.
 - A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
   client loses its courtship attempt history when it reconnects.
 - Two v1.5 AI reactions check the server's main party and player clan, so they never fire for co-op
