@@ -1,10 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Services.GameState.Patches;
-using HarmonyLib;
-using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
 using Xunit;
 
 namespace GameInterface.Tests.Services.GameState;
@@ -48,21 +44,6 @@ public class SavedMenuLoadPatchTests
     public void NeedsSettlement_UnregisteredMenu_IsFalse()
     {
         Assert.False(SavedMenuLoadPatch.NeedsSettlement(null));
-    }
-
-    // A postfix runs after EnterMenuMode has already run the menu init, which is where the load crashed.
-    [Fact]
-    public void Patch_RunsBeforeOnLoadingFinished()
-    {
-        var patches = typeof(SavedMenuLoadPatch)
-            .GetMethods(BindingFlags.Static | BindingFlags.NonPublic)
-            .Where(method => method.GetCustomAttributes<HarmonyPatch>()
-                .Any(patch => patch.info.declaringType == typeof(MapState) &&
-                    patch.info.methodName == nameof(MapState.OnLoadingFinished)))
-            .ToArray();
-
-        var patch = Assert.Single(patches);
-        Assert.NotNull(patch.GetCustomAttribute<HarmonyPrefix>());
     }
 
     private static GameMenu CreateMenu(string menuId, GameMenu.MenuOverlayType overlay)

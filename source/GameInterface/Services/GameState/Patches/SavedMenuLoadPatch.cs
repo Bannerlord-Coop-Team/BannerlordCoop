@@ -17,10 +17,8 @@ namespace GameInterface.Services.GameState.Patches;
 /// Keeps the game menu stored in a save from reopening on load when it can't be shown.
 /// </summary>
 /// <remarks>
-/// SandBoxGameManager.OnLoadFinished queues the stored menu, then <see cref="MapState.OnLoadingFinished"/> opens it
-/// through <see cref="MapState.EnterMenuMode"/>, which runs the menu's init right away. Town, castle and village menus
-/// read <see cref="Settlement.CurrentSettlement"/> without a null check, so a save made in one crashed the server on
-/// every boot and joining clients at the end of their load. Based on a fix by Ryvius (@PlueRyvius) in ModderLords.
+/// OnLoadingFinished opens the stored menu and runs its init at once, and settlement menus read
+/// <see cref="Settlement.CurrentSettlement"/> without a null check, so a save made in one crashed on load.
 /// </remarks>
 [HarmonyPatch]
 internal class SavedMenuLoadPatch
@@ -28,11 +26,21 @@ internal class SavedMenuLoadPatch
     private static readonly ILogger Logger = LogManager.GetLogger<SavedMenuLoadPatch>();
 
     // The outside menus whose background init reads Settlement.CurrentSettlement; this is the handler in the crash.
-    private static readonly HashSet<string> OutsideSettlementMenus = new HashSet<string>(
-        AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init))
-            ?.GetCustomAttributes<GameMenuInitializationHandler>(false)
-            .Select(handler => handler.MenuId)
-        ?? Enumerable.Empty<string>());
+    private static readonly HashSet<string> OutsideSettlementMenus = FindOutsideSettlementMenus();
+
+    private static HashSet<string> FindOutsideSettlementMenus()
+    {
+        var menus = new HashSet<string>(
+            AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.encounter_menu_ui_castle_on_init))
+                ?.GetCustomAttributes<GameMenuInitializationHandler>(false)
+                .Select(handler => handler.MenuId)
+            ?? Enumerable.Empty<string>());
+
+        if (menus.Count == 0)
+            Logger.Warning("Found no menus for encounter_menu_ui_castle_on_init; stored outside settlement menus will not be dropped on load");
+
+        return menus;
+    }
 
     [HarmonyPatch(typeof(MapState), nameof(MapState.OnLoadingFinished))]
     [HarmonyPrefix]
