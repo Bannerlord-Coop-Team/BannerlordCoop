@@ -12,6 +12,7 @@ using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Newtonsoft.Json;
 using SandBox.View.Map.Managers;
@@ -34,6 +35,14 @@ internal static class DefenderSiegeFixtureCommands
 #if DEBUG
     public sealed class CaptureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns the optional settlement name or id argument into a settlement.
+        public CaptureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_capture";
         public string Description => "Captures both defender parties before staging.";
@@ -42,13 +51,27 @@ internal static class DefenderSiegeFixtureCommands
         {
             new ExpectedArgs("first_controller_id", "First defender controller."),
             new ExpectedArgs("second_controller_id", "Second defender controller."),
-            new ExpectedArgs("settlement_id", "Exact castle; refuses fallback when supplied.", false)
+            new ExpectedArgs("settlement_id", "Exact castle name or id; quote names with spaces. Refuses fallback when supplied.", false)
         };
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            string output = Capture(args.ToList());
+            var values = args.ToList();
+            string output = TryResolveRequestedSettlement(values, out string resolveError)
+                ? Capture(values)
+                : Failure("capture", resolveError);
             bool success = Newtonsoft.Json.Linq.JObject.Parse(output.Substring("LIVE_TEST_JSON=".Length)).Value<bool>("success");
             return new CoopCommandResult(success, output, success ? null : "fixture_failed");
+        }
+
+        // Replaces the optional settlement argument with the resolved settlement's StringId, which Capture compares against.
+        private bool TryResolveRequestedSettlement(List<string> values, out string error)
+        {
+            error = null;
+            if (values.Count != 3 || string.IsNullOrWhiteSpace(values[2])) return true;
+            if (!resolver.TryResolveSettlement(values[2], out var settlement, out error)) return false;
+
+            values[2] = settlement.StringId;
+            return true;
         }
     }
 

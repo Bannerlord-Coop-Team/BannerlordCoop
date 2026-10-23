@@ -6,6 +6,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,8 +45,15 @@ internal class AlliedAiPartyFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id of a player in a running battle."),
-            new ExpectedArgs("party_id", "An AI mobile party id. Defaults to the nearest free lord party allied to the player.", false),
+            new ExpectedArgs("party_id", "An AI mobile party name or id; quote names with spaces. Defaults to the nearest free lord party allied to the player.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public AddAlliedAiPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -71,8 +79,8 @@ internal class AlliedAiPartyFixtureCommands
             MobileParty alliedParty;
             if (args.Count == 2)
             {
-                if (!objectManager.TryGetObjectWithLogging(args[1], out alliedParty))
-                    return Failed($"Unable to resolve party {args[1]}.");
+                if (!resolver.TryResolveMobileParty(args[1], out alliedParty, out var partyError))
+                    return Failed(partyError);
                 if (!alliedParty.IsActive || alliedParty.IsPlayerParty() || alliedParty.MapEvent != null)
                     return Failed($"Party {args[1]} must be an active AI party outside any battle.");
             }
