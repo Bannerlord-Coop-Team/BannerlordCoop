@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Issue availability and expiry are authoritative on the campaign server.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class IssueManagerClientLifecyclePatches
 {
@@ -23,6 +24,7 @@ internal static class IssueManagerClientLifecyclePatches
         yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnCharacterPortraitPopUpOpened));
     }
 
+    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     private static class HeroKilledPatch
     {

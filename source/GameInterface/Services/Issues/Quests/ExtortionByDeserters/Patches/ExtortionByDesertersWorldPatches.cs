@@ -17,6 +17,7 @@ using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
 /// <summary>The server's unstarted quest listens through the dispatcher, in its owner's context.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ExtortionByDesertersWorldPatches
 {

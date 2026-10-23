@@ -31,15 +31,18 @@ internal class ExtortionByDesertersSync : IHandler
 
     public ExtortionByDesertersSync(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
-        IAutoSyncPatchCollector patchCollector)
+        IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag)
     {
-        // Compile these callers after AutoSync so they cannot inline unpatched setters.
-        var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
-        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)), prefix);
-        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty)), prefix);
-        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty)), prefix);
-        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)),
-            AccessTools.Method(typeof(ExtortionByDesertersRewardPatches), nameof(ExtortionByDesertersRewardPatches.ApplyQuestResultPrefix)));
+        if (questFeatureFlag.IsEnabled)
+        {
+            // Compile these callers after AutoSync so they cannot inline unpatched setters.
+            var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
+            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)), prefix);
+            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty)), prefix);
+            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty)), prefix);
+            patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)),
+                AccessTools.Method(typeof(ExtortionByDesertersRewardPatches), nameof(ExtortionByDesertersRewardPatches.ApplyQuestResultPrefix)));
+        }
 
         this.broker = broker;
         this.network = network;

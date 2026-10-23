@@ -17,6 +17,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
 /// <summary>World creation and cleanup belong to the server, encounters to the owning client.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ExtortionByDesertersPartyPatches
 {
@@ -78,6 +79,7 @@ internal class ExtortionByDesertersPartyPatches
 }
 
 /// <summary>These world methods must stay server-only even during client replay.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ExtortionByDesertersServerMethodsPatch
 {

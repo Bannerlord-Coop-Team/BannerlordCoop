@@ -9,6 +9,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 
 /// <summary>Routes the three inline dialogue rewards before any personal or world consequence runs.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ExtortionByDesertersRewardPatches
 {
