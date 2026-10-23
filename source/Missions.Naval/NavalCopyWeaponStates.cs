@@ -28,8 +28,10 @@ public class NavalCopyWeaponStates : INavalCopyWeaponStates
 {
     private readonly Dictionary<MissionObject, BattleShipWeaponState> states = new Dictionary<MissionObject, BattleShipWeaponState>();
 
+    // The latest state replaces the one before it.
     public void Remember(MissionObject weapon, BattleShipWeaponState state) => states[weapon] = state;
 
+    // Removes the entry, as the weapon it belongs to is about to be replaced.
     public BattleShipWeaponState Take(MissionObject weapon)
     {
         if (!states.TryGetValue(weapon, out var state)) return null;
@@ -38,10 +40,12 @@ public class NavalCopyWeaponStates : INavalCopyWeaponStates
         return state;
     }
 
+    // Drops each weapon's entry; weapons without one are skipped.
     public void Forget(IEnumerable<MissionObject> weapons)
     {
         foreach (var weapon in weapons) states.Remove(weapon);
     }
 
+    // Drops every entry.
     public void Clear() => states.Clear();
 }

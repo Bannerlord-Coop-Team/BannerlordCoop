@@ -10,6 +10,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>In a co-op battle vanilla's elapsed capture timer goes to the capture replicator instead of swapping the hulls.</summary>
+[Collection("Mission.Current")]
 public class CoopShipCapturePatchTests
 {
     // The prefix hooks the helm's capture completion, the one call into NavalShipsLogic.OnShipCaptured, which the engine replays.

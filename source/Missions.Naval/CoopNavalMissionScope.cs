@@ -1,7 +1,16 @@
 ﻿namespace Missions.Naval;
 
-/// <summary>[Game thread] Whether a coop naval battle is running, so the agent-wide station patches stay idle elsewhere.</summary>
+/// <summary>
+/// Whether a coop naval battle is running, so the agent-wide patches stay idle elsewhere. Written on the game thread, read there
+/// and on the engine's async agent tick and fixed tick, so it is volatile.
+/// </summary>
 internal static class CoopNavalMissionScope
 {
-    public static bool IsActive { get; set; }
+    private static volatile bool isActive;
+
+    public static bool IsActive
+    {
+        get => isActive;
+        set => isActive = value;
+    }
 }

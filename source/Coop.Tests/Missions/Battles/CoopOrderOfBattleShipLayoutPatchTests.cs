@@ -6,6 +6,7 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+[Collection("Mission.Current")]
 public class CoopOrderOfBattleShipLayoutPatchTests
 {
     [Fact]
