@@ -9,6 +9,7 @@ using Moq;
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
@@ -16,6 +17,11 @@ namespace GameInterface.Tests.Services.Issues;
 [Collection(ModInformationRoleCollection.Name)]
 public class IssueOwnershipSnapshotReceiverTests : IDisposable
 {
+    static IssueOwnershipSnapshotReceiverTests()
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly IssueOwnershipRegistry registry = new IssueOwnershipRegistry();
     private readonly IssueOwnershipSnapshotReceiver receiver;
@@ -24,7 +30,6 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     {
         ModInformation.IsServer = false;
         registry.TrySetOwner("hero_1", "issue_1", "stale-player");
-        GameThread.Instance.MarkGameThread();
         receiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry,
             Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
     }
@@ -37,7 +42,9 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
 
     private void Receive(NetworkIssueOwnershipSnapshot snapshot)
     {
-        receiver.Handle_NetworkIssueOwnershipSnapshot(new MessagePayload<NetworkIssueOwnershipSnapshot>(this, snapshot));
+        Assert.False(GameThread.Instance.IsGameThread);
+        GameThread.Run(() => receiver.Handle_NetworkIssueOwnershipSnapshot(
+            new MessagePayload<NetworkIssueOwnershipSnapshot>(this, snapshot)), blocking: true);
     }
 
     private static NetworkIssueOwnershipSnapshot ThroughTheWire(NetworkIssueOwnershipSnapshot snapshot)
