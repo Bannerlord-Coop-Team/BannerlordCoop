@@ -15,6 +15,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Locations.Conversations;
 using GameInterface.Services.Locations.Messages.Conversation;
@@ -3345,6 +3346,150 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             client.Resolve<IMessageBroker>().Publish(this, new BreakInAttempted(MobileParty.MainParty, null));
             Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BreakIn_SiegeEndsOrPartyMovesBeforeTheServerReadsTheRequest_IsTurnedDownAndCostsNothing(bool siegeEnds)
+    {
+        var (client, playerMobilePartyId, siege, troops) = PrepareBreakInMenu();
+
+        // The request is still on its way when the siege ends or the party is moved away.
+        using (new ReliableMessageDeliveryBlocker<NetworkRequestBreakIn>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestBreakIn>());
+        if (siegeEnds)
+            EndSiege(siege.SiegeEventId, siege.SettlementId);
+        else
+            MovePartyAway(playerMobilePartyId);
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
+        AssertRegularTroops(playerMobilePartyId, troops);
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+    }
+
+    [Fact]
+    public void BreakIn_SiegeEndsAfterTheServerPaidButBeforeTheReply_ClientKeepsTheServerLossesAndIsTold()
+    {
+        var (client, playerMobilePartyId, siege, troops) = PrepareBreakInMenu();
+
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>());
+        Assert.True(result.Approved);
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+
+        EndSiege(siege.SiegeEventId, siege.SettlementId);
+        client.InternalMessages.Clear();
+        client.NetworkSentMessages.Clear();
+
+        client.SimulateMessage(Server.NetPeer, result);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        var message = Assert.Single(client.InternalMessages.GetMessages<SendInformationMessage>());
+        Assert.Equal("The siege changed before your break in went through. 40 troops were already lost getting there.", message.Text);
+        client.Call(() =>
+        {
+            Assert.NotEqual("break_in_debrief_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+        });
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+    }
+
+    [Fact]
+    public void BreakIn_PaidReplyArrivesAfterANewerAttempt_TellsThePlayerOnceWithoutEntering()
+    {
+        var (client, playerMobilePartyId, _, troops) = PrepareBreakInMenu();
+
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>());
+        Assert.True(result.Approved);
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+
+        // The encounter moved on and a newer attempt replaced the old request before its reply came.
+        client.Call(() =>
+        {
+            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            client.Resolve<IMessageBroker>().Publish(this, new BreakInAttempted(MobileParty.MainParty, null));
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+        client.InternalMessages.Clear();
+        client.NetworkSentMessages.Clear();
+
+        client.SimulateMessage(Server.NetPeer, result);
+        client.SimulateMessage(Server.NetPeer, result);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        var message = Assert.Single(client.InternalMessages.GetMessages<SendInformationMessage>());
+        Assert.Equal("The siege changed before your break in went through. 40 troops were already lost getting there.", message.Text);
+        client.Call(() =>
+        {
+            Assert.NotEqual("break_in_debrief_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+        });
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestBreakInContinuation>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+    }
+
+    // A player outside a besieged town with 200 regulars, looking at a real break in menu that costs 40 troops.
+    private (EnvironmentInstance client, string playerMobilePartyId, (string SiegeEventId, string SettlementId, string LeaderPartyId) siege, int troops) PrepareBreakInMenu()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        var troops = AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+        OpenBreakInMenu(client);
+        Server.NetworkSentMessages.Clear();
+        client.NetworkSentMessages.Clear();
+        return (client, playerMobilePartyId, siege, troops);
+    }
+
+    // Ends the siege the vanilla way on the server, which carries the end to every client.
+    private void EndSiege(string siegeEventId, string settlementId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            siegeEvent.FinalizeSiegeEvent();
+        }, MapEventDisabledMethods);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Null(settlement.SiegeEvent);
+            });
+        }
+    }
+
+    private void MovePartyAway(string mobilePartyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            using (new AllowedThread())
+                party.Position = new CampaignVec2(new Vec2(900f, 900f), isOnLand: true);
         });
     }
 
