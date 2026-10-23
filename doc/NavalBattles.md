@@ -237,6 +237,9 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   vanilla's helm checks ask whether a null hull is connected; `CapturedFormationConnectionPatch` answers "not connected".
 - Vanilla points the old owner's crew record of the prize at the captor's orphan. A tracked agent counts as a hull's crew
   only on the hull's team (`NavalShipEngine.IsHullCrew`), so those swimmers never withdraw with the orphan.
+  Removing the orphan leaves that record naming the removed hull: vanilla's removal handlers skip a hull with no team
+  (`NavalAgentsLogic.OnShipRemoved`), and its reinforcement tick skips such a record (`NavalShipAgents.CheckSpawnReinforcements`
+  needs `Ship?.Team`), so the swimmers stay in the battle and nothing spawns onto the removed hull. Not yet live-checked (R48).
 - When the captor leaves, retreats or disconnects, the prize and the orphan leave with it through the usual departure path
   (they don't follow the host), and the NPC keeps its ship with the battle HP the captor reported. The captor's own mission
   end announces only the prize: vanilla's `NavalShipsLogic.RemoveShip` acts only through the ship assignment holding a hull,
@@ -586,7 +589,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (partly done, capture P0).** Hulls fielded after
   deployment (AI fleet, copies, swap replacements) now get the weapon AI, the helm's `OnDeploymentFinished` (standing
   point components, enemy helm AI-only, the logics its vacancy check reads) and `CrewSizeOnMainDeck`
-  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap carries the old hull's ammo over), the anchor, wake and flotsam, the
+  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap carries the old hull's ammo over, one bolt fewer when caught mid-reload since the fresh weapon spawns loaded), the anchor, wake and flotsam, the
   rope, oar, climbing and ammo barrel machines' standing point setup, and `IsDeployed`. The capture side is done: a fresh
   enemy copy's helm opens to the player (section 2, "Capture"), and capture replicates.
 - **Capture limits (not live yet, R46).**
