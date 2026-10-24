@@ -1,9 +1,11 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.UI.Notifications;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -162,6 +164,7 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
             Assert.False(giver.IsAlive);
             Assert.Null(giver.Issue);
             authoritative = Archive(Campaign.Current.LogEntryHistory);
+            Assert.Equal(QuestScenario.ControllerA, Assert.IsType<PlayerJournalLogEntry>(authoritative).OwnerControllerId);
             Assert.True(authoritative.IsEnded());
             Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, authoritative._lastIssueStatus);
             Assert.Single(authoritative.GetEntries(), log => log.LogText.GetID() == "V5Za6d4h");
@@ -186,6 +189,7 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
         });
 
         LogEntryHistory loaded = null!;
+        JournalLogEntry ownerArchive = null!;
         Check(savedHistory ? "full native owner history (SaveContext/InMemDriver/LoadContext)" : "full native owner history (immediate)", () =>
         {
             if (savedHistory)
@@ -206,12 +210,18 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
                     Assert.True(load.Load(driver.Load("herd_alternative_cancel"), loadAsLateInitialize: true));
                     loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
                     Assert.NotSame(Campaign.Current.LogEntryHistory, loaded);
+                    Assert.Equal(QuestScenario.ControllerA, Assert.IsType<PlayerJournalLogEntry>(Archive(loaded)).OwnerControllerId);
                 });
             }
 
             Scenario.ClientA.Call(() =>
             {
-                var owner = Archive(savedHistory ? loaded : Campaign.Current.LogEntryHistory);
+                Assert.Equal(QuestScenario.ControllerA, Scenario.ClientA.Resolve<IControllerIdProvider>().ControllerId);
+                var history = savedHistory ? loaded : Campaign.Current.LogEntryHistory;
+                var owner = Assert.Single(history.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+                Assert.Same(Archive(history), owner);
+                ownerArchive = owner;
                 output.WriteLine("Owner raw history before UI: saved={0}, ended={1}, status={2}, stages={3}",
                     savedHistory, owner.IsEnded(), owner._lastIssueStatus, owner.GetEntries().Count());
                 Assert.True(owner.IsEnded(), "The owner's raw cancellation archive must be ended immediately, before opening the journal or rejoining.");
@@ -276,11 +286,20 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
         }
         Check("empty pending alternative troop return", () => Scenario.Server.Call(() =>
             Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster())));
-        Check("bystander has no owner archive", () => Scenario.ClientB.Call(() =>
+        Check("bystander cannot see owner history through IsEnded", () => Scenario.ClientB.Call(() =>
         {
+            Assert.Equal(QuestScenario.ControllerB, Scenario.ClientB.Resolve<IControllerIdProvider>().ControllerId);
             Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
             if (savedHistory)
-                Assert.Empty(loaded.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
+            {
+                Assert.Same(ownerArchive, Archive(loaded));
+                Assert.False(ownerArchive.IsEnded());
+                Assert.Empty(loaded.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+                Assert.Same(ownerArchive, Archive(loaded));
+                Assert.Equal(authoritative._lastIssueStatus, ownerArchive._lastIssueStatus);
+                AssertHistory(authoritative.GetEntries(), ownerArchive.GetEntries());
+            }
         }));
         Assert.Multiple(checks.ToArray());
         output.WriteLine("PASS one finalization, one companion/troop return after hourly retry, cleared ownership, controller XP, observer WithoutXP, and unchanged bystander quest/roster/gold");
