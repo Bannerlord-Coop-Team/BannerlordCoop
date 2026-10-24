@@ -351,6 +351,27 @@ internal class PlayerEncounterPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
+    [HarmonyPrefix]
+    private static bool FinishPrefix()
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+            return true;
+
+        // Receive callbacks must not finalize a live raid owned by this encounter.
+        var mapEvent = PlayerEncounter.Battle;
+        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)
+            return true;
+
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            Logger.Debug("Ignored received raid encounter finish for {MapEventId}. {StackTrace}",
+                mapEvent.StringId, System.Environment.StackTrace);
+        else
+            MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+
+        return false;
+    }
+
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
     // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
     // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the
@@ -358,9 +379,9 @@ internal class PlayerEncounterPatches
     // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
     [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPostfix]
-    private static void FinishPostfix()
+    private static void FinishPostfix(bool __runOriginal)
     {
-        if (ModInformation.IsServer) return;
+        if (!__runOriginal || ModInformation.IsServer) return;
 
         // The server holds the AI party this player was conversing with; tell it the encounter is over.
         MessageBroker.Instance.Publish(null, new ConversationEnded());

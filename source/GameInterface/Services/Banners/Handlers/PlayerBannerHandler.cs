@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -25,18 +26,21 @@ namespace GameInterface.Services.Banners.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly IPlayerManager playerManager;
+        private readonly ICoopClanPermissions permissions;
         private readonly ILogger Logger = LogManager.GetLogger<PlayerBannerHandler>();
 
         public PlayerBannerHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            IPlayerManager playerManager)
+            IPlayerManager playerManager,
+            ICoopClanPermissions permissions)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.playerManager = playerManager;
+            this.permissions = permissions;
             messageBroker.Subscribe<PlayerBannerChanged>(Handle);
             messageBroker.Subscribe<NetworkUpdatePlayerBanner>(Handle);
         }
@@ -82,7 +86,7 @@ namespace GameInterface.Services.Banners.Handlers
                 }
 
                 // Only the clan leader may edit the banner, same rule as the banner editor button.
-                if (ModInformation.IsServer && !playerManager.IsSenderClanLeader(obj.Who, clan)) return;
+                if (ModInformation.IsServer && !CanSenderManageClan(obj.Who, clan)) return;
 
                 using (new AllowedThread())
                 {
@@ -152,6 +156,14 @@ namespace GameInterface.Services.Banners.Handlers
                 kingdomClan.UpdateBannerColorsAccordingToKingdom();
                 messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
             }
+        }
+
+        private bool CanSenderManageClan(object sender, Clan clan)
+        {
+            if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
+
+            Logger.Warning("Ignoring a banner edit for clan {ClanId} from a peer that does not lead it", clan?.StringId);
+            return false;
         }
 
         /// <summary>

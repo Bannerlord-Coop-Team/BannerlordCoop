@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Inventory.Handlers;
 using GameInterface.Services.Inventory.Interfaces;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
@@ -99,6 +100,16 @@ public class InventoryFoodUpkeepTests
 
         var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted);
         Assert.Equal(5, rebased.Single().Amount);
+    }
+
+    [Fact]
+    public void EmptyAuthoritativeRoster_AppliesThePurchase()
+    {
+        var grain = new ItemObject("grain");
+        var submitted = new ItemRosterElement[] { new(grain, 1) };
+
+        var rebased = TradeHandler.RebaseInventoryData(new ItemRoster(), Array.Empty<ItemRosterElement>(), submitted);
+        Assert.Equal(1, rebased.Single().Amount);
     }
 
     [Fact]
