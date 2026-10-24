@@ -3,16 +3,26 @@ using Common.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
 // coop.debug.naval.copy_steer
 // coop.debug.naval.copy_steer softzone=1 tau=0.3 lead=0.15
-/// <summary>DEBUG: shows or tunes this client's steered copy knobs; every copy reads them on its next physics step.</summary>
+/// <summary>
+/// DEBUG: shows or tunes this client's steered copy knobs; every copy reads them on its next physics step, and they hold
+/// across battles until the game restarts.
+/// </summary>
 public sealed class NavalCopySteerCoopCommand : ICoopCommand
 {
     private const int MaxKnobs = 7;
+
+    private readonly CopySteeringKnobs knobs;
+
+    /// <summary>A command over this client's shared copy steering knobs.</summary>
+    public NavalCopySteerCoopCommand(CopySteeringKnobs knobs)
+    {
+        this.knobs = knobs;
+    }
 
     public string Prefix => "coop.debug.naval";
 
@@ -27,13 +37,9 @@ public sealed class NavalCopySteerCoopCommand : ICoopCommand
         .Select(index => (IExpectedArgs)new ExpectedArgs($"knob_{index}", "A key=value knob: " + CopySteeringKnobs.KnobNames + ".", false))
         .ToArray();
 
-    // Applies every key=value argument to the mission's shared knobs, all or none, and echoes the result.
+    // Applies every key=value argument to the client's shared knobs, all or none, and echoes the result.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        var probe = Mission.Current?.GetMissionBehavior<NavalCopyProbeLogic>();
-        if (probe == null || !CoopNavalMissionScope.IsActive) return Failed("No active coop naval battle mission.");
-
-        var knobs = probe.SteeredCopies.Knobs;
         var error = Validate(args?.ToArray() ?? Array.Empty<string>());
         if (error != null) return Failed(error);
 

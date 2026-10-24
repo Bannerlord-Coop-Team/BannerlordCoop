@@ -39,15 +39,6 @@ public interface INavalShipEngine
     /// <summary>The hull body's planar velocity and yaw rate, sent with its samples.</summary>
     BattleShipMotion ReadMotion(MissionObject hull);
 
-    /// <summary>[Fixed physics step] Steers every copy toward its owner's latest sample.</summary>
-    void TickCopies(float fixedDt);
-
-    /// <summary>[Mission tick] Teleports the copies the physics steps found too far from their owner's sample.</summary>
-    void SnapCopies();
-
-    /// <summary>[Game thread] Stops treating a hull that left the mission as a copy and drops its steering.</summary>
-    void ForgetHull(MissionObject hull);
-
     /// <summary>The hull's effective helm input this frame.</summary>
     BattleShipInput ReadInput(MissionObject hull);
 

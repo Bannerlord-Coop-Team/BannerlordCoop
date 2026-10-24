@@ -38,9 +38,12 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   enemy hull, sends an empty load and the copy takes no crew weight. A sample without a load (a frame that committed
   none while agents stood aboard) and a stale owner keep the last load. Own hulls run vanilla. One rule decides a copy's mode at
   every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
-  simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers
-  of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing and removing a hull all
-  go through them.
+  simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` and the mission-end
+  reset are the only writers of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing
+  and removing a hull all go through `Track`/`Forget`. `Track` also leaves the hull without a controller, and
+  `ForeignHullControllerPatch` (a prefix on `MissionShip.SetController`) turns every later controller write on a copy into
+  none without auto update: vanilla hands a hull a controller at init, at deployment end, when it burns or sinks and in
+  the capture swap. A captor forgets its prize as a copy before the swap, so the prize takes the captor's controller.
 - A copy collides with this client's own hulls, but its owner stays the authority of everything that happens to it:
   contact and ram damage on a copy is routed to the owner (`BattleShipDamageRouter`). Two copies never touch here
   (`CopyPairCollisionFilterPatch`, a prefix on `MissionShip.CanPhysicsCollideBetweenTwoEntities`), since no client
@@ -696,7 +699,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `try_helm <ship> [force]` | client | Has the main agent try a hull's helm as the use key would: vanilla's `CanUseObject` (the helm's `IsDisabledForPlayers`), a free seat and `IsAbleToUseMachine`, then `HandleStartUsingAction`, where `ForeignHelmUsePatch` refuses a copy's helm unless the copy is an enemy (to capture it; an orphan has no team, so it stays refused). One `NAVAL_TRY_HELM` line with `enemy`, `copy`, `canUseObject`, `vacant`, `ableToUse` and `result=REFUSED_BY_VANILLA\|BLOCKED\|ALLOWED`. An enemy helm is only offered once vanilla would allow a capture (the hull vacant and connected), so `force` skips vanilla's gates to test the co-op block directly (a friendly copy or an orphan reads `BLOCKED`). An allowed seat is released again. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
-| `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
+| `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live; a tuning holds across battles until the game restarts. |
 | `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre, null for none or an empty deck) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |

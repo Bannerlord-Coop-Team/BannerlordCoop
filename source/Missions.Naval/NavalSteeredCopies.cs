@@ -3,6 +3,7 @@ using Missions.Messages;
 using NavalDLC.Missions;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
+using NavalDLC.Missions.ShipControl;
 using Serilog;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -19,15 +20,12 @@ namespace Missions.Naval;
 /// </summary>
 public interface INavalSteeredCopies
 {
-    /// <summary>The correction knobs every copy of this engine reads each step.</summary>
-    CopySteeringKnobs Knobs { get; }
-
 #if DEBUG
     /// <summary>DEBUG: every tracked copy.</summary>
     IReadOnlyDictionary<MissionShip, SteeredCopy> Copies { get; }
 #endif
 
-    /// <summary>Makes a hull another owner's copy here, for this engine and the patches.</summary>
+    /// <summary>Makes a hull another owner's copy here, for this engine and the patches, and leaves it without a controller.</summary>
     void Track(MissionShip ship);
 
     /// <summary>Takes the owner's latest sample of a tracked copy; a copy whose body isn't simulating gets the frame written.</summary>
@@ -36,7 +34,7 @@ public interface INavalSteeredCopies
     /// <summary>[Fixed physics step] Pushes every simulating copy toward its target; a snap waits for <see cref="ApplySnaps"/>.</summary>
     void Tick(float fixedDt);
 
-    /// <summary>[Mission tick] Teleports the copies whose steering asked for a snap in the physics steps since the last call.</summary>
+    /// <summary>[Mission tick] Teleports the copies whose steering queued a snap since the last call.</summary>
     void ApplySnaps();
 
     /// <summary>Stops treating a hull as a copy, when it left the mission or this client took it over.</summary>
@@ -48,79 +46,55 @@ public interface INavalSteeredCopies
 #endif
 }
 
-/// <summary>One tracked copy's steering toward its owner's samples, and the owner's crew load it heels under.</summary>
-#if DEBUG
-public
-#else
-internal
-#endif
-sealed class SteeredCopy
-{
-    internal SteeredCopy(CopySteering steering)
-    {
-        Steering = steering;
-    }
-
-    internal CopySteering Steering { get; }
-
-    /// <summary>Whether the warning that its body isn't simulating was logged.</summary>
-    internal bool WarnedWritten { get; set; }
-
-    /// <summary>Whether a physics step asked to teleport the copy, which the next mission tick does.</summary>
-    internal bool SnapPending { get; set; }
-
-    private volatile BattleShipCrewLoad crewLoad;
-
-    /// <summary>
-    /// [Game thread writes, fixed tick reads] The owner's crew load from its latest sample that carried one; null before
-    /// the first, which leaves the copy on vanilla's own crew weight.
-    /// </summary>
-    internal BattleShipCrewLoad CrewLoad
-    {
-        get => crewLoad;
-        set => crewLoad = value;
-    }
-
-#if DEBUG
-    internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
-#endif
-}
-
 /// <inheritdoc cref="INavalSteeredCopies"/>
 public class NavalSteeredCopies : INavalSteeredCopies
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalSteeredCopies>();
 
+    private readonly CopySteeringKnobs knobs;
     // Copy on write: the fixed physics step enumerates it while a capture or a host change adds or drops a copy.
     private volatile Dictionary<MissionShip, SteeredCopy> copies = new Dictionary<MissionShip, SteeredCopy>();
 #if DEBUG
     private readonly Stopwatch tickClock = new Stopwatch();
 
+    /// <inheritdoc/>
     public float LastTickMilliseconds { get; private set; }
 
+    /// <inheritdoc/>
     public IReadOnlyDictionary<MissionShip, SteeredCopy> Copies => copies;
 #endif
 
-    public CopySteeringKnobs Knobs { get; } = new CopySteeringKnobs();
+    /// <summary>Copies steered with this client's shared knobs, which copy_steer tunes.</summary>
+    public NavalSteeredCopies(CopySteeringKnobs knobs)
+    {
+        this.knobs = knobs;
+    }
 
+    /// <inheritdoc/>
     public void Track(MissionShip ship)
     {
         if (copies.ContainsKey(ship)) return;
 
-        var copy = new SteeredCopy(new CopySteering(Knobs));
+        var copy = new SteeredCopy(new CopySteering(knobs));
         copies = new Dictionary<MissionShip, SteeredCopy>(copies) { [ship] = copy };
         NavalForeignHulls.Add(ship, copy);
+        // The owner decides this hull. ForeignHullControllerPatch keeps every later write at no controller while it is a copy.
+        ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
 
+    /// <inheritdoc/>
     public void Observe(MissionShip ship, MatrixFrame frame, BattleShipMotion motion)
     {
         if (!copies.TryGetValue(ship, out var copy) || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
-        // A sample without a load keeps the last one, so a frame that committed no weight doesn't drop the copy to vanilla.
-        if (motion.CrewLoad != null) copy.CrewLoad = motion.CrewLoad;
+        copy.CrewLoad = KeptLoad(copy.CrewLoad, motion.CrewLoad);
+#if DEBUG
+        var targetBefore = copy.Steering.HasTarget ? copy.Steering.Target.Position : (Vec2?)null;
+#endif
         copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
 #if DEBUG
-        copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, copy.Steering.LastTargetJumpMetres);
+        float jump = targetBefore.HasValue ? (copy.Steering.Target.Position - targetBefore.Value).Length : 0f;
+        copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, jump);
 #endif
         if (IsSimulating(ship)) return;
 
@@ -129,6 +103,10 @@ public class NavalSteeredCopies : INavalSteeredCopies
         ship.GameEntity.UpdateAttachedNavigationMeshFaces();
     }
 
+    /// <summary>The load a copy keeps: a sample without one keeps the last, so a frame that committed no weight doesn't drop it to vanilla.</summary>
+    internal static BattleShipCrewLoad KeptLoad(BattleShipCrewLoad last, BattleShipCrewLoad sampled) => sampled ?? last;
+
+    /// <inheritdoc/>
     public void Tick(float fixedDt)
     {
 #if DEBUG
@@ -137,7 +115,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
         foreach (var entry in copies)
         {
             var ship = entry.Key;
-            if (entry.Value.SnapPending || ship.IsRemoved || !IsSimulating(ship)) continue;
+            if (entry.Value.Steering.IsSnapQueued || ship.IsRemoved || !IsSimulating(ship)) continue;
 
             SteerOne(ship, entry.Value, fixedDt);
         }
@@ -146,18 +124,25 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #endif
     }
 
+    /// <inheritdoc/>
     public void ApplySnaps()
     {
         foreach (var entry in copies)
         {
             var copy = entry.Value;
-            if (!copy.SnapPending) continue;
+            if (!copy.Steering.IsSnapQueued) continue;
 
-            copy.SnapPending = false;
-            if (!entry.Key.IsRemoved && entry.Key.GameEntity.IsValid) Snap(entry.Key, copy, copy.Steering.TakeSnapFrame());
+            var target = copy.Steering.TakeSnapFrame();
+            if (entry.Key.IsRemoved || !entry.Key.GameEntity.IsValid) continue;
+
+            Snap(entry.Key, copy, target);
+#if DEBUG
+            copy.Diagnostics.RecordSnap();
+#endif
         }
     }
 
+    /// <inheritdoc/>
     public void Forget(MissionShip ship)
     {
         if (!copies.ContainsKey(ship)) return;
@@ -190,7 +175,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
     }
 
     // One correction step from the body's physics pose, as vanilla's fixed-tick code reads it, or a snap queued for the mission tick.
-    private static void SteerOne(MissionShip ship, SteeredCopy copy, float dt)
+    private void SteerOne(MissionShip ship, SteeredCopy copy, float dt)
     {
         var entity = ship.GameEntity;
         var frame = entity.GetBodyWorldTransform();
@@ -198,13 +183,9 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var angular = entity.GetAngularVelocity();
         var step = copy.Steering.Compute(dt, frame.origin, CopySteering.YawOf(frame.rotation.f), velocity.AsVec2, angular.z);
 #if DEBUG
-        copy.Diagnostics.RecordStep(Mission.Current?.CurrentTime ?? 0f, step);
+        copy.Diagnostics.RecordStep(Mission.Current?.CurrentTime ?? 0f, dt, knobs.TauSeconds, step);
 #endif
-        if (step.Snap)
-        {
-            copy.SnapPending = true;
-            return;
-        }
+        if (step.Snap) return;
 
         var deltaVelocity = step.DeltaVelocity;
         if (deltaVelocity.x != 0f || deltaVelocity.y != 0f)
@@ -232,20 +213,50 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var ownerVelocity = copy.Steering.FeedForwardVelocity;
         entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
         entity.SetAngularVelocity(new Vec3(0f, 0f, copy.Steering.FeedForwardYawRate));
-        Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Snaps} snaps, {Riders} rider(s) moved along)",
-            ship.Index, copy.Steering.Snaps, riders.Count);
+        Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Riders} rider(s) moved along)", ship.Index, riders.Count);
     }
 
     // Agents standing on the copy that aren't its crew, like a local main agent that boarded it; TeleportShip moves only the crew.
     private static List<Agent> RidersOf(MissionShip ship)
     {
         var mission = Mission.Current;
-        var crew = mission?.GetMissionBehavior<NavalAgentsLogic>()?.GetActiveAgentsOfShip(ship);
-        if (mission == null) return new List<Agent>();
-
+        var crew = mission.GetMissionBehavior<NavalAgentsLogic>()?.GetActiveAgentsOfShip(ship);
         return mission.Agents
             .Where(agent => agent.IsActive() && agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship
                 && (crew == null || !crew.Contains(agent)))
             .ToList();
     }
+}
+
+/// <summary>One tracked copy's steering toward its owner's samples, and the owner's crew load it heels under.</summary>
+public sealed class SteeredCopy
+{
+    /// <summary>A copy driven by its own steering state.</summary>
+    internal SteeredCopy(CopySteering steering)
+    {
+        Steering = steering;
+    }
+
+    /// <summary>The control law that steers this copy toward its owner's samples.</summary>
+    internal CopySteering Steering { get; }
+
+    /// <summary>Whether the warning that its body isn't simulating was logged.</summary>
+    internal bool WarnedWritten { get; set; }
+
+    private volatile BattleShipCrewLoad crewLoad;
+
+    /// <summary>
+    /// [Game thread writes, fixed tick reads] The owner's crew load from its latest sample that carried one; null before
+    /// the first, which leaves the copy on vanilla's own crew weight.
+    /// </summary>
+    internal BattleShipCrewLoad CrewLoad
+    {
+        get => crewLoad;
+        set => crewLoad = value;
+    }
+
+#if DEBUG
+    /// <summary>DEBUG: this copy's drift, correction, snap and oscillation record.</summary>
+    internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
+#endif
 }

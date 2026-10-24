@@ -49,8 +49,8 @@ public class NavalShipEngine : INavalShipEngine
         this.copyWeaponStates = copyWeaponStates;
     }
 
-    /// <summary>This engine's copies and their steering knobs (the DEBUG probe and copy_steer read them).</summary>
-    internal INavalSteeredCopies SteeredCopies { get; }
+    // This battle's copies, which the launcher hands to the behaviour that steers them.
+    private INavalSteeredCopies SteeredCopies { get; }
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
@@ -110,8 +110,7 @@ public class NavalShipEngine : INavalShipEngine
         var frame = NetworkBattleShipSample.ToFrame(data.Frame);
         var ship = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
 
-        // The owner decides this hull: no local controller and no auto controller; its body is steered toward the samples.
-        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        // The owner decides this hull: no local controller; its body is steered toward the samples.
         SteeredCopies.Track(ship);
         OpenEmptyEnemyHelm(ship, Mission.Current?.PlayerTeam);
         formation = ship.Formation;
@@ -136,9 +135,7 @@ public class NavalShipEngine : INavalShipEngine
 
     public void ReleaseHull(MissionObject hull)
     {
-        var ship = (MissionShip)hull;
-        SteeredCopies.Track(ship);
-        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        SteeredCopies.Track((MissionShip)hull);
     }
 
     // A steered copy keeps its dynamic body, so dropping it from the copy set is all a new authority needs to simulate it.
@@ -527,15 +524,6 @@ public class NavalShipEngine : INavalShipEngine
         return false;
     }
 
-    public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);
-
-    public void SnapCopies() => SteeredCopies.ApplySnaps();
-
-    public void ForgetHull(MissionObject hull)
-    {
-        if (hull is MissionShip ship) SteeredCopies.Forget(ship);
-    }
-
     public BattleShipInput ReadInput(MissionObject hull)
     {
         var input = ((MissionShip)hull)._inputRecord;
@@ -890,9 +878,6 @@ public class NavalShipEngine : INavalShipEngine
 
             ApplySinkingState(ship, (SinkingState)condition.SinkingState, isCopy);
         }
-
-        // PrepareForAbandonment and SetSinkingState leave the hull an auto-updated controller; a copy keeps none.
-        if (isCopy) ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
 
     private static void ApplyPartialHitPoints(MissionShip ship, float[] partialHitPoints)

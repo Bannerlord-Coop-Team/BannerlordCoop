@@ -70,9 +70,19 @@ internal sealed class RollingWindow
     public void Clear() => samples.Clear();
 }
 
-/// <summary>DEBUG: how far one copy sits from its owner's estimated pose, and how hard its steering pushes, over the last 10 s.</summary>
+/// <summary>
+/// DEBUG: how far one copy sits from its owner's estimated pose, how hard its steering pushes and how often it crosses its
+/// target over the last 10 s, plus its snap and oscillation totals.
+/// </summary>
 internal sealed class CopyDiagnostics
 {
+    // A position error along the heading smaller than this (m) has no sign, so a copy sitting on its target does not oscillate.
+    internal const float OscillationDeadbandMetres = 0.1f;
+
+    private float smoothedAlong;
+    private bool hasSmoothedAlong;
+    private int lastSign;
+
     public RollingWindow Distance { get; } = new RollingWindow();
 
     public RollingWindow HeadingDegrees { get; } = new RollingWindow();
@@ -88,14 +98,60 @@ internal sealed class CopyDiagnostics
     /// <summary>How far the target moved at each sample arrival; owner frame-time jitter times speed shows here.</summary>
     public RollingWindow TargetJump { get; } = new RollingWindow();
 
-    /// <summary>Records one steering step's velocity change and along-heading error.</summary>
-    public void RecordStep(float time, CopySteeringStep step)
+    /// <summary>Sign changes of the smoothed along-heading error since the copy was tracked, restarted by nothing.</summary>
+    public long Oscillations { get; private set; }
+
+    /// <summary>Teleports of the copy to its owner's frame.</summary>
+    public long Snaps { get; private set; }
+
+    /// <summary>
+    /// Records one steering step's velocity change and its along-heading error, low-passed over <paramref name="tauSeconds"/>
+    /// because the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed (R43).
+    /// </summary>
+    public void RecordStep(float time, float dt, float tauSeconds, CopySteeringStep step)
     {
         Correction.Add(time, step.DeltaVelocity.Length);
-        ErrorAlongHeading.Add(time, step.SmoothedErrorAlongHeading);
+        if (step.Snap)
+        {
+            ErrorAlongHeading.Add(time, 0f);
+            return;
+        }
+
+        float smoothed = SmoothAlong(step.ErrorAlongHeading, dt, tauSeconds);
+        ErrorAlongHeading.Add(time, smoothed);
+        CountOscillation(smoothed);
     }
 
-    /// <summary>The drift, heading, heave and correction windows with the steering's counters.</summary>
+    /// <summary>Counts a snap and restarts the smoothing and the last sign, since the copy now sits on its target.</summary>
+    public void RecordSnap()
+    {
+        Snaps++;
+        lastSign = 0;
+        hasSmoothedAlong = false;
+    }
+
+    /// <summary>The oscillations within the window, by the same deadband as the total.</summary>
+    public int WindowOscillations => ErrorAlongHeading.SignChanges(OscillationDeadbandMetres);
+
+    // The along-heading error low-passed with the steering's own tau, starting from the first error after a reset.
+    private float SmoothAlong(float along, float dt, float tauSeconds)
+    {
+        smoothedAlong = hasSmoothedAlong ? smoothedAlong + ((along - smoothedAlong) * Math.Min(1f, dt / tauSeconds)) : along;
+        hasSmoothedAlong = true;
+        return smoothedAlong;
+    }
+
+    // A sign change of the smoothed along-heading error, the copy crossing its target; errors in the deadband keep the last sign.
+    private void CountOscillation(float along)
+    {
+        if (Math.Abs(along) < OscillationDeadbandMetres) return;
+
+        int sign = along > 0f ? 1 : -1;
+        if (lastSign != 0 && sign != lastSign) Oscillations++;
+        lastSign = sign;
+    }
+
+    /// <summary>The drift, heading, heave and correction windows with the counters and the steering's sample age.</summary>
     public object Inspect(CopySteering steering) => new
     {
         drift = new { samples = Distance.Count, meanM = Round(Distance.Mean), maxM = Round(Distance.Max) },
@@ -107,9 +163,9 @@ internal sealed class CopyDiagnostics
             samples = Correction.Count,
             meanMps = Round(Correction.Mean),
             maxMps = Round(Correction.Max),
-            oscillations10s = ErrorAlongHeading.SignChanges(CopySteering.OscillationDeadbandMetres),
-            oscillationsTotal = steering?.Oscillations,
-            snaps = steering?.Snaps,
+            oscillations10s = WindowOscillations,
+            oscillationsTotal = Oscillations,
+            snaps = Snaps,
             sampleAgeS = steering == null ? (float?)null : Round(steering.SecondsSinceSample),
         },
     };
