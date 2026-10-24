@@ -4156,15 +4156,20 @@ public class VillageHostileActionTests : MapEventTestBase
                 var quest = new RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest(
                     "raid_map_event_quest", giver, CampaignTime.DaysFromNow(60), (Kingdom)settlement.MapFaction);
                 issue.IssueQuest = quest;
-                var log = new JournalLog(CampaignTime.Now, new TextObject("Raid enemy villages"),
-                    new TextObject("Raided Village Count"), 0, 3, LogType.Discreate);
-                quest._raidedVillagesTrackLog = log;
-                quest._journalEntries.Add(log);
                 if (instance != Server)
                 {
-                    quest.StartQuest();
+                    quest.QuestAcceptedByPlayerConsequences();
                 }
                 Assert.True(quest.IsOngoing);
+            }
+            if (instance == Server)
+            {
+                var strategy = new GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.RaidAnEnemyTerritoryQuestSolutionAcceptStrategy();
+                strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
+                strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
+                var quest = (RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest)giver.Issue.IssueQuest;
+                Assert.Same(quest._raidedVillagesTrackLog, Assert.Single(quest.JournalEntries));
+                Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
             }
         }, MapEventDisabledMethods.Append(AccessTools.Method(
             typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest), "SetDialogs")));

@@ -1,8 +1,10 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
@@ -36,6 +38,14 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
         using (var reader = new BinaryReader(stream))
         {
             quest.ChangeQuestDueTime(new CampaignTime(reader.ReadInt64()));
+        }
+
+        if (ModInformation.IsServer && quest._raidedVillagesTrackLog == null)
+        {
+            // Keep the acceptance stage in the saved mirror without starting it or raising UI events.
+            quest._raidedVillagesTrackLog = new JournalLog(CampaignTime.Now, quest.QuestAcceptedByPlayerLog,
+                new TextObject("{=RFH1lDMj}Raided Village Count"), quest._raidedVillages.Count, 3, LogType.Discreate);
+            quest._journalEntries.Add(quest._raidedVillagesTrackLog);
         }
     }
 }

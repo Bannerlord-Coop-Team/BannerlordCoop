@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -43,7 +44,10 @@ internal sealed class RaidAnEnemyTerritoryHeirSelectionHandler : IHandler
                 ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) &&
                 (ownerHero == payload.What.OriginalHero || ownerHero == payload.What.Heir))
             {
-                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                {
+                    quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
+                }
             }
         }
     }
