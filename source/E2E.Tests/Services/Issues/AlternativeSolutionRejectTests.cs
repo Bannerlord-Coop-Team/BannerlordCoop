@@ -120,7 +120,6 @@ public class AlternativeSolutionRejectTests : IDisposable
                 Campaign.Current.MainParty = party;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
                 clientIssue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-
             }
 
             Assert.True(party.MemberRoster.FindIndexOfTroop(companion.CharacterObject) < 0);
