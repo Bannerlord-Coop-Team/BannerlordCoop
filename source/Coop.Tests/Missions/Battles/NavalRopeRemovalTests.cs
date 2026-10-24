@@ -4,7 +4,6 @@ using Missions.Naval;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using TaleWorlds.Library;
 using Xunit;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
@@ -29,7 +28,7 @@ public class NavalRopeRemovalTests
         var preferringOther = Machine(owner: Hull(), preferred: other);
         var remaining = Hull(preferringRemoved, preferringOther);
 
-        NavalRopes.ForgetTarget(new[] { remaining, other }, removed);
+        NavalRopeRemoval.ForgetTarget(new[] { remaining, other }, removed);
 
         Assert.Null(preferringRemoved.GetPreferredTargetShip());
         Assert.Same(other, preferringOther.GetPreferredTargetShip());
@@ -72,7 +71,7 @@ public class NavalRopeRemovalTests
         target._isRemoved = targetRemoved;
         var joint = JointBetween(sourceMissing ? null : source, targetMissing ? null : target);
 
-        Assert.Equal(expected, NavalRopes.JointHasHulls(joint));
+        Assert.Equal(expected, NavalRopeRemoval.JointHasHulls(joint));
     }
 
     // Review follow-up: the joint guard alone would skip a hull-less joint forever, so the rope tick breaks its rope too.
@@ -95,7 +94,7 @@ public class NavalRopeRemovalTests
         attachment.AttachmentTarget = Point(targetHull);
         attachment.ShipAttachmentJoint = JointBetween(sourceHull, jointMissingTarget ? null : targetHull);
 
-        Assert.Equal(expected, NavalRopes.EndIsGone(attachment));
+        Assert.Equal(expected, NavalRopeRemoval.EndIsGone(attachment));
     }
 
     [Fact]
@@ -103,10 +102,10 @@ public class NavalRopeRemovalTests
     {
         NavalRopes.Clear();
 
-        Assert.True(NavalRopes.AllowJointStep(JointBetween(Hull(), Hull())));
-        Assert.False(NavalRopes.AllowJointStep(JointBetween(Hull(), null)));
-        Assert.False(NavalRopes.AllowJointStep(JointBetween(Hull(), null)));
-        Assert.Equal(2L, Interlocked.Read(ref NavalRopes.jointStepsSkipped));
+        Assert.True(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), Hull())));
+        Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
+        Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
+        Assert.Equal(2L, NavalRopeRemoval.JointStepsSkipped);
         NavalRopes.Clear();
     }
 

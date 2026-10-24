@@ -1,6 +1,8 @@
 ﻿using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Engine;
 
 namespace Missions.Naval;
@@ -49,33 +51,26 @@ internal static class NavalForeignHulls
     }
 
     /// <summary>[Any thread] Whether the entity belongs to a copy: its root is a copy's hull entity.</summary>
-    public static bool ContainsRootOf(WeakGameEntity entity)
-    {
-        if (!entity.IsValid) return false;
+    public static bool ContainsRootOf(WeakGameEntity entity) => entity.IsValid && IsCopyRoot(entity.Root);
 
-        var root = entity.Root;
-        foreach (var ship in current.Hulls)
-        {
-            if (ship.GameEntity == root) return true;
-        }
-
-        return false;
-    }
+    /// <summary>[Any thread] Whether the root entity is a copy's hull entity.</summary>
+    public static bool IsCopyRoot(WeakGameEntity root) => current.Roots.Contains(root.Pointer);
 
     /// <summary>Forgets every copy when the battle ends.</summary>
     public static void Clear() => current = Snapshot.Empty;
 
-    /// <summary>The copy set and its physics lookup at one moment; never changed once published.</summary>
+    /// <summary>The copy set and its lookups at one moment; never changed once published.</summary>
     private sealed class Snapshot
     {
         public static readonly Snapshot Empty =
             new Snapshot(new HashSet<MissionShip>(), new Dictionary<NavalPhysics, SteeredCopy>());
 
-        /// <summary>A snapshot over collections nobody writes after this.</summary>
+        /// <summary>A snapshot over collections nobody writes after this; the root lookup is built from the hulls.</summary>
         public Snapshot(HashSet<MissionShip> hulls, Dictionary<NavalPhysics, SteeredCopy> byPhysics)
         {
             Hulls = hulls;
             ByPhysics = byPhysics;
+            Roots = new HashSet<UIntPtr>(hulls.Select(hull => hull.GameEntity.Pointer));
         }
 
         // Every copy hull.
@@ -83,5 +78,8 @@ internal static class NavalForeignHulls
 
         // Each copy by its hull's physics script, for the crew load patch, which only sees the NavalPhysics.
         public Dictionary<NavalPhysics, SteeredCopy> ByPhysics { get; }
+
+        // Each copy's hull entity pointer, for the contact filter; keyed on the pointer, as WeakGameEntity compares by it.
+        public HashSet<UIntPtr> Roots { get; }
     }
 }

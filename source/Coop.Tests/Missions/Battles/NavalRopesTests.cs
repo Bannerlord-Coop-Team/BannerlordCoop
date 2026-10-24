@@ -60,14 +60,6 @@ public class NavalRopesTests
         Assert.Equal(expected, AllowsChange(sourceIsCopy, applying));
     }
 
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void AllowsForce_WritesJointForceOnlyToSimulatedHulls(bool bodyIsCopy, bool expected)
-    {
-        Assert.Equal(expected, AllowsForce(bodyIsCopy));
-    }
-
     [Fact]
     public void Removed_KeepsTheStationGenerationAndTarget()
     {

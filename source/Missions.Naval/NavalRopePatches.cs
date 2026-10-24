@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
@@ -19,58 +20,72 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeConnectPatch
 {
+    // Refuses a replica's own connect and any rope to a removed hull.
     [HarmonyPrefix]
     private static bool Prefix(ShipAttachmentMachine __instance, ShipAttachmentPointMachine attachmentPointMachine) =>
         NavalRopes.AllowConnection(__instance, attachmentPointMachine);
 
+    // Opens the station's next generation on the owner.
     [HarmonyPostfix]
     private static void Postfix(ShipAttachmentMachine __instance) => NavalRopes.ObserveCreated(__instance);
 }
 
+// A replica disconnects only as its owner's state applies.
 [HarmonyPatch(typeof(ShipAttachmentMachine), nameof(ShipAttachmentMachine.DisconnectAttachment))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeDisconnectPatch
 {
+    // Skips a replica's own disconnect.
     [HarmonyPrefix]
     private static bool Prefix(ShipAttachmentMachine __instance) => NavalRopes.AllowDisconnect(__instance);
 }
 
+// A replica's state changes only as its owner's state applies.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.SetAttachmentState))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeStatePatch
 {
+    // Skips a replica's own state change.
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.AllowState(__instance);
 }
 
+// Whether a rope becomes a plank is the owner's decision.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.CheckAndConnectBridge))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopePlankEligibilityPatch
 {
+    // Skips the plank check on a replica.
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
 }
 
+// Whether a rope breaks is the owner's decision.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.CheckAndBreakAttachment))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeBreakCheckPatch
 {
+    // Skips the break check on a replica.
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
 }
 
+// A replica plank flies on its owner's clock.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.TickThrownBridge))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeReplicaPlankFlightPatch
 {
+    // Lays a replica plank out instead of running its flight clock.
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.TickPlankFlight(__instance);
 }
 
+// A replica rope is drawn from its owner's state, and a rope whose end left breaks.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.OnTick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeReplicaTickPatch
 {
+    // Runs vanilla's rope tick only for an owned rope with both ends.
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.TickRope(__instance);
 }
@@ -82,7 +97,7 @@ internal class RopeJointHullGuardPatch
 {
     // Runs vanilla's joint step only while both of its hulls are in the mission.
     [HarmonyPrefix]
-    private static bool Prefix(Joint __instance) => NavalRopes.AllowJointStep(__instance);
+    private static bool Prefix(Joint __instance) => NavalRopeRemoval.AllowJointStep(__instance);
 }
 
 // Retargeting destroys and recreates a rope; on a copied hull that is the owner's decision.
@@ -90,26 +105,57 @@ internal class RopeJointHullGuardPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeRetargetPatch
 {
+    // Skips the retarget logic on a copy.
     [HarmonyPrefix]
     private static bool Prefix(ShipAttachmentMachineConnectionLogic __instance) =>
         NavalRopes.AllowConnectionRetarget(__instance._ownerShip);
 }
 
+// The owner's throw curve rides its samples, so a replica draws the same flight.
 [HarmonyPatch(typeof(Attachment), nameof(Attachment.UpdateRopeMeshVisualAccordingToTargetPoint))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeThrowCurvePatch
 {
+    // Keeps the curve vanilla just drew.
     [HarmonyPostfix]
     private static void Postfix(Attachment __instance, in Vec3 targetGlobalPosition, float throwingAngleDegree) =>
         NavalRopes.ObserveCurve(__instance, targetGlobalPosition, throwingAngleDegree);
 }
 
-// The joint's force callsites, bound directly because the physics methods can be inlined into them. Runs last, so
-// another transpiler over the same callsites keeps its wrappers.
+// A rope joint writes force only to a hull this client simulates; a copy follows its owner's frames. Binds the joint's
+// force callsites, because the physics methods can be inlined into them, and runs last so other transpilers keep theirs.
 [HarmonyPatch]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeForcePatch
 {
+    // [Fixed-tick thread writes] Per force kind: writes let through to own hulls, and writes dropped for copies.
+    private static readonly long[] ownForceWrites = new long[3];
+    private static readonly long[] foreignForceFiltered = new long[3];
+
+    /// <summary>The force writes let through to own hulls so far, per kind.</summary>
+    internal static long[] OwnForceWrites() => ownForceWrites.ToArray();
+
+    /// <summary>The force writes dropped for copies so far, per kind.</summary>
+    internal static long[] ForeignForcesFiltered() => foreignForceFiltered.ToArray();
+
+    /// <summary>Resets both counters at mission end.</summary>
+    internal static void ClearCounters()
+    {
+        Array.Clear(ownForceWrites, 0, ownForceWrites.Length);
+        Array.Clear(foreignForceFiltered, 0, foreignForceFiltered.Length);
+    }
+
+    /// <summary>[Fixed-tick thread] Whether a joint force of this kind may reach the body, counting the write either way.</summary>
+    internal static bool AllowForce(NavalPhysics physics, int kind)
+    {
+        if (!CoopNavalMissionScope.IsActive) return true;
+
+        bool copy = NavalForeignHulls.TryGetCopy(physics, out _);
+        Interlocked.Increment(ref (copy ? foreignForceFiltered : ownForceWrites)[kind]);
+        return !copy;
+    }
+
+    // The joint force steps and the attachment's own force step.
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach (var name in new[]
@@ -118,6 +164,7 @@ internal class RopeForcePatch
         yield return AccessTools.DeclaredMethod(typeof(Attachment), nameof(Attachment.OnFixedTick));
     }
 
+    // Routes every NavalPhysics force write through a gated wrapper; fails closed when the callsites changed.
     [HarmonyTranspiler]
     [HarmonyPriority(Priority.Last)]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -146,19 +193,22 @@ internal class RopeForcePatch
         return result;
     }
 
+    // ApplyForceToDynamicBody, gated.
     private static void Force(NavalPhysics physics, in Vec3 forceVec, ForceMode mode)
     {
-        if (NavalRopes.AllowForce(physics, 0)) physics.ApplyForceToDynamicBody(in forceVec, mode);
+        if (AllowForce(physics, 0)) physics.ApplyForceToDynamicBody(in forceVec, mode);
     }
 
+    // ApplyTorque, gated.
     private static void Torque(NavalPhysics physics, in Vec3 torqueVec, ForceMode mode)
     {
-        if (NavalRopes.AllowForce(physics, 1)) physics.ApplyTorque(in torqueVec, mode);
+        if (AllowForce(physics, 1)) physics.ApplyTorque(in torqueVec, mode);
     }
 
+    // ApplyGlobalForceAtLocalPos, gated.
     private static void ForceAtPosition(NavalPhysics physics, in Vec3 localPos, in Vec3 forceVec, ForceMode mode)
     {
-        if (NavalRopes.AllowForce(physics, 2)) physics.ApplyGlobalForceAtLocalPos(in localPos, in forceVec, mode);
+        if (AllowForce(physics, 2)) physics.ApplyGlobalForceAtLocalPos(in localPos, in forceVec, mode);
     }
 }
 
@@ -169,22 +219,26 @@ internal class RopePlankCosmeticsPatch
 {
     [ThreadStatic] private static Random cosmeticRandom;
 
+    // The three plank methods that draw decoration randomness.
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach (var name in new[] { nameof(Attachment.SpawnPlankEntities), nameof(Attachment.ConnectBridge), nameof(Attachment.AddRopesToBridge) })
             yield return AccessTools.DeclaredMethod(typeof(Attachment), name);
     }
 
+    // Seeds this call's randomness, keeping the caller's seed for the finalizer.
     [HarmonyPrefix]
     private static void Prefix(Attachment __instance, MethodBase __originalMethod, out Random __state)
     {
         __state = cosmeticRandom;
-        cosmeticRandom = NavalRopes.PlankCosmeticRandom(__instance, __originalMethod.Name);
+        cosmeticRandom = NavalPlankCosmetics.PlankCosmeticRandom(__instance, __originalMethod.Name);
     }
 
+    // Restores the caller's seed, so nested plank calls keep theirs.
     [HarmonyFinalizer]
     private static void Finalizer(Random __state) => cosmeticRandom = __state;
 
+    // Routes MBRandom draws to the seeded wrappers and the plank count to the owner's.
     [HarmonyTranspiler]
     [HarmonyPriority(Priority.Last)]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -202,16 +256,19 @@ internal class RopePlankCosmeticsPatch
                 && field.DeclaringType == typeof(Attachment) && field.Name == nameof(Attachment._numberOfPlanksNeeded))
             {
                 instruction.opcode = OpCodes.Call;
-                instruction.operand = AccessTools.DeclaredMethod(typeof(NavalRopes), nameof(NavalRopes.DecorationCount));
+                instruction.operand = AccessTools.DeclaredMethod(typeof(NavalPlankCosmetics), nameof(NavalPlankCosmetics.DecorationCount));
             }
 
             yield return instruction;
         }
     }
 
+    // MBRandom.RandomFloat from the seed while one is set.
     private static float CosmeticFloat() => cosmeticRandom == null ? MBRandom.RandomFloat : (float)cosmeticRandom.NextDouble();
 
+    // MBRandom.RandomInt(max) from the seed while one is set.
     private static int CosmeticInt(int max) => cosmeticRandom == null ? MBRandom.RandomInt(max) : cosmeticRandom.Next(max);
 
+    // MBRandom.RandomInt(min, max) from the seed while one is set.
     private static int CosmeticRange(int min, int max) => cosmeticRandom == null ? MBRandom.RandomInt(min, max) : cosmeticRandom.Next(min, max);
 }

@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.Missions.NavalPhysics;
+using NavalDLC.Missions.Objects;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -52,6 +53,32 @@ public class NavalRopePatchesTests
         }
 
         Assert.True(routed >= 2);
+    }
+
+    [Fact]
+    public void AllowForce_WritesJointForceOnlyToSimulatedHulls_AndCountsEachKind()
+    {
+        var copyPhysics = ShipTestHulls.Uninitialized<NavalPhysics>();
+        var copy = ShipTestHulls.Uninitialized<MissionShip>();
+        copy._physics = copyPhysics;
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        NavalRopes.Clear();
+        try
+        {
+            CoopNavalMissionScope.IsActive = true;
+            NavalForeignHulls.Add(copy, null);
+
+            Assert.False(RopeForcePatch.AllowForce(copyPhysics, 1));
+            Assert.True(RopeForcePatch.AllowForce(ShipTestHulls.Uninitialized<NavalPhysics>(), 0));
+            Assert.Equal(new long[] { 0, 1, 0 }, RopeForcePatch.ForeignForcesFiltered());
+            Assert.Equal(new long[] { 1, 0, 0 }, RopeForcePatch.OwnForceWrites());
+        }
+        finally
+        {
+            NavalForeignHulls.Remove(copy);
+            CoopNavalMissionScope.IsActive = wasActive;
+            NavalRopes.Clear();
+        }
     }
 
     [Fact]

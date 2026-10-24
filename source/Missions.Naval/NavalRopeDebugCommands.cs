@@ -16,12 +16,11 @@ public static class NavalRopeDebugCommands
     /// <summary>Vanilla drops a flying hook farther than this from its station (DistanceSquared &gt; 1600).</summary>
     internal const float ThrowRange = 40f;
 
-    internal static bool IsTargetFree(ShipAttachmentPointMachine target) =>
-        target.CurrentAttachment == null && target.LinkedAttachmentMachine?.CurrentAttachment == null;
-
+    // Whether no rope holds the station or the point linked to it.
     internal static bool IsStationFree(ShipAttachmentMachine source) =>
         source.CurrentAttachment == null && source.LinkedAttachmentPointMachine?.CurrentAttachment == null;
 
+    // The station's distance to the point's hook position.
     internal static float Distance(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
         source.GameEntity.GlobalPosition.Distance(NavalDebugHulls.HookPosition(target));
 
@@ -30,6 +29,7 @@ public static class NavalRopeDebugCommands
         ShipAttachmentMachine.ComputePotentialAttachmentValue(source, target, checkInteractionDistance: false,
             checkConnectionBlock: false, allowWiderAngleBetweenConnections: true) > 0f;
 
+    // Whether a hook thrown this far would reach before vanilla drops it.
     internal static bool IsInRange(float distance) => !float.IsNaN(distance) && distance <= ThrowRange;
 
     /// <summary>The closest free, aligned point in range, or -1.</summary>
@@ -40,7 +40,7 @@ public static class NavalRopeDebugCommands
         for (int index = 0; index < targets.Length; index++)
         {
             float candidate = Distance(source, targets[index]);
-            if (candidate >= distance || !IsInRange(candidate) || !IsTargetFree(targets[index]) || !IsAligned(source, targets[index]))
+            if (candidate >= distance || !IsInRange(candidate) || NavalRopes.IsBusy(targets[index]) || !IsAligned(source, targets[index]))
                 continue;
 
             best = index;
@@ -50,6 +50,7 @@ public static class NavalRopeDebugCommands
         return best;
     }
 
+    // Reads rope_throw's station indices, or the usage error.
     internal static bool TryParseThrow(IReadOnlyList<string> args, out int source, out int? target, out string error)
     {
         source = -1;
@@ -68,11 +69,14 @@ public static class NavalRopeDebugCommands
         return error == null;
     }
 
+    // A whole, non-negative index.
     private static bool TryParseIndex(string value, out int index) =>
         int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out index) && index >= 0;
 
+    // A failed command result with this message.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
 
+    // The script's content path below the hull.
     private static string KeyOf(TaleWorlds.Engine.ScriptComponentBehavior script, MissionShip hull) =>
         NavalShipEngine.EntityPath(script.GameEntity, hull.GameEntity);
 
@@ -133,7 +137,7 @@ public static class NavalRopeDebugCommands
                     {
                         index,
                         key = KeyOf(target, foreign),
-                        free = IsTargetFree(target),
+                        free = !NavalRopes.IsBusy(target),
                         nearestSource = sources.Length == 0 ? (int?)null : nearest.sourceIndex,
                         distance = sources.Length == 0 ? (float?)null : nearest.distance,
                     };
@@ -205,7 +209,7 @@ public static class NavalRopeDebugCommands
             if (chosen >= targets.Length) return Failed($"The other hull has {targets.Length} attachment points.");
             distance = Distance(source, targets[chosen]);
             if (!IsInRange(distance)) return Failed($"Attachment point {chosen} is {distance:F1} m away, beyond {ThrowRange} m.");
-            if (!IsTargetFree(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
+            if (NavalRopes.IsBusy(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
             if (!IsAligned(source, targets[chosen])) return Failed($"Attachment point {chosen} does not face rope station {sourceIndex}.");
         }
 
