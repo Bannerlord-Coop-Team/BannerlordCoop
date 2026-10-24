@@ -14,6 +14,15 @@ namespace GameInterface.Tests.Services.Issues;
 [Collection(ModInformationRoleCollection.Name)]
 public class MerchantOutlawsHourlyTickTests : IDisposable
 {
+    private sealed class RecordingProgress : IMerchantOutlawsProgress
+    {
+        public int Calls { get; private set; }
+
+        public void Send(Quest quest, bool final = false) => Calls++;
+
+        public void Send(TaleWorlds.CampaignSystem.Issues.IssueBase issue) => Calls++;
+    }
+
     private readonly bool wasServer = ModInformation.IsServer;
 
     public MerchantOutlawsHourlyTickTests() => ModInformation.IsServer = true;
@@ -27,22 +36,22 @@ public class MerchantOutlawsHourlyTickTests : IDisposable
     public void UnrelatedPartiesDoNotDispatchEnterOwnerScopesOrSendProgress(int count)
     {
         var dispatcher = new Mock<IOutcomeDispatcher>(MockBehavior.Strict);
-        var progress = new Mock<IMerchantOutlawsProgress>(MockBehavior.Strict);
-        var service = new MerchantOutlawsHourlyTick(dispatcher.Object, progress.Object);
+        var progress = new RecordingProgress();
+        var service = new MerchantOutlawsHourlyTick(dispatcher.Object, progress);
         var parties = Enumerable.Range(0, count).Select(_ => ObjectHelper.SkipConstructor<MobileParty>()).ToArray();
 
         service.Tick(parties);
 
         dispatcher.VerifyNoOtherCalls();
-        progress.VerifyNoOtherCalls();
+        Assert.Equal(0, progress.Calls);
     }
 
     [Fact]
     public void FiveHundredBanditsShareOneDispatchInsteadOfScanningIssuesPerParty()
     {
         var dispatcher = new Mock<IOutcomeDispatcher>();
-        var progress = new Mock<IMerchantOutlawsProgress>(MockBehavior.Strict);
-        var service = new MerchantOutlawsHourlyTick(dispatcher.Object, progress.Object);
+        var progress = new RecordingProgress();
+        var service = new MerchantOutlawsHourlyTick(dispatcher.Object, progress);
         var parties = Enumerable.Range(0, 500).Select(_ =>
         {
             var party = ObjectHelper.SkipConstructor<MobileParty>();
@@ -54,6 +63,6 @@ public class MerchantOutlawsHourlyTickTests : IDisposable
 
         dispatcher.Verify(value => value.RunAsOwners(It.IsAny<Action<Quest>>()), Times.Once);
         dispatcher.VerifyNoOtherCalls();
-        progress.VerifyNoOtherCalls();
+        Assert.Equal(0, progress.Calls);
     }
 }
