@@ -11,19 +11,13 @@ internal static class CoopShipSnapshots
 {
     private static readonly ConditionalWeakTable<Ship, Entry> snapshots = new ConditionalWeakTable<Ship, Entry>();
 
-    /// <summary>Records a snapshot of the party's own <paramref name="source"/>, or of another owner's ship by its registry id.</summary>
-    public static void Add(Ship ship, Ship source = null, string campaignShipId = null)
-    {
-        snapshots.Remove(ship);
-        snapshots.Add(ship, new Entry(source, campaignShipId));
-    }
+    /// <summary>Records a new snapshot of the campaign ship with registry id <paramref name="campaignShipId"/>.</summary>
+    public static void Add(Ship ship, string campaignShipId) => snapshots.Add(ship, new Entry(campaignShipId));
 
+    /// <summary>True for a ship the builder made, which the campaign gates keep off the campaign.</summary>
     public static bool Contains(Ship ship) => ship != null && snapshots.TryGetValue(ship, out _);
 
-    /// <summary>The party's own campaign ship a snapshot was built from; null for another owner's ship.</summary>
-    public static Ship SourceOf(Ship ship) => ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.Source : null;
-
-    /// <summary>The registry id another owner's record gave the snapshot's campaign ship; null for an own snapshot.</summary>
+    /// <summary>The registry id of the campaign ship a snapshot stands for; null for any other ship or an unregistered source.</summary>
     public static string CampaignShipIdOf(Ship ship) =>
         ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.CampaignShipId : null;
 
@@ -39,17 +33,15 @@ internal static class CoopShipSnapshots
     public static float MitigatedDamageOf(Ship ship) =>
         ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.MitigatedDamage : 0f;
 
-    // What the weak table holds for one snapshot: the own campaign ship it was built from or the id a record carried, and the
-    // damage mitigated on it.
+    // What the weak table holds for one snapshot: its campaign ship's registry id and the damage mitigated on it.
     private sealed class Entry
     {
-        public Entry(Ship source, string campaignShipId)
+        // Takes the campaign ship's registry id, null when the source had none.
+        public Entry(string campaignShipId)
         {
-            Source = source;
             CampaignShipId = campaignShipId;
         }
 
-        public Ship Source { get; }
         public string CampaignShipId { get; }
         public float MitigatedDamage { get; set; }
     }

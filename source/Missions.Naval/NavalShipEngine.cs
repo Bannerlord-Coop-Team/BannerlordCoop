@@ -59,6 +59,7 @@ public class NavalShipEngine : INavalShipEngine
 
     public bool IsDeploymentMode => ShipsLogic?.IsDeploymentMode == true;
 
+    // The ship fields written here are the ones CoopShipSnapshotBuilder.Build(data, owner) reads back; keep the two in step.
     public BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity)
     {
         var ship = (MissionShip)hull;
@@ -831,20 +832,9 @@ public class NavalShipEngine : INavalShipEngine
         return added;
     }
 
-    public string CampaignShipIdOf(MissionObject hull) => CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
+    public string CampaignShipIdOf(MissionObject hull) => CoopShipSnapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
     public float ReadMitigatedDamage(MissionObject hull) => CoopShipSnapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
-
-    /// <summary>
-    /// An own snapshot's party ship by its registry id, or the id another owner's record gave the snapshot; null for any other
-    /// ship origin.
-    /// </summary>
-    internal string CampaignShipIdOf(Ship snapshot)
-    {
-        var source = CoopShipSnapshots.SourceOf(snapshot);
-        if (source == null) return CoopShipSnapshots.CampaignShipIdOf(snapshot);
-        return objectManager.TryGetId(source, out var id) ? id : null;
-    }
 
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
     public void WithdrawAgent(Agent agent)

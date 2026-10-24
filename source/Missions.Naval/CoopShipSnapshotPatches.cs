@@ -5,9 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Naval;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
@@ -17,6 +15,7 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipDestroyPatch
 {
+    // Skips the destroy for a snapshot; campaign ships run it.
     [HarmonyPrefix]
     private static bool Prefix(Ship ship) => !CoopShipSnapshots.Contains(ship);
 }
@@ -27,6 +26,7 @@ internal class SnapshotShipDestroyPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipDamageXpPatch
 {
+    // Sums a snapshot's mitigated damage instead of granting XP; campaign ships run the vanilla grant.
     [HarmonyPrefix]
     internal static bool Prefix(Ship ship, float rawDamage, float finalDamage)
     {
@@ -43,19 +43,14 @@ internal class SnapshotShipDamageXpPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipHitPointsSyncScopePatch
 {
-    [ThreadStatic]
-    private static int snapshotWrites;
-
-    /// <summary>True while a snapshot's hit point setter, its postfixes included, runs on this thread.</summary>
-    internal static bool IsWritingSnapshot => snapshotWrites > 0;
-
+    // The two hit point setters a snapshot's mission damage and condition sync write.
     private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
         AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)),
         AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)),
     };
 
-    // First, so the AutoSync setter prefix (default priority) already runs inside the scope.
+    // Opens the allowed scope for a snapshot's write. First, so the AutoSync setter prefix (default priority) runs inside it.
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
     private static void Prefix(Ship __instance, out IDisposable __state)
@@ -63,28 +58,10 @@ internal class SnapshotShipHitPointsSyncScopePatch
         __state = null;
         if (!CoopShipSnapshots.Contains(__instance)) return;
 
-        snapshotWrites++;
         __state = CallOriginalPolicy.AllowOriginalsForCurrentOperation();
     }
 
-    // Finalizers run after every postfix, so the flag covers the campaign postfixes on the setter.
+    // Closes the scope; finalizers run after every postfix and on a throw, so the scope covers the setter's postfixes.
     [HarmonyFinalizer]
-    private static void Finalizer(IDisposable __state)
-    {
-        if (__state == null) return;
-
-        snapshotWrites--;
-        __state.Dispose();
-    }
-}
-
-// The campaign HitPoints postfix (ShipHitPointsPatches) refreshes the open menu for main-party ships; a snapshot is no
-// campaign ship, and while a mission opens or runs that menu context can have no handler. The server's applied ship fates
-// reach clients still in the battle, so no refresh runs during a mission; MapState.OnActivate refreshes the menu on return.
-[HarmonyPatch(typeof(GameMenuManager), nameof(GameMenuManager.RefreshMenuOptions))]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class SnapshotShipMenuRefreshPatch
-{
-    [HarmonyPrefix]
-    internal static bool Prefix() => !SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot && Mission.Current == null;
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }

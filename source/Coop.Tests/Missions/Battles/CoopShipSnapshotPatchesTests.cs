@@ -1,7 +1,9 @@
 ﻿#if DEBUG
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Missions.Naval;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -13,15 +15,13 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
-// The menu refresh gate reads Mission.Current, which other test classes in this collection set.
-[Collection("Mission.Current")]
 public class CoopShipSnapshotPatchesTests
 {
     // M6 D7: a snapshot's hits grant no XP here, but their mitigated damage is kept for the fate report; a campaign ship's pass.
     [Fact]
     public void DamageXp_SumsASnapshotsMitigatedDamage_AndLetsACampaignShipThrough()
     {
-        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
         var ship = CreateOwnedShip();
 
         Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 100f, finalDamage: 70f));
@@ -33,20 +33,10 @@ public class CoopShipSnapshotPatchesTests
         Assert.Equal(0f, CoopShipSnapshots.MitigatedDamageOf(ship));
     }
 
-    // M6 D5: the server's applied ship fates reach clients still in the battle, where the menu context can have no handler.
-    [Fact]
-    public void MenuRefresh_IsHeldWhileAMissionIsCurrent()
-    {
-        using (new MissionCurrentScope())
-            Assert.False(SnapshotShipMenuRefreshPatch.Prefix());
-
-        Assert.True(SnapshotShipMenuRefreshPatch.Prefix());
-    }
-
     [Fact]
     public void SnapshotHitPointWrites_RunTheDefaultPrioritySyncPrefixInsideTheScope()
     {
-        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
 
         var recorded = RecordSyncPrefixScope(() =>
         {
@@ -78,7 +68,7 @@ public class CoopShipSnapshotPatchesTests
     [Fact]
     public void SnapshotHitPointWriteThatThrows_StillClosesTheScope()
     {
-        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
 
         RecordSyncPrefixScope(() =>
         {
@@ -88,53 +78,6 @@ public class CoopShipSnapshotPatchesTests
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
     }
-
-    [Fact]
-    public void SnapshotHitPointWrites_HoldTheMenuRefreshOnlyWhileTheirPostfixesRun()
-    {
-        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
-        var ship = CreateOwnedShip();
-
-        var recorded = RecordPostfixMenuRefresh(() =>
-        {
-            snapshot.HitPoints = 100f;
-            snapshot.SailHitPoints = 50f;
-            ship.HitPoints = 100f;
-        });
-
-        Assert.Equal(new[] { false, false, true }, recorded);
-        Assert.False(SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot);
-        Assert.True(SnapshotShipMenuRefreshPatch.Prefix());
-    }
-
-    // The probe postfix stands in for the campaign HitPoints postfix that refreshes the open menu.
-    private static List<bool> RecordPostfixMenuRefresh(Action writeHitPoints)
-    {
-        var probeHarmony = new Harmony("coop.tests.naval.ship_snapshot_menu_probe");
-        var scopeHarmony = new Harmony("coop.tests.naval.ship_snapshot_menu_scope");
-        try
-        {
-            var probe = new HarmonyMethod(typeof(CoopShipSnapshotPatchesTests), nameof(MenuRefreshProbe));
-            probeHarmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)), postfix: probe);
-            probeHarmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)), postfix: probe);
-            scopeHarmony.CreateClassProcessor(typeof(SnapshotShipHitPointsSyncScopePatch)).Patch();
-            recordedMenuRefreshes = new List<bool>();
-
-            writeHitPoints();
-            return recordedMenuRefreshes;
-        }
-        finally
-        {
-            recordedMenuRefreshes = null;
-            scopeHarmony.UnpatchAll(scopeHarmony.Id);
-            probeHarmony.UnpatchAll(probeHarmony.Id);
-        }
-    }
-
-    [ThreadStatic]
-    private static List<bool> recordedMenuRefreshes;
-
-    private static void MenuRefreshProbe() => recordedMenuRefreshes?.Add(SnapshotShipMenuRefreshPatch.Prefix());
 
     // The probe stands in for the generated AutoSync setter prefix, which declares no priority. It is patched before
     // the scope patch, so only the priority can put the scope first.
