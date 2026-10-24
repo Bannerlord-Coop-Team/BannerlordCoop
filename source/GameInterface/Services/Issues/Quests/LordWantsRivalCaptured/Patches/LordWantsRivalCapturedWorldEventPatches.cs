@@ -9,7 +9,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
 
@@ -17,19 +16,12 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 
 /// <summary>
 /// The server runs the world event listeners the framework's QuestEventRelay does not cover as each owning player:
-/// kills, prisoner releases, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
+/// prisoner releases and the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken).
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches
 {
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void HeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
-    }
-
     [HarmonyPatch(nameof(CampaignEventDispatcher.OnHeroPrisonerTaken))]
     [HarmonyPostfix]
     private static void HeroPrisonerTakenPostfix(PartyBase capturer, Hero prisoner)
@@ -47,13 +39,6 @@ internal class LordWantsRivalCapturedWorldEventPatches
         bool showNotification)
     {
         RunAsOwners(quest => quest.OnHeroPrisonerReleased(prisoner, party, capturerFaction, detail, showNotification));
-    }
-
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void MapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
     }
 
     private static void RunAsOwners(Action<Quest> listener)
