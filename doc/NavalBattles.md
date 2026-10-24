@@ -536,8 +536,10 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   otherwise it logs the match count and DLL identity and waves stay vanilla. The redirect is switched on only while a
   coop naval battle runs (only from the game thread, the thread that runs the load) and switched back first thing at
   mission end, so other scenes run vanilla code. `0x1DA870`'s only caller chain is `0x9B820`, the frame tick `0x53950`
-  and the `rglFrame_move_task`, one frame task at a time, which also runs the managed tick after the water update, so a
-  swap from `AfterStart` or mission end can't race the site. The campaign map's view may stay registered under the mission
+  and the `rglFrame_move_task`, with one frame task in flight at a time. After the water update the same frame tick calls
+  through the managed interface at `0xDA2A28` (`0x5422A`, with dt), most likely the managed tick, though that callback
+  wasn't identified. So a swap from `AfterStart` or mission end shouldn't race the site; this is a static reading, not a
+  live check. The campaign map's view may stay registered under the mission
   (`MapScreen` toggles its scene view itself, and `0x9B820` has no enabled-view check), so map water can read battle
   time while the battle runs; that is hidden and cosmetic, and map water right after a battle is a live check.
   - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`

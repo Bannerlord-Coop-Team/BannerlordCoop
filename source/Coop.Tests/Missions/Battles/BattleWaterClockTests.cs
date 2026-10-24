@@ -210,6 +210,26 @@ public class BattleWaterClockTests
     }
 
     [Fact]
+    public void PromotedHost_KeepsAReportForANewerEpochUntilThatEpochArrives()
+    {
+        waterClock.Vanilla = 1000f;
+        clock.Tick(0.016f);
+
+        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 4, fromHost: false));
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        session.SetupGet(s => s.HostEpoch).Returns(3);
+        waterClock.Vanilla = 1000.5f;
+        clock.Tick(0.016f);
+        Assert.Equal(0.5f, waterClock.WrittenTime);
+
+        session.SetupGet(s => s.HostEpoch).Returns(4);
+        waterClock.Vanilla = 1001f;
+        clock.Tick(0.016f);
+
+        Assert.Equal(3001f, waterClock.WrittenTime);
+    }
+
+    [Fact]
     public void Client_DropsAReportForAnEpochItAlreadyHolds()
     {
         waterClock.Vanilla = 1000f;
