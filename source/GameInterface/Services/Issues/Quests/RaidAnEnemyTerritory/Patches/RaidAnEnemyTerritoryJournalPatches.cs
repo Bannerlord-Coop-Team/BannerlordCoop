@@ -36,7 +36,7 @@ public sealed class RaidAnEnemyTerritoryJournalSaveableTypeDefiner : SaveableTyp
     public override void DefineClassTypes() => AddClassDefinition(typeof(RaidAnEnemyTerritoryJournalLog), 1);
 }
 
-[HarmonyPatch(typeof(JournalLogsCampaignBehavior), "CreateRelatedLog", new[] { typeof(IssueBase) })]
+[HarmonyPatch(typeof(JournalLogsCampaignBehavior), nameof(JournalLogsCampaignBehavior.CreateRelatedLog), new[] { typeof(IssueBase) })]
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryJournalCreationPatch
 {

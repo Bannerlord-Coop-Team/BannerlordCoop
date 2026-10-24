@@ -114,35 +114,35 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
             __instance.IsOngoing);
     }
 
-    [HarmonyPatch(typeof(Quest), "OnHeroKilled")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnHeroKilled))]
     [HarmonyPrefix]
     private static bool OnHeroKilledPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnSettlementOwnerChanged")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged))]
     [HarmonyPrefix]
     private static bool OnSettlementOwnerChangedPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnWarDeclared")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
     [HarmonyPrefix]
     private static bool OnWarDeclaredPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnMakePeace")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnMakePeace))]
     [HarmonyPrefix]
     private static bool OnMakePeacePrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnClanChangedKingdom")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
     [HarmonyPrefix]
     private static bool OnClanChangedKingdomPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "DailyTick")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.DailyTick))]
     [HarmonyPrefix]
     private static bool DailyTickPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnTimedOut")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
     private static bool OnTimedOutPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), "OnBeforeTimedOut")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnBeforeTimedOut))]
     [HarmonyPrefix]
     private static bool OnBeforeTimedOutPrefix() => ModInformation.IsServer;
 

@@ -25,7 +25,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<RaidAnEnemyTerritoryRaidCompletionPatch>();
 
-    [HarmonyPatch(typeof(Quest), "OnRaidCompleted")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnRaidCompleted))]
     [HarmonyPrefix]
     private static bool OnRaidCompletedPrefix() => false;
 

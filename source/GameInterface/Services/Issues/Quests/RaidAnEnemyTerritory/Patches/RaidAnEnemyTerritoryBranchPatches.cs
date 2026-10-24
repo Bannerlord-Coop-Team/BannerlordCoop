@@ -14,7 +14,7 @@ internal sealed class RaidAnEnemyTerritoryBranchPatches
 {
     private static readonly ConditionalWeakTable<Quest, object> HandedOff = new();
 
-    [HarmonyPatch(typeof(Quest), "MainHeroRaidedAllVillages")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.MainHeroRaidedAllVillages))]
     [HarmonyPrefix]
     private static bool MainHeroRaidedAllVillagesPrefix(Quest __instance)
     {
@@ -28,15 +28,15 @@ internal sealed class RaidAnEnemyTerritoryBranchPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(Quest), "DailyTick")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.DailyTick))]
     [HarmonyPrefix]
     private static bool DailyTickPrefix(Quest __instance) => !HandedOff.TryGetValue(__instance, out _);
 
-    [HarmonyPatch(typeof(Quest), "OnBeforeTimedOut")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnBeforeTimedOut))]
     [HarmonyPrefix]
     private static bool OnBeforeTimedOutPrefix(Quest __instance) => !HandedOff.TryGetValue(__instance, out _);
 
-    [HarmonyPatch(typeof(Quest), "OnTimedOut")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
     private static bool OnTimedOutPrefix(Quest __instance) => ModInformation.IsServer && !HandedOff.TryGetValue(__instance, out _);
 
