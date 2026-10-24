@@ -185,7 +185,7 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithLordSolution ||
+        if (issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
