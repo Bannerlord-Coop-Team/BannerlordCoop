@@ -164,7 +164,7 @@ internal class PartyScreenLogicPatches
                 try
                 {
                     PartyScreenLockPreserver.Reset(
-                        Campaign.Current.GetCampaignBehavior<IViewDataTracker>(),
+                        Campaign.Current?.GetCampaignBehavior<IViewDataTracker>(),
                         () => __instance.Reset(true));
 
                     //__instance.FireCampaignRelatedEvents(); // Managed on server

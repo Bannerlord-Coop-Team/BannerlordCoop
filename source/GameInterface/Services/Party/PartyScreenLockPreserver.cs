@@ -15,6 +15,12 @@ internal static class PartyScreenLockPreserver
 {
     public static void Reset(IViewDataTracker tracker, Action reset)
     {
+        if (tracker == null)
+        {
+            reset();
+            return;
+        }
+
         var troopLocks = tracker.GetPartyTroopLocks().ToList();
         var prisonerLocks = tracker.GetPartyPrisonerLocks().ToList();
 

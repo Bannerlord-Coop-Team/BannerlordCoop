@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Party;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -35,7 +36,7 @@ public class PartyScreenLockPreserverTests
         });
 
         tracker.SetPartyTroopLocks(new[] { "new_troop" });
-        tracker.SetPartyPrisonerLocks(new string[0]);
+        tracker.SetPartyPrisonerLocks(Array.Empty<string>());
 
         PartyScreenLockPreserver.Reset(tracker, () => logic.OnReset(true));
 
