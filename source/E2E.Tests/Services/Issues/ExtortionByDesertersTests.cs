@@ -18,6 +18,7 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using System.Reflection;
+using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -32,6 +33,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
@@ -93,9 +95,9 @@ public class ExtortionByDesertersTests : IDisposable
         notable.Occupation = Occupation.Headman;
     }
 
-    private Quest Accept()
+    private Quest Accept(IEnumerable<MethodBase>? disabledMethods = null)
     {
-        scenario.Accept(Owner, TextLinks);
+        scenario.Accept(Owner, disabledMethods ?? TextLinks);
         var quest = (Quest)scenario.QuestOf(Owner);
         Owner.Call(() => quest.StartQuest());
         return quest;
@@ -1026,15 +1028,181 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void Timeout_AppliesThePenaltyAndJournalOnTheOwningQuest()
     {
-        var quest = Accept();
+        using var binding = new TimeoutCharacterProperties();
+        var quest = Accept(TextLinks.Skip(1));
         var mirror = (Quest)scenario.QuestOf(Server);
-        Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks);
+        string expected = null!;
+        Server.Call(() => expected = AssertTimeoutTextRoundTrip(mirror));
+        Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
         Assert.Equal(-10, mirror.RelationshipChangeWithQuestGiver);
         Assert.True(quest.IsFinalized);
-        Assert.Single(quest.JournalEntries);
+        AssertTimeoutDelivery();
+        Assert.Equal(expected, Assert.Single(quest.JournalEntries).LogText.ToString());
+    }
+
+    [Fact]
+    public void Timeout_WithEnglishServerAndFrenchOwner_AddsOneLocalizedJournalEntry()
+    {
+        using var binding = new TimeoutCharacterProperties();
+        var quest = Accept(TextLinks.Skip(1));
+        var mirror = (Quest)scenario.QuestOf(Server);
+        var router = Server.Resolve<TestNetworkRouter>();
+        var statesBeforeTimeout = Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>().Count();
+        var receiveContext = router.ReceiveContext;
+        var languages = LanguageData.All.ToArray();
+        var translations = LocalizedTextManager._gameTextDictionary.ToArray();
+        var functions = MBTextManager.TextContext._functions.ToArray();
+        var language = MBTextManager.ActiveTextLanguage;
+        var languageIndex = MBTextManager.GetActiveTextLanguageIndex();
+        var processor = MBTextManager._languageProcessor;
+        var debugMode = MBTextManager.LocalizationDebugMode;
+        try
+        {
+            var native = Path.GetFullPath(Path.Combine(BasePath.Name, "Modules", "Native"));
+            var sandbox = Path.GetFullPath(Path.Combine(BasePath.Name, "Modules", "SandBox"));
+            var frenchPath = Path.Combine(sandbox, "ModuleData", "Languages", "FR", "std_TaleWorlds_CampaignSystem_fre-FR.xml");
+            Assert.True(File.Exists(Path.Combine(native, "ModuleData", "Languages", "FR", "language_data.xml")),
+                $"Localization prerequisite missing: Native French language_data.xml under {native}");
+            Assert.True(File.Exists(frenchPath), $"Localization prerequisite missing: {frenchPath}");
+            var frenchTemplate = XDocument.Load(frenchPath).Descendants("string")
+                .Single(element => (string?)element.Attribute("id") == "YjxCkglX").Attribute("text")!.Value;
+            LocalizedTextManager.LoadLocalizationXmls(new[] { native, sandbox });
+            MBTextManager.LocalizationDebugMode = false;
+            Assert.True(MBTextManager.ChangeLanguage("English"), "Localization prerequisite: English could not be loaded");
+            var englishIndex = MBTextManager.GetActiveTextLanguageIndex();
+            string english = null!;
+            Server.Call(() => english = AssertTimeoutTextRoundTrip(mirror));
+
+            router.ReceiveContext = TestNetworkReceiveContext.PollerThread;
+            Owner.Call(() => quest.CompleteQuestWithTimeOut(), TextLinks.Skip(1));
+            Assert.True(Server.PendingGameThreadActionCount > 0);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Server.Call(() => Server.PumpGameThread(), TextLinks.Skip(1));
+            Assert.Equal(-10, mirror.RelationshipChangeWithQuestGiver);
+            Assert.True(mirror.IsFinalized);
+            Assert.Empty(quest.JournalEntries);
+            Assert.False(quest.IsFinalized);
+            Assert.True(Owner.PendingGameThreadActionCount > 0);
+
+            var state = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>()
+                .Skip(statesBeforeTimeout));
+            var stateWire = Owner.DeserializeFromWire<NetworkExtortionByDesertersState>(Server.SerializeForWire(state));
+            Assert.Equal(english, stateWire.Log.ToString());
+            var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+            var snapshotWire = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(snapshot));
+            var ending = Assert.Single(snapshotWire.Logs);
+            Assert.Equal(english, AssertValidTimeoutText(ending));
+            output.WriteLine($"English state Log ({stateWire.Log.GetType().Name}): {stateWire.Log}");
+            output.WriteLine($"Snapshot template: {ending.Value}");
+
+            Assert.True(MBTextManager.ChangeLanguage("Français"), "Localization prerequisite: Français could not be loaded");
+            Assert.NotEqual(englishIndex, MBTextManager.GetActiveTextLanguageIndex());
+            Assert.Equal(frenchTemplate, LocalizedTextManager.GetTranslatedText("Français", "YjxCkglX"));
+            var properties = Assert.IsType<TextObject>(ending.Attributes["QUEST_GIVER"]);
+            var link = Assert.IsType<TextObject>(properties.Attributes["LINK"]).ToString();
+            var french = AssertValidTimeoutText(ending);
+            Assert.Equal(frenchTemplate.Replace("{QUEST_GIVER.LINK}", link), french);
+            Assert.NotEqual(english, french);
+            Owner.PumpGameThread();
+            Other.PumpGameThread();
+            Assert.True(quest.IsFinalized);
+            AssertTimeoutDelivery();
+            output.WriteLine($"Owner journal: {string.Join(" | ", quest.JournalEntries.Select(entry => entry.LogText.ToString()))}");
+            Assert.Equal(french, Assert.Single(quest.JournalEntries).LogText.ToString());
+        }
+        finally
+        {
+            try
+            {
+                foreach (var instance in new[] { Server, Owner, Other })
+                    instance.Call(() => instance.PumpGameThread(), TextLinks.Skip(1));
+            }
+            finally
+            {
+                router.ReceiveContext = receiveContext;
+                LanguageData._all.Clear();
+                LanguageData._all.AddRange(languages);
+                LocalizedTextManager._gameTextDictionary.Clear();
+                foreach (var entry in translations) LocalizedTextManager._gameTextDictionary.Add(entry.Key, entry.Value);
+                MBTextManager.TextContext._functions.Clear();
+                foreach (var entry in functions) MBTextManager.TextContext._functions.Add(entry.Key, entry.Value);
+                MBTextManager._activeTextLanguageId = language;
+                MBTextManager._activeTextLanguageIndex = languageIndex;
+                MBTextManager._languageProcessor = processor;
+                MBTextManager.LocalizationDebugMode = debugMode;
+            }
+        }
+    }
+
+    private void AssertTimeoutDelivery()
+    {
+        var request = Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
+        Assert.Equal(scenario.NotableId, request.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, request.IssueId);
         Assert.Equal(IssueOutcome.QuestTimeOut,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Other.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, item => item is Quest));
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Equal(scenario.NotableId, snapshot.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, snapshot.IssueId);
+        Assert.True(snapshot.IsQuestJournal);
+        Assert.Single(snapshot.Logs);
+        Other.Call(() =>
+        {
+            Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, item => item is Quest);
+            var notable = Other.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.Null(notable.Issue.IssueQuest);
+            Assert.Empty(notable.Issue.JournalEntries);
+        });
+    }
+
+    private string AssertTimeoutTextRoundTrip(Quest mirror)
+    {
+        var text = mirror.OnQuestTimedOutLogText;
+        var envelope = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { text });
+        var roundTrip = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(envelope));
+        var rendered = AssertValidTimeoutText(text);
+        Assert.Equal(rendered, AssertValidTimeoutText(Assert.Single(roundTrip.Logs)));
+        return rendered;
+    }
+
+    private static string AssertValidTimeoutText(TextObject text)
+    {
+        Assert.Contains("{=YjxCkglX}", text.Value);
+        var properties = Assert.IsType<TextObject>(text.Attributes["QUEST_GIVER"]);
+        var name = Assert.IsType<TextObject>(properties.Attributes["NAME"]);
+        Assert.IsType<int>(properties.Attributes["GENDER"]);
+        var link = Assert.IsType<TextObject>(properties.Attributes["LINK"]);
+        Assert.False(TextObject.IsNullOrEmpty(name));
+        Assert.False(TextObject.IsNullOrEmpty(link));
+        var rendered = text.ToString();
+        Assert.DoesNotContain("ERROR:", rendered);
+        Assert.Contains(name.ToString(), rendered);
+        Assert.Contains(link.ToString(), rendered);
+        return rendered;
+    }
+
+    private sealed class TimeoutCharacterProperties : IDisposable
+    {
+        private readonly Harmony harmony = new($"timeout-character-properties-{Guid.NewGuid()}");
+        private readonly MethodInfo method = AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties));
+
+        public TimeoutCharacterProperties() => harmony.Patch(method,
+            prefix: new HarmonyMethod(typeof(TimeoutCharacterProperties), nameof(Prefix)));
+
+        public void Dispose() => harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+
+        private static bool Prefix(CharacterObject character, ref TextObject __result)
+        {
+            var link = new TextObject("{=!}<a style=\"Link.Hero\" href=\"{ID}\"><b>{NAME}</b></a>");
+            link.SetTextVariable("ID", character.HeroObject.StringId);
+            link.SetTextVariable("NAME", character.Name);
+            __result = TextObject.GetEmpty();
+            __result.SetTextVariable("NAME", character.Name);
+            __result.SetTextVariable("GENDER", character.IsFemale ? 1 : 0);
+            __result.SetTextVariable("LINK", link);
+            return false;
+        }
     }
 
     [Fact]
