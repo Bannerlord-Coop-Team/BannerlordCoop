@@ -4,6 +4,8 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
+using ProtoBuf;
+using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -184,6 +186,31 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             Assert.Same(issues[scenario.ClientA], issues[scenario.ClientA].IssueOwner.Issue);
             Assert.False(archives[scenario.ClientA].IsEnded());
         });
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", "")]
+    [InlineData("Previous text", "Previous task")]
+    public void AlternativeJournal_ReplaysPreviousPayloadWithoutNativeText(string text, string task)
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new PreviousJournalEntry { Text = text, TaskName = task });
+        stream.Position = 0;
+        var received = Serializer.Deserialize<AlternativeSolutionJournalEntry>(stream);
+        var log = received.ToJournalLog();
+
+        Assert.Null(received.NativeText);
+        Assert.Null(received.NativeTaskName);
+        Assert.Equal(text, log.LogText?.Value);
+        Assert.Equal(task, log.TaskName?.Value);
+    }
+
+    [ProtoContract]
+    private class PreviousJournalEntry
+    {
+        [ProtoMember(2)] public string Text { get; set; }
+        [ProtoMember(3)] public string TaskName { get; set; }
     }
 
     private void EndOnServer(IssueBase.IssueUpdateDetails ending)
