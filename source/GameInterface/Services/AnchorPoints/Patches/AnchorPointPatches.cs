@@ -130,7 +130,6 @@ internal class AnchorPointMenuRefreshPatch
     private static void Postfix(MenuContext __instance)
     {
         if (ModInformation.IsServer) return;
-        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
 
         var anchor = MobileParty.MainParty?.Anchor;
         if (anchor == null || !anchor.IsMovingToPoint) return;
