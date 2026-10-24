@@ -8,7 +8,6 @@ using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
-using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
@@ -161,10 +160,6 @@ internal class SiegeEntryFlowPatches
         if (army != null)
         {
             MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
-            using (new AllowedThread())
-            {
-                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
-            }
         }
         PlayerSiege.FinalizePlayerSiege();
 
@@ -210,8 +205,8 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
-    // The army follower "Leave Army" option clears the camp and the army in one consequence. The army
-    // write already flows through the co-op army patches, so only the camp write is rerouted.
+    // The army follower "Leave Army" option clears the camp and the army in one consequence. Both the army
+    // and the camp writes are rerouted.
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_strategies_passive_wait_leave_on_consequence))]
     [HarmonyPrefix]
     private static bool PassiveWaitLeavePrefix()
@@ -227,7 +222,11 @@ internal class SiegeEntryFlowPatches
         MessageBroker.Instance.Publish(
             null,
             new BreakSiegeAttempted(MobileParty.MainParty, finishLocalMenus: false));
-        MobileParty.MainParty.Army = null;
+
+        MessageBroker.Instance.Publish(null,
+            new MobilePartyInArmyRemoved(MobileParty.MainParty.Army,
+            MobileParty.MainParty,
+            MobileParty.MainParty));
         return false;
     }
 
@@ -283,10 +282,6 @@ internal class SiegeEntryFlowPatches
         if (army != null && army.LeaderParty != mainParty)
         {
             MessageBroker.Instance.Publish(army, new MobilePartyInArmyRemoved(army, mainParty, mainParty));
-            using (new AllowedThread())
-            {
-                ArmyPatches.RemoveMobilePartyInArmy(mainParty, army, mainParty);
-            }
         }
 
         // A besieger prompted into join_siege_event can already sit on a side of the sally-out/relief map
