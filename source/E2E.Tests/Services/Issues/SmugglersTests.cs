@@ -459,7 +459,7 @@ public class SmugglersTests : IDisposable
             }, questTexts);
         }
 
-        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+        using var failQuest = new MethodCallRecorder(Priority.Last, runOriginal: true, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
         Quest observedQuest = null!;
         Hero ownerHero = null!;
         Hero observedMainHero = null!;
