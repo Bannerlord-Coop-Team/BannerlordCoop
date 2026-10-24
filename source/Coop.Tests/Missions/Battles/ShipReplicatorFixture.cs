@@ -22,9 +22,10 @@ public sealed class ShipReplicatorFixture
         network ??= Mock.Of<IBattleNetwork>();
         Arrivals = arrivals ?? new ImmediateShipArrivals();
         HullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, engine, context.TroopWithdrawal);
+        AppliedHost = new NavalAppliedHost(broker, context.Session);
         Conditions = new BattleShipConditionStream(network, context.Session, engine, context.HostEpochPolicy, context.MissionContext);
         Replicator = new BattleShipReplicator(network, broker, context, engine, teamResolver ?? Mock.Of<IBattleTeamResolver>(),
-            objectManager ?? Mock.Of<IObjectManager>(), HullAuthority, Conditions, stations ?? Mock.Of<IAgentStationUseReplicator>(),
+            objectManager ?? Mock.Of<IObjectManager>(), HullAuthority, AppliedHost, Conditions, stations ?? Mock.Of<IAgentStationUseReplicator>(),
             captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals);
     }
 
@@ -33,6 +34,9 @@ public sealed class ShipReplicatorFixture
 
     /// <summary>Moves hull authority, swaps and removes hulls.</summary>
     public NavalHullAuthority HullAuthority { get; }
+
+    /// <summary>The host and epoch whose AI hull move this client applied.</summary>
+    public NavalAppliedHost AppliedHost { get; }
 
     /// <summary>The hulls' damage state and reported reserve.</summary>
     public BattleShipConditionStream Conditions { get; }

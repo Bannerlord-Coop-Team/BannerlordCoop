@@ -26,7 +26,7 @@ namespace Missions.Battles;
 /// with its owner (retreat, leave or disconnect) is removed on every client, after its seats and deck are cleared; only the
 /// AI hulls move to the next battle host.
 /// </summary>
-public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
+public interface IBattleShipReplicator : IDisposable
 {
     /// <summary>[Game thread] Announce hulls, stream own samples and expire stale ones for this frame.</summary>
     void Tick(float dt);
@@ -125,6 +125,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
     private readonly INavalHullAuthority hullAuthority;
+    private readonly INavalAppliedHost appliedHost;
     private readonly IBattleShipConditionStream conditions;
     private readonly IAgentStationUseReplicator stations;
     private readonly IBattlePartyWithdrawal partyWithdrawal;
@@ -147,12 +148,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     // [Game thread] Departed players whose party withdrawal waits for their hulls to settle, with whether each was the host.
     private readonly Dictionary<string, bool> pendingWithdrawals = new Dictionary<string, bool>();
     private long recordsHeld;
-    // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
-    private string npcHullHost;
-    // The host epoch whose AI hull move this client applied last, or the one it joined at; a report from a newer one is early.
-    private int appliedHostEpoch;
-    // [Game thread] Host changes whose hull move waits in the arrivals queue; the session already reads their epoch.
-    private int queuedHostChanges;
     private bool spawnRecordsSent;
     private float sendElapsed;
     private float elapsed;
@@ -174,6 +169,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         IBattleTeamResolver teamResolver,
         IObjectManager objectManager,
         INavalHullAuthority hullAuthority,
+        INavalAppliedHost appliedHost,
         IBattleShipConditionStream conditions,
         IAgentStationUseReplicator stations,
         INavalShipCaptureEngine captureEngine,
@@ -192,11 +188,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
         this.hullAuthority = hullAuthority;
+        this.appliedHost = appliedHost;
         this.conditions = conditions;
         this.stations = stations;
         this.captureEngine = captureEngine;
         this.arrivals = arrivals;
-        NoteJoinEpoch();
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -260,29 +256,26 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (migrated.MapEventId != session.InstanceId) return;
         if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, session.IsNaval)) return;
 
-        // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers.
-        string newHost = migrated.NewHostControllerId ?? session.OwnControllerId;
-        // The epoch the session reads now is the change's; the move applies later, so it carries it.
-        int epoch = migrated.Epoch > 0 ? migrated.Epoch : session.HostEpoch;
-        GameThread.RunSafe(() =>
+        // The server's assignment always names both, so a guess here would move every AI hull to the wrong client.
+        string newHost = migrated.NewHostControllerId;
+        int epoch = migrated.Epoch;
+        if (newHost == null || epoch <= 0)
         {
-            queuedHostChanges++;
-            arrivals.Enqueue(() => ApplyQueuedHostChange(newHost, epoch), nameof(Handle_BattleHostMigrated));
-        }, context: nameof(Handle_BattleHostMigrated));
-    }
+            Logger.Error("[NavalSync] Host change of {MapEventId} names host {Host} at epoch {Epoch}; the AI hulls stay where they are",
+                migrated.MapEventId, newHost ?? "none", epoch);
+            return;
+        }
 
-    // [Mission tick] The queued hull move of a host change, at the epoch the change carried.
-    private void ApplyQueuedHostChange(string newHost, int epoch)
-    {
-        queuedHostChanges--;
-        TransferHostHulls(newHost, epoch);
+        // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers. The
+        // session reads the change's epoch now and the move applies later, so it carries the epoch.
+        GameThread.RunSafe(() => arrivals.Enqueue(() => TransferHostHulls(newHost, epoch), nameof(Handle_BattleHostMigrated)),
+            context: nameof(Handle_BattleHostMigrated));
     }
 
     /// <summary>[Game thread] Moves every AI hull to <paramref name="newHost"/>, and flips local simulation where ours changed.</summary>
-    internal int TransferHostHulls(string newHost, int epoch = 0)
+    internal int TransferHostHulls(string newHost, int epoch)
     {
-        npcHullHost = newHost;
-        appliedHostEpoch = epoch > 0 ? epoch : session.HostEpoch;
+        appliedHost.Apply(newHost, epoch);
         int transferred = 0;
         foreach (var ship in Registry.Ships)
         {
@@ -414,9 +407,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Own hull {ShipId} leaves the mission ({Reason}{Ending}); told peers to remove it",
             ship.ShipId, reason, missionEnding ? ", mission ending" : "");
     }
-
-    // The epoch whose AI hull move applied last, or the one this client joined at.
-    public int AppliedHostEpoch => appliedHostEpoch;
 
     public int DepartedHulls(BattleSideEnum side) => departedHulls.TryGetValue(side, out int count) ? count : 0;
 
@@ -617,14 +607,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     // Reads the hull and the session's epoch for IsEarlyHostCondition.
     private bool IsEarlyHostCondition(NetworkShipInfo ship, NetworkShipCondition condition, string rejection) =>
-        IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHostEpoch);
-
-    // The epoch this client joined the battle at, taken at the start or with the first hull records once a host is known and no
-    // host change is queued (the session already reads a queued change's epoch), so a stale report isn't read as an early one.
-    private void NoteJoinEpoch()
-    {
-        if (appliedHostEpoch == 0 && queuedHostChanges == 0) appliedHostEpoch = session.HostEpoch;
-    }
+        IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHost.AppliedHostEpoch);
 
     // Keeps the newest early report per hull.
     private void HoldEarlyHostCondition(NetworkShipCondition condition)
@@ -712,7 +695,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     /// <summary>[Game thread] Queues other owners' hull records and spawns the copies that can spawn now.</summary>
     internal void AcceptSpawnRecords(IEnumerable<BattleShipSpawnData> records)
     {
-        NoteJoinEpoch();
         foreach (var record in records.Where(record => record != null))
         {
             // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host. A returner's
@@ -905,7 +887,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     // Who simulates a hull whose record waited: an AI hull moves with the host, a player's stays with its owner.
     private string CurrentAuthorityOf(NetworkShipInfo ship) =>
-        ship.FollowsBattleHost ? npcHullHost ?? ship.CurrentAuthority : ship.CurrentAuthority;
+        ship.FollowsBattleHost ? appliedHost.Host ?? ship.CurrentAuthority : ship.CurrentAuthority;
 
     // The departed owner's last held state goes on before the move, so the new authority takes over from its pose and damage.
     // Its epoch may be behind and its sender is out of the mission by now, so only the authority, order and validity checks apply.
@@ -1153,6 +1135,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     public object Inspect() => new
     {
         spawnRecordsSent,
+        appliedHostEpoch = appliedHost.AppliedHostEpoch,
+        appliedHost = appliedHost.Host,
         removalsSent,
         removalsAccepted,
         removalsRejected,

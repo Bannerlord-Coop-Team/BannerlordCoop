@@ -75,6 +75,7 @@ public class NavalBattleServices : INavalBattleServices
     private static readonly ILogger Logger = LogManager.GetLogger<NavalBattleServices>();
 
     private readonly INavalHullAuthority hullAuthority;
+    private readonly INavalAppliedHost appliedHost;
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
@@ -93,6 +94,7 @@ public class NavalBattleServices : INavalBattleServices
         this.asyncAgentTick = asyncAgentTick;
         session = context.Session;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
+        appliedHost = new NavalAppliedHost(messageBroker, context.Session);
         Arrivals = new BattleShipArrivals();
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
             context.MissionContext);
@@ -100,7 +102,7 @@ public class NavalBattleServices : INavalBattleServices
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, conditions, StationUseReplicator, captureEngine, Arrivals);
+            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals);
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
         captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
             hullAuthority, Arrivals);
@@ -113,7 +115,7 @@ public class NavalBattleServices : INavalBattleServices
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, hullAuthority);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, ShipReplicator, Arrivals);
+            shipEngine, appliedHost, Arrivals);
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, hullAuthority, context.HostEpochPolicy, context.MissionContext);
         FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
@@ -223,6 +225,7 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.Dispose();
         ShipReplicator.Dispose();
         hullAuthority.Dispose();
+        appliedHost.Dispose();
         Arrivals.Clear();
     }
 }

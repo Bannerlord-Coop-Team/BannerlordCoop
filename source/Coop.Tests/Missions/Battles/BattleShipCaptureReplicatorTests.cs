@@ -913,7 +913,7 @@ public class BattleShipCaptureReplicatorTests
         {
             hostEpoch = epoch;
             host = newHost;
-            Ships.TransferHostHulls(newHost);
+            Ships.TransferHostHulls(newHost, epoch);
         }
 
         public JObject Inspect() => JObject.FromObject(Exchange.Inspect());
