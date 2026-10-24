@@ -116,6 +116,8 @@ public sealed class ModOptionsData
 
     public int? WandererLimit { get; set; }
 
+    public int? SpawnRateWanderers { get; set; }
+
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
     public int? PlayerKingdomClanTierRequired { get; set; }
@@ -141,6 +143,8 @@ public sealed class ModOptionsData
     public bool? PlayerWoundedBattleEntry { get; set; }
 
     public bool? ShowPlayerNameplates { get; set; }
+
+    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

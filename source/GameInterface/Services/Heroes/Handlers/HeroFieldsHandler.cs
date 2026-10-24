@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -25,11 +24,7 @@ namespace GameInterface.Services.Heroes.Handlers
 
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
-            messageBroker.Subscribe<ChangeFirstName>(Handle);
-            messageBroker.Subscribe<ChangeName>(Handle);
             messageBroker.Subscribe<ChangeHeroState>(Handle);
-            messageBroker.Subscribe<ChangeHeroLevel>(Handle);
-            messageBroker.Subscribe<ChangeSpcDaysInLocation>(Handle);
             messageBroker.Subscribe<ChangeDefaultAge>(Handle);
             messageBroker.Subscribe<ChangeBirthDay>(Handle);
             messageBroker.Subscribe<ChangePower>(Handle);
@@ -42,11 +37,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
-            messageBroker.Unsubscribe<ChangeFirstName>(Handle);
-            messageBroker.Unsubscribe<ChangeName>(Handle);
             messageBroker.Unsubscribe<ChangeHeroState>(Handle);
-            messageBroker.Unsubscribe<ChangeHeroLevel>(Handle);
-            messageBroker.Unsubscribe<ChangeSpcDaysInLocation>(Handle);
             messageBroker.Unsubscribe<ChangeDefaultAge>(Handle);
             messageBroker.Unsubscribe<ChangeBirthDay>(Handle);
             messageBroker.Unsubscribe<ChangePower>(Handle);
@@ -130,23 +121,6 @@ namespace GameInterface.Services.Heroes.Handlers
             MarshalApply(data.HeroId, nameof(ChangeDefaultAge), instance => instance._defaultAge = data.Age);
         }
 
-        private void Handle(MessagePayload<ChangeSpcDaysInLocation> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeSpcDaysInLocation), instance =>
-            {
-                //instance.SpcDaysInLocation = data.Days;
-            });
-        }
-
-        private void Handle(MessagePayload<ChangeHeroLevel> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeHeroLevel), instance => instance.Level = data.HeroLevel);
-        }
-
         private void Handle(MessagePayload<ChangeHeroState> payload)
         {
             var data = payload.What;
@@ -159,20 +133,6 @@ namespace GameInterface.Services.Heroes.Handlers
                     instance.ChangeState((Hero.CharacterStates)data.HeroState);
                 }
             });
-        }
-
-        private void Handle(MessagePayload<ChangeName> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeName), instance => instance._name = new TextObject(data.NewName));
-        }
-
-        private void Handle(MessagePayload<ChangeFirstName> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeFirstName), instance => instance._firstName = new TextObject(data.NewName));
         }
 
         private void Handle(MessagePayload<ChangeCharacterObject> payload)

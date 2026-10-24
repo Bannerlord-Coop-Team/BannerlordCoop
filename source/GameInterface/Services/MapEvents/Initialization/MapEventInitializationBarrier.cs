@@ -33,6 +33,7 @@ namespace GameInterface.Services.MapEvents.Initialization;
 public interface IMapEventInitializationBarrier : IGameAbstraction
 {
     bool IsPending(MapEvent mapEvent);
+    bool IsCommitted(MapEvent mapEvent);
     bool IsPartyPending(PartyBase party);
     void Register(MapEvent mapEvent, bool committed = false);
     void SetServerPartyPending(MapEvent mapEvent, PartyBase party, bool pending);
@@ -94,6 +95,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     public bool IsPending(MapEvent mapEvent) =>
         mapEvent != null && states.TryGetValue(mapEvent, out var state) && !state.Committed;
+
+    public bool IsCommitted(MapEvent mapEvent) =>
+        mapEvent != null && states.TryGetValue(mapEvent, out var state) && state.Committed;
 
     public bool IsPartyPending(PartyBase party) =>
         party != null && Volatile.Read(ref pendingParties).Contains(party);

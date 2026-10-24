@@ -46,6 +46,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly ILocationConversationAgentGuard conversationAgentGuard;
     private readonly ILocationPartyPuppetRegistrar partyPuppetRegistrar;
+    private readonly ILocationNpcAuthorityState authorityState;
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -65,6 +66,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationControllerWithdrawalState withdrawalState,
         IMissionContext missionContext,
         IMissionWeaponDataMapper missionWeaponDataMapper,
+        ILocationNpcAuthorityState authorityState,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
         ICoopMissionComponent coopMissionComponent)
@@ -81,6 +83,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         this.missionWeaponDataMapper = missionWeaponDataMapper;
         this.conversationAgentGuard = conversationAgentGuard;
         this.partyPuppetRegistrar = partyPuppetRegistrar;
+        this.authorityState = authorityState;
         //this.boardGameManager = boardGameManager;
 
         // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
@@ -99,8 +102,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             npcHoldRegistry, conversationAgentGuard);
         npcPuppetSpawner = new LocationPuppetSpawner(
             messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
-            bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
-        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
+            bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState,
+            authorityState);
+        populationDirector = new LocationPopulationDirector(
+            messageBroker, session, bindingMap, npcPuppetSpawner, authorityState);
 
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
@@ -219,10 +224,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         if (mission == null || location == null || agentHandler == null) return;
 
         _spawningOwnedCompanions = true;
-        bool previousSuppressCapture = LocationNpcGate.SuppressCapture;
-        LocationNpcGate.SuppressCapture = true;
         int ownedRosterEntries = 0;
         int recoverySpawns = 0;
+        using var captureScope = authorityState.SuppressCapture();
         try
         {
             foreach (LocationCharacter locationCharacter in location.GetCharacterList())
@@ -265,7 +269,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         }
         finally
         {
-            LocationNpcGate.SuppressCapture = previousSuppressCapture;
             _spawningOwnedCompanions = false;
             Logger.Information("[LocationCompanion] Owner roster reconciliation complete for {Location}: ownedRosterEntries={RosterCount}, recoverySpawns={RecoveryCount}",
                 location.StringId, ownedRosterEntries, recoverySpawns);
@@ -429,12 +432,13 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         // A fresh mission has no host yet: drop any assignment left from a PREVIOUS visit to this
         // settlement (the server clears only its own entry when an instance empties), or a stale
-        // host would read as "previous host" and fake a migration when the new election lands.
+        // host would read as "previous host" and fake a migration when the new election lands. It also
+        // keeps the authority state from confirming a stale host when BeginMission activates the instance.
         hostRegistry.Remove(instanceId);
 
-        // Engage the NPC gate: native population spawning is suppressed on every client until the
-        // server's host assignment confirms who runs it (SR-013).
-        LocationNpcGate.BeginMission(instanceId, IsKnownPartyAgent);
+        // Native population spawning is suppressed on every client until the server's host assignment
+        // confirms who runs it (SR-013).
+        authorityState.BeginMission(instanceId, IsKnownPartyAgent);
 
         network.ConnectToInstance(instanceId);
         coopMissionComponent.AgentRegistry.Clear();
@@ -502,7 +506,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
     protected override void OnLeaving()
     {
-        LocationNpcGate.EndMission();
+        authorityState.EndMission();
         relayNetwork.SendAll(new NetworkMissionLeft(controllerIdProvider.ControllerId, instanceId));
         messageBroker.Publish(this, new PlayerLeftLocation());
         network.Stop();
@@ -633,7 +637,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             if (Mission.Current == null) return null;
 
             // The owner sends the live mount state because companions can spawn mounted in village centers.
-            bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
+            var settlement = Settlement.CurrentSettlement;
+            bool useBattleEquipment = ShouldUseBattleEquipment(
+                settlement?.IsVillage == true,
+                settlement?.SettlementComponent is RetirementSettlementComponent);
 
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
@@ -641,7 +648,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
-            agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
+            agentBuildData.Equipment(useBattleEquipment
+                ? character.FirstBattleEquipment
+                : character.FirstCivilianEquipment);
             MissionEquipment missionEquipment = ResolveMissionEquipment(missionEquipmentData);
             if (missionEquipment != null)
                 agentBuildData.MissionEquipment(missionEquipment);
@@ -652,14 +661,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
             Agent agent;
             // Remote party puppets are not host-owned NPCs and must not be captured for replication.
-            LocationNpcGate.SuppressCapture = true;
-            try
+            using (authorityState.SuppressCapture())
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
-            }
-            finally
-            {
-                LocationNpcGate.SuppressCapture = false;
             }
 
             if (health > 0)
@@ -725,6 +729,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     }
 
     internal static bool ShouldDisableHorses(bool hasMount) => !hasMount;
+
+    internal static bool ShouldUseBattleEquipment(bool isVillage, bool isRetirementLocation)
+        => isVillage || isRetirementLocation;
 
     // Cheap, non-throwing pre-filter for the common "unresolved remote hero" case, so the normal
     // path does not rely on a thrown exception (which trips first-chance break in the debugger).

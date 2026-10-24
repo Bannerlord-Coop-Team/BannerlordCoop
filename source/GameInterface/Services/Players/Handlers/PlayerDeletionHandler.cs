@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
@@ -35,6 +36,7 @@ internal class PlayerDeletionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ICoopSessionProvider sessionProvider;
+    private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
 
     public PlayerDeletionHandler(
         IMessageBroker messageBroker,
@@ -42,7 +44,8 @@ internal class PlayerDeletionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISiegeEventInterface siegeEventInterface,
-        ICoopSessionProvider sessionProvider)
+        ICoopSessionProvider sessionProvider,
+        IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -50,10 +53,14 @@ internal class PlayerDeletionHandler : IHandler
         this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
         this.sessionProvider = sessionProvider;
+        this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Subscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
         messageBroker.Subscribe<NetworkPlayerRemoved>(Handle_NetworkPlayerRemoved);
+        messageBroker.Subscribe<PlayerRetirementRequested>(Handle_PlayerRetirementRequested);
+        messageBroker.Subscribe<NetworkRequestPlayerRetirement>(Handle_NetworkRequestPlayerRetirement);
+        messageBroker.Subscribe<NetworkPlayerRetired>(Handle_NetworkPlayerRetired);
         messageBroker.Subscribe<NetworkDeletePlayerDenied>(Handle_NetworkDeletePlayerDenied);
         messageBroker.Subscribe<PlayerDisconnectRequested>(Handle_PlayerDisconnectRequested);
         messageBroker.Subscribe<NetworkRequestPlayerDisconnect>(Handle_NetworkRequestPlayerDisconnect);
@@ -64,6 +71,9 @@ internal class PlayerDeletionHandler : IHandler
         messageBroker.Unsubscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Unsubscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
         messageBroker.Unsubscribe<NetworkPlayerRemoved>(Handle_NetworkPlayerRemoved);
+        messageBroker.Unsubscribe<PlayerRetirementRequested>(Handle_PlayerRetirementRequested);
+        messageBroker.Unsubscribe<NetworkRequestPlayerRetirement>(Handle_NetworkRequestPlayerRetirement);
+        messageBroker.Unsubscribe<NetworkPlayerRetired>(Handle_NetworkPlayerRetired);
         messageBroker.Unsubscribe<NetworkDeletePlayerDenied>(Handle_NetworkDeletePlayerDenied);
         messageBroker.Unsubscribe<PlayerDisconnectRequested>(Handle_PlayerDisconnectRequested);
         messageBroker.Unsubscribe<NetworkRequestPlayerDisconnect>(Handle_NetworkRequestPlayerDisconnect);
@@ -119,6 +129,68 @@ internal class PlayerDeletionHandler : IHandler
         GameThread.RunSafe(() => DeletePlayer(peer, data.HeroId, data.KeepConnected), context: nameof(PlayerDeletionHandler));
     }
 
+    private void Handle_PlayerRetirementRequested(MessagePayload<PlayerRetirementRequested> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        network.SendAll(new NetworkRequestPlayerRetirement());
+    }
+
+    private void Handle_NetworkRequestPlayerRetirement(MessagePayload<NetworkRequestPlayerRetirement> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        if (payload.Who is not NetPeer peer)
+        {
+            Logger.Error("{Message} arrived without a source peer; cannot resolve the requesting player",
+                nameof(NetworkRequestPlayerRetirement));
+            return;
+        }
+
+        GameThread.RunSafe(() => RetirePlayer(peer), context: nameof(PlayerDeletionHandler));
+    }
+
+    private void RetirePlayer(NetPeer peer)
+    {
+        if (!playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Warning("Retirement request from peer {PeerId} with no registered player", peer.Id);
+            return;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) || !hero.IsAlive)
+        {
+            Logger.Warning("Cannot retire player {ControllerId} because hero {HeroId} is missing or no longer alive",
+                player.ControllerId, player.HeroId);
+            return;
+        }
+
+        objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
+
+        Logger.Information("Retiring player {ControllerId} (hero {HeroId}) at its own request",
+            player.ControllerId, player.HeroId);
+
+        if (party?.CurrentSettlement != null)
+        {
+            TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
+        }
+
+        if (!playerManager.RemovePlayer(player))
+        {
+            Logger.Warning("Could not remove player registration for {ControllerId} during retirement", player.ControllerId);
+            return;
+        }
+
+        network.SendAll(new NetworkPlayerRetired(player.ControllerId, player.HeroId));
+
+        TryStep("hero retirement", () => applyHeirSelectionActionInterface.ApplyByRetirementWithoutHeir(hero));
+
+        if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out MobileParty remainingParty))
+        {
+            TryStep("party destroy", () => DestroyPartyAction.Apply(null, remainingParty));
+        }
+    }
+
     private void DeletePlayer(NetPeer peer, string requestedHeroId, bool keepConnected)
     {
         if (!playerManager.TryGetPlayer(peer, out var player))
@@ -154,7 +226,7 @@ internal class PlayerDeletionHandler : IHandler
         {
             network.Send(peer, new NetworkDeletePlayerDenied(
                 "Cannot delete a player whose party is in a battle or siege; leave it first " +
-                "(coop.debug.mobileparty.unstuck can force the exit)."));
+                "(coop.unstuck can force the exit)."));
             return;
         }
 
@@ -288,6 +360,35 @@ internal class PlayerDeletionHandler : IHandler
         }, blocking: true, context: nameof(PlayerDeletionHandler));
     }
 
+    private void Handle_NetworkPlayerRetired(MessagePayload<NetworkPlayerRetired> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            // The retirement message arrives before party teardown, so apply the disabled state here.
+            if (objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero) &&
+                hero.HeroState != Hero.CharacterStates.Disabled)
+            {
+                using (new AllowedThread())
+                {
+                    hero.ChangeState(Hero.CharacterStates.Disabled);
+                }
+            }
+
+            if (playerManager.TryGetPlayer(data.ControllerId, out var player))
+            {
+                playerManager.RemovePlayer(player);
+                Logger.Information("Player {ControllerId} (hero {HeroId}) retired", data.ControllerId, data.HeroId);
+            }
+            else
+            {
+                Logger.Debug("Retired player {ControllerId} was not registered on this client", data.ControllerId);
+            }
+        }, blocking: true, context: nameof(PlayerDeletionHandler));
+    }
+
     /// <summary>
     /// Requesting client: the server denied the delete; surface the reason.
     /// </summary>
@@ -315,7 +416,7 @@ internal class PlayerDeletionHandler : IHandler
         {
             // The registration is already gone and the peer kicked; a failed world-side step must
             // not abort the rest of the teardown.
-            Logger.Error(e, "Delete player step {Step} failed", step);
+            Logger.Error(e, "Player teardown step {Step} failed", step);
         }
     }
 

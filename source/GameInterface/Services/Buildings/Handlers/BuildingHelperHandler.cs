@@ -147,6 +147,7 @@ internal class BuildingHelperHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.HeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
             if (!CanManageTown(obj.Who, town)) return;
 

@@ -4,7 +4,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
@@ -128,6 +127,44 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
         AssertSuccessfulResults();
     }
 
+    [Fact]
+    public void PlayerFollower_HalfRemovedFromArmy_UnstuckFinishesLeaveOnEveryPeer()
+    {
+        // #3892: a leave that stopped after _parties.Remove left Army and AttachedTo set
+        var player = CreateRequester("unstuck-stale-attachment");
+        var army = CreateArmy(TestEnvironment.CreateRegisteredObject<MobileParty>(), player.partyId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(player.partyId);
+                using (new AllowedThread())
+                {
+                    army.Replicas[instance]._parties.Remove(party);
+                }
+                Assert.Same(army.Replicas[instance], party.Army);
+                Assert.NotNull(party.AttachedTo);
+            });
+        }
+
+        RequestUnstuck(player.partyId, player.heroId);
+        RequestUnstuck(player.partyId, player.heroId);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(player.partyId);
+                var leader = instance.GetRegisteredObject<MobileParty>(army.PartyIds[0]);
+                Assert.Null(party.Army);
+                Assert.Null(party.AttachedTo);
+                Assert.DoesNotContain(party, leader.AttachedParties);
+            });
+        }
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>().First().Actions,
+            action => action.StartsWith("Removed the party from the army"));
+        AssertSuccessfulResults();
+    }
     private (string heroId, string partyId) CreateRequester(string controllerId)
     {
         var player = CreatePlayerHeroParty(controllerId);
@@ -192,8 +229,8 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
         var client = Clients.First();
         client.Call(() =>
         {
-            var command = new UnstuckCommand.UnstuckCoopCommand();
-            var result = command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
+            var result = client.Resolve<ICoopCommandRegistry>()
+                .ProcessCommand("coop.unstuck", new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
             Assert.True(result.Succeeded, result.Output);
         });
         TestEnvironment.FlushCoalescer();

@@ -138,6 +138,26 @@ public class NetworkBarterSerializationTest
     }
 
     [Fact]
+    public void LordBarterRequest_RoundTrip_PreservesPlayerPartyPrisonerContext()
+    {
+        var original = new NetworkRequestLordBarter(
+            "prisoner-lord",
+            PeaceConversationContext.PlayerPartyPrisoner,
+            "player-party",
+            LordBarterKind.JoinKingdomAsClan,
+            System.Array.Empty<PeaceBarterTerm>(),
+            "lord-request");
+
+        var result = RoundTrip(original);
+
+        // Appended: an older peer reads 3 as undefined and rejects it instead of misreading it.
+        Assert.Equal(3, result.Context);
+        Assert.Equal((int)PeaceConversationContext.PlayerPartyPrisoner, result.Context);
+        Assert.Equal("player-party", result.ContextId);
+        Assert.Equal((int)LordBarterKind.JoinKingdomAsClan, result.Kind);
+    }
+
+    [Fact]
     public void LordBarterAuthorizationCancellation_RoundTrip_PreservesCorrelation()
     {
         var result = RoundTrip(new NetworkCancelLordBarterAuthorization("lord-request"));

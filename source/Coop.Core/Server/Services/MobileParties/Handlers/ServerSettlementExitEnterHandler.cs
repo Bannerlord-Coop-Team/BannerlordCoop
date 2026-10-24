@@ -7,6 +7,7 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Settlements;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -73,6 +74,10 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=receive partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                payload.PartyId, payload.SettlementId);
+#endif
             if (!DoesPeerControlParty(peer, payload.PartyId))
             {
                 RejectSettlementEncounter(peer, payload, "your party is not controlled by you");
@@ -103,6 +108,10 @@ public class ServerSettlementExitEnterHandler : IHandler
             {
                 if (mobileParty.CurrentSettlement == settlement)
                 {
+#if DEBUG
+                    Logger.Debug("SettlementEncounterRecovery phase=approve branch=already-inside partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                        payload.PartyId, payload.SettlementId);
+#endif
                     network.Send(peer, new NetworkStartSettlementEncounter(payload));
                 }
                 else
@@ -132,6 +141,10 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=approve branch=validated-entry partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                payload.PartyId, payload.SettlementId);
+#endif
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
@@ -150,6 +163,10 @@ public class ServerSettlementExitEnterHandler : IHandler
         NetworkRequestStartSettlementEncounter payload,
         string reason)
     {
+#if DEBUG
+        Logger.Debug("SettlementEncounterRecovery phase=reject partyHandle={PartyHandle} settlementHandle={SettlementHandle} reason={Reason}",
+            payload.PartyId, payload.SettlementId, reason);
+#endif
         network.Send(peer, new NetworkSettlementEncounterRejected(payload));
         network.Send(
             peer,
@@ -198,7 +215,7 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             var leftSettlement = mobileParty.CurrentSettlement;
-            LeaveHideoutMapEvent(mobileParty);
+            LeaveSettlementMapEvent(mobileParty);
             settlementInterface.PartyLeaveSettlement(mobileParty);
 
             network.Send(
@@ -215,10 +232,17 @@ public class ServerSettlementExitEnterHandler : IHandler
         }, context: nameof(NetworkRequestEndSettlementEncounter));
     }
 
-    private void LeaveHideoutMapEvent(MobileParty mobileParty)
+    private void LeaveSettlementMapEvent(MobileParty mobileParty)
     {
         var party = mobileParty?.Party;
         var mapEvent = party?.MapEvent;
+        // Detach a leaving village defender before the settlement reply closes its menus.
+        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && party.MapEventSide == mapEvent.DefenderSide)
+        {
+            messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party, finishLocalMenus: false));
+            return;
+        }
+
         if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
         foreach (var player in playerManager.Players)

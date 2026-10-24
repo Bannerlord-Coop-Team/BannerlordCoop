@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using Serilog;
+using System;
 using TaleWorlds.Core;
 
 namespace GameInterface.Registry.Auto;
@@ -19,15 +20,17 @@ internal class LifetimePatches<T>
 
         if (ModInformation.IsClient)
         {
-            if (typeof(T) == typeof(Equipment))
-                Logger.Error("Client created managed {name}; caller={Caller}", __instance.GetType(), System.Environment.StackTrace);
-            else
-                Logger.Error("Client created managed {name}", __instance.GetType());
+            ClientCallSites.Log(Logger,
+                "Client created managed {name}; caller={Caller}", new object[] { __instance.GetType() },
+                "Client created managed {name} {Count} more times from callers already logged", __instance.GetType());
             return;
         }
 
         MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance));
     }
+
+    // static in a generic class, so each managed type gets its own limiter
+    private static readonly CallSiteLogLimiter ClientCallSites = new(256, TimeSpan.FromSeconds(10));
 
     internal static void DestroyPostfix(ref T __instance, bool __runOriginal)
     {

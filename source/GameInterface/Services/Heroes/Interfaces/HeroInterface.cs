@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -14,6 +15,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Traits.Interfaces;
 using GameInterface.Services.UI.Messages;
 using SandBox.View.Map.Managers;
 using Serilog;
@@ -47,19 +49,22 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
+    private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
         IPartyVisibilitySweep partyVisibilitySweep,
-        IPlayerPartyRestorer playerPartyRestorer)
+        IPlayerPartyRestorer playerPartyRestorer,
+        ITraitLevelingHelperInterface traitLevelingHelperInterface)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
         this.playerPartyRestorer = playerPartyRestorer;
+        this.traitLevelingHelperInterface = traitLevelingHelperInterface;
     }
 
     public byte[] PackageMainHero()
@@ -189,6 +194,7 @@ internal class HeroInterface : IHeroInterface
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
         // inside and rebuild the local in-settlement state afterwards.
         LeaveSettlementActionPatches.SuppressForPlayerSwitch = true;
+        PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = true;
         try
         {
             ChangePlayerCharacterAction.Apply(playerHero);
@@ -196,6 +202,7 @@ internal class HeroInterface : IHeroInterface
         finally
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
+            PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = false;
         }
 
         LogPlayerSwitchState("after", player, playerHero, playerParty);
@@ -220,6 +227,11 @@ internal class HeroInterface : IHeroInterface
         {
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
+        }
+        else
+        {
+            // Vanilla skips the camera target while a saved party is parked for login.
+            playerParty.Party.SetAsCameraFollowParty();
         }
 
         // The transferred host save carries the server's always-visible party state
@@ -332,6 +344,9 @@ internal class HeroInterface : IHeroInterface
             playerPartyRestorer.Restore(hero, party);
         else
             playerPartyRestorer.RestoreClanMembership(hero);
+
+        // Matches CharacterCreationManager.ApplyFinalEffects setting trait xp from the created hero's levels
+        traitLevelingHelperInterface.InitializeTraitXp(hero);
     }
 
     /// <summary>

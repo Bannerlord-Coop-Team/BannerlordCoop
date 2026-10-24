@@ -1,4 +1,4 @@
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -78,7 +78,6 @@ public class KingdomSyncTests : SyncTestBase
         //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.LabelColor), 7);
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastKingdomDecisionConclusionDate), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastMercenaryOfferTime), new CampaignTime(54));
-        TestEnvironment.AssertProperty<Kingdom, float>(nameof(Kingdom.MainHeroCrimeRating), 55f);
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.Name), new TextObject("kingdomName"), kingdom.Name);
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.NotAttackableByPlayerUntilTime), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.PrimaryBannerColor), 7);

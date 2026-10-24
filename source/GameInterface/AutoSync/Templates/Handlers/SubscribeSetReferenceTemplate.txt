@@ -31,7 +31,13 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_S
 {{~ end ~}}
 });
 {{~ else ~}}
-SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>();
+SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>(
+{{~ if HeadlessMapEventVisual ~}}
+    // Only the known non-rendering providers have no graphical identity.
+    value => value.GetType().FullName == "DedicatedServer.NoOpMapEventVisualCreator+NoOpMapEventVisual"
+        || value.GetType().FullName == "GameInterface.Services.MapEvents.MapEventBattleFactory+HeadlessMapEventVisual"
+{{~ end ~}}
+);
 
 SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
 {{~ if Debug ~}}

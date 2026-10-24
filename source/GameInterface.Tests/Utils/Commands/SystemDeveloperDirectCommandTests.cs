@@ -35,7 +35,6 @@ public class SystemDeveloperDirectCommandTests
         "HeroDeveloperCommands",
         "InventoryCommands",
         "TradeSkillCommands",
-        "IssuesDebugCommand",
         "ItemObjectCommands",
         "ItemRosterDebugCommands",
         "AiLordPeaceReleaseFixtureCommands",
@@ -54,9 +53,9 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(105, commandTypes.Length);
+        Assert.Equal(103, commandTypes.Length);
 #else
-        Assert.Equal(93, commandTypes.Length);
+        Assert.Equal(91, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -113,11 +112,11 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
                 "set_time_mode",
+                "social_parameter",
             },
             countReaders);
 #else
@@ -125,10 +124,10 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
+                "social_parameter",
             },
             countReaders);
 #endif
@@ -172,6 +171,30 @@ public class SystemDeveloperDirectCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
+    public void SocialParameterWrite_RunOnClient_ReturnsExplicitFailure()
+    {
+        bool wasServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = false;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Prefix == "coop.debug.hero_developer" && candidate.Name == "social_parameter");
+            Assert.Equal(CoopCommandSide.Both, command.Side);
+
+            CoopCommandResult result = command.ProcessCommand(new TestArgs(new[] { "hero", "mercy", "1", "0" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal("The 'coop.debug.hero_developer.social_parameter' command cannot be used on the client. It is intended for server use only.", result.Output);
         }
         finally
         {
@@ -233,7 +256,10 @@ public class SystemDeveloperDirectCommandTests
     {
         if (type == typeof(ModOptionsCommands.VoiceEnabledCoopCommand))
             return new ModOptionsCommands.VoiceEnabledCoopCommand(Mock.Of<INetwork>(), Mock.Of<IMessageBroker>());
-        return (ICoopCommand)Activator.CreateInstance(type)!;
+        // Only the metadata is read here, so the server dependencies can stay empty.
+        if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
+            return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);
+        return CommandTestFactory.Create<ICoopCommand>(type);
     }
 
     private sealed class TestArgs : ICoopCommandArgs

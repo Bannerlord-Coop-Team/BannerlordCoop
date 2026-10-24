@@ -528,4 +528,34 @@
       <EquipmentSet id="npc_companion_equipment_template_battania" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_a634d3aa"
+    name="{=!}Katie"
+    voice="softspoken"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="true"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_0_skills">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Honor" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.scarf" />
+        <equipment slot="Body" id="Item.footmans_tunic" />
+        <equipment slot="Gloves" id="Item.leather_gloves" />
+        <equipment slot="Leg" id="Item.eastern_leather_boots" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

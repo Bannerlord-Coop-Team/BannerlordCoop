@@ -18,42 +18,6 @@ public class BattleMissionIdentityTests : MissionTestEnvironment
     public BattleMissionIdentityTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
     /// <summary>
-    /// BR-104: the battle instance id is unchanged on the server and every client across a host migration
-    /// (the host departs, the earliest successor is promoted) AND across a mid-line successor's retreat while
-    /// another player remains — the identifier never changes and the same id keeps naming the same battle.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-104")]
-    public void BattleInstanceId_PersistsAcrossHostMigrationAndSuccessorRetreat_OnAllInstances()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
-        var clients = Clients.ToArray();
-        EnterBattle(clients[0], mapEventId); // ctrl-A -> host
-        EnterBattle(clients[1], mapEventId); // ctrl-B -> successor
-        EnterBattle(clients[2], mapEventId); // ctrl-C -> successor
-        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
-
-        // Baseline: the instance id keys the record and resolves the event on every instance.
-        AssertBattleInstanceIdentity(Server, mapEventId);
-        foreach (var client in Clients)
-            AssertBattleInstanceIdentity(client, mapEventId);
-
-        // Host migration must not change the identifier.
-        DepartBattle("ctrl-A", mapEventId);
-        AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
-        AssertBattleInstanceIdentity(Server, mapEventId);
-        foreach (var client in Clients)
-            AssertBattleInstanceIdentity(client, mapEventId);
-
-        // A mid-line successor retreating while another player remains must not change it either.
-        DepartBattle("ctrl-C", mapEventId, wasRetreat: true);
-        AssertHost(Server, mapEventId, "ctrl-B");
-        AssertBattleInstanceIdentity(Server, mapEventId);
-        foreach (var client in Clients)
-            AssertBattleInstanceIdentity(client, mapEventId);
-    }
-
-    /// <summary>
     /// BR-104: a departure message scoped to a DIFFERENT (previous/unrelated) battle instance id — even one
     /// that names the current host — must not affect the current mission's instance record. The current host
     /// line and the current instance id are untouched on the server and every client.

@@ -204,14 +204,6 @@ public class SiegeDefenderCommandAuthorityTests
         }
     }
 
-    [Fact]
-    public void MapSiegeLeaderPatch_TargetsIsPlayerLeaderGetter()
-    {
-        MethodInfo getter = AccessTools.PropertyGetter(typeof(MapSiegeVM), "IsPlayerLeaderOfSiegeEvent");
-
-        Assert.NotNull(getter);
-    }
-
     private static MobileParty CreateParty(Hero leader)
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();

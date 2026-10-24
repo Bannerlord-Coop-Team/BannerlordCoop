@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -42,6 +44,13 @@ internal class MapEventSideDestructionPatches
 
         __instance.InvalidateSimulationSetup();
         __instance._battleParties.RemoveAt(index);
+
+        // Player departures use NetworkPartyLeftBattle; AI removal must precede finalization callbacks.
+        if (ModInformation.IsServer &&
+            !__instance.MapEvent.IsFinalized &&
+            party.MobileParty?.IsPlayerParty() != true)
+            MessageBroker.Instance.Publish(__instance, new MapEventPartyRemoved(__instance, mapEventParty));
+
         __instance._mapEvent.RemoveInvolvedPartyInternal(mapEventParty);
         if (__instance.LeaderParty == party)
         {

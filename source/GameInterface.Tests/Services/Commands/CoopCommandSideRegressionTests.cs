@@ -3,6 +3,7 @@ using Common.Commands;
 #if DEBUG
 using Coop.Core.Common.Commands;
 #endif
+using GameInterface.Tests.Utils.Commands;
 using GameInterface;
 using Serilog;
 using System;
@@ -15,18 +16,29 @@ namespace GameInterface.Tests.Services.Commands;
 [Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class CoopCommandSideRegressionTests
 {
-    [Theory]
-    [MemberData(nameof(CorrectedCommandSides))]
-    public void CorrectedCommands_ExposeExpectedSide(string outerTypeName, string typeName, CoopCommandSide expectedSide)
+    // One assembly scan for the whole table instead of one per row.
+    [Fact]
+    public void CorrectedCommands_ExposeExpectedSide()
     {
-        ICoopCommand command = CreateCommand(outerTypeName, typeName);
+        ILookup<(string OuterTypeName, string TypeName), Type> nestedTypes = GetCommandAssemblies()
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.DeclaringType != null)
+            .ToLookup(type => (type.DeclaringType!.Name, type.Name));
 
-        Assert.Equal(expectedSide, command.Side);
+        Assert.All(CorrectedCommandSides(), expected =>
+        {
+            Type commandType = Assert.Single(nestedTypes[(expected.OuterTypeName, expected.TypeName)]);
+            var command = CommandTestFactory.Create<ICoopCommand>(commandType);
+
+            Assert.True(
+                expected.Side == command.Side,
+                $"{expected.OuterTypeName}.{expected.TypeName} exposes {command.Side}, expected {expected.Side}");
+        });
     }
 
     [Theory]
     [InlineData(false, "HeroDeveloperCommands", "HeroDeveloperAddAttributePointsCoopCommand", "This command is only available on the server")]
-    [InlineData(true, "UnstuckCommand", "UnstuckCoopCommand", "This command is only available on the client")]
+    [InlineData(true, "MapEventDebugCommands", "StartAttackMissionCoopCommand", "This command is only available on the client")]
     public void Registry_RejectsWrongSideForRealCommands(
         bool isServer,
         string outerTypeName,
@@ -53,63 +65,61 @@ public class CoopCommandSideRegressionTests
         }
     }
 
-    public static IEnumerable<object[]> CorrectedCommandSides()
+    private static IEnumerable<(string OuterTypeName, string TypeName, CoopCommandSide Side)> CorrectedCommandSides()
     {
 #if DEBUG
-        yield return new object[] { "JoinDebugCommands", "JoinStateCoopCommand", CoopCommandSide.Both };
+        yield return ("JoinDebugCommands", "JoinStateCoopCommand", CoopCommandSide.Both);
 #endif
-        yield return new object[] { "ArenaMasterCommands", "ViewArenaMasterInteractionsCommandCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "CaravansCommands", "CaravansViewProhibitedKingdomsCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "CaravansCommands", "CaravansViewInteractedCaravansCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "CaravansCommands", "CaravansViewTakenTradeRumorsCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "TradeSkillCommands", "InventoryViewPlayerTradeDataCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "TradeSkillCommands", "InventoryViewPlayerTradeRumorsCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "TradeSkillCommands", "InventoryViewEnteredSettlementsCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "SmithingCommands", "CraftingCraftedItemHistoryCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "SmithingCommands", "CraftingCraftingPiecesXpCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "SmithingCommands", "CraftingUnlockedCraftingPiecesCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "VillagerPartiesCommands", "ViewInteractedVillagersCommandCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "WorkshopDebugCommand", "ViewWarehouseRostersCommandCoopCommand", CoopCommandSide.Both };
-        yield return new object[] { "HeroDebugCommand", "HeroAddPowerCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroSetGoldCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroSetGoldStateCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroSetHitpointsCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroSetBannerItemCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroSetIssueCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "HeroDebugCommand", "HeroRefreshVolunteersCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesGiveCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesCompleteCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "TacticalUnitSymbolsDebugCommand", "UiTacticalSymbolsCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRandomCapturePlayerCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerFixtureCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRestoreRosterFixtureCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityReleasePlayerCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityPrepareVisualTestFixtureCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRestoreVisualTestFixtureCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRansomPlayerAtSettlementCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRestorePartyFixtureStateCoopCommand", CoopCommandSide.Server };
+        yield return ("ArenaMasterCommands", "ViewArenaMasterInteractionsCommandCoopCommand", CoopCommandSide.Both);
+        yield return ("CaravansCommands", "CaravansViewProhibitedKingdomsCoopCommand", CoopCommandSide.Both);
+        yield return ("CaravansCommands", "CaravansViewInteractedCaravansCoopCommand", CoopCommandSide.Both);
+        yield return ("CaravansCommands", "CaravansViewTakenTradeRumorsCoopCommand", CoopCommandSide.Both);
+        yield return ("TradeSkillCommands", "InventoryViewPlayerTradeDataCoopCommand", CoopCommandSide.Both);
+        yield return ("TradeSkillCommands", "InventoryViewPlayerTradeRumorsCoopCommand", CoopCommandSide.Both);
+        yield return ("TradeSkillCommands", "InventoryViewEnteredSettlementsCoopCommand", CoopCommandSide.Both);
+        yield return ("SmithingCommands", "CraftingCraftedItemHistoryCoopCommand", CoopCommandSide.Both);
+        yield return ("SmithingCommands", "CraftingCraftingPiecesXpCoopCommand", CoopCommandSide.Both);
+        yield return ("SmithingCommands", "CraftingUnlockedCraftingPiecesCoopCommand", CoopCommandSide.Both);
+        yield return ("VillagerPartiesCommands", "ViewInteractedVillagersCommandCoopCommand", CoopCommandSide.Both);
+        yield return ("WorkshopDebugCommand", "ViewWarehouseRostersCommandCoopCommand", CoopCommandSide.Both);
+        yield return ("HeroDebugCommand", "HeroAddPowerCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroSetGoldCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroSetGoldStateCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroSetHitpointsCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroSetBannerItemCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroSetIssueCoopCommand", CoopCommandSide.Server);
+        yield return ("HeroDebugCommand", "HeroRefreshVolunteersCoopCommand", CoopCommandSide.Server);
+        yield return ("TacticalUnitSymbolsDebugCommand", "UiTacticalSymbolsCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityRandomCapturePlayerCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerFixtureCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityRestoreRosterFixtureCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityReleasePlayerCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityPrepareVisualTestFixtureCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityRestoreVisualTestFixtureCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityRansomPlayerAtSettlementCoopCommand", CoopCommandSide.Server);
+        yield return ("PlayerCaptivityCommands", "PlayerCaptivityRestorePartyFixtureStateCoopCommand", CoopCommandSide.Server);
 #if DEBUG
-        yield return new object[] { "AiLordPeaceReleaseFixtureCommands", "PlayerCaptivityCaptureAiLordFixtureCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "LargeBattleRosterFixtureCommands", "LargeBattleRosterStatusCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "LargeBattleRosterFixtureCommands", "ExactBattleRosterStatusCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "LargeBattleRosterFixtureCommands", "LargeBattleRosterRestoreCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "LargeBattleRosterFixtureCommands", "ExactBattleRosterRestoreCoopCommand", CoopCommandSide.Server };
+        yield return ("AiLordPeaceReleaseFixtureCommands", "PlayerCaptivityCaptureAiLordFixtureCoopCommand", CoopCommandSide.Server);
+        yield return ("LargeBattleRosterFixtureCommands", "LargeBattleRosterStatusCoopCommand", CoopCommandSide.Server);
+        yield return ("LargeBattleRosterFixtureCommands", "ExactBattleRosterStatusCoopCommand", CoopCommandSide.Server);
+        yield return ("LargeBattleRosterFixtureCommands", "LargeBattleRosterRestoreCoopCommand", CoopCommandSide.Server);
+        yield return ("LargeBattleRosterFixtureCommands", "ExactBattleRosterRestoreCoopCommand", CoopCommandSide.Server);
 #endif
-        yield return new object[] { "PartyCommands", "RestorePositionCoopCommand", CoopCommandSide.Server };
+        yield return ("PartyCommands", "RestorePositionCoopCommand", CoopCommandSide.Server);
 #if DEBUG
-        yield return new object[] { "MapEventDebugCommands", "LateJoinModeExitMissionsCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "MapEventDebugCommands", "LateJoinModeCleanupCoopCommand", CoopCommandSide.Server };
+        yield return ("MapEventDebugCommands", "LateJoinModeExitMissionsCoopCommand", CoopCommandSide.Server);
+        yield return ("MapEventDebugCommands", "LateJoinModeCleanupCoopCommand", CoopCommandSide.Server);
 #endif
-        yield return new object[] { "MapEventDebugCommands", "LateJoinModeFixtureStateCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "MapEventDebugCommands", "StartAttackMissionCoopCommand", CoopCommandSide.Client };
-        yield return new object[] { "CampaignOptionsCommands", "CampaignOptionsIsIronmanModeCoopCommand", CoopCommandSide.Both };
+        yield return ("MapEventDebugCommands", "LateJoinModeFixtureStateCoopCommand", CoopCommandSide.Server);
+        yield return ("MapEventDebugCommands", "StartAttackMissionCoopCommand", CoopCommandSide.Client);
+        yield return ("CampaignOptionsCommands", "CampaignOptionsIsIronmanModeCoopCommand", CoopCommandSide.Both);
     }
 
     private static ICoopCommand CreateCommand(string outerTypeName, string typeName)
     {
         Type commandType = GetCommandType(outerTypeName, typeName);
-        return (ICoopCommand)Activator.CreateInstance(commandType)!;
+        return CommandTestFactory.Create<ICoopCommand>(commandType);
     }
 
     private static Type GetCommandType(string outerTypeName, string typeName)

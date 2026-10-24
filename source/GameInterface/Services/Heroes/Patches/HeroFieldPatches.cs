@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -65,7 +64,10 @@ namespace GameInterface.Services.Heroes.Patches
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
-                yield return method;
+                if (method.Name != nameof(Hero.AddPower))
+                {
+                    yield return method;
+                }
             }
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
@@ -73,7 +75,6 @@ namespace GameInterface.Services.Heroes.Patches
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
-            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
 
         [HarmonyTranspiler]
@@ -148,80 +149,6 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
 
             instance._characterObject = newCharacterObject;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(firstNameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void FirstNameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._firstName = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._firstName));
-                instance._firstName = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
-
-            instance._firstName = newName;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(nameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void NameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._name = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._name));
-                instance._name = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
-
-            instance._name = newName;
         }
 
         [HarmonyTranspiler]
@@ -340,7 +267,7 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._power));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PowerIntercept));
@@ -449,6 +376,19 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
 
             instance.IsPregnant = isPregnant;
+        }
+    }
+
+    // Quest outcomes such as a hand-in raise a hero's power through AddPower, which a patched caller inlines when it is
+    // compiled before this writer is installed. Only AddPower is moved ahead; the rest of HeroFieldPatches stays where it was.
+    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
+    [HarmonyPatch(typeof(Hero), nameof(Hero.AddPower))]
+    internal class HeroAddPowerPatch
+    {
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return HeroFieldPatches.PowerTranspiler(instructions);
         }
     }
 }

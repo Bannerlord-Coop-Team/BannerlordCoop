@@ -253,6 +253,7 @@ public class ServerAdmissionGateTests
         Mock.Of<IReliableMessageBatcher<NetPeer>>(),
         session);
 
+    /// <summary>Connects a real client to a loopback server transport and pumps both until <paramref name="complete"/>.</summary>
     private static void RunLoopback(
         TestMessageBroker broker,
         Action<ConnectionRequest> onConnectionRequest,
@@ -272,8 +273,8 @@ public class ServerAdmissionGateTests
 
         try
         {
-            Assert.True(serverTransport.StartInManualMode(0));
-            Assert.True(clientTransport.StartInManualMode(0));
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, suppliedPassword);
 
             PumpUntil(serverTransport, clientTransport, cancellation.Token, complete);
@@ -385,8 +386,8 @@ public class ServerAdmissionGateTests
         /// <summary>Connects until the server has accepted the request, without registering the peer.</summary>
         public void ConnectAndHoldRegistration()
         {
-            Assert.True(serverTransport.StartInManualMode(0));
-            Assert.True(clientTransport.StartInManualMode(0));
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, Password);
 
             PumpUntil(() => acceptedPeer != null && clientBroker.GetMessagesFromType<NetworkConnected>().Any());
@@ -427,6 +428,7 @@ public class ServerAdmissionGateTests
             Mock.Of<INetwork>(),
             Mock.Of<IModuleValidator>(),
             Mock.Of<IModuleInfoProvider>(),
+            Mock.Of<IModuleNameProvider>(),
             Mock.Of<IPlayerManager>(),
             Mock.Of<IPlayerPartyRestorer>(),
             Mock.Of<IPlayerCreationRollback>(),

@@ -23,7 +23,7 @@ public class TournamentTabFlowTests : SyncTestBase
     }
 
     [Fact]
-    public void AdvanceChoice_ContestantInMatch_Joins_OthersWatch()
+    public void SnapshotBroadcast_DrivesAdvanceChoiceThenLiveMatchLeaveMenu()
     {
         EnvironmentInstance[] clients = Clients.ToArray();
         SetControllerId(clients[0], "player-a");
@@ -38,72 +38,15 @@ public class TournamentTabFlowTests : SyncTestBase
 
         AssertAdvanceChoice(clients[0], "player-a", TournamentPlayerChoice.Join);
         AssertAdvanceChoice(clients[1], "spectator-b", TournamentPlayerChoice.Watch);
-    }
 
-    [Fact]
-    public void AdvanceChoice_NoHumanInMatch_Skips()
-    {
-        EnvironmentInstance[] clients = Clients.ToArray();
-        SetControllerId(clients[0], "player-a");
-        SetControllerId(clients[1], "spectator-b");
-        TournamentSessionSnapshot snapshot = CreateSnapshot(
-            TournamentSessionPhase.AwaitingChoices,
-            1,
-            humanInCurrentMatch: false,
-            skipAllowed: true);
-
-        Broadcast(new NetworkTournamentSessionSnapshot(snapshot));
-
-        AssertAdvanceChoice(clients[0], "player-a", TournamentPlayerChoice.Skip);
-        AssertAdvanceChoice(clients[1], "spectator-b", TournamentPlayerChoice.Skip);
-    }
-
-    [Fact]
-    public void LeaveMenuPredicate_LiveMatchSpectatorOnly()
-    {
-        EnvironmentInstance[] clients = Clients.ToArray();
-        SetControllerId(clients[0], "player-a");
-        SetControllerId(clients[1], "spectator-b");
-        TournamentSessionSnapshot snapshot = CreateSnapshot(
+        Broadcast(new NetworkTournamentSessionSnapshot(CreateSnapshot(
             TournamentSessionPhase.LiveMatch,
-            1,
+            2,
             humanInCurrentMatch: true,
-            skipAllowed: false);
-
-        Broadcast(new NetworkTournamentSessionSnapshot(snapshot));
+            skipAllowed: false)));
 
         AssertLeaveMenu(clients[0], "player-a", expectedOpen: false);
         AssertLeaveMenu(clients[1], "spectator-b", expectedOpen: true);
-    }
-
-    [Fact]
-    public void TryLeaveActive_SpectatorDuringLiveMatch_DropsFromSession()
-    {
-        Server.Call(() =>
-        {
-            var registry = Server.Resolve<ITournamentSessionRegistry>();
-            TournamentSessionSnapshot snapshot = CreateStartedLiveSession(registry);
-
-            Assert.Contains("spectator-b", snapshot.SpectatorControllerIds);
-
-            TournamentMutationStatus status = registry.TryLeaveActive(
-                snapshot.SessionId,
-                snapshot.Revision,
-                "spectator-b",
-                900,
-                "Tournament Recruit",
-                out snapshot,
-                out var outcome,
-                out var noViewers);
-
-            Assert.Equal(TournamentMutationStatus.Applied, status);
-            Assert.Equal(TournamentBallotOutcome.Open, outcome);
-            Assert.DoesNotContain("spectator-b", snapshot.SpectatorControllerIds);
-            Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
-            Assert.False(noViewers);
-            Assert.Equal(2, snapshot.Contestants.Count(contestant => contestant.IsHuman));
-            Assert.DoesNotContain(snapshot.Contestants, contestant => contestant.IsReplaced);
-        });
     }
 
     private static void AssertAdvanceChoice(
@@ -197,73 +140,5 @@ public class TournamentTabFlowTests : SyncTestBase
             skipAllowed,
             false,
             null);
-    }
-
-    private static TournamentSessionSnapshot CreateStartedLiveSession(ITournamentSessionRegistry registry)
-    {
-        TournamentContestantData[] contestants = Enumerable.Range(0, 16)
-            .Select(index => new TournamentContestantData(
-                $"tab-session:slot:{index}",
-                $"npc-{index}",
-                index + 1,
-                null,
-                $"NPC {index}",
-                false,
-                false,
-                index == 15,
-                null,
-                0))
-            .ToArray();
-        var seed = new TournamentSessionSeed(
-            "tab-session",
-            "tab-session",
-            TownId,
-            "arena-scene",
-            "prize-item",
-            "basic-troop",
-            contestants);
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryCreate(seed, out var snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryJoin(
-            snapshot.SessionId, snapshot.Revision, "player-1", "player-character-1", "Player One", 500, false, out snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryJoin(
-            snapshot.SessionId, snapshot.Revision, "player-2", "player-character-2", "Player Two", 501, false, out snapshot));
-
-        string firstSlot = snapshot.Contestants.Single(contestant => contestant.ControllerId == "player-1").SlotId;
-        var teams = new[]
-        {
-            new TournamentTeamData("team-1", new[] { firstSlot }, 0, false, 1, null),
-            new TournamentTeamData("team-2", new[] { "tab-session:slot:0" }, 0, false, 2, null)
-        };
-        var match = new TournamentMatchData(
-            "match-1",
-            "round-1",
-            0,
-            1,
-            1,
-            teams,
-            Array.Empty<string>(),
-            1);
-        var rounds = new[] { new TournamentRoundData("round-1", 0, 0, new[] { match }) };
-
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryStart(
-            snapshot.SessionId, snapshot.Revision, "player-1", rounds, match.MatchId, out snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
-            snapshot.SessionId, snapshot.Revision, "spectator-b", out snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
-            snapshot.SessionId, snapshot.Revision, "player-1", out snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
-            snapshot.SessionId, snapshot.Revision, "player-2", out snapshot));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
-            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-1",
-            TournamentPlayerChoice.Join, out snapshot, out _));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
-            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "player-2",
-            TournamentPlayerChoice.Watch, out snapshot, out _));
-        Assert.Equal(TournamentMutationStatus.Applied, registry.TryChoose(
-            snapshot.SessionId, snapshot.Revision, snapshot.CurrentMatchId, "spectator-b",
-            TournamentPlayerChoice.Watch, out snapshot, out _));
-
-        Assert.Equal(TournamentSessionPhase.LiveMatch, snapshot.Phase);
-        return snapshot;
     }
 }

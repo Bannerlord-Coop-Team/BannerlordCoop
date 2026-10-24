@@ -2,12 +2,9 @@
 using HarmonyLib;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Tests.Services.SiegeEvents;
-using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
 
@@ -16,14 +13,36 @@ namespace GameInterface.Tests
     [Collection(nameof(CampaignCurrentCollection))]
     public class PatchTest
     {
-        [Fact]
-        public void HarmonyPatchesAll()
+        // PatchAll leaves these categories to boot and game start, so E2E environments never apply them.
+        [Theory]
+        [InlineData(GameInterface.HARMONY_GAME_STARTED_CATEGORY)]
+        [InlineData(GameInterface.HARMONY_UI_LOADING_CATEGORY)]
+        public void LateCategoryPatches_ApplyToCurrentGameAssemblies(string category)
         {
-            var harmony = new Harmony("Test");
+            var harmony = new Harmony($"{nameof(LateCategoryPatches_ApplyToCurrentGameAssemblies)}.{category}");
 
             try
             {
-                harmony.PatchAll(typeof(GameInterface).Assembly);
+                harmony.PatchCategory(typeof(GameInterface).Assembly, category);
+
+                Assert.NotEmpty(harmony.GetPatchedMethods());
+            }
+            finally
+            {
+                harmony.UnpatchAll(harmony.Id);
+            }
+        }
+
+        [Fact]
+        public void QuestCategoryPatches_ApplyToCurrentGameAssemblies()
+        {
+            var harmony = new Harmony(nameof(QuestCategoryPatches_ApplyToCurrentGameAssemblies));
+
+            try
+            {
+                harmony.PatchCategory(typeof(GameInterface).Assembly, GameInterface.HARMONY_QUESTS_CATEGORY);
+
+                Assert.NotEmpty(harmony.GetPatchedMethods());
             }
             finally
             {
@@ -95,30 +114,6 @@ namespace GameInterface.Tests
             party._army = army;
 
             Assert.False(PlayerLeaveSiegeEncounterPatch.ShouldRequestLeave(party));
-        }
-
-        private readonly Dictionary<Type, Delegate> BranchLookup = new Dictionary<Type, Delegate>()
-        {
-            { typeof(Hideout), Delegate.CreateDelegate(typeof(TestClass.GetObjectDelegate), null, typeof(TestClass).GetMethod(nameof(TestClass.GetObject))) }
-        };
-
-        [Fact]
-        public void DynamicInvokeTest()
-        {
-            object obj = null;
-            var testClass = new TestClass();
-            BranchLookup[typeof(Hideout)].DynamicInvoke(testClass, "someid", obj);
-        }
-    }
-
-    class TestClass
-    {
-
-        public delegate bool GetObjectDelegate(TestClass instance, string id, out object obj);
-        public bool GetObject(string id, out object obj)
-        {
-            obj = 5;
-            return true;
         }
     }
 

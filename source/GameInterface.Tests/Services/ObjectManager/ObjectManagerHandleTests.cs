@@ -130,5 +130,75 @@ public class ObjectManagerHandleTests
         }
     }
 
+    [Fact]
+    public void ExistingClientRegistration_BindsAuthoritativeHandleAndAcceptsReplay()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
+        try
+        {
+            var manager = CreateManager();
+            var stance = new object();
+            const string id = "StanceLink_vlandia_Player";
+
+            Assert.True(manager.AddExisting(id, stance));
+            Assert.False(manager.TryGetHandle(stance, out _));
+            Assert.True(manager.AddExisting(id, stance, 40854));
+            Assert.True(manager.AddExisting(id, stance, 40854));
+            Assert.True(manager.TryGetObject(40854u, out object resolved));
+            Assert.Same(stance, resolved);
+            Assert.True(manager.TryGetObject(id, out object byId));
+            Assert.Same(stance, byId);
+            Assert.True(manager.TryGetId(stance, out var registeredId));
+            Assert.Equal(id, registeredId);
+            Assert.Equal(40854u, Assert.Single(manager.GetHandleMap()).Value);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
+    public void ExistingClientRegistration_RejectsConflictsWithoutChangingRegistry()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = false;
+        try
+        {
+            var manager = CreateManager();
+            var stance = new object();
+            var occupied = new object();
+            var different = new object();
+
+            Assert.True(manager.AddExisting("stance", stance));
+            Assert.True(manager.AddExisting("occupied", occupied, 7));
+            Assert.False(manager.AddExisting("other-id", stance, 8));
+            Assert.False(manager.AddExisting("stance", different, 8));
+            Assert.False(manager.AddExisting("stance", stance, 0));
+            Assert.False(manager.AddExisting("stance", stance, 7));
+            Assert.False(manager.TryGetHandle(stance, out _));
+            Assert.False(manager.Contains("other-id"));
+            Assert.False(manager.Contains(different));
+            Assert.False(manager.TryGetObject<object>(8u, out _));
+            Assert.True(manager.TryGetObject(7u, out object occupiedResult));
+            Assert.Same(occupied, occupiedResult);
+            Assert.Single(manager.GetHandleMap());
+
+            Assert.True(manager.AddExisting("stance", stance, 8));
+            Assert.False(manager.AddExisting("stance", stance, 9));
+            Assert.False(manager.AddExisting("other-id", stance, 8));
+            Assert.False(manager.AddExisting("stance", different, 8));
+            Assert.False(manager.TryGetObject<object>(9u, out _));
+            Assert.True(manager.TryGetObject(8u, out object result));
+            Assert.Same(stance, result);
+            Assert.Equal(2, manager.GetHandleMap().Count);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
     private static ObjectManagerService CreateManager() => new(Mock.Of<ILogger>());
 }

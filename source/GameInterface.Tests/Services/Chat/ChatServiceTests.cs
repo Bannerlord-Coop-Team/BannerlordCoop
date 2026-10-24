@@ -1,11 +1,11 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
-using Common.Serialization;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab.Sections;
@@ -18,17 +18,6 @@ namespace GameInterface.Tests.Services.Chat;
 [Collection(ViewModelCollection.Name)]
 public class ChatServiceTests
 {
-    [Fact]
-    public void ParticipantSnapshot_RoundTripsControllerIds()
-    {
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        byte[] payload = serializer.Serialize(new NetworkChatParticipants(new[] { "first", "second" }));
-
-        var snapshot = Assert.IsType<NetworkChatParticipants>(serializer.Deserialize(payload));
-
-        Assert.Equal(new[] { "first", "second" }, snapshot.ControllerIds);
-    }
-
     [Fact]
     public void RequestParticipants_AsksServerForLiveMembership()
     {
@@ -74,11 +63,24 @@ public class ChatServiceTests
         using var messageBroker = new MessageBroker();
         using var service = CreateService(optionsStore: optionsStore, messageBroker: messageBroker);
 
-        Assert.False(service.IsChatEnabled);
+        Assert.False(service.IsPlayerChatEnabled);
 
         messageBroker.Publish(this, new ChatVisibilitySelected(true));
 
-        Assert.True(service.IsChatEnabled);
+        Assert.True(service.IsPlayerChatEnabled);
+    }
+
+    /// <summary>Verifies dispose stops the event log and survives the overlay's vanilla restore with no vanilla chat log view present.</summary>
+    /// <remarks>Only the null <c>GauntletChatLogView.Current</c> path is reachable here; the non-null restore needs the game runtime.</remarks>
+    [Fact]
+    public void Dispose_StopsEventLog()
+    {
+        var eventLog = new Mock<IChatEventLog>();
+        var service = CreateService(eventLog: eventLog);
+
+        service.Dispose();
+
+        eventLog.Verify(value => value.Dispose(), Times.Once);
     }
 
     private static ChatService CreateService(
@@ -86,7 +88,8 @@ public class ChatServiceTests
         Mock<IPlayerManager>? playerManager = null,
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
         Mock<ICoopOptionsStore>? optionsStore = null,
-        IMessageBroker? messageBroker = null)
+        IMessageBroker? messageBroker = null,
+        Mock<IChatEventLog>? eventLog = null)
     {
         network ??= new Mock<INetwork>();
         playerManager ??= new Mock<IPlayerManager>();
@@ -97,6 +100,7 @@ public class ChatServiceTests
             optionsStore.Setup(store => store.LoadOrDefault()).Returns(new CoopOptionsData());
         }
         messageBroker ??= new MessageBroker();
+        eventLog ??= new Mock<IChatEventLog>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
 
@@ -106,7 +110,9 @@ public class ChatServiceTests
             playerNameResolver.Object,
             controllerIdProvider.Object,
             optionsStore.Object,
-            messageBroker);
+            messageBroker,
+            eventLog.Object,
+            new PlayerKillFeedColorService());
     }
 
     private static Player Player(string controllerId)

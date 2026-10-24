@@ -5,8 +5,10 @@ using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
 using Serilog;
@@ -18,6 +20,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -171,6 +174,13 @@ public class HeroDebugCommand
 
     public sealed class HeroInfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroInfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "info";
@@ -181,19 +191,14 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
 
             var fields = typeof(Hero).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -217,6 +222,13 @@ public class HeroDebugCommand
 
     public sealed class HeroCreateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroCreateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "create_hero";
@@ -227,7 +239,7 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_object_id", "The character template StringId."),
+            new ExpectedArgs("character_object_id", "Character template name or id; quote names with spaces."),
             new ExpectedArgs("age", "The optional hero age.", false),
         };
 
@@ -238,25 +250,18 @@ public class HeroDebugCommand
                 return Failed("Create hero is only to be called on the server");
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             var age = -1;
             if (args.Count == 2 && int.TryParse(args[1], out age) == false)
             {
                 return Succeeded($"{args[1].GetType().Name} was not of type int");
             }
 
-            string characterObjectId = args[0];
-
-            if (objectManager.TryGetObject<CharacterObject>(characterObjectId, out var template) == false)
+            if (!resolver.TryResolveCharacterObject(args[0], out var template, out var templateError))
             {
-                return Failed($"Unable to get {typeof(CharacterObject)} with id: {characterObjectId}");
+                return Failed(templateError);
             }
 
-            HeroCreator.CreateBasicHero(characterObjectId, template, out var newHero);
+            HeroCreator.CreateBasicHero(template.StringId, template, out var newHero);
 
             return Succeeded($"Created new hero with string id: {newHero.StringId}");
         }
@@ -289,6 +294,13 @@ public class HeroDebugCommand
 
     public sealed class HeroAddPowerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroAddPowerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "add_power";
@@ -299,7 +311,7 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("power", "The integer power amount."),
         };
 
@@ -310,14 +322,9 @@ public class HeroDebugCommand
                 return Failed(error);
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
 
             if (int.TryParse(args[1], out int power) == false)
@@ -333,17 +340,24 @@ public class HeroDebugCommand
 
     public sealed class HeroSetGoldCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetGoldCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_gold";
 
-        public string Description => "Sets gold for every hero with an exact display name on the server.";
+        public string Description => "Sets gold for a hero by display name or registered id on the server.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name. Quote multi-word values."),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("gold", "The integer gold value."),
         };
 
@@ -356,28 +370,28 @@ public class HeroDebugCommand
                 return Failed($"{args[1]} is not a valid integer");
             }
 
-            string heroName = args[0];
-
-            var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
-                .Where(h => h.Name?.ToString() == heroName)
-                .ToList();
-
-            if (heroes.Count == 0)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to find hero with name: {heroName}");
+                return Failed(heroError);
             }
 
-            foreach (var hero in heroes)
-            {
-                hero.Gold = gold;
-            }
+            hero.Gold = gold;
 
-            return Succeeded($"Set gold to {gold} for {heroes.Count} hero(es) named '{heroName}'");
+            return Succeeded($"Set gold to {gold} for hero '{hero.Name}'");
         }
     }
 
     public sealed class HeroGoldStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroGoldStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "gold_state";
@@ -388,22 +402,31 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out Hero hero))
-                return Failed($"Hero with id {args[0]} not found.");
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
+                return Failed(heroError);
+            if (!objectManager.TryGetId(hero, out var heroId))
+                return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 
-            return Succeeded($"HERO_GOLD_STATE hero={args[0]} gold={hero.Gold}");
+            return Succeeded($"HERO_GOLD_STATE hero={heroId} gold={hero.Gold}");
         }
     }
 
     public sealed class HeroSetGoldStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroSetGoldStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_gold_state";
@@ -414,7 +437,7 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("gold", "The non-negative integer gold value."),
         };
 
@@ -424,30 +447,37 @@ public class HeroDebugCommand
                 return Failed(error);
             if (!int.TryParse(args[1], out int gold) || gold < 0)
                 return Failed($"Unable to parse non-negative gold amount: {args[1]}.");
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out Hero hero))
-                return Failed($"Hero with id {args[0]} not found.");
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
+                return Failed(heroError);
+            if (!objectManager.TryGetId(hero, out var heroId))
+                return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 
             int oldGold = hero.Gold;
             hero.Gold = gold;
-            return Succeeded($"HERO_GOLD_SET hero={args[0]} oldGold={oldGold} newGold={hero.Gold}");
+            return Succeeded($"HERO_GOLD_SET hero={heroId} oldGold={oldGold} newGold={hero.Gold}");
         }
     }
 
     public sealed class HeroSetAgeCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetAgeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_age";
 
-        public string Description => "Sets the age of heroes matching a display name or registered id on the server.";
+        public string Description => "Sets the age of a hero by display name or registered id on the server.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name_or_id", "The exact hero display name or registered id. Quote multi-word values."),
+            new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("age", "The age in years."),
         };
 
@@ -455,45 +485,34 @@ public class HeroDebugCommand
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_age")) return Failed(error);
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             if (float.TryParse(args[1], out float age) == false)
             {
                 return Failed($"{args[1]} is not a valid float");
             }
 
-            string heroNameOrId = args[0];
-            var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
-                .Where(h => h.Name?.ToString() == heroNameOrId)
-                .ToList();
-
-            if (heroes.Count == 0)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                if (objectManager.TryGetObject<Hero>(heroNameOrId, out var hero))
-                {
-                    heroes.Add(hero);
-                }
-                else
-                {
-                    return Failed($"Unable to find hero with id or name: {heroNameOrId}");
-                }
+                return Failed(heroError);
             }
 
-            foreach (var hero in heroes)
-            {
-                var ageInTicks = (long)(CampaignTime.TimeTicksPerYear * age);
-                hero.SetBirthDay(new CampaignTime(CampaignTime.CurrentTicks - ageInTicks));
-            }
+            var ageInTicks = (long)(CampaignTime.TimeTicksPerYear * age);
+            hero.SetBirthDay(new CampaignTime(CampaignTime.CurrentTicks - ageInTicks));
 
-            return Succeeded($"Set age to {age} for {heroes.Count} hero(es) matching '{heroNameOrId}'");
+            return Succeeded($"Set age to {age} for hero '{hero.Name}'");
         }
     }
 
     public sealed class HeroKillPlayerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "kill_player";
@@ -504,63 +523,118 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id."),
+            new ExpectedArgs("hero_id", "Player hero name or id; quote names with spaces."),
             new ExpectedArgs("death_detail", "One of old_age, battle, or execution."),
-            new ExpectedArgs("killer_hero_id", "The optional registered killer hero id.", false),
+            new ExpectedArgs("killer_hero_id", "Optional killer hero name or id; quote names with spaces.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
+            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: true);
+        }
+    }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out Hero hero))
-                return Failed($"Hero with id {args[0]} not found.");
-            if (!hero.IsPlayerHero() || !hero.IsAlive)
-                return Failed("The hero must be a living registered player.");
+    public sealed class HeroKillNpcCoopCommand : ICoopCommand
+    {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-            KillCharacterAction.KillCharacterActionDetail detail;
-            switch (args[1].ToLowerInvariant())
-            {
-                case "old_age":
-                    detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
-                    break;
-                case "battle":
-                    detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
-                    break;
-                case "execution":
-                    detail = KillCharacterAction.KillCharacterActionDetail.Executed;
-                    break;
-                default:
-                    return Failed($"Unknown death detail: {args[1]}. Expected old_age, battle, or execution.");
-            }
+        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
 
-            Hero killer = null;
-            if (args.Count == 3 && !objectManager.TryGetObject(args[2], out killer))
-                return Failed($"Hero with id {args[2]} not found.");
-            if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
-                return Failed("Execution requires a killer hero id, use coop.debug.hero.list to find one.");
+        public string Prefix => "coop.debug.hero";
+        public string Name => "kill_npc";
+        public string Description => "Kills a living registered NPC through the native death action in a registered player's context.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "NPC hero name or id; quote names with spaces."),
+            new ExpectedArgs("death_detail", "One of old_age, battle, or execution."),
+            new ExpectedArgs("controller_id", "The acting player's registered controller id."),
+            new ExpectedArgs("killer_hero_id", "Optional killer hero name or id; quote names with spaces.", false),
+        };
 
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_npc")) return Failed(error);
+            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: false);
+        }
+    }
+
+    // Resolves the target (and optional killer) hero by name or id, then applies the native death action.
+    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, ICoopCommandArgs args, bool requirePlayer)
+    {
+        if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
+            return Failed(heroError);
+        if (hero.IsPlayerHero() != requirePlayer || !hero.IsAlive)
+            return Failed(requirePlayer ? "The hero must be a living registered player." : "The hero must be a living registered NPC.");
+
+        KillCharacterAction.KillCharacterActionDetail detail;
+        switch (args[1].ToLowerInvariant())
+        {
+            case "old_age":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
+                break;
+            case "battle":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
+                break;
+            case "execution":
+                detail = KillCharacterAction.KillCharacterActionDetail.Executed;
+                break;
+            default:
+                return Failed($"Unknown death detail: {args[1]}. Expected old_age, battle, or execution.");
+        }
+
+        var killerIndex = requirePlayer ? 2 : 3;
+        Hero killer = null;
+        if (args.Count > killerIndex && !resolver.TryResolveHero(args[killerIndex], out killer, out heroError))
+            return Failed(heroError);
+        if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
+            return Failed("Execution requires a killer hero id, use coop.debug.hero.list to find one.");
+
+        Hero actor = null;
+        MobileParty party = null;
+        if (!requirePlayer && (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+            !players.TryGetPlayer(args[2], out var player) ||
+            !objectManager.TryGetObject(player.HeroId, out actor) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party)))
+            return Failed("The acting player's registered hero and party are required.");
+        if (!requirePlayer && detail == KillCharacterAction.KillCharacterActionDetail.Executed &&
+            killer.IsPlayerHero() && killer != actor)
+            return Failed("A player execution killer must match the acting controller's hero.");
+
+        using (requirePlayer ? null : new MainHeroSubstitutionScope(actor, party))
+        {
             hero.AddDeathMark(killer, detail);
             KillCharacterAction.ApplyByDeathMarkForced(hero, true);
-            return Succeeded($"Player {hero.Name} was killed with detail {detail}.");
         }
+        return Succeeded($"{(requirePlayer ? "Player" : "NPC")} {hero.Name} was killed with detail {detail}.");
     }
 
     public sealed class HeroIllDaysCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroIllDaysCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "ill_days";
 
-        public string Description => "Reports the local player's illness duration on clients or matching heroes on the server.";
+        public string Description => "Reports the local player's illness duration on clients or a hero's on the server.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name required on the server. Quote multi-word values.", false),
+            new ExpectedArgs("hero_name", "Hero name or id required on the server; quote names with spaces.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -577,30 +651,18 @@ public class HeroDebugCommand
 
             if (args.Count == 0)
             {
-                return Failed("A hero name is required when running this command on the server.");
+                return Failed("A hero name or id is required when running this command on the server.");
             }
 
             if (!ContainerProvider.TryResolve<IAgingCampaignBehaviorInterface>(out var agingBehaviorInterface))
                 return Failed("Unable to resolve behavior interface.");
 
-            string heroName = args[0];
-
-            var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
-                .Where(h => h.Name?.ToString() == heroName)
-                .ToList();
-
-            if (heroes.Count == 0)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to find hero with name: {heroName}");
+                return Failed(heroError);
             }
 
-            StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in heroes)
-            {
-                stringBuilder.AppendLine($"{hero.StringId}: {agingBehaviorInterface.GetPlayerIllDays(hero)}");
-            }
-
-            return Succeeded(stringBuilder.ToString());
+            return Succeeded($"{hero.StringId}: {agingBehaviorInterface.GetPlayerIllDays(hero)}{Environment.NewLine}");
         }
     }
 
@@ -612,6 +674,13 @@ public class HeroDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class HeroSetHitpointsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetHitpointsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_hitpoints";
@@ -622,7 +691,7 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("hit_points", "The integer hit-point value."),
         };
 
@@ -633,14 +702,9 @@ public class HeroDebugCommand
                 return Failed(error);
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
 
             if (int.TryParse(args[1], out int hitPoints) == false)
@@ -661,6 +725,13 @@ public class HeroDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class HeroSetBannerItemCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetBannerItemCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_banneritem";
@@ -671,8 +742,8 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
-            new ExpectedArgs("banner_item_id", "The banner item StringId."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
+            new ExpectedArgs("banner_item_id", "Banner item name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -682,19 +753,15 @@ public class HeroDebugCommand
                 return Failed(error);
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(heroError);
             }
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+            var bannerItems = MBObjectManager.Instance.GetObjectTypeList<ItemObject>()
+                .Where(i => i.ItemType == ItemObject.ItemTypeEnum.Banner);
+            if (!resolver.TryResolve(args[1], bannerItems, i => i.Name?.ToString(), out var bannerItem, out var itemError))
             {
-                return Failed($"Unable to find hero with id: {args[0]}");
-            }
-            var bannerItem = MBObjectManager.Instance.GetObjectTypeList<ItemObject>()
-                    .FirstOrDefault(i => i.StringId == args[1] && i.ItemType == ItemObject.ItemTypeEnum.Banner);
-            if (bannerItem == null)
-            {
-                return Failed($"Unable to find banneritem with StringId: {args[1]}");
+                return Failed(itemError);
             }
 
             hero.BannerItem = new EquipmentElement(bannerItem);
@@ -740,6 +807,13 @@ public class HeroDebugCommand
     /// <returns>returns banneritem info from hero </returns>
     public sealed class HeroGetBannerItemCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroGetBannerItemCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "get_banneritem";
@@ -750,19 +824,14 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
 
             return Succeeded($"Hero BannerItem: {hero.BannerItem.Item?.StringId ?? "none"}");
@@ -813,6 +882,13 @@ public class HeroDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class HeroSetIssueCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetIssueCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_issue";
@@ -823,7 +899,7 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("issue_id", "The issue StringId."),
         };
 
@@ -834,13 +910,9 @@ public class HeroDebugCommand
                 return Failed(error);
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
             var issue = Campaign.Current.CampaignObjectManager.GetAllHeroes()
                 .Where(h => h.Issue != null)
@@ -864,6 +936,13 @@ public class HeroDebugCommand
     /// <returns>returns Issue info from hero </returns>
     public sealed class HeroGetIssueCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroGetIssueCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "get_issue";
@@ -874,19 +953,14 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[0]}");
+                return Failed(heroError);
             }
 
             return Succeeded($"Hero Issue: {hero.Issue?.StringId ?? "none"}");
@@ -898,6 +972,13 @@ public class HeroDebugCommand
     /// </summary>
     public sealed class HeroVolunteersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroVolunteersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "volunteers";
@@ -908,35 +989,29 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The hero StringId."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             {
-                if (hero.StringId == args[0])
-                {
-                    stringBuilder.AppendLine(hero.Name.ToString());
-                    foreach (var volunteer in hero.VolunteerTypes)
-                    {
-                        if (volunteer == null)
-                        {
-                            stringBuilder.AppendLine("[EMPTY SLOT]");
-                            continue;
-                        }
-                        stringBuilder.AppendLine(volunteer.Name.ToString());
-                    }
-                }
+                return Failed(heroError);
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.AppendLine(hero.Name.ToString());
+            foreach (var volunteer in hero.VolunteerTypes)
             {
-                return Succeeded(result);
+                if (volunteer == null)
+                {
+                    stringBuilder.AppendLine("[EMPTY SLOT]");
+                    continue;
+                }
+                stringBuilder.AppendLine(volunteer.Name.ToString());
             }
-            return Failed("Hero not found.");
+
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -945,6 +1020,13 @@ public class HeroDebugCommand
     /// </summary>
     public sealed class HeroRefreshVolunteersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroRefreshVolunteersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "refresh_volunteers";
@@ -955,16 +1037,16 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The optional settlement StringId; defaults to town_ES1.", false),
+            new ExpectedArgs("settlement_id", "Optional settlement name or id; defaults to town_ES1. Quote names with spaces.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.refresh_volunteers")) return Failed(error);
 
-            string settlementId = args.Count == 0 ? "town_ES1" : args[0];
-            var settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == settlementId);
-            if (settlement == null) return Failed($"Settlement '{settlementId}' not found.");
+            string settlementQuery = args.Count == 0 ? "town_ES1" : args[0];
+            if (!resolver.TryResolveSettlement(settlementQuery, out var settlement, out var settlementError))
+                return Failed(settlementError);
 
             var behavior = Campaign.Current?.GetCampaignBehavior<RecruitmentCampaignBehavior>();
             if (behavior == null) return Failed($"Unable to find {nameof(RecruitmentCampaignBehavior)}.");
@@ -978,6 +1060,13 @@ public class HeroDebugCommand
 
     public sealed class HeroSetRelationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetRelationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_relation";
@@ -988,8 +1077,8 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero1_id", "The first registered hero id."),
-            new ExpectedArgs("hero2_id", "The second registered hero id."),
+            new ExpectedArgs("hero1_id", "First hero name or id; quote names with spaces."),
+            new ExpectedArgs("hero2_id", "Second hero name or id; quote names with spaces."),
             new ExpectedArgs("value", "The integer relation value."),
         };
 
@@ -1000,19 +1089,14 @@ public class HeroDebugCommand
                 return Failed("Set relation is only to be called on the server");
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero1, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(heroError);
             }
 
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+            if (!resolver.TryResolveHero(args[1], out var hero2, out heroError))
             {
-                return Failed($"Unable to find hero with id: {args[0]}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[1]}");
+                return Failed(heroError);
             }
 
             if (hero1 == hero2)
@@ -1035,6 +1119,13 @@ public class HeroDebugCommand
 
     public sealed class HeroGetRelationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroGetRelationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "get_relation";
@@ -1045,25 +1136,20 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero1_id", "The first registered hero id."),
-            new ExpectedArgs("hero2_id", "The second registered hero id."),
+            new ExpectedArgs("hero1_id", "First hero name or id; quote names with spaces."),
+            new ExpectedArgs("hero2_id", "Second hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero1, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(heroError);
             }
 
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+            if (!resolver.TryResolveHero(args[1], out var hero2, out heroError))
             {
-                return Failed($"Unable to find hero with id: {args[0]}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[1]}");
+                return Failed(heroError);
             }
 
             return Succeeded($"Relation between '{hero1.Name}' and '{hero2.Name}': {CharacterRelationManager.GetHeroRelation(hero1, hero2)}");
@@ -1072,6 +1158,13 @@ public class HeroDebugCommand
 
     public sealed class HeroGetEffectiveRelationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroGetEffectiveRelationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "get_effective_relation";
@@ -1082,25 +1175,20 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero1_id", "The first registered hero id."),
-            new ExpectedArgs("hero2_id", "The second registered hero id."),
+            new ExpectedArgs("hero1_id", "First hero name or id; quote names with spaces."),
+            new ExpectedArgs("hero2_id", "Second hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero1, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(heroError);
             }
 
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+            if (!resolver.TryResolveHero(args[1], out var hero2, out heroError))
             {
-                return Failed($"Unable to find hero with id: {args[0]}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[1]}");
+                return Failed(heroError);
             }
 
             var campaign = Campaign.Current;
@@ -1126,6 +1214,13 @@ public class HeroDebugCommand
 
     public sealed class HeroSetEffectiveRelationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroSetEffectiveRelationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero";
 
         public string Name => "set_effective_relation";
@@ -1136,8 +1231,8 @@ public class HeroDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero1_id", "The first registered hero id."),
-            new ExpectedArgs("hero2_id", "The second registered hero id."),
+            new ExpectedArgs("hero1_id", "First hero name or id; quote names with spaces."),
+            new ExpectedArgs("hero2_id", "Second hero name or id; quote names with spaces."),
             new ExpectedArgs("value", "The integer effective relation value."),
         };
 
@@ -1148,19 +1243,14 @@ public class HeroDebugCommand
                 return Failed("Set effective relation is only to be called on the server");
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            if (!resolver.TryResolveHero(args[0], out var hero1, out var heroError))
             {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
+                return Failed(heroError);
             }
 
-            if (objectManager.TryGetObject<Hero>(args[0], out var hero1) == false)
+            if (!resolver.TryResolveHero(args[1], out var hero2, out heroError))
             {
-                return Failed($"Unable to find hero with id: {args[0]}");
-            }
-
-            if (objectManager.TryGetObject<Hero>(args[1], out var hero2) == false)
-            {
-                return Failed($"Unable to find hero with id: {args[1]}");
+                return Failed(heroError);
             }
 
             if (int.TryParse(args[2], out int value) == false)

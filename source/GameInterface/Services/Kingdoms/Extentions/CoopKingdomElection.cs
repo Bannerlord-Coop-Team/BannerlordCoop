@@ -51,6 +51,16 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
+        /// <summary>
+        /// Like native <see cref="KingdomElection.StartElectionWithoutPlayer"/>: the AI picks and applies the outcome
+        /// even when a player clan supports the decision.
+        /// </summary>
+        public void StartElectionWithoutPlayerCoop()
+        {
+            this._ignorePlayerSupport = true;
+            this.StartElectionCoop();
+        }
+
         public void SetupPlayerVoteElection()
         {
             this.Setup();
@@ -106,6 +116,16 @@ namespace GameInterface.Services.Kingdoms.Extentions
                 this._chosenOutcome = this.GetAiChoiceCoop(this._possibleOutcomes);
             }
             return this._chosenOutcome;
+        }
+
+        public DecisionOutcome ChooseCallToWarRefusal()
+        {
+            this.DetermineOfficialSupport();
+            this._chosenOutcome = this._possibleOutcomes.FirstOrDefault(outcome =>
+                outcome is ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome { ShouldCallToWar: false }
+                || outcome is AcceptCallToWarAgreementDecision.AcceptCallToWarAgreementDecisionOutcome { ShouldAcceptCallToWar: false });
+
+            return this._chosenOutcome ?? this.ChooseOutcomeWithCurrentVotes();
         }
 
         public void ApplyChosenOutcomeCoop()
@@ -222,6 +242,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
             playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
 
             return true;
+        }
+
+        internal static bool IsPlayerTargetedCallToWarProposal(KingdomDecision decision)
+        {
+            return decision is ProposeCallToWarAgreementDecision { CalledKingdom: Kingdom calledKingdom }
+                   && calledKingdom.IsPlayerKingdom();
         }
 
         internal static bool TryRedirectPlayerProposeCallToWarAgreementOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Commands;
+using GameInterface.Tests.Utils.Commands;
 using GameInterface;
 using Serilog;
 using System;
@@ -38,9 +39,9 @@ public class CharacterFactionCoopCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(140, commandTypes.Length);
+        Assert.Equal(144, commandTypes.Length);
 #else
-        Assert.Equal(135, commandTypes.Length);
+        Assert.Equal(138, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -98,11 +99,11 @@ public class CharacterFactionCoopCommandTests
         ICoopCommand clanEconomy = CreateCommand("coop.debug.clan", "economy");
 
         Assert.Equal(2, setGold.ExpectedArgs.Length);
-        Assert.Contains("Quote multi-word", setGold.ExpectedArgs[0].Description);
+        Assert.Contains("quote", setGold.ExpectedArgs[0].Description, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, createKingdom.ExpectedArgs.Length);
-        Assert.All(createKingdom.ExpectedArgs, expected => Assert.Contains("Quote multi-word", expected.Description));
+        Assert.All(createKingdom.ExpectedArgs, expected => Assert.Contains("quote", expected.Description, StringComparison.OrdinalIgnoreCase));
         Assert.Single(clanEconomy.ExpectedArgs);
-        Assert.Contains("Quote multi-word", clanEconomy.ExpectedArgs[0].Description);
+        Assert.Contains("quote", clanEconomy.ExpectedArgs[0].Description, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -154,13 +155,19 @@ public class CharacterFactionCoopCommandTests
     }
 
     [Theory]
-    [InlineData("coop.debug.army", "create", "empire", "town_ES1", "hero", "Raider")]
-    [InlineData("coop.debug.romance", "marry", "player", "npc")]
-    [InlineData("coop.debug.kingdom", "force_ally", "empire", "empire_s")]
-    [InlineData("coop.debug.kingdom", "force_trade_agreement", "empire", "empire_s")]
+    [InlineData("coop.debug.army", "create", "Command is only available to run on the server", "empire", "town_ES1", "hero", "Raider")]
+    [InlineData("coop.debug.romance", "marry", "Command can only be run on the server.", "player", "npc")]
+    [InlineData("coop.debug.hero", "kill_npc", "The 'coop.debug.hero.kill_npc' command cannot be used on the client. It is intended for server use only.", "npc", "old_age", "player")]
+    [InlineData("coop.debug.kingdom", "force_ally", "Command is only available to run on the server", "empire", "empire_s")]
+    [InlineData("coop.debug.kingdom", "force_trade_agreement", "Command is only available to run on the server", "empire", "empire_s")]
+    [InlineData("coop.debug.kingdom", "declare_war", "Run this command on the server.", "empire", "empire_s", "hostility", "player")]
+    [InlineData("coop.debug.kingdom", "make_peace", "Run this command on the server.", "empire", "empire_s", "player")]
+    [InlineData("coop.debug.clan", "change_clan_kingdom", "Command is only available to run on the server", "clan", "empire_s", "defection", "player")]
+    [InlineData("coop.debug.clan", "leave_kingdom", "Command is only available to run on the server", "clan", "rebellion", "player")]
     public void ServerCommands_RunOnClient_ReturnExplicitFailures(
         string prefix,
         string name,
+        string expectedOutput,
         params string[] args)
     {
         bool originalIsServer = ModInformation.IsServer;
@@ -171,6 +178,7 @@ public class CharacterFactionCoopCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal(expectedOutput, result.Output);
         }
         finally
         {
@@ -181,6 +189,8 @@ public class CharacterFactionCoopCommandTests
     [Theory]
     [InlineData("force_ally")]
     [InlineData("force_trade_agreement")]
+    [InlineData("declare_war")]
+    [InlineData("make_peace")]
     public void KingdomForceCommands_RegistryRejectsClientExecution(string name)
     {
         bool originalIsServer = ModInformation.IsServer;
@@ -195,7 +205,11 @@ public class CharacterFactionCoopCommandTests
 
             CoopCommandResult result = registry.ProcessCommand(
                 $"{command.Prefix}.{command.Name}",
-                new TestArgs(new[] { "empire", "empire_s" }));
+                new TestArgs(name == "declare_war"
+                    ? new[] { "empire", "empire_s", "default", "player" }
+                    : name == "make_peace"
+                        ? new[] { "empire", "empire_s", "player" }
+                        : new[] { "empire", "empire_s" }));
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_wrong_side", result.ErrorCode);
@@ -220,7 +234,7 @@ public class CharacterFactionCoopCommandTests
 
     private static ICoopCommand[] CreateCommands() =>
         GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
 
     private sealed class TestArgs : ICoopCommandArgs

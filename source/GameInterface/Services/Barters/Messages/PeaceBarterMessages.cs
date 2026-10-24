@@ -29,6 +29,11 @@ internal enum PeaceConversationContext
     /// Appended, never reordered: the value travels as an int on the wire.
     /// </remarks>
     Settlement,
+
+    /// <summary>
+    /// A talk with a prisoner the requester's own party holds; the context id is that party.
+    /// </summary>
+    PlayerPartyPrisoner,
 }
 
 [ProtoContract(SkipConstructor = true)]

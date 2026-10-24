@@ -135,7 +135,10 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
                 partyId,
                 clanId,
                 characterObjectId,
-                player.OriginalClanId ?? player.ClanId);
+                player.OriginalClanId ?? player.ClanId)
+            {
+                CrimeRatings = player.CrimeRatings
+            };
         }
 
         return true;
@@ -261,7 +264,9 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             position = hero.LastKnownClosestSettlement.GatePosition;
         if (!position.IsValid()) return null;
 
-        var component = new LordPartyComponent(hero, null, null);
+        var recoveryArgs = new LordPartyComponent.InitializationArgs(position, 0, hero.LastKnownClosestSettlement);
+
+        var component = new LordPartyComponent(hero, null, recoveryArgs);
         var party = MobileParty.CreateParty($"{hero.StringId}_recovered_{Guid.NewGuid():N}", component);
         party.InitializeMobilePartyAtPosition(position);
         return party;

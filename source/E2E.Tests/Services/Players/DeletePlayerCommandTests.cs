@@ -198,6 +198,7 @@ public class DeletePlayerCommandTests : IDisposable
 
         var denial = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkDeletePlayerDenied>());
         Assert.Contains("battle or siege", denial.Reason);
+        Assert.Contains("coop.unstuck can force the exit", denial.Reason);
 
         // The requester surfaced the denial and stays connected with everything intact.
         var denied = Assert.Single(Client.InternalMessages.GetMessages<PlayerDeleteDenied>());

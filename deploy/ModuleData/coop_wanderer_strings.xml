@@ -457,4 +457,28 @@
   <string
     id="generic_backstory.coop_wanderer_8886871f"
     text="{=!}A seasoned traveler shaped by years among caravans, craftsmen, merchants, and fighting men. He once served a reckless commander whose poor judgment brought his own company to ruin, an experience that taught him the value of foresight, disci" />
+  <string
+    id="prebackstory.coop_wanderer_a634d3aa"
+    text="{=!}Hello! What is your name?" />
+  <string
+    id="backstory_a.coop_wanderer_a634d3aa"
+    text="{=!}I came from Seonon and I am a nurse" />
+  <string
+    id="backstory_b.coop_wanderer_a634d3aa"
+    text="{=!}I always wanted to help people." />
+  <string
+    id="backstory_c.coop_wanderer_a634d3aa"
+    text="{=!}The Vlandian&apos;s Raided my town and destroyed the hospital I worked at." />
+  <string
+    id="response_1.coop_wanderer_a634d3aa"
+    text="{=!}Im sorry to hear that" />
+  <string
+    id="response_2.coop_wanderer_a634d3aa"
+    text="{=!}Are you sure it was the Vlandians?" />
+  <string
+    id="backstory_d.coop_wanderer_a634d3aa"
+    text="{=!}Hopefully I can heal your wounded" />
+  <string
+    id="generic_backstory.coop_wanderer_a634d3aa"
+    text="{=!}Hello, I am a nurse and Hopefully I can help you" />
 </strings>

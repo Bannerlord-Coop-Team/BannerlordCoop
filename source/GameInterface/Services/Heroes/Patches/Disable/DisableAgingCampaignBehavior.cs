@@ -11,14 +11,9 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableAgingCampaignBehavior
 {
     [HarmonyPatch(nameof(AgingCampaignBehavior.RegisterEvents))]
-#if TESTER
     static bool Prefix() => ModInformation.IsServer;
-#else
-    static bool Prefix() => false;
-#endif
 }
 
-#if TESTER
 [HarmonyPatch(typeof(AgingCampaignBehavior))]
 internal class AgingCampaignBehaviorPatches
 {
@@ -26,6 +21,9 @@ internal class AgingCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickHeroPrefix(AgingCampaignBehavior __instance, Hero hero)
     {
+        // Guard against Hero.MainHero ever dying. Hero.OnDeath sets multiple properties to null that can cause issues when handled incorrectly
+        if (hero == Hero.MainHero) return false;
+
         if (!ContainerProvider.TryResolve<IAgingCampaignBehaviorInterface>(out var agingBehaviorInterface)) return false;
 
         agingBehaviorInterface.DailyTickHero(__instance, hero);
@@ -67,4 +65,3 @@ internal class AgingCampaignBehaviorPatches
         return true;
     }
 }
-#endif

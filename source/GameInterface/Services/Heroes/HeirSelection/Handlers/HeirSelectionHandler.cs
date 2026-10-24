@@ -17,6 +17,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Handlers;
 using GameInterface.Services.Players.Messages;
+using GameInterface.Services.Traits.Interfaces;
 using GameInterface.Services.UI.Cutscenes.Handlers;
 using LiteNetLib;
 using SandBox.View.Map;
@@ -44,6 +45,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
+    private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
     private readonly ISendCoalescer sendCoalescer;
@@ -63,6 +65,7 @@ internal class HeirSelectionHandler : IHandler
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
         ICoopSessionMigrator coopSessionMigrator,
+        ITraitLevelingHelperInterface traitLevelingHelperInterface,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
         ISendCoalescer sendCoalescer = null)
@@ -75,6 +78,7 @@ internal class HeirSelectionHandler : IHandler
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
+        this.traitLevelingHelperInterface = traitLevelingHelperInterface;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
         this.sendCoalescer = sendCoalescer;
@@ -88,6 +92,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Subscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Subscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
+
+        messageBroker.Subscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Subscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
 
         messageBroker.Subscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Subscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
@@ -106,6 +113,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Unsubscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Unsubscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
+
+        messageBroker.Unsubscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Unsubscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
 
         messageBroker.Unsubscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Unsubscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
@@ -353,6 +363,36 @@ internal class HeirSelectionHandler : IHandler
         });
     }
 
+    private void Handle_HeirSelectedForRetirement(MessagePayload<HeirSelectedForRetirement> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.SelectedHeir, out var selectedHeirId)) return;
+
+        network.SendAll(new NetworkHeirSelectedForRetirement(originalHeroId, selectedHeirId));
+    }
+
+    private void Handle_NetworkHeirSelectedForRetirement(MessagePayload<NetworkHeirSelectedForRetirement> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.OriginalHeroId)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
+
+            if (originalHero.Clan == null || !originalHero.Clan.GetHeirApparents().ContainsKey(selectedHeir))
+            {
+                Logger.Warning($"Ignoring invalid heir {data.SelectedHeirId} for hero {data.OriginalHeroId}");
+                return;
+            }
+
+            applyHeirSelectionActionInterface.ApplyByRetirement(originalHero, selectedHeir);
+        });
+    }
+
     private void Handle_ChangePlayerCharacterAfterHeirSelection(MessagePayload<ChangePlayerCharacterAfterHeirSelection> obj)
     {
         var data = obj.What;
@@ -392,6 +432,10 @@ internal class HeirSelectionHandler : IHandler
 
         // Migrate CoopSession data before changed player action calls PlayerHeroChanged
         coopSessionMigrator.MigratePlayerData(data.OriginalHero, data.Heir);
+
+        // Matches Campaign.OnPlayerCharacterChanged resetting trait xp to the new hero's levels
+        traitLevelingHelperInterface.InitializeTraitXp(data.Heir);
+
         sentSelections.Remove(originalHeroId);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
