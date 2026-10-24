@@ -729,15 +729,17 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
         TestEnvironment.FlushCoalescer();
         SetMockPlayerEncounter(owner, mapEventId: eventId);
+        var raidInitializations = new Dictionary<EnvironmentInstance, int>();
         foreach (var client in Clients)
         {
+            raidInitializations[client] = 0;
             client.Call(() =>
             {
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
                 settlement._readyMilitia = 0.5f;
                 var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
                 starter.AddGameMenu("encounter", "Encounter", _ => { });
-                starter.AddGameMenu("raiding_village", "Raiding village", _ => { });
+                starter.AddGameMenu("raiding_village", "Raiding village", _ => raidInitializations[client]++);
                 var state = Game.Current.GameStateManager.CreateState<MapState>();
                 state._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
                 state._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
@@ -761,11 +763,19 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Call(() => Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId));
             if (militiaLast) client.SimulateMessage(Server.NetPeer, militia);
             else client.SimulateMessage(Server.NetPeer, removal);
+            for (int i = 0; i < 200; i++)
+            {
+                client.SimulateMessage(Server.NetPeer, removal);
+                client.SimulateMessage(Server.NetPeer, militia);
+            }
+            client.SimulateMessage(Server.NetPeer, new NetworkRemoveMapEventParty(string.Empty, string.Empty));
+            client.SimulateMessage(Server.NetPeer, new NetworkChangeSettlementMilitia(0, 0f));
             client.Call(() =>
             {
                 Assert.True(client.ObjectManager.TryGetObject<MapEvent>(eventId!, out var mapEvent));
                 Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
                 Assert.Equal(client == owner ? "raiding_village" : "encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                Assert.Equal(client == owner ? 1 : 0, raidInitializations[client]);
             });
         }
         Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkRemoveMapEventParty>());
