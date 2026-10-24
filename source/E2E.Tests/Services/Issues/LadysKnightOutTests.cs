@@ -95,6 +95,7 @@ public class LadysKnightOutTests : IDisposable
                     giver.StayingInSettlement = settlement;
                     giver.Occupation = Occupation.Lord;
                     giver.IsFemale = true;
+                    giver.Clan.Name = new TextObject("Test Lady Clan");
                     var issue = new Issue(giver) { StringId = QuestScenario.IssueId };
                     Campaign.Current.IssueManager._issues[giver] = issue;
                     giver.OnIssueCreatedForHero(issue);
@@ -581,12 +582,18 @@ public class LadysKnightOutTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, started.ControllerId);
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        byte[] serverStart = Array.Empty<byte>();
+        scenario.Server.Call(() => serverStart = scenario.Server.SerializeForWire(
+            Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries).LogText));
         scenario.ClientA.Call(() =>
         {
             var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             Assert.True(issue.IsSolvingWithLordSolution);
             Assert.True(issue.IsTriedToSolveBefore);
-            Assert.Single(issue.JournalEntries);
+            var start = Assert.Single(issue.JournalEntries).LogText;
+            var giver = Assert.IsType<TextObject>(start.Attributes["ISSUE_OWNER"]);
+            Assert.Equal("Test Lady Clan", Assert.IsType<TextObject>(giver.Attributes["FACTION"]).Value);
+            Assert.Equal(scenario.ClientA.DeserializeFromWire<TextObject>(serverStart).ToString(), start.ToString());
             var history = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry.IsRelatedTo(issue)));
             Assert.False(history.IsEnded());
@@ -652,16 +659,8 @@ public class LadysKnightOutTests : IDisposable
             });
             router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
             router.RunUntilIdle();
+            environment.FlushCoalescer();
             Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
-            scenario.ClientA.Call(() => Assert.True(
-                scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Any(),
-                "client menu state=" + GameStateManager.Current?.ActiveState?.GetType().Name +
-                " conversation=" + Campaign.Current.ConversationManager.IsConversationInProgress +
-                " next=" + Campaign.Current.GameMenuManager.NextLocation +
-                " issueSolving=" + localIssue.IsSolvingWithLordSolution +
-                " pending=" + scenario.ClientA.Resolve<ILordSolutionCoordinator>().IsDecisionPending(localIssue) +
-                " requests=" + string.Join(",", scenario.ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>()
-                    .Select(request => request.Operation.ToString()))));
             var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
             Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
@@ -724,7 +723,7 @@ public class LadysKnightOutTests : IDisposable
                 Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
                 Assert.Equal(0, scenario.Server.GetRegisteredObject<Hero>(other.HeroId).Clan.Influence);
             });
-            scenario.ClientA.Call(() => Assert.True(ownerIssue.JournalEntries.Count == 2, string.Join("\n", ownerIssue.JournalEntries.Select(log => log.LogText.ToString()))));
+            scenario.ClientA.Call(() => Assert.Equal(2, ownerIssue.JournalEntries.Count));
             scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
         }
         finally { GameStateManager._current = previousStates; }
@@ -892,7 +891,7 @@ public class LadysKnightOutTests : IDisposable
         Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
-        scenario.ClientA.Call(() => Assert.True(localIssue.JournalEntries.Count == 2, string.Join("\n", localIssue.JournalEntries.Select(log => log.LogText.ToString()))));
+        scenario.ClientA.Call(() => Assert.Equal(2, localIssue.JournalEntries.Count));
     }
 
     private void PrepareLordSolution(float influence = 100)
@@ -988,7 +987,7 @@ public class LadysKnightOutTests : IDisposable
                     Assert.Equal(before[controller].Relation + (owner ? 5 : 0), giver.GetRelation(hero));
                 }
             });
-        scenario.ClientA.Call(() => Assert.True(ownerIssue.JournalEntries.Count == 2, string.Join("\n", ownerIssue.JournalEntries.Select(log => log.LogText.ToString()))));
+        scenario.ClientA.Call(() => Assert.Equal(2, ownerIssue.JournalEntries.Count));
     }
 
     [Theory]
