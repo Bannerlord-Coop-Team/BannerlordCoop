@@ -71,7 +71,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
     {
         giverId = null;
         issueId = null;
-        if (!pickers.TryGetValue(roster, out var picker) ||
+        if (roster == null || !pickers.TryGetValue(roster, out var picker) ||
             !objects.TryGetIdWithLogging(picker.Issue.IssueOwner, out giverId)) return false;
         issueId = picker.Issue.StringId;
         return true;
