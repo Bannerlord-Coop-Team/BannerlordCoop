@@ -132,10 +132,10 @@ public class NativeWaterClockPatchTests : IDisposable
 
         Assert.False(waterClock.IsInstalled);
         Assert.False(waterClock.TryReadVanillaMissionTime(out _));
-        Assert.False(waterClock.TryBeginOverride(1f));
+        Assert.False(waterClock.TryRedirect(1f));
         waterClock.SetWaterTime(1f);
-        waterClock.EndOverride();
-        Assert.False(waterClock.IsOverriding);
+        waterClock.Restore();
+        Assert.False(waterClock.IsRedirected);
     }
 
     // "48 8B ..." as bytes.

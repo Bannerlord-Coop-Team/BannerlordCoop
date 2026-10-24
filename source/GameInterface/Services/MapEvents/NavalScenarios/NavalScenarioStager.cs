@@ -9,7 +9,6 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Rafts.Interfaces;
-using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -24,7 +23,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using StartNavalCoopCommand = GameInterface.Services.Villages.Commands.MapEventDebugCommands.StartNavalCoopCommand;
 
 namespace GameInterface.Services.MapEvents.NavalScenarios;
 
@@ -53,18 +51,22 @@ public class NavalScenarioStager : INavalScenarioStager
 
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IMessageBroker messageBroker;
+    private readonly INavalBattleStaging staging;
     private readonly INavalScenarioState state;
     private readonly INavalEngageResetTracer resetTracer;
     private readonly IPlayerRaftFleetInterface raftFleets;
     // Only the server registers mission membership; a client container resolves this command without it.
     private readonly IMissionMembershipRegistry missionMembership;
 
-    public NavalScenarioStager(IObjectManager objectManager, INetwork network, INavalScenarioState state,
-        INavalEngageResetTracer resetTracer, IPlayerRaftFleetInterface raftFleets,
-        IMissionMembershipRegistry missionMembership = null)
+    public NavalScenarioStager(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker,
+        INavalBattleStaging staging, INavalScenarioState state, INavalEngageResetTracer resetTracer,
+        IPlayerRaftFleetInterface raftFleets, IMissionMembershipRegistry missionMembership = null)
     {
         this.objectManager = objectManager;
         this.network = network;
+        this.messageBroker = messageBroker;
+        this.staging = staging;
         this.state = state;
         this.resetTracer = resetTracer;
         this.raftFleets = raftFleets;
@@ -83,7 +85,7 @@ public class NavalScenarioStager : INavalScenarioStager
         var players = new MobileParty[config.ControllerIds.Length];
         for (int i = 0; i < players.Length; i++)
         {
-            if (!MapEventDebugCommands.TryGetPlayerParty(config.ControllerIds[i], requireReady: true, out _, out players[i], out output))
+            if (!staging.TryGetReadyPlayerParty(config.ControllerIds[i], out players[i], out output))
                 return false;
         }
 
@@ -114,10 +116,21 @@ public class NavalScenarioStager : INavalScenarioStager
 
         MobileParty engagingEnemy = null;
         bool started;
-        if (config.Duel) started = TryStartDuel(config, players, log, out output);
-        else if (config.CampaignEngage) started = TryStageEncounter(config, players, hull, log, out engagingEnemy, out output);
-        else if (config.Blockade) started = TryStartBlockade(config, players, hull, log, out output);
-        else started = TryStartAgainstAiFleet(config, players, hull, log, out output);
+        switch (config.Entry)
+        {
+            case NavalScenarioEntry.Duel:
+                started = TryStartDuel(config, players, log, out output);
+                break;
+            case NavalScenarioEntry.Encounter:
+                started = TryStageEncounter(config, players, hull, log, out engagingEnemy, out output);
+                break;
+            case NavalScenarioEntry.Blockade:
+                started = TryStartBlockade(config, players, hull, log, out output);
+                break;
+            default:
+                started = TryStartAgainstAiFleet(config, players, hull, log, out output);
+                break;
+        }
         if (!started)
         {
             output = log + " FAILED: " + output;
@@ -127,7 +140,7 @@ public class NavalScenarioStager : INavalScenarioStager
         }
 
         state.Start(config, localControllerId: null, isServer: true);
-        if (config.Blockade) state.Complete(NavalScenarioState.BlockadeStep, true, log.ToString());
+        if (config.Entry == NavalScenarioEntry.Blockade) state.Complete(NavalScenarioState.BlockadeStep, true, log.ToString());
 
         // The encounter's map event comes from the campaign AI later; the clients hear of the scenario once it exists, and
         // until then only answer the encounter conversation that comes first.
@@ -180,7 +193,12 @@ public class NavalScenarioStager : INavalScenarioStager
     // A failed encounter or blockade stays visible in scenario_status with the reason.
     private void RecordServerStepFailure(NavalScenarioConfig config, string output)
     {
-        string step = config.CampaignEngage ? NavalScenarioState.EngageStep : config.Blockade ? NavalScenarioState.BlockadeStep : null;
+        string step = config.Entry switch
+        {
+            NavalScenarioEntry.Encounter => NavalScenarioState.EngageStep,
+            NavalScenarioEntry.Blockade => NavalScenarioState.BlockadeStep,
+            _ => null,
+        };
         if (step == null) return;
 
         state.Start(config, localControllerId: null, isServer: true);
@@ -213,14 +231,14 @@ public class NavalScenarioStager : INavalScenarioStager
     }
 
     // The nearest hostile AI fleet at sea, a pirate (bandit) one when there is one.
-    private static MobileParty FindEncounterEnemy(MobileParty player)
+    private MobileParty FindEncounterEnemy(MobileParty player)
     {
         var position = player.Position.ToVec2();
         return MobileParty.All
-                .Where(party => party.IsBandit && StartNavalCoopCommand.IsNavalEnemy(party, player))
+                .Where(party => party.IsBandit && staging.IsNavalEnemy(party, player))
                 .OrderBy(party => party.Position.ToVec2().DistanceSquared(position))
                 .FirstOrDefault()
-            ?? StartNavalCoopCommand.FindNavalEnemy(player);
+            ?? staging.FindNavalEnemy(player);
     }
 
     // Like coop.debug.map_event.engage_nearest_bandit at sea: the players go to the fleet, which is ordered to engage the
@@ -245,7 +263,7 @@ public class NavalScenarioStager : INavalScenarioStager
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
         if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
         foreach (var player in players)
-            StartNavalCoopCommand.PlaceAtSea(player, enemy.Position);
+            staging.PlaceAtSea(player, enemy.Position);
 
         OrderEngage(enemy, players[0]);
 
@@ -261,7 +279,7 @@ public class NavalScenarioStager : INavalScenarioStager
     {
         enemy.SetMoveEngageParty(target, MobileParty.NavigationType.Naval);
         enemy.Ai.DoNotMakeNewDecisions = true;
-        MessageBroker.Instance.Publish(this, new PartyBehaviorChangeAttempted(enemy));
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(enemy));
     }
 
     // The encounter preset's wait for its map event: the parties, the deadlines and what the poll did so far.
@@ -302,7 +320,8 @@ public class NavalScenarioStager : INavalScenarioStager
         var players = wait.Players;
         if (state.Current?.ScenarioId != config.ScenarioId || !state.IsPending(NavalScenarioState.EngageStep))
         {
-            resetTracer.Stop(enemy);
+            // A newer encounter holding the same fleet puts the hold back at its next poll.
+            ReleaseEngage(enemy);
             return;
         }
 
@@ -335,7 +354,7 @@ public class NavalScenarioStager : INavalScenarioStager
         var joined = new StringBuilder();
         for (int i = 1; i < players.Length; i++)
         {
-            bool ok = StartNavalCoopCommand.TryJoinNavalAlly(objectManager, mapEventId, enemy, players[0], players[i], out var error);
+            bool ok = staging.TryJoinNavalAlly(mapEventId, enemy, players[0], players[i], out var error);
             joined.Append($" {config.ControllerIds[i]}={(ok ? "joined" : error)}");
         }
 
@@ -350,10 +369,22 @@ public class NavalScenarioStager : INavalScenarioStager
     // Ends the encounter scenario with the engage step failed for detail.
     private void FailEngage(NavalScenarioConfig config, MobileParty enemy, string detail)
     {
-        resetTracer.Stop(enemy);
+        ReleaseEngage(enemy);
         state.Complete(NavalScenarioState.EngageStep, false, detail);
         state.Advance(NavalScenarioPhase.Ended);
         Logger.Error("[NavalScenario] Encounter {ScenarioId}: {Detail}", config.ScenarioId, detail);
+    }
+
+    // Gives a fleet the scenario stopped engaging its campaign AI back, as a conversation hold's release does; the flag only
+    // matters to the server's campaign AI, so nothing is sent.
+    private void ReleaseEngage(MobileParty enemy)
+    {
+        resetTracer.Stop(enemy);
+        // A player conversation's hold owns the flag now and gives it back when the conversation ends.
+        if (ConversationPartyHold.IsInPlayerConversation(enemy)) return;
+
+        enemy.Ai.DoNotMakeNewDecisions = false;
+        enemy.Ai.RethinkAtNextHourlyTick = true;
     }
 
     // Puts the fleet back on its engage order when something replaced it; the reset tracer logs what did.
@@ -361,7 +392,13 @@ public class NavalScenarioStager : INavalScenarioStager
     {
         var enemy = wait.Enemy;
         var target = wait.Players[0];
-        if (IsEncounterUnderWay(enemy, target) || (enemy.DefaultBehavior == AiBehavior.EngageParty && enemy.TargetParty == target)) return;
+        if (IsEncounterUnderWay(enemy, target)) return;
+        if (enemy.DefaultBehavior == AiBehavior.EngageParty && enemy.TargetParty == target)
+        {
+            // An older scenario's release of the same fleet must not let the campaign AI drop this engage.
+            enemy.Ai.DoNotMakeNewDecisions = true;
+            return;
+        }
 
         string before = $"{enemy.DefaultBehavior}, target {enemy.TargetParty?.StringId ?? "none"}";
         OrderEngage(enemy, target);
@@ -424,7 +461,7 @@ public class NavalScenarioStager : INavalScenarioStager
         }
 
         foreach (var party in players)
-            StartNavalCoopCommand.PlaceAtSea(party, town.PortPosition);
+            staging.PlaceAtSea(party, town.PortPosition);
 
         var flags = new BattleCreationFlags(forceRaid: false, forceSallyOut: false, forceVolunteers: false, forceSupplies: false,
             isSallyOutAmbush: false, forceBlockadeAttack: true, forceBlockadeSallyOutAttack: false, forceHideoutSendTroops: false);
@@ -448,7 +485,7 @@ public class NavalScenarioStager : INavalScenarioStager
         log.Append($" naval={mapEvent.IsNavalMapEvent} type={mapEvent.EventType}");
         for (int i = 1; i < players.Length; i++)
         {
-            if (!StartNavalCoopCommand.TryJoinNavalAlly(objectManager, mapEventId, besieger, player, players[i], out error)) return false;
+            if (!staging.TryJoinNavalAlly(mapEventId, besieger, player, players[i], out error)) return false;
         }
 
         error = null;
@@ -457,6 +494,7 @@ public class NavalScenarioStager : INavalScenarioStager
 
     internal const float LiftBlockadePowerRatio = 1.2f;
 
+    /// <summary>Whether vanilla would lift the blockade with no battle against attackers this much stronger.</summary>
     internal static bool IsBlockadeLiftedWithoutBattle(float attackerPower, float blockadePower) =>
         attackerPower > blockadePower * LiftBlockadePowerRatio;
 
@@ -614,19 +652,22 @@ public class NavalScenarioStager : INavalScenarioStager
             .FirstOrDefault();
     }
 
+    // Whether the players can attack this besieger's blockade: an AI party at war with them, not already fighting.
     private static bool IsBlockadeAttackable(MobileParty besieger, MobileParty player) =>
         !besieger.IsPlayerParty() && besieger.MapEvent == null && besieger.MapFaction != null &&
         FactionManager.IsAtWarAgainstFaction(besieger.MapFaction, player.MapFaction);
 
+    // An active AI lord party with troops, outside any settlement, map event, siege camp and army, free to start a siege.
     private static bool IsFreeLord(MobileParty party) =>
         party.IsActive && !party.IsPlayerParty() && party.LeaderHero != null && party.CurrentSettlement == null &&
         party.MapEvent == null && party.BesiegerCamp == null && party.Army == null && party.MapFaction != null &&
         party.MemberRoster.TotalManCount > 0;
 
+    // start_naval's entry: sizes and arms the nearest hostile AI fleet and starts the battle against it.
     private bool TryStartAgainstAiFleet(NavalScenarioConfig config, MobileParty[] players, ShipHull hull, StringBuilder log,
         out string error)
     {
-        var enemy = StartNavalCoopCommand.FindNavalEnemy(players[0]);
+        var enemy = staging.FindNavalEnemy(players[0]);
         if (enemy == null)
         {
             error = $"No hostile AI party with ships is at sea for player {config.ControllerIds[0]}.";
@@ -652,7 +693,7 @@ public class NavalScenarioStager : INavalScenarioStager
         }
 
         var starters = config.LateJoin ? players.Take(1).ToArray() : players;
-        if (!StartNavalCoopCommand.TryStart(objectManager, starters, enemy, out var mapEvent, out var mapEventId, out error))
+        if (!staging.TryStart(starters, enemy, out var mapEvent, out var mapEventId, out error))
             return false;
 
         config.MapEventId = mapEventId;
@@ -694,15 +735,15 @@ public class NavalScenarioStager : INavalScenarioStager
         }
 
         // Any AI fleet at sea marks a sea position; it takes no part in the duel.
-        var seaAnchor = StartNavalCoopCommand.FindNavalEnemy(defender);
+        var seaAnchor = staging.FindNavalEnemy(defender);
         if (seaAnchor == null)
         {
             error = "No AI party with ships is at sea to mark a sea position for the duel.";
             return false;
         }
 
-        StartNavalCoopCommand.PlaceAtSea(defender, seaAnchor.Position);
-        StartNavalCoopCommand.PlaceAtSea(attacker, seaAnchor.Position);
+        staging.PlaceAtSea(defender, seaAnchor.Position);
+        staging.PlaceAtSea(attacker, seaAnchor.Position);
         StartBattleAction.Apply(attacker.Party, defender.Party);
 
         var mapEvent = defender.MapEvent;
@@ -730,12 +771,14 @@ public class NavalScenarioStager : INavalScenarioStager
         return true;
     }
 
+    // Joins the late joiner delay seconds after staging, on the game thread.
     private void ScheduleLateJoin(NavalScenarioConfig config, MobileParty enemy, MobileParty initiator, MobileParty joiner)
     {
         Task.Delay(TimeSpan.FromSeconds(config.DelaySeconds)).ContinueWith(_ =>
             GameThread.RunSafe(() => JoinLateJoiner(config, enemy, initiator, joiner), context: nameof(ScheduleLateJoin)));
     }
 
+    // Adds the late joiner to the running battle, or fails the step when the battle or its parties moved on.
     private void JoinLateJoiner(NavalScenarioConfig config, MobileParty enemy, MobileParty initiator, MobileParty joiner)
     {
         if (state.Current?.ScenarioId != config.ScenarioId) return;
@@ -750,8 +793,8 @@ public class NavalScenarioStager : INavalScenarioStager
 
         if (error == null)
         {
-            StartNavalCoopCommand.PlaceAtSea(joiner, enemy.Position);
-            StartNavalCoopCommand.TryJoinNavalAlly(objectManager, config.MapEventId, enemy, initiator, joiner, out error);
+            staging.PlaceAtSea(joiner, enemy.Position);
+            staging.TryJoinNavalAlly(config.MapEventId, enemy, initiator, joiner, out error);
         }
 
         state.Complete(NavalScenarioState.LateJoinStep, error == null,
@@ -770,13 +813,14 @@ public class NavalScenarioStager : INavalScenarioStager
         if (ally == null) return "none(no friendly lord party is free)";
 
         TopUpShips(ally.Party, 1, hull);
-        StartNavalCoopCommand.PlaceAtSea(ally, enemy.Position);
+        staging.PlaceAtSea(ally, enemy.Position);
         ally.Party.MapEventSide = player.Party.MapEventSide;
         return ally.MapEvent == mapEvent
             ? $"{ally.StringId}(ships={ally.Ships.Count},troops={ally.MemberRoster.TotalManCount})"
             : $"{ally.StringId}(not added to the map event)";
     }
 
+    // A free AI lord party friendly to the player and at war with the AI fleet.
     private static bool IsAlliedLord(MobileParty party, MobileParty player, MobileParty enemy) =>
         party.IsActive &&
         party.IsLordParty &&
@@ -797,6 +841,7 @@ public class NavalScenarioStager : INavalScenarioStager
             ChangeShipOwnerAction.ApplyByProduction(party, new Ship(hull));
     }
 
+    // Tops the fleet up to count ships, or destroys the extra ones.
     private static void SizeFleet(PartyBase party, int count, ShipHull hull)
     {
         TopUpShips(party, count, hull);
@@ -849,6 +894,7 @@ public class NavalScenarioStager : INavalScenarioStager
         ship.HasSlot(NavalScenarioPresets.WeaponSlotTag)
         && ship.GetPieceAtSlot(NavalScenarioPresets.WeaponSlotTag)?.StringId == NavalScenarioPresets.WeaponPieceId;
 
+    // Tops the party's regulars up to the given number of add_troops templates.
     private void TopUpTroops(MobileParty party, int templates)
     {
         var log = new StringBuilder();
@@ -872,6 +918,7 @@ public class NavalScenarioStager : INavalScenarioStager
     // Every crew place on a party's ships, the most troops its hulls can take on deck and below.
     private static int CrewCapacityOf(MobileParty party) => party.Ships.Sum(ship => ship.TotalCrewCapacity);
 
+    /// <summary>How many ships bring <paramref name="ships"/> up to <paramref name="wanted"/>.</summary>
     internal static int ShipsMissing(int ships, int wanted) => Math.Max(0, wanted - ships);
 
     /// <summary>How many add_troops templates bring <paramref name="healthy"/> troops to <paramref name="reserve"/> past <paramref name="crewCapacity"/>.</summary>
@@ -882,6 +929,7 @@ public class NavalScenarioStager : INavalScenarioStager
     internal static int TemplatesMissing(int regulars, int templates) =>
         Math.Max(0, ((templates * TroopsPerTemplate) - regulars + TroopsPerTemplate - 1) / TroopsPerTemplate);
 
+    // The ship's registry id for the log, or "unregistered".
     private string DescribeId(Ship ship) => objectManager.TryGetId(ship, out var shipId) ? shipId : "unregistered";
 }
 #endif

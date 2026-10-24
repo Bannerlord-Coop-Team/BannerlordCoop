@@ -112,6 +112,7 @@ internal class NavalScenarioClientHandler : IHandler
             wait.Config.ScenarioId, wait.Answers);
     }
 
+    // [Poller thread] Starts this client's copy of the scenario on the game thread and polls its Attack.
     private void Handle_NetworkNavalScenarioStarted(MessagePayload<NetworkNavalScenarioStarted> payload)
     {
         if (ModInformation.IsServer) return;
@@ -149,6 +150,7 @@ internal class NavalScenarioClientHandler : IHandler
             GameThread.RunSafe(() => PollAttack(config, deadline), context: nameof(PollAttack)));
     }
 
+    // The Attack step this client still has to run (first entry, late join or rejoin), or null.
     private string PendingAttackStep()
     {
         if (state.IsPending(NavalScenarioState.AttackStep)) return NavalScenarioState.AttackStep;
@@ -157,11 +159,12 @@ internal class NavalScenarioClientHandler : IHandler
         return null;
     }
 
+    // Asks the server to start the scenario's mission once its encounter is up here; false while it isn't yet.
     private bool TryAttack(NavalScenarioConfig config, string step)
     {
         var mainParty = MobileParty.MainParty;
         var mapEvent = mainParty?.MapEvent;
-        if (mapEvent == null || Mission.Current != null || CurrentEncounterBattle() != mapEvent) return false;
+        if (mapEvent == null || Mission.Current != null || PlayerEncounter.Battle != mapEvent) return false;
         if (!objectManager.TryGetId(mapEvent, out string mapEventId) || mapEventId != config.MapEventId) return false;
         if (!objectManager.TryGetId(mainParty, out string partyId)) return false;
 
@@ -174,19 +177,6 @@ internal class NavalScenarioClientHandler : IHandler
             : "the server refused the mission start");
         Logger.Information("[NavalScenario] {Step} for {MapEventId}: accepted={Accepted}", step, mapEventId, accepted);
         return true;
-    }
-
-    // PlayerEncounter.Battle dereferences the current encounter, which can be torn down between frames.
-    private static MapEvent CurrentEncounterBattle()
-    {
-        try
-        {
-            return PlayerEncounter.Current == null ? null : PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
     }
 }
 

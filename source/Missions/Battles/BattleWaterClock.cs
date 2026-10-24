@@ -47,8 +47,9 @@ public class BattleWaterClock : IBattleWaterClock
     private readonly IWaterClock waterClock;
     private float sinceBroadcast = BroadcastIntervalSeconds;
     private bool started;
-    private bool overriding;
-    private int lastHostEpoch;
+    private bool redirected;
+    // A client's report that reached this client before the assignment making it the host; applied on its first host tick.
+    private EarlyReport? earlyReport;
 
     public BattleWaterClock(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
         IHostEpochPolicy hostEpochPolicy, IWaterClock waterClock, IBattleWaterTimeEstimator estimator)
@@ -61,6 +62,7 @@ public class BattleWaterClock : IBattleWaterClock
         Estimator = estimator;
         messageBroker.Subscribe<NetworkBattleWaterTime>(Handle_NetworkBattleWaterTime);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     public IBattleWaterTimeEstimator Estimator { get; }
@@ -77,8 +79,8 @@ public class BattleWaterClock : IBattleWaterClock
 
         float waterTime = Estimator.Begin(local, BattleStartWaterTime);
         // A failed redirect has been logged; this battle keeps vanilla waves rather than retrying every frame.
-        overriding = waterClock.TryBeginOverride(waterTime);
-        if (overriding)
+        redirected = waterClock.TryRedirect(waterTime);
+        if (redirected)
             Logger.Information("[NavalSync] Battle water clock on at {WaterTime} (local {Local}, host time {HostTime})",
                 waterTime, local, Estimator.HasHostTime);
     }
@@ -87,28 +89,39 @@ public class BattleWaterClock : IBattleWaterClock
     {
         // AfterStart normally starts the clock; a battle that skipped it starts on its first tick instead.
         Start();
-        if (!overriding || !waterClock.TryReadVanillaMissionTime(out var local)) return;
+        if (!redirected || !waterClock.TryReadVanillaMissionTime(out var local)) return;
 
         bool isHost = session.IsLocalHost;
-        WatchHostChange(isHost);
+        if (isHost) ApplyEarlyReport();
         float waterTime = Estimator.Advance(local, isHost);
         waterClock.SetWaterTime(waterTime);
         if (isHost) BroadcastEvery(dt, waterTime);
     }
 
-    // A host change can promote a member whose water lagged: a client re-arms a forward jump and tells the new host its time.
-    private void WatchHostChange(bool isHost)
+    // [Game thread] Published from the host assignment. A host change can promote a member whose water lagged, so a client
+    // re-arms a forward jump and tells the new host its time.
+    private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
     {
-        int epoch = session.HostEpoch;
-        if (epoch == lastHostEpoch) return;
+        var migrated = payload.What;
+        if (migrated.MapEventId != session.InstanceId) return;
+        if (!redirected || session.IsLocalHost) return;
 
-        bool changed = lastHostEpoch != 0;
-        lastHostEpoch = epoch;
-        if (!changed || isHost) return;
+        var newHost = migrated.NewHostControllerId ?? session.HostControllerId;
+        if (newHost == null) return;
 
         Estimator.RearmAdoption();
-        var host = session.HostControllerId;
-        if (host != null) network.Send(host, new NetworkBattleWaterTime(waterClock.WrittenTime, epoch, fromHost: false));
+        int epoch = migrated.Epoch > 0 ? migrated.Epoch : session.HostEpoch;
+        network.Send(newHost, new NetworkBattleWaterTime(waterClock.WrittenTime, epoch, fromHost: false));
+    }
+
+    // Applies the report held from before this client became the host, if it was sent for this host epoch.
+    private void ApplyEarlyReport()
+    {
+        if (earlyReport is not EarlyReport report) return;
+        if (report.HostEpoch > session.HostEpoch) return;
+
+        earlyReport = null;
+        if (report.HostEpoch == session.HostEpoch) AdoptReport(report.WaterTime, report.LocalTime);
     }
 
     // Sends the host's water time once per interval.
@@ -150,14 +163,36 @@ public class BattleWaterClock : IBattleWaterClock
         SamplesAccepted++;
     }
 
-    // [Game thread] On the host: a client's time far ahead means this host lagged when promoted, so it jumps forward to it.
+    // [Game thread] On the host: a client's time far ahead means this host lagged when promoted, so it jumps forward to it. A
+    // report for a newer epoch beat this client's own assignment (another channel) and waits for its first host tick.
     private void AcceptPeerTime(NetworkBattleWaterTime report)
     {
-        if (!overriding || !session.IsLocalHost) return;
-        if (!waterClock.TryReadVanillaMissionTime(out var local)) return;
+        if (!redirected || !waterClock.TryReadVanillaMissionTime(out var local)) return;
+        if (session.IsLocalHost)
+        {
+            AdoptReport(report.WaterTime, local);
+            return;
+        }
+        if (report.HostEpoch <= session.HostEpoch) return;
 
-        if (Estimator.AdoptIfAhead(report.WaterTime, local))
-            Logger.Information("[NavalSync] Promoted host jumped forward to a client's water time {WaterTime}", report.WaterTime);
+        HoldEarlyReport(new EarlyReport(report.WaterTime, local, report.HostEpoch));
+    }
+
+    // Keeps the report of the newest epoch that is furthest ahead of the local clock.
+    private void HoldEarlyReport(EarlyReport report)
+    {
+        if (earlyReport is EarlyReport held && (held.HostEpoch > report.HostEpoch
+            || (held.HostEpoch == report.HostEpoch && held.Offset >= report.Offset)))
+            return;
+
+        earlyReport = report;
+    }
+
+    // Jumps the host forward to a client's time when it is far enough ahead.
+    private void AdoptReport(float waterTime, float local)
+    {
+        if (Estimator.AdoptIfAhead(waterTime, local))
+            Logger.Information("[NavalSync] Promoted host jumped forward to a client's water time {WaterTime}", waterTime);
     }
 
     // [Poller thread] A peer entering the battle gets the host's time at once instead of up to a second later.
@@ -174,7 +209,7 @@ public class BattleWaterClock : IBattleWaterClock
     /// <summary>[Game thread] Sends the host's current water time to one peer.</summary>
     internal void SendTimeTo(string controllerId)
     {
-        if (!overriding || !session.IsLocalHost || session.IsOwn(controllerId)) return;
+        if (!redirected || !session.IsLocalHost || session.IsOwn(controllerId)) return;
 
         network.Send(controllerId, new NetworkBattleWaterTime(waterClock.WrittenTime, session.HostEpoch));
     }
@@ -184,10 +219,29 @@ public class BattleWaterClock : IBattleWaterClock
     {
         messageBroker.Unsubscribe<NetworkBattleWaterTime>(Handle_NetworkBattleWaterTime);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
-        if (!overriding) return;
+        messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        if (!redirected) return;
 
-        overriding = false;
-        waterClock.EndOverride();
+        redirected = false;
+        waterClock.Restore();
         Logger.Information("[NavalSync] Battle water clock off at {WaterTime}", waterClock.WrittenTime);
+    }
+
+    /// <summary>A client's water time report held until this client's own host assignment arrives, with the local clock then.</summary>
+    private readonly struct EarlyReport
+    {
+        public readonly float WaterTime;
+        public readonly float LocalTime;
+        public readonly int HostEpoch;
+
+        public EarlyReport(float waterTime, float localTime, int hostEpoch)
+        {
+            WaterTime = waterTime;
+            LocalTime = localTime;
+            HostEpoch = hostEpoch;
+        }
+
+        /// <summary>How far the report is ahead of the local clock.</summary>
+        public double Offset => (double)WaterTime - LocalTime;
     }
 }

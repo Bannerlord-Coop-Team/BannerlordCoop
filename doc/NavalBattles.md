@@ -484,7 +484,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R41a retreat, leave and disconnect live validation | done (R41a, R41a-2, R41a-3) |
 | R41b probes | done, D3 decided |
 | M10a ram and contact (steered copies) | in progress, R42 next |
-| M10w water clock sync (shared battle wave time) | done in code, pending live check |
+| M10w water clock sync (shared battle wave time) | done, live-verified in R45 |
 | M10b plank crossing and melee | pending, needs M10a |
 | M6 results parity (fates, Boatswain XP, loot hold) | done in code, R45 next |
 | M6 in-mission capture | done in code, R46 next |
@@ -531,7 +531,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   be built (`AddPhysics(isStatic)` left no static body). Kinematic and static copies and `copy_body` were deleted.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
-- **Waves are synced (water clock, 2026-10-21, pending live check).** This supersedes "copies float on local water".
+- **Waves are synced (water clock, 2026-10-21, live-verified in R45).** This supersedes "copies float on local water".
+  R45 measured the water 0.022 m mean apart, with no backward step through two host changes and a late join.
   R42 found that wave height follows the engine's accumulated mission timer, which adds up every mission a client has
   run, so clients with different mission histories saw different wave phases (1.54 m mean apart in
   `battle_terrain_opensea_southern`; aligned on the probe's `total` the two clients' water matched to 0.003 m). The
@@ -543,7 +544,11 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   (Windows, client role; it refuses a server or headless build), and only when its signature matches exactly once;
   otherwise it logs the match count and DLL identity and waves stay vanilla. The redirect is switched on only while a
   coop naval battle runs (only from the game thread, the thread that runs the load) and switched back first thing at
-  mission end, so other scenes run vanilla code. The campaign map's view may stay registered under the mission
+  mission end, so other scenes run vanilla code. `0x1DA870`'s only caller chain is `0x9B820`, the frame tick `0x53950`
+  and the `rglFrame_move_task`, with one frame task in flight at a time. After the water update the same frame tick calls
+  through the managed interface at `0xDA2A28` (`0x5422A`, with dt), most likely the managed tick, though that callback
+  wasn't identified. So a swap from `AfterStart` or mission end shouldn't race the site; this is a static reading, not a
+  live check. The campaign map's view may stay registered under the mission
   (`MapScreen` toggles its scene view itself, and `0x9B820` has no enabled-view check), so map water can read battle
   time while the battle runs; that is hidden and cosmetic, and map water right after a battle is a live check.
   - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`
@@ -562,11 +567,15 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     once to a peer entering the battle. From `AfterStart` on, a client's written time never runs backwards: a host time
     more than 2 s of mission time (20 water units) ahead jumps forward, at once for the first host time and the first
     after a host change, otherwise only when all of the last 3 samples are that far ahead. Everything else is slewed
-    at 75% to 125% speed toward the largest offset of the last 3 samples (transit only makes an offset look smaller).
+    at 75% to 125% speed toward a target smoothed (0.3 per sample) toward the largest offset of the last 3 samples
+    (transit only makes an offset look smaller).
   - A promoted host keeps its current offset, so it continues from its own water time. Election ignores water time, so
-    a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change every client
-    therefore sends its own time to the new host once, and the host jumps forward to any client time more than 2 s
-    ahead; the clients' backward gap to the lagging host only lasts until then.
+    a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change
+    (`BattleHostMigrated`) every client therefore sends its own time to the new host once, and the host jumps forward to
+    any client time more than 2 s ahead; the clients' backward gap to the lagging host only lasts until then. The report
+    travels the mission mesh and the assignment the server channel, so a report that arrives first is held and applied
+    on the new host's first tick at that epoch. `NavalWaterClockScenarioTests` covers this across instances with an
+    in-memory water clock.
   - The ship wake renderer reads the same clock at `0x1DAB69` (1e-5 scale, seconds) and is not patched, so wake effects
     stay on each client's local clock.
   - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of
@@ -690,7 +699,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - `NavalScenarioStager` (about 820 lines) should split into encounter, blockade and fleet-outfitter classes behind DI;
   - one staleness constant should serve both the replicator's `SampleLifetimeSeconds` and `CopySteering.StaleSeconds`;
   - `CoopNavalBattleBehavior` should get the engine directly instead of through `INavalBattleServices.Engine`;
-  - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves;
+  - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves; delete it
+    (`NavalEngageResetTracer` and `NavalEngageResetTracePatch`) once the `encounter` preset passes live (G5);
   - `RamTickPatch` replaces vanilla `MissionShipRam.OnTick` on every client (with `NavalRamKills.ApplyImpact`), so
     re-check the whole replacement against it on every DLC update;
   - the next cut of `NavalShipEngine` is the hull-swap trio (`ParkHullAgents`, `ReplaceHull`, `BoardHullAgents`).
@@ -707,7 +717,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | Command | Side | What it does |
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. Refuses while a listed player is still in a battle mission (leave it and finish the post-battle screens first), and heals each listed player's hero to full. |
-| `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
+| `scenario_status` | client | Preset steps, knobs (`entry`, `ram`, `reserve` and `drop` included) and `battle.hulls[]` with owner, AI flag, weapon and ram. |
 | `inspect [summary\|brief]` | client | `summary` (or `brief`) prints a `NAVAL_INSPECT_SUMMARY` header (instance, own id, host, epoch, deployment, hull count, the deck puppets' last/max deck error, DEBUG `copyOnCopy`) and one line per hull: the 8-digit id that the hull commands take, hull type, owner (`(npc)` for an AI hull), authority, HP, sail HP, `afloat`/`sinking`/`sunk`, `copy=own\|steered\|written`, and in DEBUG the copy's drift mean/max and `fatesSent`. Without it, the full JSON: session, host epoch, hull streams (per hull `followsHost`, `captor`, `captureSequence`, `orphan`, `side`, `formation`), `shipCapture` (`captureRequests`, `captureRejections` by reason, `captureExpired`, `pendingRequests` with `waitedSeconds`, and `applied`: `capturesApplied`, `recordsApplied`, `confirmsDropped`, `duplicateConfirms`, `captureConflicts`, `heldConfirms`), `ships[].captureTimer`, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`); and `ships[].fatesSent`, the campaign ship fates this client sent for the hull (M6). |
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
@@ -750,7 +760,8 @@ first player before the map event, and so before the scenario message, exists. S
 that has stayed open 2 s, as `coop.debug.map_event.complete_encounter_meeting` does, until the scenario message arrives
 (R42 needed that command by hand on the engaged client). While the
 engage step waits, each distinct stack that resets the fleet's movement is logged once. `scenario_status` reports the
-re-issue count and whether the fallback ran.
+re-issue count and whether the fallback ran. A failed engage, or one a newer scenario replaced, gives the fleet its campaign
+AI back (`DoNotMakeNewDecisions` off).
 
 `blockade` prefers a free lord already at war with the town's and the players' factions. Failing that, it takes the nearest
 free lord of a third faction and declares the missing wars with `DeclareWarAction.ApplyByDefault`, logged as
@@ -769,8 +780,10 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `who=host|nonhost` who disconnects;
 - `drop=hard|leave` for `migration`: `hard` (default) has the server drop the player's connection at once, the real
   disconnect path; `leave` goes to the main menu, which the battle sees as a leave. Who drops is fixed by the first host
-  each client sees, so the successor never drops too. A player that reconnects while the battle runs gets the scenario
-  again with its disconnect done and re-enters through Attack, or presses Ready if a mission start already pulled it in;
+  each client sees, so the successor never drops too. The disconnect step is done once the leave or drop request ran, and
+  fails (with the rejoin) when its console command is missing. A player that reconnects while the battle runs gets the
+  scenario again with its disconnect done and re-enters through Attack, or presses Ready if a mission start already
+  pulled it in;
 - `town=id` for `blockade`;
 - `weapons=n` (0 to 4) arms the first n ships of every player and of the AI fleet with `fore_ballista`, swapping in a Battle
   Knarr where a hull has no fore slot.

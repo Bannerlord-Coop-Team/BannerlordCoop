@@ -115,7 +115,7 @@ public class NavalScenarioResolverTests
         Assert.True(Resolve("allied_npc").AlliedNpc);
 
         var duel = Resolve("duel");
-        Assert.True(duel.Duel);
+        Assert.Equal(NavalScenarioEntry.Duel, duel.Entry);
         Assert.Equal(0, duel.EnemyHulls);
 
         var lateJoin = Resolve("late_join");
@@ -162,15 +162,14 @@ public class NavalScenarioResolverTests
     [Fact]
     public void Resolve_EncounterAndBlockadeKeepTheVanillaDeploymentAndTheirEntryPath()
     {
+        Assert.Equal(NavalScenarioEntry.StartBattle, Resolve("vs_pirates").Entry);
         var encounter = Resolve("encounter");
-        Assert.True(encounter.CampaignEngage);
-        Assert.False(encounter.Blockade);
+        Assert.Equal(NavalScenarioEntry.Encounter, encounter.Entry);
         Assert.Equal(NavalScenarioPlacement.Deployment, encounter.Placement);
         Assert.Equal(Connected, encounter.ControllerIds);
 
         var blockade = Resolve("blockade", "town=town_EN1", "hulls=4");
-        Assert.True(blockade.Blockade);
-        Assert.False(blockade.CampaignEngage);
+        Assert.Equal(NavalScenarioEntry.Blockade, blockade.Entry);
         Assert.Equal("town_EN1", blockade.BlockadeTownId);
         Assert.Equal(4, blockade.EnemyHulls);
         Assert.Equal("", Resolve("blockade").BlockadeTownId);

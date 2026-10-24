@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -12,6 +13,7 @@ using Missions.Services.Network;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
+using GameInterface.Utils;
 using Moq;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
@@ -38,7 +40,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
     protected const float TickSeconds = 0.05f;
 
-    protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients) { }
+    // An in-memory water clock per client, so no naval battle runs the native patch in the test process.
+    protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients,
+        builder => builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope()) { }
 
     /// <summary>
     /// Stands up a naval battle with one client per player, in order; the first player is the battle host and the rest are
