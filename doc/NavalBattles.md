@@ -652,6 +652,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   that doesn't fit. The side base comes from `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens with the
   ship count each client assigns (only its own fleet) above two ships, so players whose fleets differ in size above two
   hulls can derive different bases; the `Deployment slot` Information line logs the base on each client.
+- **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
+  AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
+  on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a
+  1.12 m radius) and a torn read of the engine's agent grid: a cell head read while an agent moved to the next cell. The
+  managed lock only serializes readers, so no managed check can prevent it. The trigger was the slot overlap above, which
+  threw crews across cells next to floating objects. Skipping the solver would also turn off vanilla's agent push on
+  floating objects, so it's left as is; the next freeze needs a watchdog-timed dump (§7 ProcDump).
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
   one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E) and R41a-3 (W2, D, E); the condition catch-up is
   E2E-only. Not hit live yet: an item pickup on a rejoined client in W2 (pickups by the returner's agents ran in R41a-3
@@ -847,8 +854,14 @@ A scenario client whose Ready press throws (R42 crash 2's first symptom) logs th
 
 ### ProcDump
 
-- Don't use `-h`. It false-fired while the game was loading, stopped after its dump count, and in R40 didn't fire on a
-  3-minute freeze.
-- `-e` is refused while the TaleWorlds watchdog is attached. The watchdog takes its own crash dump.
-- On a freeze, take `procdump64 -accepteula -ma <pid>` by hand, ideally twice a few seconds apart.
+- Don't use `-h`. It fires only when `IsHungAppWindow` reports a hung window: it false-fired on a busy loading screen, and
+  it never fires on a crash, because the TaleWorlds watchdog (attached as the debugger) holds the unhandled exception and
+  freezes every thread while its crash dialog waits (R40 3 minutes, R49 9 minutes, `Responding=False` at 0 CPU).
+- `-e` is refused while the watchdog is attached. The watchdog takes its own crash dump once the dialog is answered.
+- Watch `C:\ProgramData\Mount and Blade II Bannerlord\logs\watchdog_log_<pid>.txt` (copied into each case's `logs/`): the line
+  `Crash occurred. Asking for dump.` means a crash, not a hang. Take `procdump64 -accepteula -ma <pid>` at once, while
+  the process is frozen at the fault, then leave the dialog to the user, whose answer lets the watchdog write its dump
+  with the exception record.
+- Without that line, a client `Coop_client.log` silent for 15 s during a battle (it logs every second) is the freeze
+  signal: take two `-ma` dumps a few seconds apart and check the watchdog log again.
 - `dotnet-dump` only shows managed frames. A native crash needs cdb: `cdb -z <dmp> -c "!analyze -v; ~0k; q"`.
