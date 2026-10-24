@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using NavalDLC.Missions.NavalPhysics;
+using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using System;
 using System.Collections.Generic;
@@ -98,6 +99,56 @@ internal class RopeJointHullGuardPatch
     // Runs vanilla's joint step only while both of its hulls are in the mission.
     [HarmonyPrefix]
     private static bool Prefix(Joint __instance) => NavalRopeRemoval.AllowJointStep(__instance);
+}
+
+// Vanilla's OnShipRemoved runs on every hull for any removal and breaks every rope and plank in the battle; in co-op it
+// breaks only the ropes with an end on the removed hull, so one hull leaving doesn't end every other boarding.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.OnShipRemoved))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class RopeShipRemovalPatch
+{
+    // Routes both rope loops' CurrentAttachment reads through the removal filter; fails closed when the loops changed.
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var stationGetter = AccessTools.PropertyGetter(typeof(ShipAttachmentMachine), nameof(ShipAttachmentMachine.CurrentAttachment));
+        var pointGetter = AccessTools.PropertyGetter(typeof(ShipAttachmentPointMachine), nameof(ShipAttachmentPointMachine.CurrentAttachment));
+        var result = new List<CodeInstruction>();
+        int stations = 0, points = 0;
+        foreach (var instruction in instructions)
+        {
+            bool isCall = instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt;
+            string wrapper = !isCall ? null
+                : Equals(instruction.operand, stationGetter) ? nameof(StationRopeBroken)
+                : Equals(instruction.operand, pointGetter) ? nameof(PointRopeBroken) : null;
+            if (wrapper == null)
+            {
+                result.Add(instruction);
+                continue;
+            }
+
+            // The machine is on the stack; the removed hull (argument 1) joins it for the wrapper.
+            result.Add(new CodeInstruction(OpCodes.Ldarg_1).MoveLabelsFrom(instruction).MoveBlocksFrom(instruction));
+            result.Add(new CodeInstruction(OpCodes.Call, AccessTools.DeclaredMethod(typeof(RopeShipRemovalPatch), wrapper)));
+            if (wrapper == nameof(StationRopeBroken)) stations++;
+            else points++;
+        }
+
+        if (stations == 0 || points == 0) throw new InvalidOperationException("Native ship removal rope loops changed.");
+        return result;
+    }
+
+    // The station's rope when this removal breaks it, else null so vanilla's loop leaves it.
+    private static Attachment StationRopeBroken(ShipAttachmentMachine station, MissionShip removed) =>
+        BrokenOrNull(station.CurrentAttachment, removed);
+
+    // The point's rope when this removal breaks it, else null so vanilla's loop leaves it.
+    private static Attachment PointRopeBroken(ShipAttachmentPointMachine point, MissionShip removed) =>
+        BrokenOrNull(point.CurrentAttachment, removed);
+
+    // The rope when it breaks on this removal, else null.
+    private static Attachment BrokenOrNull(Attachment rope, MissionShip removed) =>
+        rope != null && NavalRopeRemoval.BreaksOnRemoval(rope, removed) ? rope : null;
 }
 
 // Retargeting destroys and recreates a rope; on a copied hull that is the owner's decision.

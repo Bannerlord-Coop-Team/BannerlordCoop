@@ -352,6 +352,10 @@ removed hull, `TickRope` breaks one whose end left or whose joint lacks a hull (
 `RopeJointHullGuardPatch` skips such a joint's force step until then (the first skip is logged, `jointStepsSkipped`). A sinking
 hull is not removed (vanilla keeps it in `AllShips`).
 
+A removal breaks only the ropes with an end on the removed hull. Vanilla's `MissionShip.OnShipRemoved` runs on every hull for
+any removal and breaks every rope and plank in the battle (R49 B4: one player leaving cut three unrelated boarding ropes);
+`RopeShipRemovalPatch` filters its two rope loops by `NavalRopeRemoval.BreaksOnRemoval` in a coop naval battle.
+
 Agents may be parked during the removal itself. The swap holds them for the fresh hull, and a removal unparks the ones
 it doesn't withdraw in the same step.
 

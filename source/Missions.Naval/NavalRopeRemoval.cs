@@ -11,7 +11,8 @@ using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine
 namespace Missions.Naval;
 
 /// <summary>
-/// No rope may hook, keep or push a hull that left the mission (the R46 freeze). Static because the rope patches call it.
+/// A leaving hull breaks only its own ropes, and no rope may hook, keep or push a hull that left (the R46 freeze). Static
+/// because the rope patches call it.
 /// </summary>
 internal static class NavalRopeRemoval
 {
@@ -51,6 +52,13 @@ internal static class NavalRopeRemoval
             }
         }
     }
+
+    /// <summary>
+    /// Whether vanilla's removal of <paramref name="removed"/> breaks this rope. In a coop naval battle only a rope with an end
+    /// on that hull breaks, because hulls leave mid-battle there and vanilla's removal would end every other boarding.
+    /// </summary>
+    internal static bool BreaksOnRemoval(Attachment rope, MissionShip removed) =>
+        !CoopNavalMissionScope.IsActive || rope.AttachmentSource?.OwnerShip == removed || rope.AttachmentTarget?.OwnerShip == removed;
 
     /// <summary>Whether a rope end has no hull: it left the mission, or never resolved to one (a joint built against a removed hull).</summary>
     internal static bool IsMissingOrRemoved(MissionShip hull) => hull == null || hull.IsRemoved;
