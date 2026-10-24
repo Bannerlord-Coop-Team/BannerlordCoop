@@ -183,5 +183,4 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 
     private static T Uninitialized<T>() where T : class =>
         (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
-
 }
