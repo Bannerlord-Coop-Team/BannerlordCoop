@@ -119,6 +119,17 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ## 2. Lifecycles
 
+### Arrivals
+
+- Hull-addressed naval messages that are sent once, or that depend on queued state, apply from the arrivals queue
+  (`IBattleShipArrivals`) at the start of the next naval services tick, in arrival order: spawn records, removals, departures,
+  entries, host changes, conditions, final ropes, routed damage and capture requests, confirms and records. The game-thread
+  queue drains while the engine's async agent and team tick runs, which reads the hull state these change (R48 L6).
+- Streams that resend continuously (samples, weapon state) still apply on receipt; a sample for a hull whose record still
+  waits is dropped and the next one lands about 50 ms later. Station use is kept pending and applied by its replicator's tick.
+- Routed damage to AI hulls is stamped and checked with the host epoch whose hull move this client applied
+  (`IAppliedHostEpoch`), which trails the session's epoch by the queued move of a host change.
+
 ### Deployment hold
 
 - Own hulls are announced at the first deployment commit, not at spawn.

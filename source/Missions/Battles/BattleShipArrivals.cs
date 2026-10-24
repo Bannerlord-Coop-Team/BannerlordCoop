@@ -6,9 +6,9 @@ using System.Collections.Generic;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Hull spawn records, removals, departures, host changes and capture traffic that arrived since the last naval
-/// tick, applied from that tick in arrival order: the game-thread queue drains while the engine's async agent and team tick
-/// runs, and all of these rewrite hull state that tick reads (R48 L6).
+/// [Game thread] Hull-addressed naval messages that are sent once, or that depend on queued state, applied from the next naval
+/// tick in arrival order: spawn records, removals, departures, entries, host changes, conditions, final ropes, routed damage and
+/// capture traffic. The game-thread queue drains while the engine's async agent tick runs, and these change what it reads (R48 L6).
 /// </summary>
 public interface IBattleShipArrivals
 {

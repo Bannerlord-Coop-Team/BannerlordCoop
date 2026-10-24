@@ -478,12 +478,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Engine.AssertRemovalInvariant();
         });
 
-        /// <summary>The arrivals (hull and capture traffic) and capture steps of the services tick alone, without advancing clocks.</summary>
+        /// <summary>The arrivals, capture and station steps of the services tick alone, without advancing clocks.</summary>
         public void TickArrivals() => Call(() =>
         {
             Services.Arrivals.ApplyAll();
             Applier.Tick(0f);
             Captures.Tick(0f);
+            Stations.Tick(0f);
         });
 
         public void Ticks(int count)
@@ -631,11 +632,16 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         /// The use/release patch's event for an agent this client drives at a station of its local hull, published after
         /// vanilla seated or released it.
         /// </summary>
-        public void UseStation(Agent agent, UsableMissionObject point, bool inUse) => Call(() =>
+        public void UseStation(Agent agent, UsableMissionObject point, bool inUse)
         {
-            if (inUse || Engine.IsSeated(agent, point)) Engine.ApplyStationUse(agent, point, inUse);
-            Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
-        });
+            Call(() =>
+            {
+                if (inUse || Engine.IsSeated(agent, point)) Engine.ApplyStationUse(agent, point, inUse);
+                Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
+            });
+            // Peers keep the use pending for their next tick, which applies it.
+            SettleMesh?.Invoke();
+        }
 
         /// <summary>
         /// The capture patch's event: this client's main agent, crew of its hull <paramref name="ownHull"/>, held the helm of

@@ -151,12 +151,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         GameThread.RunSafe(() => AcceptUse(use), context: nameof(Handle_NetworkAgentStationUse));
     }
 
-    /// <summary>[Game thread] Applies an owner's station use now, or keeps it pending until its agent and hull are here.</summary>
+    /// <summary>
+    /// [Game thread] Keeps an owner's station use pending; the next tick applies it, once its agent and hull are here, as seating
+    /// from the game-thread queue would overlap the engine's async agent tick.
+    /// </summary>
     internal void AcceptUse(NetworkAgentStationUse use)
     {
         if (disposed || use == null) return;
         pending.Add(new PendingUse(use, elapsed));
-        DrainPending();
     }
 
     public void Tick(float dt)
