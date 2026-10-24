@@ -24,9 +24,9 @@ public sealed class BrowserLinkOpenerTests : IDisposable
     }
 
     [Fact]
-    public void CheckedAddress_StartsTheShellWithThatAddressOnly()
+    public void Open_StartsTheShellWithTheAddressOnly()
     {
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), started.Add);
+        var opener = new BrowserLinkOpener(started.Add);
 
         opener.Open("https://xn--bcher-kva.example/Pfad?q=%22x%22");
 
@@ -36,48 +36,12 @@ public sealed class BrowserLinkOpenerTests : IDisposable
         Assert.True(info.UseShellExecute);
     }
 
-    // The dialog shows the checked form, so text that checks to anything else was never shown and never opens.
-    [Theory]
-    [InlineData("HTTPS://Example.COM/")]
-    [InlineData("https://Bücher.example/pfad")]
-    [InlineData("http://example.com")]
-    [InlineData("https://example.com:443/")]
-    [InlineData("https://example.com/a\"b")]
-    public void AddressThatIsNotInItsCheckedForm_NeverStartsAnything(string address)
-    {
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), started.Add);
-
-        opener.Open(address);
-
-        Assert.Empty(started);
-        Assert.Contains(logs, log => log.Contains("Refused to open a server info link"));
-    }
-
-    // The client never opens what it would not show, even if a caller passes the raw server text.
-    [Theory]
-    [InlineData("javascript:void(0)")]
-    [InlineData("file:///C:/Windows/win.ini")]
-    [InlineData("https://user@example.com/")]
-    [InlineData("/relative/path")]
-    [InlineData("https://example.com/ \"--flag")]
-    [InlineData("")]
-    [InlineData(null)]
-    public void RefusedAddress_NeverStartsAnything(string address)
-    {
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), started.Add);
-
-        opener.Open(address);
-
-        Assert.Empty(started);
-        Assert.Contains(logs, log => log.Contains("Refused to open a server info link"));
-    }
-
     // 1155 is ERROR_NO_ASSOCIATION, what Windows reports when no browser is set up for http.
     [Fact]
     public void FailedStart_IsLoggedWithItsTypeAndCodeAndNotThrown()
     {
         string marker = "no browser " + Guid.NewGuid().ToString("N");
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw new Win32Exception(1155, marker));
+        var opener = new BrowserLinkOpener(_ => throw new Win32Exception(1155, marker));
 
         var thrown = Record.Exception(() => opener.Open("https://example.com/"));
 
@@ -96,14 +60,13 @@ public sealed class BrowserLinkOpenerTests : IDisposable
             new Win32Exception(2, "An error occurred trying to start process 'https://example.com/" + marker + "' with working directory 'C:\\'."),
             new InvalidOperationException("start failed for https://example.com/" + marker),
         });
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw errors.Dequeue());
+        var opener = new BrowserLinkOpener(_ => throw errors.Dequeue());
 
-        opener.Open("javascript:" + marker);
         opener.Open("https://example.com/" + marker);
         opener.Open("https://example.com/" + marker);
 
         Assert.DoesNotContain(logs, log => log.Contains(marker));
-        Assert.Equal(3, logs.Count(log => log.Contains("server info link")));
+        Assert.Equal(2, logs.Count(log => log.Contains("Could not open a server info link")));
         Assert.Contains(logs, log => log.Contains("InvalidOperationException") && log.Contains("code " + new InvalidOperationException().HResult));
     }
 

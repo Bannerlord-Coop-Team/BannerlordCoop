@@ -1,15 +1,12 @@
-﻿using GameInterface.Services.Chat;
-using SandBox.View.Map;
-using System;
+﻿using System;
 using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.ServerInfo;
 
-/// <summary>The panel's screen side, kept apart so the show-once rules run without Gauntlet.</summary>
+/// <summary>The panel's screen side, kept apart so the open rules run without Gauntlet.</summary>
 internal interface IServerInfoPopup : IDisposable
 {
     bool CanOpen();
@@ -20,20 +17,23 @@ internal interface IServerInfoPopup : IDisposable
 /// <summary>Shows the server info panel over the campaign map without pausing the shared world.</summary>
 internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
 {
+    // Only answered on the campaign map, through the same guard as the player list key.
+    internal const InputKey ToggleKey = InputKey.F3;
+
     private readonly ServerInfoVM viewModel;
-    private readonly IChatService chat;
     private readonly IMapAvailability mapAvailability;
     private readonly Action update;
+    private readonly Action toggle;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
-    // Receives the panel state, the chat focus guard, the map check shared with the player list and the service's per-frame check.
-    public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, IMapAvailability mapAvailability, Action update)
+    // Receives the panel state, the map check shared with the player list, the service's per-frame check and its F3 action.
+    public ServerInfoOverlay(ServerInfoVM viewModel, IMapAvailability mapAvailability, Action update, Action toggle)
     {
         this.viewModel = viewModel;
-        this.chat = chat;
         this.mapAvailability = mapAvailability;
         this.update = update;
+        this.toggle = toggle;
     }
 
     // Sits just above the player list (115) and stays unfocused until the panel opens.
@@ -46,29 +46,22 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
         ScreenManager.AddGlobalLayer(this, false);
     }
 
-    // Closes on the same conditions as the player list; while closed the service may open pending info.
+    // Closes on the same conditions as the player list, routes F3 to the service, and while closed lets pending info open.
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
-        if (!viewModel.IsOpen)
+        if (viewModel.IsOpen && (!mapAvailability.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)))
         {
-            update();
+            Close();
             return;
         }
-        if (!mapAvailability.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
+        if (Input.IsKeyPressed(ToggleKey)) toggle();
+        else if (!viewModel.IsOpen) update();
         else if (Input.IsKeyReleased(InputKey.Escape)) viewModel.HandleEscape();
         else viewModel.Tick(dt);
     }
 
-    // Uses the player list's toggle rules, so it waits while the list, chat typing or another modal has focus.
-    public bool CanOpen()
-    {
-        if (!mapAvailability.IsMapAvailable() || chat.IsTyping || Input.IsOnScreenKeyboardActive) return false;
-        var focused = ScreenManager.FocusedLayer;
-        if (focused is GauntletLayer gauntlet &&
-            gauntlet.UIContext.EventManager.FocusedWidget is EditableTextWidget) return false;
-        return focused == null || focused == ((MapScreen)ScreenManager.TopScreen).SceneLayer;
-    }
+    public bool CanOpen() => mapAvailability.CanOpenOverlay();
 
     // Takes input focus like the open player list.
     public void Open()

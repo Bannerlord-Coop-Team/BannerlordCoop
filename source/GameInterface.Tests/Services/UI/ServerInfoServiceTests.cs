@@ -6,7 +6,7 @@ using static GameInterface.Tests.Services.UI.ServerInfoVMTests;
 
 namespace GameInterface.Tests.Services.UI;
 
-/// <summary>Protects when the server info panel opens: once per join, after the map is free, and never empty.</summary>
+/// <summary>Protects when the server info panel opens: after a join once the map is free, on F3, and never empty.</summary>
 [Collection(ViewModelCollection.Name)]
 public class ServerInfoServiceTests
 {
@@ -57,9 +57,9 @@ public class ServerInfoServiceTests
         Assert.Contains("Pending: False", service.Describe());
     }
 
-    // A rejoin follows a disconnect, which clears the session, so the next join's info opens the panel again.
+    // The server sends once per join, so info that arrives while the panel is closed opens it again.
     [Fact]
-    public void NewJoinShowsTheInfoAgain()
+    public void InfoAfterAClosedPanel_OpensItAgain()
     {
         var popup = new FakePopup();
         using var service = popup.CreateService();
@@ -67,7 +67,6 @@ public class ServerInfoServiceTests
         service.Show(Welcome);
         service.Update();
         popup.ViewModel!.ExecuteClose();
-        service.Clear();
 
         service.Show(new NetworkServerInfo(new[] { "Welcome back" }, null, null, null));
         service.Update();
@@ -75,59 +74,6 @@ public class ServerInfoServiceTests
         Assert.True(popup.ViewModel.IsOpen);
         Assert.Equal(2, popup.Opened);
         Assert.Equal("Welcome back", Assert.Single(popup.ViewModel.Paragraphs).Text);
-    }
-
-    // Only the session's first info opens the panel by itself. Info the server sends again after the player closed
-    // the panel replaces what it shows without taking the map away, and !motd opens the newest.
-    [Fact]
-    public void LaterInfoInTheSameSession_DoesNotReopenAClosedPanel()
-    {
-        var popup = new FakePopup();
-        using var service = popup.CreateService();
-        service.Initialize();
-        service.Show(Welcome);
-        service.Update();
-        popup.ViewModel!.ExecuteClose();
-
-        for (int i = 0; i < 3; i++)
-        {
-            service.Show(new NetworkServerInfo(new[] { "Again " + i }, null, null, null));
-            service.Update();
-        }
-
-        Assert.False(popup.ViewModel.IsOpen);
-        Assert.Equal(1, popup.Opened);
-        Assert.Contains("Pending: False", service.Describe());
-        Assert.Equal("Again 2", Assert.Single(popup.ViewModel.Paragraphs).Text);
-
-        Assert.True(service.Reopen());
-        service.Update();
-
-        Assert.True(popup.ViewModel.IsOpen);
-        Assert.Equal(2, popup.Opened);
-    }
-
-    // Info that arrives while a !motd open waits for the map does not cancel it.
-    [Fact]
-    public void LaterInfo_KeepsAWaitingReopen()
-    {
-        var popup = new FakePopup();
-        using var service = popup.CreateService();
-        service.Initialize();
-        service.Show(Welcome);
-        service.Update();
-        popup.ViewModel!.ExecuteClose();
-        popup.CanOpenResult = false;
-        Assert.True(service.Reopen());
-
-        service.Show(new NetworkServerInfo(new[] { "Updated" }, null, null, null));
-        Assert.Contains("Pending: True", service.Describe());
-        popup.CanOpenResult = true;
-        service.Update();
-
-        Assert.True(popup.ViewModel.IsOpen);
-        Assert.Equal(2, popup.Opened);
-        Assert.Equal("Updated", Assert.Single(popup.ViewModel.Paragraphs).Text);
     }
 
     // Info with nothing to show never opened the panel, so the first usable info after it still does.
@@ -179,8 +125,7 @@ public class ServerInfoServiceTests
         popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.News);
         popup.ViewModel.ExecuteClose();
 
-        Assert.True(service.Reopen());
-        service.Update();
+        Assert.True(service.Toggle());
 
         Assert.Equal(ServerInfoTab.Motd, popup.ViewModel.SelectedTab);
 
@@ -188,7 +133,6 @@ public class ServerInfoServiceTests
         popup.ViewModel.ExecuteClose();
         service.Show(Info(false, false, true, true));
         Assert.Equal(ServerInfoTab.News, popup.ViewModel.SelectedTab);
-        Assert.True(service.Reopen());
         service.Update();
 
         Assert.Equal(ServerInfoTab.Links, popup.ViewModel.SelectedTab);
@@ -261,9 +205,9 @@ public class ServerInfoServiceTests
             service.Describe());
     }
 
-    // !motd reopens the last info on its first tab, after the map is free, and only once.
+    // F3 opens the last info again on its first tab.
     [Fact]
-    public void ReopenShowsTheLastInfoAgainOnItsFirstTab()
+    public void ToggleOpensTheLastInfoOnItsFirstTab()
     {
         var popup = new FakePopup();
         using var service = popup.CreateService();
@@ -272,17 +216,8 @@ public class ServerInfoServiceTests
         service.Update();
         popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.Rules);
         popup.ViewModel.ExecuteClose();
-        popup.CanOpenResult = false;
 
-        Assert.True(service.Reopen());
-        Assert.True(service.Reopen());
-        service.Update();
-        Assert.False(popup.ViewModel.IsOpen);
-        Assert.Contains("Pending: True", service.Describe());
-
-        popup.CanOpenResult = true;
-        service.Update();
-        service.Update();
+        Assert.True(service.Toggle());
 
         Assert.True(popup.ViewModel.IsOpen);
         Assert.Equal(2, popup.Opened);
@@ -290,97 +225,82 @@ public class ServerInfoServiceTests
         Assert.Equal(1, popup.ViewModel.Rules.Count);
     }
 
+    // F3 on the open panel closes it, link dialog included, and opens nothing in the browser.
     [Fact]
-    public void ReopenWhileOpen_KeepsThePanelAsItIs()
+    public void ToggleWhileOpen_ClosesThePanel()
     {
         var popup = new FakePopup();
         using var service = popup.CreateService();
         service.Initialize();
-        service.Show(Info(true, true, false, false));
+        service.Show(Info(true, false, true, false));
         service.Update();
-        popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.Rules);
+        popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.Links);
+        popup.ViewModel.Links[0].ExecuteOpen();
 
-        Assert.True(service.Reopen());
-        service.Update();
-
-        Assert.Equal(1, popup.Opened);
-        Assert.Equal(ServerInfoTab.Rules, popup.ViewModel.SelectedTab);
-        Assert.Contains("Pending: False", service.Describe());
-    }
-
-    // The join's own pending open and a !motd before the map is free open the panel once.
-    [Fact]
-    public void ReopenBeforeTheFirstOpen_OpensOnce()
-    {
-        var popup = new FakePopup { CanOpenResult = false };
-        using var service = popup.CreateService();
-        service.Initialize();
-        service.Show(Welcome);
-
-        Assert.True(service.Reopen());
-        popup.CanOpenResult = true;
-        service.Update();
-        service.Update();
-
-        Assert.Equal(1, popup.Opened);
-    }
-
-    [Theory]
-    [MemberData(nameof(EmptyInfos))]
-    public void ReopenWithoutUsableInfo_ReportsIt(NetworkServerInfo info)
-    {
-        var popup = new FakePopup();
-        using var service = popup.CreateService();
-        service.Initialize();
-        if (info != null) service.Show(info);
-
-        Assert.False(service.Reopen());
-        service.Update();
-
-        Assert.Equal(0, popup.Opened);
-    }
-
-    // After a disconnect the old server's info is gone: nothing pending, nothing to reopen, the panel closed.
-    [Fact]
-    public void ClearForgetsTheInfoAndClosesThePanel()
-    {
-        var popup = new FakePopup();
-        using var service = popup.CreateService();
-        service.Initialize();
-        service.Show(Info(true, true, true, true));
-        service.Update();
-        popup.ViewModel!.Links[0].ExecuteOpen();
-
-        service.Clear();
+        Assert.True(service.Toggle());
 
         Assert.False(popup.ViewModel.IsOpen);
         Assert.False(popup.ViewModel.IsLinkDialogOpen);
-        Assert.False(service.Reopen());
-        Assert.StartsWith("Open: False\nPending: False\nTab: none\nTabs: none\nCounts: motd 0, rules 0, links 0, news 0", service.Describe());
-
-        // The next server's first info opens the panel again, because the disconnect ended the session.
-        service.Show(new NetworkServerInfo(new[] { "Other server" }, null, null, null));
-        service.Update();
-
-        Assert.True(popup.ViewModel.IsOpen);
-        Assert.Equal(2, popup.Opened);
-        Assert.Equal("Other server", Assert.Single(popup.ViewModel.Paragraphs).Text);
+        Assert.Equal(1, popup.Closed);
+        Assert.Contains("Pending: False", service.Describe());
         Assert.Empty(popup.Opener.Opened);
     }
 
+    // F3 in a battle, a town menu or while typing does nothing now and does not queue an open for later.
     [Fact]
-    public void ClearWhilePending_OpensNothing()
+    public void ToggleWhileTheMapIsNotAvailable_DoesNothingNowOrLater()
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Welcome);
+        service.Update();
+        popup.ViewModel!.ExecuteClose();
+        popup.CanOpenResult = false;
+
+        Assert.False(service.Toggle());
+        popup.CanOpenResult = true;
+        service.Update();
+
+        Assert.False(popup.ViewModel.IsOpen);
+        Assert.Equal(1, popup.Opened);
+        Assert.Contains("Pending: False", service.Describe());
+    }
+
+    // F3 before the campaign is ready, or without usable info from this server, changes nothing.
+    [Theory]
+    [MemberData(nameof(EmptyInfos))]
+    public void ToggleWithoutUsableInfo_DoesNothing(NetworkServerInfo info)
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        Assert.False(service.Toggle());
+        service.Initialize();
+        if (info != null) service.Show(info);
+
+        Assert.False(service.Toggle());
+
+        Assert.Equal(0, popup.Opened);
+        Assert.False(popup.ViewModel!.IsOpen);
+    }
+
+    // The join's own pending open and an F3 once the map is free open the panel once.
+    [Fact]
+    public void ToggleWhileInfoIsPending_OpensOnce()
     {
         var popup = new FakePopup { CanOpenResult = false };
         using var service = popup.CreateService();
         service.Initialize();
         service.Show(Welcome);
+        Assert.False(service.Toggle());
 
-        service.Clear();
         popup.CanOpenResult = true;
+        Assert.True(service.Toggle());
+        service.Update();
         service.Update();
 
-        Assert.Equal(0, popup.Opened);
+        Assert.Equal(1, popup.Opened);
+        Assert.Contains("Pending: False", service.Describe());
     }
 
     // The overlay is created once and removed with the session.
@@ -408,7 +328,7 @@ public class ServerInfoServiceTests
         public int Closed { get; private set; }
         public bool Disposed { get; private set; }
 
-        public ServerInfoService CreateService() => new((viewModel, _) =>
+        public ServerInfoService CreateService() => new((viewModel, _, _) =>
         {
             ViewModel = viewModel;
             Created++;

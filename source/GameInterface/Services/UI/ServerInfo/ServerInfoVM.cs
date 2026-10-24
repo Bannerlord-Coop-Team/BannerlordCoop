@@ -46,7 +46,7 @@ internal sealed class ServerInfoVM : ViewModel
     [DataSourceProperty] public string RulesTabText => new TextObject("{=coop_server_info_rules}Rules").ToString();
     [DataSourceProperty] public string LinksTabText => new TextObject("{=coop_server_info_links}Links").ToString();
     [DataSourceProperty] public string NewsTabText => new TextObject("{=coop_server_info_news}News").ToString();
-    [DataSourceProperty] public string HintText => new TextObject("{=coop_server_info_hint}Type !motd in chat to open this again").ToString();
+    [DataSourceProperty] public string HintText => new TextObject("{=coop_server_info_hint}Press F3 on the campaign map to open this again").ToString();
     [DataSourceProperty] public string CloseText => new TextObject("{=coop_server_info_close}Close").ToString();
     [DataSourceProperty] public string LinkDialogTitle => new TextObject("{=coop_server_info_link_title}Open link").ToString();
     [DataSourceProperty] public string LinkDialogText => new TextObject("{=coop_server_info_link_text}Open this link in your browser?").ToString();

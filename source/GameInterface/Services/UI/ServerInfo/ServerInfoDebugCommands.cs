@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace GameInterface.Services.UI.ServerInfo;
 
-/// <summary>[Debug] Shows and inspects the server info panel on a client without a server file.</summary>
+/// <summary>[Debug] Shows, toggles and inspects the server info panel on a client whose server sends none.</summary>
 internal class ServerInfoDebugCommands
 {
     internal static readonly string[] SampleParagraphs =
@@ -108,12 +108,29 @@ internal class ServerInfoDebugCommands
             return Preview(service, info);
         }
 
-        // After the join's own open, new info no longer opens the panel by itself, so the preview opens it like !motd.
+        // Like info from the server: a closed panel opens once the map is free, an open one shows the new content.
         internal static CoopCommandResult Preview(IServerInfoService service, NetworkServerInfo info)
         {
             service.Show(info);
-            service.Reopen();
             return new CoopCommandResult(true, service.Describe());
+        }
+    }
+
+    public sealed class ServerInfoToggleCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.ui";
+        public string Name => "server_info_toggle";
+        public string Description => "Toggles the server info panel like F3, using its normal map and focus guards.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        // Exercises the same action as the key and reports whether the current screen permits it.
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<IServerInfoService>(out var service))
+                return new CoopCommandResult(false, "Server info unavailable.", "unavailable");
+            bool changed = service.Toggle();
+            return new CoopCommandResult(changed, service.Describe(), changed ? null : "not_on_map");
         }
     }
 

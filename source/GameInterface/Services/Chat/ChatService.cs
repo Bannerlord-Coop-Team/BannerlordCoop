@@ -6,7 +6,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.Messages;
-using GameInterface.Services.UI.ServerInfo;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +21,7 @@ public interface IChatService : IGameAbstraction
 }
 
 /// <summary>Owns the client chat view model and overlay for one co-op session.</summary>
-public sealed partial class ChatService : IChatService, IDisposable
+public sealed class ChatService : IChatService, IDisposable
 {
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
@@ -38,8 +37,7 @@ public sealed partial class ChatService : IChatService, IDisposable
         IChatPlayerNameResolver playerNameResolver,
         IControllerIdProvider controllerIdProvider,
         ICoopOptionsStore optionsStore,
-        IMessageBroker messageBroker,
-        Lazy<IServerInfoService> serverInfo)
+        IMessageBroker messageBroker)
     {
         this.network = network;
         this.playerManager = playerManager;
@@ -47,12 +45,7 @@ public sealed partial class ChatService : IChatService, IDisposable
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
 
-        // Lazy breaks the construction cycle: the server info panel waits while chat is typing, and
-        // chat needs the panel only when !motd is sent.
-        viewModel = new ChatVM(
-            Send,
-            () => controllerIdProvider.ControllerId,
-            () => serverInfo.Value.Reopen());
+        viewModel = new ChatVM(message => network.SendAll(message), () => controllerIdProvider.ControllerId);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
         overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
@@ -102,15 +95,6 @@ public sealed partial class ChatService : IChatService, IDisposable
     {
         network.SendAll(new NetworkRequestChatParticipants());
     }
-
-    private void Send(NetworkSendChatMessage message)
-    {
-        network.SendAll(message);
-        OnChatLineSent();
-    }
-
-    // Only the Debug live-test file implements this, so Release compiles the call out.
-    partial void OnChatLineSent();
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)
     {

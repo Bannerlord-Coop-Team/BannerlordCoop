@@ -30,7 +30,7 @@ public sealed class ServerInfoVMTests : IDisposable
 
         Assert.Equal("Server Info", vm.Title);
         Assert.Equal(new[] { "Message of the Day", "Rules", "Links", "News" }, new[] { vm.MotdTabText, vm.RulesTabText, vm.LinksTabText, vm.NewsTabText });
-        Assert.Equal("Type !motd in chat to open this again", vm.HintText);
+        Assert.Equal("Press F3 on the campaign map to open this again", vm.HintText);
         Assert.Equal("Close", vm.CloseText);
         Assert.Equal(("Open link", "Open this link in your browser?", "Open", "Cancel"), (vm.LinkDialogTitle, vm.LinkDialogText, vm.OpenLinkText, vm.CancelLinkText));
     }

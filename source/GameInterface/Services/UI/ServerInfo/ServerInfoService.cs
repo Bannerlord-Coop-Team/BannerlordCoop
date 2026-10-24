@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Chat;
-using System;
+﻿using System;
 using System.Linq;
 using System.Text;
 
@@ -10,14 +9,11 @@ public interface IServerInfoService : IGameAbstraction
 {
     void Initialize();
 
-    /// <summary>Replaces what the panel shows; only the session's first info opens it by itself, once the map is free.</summary>
+    /// <summary>Replaces what the panel shows and, while it is closed, opens it once the map is free.</summary>
     void Show(NetworkServerInfo info);
 
-    /// <summary>Opens the last info this session received again, once the map is free; false when there is none.</summary>
-    bool Reopen();
-
-    /// <summary>Forgets this session's info and closes the panel, as when the client disconnects.</summary>
-    void Clear();
+    /// <summary>F3 on the campaign map: closes the open panel, or opens the last info on its first tab; false when nothing changed.</summary>
+    bool Toggle();
 
     string Describe();
 }
@@ -25,23 +21,22 @@ public interface IServerInfoService : IGameAbstraction
 /// <inheritdoc cref="IServerInfoService"/>
 public sealed class ServerInfoService : IServerInfoService, IDisposable
 {
-    private readonly Func<ServerInfoVM, Action, IServerInfoPopup> createPopup;
+    private readonly Func<ServerInfoVM, Action, Action, IServerInfoPopup> createPopup;
     private readonly ServerInfoVM viewModel;
     private IServerInfoPopup popup;
     private bool pending;
-    private bool openedThisSession;
 
     // Builds the Gauntlet overlay only when Initialize runs on a client with a campaign.
-    public ServerInfoService(IChatService chat, IMapAvailability mapAvailability, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update) =>
+    public ServerInfoService(IMapAvailability mapAvailability, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update, toggle) =>
     {
-        var overlay = new ServerInfoOverlay(viewModel, chat, mapAvailability, update);
+        var overlay = new ServerInfoOverlay(viewModel, mapAvailability, update, toggle);
         overlay.Initialize();
         return overlay;
     }, linkRules, opener)
     {
     }
 
-    internal ServerInfoService(Func<ServerInfoVM, Action, IServerInfoPopup> createPopup, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener)
+    internal ServerInfoService(Func<ServerInfoVM, Action, Action, IServerInfoPopup> createPopup, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener)
     {
         this.createPopup = createPopup;
         viewModel = new ServerInfoVM(() => popup?.Close(), linkRules, opener);
@@ -51,10 +46,10 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
     public void Initialize()
     {
         if (popup != null) return;
-        popup = createPopup(viewModel, Update);
+        popup = createPopup(viewModel, Update, () => Toggle());
     }
 
-    // Keeps the newest info for this join; info with nothing to show opens nothing.
+    // Keeps the newest info; info with nothing to show closes the panel instead.
     public void Show(NetworkServerInfo info)
     {
         if (!viewModel.SetContent(info))
@@ -64,34 +59,35 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
             return;
         }
 
-        // Only the session's first info opens the panel by itself. Later info replaces what it shows, open or closed,
-        // so a server that sends it again cannot take the map away each time the player closes the panel.
-        if (!openedThisSession && !viewModel.IsOpen) pending = true;
+        if (!viewModel.IsOpen) pending = true;
     }
 
-    // Behind !motd: an open panel stays as it is, a closed one waits for the map like a join.
-    public bool Reopen()
+    // Opens only when the map is free, so F3 in a battle or a town menu does nothing instead of queueing an open.
+    public bool Toggle()
     {
-        if (!viewModel.HasContent) return false;
-        if (!viewModel.IsOpen) pending = true;
+        if (popup == null) return false;
+        if (viewModel.IsOpen)
+        {
+            popup.Close();
+            return true;
+        }
+
+        if (!viewModel.HasContent || !popup.CanOpen()) return false;
+        Open();
         return true;
     }
 
-    // A disconnect ends the session, so the next join's info opens the panel again.
-    public void Clear()
-    {
-        pending = false;
-        openedThisSession = false;
-        popup?.Close();
-        viewModel.SetContent(null);
-    }
-
-    // Runs each frame while closed: opens pending info once, on its first tab, when the map is free.
+    // Runs each frame while closed: opens pending info once the map is free.
     internal void Update()
     {
         if (!pending || popup == null || viewModel.IsOpen || !popup.CanOpen()) return;
+        Open();
+    }
+
+    // Every open starts on the first tab.
+    private void Open()
+    {
         pending = false;
-        openedThisSession = true;
         viewModel.SelectFirstTab();
         popup.Open();
     }

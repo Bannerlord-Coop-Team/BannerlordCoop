@@ -5,6 +5,7 @@ using Coop.Tests.Stubs;
 using GameInterface.Services.UI.ServerInfo;
 using Moq;
 using System;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Client.Services.Session;
@@ -40,32 +41,36 @@ public sealed class ServerInfoClientHandlerTests : IDisposable
         service.Verify(serverInfo => serverInfo.Initialize(), Times.Never);
     }
 
-    // !motd after leaving a server must not show that server's info.
-    [Fact]
-    public void Disconnect_ClearsTheInfo()
-    {
-        using var handler = new ServerInfoClientHandler(broker, service.Object);
-
-        broker.Publish(this, new NetworkDisconnected(default));
-        DrainGameThread();
-
-        service.Verify(serverInfo => serverInfo.Clear(), Times.Once);
-        service.Verify(serverInfo => serverInfo.Show(It.IsAny<NetworkServerInfo>()), Times.Never);
-    }
-
     [Fact]
     public void Dispose_Unsubscribes()
     {
         var handler = new ServerInfoClientHandler(broker, service.Object);
-        Assert.Equal(3, broker.GetTotalSubscribers());
+        Assert.Equal(2, broker.GetTotalSubscribers());
 
         handler.Dispose();
         broker.Publish(this, new ClientCampaignReady());
         broker.Publish(this, new NetworkServerInfo(new[] { "Welcome to EU-1" }, null, null, null));
-        broker.Publish(this, new NetworkDisconnected(default));
         DrainGameThread();
 
         Assert.Equal(0, broker.GetTotalSubscribers());
+        service.VerifyNoOtherCalls();
+    }
+
+    // A message published before Dispose has its apply queued on the game thread; the disposed flag keeps it from the UI.
+    [Fact]
+    public void ApplyQueuedBeforeDispose_DoesNotReachTheService()
+    {
+        var handler = new ServerInfoClientHandler(broker, service.Object);
+        using var gate = new ManualResetEventSlim(false);
+        // Holds the game loop, so the applies queued below cannot run before Dispose.
+        GameThread.Run(() => { gate.Wait(TimeSpan.FromSeconds(10)); }, label: nameof(ApplyQueuedBeforeDispose_DoesNotReachTheService));
+
+        broker.Publish(this, new ClientCampaignReady());
+        broker.Publish(this, new NetworkServerInfo(new[] { "Welcome to EU-1" }, null, null, null));
+        handler.Dispose();
+        gate.Set();
+        DrainGameThread();
+
         service.VerifyNoOtherCalls();
     }
 

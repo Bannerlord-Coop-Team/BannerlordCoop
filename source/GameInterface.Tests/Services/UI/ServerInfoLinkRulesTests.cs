@@ -26,6 +26,23 @@ public class ServerInfoLinkRulesTests
         Assert.Equal(expected, normalized);
     }
 
+    // A stats page on the server's own address or a LAN name is a normal link; the player sees the full address before it opens.
+    [Theory]
+    [InlineData("http://127.0.0.1:8080/status", "http://127.0.0.1:8080/status")]
+    [InlineData("http://192.168.1.1/", "http://192.168.1.1/")]
+    [InlineData("http://203.0.113.7/", "http://203.0.113.7/")]
+    [InlineData("http://[::1]:8080/status", "http://[::1]:8080/status")]
+    [InlineData("http://[2001:db8::1]/", "http://[2001:db8::1]/")]
+    [InlineData("http://localhost/", "http://localhost/")]
+    [InlineData("http://LocalHost:8080/admin", "http://localhost:8080/admin")]
+    [InlineData("http://router/", "http://router/")]
+    [InlineData("http://stats.lan/", "http://stats.lan/")]
+    public void IpAddressesAndLocalNames_AreKept(string address, string expected)
+    {
+        Assert.True(rules.TryNormalize(address, out string normalized));
+        Assert.Equal(expected, normalized);
+    }
+
     // A look-alike host is shown in punycode, so it cannot pass for the real name.
     [Theory]
     [InlineData("https://bücher.example/pfad", "https://xn--bcher-kva.example/pfad")]
@@ -66,43 +83,6 @@ public class ServerInfoLinkRulesTests
     [InlineData(" https://example.com/")]
     [InlineData("https://example.com/ ")]
     public void EverythingElse_IsRejected(string address)
-    {
-        Assert.False(rules.TryNormalize(address, out string normalized));
-        Assert.Equal(string.Empty, normalized);
-    }
-
-    // A community link names a site. An IP address in any spelling Uri or a browser reads as one, a single name, a
-    // name under .localhost or a trailing dot would point at the player's own machine or network or make one site
-    // look like two, and no browser opens port 0.
-    [Theory]
-    [InlineData("http://127.0.0.1:8080/status")]
-    [InlineData("http://[::1]:8080/status")]
-    [InlineData("http://0x7f.1/")]
-    [InlineData("http://2130706433/")]
-    [InlineData("http://127.1/")]
-    [InlineData("http://0177.0.0.1/")]
-    [InlineData("http://0x7f.0x0.0x0.0x1/")]
-    [InlineData("http://0/")]
-    [InlineData("http://127.0.0.1./")]
-    [InlineData("http://10.0.0.1/")]
-    [InlineData("http://192.168.1.1/")]
-    [InlineData("http://169.254.169.254/latest/meta-data/")]
-    [InlineData("http://203.0.113.7/")]
-    [InlineData("http://[::ffff:127.0.0.1]/")]
-    [InlineData("http://[fe80::1%25eth0]/")]
-    [InlineData("http://[2001:db8::1]/")]
-    [InlineData("http://localhost/")]
-    [InlineData("http://LocalHost:8080/admin")]
-    [InlineData("http://localhost./")]
-    [InlineData("http://app.localhost/")]
-    [InlineData("http://router/")]
-    [InlineData("http://1.2.3.4.5/")]
-    [InlineData("http://example.123/")]
-    [InlineData("https://discord.gg./")]
-    [InlineData("https://xn--bcher-kva.example./")]
-    [InlineData("https://example.com:0/")]
-    [InlineData("https://example.com:00/rules")]
-    public void IpAddressesLocalNamesAndPortZero_AreRejected(string address)
     {
         Assert.False(rules.TryNormalize(address, out string normalized));
         Assert.Equal(string.Empty, normalized);
@@ -152,6 +132,8 @@ public class ServerInfoLinkRulesTests
     [InlineData("HTTPS://Example.COM:443/Path")]
     [InlineData("https://example.com/a\"b")]
     [InlineData("http://Status.Example.com:8080/x")]
+    [InlineData("http://[::1]:8080/status")]
+    [InlineData("http://192.168.1.1/")]
     public void NormalizedAddress_NormalizesToItself(string address)
     {
         Assert.True(rules.TryNormalize(address, out string once));

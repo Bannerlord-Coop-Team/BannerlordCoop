@@ -1,11 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.UI.ServerInfo;
-using LiteNetLib;
-using System.Linq;
+using System;
 
 namespace Coop.Core.Server.Services.Session;
 
@@ -14,37 +13,33 @@ internal sealed class ServerInfoServerHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly IServerInfoConfig serverInfo;
+    private readonly Lazy<NetworkServerInfo> info;
+    private bool disposed;
 
-    public ServerInfoServerHandler(IMessageBroker messageBroker, INetwork network, IServerInfoConfig serverInfo)
+    public ServerInfoServerHandler(IMessageBroker messageBroker, INetwork network, IModConfig modConfig, IServerInfoMessageBuilder builder)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.serverInfo = serverInfo;
+        // Built once per session, so the caps and link warnings log once and not on every join.
+        info = new Lazy<NetworkServerInfo>(() => builder.Build(modConfig.Data.ServerInfo));
 
         messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
     }
 
+    // Prevents a queued send after the session ended.
     public void Dispose()
     {
+        disposed = true;
         messageBroker.Unsubscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
     }
 
     private void Handle_PlayerCampaignSynchronized(MessagePayload<PlayerCampaignSynchronized> payload)
     {
-        if (serverInfo.Motd.Count == 0 && serverInfo.Rules.Count == 0 &&
-            serverInfo.Links.Count == 0 && serverInfo.News.Count == 0) return;
-
         var peer = payload.What.PlayerId;
-        GameThread.RunSafe(() => SendServerInfo(peer), context: nameof(ServerInfoServerHandler));
-    }
-
-    private void SendServerInfo(NetPeer peer)
-    {
-        network.Send(peer, new NetworkServerInfo(
-            serverInfo.Motd.ToArray(),
-            serverInfo.Rules.ToArray(),
-            serverInfo.Links.ToArray(),
-            serverInfo.News.ToArray()));
+        GameThread.RunSafe(() =>
+        {
+            if (disposed || info.Value == null) return;
+            network.Send(peer, info.Value);
+        }, context: nameof(ServerInfoServerHandler));
     }
 }

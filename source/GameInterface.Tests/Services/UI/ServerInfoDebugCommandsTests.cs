@@ -13,9 +13,9 @@ public class ServerInfoDebugCommandsTests
 {
     private readonly ServerInfoLinkRules rules = new();
 
-    // A live run previews after the join's own open, when new info no longer opens the panel by itself.
+    // A preview after the join's own open behaves like info from the server: the closed panel opens once the map is free.
     [Fact]
-    public void Preview_OpensTheSampleAfterTheJoinsOwnOpen()
+    public void Preview_OpensTheSampleLikeInfoFromTheServer()
     {
         var popup = new ServerInfoServiceTests.FakePopup();
         using var service = popup.CreateService();
@@ -33,12 +33,40 @@ public class ServerInfoDebugCommandsTests
         Assert.Equal(2, popup.Opened);
     }
 
+    // The toggle command is F3 for a live run: it opens the last info and closes the open panel through the same guards.
+    [Fact]
+    public void Toggle_OpensAndClosesLikeF3()
+    {
+        var popup = new ServerInfoServiceTests.FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(ServerInfoDebugCommands.Samples["full"]);
+        service.Update();
+        popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.News);
+        popup.ViewModel.ExecuteClose();
+
+        Assert.True(service.Toggle());
+        Assert.True(popup.ViewModel.IsOpen);
+        Assert.Equal(ServerInfoTab.Motd, popup.ViewModel.SelectedTab);
+
+        Assert.True(service.Toggle());
+        Assert.False(popup.ViewModel.IsOpen);
+        Assert.Equal(2, popup.Opened);
+    }
+
     [Fact]
     public void CommandsAreClientSideUnderTheUiPrefix()
     {
-        ICoopCommand[] commands = { new ServerInfoDebugCommands.ServerInfoPreviewCoopCommand(), new ServerInfoDebugCommands.ServerInfoStateCoopCommand() };
+        ICoopCommand[] commands =
+        {
+            new ServerInfoDebugCommands.ServerInfoPreviewCoopCommand(),
+            new ServerInfoDebugCommands.ServerInfoStateCoopCommand(),
+            new ServerInfoDebugCommands.ServerInfoToggleCoopCommand(),
+        };
 
-        Assert.Equal(new[] { "coop.debug.ui.server_info_preview", "coop.debug.ui.server_info_state" }, commands.Select(command => command.Prefix + "." + command.Name));
+        Assert.Equal(
+            new[] { "coop.debug.ui.server_info_preview", "coop.debug.ui.server_info_state", "coop.debug.ui.server_info_toggle" },
+            commands.Select(command => command.Prefix + "." + command.Name));
         Assert.All(commands, command => Assert.Equal(CoopCommandSide.Client, command.Side));
     }
 
@@ -63,20 +91,17 @@ public class ServerInfoDebugCommandsTests
         var news = info.News ?? Array.Empty<ServerInfoNews>();
 
         Assert.InRange(motd.Length, 1, ServerInfoLimits.MaxMotdParagraphs);
-        Assert.InRange(motd.Sum(text => text.Length), 1, ServerInfoLimits.MaxMotdLength);
+        Assert.All(motd, text => Assert.InRange(text.Length, 1, ServerInfoLimits.MaxTextLength));
         Assert.InRange(ruleTexts.Length, 0, ServerInfoLimits.MaxRules);
-        Assert.InRange(ruleTexts.Sum(text => text.Length), 0, ServerInfoLimits.MaxRulesLength);
+        Assert.All(ruleTexts, text => Assert.InRange(text.Length, 1, ServerInfoLimits.MaxTextLength));
         Assert.InRange(links.Length, 0, ServerInfoLimits.MaxLinks);
         Assert.All(links, link => Assert.InRange(link.Label.Length, 0, ServerInfoLimits.MaxLinkLabelLength));
+        Assert.All(links, link => Assert.InRange(link.Url.Length, 1, ServerInfoLimits.MaxLinkUrlLength));
         Assert.InRange(news.Length, 0, ServerInfoLimits.MaxNews);
         Assert.All(news, item => Assert.True(
             item.Date.Length <= ServerInfoLimits.MaxNewsDateLength &&
             item.Title.Length <= ServerInfoLimits.MaxNewsTitleLength &&
-            item.Text.Length <= ServerInfoLimits.MaxNewsTextLength));
-        int total = motd.Sum(text => text.Length) + ruleTexts.Sum(text => text.Length) +
-            links.Sum(link => link.Label.Length + link.Url.Length) +
-            news.Sum(item => item.Date.Length + item.Title.Length + item.Text.Length);
-        Assert.InRange(total, 1, ServerInfoLimits.MaxTotalLength);
+            item.Text.Length <= ServerInfoLimits.MaxTextLength));
     }
 
     [Fact]

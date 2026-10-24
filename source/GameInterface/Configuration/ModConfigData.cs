@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using GameInterface.Services.UI.ServerInfo;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 
@@ -21,6 +22,27 @@ public sealed class ModConfigData
     public ModOptionsData ModOptions { get; set; } = new ModOptionsData();
 
     public VoiceConfigData Voice { get; set; } = new VoiceConfigData();
+
+    /// <summary>The "serverInfo" block, sent to each player after their campaign sync and shown in the Server Info panel.</summary>
+    public ServerInfoConfigData ServerInfo { get; set; } = new ServerInfoConfigData();
+
+    [JsonExtensionData]
+    public IDictionary<string, JToken> UnknownKeys { get; set; }
+}
+
+/// <summary>
+/// The "serverInfo" block: operator text for the Server Info panel. Every key is optional and an absent or empty
+/// key hides its tab; ServerInfoMessageBuilder applies the caps and the link rules before anything is sent.
+/// </summary>
+public sealed class ServerInfoConfigData
+{
+    public string[] Motd { get; set; }
+
+    public string[] Rules { get; set; }
+
+    public ServerInfoLink[] Links { get; set; }
+
+    public ServerInfoNews[] News { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

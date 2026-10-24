@@ -22,7 +22,7 @@ public class NetworkServerInfoTests
     public void AllSectionsRoundTripInOneMessage()
     {
         var info = new NetworkServerInfo(
-            new[] { "Willkommen überall, 欢迎 \U0001F600", "{PLAYER} <b>bold</b>", new string('a', ServerInfoLimits.MaxMotdLength) },
+            new[] { "Willkommen überall, 欢迎 \U0001F600", "{PLAYER} <b>bold</b>", new string('a', ServerInfoLimits.MaxTextLength) },
             new[] { "Be kind", "{=coop_server_info_title}x" },
             new[] { new ServerInfoLink { Label = "Discord", Url = "https://discord.gg/example" }, new ServerInfoLink { Label = "", Url = "https://example.com/" } },
             new[] { new ServerInfoNews { Date = "28 Sep 2026", Title = "Siege weekend", Text = "Double renown." } });
