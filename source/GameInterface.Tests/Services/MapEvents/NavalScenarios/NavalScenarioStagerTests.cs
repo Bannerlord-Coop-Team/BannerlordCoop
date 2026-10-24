@@ -34,20 +34,43 @@ public class NavalScenarioStagerTests
         Assert.Equal(expected, NavalScenarioStager.TemplatesMissing(regulars, templates));
     }
 
-    // R48: reserve=n leaves at least n regulars beyond every crew place, so the victim has troops to reinforce with.
     [Theory]
-    [InlineData(33, 104, 10, 8)]
-    [InlineData(33, 104, 1, 7)]
-    [InlineData(114, 104, 10, 0)]
-    [InlineData(120, 104, 10, 0)]
-    [InlineData(0, 0, 5, 1)]
-    public void ReserveTemplatesMissing_AddsWholeTemplatesUntilTheReserveIsPastTheCrewCapacity(int regulars, int crewCapacity,
-        int reserve, int expected)
+    [InlineData(33, 114, 8)]
+    [InlineData(33, 105, 7)]
+    [InlineData(114, 114, 0)]
+    [InlineData(120, 114, 0)]
+    [InlineData(0, 5, 1)]
+    public void HealthyTemplatesMissing_AddsWholeTemplatesUntilTheTargetIsReached(int healthy, int target, int expected)
     {
-        int templates = NavalScenarioStager.ReserveTemplatesMissing(regulars, crewCapacity, reserve);
+        int templates = NavalScenarioStager.HealthyTemplatesMissing(healthy, target);
 
         Assert.Equal(expected, templates);
-        Assert.True(regulars + (templates * NavalScenarioStager.TroopsPerTemplate) >= crewCapacity + reserve);
+        Assert.True(healthy + (templates * NavalScenarioStager.TroopsPerTemplate) >= target);
+    }
+
+    // R49: vanilla fields at most the ships' total crew, so troops past it never reinforce; the reserve is the troops past
+    // the deck crew, on hulls with room below deck (B1: one 52/52 Battle Knarr, reserve=20, got 56 troops and no reserve).
+    [Theory]
+    [InlineData(52, 0, 20, 52)]
+    [InlineData(80, 40, 20, 100)]
+    [InlineData(132, 40, 60, 172)]
+    [InlineData(32, 0, 0, 32)]
+    public void ReserveTroopTarget_FillsTheDeckAndOnlyTheRoomBelowIt(int deck, int room, int reserve, int expected)
+    {
+        Assert.Equal(expected, NavalScenarioStager.ReserveTroopTarget(deck, room, reserve));
+    }
+
+    // R49 B3: duel ships=2 weapons=1 reserve=60 had an armed Battle Knarr and a northern_light_ship, neither with room below.
+    [Theory]
+    [InlineData(0, 60, 40, 1, 1)]
+    [InlineData(0, 60, 40, 3, 2)]
+    [InlineData(0, 20, 40, 0, 0)]
+    [InlineData(40, 20, 40, 2, 0)]
+    [InlineData(12, 20, 40, 1, 1)]
+    public void ReserveSwapsNeeded_SwapsPlainShipsUntilTheReserveFitsBelowDeck(int room, int reserve, int roomPerSwap,
+        int swappable, int expected)
+    {
+        Assert.Equal(expected, NavalScenarioStager.ReserveSwapsNeeded(room, reserve, roomPerSwap, swappable));
     }
 
     // Once the fleet is held in the player's conversation or a map event exists, neither engage nor the fallback may run.

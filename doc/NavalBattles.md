@@ -810,9 +810,14 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
   (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
   defaults to `ram=1`.
-- `reserve=n` (0 to 200) tops every player's healthy troops (wounded don't count), and those of the AI fleet a start_naval
-  preset fights (not the `encounter` or `blockade` enemy), up to n past the crew capacity of all the party's ships, so at
-  least n wait in reserve to reinforce, for example after a capture's orphan is removed (`boarding reserve=20`, `duel reserve=20`).
+- `reserve=n` (0 to 200) gives every player, and the AI fleet a start_naval preset fights (not the `encounter` or `blockade`
+  enemy), n troops in hull reserve to reinforce, for example after a capture's orphan is removed (`boarding hulls=2
+  reserve=20`, `duel ships=2 reserve=20`). It runs after `weapons=n` and `ram=n`, which swap hulls. Vanilla fields at most
+  the ships' total crew (`GetMaximumDeployableTroopCountForTeam`) and puts the troops past the deck crew below deck as each
+  hull's reserve, so a troop past the total crew never fights in vanilla either. The default hull and the Battle Knarr
+  carry their whole crew on deck, so the stager swaps plain roomless ships for an `empire_heavy_ship` (40 places below
+  deck) until n fit, then tops the healthy troops (wounded don't count) up to the deck crew plus n. A ballista or ram hull
+  is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.
