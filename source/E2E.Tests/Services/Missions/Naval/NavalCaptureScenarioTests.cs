@@ -212,6 +212,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
         c.Engine.CaptureBlocker = "captor_formation_holds_another_hull";
+        battle.ExpectLoggedFailure("takes the hull over without the swap");
 
         c.ElapseCaptureTimer(prize, captorHull);
         c.Tick();

@@ -72,6 +72,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         var parkedCrew = SeatCrewOnCopy(b, pirates[0]);
         b.Engine.ReplaceHullFails = !replaceThrows;
         b.Engine.ReplaceHullThrows = replaceThrows;
+        battle.ExpectLoggedFailure(replaceThrows ? "failed in phase ReplaceHull" : "the hull could not be replaced");
         var copy = b.Hull(pirates[0]);
 
         battle.MigrateHost(a, "B");
