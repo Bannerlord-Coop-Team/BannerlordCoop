@@ -101,7 +101,7 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         }
         catch (Exception e)
         {
-            Logger.Error(e, "[NavalSync] Applying the fate of ship {ShipId} failed; its fate is dropped", fate.CampaignShipId);
+            Logger.Error(e, "[NavalSync] Applying the fate of ship {ShipId} failed partway; it is not retried", fate.CampaignShipId);
         }
     }
 

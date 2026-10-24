@@ -12,7 +12,7 @@ using TaleWorlds.ObjectSystem;
 namespace Missions.Naval;
 
 /// <summary>
-/// Builds the campaign <see cref="Ship"/> a coop naval mission spawns instead of the party's own ship.
+/// Builds the campaign <see cref="Ship"/> a coop naval mission spawns instead of a party's campaign ship.
 /// </summary>
 public interface ICoopShipSnapshotBuilder
 {
@@ -36,7 +36,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         this.objectManager = objectManager;
     }
 
-    // Copies the party's own ship field by field; the copy carries the source's registry id for its fate report.
+    // Copies a party's campaign ship field by field; the copy carries the source's registry id for its fate report.
     public Ship Build(Ship source)
     {
         // Snapshots stay unregistered, so building one must not reach the campaign ship sync patches.
