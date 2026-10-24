@@ -79,6 +79,7 @@ public class NavalBattleServices : INavalBattleServices
 
     private readonly INavalHullAuthority hullAuthority;
     private readonly INavalAppliedHost appliedHost;
+    private readonly IBattleShipSampleStream samples;
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
@@ -105,8 +106,10 @@ public class NavalBattleServices : INavalBattleServices
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
+        var heldShips = new HeldShipBuffer();
+        samples = new BattleShipSampleStream(network, messageBroker, context, shipEngine, conditions, heldShips);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, new HeldShipBuffer());
+            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, heldShips, samples);
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
         captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
             hullAuthority, Arrivals, HullLedger);
@@ -230,6 +233,7 @@ public class NavalBattleServices : INavalBattleServices
         ShipCaptureReplicator.Dispose();
         captureApplier.Dispose();
         ShipReplicator.Dispose();
+        samples.Dispose();
         hullAuthority.Dispose();
         appliedHost.Dispose();
         Arrivals.Clear();

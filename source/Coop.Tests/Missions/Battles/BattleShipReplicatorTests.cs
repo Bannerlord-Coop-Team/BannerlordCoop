@@ -84,7 +84,7 @@ public class BattleShipReplicatorTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, false, CreateHull(), null);
         var sample = new NetworkBattleShipSample(ship.ShipId, sender, sequence, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity));
 
-        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, accepted, 0, InMission));
+        Assert.Equal(expected, BattleShipSampleStream.ValidateSample(ship, Own, sample, accepted, 0, InMission));
     }
 
     [Fact]
@@ -96,11 +96,11 @@ public class BattleShipReplicatorTests
         harness.Registry.TryRegister(ship);
         harness.LiveHulls.Add(copy);
         var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
-        const float lifetime = BattleShipReplicator.SampleLifetimeSeconds;
+        const float lifetime = BattleShipSampleStream.SampleLifetimeSeconds;
 
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame));
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame));
         harness.Replicator.Tick(0.8f * lifetime);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame));
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame));
         harness.Replicator.Tick(0.8f * lifetime);
         bool streamingWhileFresh = (bool)Inspected(harness, ship.ShipId)["streaming"]!;
         harness.Replicator.Tick(0.3f * lifetime);
@@ -149,10 +149,10 @@ public class BattleShipReplicatorTests
     [Theory]
     [InlineData(0.07f, 0.02f)]
     [InlineData(0.05f, 0f)]
-    [InlineData(1f, BattleShipReplicator.SendIntervalSeconds)]
+    [InlineData(1f, BattleShipSampleStream.SendIntervalSeconds)]
     public void CarryAfterSend_KeepsTheOvershootUpToOneInterval(float elapsed, float expected)
     {
-        Assert.Equal(expected, BattleShipReplicator.CarryAfterSend(elapsed), 4);
+        Assert.Equal(expected, BattleShipSampleStream.CarryAfterSend(elapsed), 4);
     }
 
     // A long frame is followed by one catch-up sample, not a burst of the samples it missed.
@@ -181,7 +181,7 @@ public class BattleShipReplicatorTests
 
         harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
         harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 9));
-        harness.Replicator.Tick(BattleShipReplicator.SampleLifetimeSeconds + 1.5f);
+        harness.Replicator.Tick(BattleShipSampleStream.SampleLifetimeSeconds + 1.5f);
 
         Assert.Equal(9, harness.Replicator.ReportedReserveOf(copy));
         Assert.Equal(0, harness.Replicator.ReportedReserveOf(harness.OwnHull));
@@ -263,7 +263,7 @@ public class BattleShipReplicatorTests
         var (_, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
         harness.Members.Remove(Peer);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         var inspected = Inspected(harness, ship.ShipId);
@@ -494,7 +494,7 @@ public class BattleShipReplicatorTests
         harness.Engine.Setup(e => e.SideOf(copy)).Returns(BattleSideEnum.Attacker);
 
         harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, ShipRemovalReason.Retreat, missionEnding: true));
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
         harness.Replicator.AcceptSpawnRecords(new[] { ForeignRecord(ship.ShipId) });
         harness.Replicator.Tick(0.1f);
@@ -756,7 +756,7 @@ public class BattleShipReplicatorTests
         var sample = new NetworkBattleShipSample(ship.ShipId, Peer, sequence,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, null, sampleEpoch);
 
-        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, acceptedSequence, acceptedEpoch, InMission));
+        Assert.Equal(expected, BattleShipSampleStream.ValidateSample(ship, Own, sample, acceptedSequence, acceptedEpoch, InMission));
     }
 
     [Fact]
@@ -768,8 +768,8 @@ public class BattleShipReplicatorTests
         var newerButStale = new NetworkBattleShipSample(ship.ShipId, Peer, 5,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, null, 9);
 
-        Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, older, 10, 5, InMission));
-        Assert.Equal("stale", BattleShipReplicator.ValidateSample(ship, Own, newerButStale, 10, 5, InMission));
+        Assert.Null(BattleShipSampleStream.ValidateSample(ship, Own, older, 10, 5, InMission));
+        Assert.Equal("stale", BattleShipSampleStream.ValidateSample(ship, Own, newerButStale, 10, 5, InMission));
     }
 
     [Fact]
@@ -1127,7 +1127,7 @@ public class BattleShipReplicatorTests
         var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), new BattleShipInput(0, 1, 0, float.NaN, 2));
 
-        Assert.Equal("invalid_input", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+        Assert.Equal("invalid_input", BattleShipSampleStream.ValidateSample(ship, Own, sample, 0, 0, InMission));
     }
 
     [Fact]
@@ -1138,7 +1138,7 @@ public class BattleShipReplicatorTests
         var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, ropes);
 
-        Assert.Equal("invalid_ropes", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+        Assert.Equal("invalid_ropes", BattleShipSampleStream.ValidateSample(ship, Own, sample, 0, 0, InMission));
     }
 
     [Fact]
@@ -1249,7 +1249,7 @@ public class BattleShipReplicatorTests
             motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Create(80f, Vec3.Zero))));
         typeof(NetworkBattleShipSample).GetField(nameof(NetworkBattleShipSample.CrewMass))!.SetValue(sample, float.NaN);
 
-        Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+        Assert.Null(BattleShipSampleStream.ValidateSample(ship, Own, sample, 0, 0, InMission));
         Assert.Null(sample.Motion.CrewLoad);
     }
 
@@ -1263,7 +1263,7 @@ public class BattleShipReplicatorTests
         var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
             motion: new BattleShipMotion(new Vec2(velocityX, velocityY), yawRate));
 
-        Assert.Equal("invalid_motion", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+        Assert.Equal("invalid_motion", BattleShipSampleStream.ValidateSample(ship, Own, sample, 0, 0, InMission));
     }
 
     [Fact]
@@ -1275,7 +1275,7 @@ public class BattleShipReplicatorTests
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
         harness.Replicator.Tick(0.1f);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: motion));
 
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipSample
@@ -1444,9 +1444,9 @@ public class BattleShipReplicatorTests
         var latestCondition = new NetworkShipCondition(record.ShipId, Peer, 2, 0, Condition(500f));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame));
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 3, frame));
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 2, frame));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 3, frame));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 2, frame));
         harness.Replicator.AcceptCondition(new NetworkShipCondition(record.ShipId, Peer, 1, 0, Condition(800f)));
         harness.Replicator.AcceptCondition(latestCondition);
         harness.Replicator.Tick(0.1f);
@@ -1481,7 +1481,7 @@ public class BattleShipReplicatorTests
         var heldCondition = new NetworkShipCondition(record.ShipId, Peer, 4, HostEpoch - 1, Condition(420f));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 5, MovedFrame(), hostEpoch: HostEpoch - 1));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 5, MovedFrame(), hostEpoch: HostEpoch - 1));
         harness.Replicator.AcceptCondition(heldCondition);
         harness.Replicator.Tick(0.1f);
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own, harness.SessionEpoch));
@@ -1547,8 +1547,8 @@ public class BattleShipReplicatorTests
         harness.Replicator.TransferHostHulls("successor", harness.SessionEpoch);
         deploying = false;
         harness.Replicator.Tick(0.016f);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame, hostEpoch: HostEpoch));
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, "successor", 1, frame, hostEpoch: HostEpoch));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame, hostEpoch: HostEpoch));
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, "successor", 1, frame, hostEpoch: HostEpoch));
 
         Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
         Assert.Equal("successor", ship.CurrentAuthority);
@@ -1611,7 +1611,7 @@ public class BattleShipReplicatorTests
             .Returns((MissionObject)null!);
         var record = ForeignRecord(Guid.NewGuid());
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         for (int attempt = 0; attempt < BattleShipReplicator.ForeignHullSpawnAttempts; attempt++)
@@ -1658,7 +1658,7 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: true);
         var shipId = Guid.NewGuid();
 
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(shipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(shipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         var inspected = JObject.FromObject(harness.Replicator.Inspect());
@@ -1675,7 +1675,7 @@ public class BattleShipReplicatorTests
         harness.SetupForeignSpawn();
         var record = ForeignRecord(Guid.NewGuid());
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1,
+        harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         harness.Replicator.Dispose();
@@ -1735,6 +1735,8 @@ public class BattleShipReplicatorTests
         public NavalSideHullLedger Ledger { get; }
         /// <summary>What arrived for ships not registered yet.</summary>
         public HeldShipBuffer HeldShips { get; }
+        /// <summary>The hulls' 20 Hz samples.</summary>
+        public BattleShipSampleStream Samples { get; }
         // Applies at once unless a test queues them: these tests drive the replicator alone, without the services tick.
         public IBattleShipArrivals Arrivals { get; }
         /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
@@ -1785,6 +1787,7 @@ public class BattleShipReplicatorTests
             Replicator = core.Replicator;
             Ledger = core.Ledger;
             HeldShips = core.HeldShips;
+            Samples = core.Samples;
         }
 
         // Publishes a message whose handler hops to the game thread, and waits for the hop.

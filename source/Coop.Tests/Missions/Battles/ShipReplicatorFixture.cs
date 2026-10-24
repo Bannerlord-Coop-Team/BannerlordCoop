@@ -26,9 +26,10 @@ public sealed class ShipReplicatorFixture
         Ledger = new NavalSideHullLedger();
         HeldShips = new HeldShipBuffer();
         Conditions = new BattleShipConditionStream(network, context.Session, engine, context.HostEpochPolicy, context.MissionContext);
+        Samples = new BattleShipSampleStream(network, broker, context, engine, Conditions, HeldShips);
         Replicator = new BattleShipReplicator(network, broker, context, engine, teamResolver ?? Mock.Of<IBattleTeamResolver>(),
             objectManager ?? Mock.Of<IObjectManager>(), HullAuthority, AppliedHost, Conditions, stations ?? Mock.Of<IAgentStationUseReplicator>(),
-            captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals, Ledger, HeldShips);
+            captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals, Ledger, HeldShips, Samples);
     }
 
     /// <summary>The arrivals queue the replicator enqueues on; applies at once unless the test passed a real queue.</summary>
@@ -48,6 +49,9 @@ public sealed class ShipReplicatorFixture
 
     /// <summary>The hulls' damage state and reported reserve.</summary>
     public BattleShipConditionStream Conditions { get; }
+
+    /// <summary>The hulls' 20 Hz samples.</summary>
+    public BattleShipSampleStream Samples { get; }
 
     /// <summary>The replicator under test.</summary>
     public BattleShipReplicator Replicator { get; }
