@@ -108,5 +108,6 @@ internal class AlternativeSolutionJournalHandler : IHandler
 
     private static bool IsEnding(IssueBase.IssueUpdateDetails ending) =>
         ending == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest ||
-        ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest;
+        ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest ||
+        ending == IssueBase.IssueUpdateDetails.IssueCancel;
 }
