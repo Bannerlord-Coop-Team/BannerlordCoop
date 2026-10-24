@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using Coop.Naval.PortScreen.Commands;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
@@ -17,7 +18,7 @@ public class NavalFinishLootCoopCommandTests
     [Fact]
     public void TryParseTake_TakesNoShipWithoutAnArgument()
     {
-        Assert.True(NavalFinishLootCoopCommand.TryParseTake(new string[0], out var take, out var error), error);
+        Assert.True(NavalFinishLootCoopCommand.TryParseTake(Array.Empty<string>(), out var take, out var error), error);
 
         Assert.False(take.All);
         Assert.Empty(take.Prefixes);
@@ -58,7 +59,7 @@ public class NavalFinishLootCoopCommandTests
     [Fact]
     public void TryResolveTake_AllTakesEveryOfferedShip()
     {
-        var take = new NavalFinishLootCoopCommand.LootTake(true, new string[0]);
+        var take = new NavalFinishLootCoopCommand.LootTake(true, Array.Empty<string>());
 
         Assert.Null(NavalFinishLootCoopCommand.TryResolveTake(take, Offered, out var taken));
         Assert.Equal(Offered, taken);

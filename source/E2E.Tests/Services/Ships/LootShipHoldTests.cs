@@ -94,6 +94,32 @@ public class LootShipHoldTests : SyncTestBase
         });
         AssertDestroyed(slowId);
     }
+
+    // A looter's party removed while its ships are held (a deleted player's too) never closes its loot screen, and a deleted
+    // player no longer reads as disconnected, so the next sweep destroys its ships.
+    [Fact]
+    public void UnclaimedLootShip_IsDestroyedAtTheNextSweep_OnceItsLootersPartyIsRemoved()
+    {
+        var loserId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var looterId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var shipId = GiveShip(loserId);
+        Server.Call(() =>
+        {
+            Hold().Hold(Server.GetRegisteredObject<Ship>(shipId), Server.GetRegisteredObject<MobileParty>(looterId).Party);
+            Hold().Sweep();
+        });
+        AssertAlive(shipId);
+
+        Server.Call(() =>
+        {
+            Server.GetRegisteredObject<MobileParty>(looterId).RemoveParty();
+            Hold().Sweep();
+        });
+
+        AssertDestroyed(shipId);
+    }
+
+    // The server's hold, which the results handler and the discard handler share.
     private ILootShipHold Hold() => Server.Resolve<ILootShipHold>();
 
     // A registered ship the server gives to the party through the vanilla production ownership path.
@@ -119,6 +145,7 @@ public class LootShipHoldTests : SyncTestBase
         });
     }
 
+    // The ship is still registered on the server and every client.
     private void AssertAlive(string shipId)
     {
         foreach (var instance in new[] { Server }.Concat(Clients))
@@ -128,6 +155,7 @@ public class LootShipHoldTests : SyncTestBase
         }
     }
 
+    // The ship is gone from the server and every client.
     private void AssertDestroyed(string shipId)
     {
         foreach (var instance in new[] { Server }.Concat(Clients))

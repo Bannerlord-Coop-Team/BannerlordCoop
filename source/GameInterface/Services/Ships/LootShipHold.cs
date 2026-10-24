@@ -43,6 +43,7 @@ public class LootShipHold : ILootShipHold
     // Game thread only: the results commit holds ships, a loot discard releases them and the campaign tick sweeps them.
     private readonly Dictionary<Ship, HeldShip> held = new Dictionary<Ship, HeldShip>();
 
+    // Takes the object manager that names the held ships and the player manager that tells a looter's disconnect.
     public LootShipHold(IObjectManager objectManager, IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
@@ -62,7 +63,7 @@ public class LootShipHold : ILootShipHold
     {
         objectManager.TryGetId(ship, out var shipId);
         Logger.Information("[NavalSync] Holding loot ship {ShipId} of {Loser} for {Looter} until its loot screen closes",
-            shipId, ship.Owner?.Id, looter?.Id);
+            shipId, ship.Owner?.Id, looter.Id);
 
         // The setter takes the ship out of the losing party's list, so RemoveParty at its finalize no longer destroys it.
         ship.Owner = null;
@@ -120,18 +121,19 @@ public class LootShipHold : ILootShipHold
 
     // One line per ship leaving the hold without the hold destroying it.
     private static void LogReleased(HeldShip heldShip, string outcome) =>
-        Logger.Information("[NavalSync] Released loot ship {ShipId} held for {Looter}: {Outcome}", heldShip.ShipId, heldShip.Looter?.Id, outcome);
+        Logger.Information("[NavalSync] Released loot ship {ShipId} held for {Looter}: {Outcome}", heldShip.ShipId, heldShip.Looter.Id, outcome);
 
     // Destroys a held ship nobody took (the callers checked it is unclaimed), through the vanilla destroy the ship sync replicates.
     private static void DestroyUnclaimed(Ship ship, HeldShip heldShip, string reason)
     {
-        Logger.Information("[NavalSync] Destroying unclaimed loot ship {ShipId} held for {Looter}: {Reason}", heldShip.ShipId, heldShip.Looter?.Id, reason);
+        Logger.Information("[NavalSync] Destroying unclaimed loot ship {ShipId} held for {Looter}: {Reason}", heldShip.ShipId, heldShip.Looter.Id, reason);
         DestroyShipAction.Apply(ship);
     }
 
-    // A looter whose party is gone or whose player is disconnected will never close its loot screen.
+    // A looter whose party was removed (a deleted player's too) or whose player is disconnected will never close its loot
+    // screen; RemoveParty only clears IsActive, and a deleted player no longer reads as disconnected.
     private bool IsLooterGone(PartyBase looter) =>
-        looter?.MobileParty == null || playerManager.IsOwnerOfPartyDisconnected(looter.MobileParty);
+        !looter.MobileParty.IsActive || playerManager.IsOwnerOfPartyDisconnected(looter.MobileParty);
 
     // The held ship's id (kept for the log once it is destroyed), the player party it was looted for and when its hold runs out.
     private readonly struct HeldShip
