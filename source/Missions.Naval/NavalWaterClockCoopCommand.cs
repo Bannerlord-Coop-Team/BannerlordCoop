@@ -42,7 +42,7 @@ public sealed class NavalWaterClockCoopCommand : ICoopCommand
     /// <summary>The NAVAL_WATER_CLOCK line for a water clock and the battle clock driving it, if any.</summary>
     internal static string Describe(IWaterClock waterClock, IBattleWaterClock battle)
     {
-        string line = $"NAVAL_WATER_CLOCK installed={Bool(waterClock.IsInstalled)} overriding={Bool(waterClock.IsOverriding)} " +
+        string line = $"NAVAL_WATER_CLOCK installed={Bool(waterClock.IsInstalled)} redirected={Bool(waterClock.IsRedirected)} " +
             $"status=\"{waterClock.Status}\"";
         if (waterClock.TryReadVanillaMissionTime(out var vanilla))
         {

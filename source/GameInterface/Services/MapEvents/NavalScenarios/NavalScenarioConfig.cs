@@ -52,8 +52,9 @@ public sealed class NavalScenarioConfig
     [ProtoMember(14)]
     public bool LateJoin { get; set; }
 
+    // 20 and 21 are retired: they were the encounter and blockade flags Entry replaced.
     [ProtoMember(15)]
-    public bool Duel { get; set; }
+    public NavalScenarioEntry Entry { get; set; }
 
     [ProtoMember(16)]
     public bool AlliedNpc { get; set; }
@@ -68,12 +69,6 @@ public sealed class NavalScenarioConfig
     /// <summary>With <see cref="DisconnectBattleHost"/>, the first player that is not the battle host disconnects instead.</summary>
     [ProtoMember(19)]
     public bool DisconnectNonHost { get; set; }
-
-    [ProtoMember(20)]
-    public bool CampaignEngage { get; set; }
-
-    [ProtoMember(21)]
-    public bool Blockade { get; set; }
 
     /// <summary>The coastal town the blockade preset uses; empty to let the server pick one.</summary>
     [ProtoMember(22)]

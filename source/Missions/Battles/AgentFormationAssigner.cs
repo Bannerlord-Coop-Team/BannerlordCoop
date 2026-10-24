@@ -48,6 +48,7 @@ public class AgentFormationAssigner : IAgentFormationAssigner
     /// <summary>Whether <paramref name="formation"/> can take an agent now; a refused agent keeps its current formation.</summary>
     protected virtual bool CanJoin(Formation formation) => true;
 
+    // Puts the agent in the formation when it may join; null leaves it where it was.
     private Formation Join(Agent agent, Formation formation)
     {
         if (formation == null || !CanJoin(formation)) return null;

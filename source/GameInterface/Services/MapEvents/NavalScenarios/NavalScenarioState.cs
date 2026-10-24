@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace GameInterface.Services.MapEvents.NavalScenarios;
 
+/// <summary>Where a naval scenario is on this machine; phases only move forward.</summary>
 public enum NavalScenarioPhase
 {
     None = 0,
@@ -13,6 +14,7 @@ public enum NavalScenarioPhase
     Ended = 4,
 }
 
+/// <summary>Whether a scenario step has run and how it went.</summary>
 public enum NavalScenarioStepStatus
 {
     Pending = 0,
@@ -64,8 +66,8 @@ public interface INavalScenarioState
     void Complete(string name, bool succeeded, string detail);
 
     /// <summary>
-    /// Who disconnects, fixed by the first battle host this machine sees while its disconnect is pending: after a migration
-    /// the successor would match <c>who=host</c> too (R41a-2 E). Null before a host is known or without a pending disconnect.
+    /// Who disconnects, fixed by the first battle host seen while the disconnect is pending, since a successor would match
+    /// <c>who=host</c> too (R41a-2 E); null before a host is known.
     /// </summary>
     string ResolveDisconnectingControllerId(string hostControllerId);
 }
@@ -160,8 +162,8 @@ public class NavalScenarioState : INavalScenarioState
         if (isServer)
         {
             if (config.LateJoinerControllerId != null) yield return LateJoinStep;
-            if (config.CampaignEngage) yield return EngageStep;
-            if (config.Blockade) yield return BlockadeStep;
+            if (config.Entry == NavalScenarioEntry.Encounter) yield return EngageStep;
+            if (config.Entry == NavalScenarioEntry.Blockade) yield return BlockadeStep;
             yield break;
         }
 

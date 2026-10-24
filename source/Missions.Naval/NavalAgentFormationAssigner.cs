@@ -8,10 +8,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] In a naval battle, an agent only joins a formation that has a hull. NavalDLC's team AI builds a
-/// formation's behaviours from its ship when the first unit joins (BehaviorNavalEngageCorrespondingEnemy reads the
-/// ship's entity), so a shipless formation throws there; such an agent stays without a formation until allied fleets
-/// are fielded.
+/// [Game thread] In a coop naval battle an agent joins only a formation with a hull: NavalDLC's team AI builds a formation's
+/// behaviours from its ship when the first unit joins, so a shipless one throws, and the agent stays without a formation.
 /// </summary>
 public class NavalAgentFormationAssigner : AgentFormationAssigner
 {
@@ -19,13 +17,11 @@ public class NavalAgentFormationAssigner : AgentFormationAssigner
 
     private readonly HashSet<Formation> refusedFormations = new HashSet<Formation>();
 
-    internal static bool CanJoinFormation(bool isNavalBattle, bool formationHasHull) => !isNavalBattle || formationHasHull;
-
+    // Refuses a shipless formation of a coop naval mission, logging it once; any other mission keeps the base rule.
     protected override bool CanJoin(Formation formation)
     {
-        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
-        bool isNavalBattle = shipsLogic != null;
-        if (CanJoinFormation(isNavalBattle, isNavalBattle && shipsLogic.IsAShipAssignedToFormation(formation))) return true;
+        if (!CoopNavalMissionScope.IsActive) return true;
+        if (Mission.Current?.GetMissionBehavior<NavalShipsLogic>()?.IsAShipAssignedToFormation(formation) != false) return true;
 
         if (refusedFormations.Add(formation))
             Logger.Warning("[NavalBattle] {Team} formation {Formation} has no hull, so agents assigned to it stay without a formation",

@@ -194,7 +194,7 @@ internal class BattleMissionStartHandler : IHandler
                 operation = "validate naval battle";
                 if (!IsNavalBattleAdmitted(mapEvent.IsNavalMapEvent, ModInformation.IsNavalDlcActive))
                 {
-                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles need NavalDLC active on the server", payload.What.MapEventId);
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles need NavalDLC and the coop naval code on the server", payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -822,7 +822,7 @@ internal class BattleMissionStartHandler : IHandler
             ICoopNavalBattleLauncher navalLauncher = null;
             if (battle.IsNavalMapEvent && !ContainerProvider.TryResolve(out navalLauncher))
             {
-                Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable (NavalDLC inactive); cannot open naval map event {MapEventId}", mapEventId);
+                Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable (NavalDLC or the coop naval code missing); cannot open naval map event {MapEventId}", mapEventId);
                 LogAttackMissionLifecycle("naval launcher unavailable", sequence, mapEventId);
                 return;
             }
@@ -960,6 +960,7 @@ internal class BattleMissionStartHandler : IHandler
         if (spawnGateEngaged) BattleSpawnGate.EndBattle();
     }
 
+    // A naval battle opens only where NavalDLC is enabled and the coop naval code shipped (ModInformation.IsNavalDlcActive).
     internal static bool IsNavalBattleAdmitted(bool isNavalMapEvent, bool navalDlcActive)
     {
         return !isNavalMapEvent || navalDlcActive;

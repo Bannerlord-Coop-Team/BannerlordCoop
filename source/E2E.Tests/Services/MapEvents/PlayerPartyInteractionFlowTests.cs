@@ -2352,8 +2352,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(objectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var defenderParty));
             Assert.True(objectManager.TryGetObject<PartyBase>(allyPartyId, out var allyParty));
             Assert.True(objectManager.TryGetId(enemyParty.Party, out enemyPartyId));
-            Assert.True(GameInterface.Services.Villages.Commands.MapEventDebugCommands.StartNavalCoopCommand.TryJoinNavalAlly(
-                objectManager, battle.MapEventId, enemyParty, defenderParty, allyParty.MobileParty, out var error), error);
+            Assert.True(Server.Resolve<GameInterface.Services.MapEvents.NavalScenarios.INavalBattleStaging>().TryJoinNavalAlly(
+                battle.MapEventId, enemyParty, defenderParty, allyParty.MobileParty, out var error), error);
         }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat))).ToList());
 
         if (expectOpened)

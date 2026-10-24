@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using NavalDLC.DWA;
 using System;
 using System.Linq;

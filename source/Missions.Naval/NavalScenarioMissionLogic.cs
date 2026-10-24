@@ -22,9 +22,8 @@ using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle: presses Ready on the
-/// naval order of battle, then places the own hull and throws a rope, drives the helm, disconnects or retreats, as the
-/// scenario says; a client that reconnected presses Ready again in the battle it re-entered.
+/// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle, from Ready on the naval
+/// order of battle to placing, roping, steering, sinking, disconnecting or retreating, as the scenario says.
 /// </summary>
 public class NavalScenarioMissionLogic : MissionLogic
 {
@@ -129,6 +128,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         Complete(NavalScenarioState.RejoinAttackStep, true, "already in the battle: a mission start pulled this client in");
     }
 
+    // Ends this client's scenario steps with the mission.
     public override void OnRemoveBehavior()
     {
         End();
@@ -184,9 +184,11 @@ public class NavalScenarioMissionLogic : MissionLogic
         return orderOfBattle;
     }
 
+    /// <summary>Whether the order of battle's Ready button would accept a press.</summary>
     internal static bool IsReadyEnabled(bool viewActive, bool assignmentDirty, bool canStartMission) =>
         viewActive && !assignmentDirty && canStartMission;
 
+    // Runs the in-battle steps that are due, in their order, once deployment is over.
     private void TickTimeline(float dt)
     {
         if (state.IsPending(NavalScenarioState.PlaceStep))
@@ -237,6 +239,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         return mission.GetMissionBehavior<BasicMissionHandler>();
     }
 
+    // Moves the own hull to the placement pose against one AI hull, or fails the placement once no target came in time.
     private void TryPlace()
     {
         string error = hulls.TryGetOwnHull(out var own);
@@ -269,6 +272,7 @@ public class NavalScenarioMissionLogic : MissionLogic
             $"{config.Spacing:0.#} m from AI hull {hulls.ShipIdOf(target)}");
     }
 
+    // The AI hulls still afloat, in a stable order every client shares.
     private MissionShip[] AfloatAiHulls() => registry.Ships
         .Where(ship => ship.IsNpcParty)
         .OrderBy(ship => ship.ShipId)
@@ -276,6 +280,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         .Where(hull => hull != null && !hull.IsRemoved && !hull.IsSinking)
         .ToArray();
 
+    // Fails the placement and the rope and helm steps that need it.
     private void FailPlacement(string detail)
     {
         Complete(NavalScenarioState.PlaceStep, false, detail);
@@ -326,6 +331,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         if (sincePlacement >= RopeGiveUpSeconds) Complete(NavalScenarioState.RopeStep, false, last);
     }
 
+    // Drives the own hull's helm full ahead through the helm cheat's path.
     private void DriveHelm()
     {
         var request = new NavalHelmCoopCommand.HelmRequest(0f, 1f, 1, NavalHelmCoopCommand.MaxSeconds);
@@ -354,10 +360,15 @@ public class NavalScenarioMissionLogic : MissionLogic
         Complete(NavalScenarioState.SinkStep, result.Succeeded, result.Output);
     }
 
+    /// <summary>The raw hull damage of the sinking preset's hit on a ship of <paramref name="maxHitPoints"/>.</summary>
     internal static float SinkingHitDamage(float maxHitPoints) => maxHitPoints * NavalScenarioPresets.SinkingHitRatio;
 
+    // This client's disconnect, when the scenario picked it: a main-menu leave or a server drop now, a reconnect later.
     private void Disconnect()
     {
+        // The queued leave or drop completes the step once it ran.
+        if (disconnectedHere) return;
+
         var disconnecting = state.ResolveDisconnectingControllerId(session.HostControllerId);
         if (disconnecting == null || !session.IsOwn(disconnecting))
         {
@@ -368,33 +379,59 @@ public class NavalScenarioMissionLogic : MissionLogic
         }
 
         disconnectedHere = true;
-        Complete(NavalScenarioState.DisconnectStep, true, $"{(session.IsLocalHost ? "the battle host" : "a player that is not the host")} " +
-            $"{(config.GracefulDisconnect ? "leaves to the main menu" : "is dropped by the server")} now and reconnects in " +
-            $"{config.ReconnectSeconds:0} s");
+        string outcome = $"{(session.IsLocalHost ? "the battle host" : "a player that is not the host")} " +
+            $"{(config.GracefulDisconnect ? "left to the main menu" : "was dropped by the server")}; reconnects in " +
+            $"{config.ReconnectSeconds:0} s";
         float reconnectSeconds = config.ReconnectSeconds;
 
         // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
         // this session's container.
         if (config.GracefulDisconnect)
-            GameThread.EnqueueSafe(() => RunConsoleCommand(DisconnectCommand), context: nameof(Disconnect));
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RunConsoleCommand(DisconnectCommand), outcome, reconnectSeconds),
+                context: nameof(Disconnect));
         else
-            GameThread.EnqueueSafe(RequestHardDrop, context: nameof(Disconnect));
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RequestHardDrop(), outcome, reconnectSeconds), context: nameof(Disconnect));
+    }
+
+    // Records the disconnect step once its leave or drop ran and only then starts the reconnect timer; a missing leave
+    // command fails the step and the rejoin with it.
+    private void CompleteDisconnect(bool ran, string detail, float reconnectSeconds)
+    {
+        if (!ran)
+        {
+            Complete(NavalScenarioState.DisconnectStep, false, $"{DisconnectCommand} is not a console command");
+            Complete(NavalScenarioState.RejoinStep, false, "this client never disconnected");
+            return;
+        }
+
+        Complete(NavalScenarioState.DisconnectStep, true, detail);
         Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
-            GameThread.RunSafe(() => RunConsoleCommand(ReconnectCommand), context: nameof(Disconnect)));
+            GameThread.RunSafe(Reconnect, context: nameof(CompleteDisconnect)));
+    }
+
+    // Runs the reconnect; a missing command fails the rejoin, since this client would never come back.
+    private void Reconnect()
+    {
+        if (!RunConsoleCommand(ReconnectCommand))
+            Complete(NavalScenarioState.RejoinStep, false, $"{ReconnectCommand} is not a console command");
     }
 
     // The server drops this client's connection at once, so the battle sees a real disconnect, not a mission leave, and no
     // 60 s timeout passes first.
-    private void RequestHardDrop()
+    private bool RequestHardDrop()
     {
         messageBroker.Publish(this, new PlayerDisconnectRequested());
         Logger.Information("[NavalScenario] Asked the server to drop this client's connection for {MapEventId}", config.MapEventId);
+        return true;
     }
 
-    private static void RunConsoleCommand(string command)
+    // Runs a console command as typed; false when no such command is registered.
+    private static bool RunConsoleCommand(string command)
     {
         string output = CommandLineFunctionality.CallFunction(command, new List<string>(), out bool found);
-        Logger.Information("[NavalScenario] {Command} found={Found}: {Output}", command, found, output);
+        if (found) Logger.Information("[NavalScenario] {Command}: {Output}", command, output);
+        else Logger.Error("[NavalScenario] {Command} is not a console command; the scenario's disconnect can't run", command);
+        return found;
     }
 
     // R38 saw no contact at 40 m, so the ramming preset logs how close the hulls came and how the copies existed.
@@ -407,6 +444,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         LogClosestApproach();
     }
 
+    // Logs the closest approach between hulls when it changed since the last line.
     private void LogClosestApproach()
     {
         var closest = NavalContactProbe.DescribeClosest();
@@ -425,6 +463,7 @@ public class NavalScenarioMissionLogic : MissionLogic
             Complete(pending.Name, false, "the scenario stopped: " + detail);
     }
 
+    // Ends the scenario here with the battle: every step still pending fails, unless this client disconnected out of it.
     private void End()
     {
         if (config == null || state.Current != config || state.Phase == NavalScenarioPhase.Ended || disconnectedHere) return;
@@ -435,6 +474,7 @@ public class NavalScenarioMissionLogic : MissionLogic
             Complete(step.Name, false, "the battle ended before this step ran");
     }
 
+    // Records a pending step's outcome and logs it; does nothing for a step that already ran.
     private void Complete(string step, bool succeeded, string detail)
     {
         if (!state.IsPending(step)) return;

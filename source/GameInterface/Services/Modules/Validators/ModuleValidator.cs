@@ -21,7 +21,7 @@ public interface IModuleValidator
 
     /// <summary>
     /// Ensures none of the given modules is unsupported official optional content (DLC). NavalDLC is the
-    /// only supported DLC; any other must be disabled on both the server and all connecting clients.
+    /// only supported DLC, and only by a build that shipped the naval code; any other must be disabled on both sides.
     /// </summary>
     /// <param name="modules">The modules to check.</param>
     /// <param name="error">Null if no DLC was enabled, otherwise a reason naming the enabled DLC.</param>
@@ -32,6 +32,19 @@ public interface IModuleValidator
 /// <inheritdoc href="IModuleValidator" />
 public class ModuleValidator : IModuleValidator
 {
+    private readonly Func<bool> isNavalSupported;
+
+    // Reads the startup naval-support flag on each validation.
+    public ModuleValidator() : this(() => Common.ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets tests pin whether this build supports NavalDLC.
+    internal ModuleValidator(Func<bool> isNavalSupported)
+    {
+        this.isNavalSupported = isNavalSupported;
+    }
+
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error)
     {
         if (!ValidateGameVersion(serverModules, clientModules, out error))
@@ -97,8 +110,9 @@ public class ModuleValidator : IModuleValidator
 
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
     {
+        bool navalSupported = isNavalSupported();
         var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>())
-            .Where(module => module.IsDlc && !Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc))
+            .Where(module => IsUnsupportedDlc(module, navalSupported))
             .ToList();
 
         if (dlcModules.Any())
@@ -110,6 +124,14 @@ public class ModuleValidator : IModuleValidator
 
         error = null;
         return true;
+    }
+
+    // A DLC is unsupported unless it is NavalDLC in a build that shipped the naval code.
+    private static bool IsUnsupportedDlc(ModuleInfo module, bool navalSupported)
+    {
+        if (!module.IsDlc) return false;
+
+        return !navalSupported || !Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc);
     }
 
     /// <summary>

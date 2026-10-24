@@ -1,19 +1,21 @@
 ﻿using NavalDLC.Missions.MissionLogics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] Where this client's own fleet deploys among the player parties of its side. Every client deploys its
-/// fleet on its own PlayerTeam, which vanilla plans at the same spot; the n-th player party of the side (in the
-/// replicated side order every client shares) is pushed back along the spawn path by n team depths, the way vanilla
-/// stacks a side's teams. Static because the deployment planning patches read it.
+/// [Game thread] The spawn path slot of this client's own fleet among its side's player parties, which every client
+/// plans at vanilla's first slot. Static because the deployment planning patches read it.
 /// </summary>
 internal static class NavalPlayerDeploymentSlot
 {
     // DefaultNavalMissionLogic.MakeDeploymentPlansForSide's gap between a side's teams.
     internal const float InterTeamGap = 32f;
+
+    // DefaultNavalMissionLogic.GetTeamSpawnPathOffsetRange's margin on a team's longest ship deployment length.
+    internal const float TeamRangeMargin = 1.1f;
 
     /// <summary>The own party's index among the side's player parties; 0 keeps the vanilla position.</summary>
     public static int Rank { get; set; }
@@ -21,6 +23,7 @@ internal static class NavalPlayerDeploymentSlot
     /// <summary>The naval logic whose initial side plan is being made, so the plan patch can read its team range.</summary>
     public static DefaultNavalMissionLogic PlanningSide { get; set; }
 
+    /// <summary>Clears the per-mission slot state.</summary>
     public static void Reset()
     {
         Rank = 0;
@@ -40,7 +43,22 @@ internal static class NavalPlayerDeploymentSlot
         return 0;
     }
 
-    /// <summary>The own team's spawn path offset, one team depth plus vanilla's gap behind per preceding player.</summary>
-    internal static float ShiftSpawnPathOffset(float vanillaOffset, int rank, float teamRange) =>
-        vanillaOffset - (rank * (teamRange + InterTeamGap));
+    /// <summary>The deepest team range any fleet can have, from every ship's deployment length in the game data.</summary>
+    internal static float LongestTeamRange(IEnumerable<float> shipDeploymentLengths) =>
+        TeamRangeMargin * shipDeploymentLengths.DefaultIfEmpty(0f).Max();
+
+    /// <summary>
+    /// The own team's spawn path offset: each preceding player gets the deepest possible fleet plus vanilla's gap, and the
+    /// own fleet (it extends back from its offset by <paramref name="ownTeamRange"/>) stays on the path.
+    /// </summary>
+    internal static float ShiftSpawnPathOffset(float vanillaOffset, int rank, float ownTeamRange, float longestTeamRange,
+        float pathStartOffset)
+    {
+        float spaced = SpacedSpawnPathOffset(vanillaOffset, rank, longestTeamRange);
+        return Math.Min(vanillaOffset, Math.Max(spaced, pathStartOffset + ownTeamRange));
+    }
+
+    /// <summary>The own team's offset before the path clamp; a clamped slot sits closer than vanilla's gap to the fleet ahead.</summary>
+    internal static float SpacedSpawnPathOffset(float vanillaOffset, int rank, float longestTeamRange) =>
+        rank <= 0 ? vanillaOffset : vanillaOffset - (rank * (longestTeamRange + InterTeamGap));
 }

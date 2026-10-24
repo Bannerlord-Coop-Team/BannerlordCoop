@@ -29,10 +29,10 @@ public sealed class NavalScenarioCoopCommand : ICoopCommand
     public string Name => "scenario";
 
     public string Description => "Stages a naval battle test preset (" + NavalScenarioPresets.Names + ") for the connected players " +
-        "or the listed ones; knobs: hulls=n hull=id spacing=m ships=n delay=s reconnect=s who=host|nonhost town=id weapons=n ram=n " +
-        "reserve=n. delay=s counts from this client's deployment end, which the scenario's own Ready press brings a few seconds " +
-        "after the mission opens (late_join: from staging). reserve=n gives each player, and the AI fleet of a start_naval preset, " +
-        "n regular troops beyond its ships' crew capacity, left in reserve to reinforce.";
+        "or the listed ones; knobs: hulls=n hull=id spacing=m ships=n delay=s reconnect=s who=host|nonhost drop=hard|leave town=id " +
+        "weapons=n ram=n reserve=n. delay=s counts from this client's deployment end, which the scenario's own Ready press " +
+        "brings a few seconds after the mission opens (late_join: from staging). reserve=n gives each player, and the AI fleet " +
+        "of a start_naval preset, n regular troops beyond its ships' crew capacity, left in reserve to reinforce.";
 
     public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -41,6 +41,7 @@ public sealed class NavalScenarioCoopCommand : ICoopCommand
             (IExpectedArgs)new ExpectedArgs($"option_{index}", "A key=value knob or a player controller id.", false)))
         .ToArray();
 
+    // Resolves the preset and knobs against the connected players and stages the scenario.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (ModInformation.IsClient) return Failed("Run this command on the server.");
@@ -55,6 +56,7 @@ public sealed class NavalScenarioCoopCommand : ICoopCommand
         return stager.TryStage(config, out var output) ? new CoopCommandResult(true, output) : Failed(output);
     }
 
+    // A failed result with the command_failed code.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
 }
 #endif

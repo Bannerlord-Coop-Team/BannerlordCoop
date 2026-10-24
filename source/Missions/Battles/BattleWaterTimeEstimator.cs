@@ -67,7 +67,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
         // The latest host time that arrived during loading is the start, before any frame shows the battle's water.
         bool freshHostTime = window.Count > 0;
         if (freshHostTime) AppliedOffset = TargetOffset = window.Max();
-        else AppliedOffset = TargetOffset = HasHostTime ? TargetOffset : (double)startTime - localTime;
+        else AppliedOffset = TargetOffset = (double)startTime - localTime;
         adoptionArmed = !freshHostTime;
         return (float)(localTime + AppliedOffset);
     }

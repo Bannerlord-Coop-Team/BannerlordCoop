@@ -10,8 +10,8 @@ namespace GameInterface.Services.MapEvents.NavalScenarios;
 public interface INavalScenarioResolver
 {
     /// <summary>
-    /// The scenario <paramref name="args"/> ask for: the preset name, then any mix of <c>key=value</c> knobs and player
-    /// controller ids. Without ids it takes the connected players in order, up to the preset's maximum.
+    /// The scenario <paramref name="args"/> ask for (the preset, then <c>key=value</c> knobs and player ids); without ids the
+    /// connected players in order.
     /// </summary>
     bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error);
@@ -58,6 +58,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         return true;
     }
 
+    // A fresh scenario with the preset's values and the default knobs.
     private static NavalScenarioConfig FromPreset(NavalScenarioPreset preset) => new NavalScenarioConfig
     {
         ScenarioId = Guid.NewGuid().ToString("N"),
@@ -73,11 +74,9 @@ public class NavalScenarioResolver : INavalScenarioResolver
         SinkingEnemyHull = preset.SinkingEnemyHull,
         DisconnectBattleHost = preset.DisconnectBattleHost,
         LateJoin = preset.LateJoin,
-        Duel = preset.Duel,
+        Entry = preset.Entry,
         AlliedNpc = preset.AlliedNpc,
         RetreatSecondPlayer = preset.RetreatSecondPlayer,
-        CampaignEngage = preset.CampaignEngage,
-        Blockade = preset.Blockade,
         RammedShipsPerParty = preset.RammedShipsPerParty,
         BlockadeTownId = "",
         MapEventId = "",
@@ -89,7 +88,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         switch (key)
         {
             case "hulls":
-                if (config.Duel) return "duel has no AI enemy, so it takes no hulls knob.";
+                if (config.Entry == NavalScenarioEntry.Duel) return "duel has no AI enemy, so it takes no hulls knob.";
                 if (!TryParseInt(value, 1, NavalScenarioPresets.MaxEnemyHulls, out int hulls))
                     return $"hulls must be a whole number from 1 to {NavalScenarioPresets.MaxEnemyHulls}.";
                 config.EnemyHulls = hulls;
@@ -118,7 +117,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 config.ReconnectSeconds = reconnect;
                 return null;
             case "town":
-                if (!config.Blockade) return $"{config.Preset} stages no blockade, so it takes no town knob.";
+                if (config.Entry != NavalScenarioEntry.Blockade) return $"{config.Preset} stages no blockade, so it takes no town knob.";
                 if (string.IsNullOrWhiteSpace(value)) return "town must name a coastal town's settlement id.";
                 config.BlockadeTownId = value.Trim();
                 return null;
@@ -152,6 +151,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         }
     }
 
+    // The players the scenario runs for, or null with why they can't be used.
     private static string ResolvePlayers(NavalScenarioPreset preset, List<string> requested,
         IReadOnlyList<string> connected, out string[] players)
     {
@@ -176,9 +176,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
         return null;
     }
 
+    // Parses a whole number within [min, max].
     private static bool TryParseInt(string value, int min, int max, out int result) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out result) && result >= min && result <= max;
 
+    // Parses a finite number within [min, max].
     private static bool TryParseFloat(string value, float min, float max, out float result) =>
         float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out result) && !float.IsNaN(result) &&
         result >= min && result <= max;

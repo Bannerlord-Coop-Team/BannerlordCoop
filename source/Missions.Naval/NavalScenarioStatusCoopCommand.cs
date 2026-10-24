@@ -38,19 +38,18 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
+    // Reports this machine's scenario as one NAVAL_SCENARIO_STATUS JSON line.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         var config = state.Current;
         if (config == null) return new CoopCommandResult(true, "NAVAL_SCENARIO_STATUS none");
-
-        if (ModInformation.IsServer) AdvanceServerPhase(config);
 
         var status = new
         {
             preset = config.Preset,
             scenario = config.ScenarioId,
             mapEvent = config.MapEventId,
-            phase = state.Phase.ToString(),
+            phase = (ModInformation.IsServer ? ServerPhaseOf(config) : state.Phase).ToString(),
             players = config.ControllerIds,
             knobs = new
             {
@@ -62,9 +61,12 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 delay = config.DelaySeconds,
                 reconnect = config.ReconnectSeconds,
                 who = config.DisconnectBattleHost ? config.DisconnectNonHost ? "nonhost" : "host" : null,
-                entry = config.CampaignEngage ? "campaign_engage" : config.Blockade ? "blockade_attack" : "start_battle_action",
-                town = config.Blockade ? config.BlockadeTownId : null,
+                drop = config.DisconnectBattleHost ? config.GracefulDisconnect ? "leave" : "hard" : null,
+                entry = EntryName(config.Entry),
+                town = config.Entry == NavalScenarioEntry.Blockade ? config.BlockadeTownId : null,
                 weapons = config.ArmedShipsPerParty,
+                ram = config.RammedShipsPerParty,
+                reserve = config.ReserveTroops,
             },
             pending = state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).Select(step => step.Name).ToArray(),
             steps = state.Steps.Select(step => new { name = step.Name, status = step.Status.ToString(), detail = step.Detail }).ToArray(),
@@ -74,16 +76,27 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
         return new CoopCommandResult(true, "NAVAL_SCENARIO_STATUS " + JsonConvert.SerializeObject(status));
     }
 
-    // The server runs no mission, so its phase follows the map event: claimed for a mission, then finalized.
-    private void AdvanceServerPhase(NavalScenarioConfig config)
+    // The status line's name for how the scenario's map event starts.
+    private static string EntryName(NavalScenarioEntry entry) => entry switch
     {
-        // The encounter preset's map event is still to come from the campaign AI.
-        if (string.IsNullOrEmpty(config.MapEventId)) return;
+        NavalScenarioEntry.Duel => "duel",
+        NavalScenarioEntry.Encounter => "campaign_engage",
+        NavalScenarioEntry.Blockade => "blockade_attack",
+        _ => "start_battle_action",
+    };
+
+    // The server runs no mission, so the phase it reports follows the map event (claimed for a mission, then finalized),
+    // read without moving the state's own phase.
+    private NavalScenarioPhase ServerPhaseOf(NavalScenarioConfig config)
+    {
+        // An ended scenario stays ended, and the encounter preset's map event may still be to come from the campaign AI.
+        if (state.Phase == NavalScenarioPhase.Ended || string.IsNullOrEmpty(config.MapEventId)) return state.Phase;
 
         if (!objectManager.TryGetObject(config.MapEventId, out MapEvent mapEvent) || mapEvent.IsFinalized)
-            state.Advance(NavalScenarioPhase.Ended);
-        else if (ServerBattleModeArbiter.IsMissionClaimed(config.MapEventId))
-            state.Advance(NavalScenarioPhase.Fighting);
+            return NavalScenarioPhase.Ended;
+        if (ServerBattleModeArbiter.IsMissionClaimed(config.MapEventId) && state.Phase < NavalScenarioPhase.Fighting)
+            return NavalScenarioPhase.Fighting;
+        return state.Phase;
     }
 
     // The counters coop.debug.naval.inspect reports, for this client's copy of the scenario's battle.

@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Coop.Naval.PortScreen.Commands;
 using System;
 using System.Collections.Generic;

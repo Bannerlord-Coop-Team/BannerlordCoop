@@ -114,7 +114,7 @@ public class ModuleValidatorTests
         var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
         var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
 
-        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+        var result = NavalBuildValidator().Validate(serverModules, clientModules, out var error);
 
         Assert.True(result);
         Assert.Null(error);
@@ -126,11 +126,34 @@ public class ModuleValidatorTests
         var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
         var clientModules = new List<ModuleInfo> { Native() };
 
-        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+        var result = NavalBuildValidator().Validate(serverModules, clientModules, out var error);
 
         Assert.False(result);
         Assert.Equal("To join the server the module 'NavalDLC' with version 'v1.0.0.352' is required.", error);
     }
+
+    [Fact]
+    public void Validate_RejectsNavalDlc_WhenTheBuildHasNoNavalCode()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
+
+        var result = new ModuleValidator(() => false).Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
+    }
+
+    [Fact]
+    public void ValidateNoDlc_RejectsNavalDlc_WhenTheBuildHasNoNavalCode()
+    {
+        bool result = new ModuleValidator(() => false).ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
+    }
+
+    private static ModuleValidator NavalBuildValidator() => new ModuleValidator(() => true);
 
     private static ModuleInfo Native() =>
         new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };
@@ -207,7 +230,7 @@ public class ModuleValidatorTests
     [Fact]
     public void ValidateNoDlc_AllowsNavalDlc_AndRejectsAnyOtherDlc()
     {
-        var validator = new ModuleValidator();
+        var validator = NavalBuildValidator();
 
         bool navalOnly = validator.ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var navalOnlyError);
         bool withOther = validator.ValidateNoDlc(new List<ModuleInfo>

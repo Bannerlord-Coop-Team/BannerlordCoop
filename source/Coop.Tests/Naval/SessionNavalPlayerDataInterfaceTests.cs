@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Common.Messaging;
 using Coop.Naval.CoopSession.Interfaces;
 using GameInterface.CoopSessionData;

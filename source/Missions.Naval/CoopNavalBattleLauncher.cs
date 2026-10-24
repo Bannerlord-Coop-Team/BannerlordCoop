@@ -34,11 +34,8 @@ using TaleWorlds.MountAndBlade.Source.Missions.Handlers.Logic;
 namespace Missions.Naval;
 
 /// <summary>
-/// Coop replacement for <c>NavalMissions.OpenNavalBattleMission</c>. Keeps the vanilla naval behavior list but
-/// fields only the local player's own party: coop troop suppliers, detached snapshots of own-party ships from
-/// <see cref="ICoopShipSnapshotBuilder"/>, own-party captains and <see cref="CoopNavalBattleEndLogic"/> instead of
-/// <c>NavalBattleEndLogic</c>. <c>ShipRetreatLogic</c> removes only own hulls, since a copy never takes a Retreat order.
-/// Other players' and AI hulls are not spawned here.
+/// Coop replacement for <c>NavalMissions.OpenNavalBattleMission</c>: opens vanilla's naval behaviour list fielding only the
+/// local player's own party, its snapshot ships and captains; other players' and AI hulls are not spawned here.
 /// </summary>
 public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 {
@@ -123,7 +120,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         }
 
         var mission = CreateCoopNavalBattle(rec, mapEvent, mapEventId);
-        if (mission == null) return null;
 
         // Same post-open entry as the field launcher: the controller is attached, so the reserve request it
         // triggers reaches the suppliers registered above.
@@ -131,6 +127,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         return mission;
     }
 
+    // Opens the naval mission with the own party's ships, captains and slot, then attaches the coop and naval behaviours.
     private Mission CreateCoopNavalBattle(MissionInitializerRecord rec, MapEvent mapEvent, string mapEventId)
     {
         bool isPlayerSergeant = mapEvent.IsPlayerSergeant();
@@ -231,6 +228,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         return mission;
     }
 
+    // The parties of every connected player that resolve on this client.
     private HashSet<PartyBase> GetPlayerParties()
     {
         var parties = new HashSet<PartyBase>();

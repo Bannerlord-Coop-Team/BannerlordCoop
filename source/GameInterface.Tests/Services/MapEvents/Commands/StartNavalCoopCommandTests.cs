@@ -4,7 +4,7 @@ using Common.Commands;
 using System.Collections;
 using System.Collections.Generic;
 using Xunit;
-using StartNavalCoopCommand = GameInterface.Services.Villages.Commands.MapEventDebugCommands.StartNavalCoopCommand;
+using GameInterface.Services.MapEvents.NavalScenarios;
 
 namespace GameInterface.Tests.Services.MapEvents.Commands;
 
@@ -26,7 +26,8 @@ public class StartNavalCoopCommandTests
             ModInformation.IsServer = isServer;
             ModInformation.IsNavalDlcActive = navalDlcActive;
 
-            var result = new StartNavalCoopCommand().ProcessCommand(new TestArgs(args));
+            // No staging: a refusal never reaches the campaign moves.
+            var result = new StartNavalCoopCommand(staging: null).ProcessCommand(new TestArgs(args));
 
             Assert.False(result.Succeeded);
             Assert.Equal(expectedOutput, result.Output);

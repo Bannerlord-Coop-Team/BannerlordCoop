@@ -66,7 +66,12 @@
       <Name>GameInterface</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup Condition=" '$(Configuration)' == 'Debug' ">
+  <!-- Naval tests build in Debug where War Sails is installed; their files are wrapped in #if COOP_NAVAL. -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' And '$(CoopNavalDlc)' == 'true' ">
+    <CoopNavalTests>true</CoopNavalTests>
+    <DefineConstants>$(DefineConstants);COOP_NAVAL</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition=" '$(CoopNavalTests)' == 'true' ">
     <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj" />
     <ProjectReference Include="..\Coop.Naval\Coop.Naval.csproj" />
     <Reference Include="NavalDLC">

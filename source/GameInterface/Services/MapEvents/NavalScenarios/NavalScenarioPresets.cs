@@ -18,6 +18,25 @@ public enum NavalScenarioPlacement
     Ramming = 2,
 }
 
+/// <summary>How a scenario's map event starts; one entry per scenario.</summary>
+public enum NavalScenarioEntry
+{
+    /// <summary>start_naval's StartBattleAction: the nearest hostile AI fleet attacks the first player.</summary>
+    StartBattle = 0,
+
+    /// <summary>The second player's party attacks the first one; no AI enemy.</summary>
+    Duel = 1,
+
+    /// <summary>
+    /// The AI fleet is placed at the players and ordered to engage the first one; the campaign AI starts the map event, not
+    /// start_naval's StartBattleAction.
+    /// </summary>
+    Encounter = 2,
+
+    /// <summary>An AI lord's siege of a coastal town blockades its port, and the first player attacks the blockade from the sea.</summary>
+    Blockade = 3,
+}
+
 /// <summary>DEBUG: one naval battle test setup, as plain data.</summary>
 public sealed class NavalScenarioPreset
 {
@@ -58,23 +77,14 @@ public sealed class NavalScenarioPreset
     /// <summary>The second player joins the map event <c>delay</c> seconds after the first one started it.</summary>
     public bool LateJoin { get; set; }
 
-    /// <summary>The second player's party attacks the first one; no AI enemy.</summary>
-    public bool Duel { get; set; }
+    /// <summary>How the scenario's map event starts.</summary>
+    public NavalScenarioEntry Entry { get; set; }
 
     /// <summary>The nearest friendly AI lord party joins the players' side with a ship.</summary>
     public bool AlliedNpc { get; set; }
 
     /// <summary>The second player retreats through Tab and Retreat <c>delay</c> seconds after its deployment.</summary>
     public bool RetreatSecondPlayer { get; set; }
-
-    /// <summary>
-    /// The AI fleet is placed at the players and ordered to engage the first one; the campaign AI starts the map event, not
-    /// start_naval's StartBattleAction.
-    /// </summary>
-    public bool CampaignEngage { get; set; }
-
-    /// <summary>An AI lord's siege of a coastal town blockades its port, and the first player attacks the blockade from the sea.</summary>
-    public bool Blockade { get; set; }
 
     /// <summary>The default <c>ram=n</c>: how many ships of every player and of the AI fleet carry a bow ram.</summary>
     public int RammedShipsPerParty { get; set; }
@@ -190,7 +200,7 @@ public static class NavalScenarioPresets
             MinPlayers = 2,
             MaxPlayers = 2,
             EnemyHulls = 0,
-            Duel = true,
+            Entry = NavalScenarioEntry.Duel,
         },
         new NavalScenarioPreset
         {
@@ -212,7 +222,7 @@ public static class NavalScenarioPresets
             Description = "A hostile AI fleet, a pirate one where there is one, is placed at the players and ordered to engage the " +
                 "first one: the campaign AI starts the battle and the attack goes through the encounter's mission start, " +
                 "no start_naval. The other players join the defending side.",
-            CampaignEngage = true,
+            Entry = NavalScenarioEntry.Encounter,
         },
         new NavalScenarioPreset
         {
@@ -220,10 +230,11 @@ public static class NavalScenarioPresets
             Description = "An AI lord at war with the players besieges a coastal town with hulls ships, which blockades its port; " +
                 "the players are placed at the port and the first one attacks the blockade through the server's blockade battle " +
                 "path (town=id picks the town).",
-            Blockade = true,
+            Entry = NavalScenarioEntry.Blockade,
         },
     };
 
+    /// <summary>The preset named <paramref name="name"/>, case-insensitively.</summary>
     public static bool TryGet(string name, out NavalScenarioPreset preset)
     {
         preset = All.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));

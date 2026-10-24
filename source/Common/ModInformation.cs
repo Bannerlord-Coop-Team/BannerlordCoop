@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 
 namespace Common;
@@ -14,8 +15,25 @@ public static class ModInformation
     /// <summary>Whether a module is the War Sails DLC; a non-DLC module that reuses its id is not.</summary>
     public static bool IsNavalDlcModule(string moduleId, bool isDlc) => isDlc && moduleId == NavalDlcModuleId;
 
-    /// <summary>Whether NavalDLC is an active module in this process. Set once at startup.</summary>
+    /// <summary>The naval battle assembly, shipped only by a build made with War Sails (CoopNavalDlc).</summary>
+    public const string MissionsNavalAssemblyFile = "Missions.Naval.dll";
+
+    /// <summary>The naval campaign assembly, shipped only by a build made with War Sails (CoopNavalDlc).</summary>
+    public const string CoopNavalAssemblyFile = "Coop.Naval.dll";
+
+    private static readonly string[] NavalAssemblyFiles = { MissionsNavalAssemblyFile, CoopNavalAssemblyFile };
+
+    /// <summary>
+    /// Whether this process supports NavalDLC: the module is enabled and the coop naval code shipped with this build.
+    /// Set once at startup from <see cref="IsNavalSupported"/>; the module validator, host warning and battle gate read it.
+    /// </summary>
     public static bool IsNavalDlcActive { get; set; }
+
+    /// <summary>Whether NavalDLC is enabled and every coop naval assembly is shipped, as told by <paramref name="isShipped"/>.</summary>
+    public static bool IsNavalSupported(bool navalModuleEnabled, Func<string, bool> isShipped)
+    {
+        return navalModuleEnabled && NavalAssemblyFiles.All(isShipped);
+    }
 
     /// <summary>
     /// The mod build stamped on this assembly. Its semantic version comes from the same build

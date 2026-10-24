@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Common.Util;
 using Coop.Naval.PartyVisuals.Patches;
 using HarmonyLib;

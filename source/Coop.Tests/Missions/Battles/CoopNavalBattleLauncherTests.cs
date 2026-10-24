@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Missions.Naval;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;

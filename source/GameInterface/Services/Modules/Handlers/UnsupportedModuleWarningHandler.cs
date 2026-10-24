@@ -25,7 +25,8 @@ public class UnsupportedModuleWarningHandler
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action<Exception> reportError;
-    
+    private readonly bool navalSupported;
+
     private bool optionsLoaded;
     private bool warningsSuppressed; 
     private bool modulesEvaluated;
@@ -35,11 +36,13 @@ public class UnsupportedModuleWarningHandler
     public UnsupportedModuleWarningHandler(
         IModuleInfoProvider moduleInfoProvider,
         ICoopOptionsStore optionsStore,
-        Action<Exception> reportError)
+        Action<Exception> reportError,
+        bool navalSupported)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
         this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
         this.reportError = reportError;
+        this.navalSupported = navalSupported;
     }
 
     public void TryShowPrompt(bool canShow, Action<InquiryData> showInquiry)
@@ -140,7 +143,8 @@ public class UnsupportedModuleWarningHandler
             .ToArray();
     }
 
-    private static bool IsUnsupported(ModuleInfo module)
+    // Whether a module belongs in the warning; NavalDLC is left out only by a build that shipped the naval code.
+    private bool IsUnsupported(ModuleInfo module)
     {
         if (IsCoopVariant(module))
         {
@@ -154,7 +158,7 @@ public class UnsupportedModuleWarningHandler
             return false;
         }
 
-        if (Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc))
+        if (navalSupported && Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc))
         {
             return false;
         }

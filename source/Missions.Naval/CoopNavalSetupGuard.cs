@@ -48,24 +48,8 @@ public class CoopNavalSetupGuard : MissionLogic
 
     public bool ReservePresent { get; private set; }
 
-    /// <summary>Set once vanilla's naval team setup threw; the deployment controller must not run it again.</summary>
+    /// <summary>Set once vanilla's naval team setup threw; a rerun would spawn a fresh hull per formation each tick (R41a-2 S).</summary>
     public bool SetupFailed { get; private set; }
-
-    /// <summary>
-    /// [Game thread] Ends <paramref name="mission"/> through its guard for <paramref name="reason"/>; false once any earlier
-    /// reason ends it, except a first setup failure, which is still recorded. With no guard it logs what the caller does.
-    /// </summary>
-    internal static bool TryEnd(Mission mission, NavalSetupEndReason reason, string outcome)
-    {
-        var guard = mission?.GetMissionBehavior<CoopNavalSetupGuard>();
-        if (guard == null)
-        {
-            Logger.Error("[NavalBattle] No setup guard ends the naval mission ({Reason}): {Outcome}", reason, outcome);
-            return false;
-        }
-
-        return reason == NavalSetupEndReason.TeamSetupFailed ? guard.FailSetup() : guard.RequestEnd(reason);
-    }
 
     // Checks the own reserve as the spawn logic pulls it; a missing one ends the mission at its first tick.
     public override void EarlyStart()
@@ -86,35 +70,24 @@ public class CoopNavalSetupGuard : MissionLogic
         if (!ownSupplier.IsPopulated)
             ownSupplier.SetReserve(Array.Empty<PartyReserve>(), 0, 0, 0);
 
-        RequestEnd(NavalSetupEndReason.MissingReserve);
+        End(NavalSetupEndReason.MissingReserve);
     }
 
     /// <summary>
-    /// [Game thread] Ends the mission from its next tick and tells the player why it can't start. True only for the call that
-    /// asked first.
+    /// [Game thread] Ends the mission from its next tick and tells the player once; a setup failure is latched even after an
+    /// earlier end. True when this call recorded anything.
     /// </summary>
-    internal bool RequestEnd(NavalSetupEndReason reason)
+    internal bool End(NavalSetupEndReason reason)
     {
-        if (endReason != null) return false;
+        bool newFailure = reason == NavalSetupEndReason.TeamSetupFailed && !SetupFailed;
+        if (newFailure) SetupFailed = true;
+        if (endReason != null) return newFailure;
 
         endReason = reason;
         messageBroker.Publish(this, new SendInformationMessage(MessageFor(reason)));
         // Mission.AfterStart sets the state back to Continuing after EarlyStart, and CheckMissionEnd then never ends an
         // already ended mission, so the end waits for the first tick (R41a).
         endPending = true;
-        return true;
-    }
-
-    /// <summary>
-    /// [Game thread] Records that the naval team setup threw and ends the mission; a retry would deploy every side again
-    /// and spawn a fresh hull per formation each tick (R41a-2 S). True only for the first failure.
-    /// </summary>
-    internal bool FailSetup()
-    {
-        if (SetupFailed) return false;
-
-        SetupFailed = true;
-        RequestEnd(NavalSetupEndReason.TeamSetupFailed);
         return true;
     }
 

@@ -10,7 +10,6 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
-using GameInterface.Utils;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
@@ -28,7 +27,6 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
-using Serilog;
 using System.Collections.Generic;
 using System.IO;
 using Assembly = System.Reflection.Assembly;
@@ -51,10 +49,6 @@ public class MissionModule : Module
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
     internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
-    private const string NavalMissionsAssemblyFile = "Missions.Naval.dll";
-
-    private static readonly ILogger Logger = LogManager.GetLogger<MissionModule>();
-    private static bool navalMissionsAssemblyMissingLogged;
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -149,8 +143,6 @@ public class MissionModule : Module
         builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
         builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
         builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
-        // Also in the server container, which never opens a naval battle; the patch itself refuses to install on a server.
-        builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()
             .InstancePerDependency();
@@ -316,24 +308,12 @@ public class MissionModule : Module
             builder.RegisterAssemblyModules(navalAssembly);
     }
 
-    // A build made without War Sails installed leaves Missions.Naval.dll out, so naval battles stay unavailable.
+    // Loads Missions.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
     private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
     {
-        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), NavalMissionsAssemblyFile);
-        if (File.Exists(path))
-        {
-            assembly = Assembly.LoadFrom(path);
-            return true;
-        }
-
-        assembly = null;
-        if (!navalMissionsAssemblyMissingLogged)
-        {
-            navalMissionsAssemblyMissingLogged = true;
-            Logger.Warning("{File} is missing at {Path}; naval battles are unavailable", NavalMissionsAssemblyFile, path);
-        }
-
-        return false;
+        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), ModInformation.MissionsNavalAssemblyFile);
+        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        return assembly != null;
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

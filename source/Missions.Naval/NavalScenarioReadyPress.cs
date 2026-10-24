@@ -4,9 +4,8 @@ using System;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] DEBUG: presses the naval order of battle's Ready for the scenario the way a click does, outside
-/// Mission.OnTick: the mission tick only queues the press, which runs after the tick returns and only if Ready
-/// still accepts then.
+/// [Game thread] DEBUG: presses a mission button for the scenario the way a click does: the mission tick only queues the
+/// press, which runs after the tick returns.
 /// </summary>
 public interface INavalScenarioReadyPress
 {
@@ -32,8 +31,6 @@ public class NavalScenarioReadyPress : INavalScenarioReadyPress
 
     public NavalScenarioReadyPress(Action<Action> enqueueOutsideTick)
     {
-        if (enqueueOutsideTick == null) throw new ArgumentNullException(nameof(enqueueOutsideTick));
-
         this.enqueueOutsideTick = enqueueOutsideTick;
     }
 

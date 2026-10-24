@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.ViewModelCollection.OrderOfBattle;
