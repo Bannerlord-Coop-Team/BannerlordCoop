@@ -488,7 +488,8 @@ public class MapEventLoadCleanerTests : MapEventTestBase
                 Server.Resolve<IMessageBroker>(),
                 Server.Resolve<IPlayerManager>(),
                 Server.ObjectManager,
-                Server.Resolve<IArmyDisbander>());
+                Server.Resolve<IArmyDisbander>(),
+                Server.Resolve<IStalledMapEventResolver>());
             var reportedParties = new List<PartyBase>();
 
             var releasedParties = cleaner.ReleaseEndedMapEventLinks(party =>
