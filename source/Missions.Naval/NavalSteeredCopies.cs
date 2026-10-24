@@ -129,13 +129,19 @@ public class NavalSteeredCopies : INavalSteeredCopies
     {
         foreach (var entry in copies)
         {
+            var ship = entry.Key;
             var copy = entry.Value;
             if (!copy.Steering.IsSnapQueued) continue;
+            if (ship.IsRemoved || !ship.GameEntity.IsValid)
+            {
+                copy.Steering.TakeSnapFrame();
+                continue;
+            }
 
-            var target = copy.Steering.TakeSnapFrame();
-            if (entry.Key.IsRemoved || !entry.Key.GameEntity.IsValid) continue;
+            // A copy whose body doesn't simulate gets its owner's frames written; its snap waits until the body simulates.
+            if (!IsSimulating(ship)) continue;
 
-            Snap(entry.Key, copy, target);
+            Snap(ship, copy, copy.Steering.TakeSnapFrame());
 #if DEBUG
             copy.Diagnostics.RecordSnap();
 #endif
