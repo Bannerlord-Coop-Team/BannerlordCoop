@@ -504,8 +504,8 @@ public class BattleShipReplicatorTests
         Assert.Equal(new[] { "seats", "stations", "park" }, afterFirstTick);
         Assert.Equal(new[] { "seats", "stations", "park", "remove" }, order);
         Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(ship.ShipId));
-        Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Attacker));
-        Assert.Equal(0, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Attacker));
+        Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
         harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
             Times.Never);
         var inspected = JObject.FromObject(harness.Replicator.Inspect());
@@ -676,9 +676,12 @@ public class BattleShipReplicatorTests
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipRemoved)), Times.Never);
         harness.Replicator.Tick(0.1f);
 
+        harness.Engine.Setup(e => e.SideOf(harness.OwnHull)).Returns(BattleSideEnum.Defender);
         harness.Replicator.AnnounceRemoval(aiHull, ShipRemovalReason.Leave, missionEnding: true);
         harness.Replicator.AnnounceRemoval(harness.OwnHull, ShipRemovalReason.Retreat, missionEnding: true);
 
+        // Every hull leaves as the mission ends, so none of them counts for the retreat rule.
+        Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipRemoved)), Times.Once);
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipRemoved
             && ((NetworkShipRemoved)m).ShipId == harness.OwnShipId
@@ -701,7 +704,7 @@ public class BattleShipReplicatorTests
         harness.Stations.Verify(s => s.ReleaseSeatsOn(harness.OwnHull), Times.Once);
         Assert.IsType<NetworkBattleRopeFinal>(sent[0]);
         Assert.IsType<NetworkShipRemoved>(sent[1]);
-        Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
     }
 
     // M8a r1: a hull's reserve rides its on-change condition, so a peer entering after the commit gets the last one with the
@@ -1045,7 +1048,7 @@ public class BattleShipReplicatorTests
         Assert.Equal(1, transferred);
         Assert.Equal("successor", aiShip.CurrentAuthority);
         Assert.Equal("someone_else", presentShip.CurrentAuthority);
-        Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
     }
 
     // R41a-2: a departed party withdraws the tick after its hull removal finished, so the removal took its crew first and the
@@ -1722,6 +1725,8 @@ public class BattleShipReplicatorTests
         public List<MissionObject> LiveHulls { get; } = new List<MissionObject>();
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
+        /// <summary>The hulls that left each side.</summary>
+        public NavalSideHullLedger Ledger { get; }
         // Applies at once unless a test queues them: these tests drive the replicator alone, without the services tick.
         public IBattleShipArrivals Arrivals { get; }
         /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
@@ -1767,8 +1772,10 @@ public class BattleShipReplicatorTests
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
             var context = ShipReplicatorFixture.Context(session.Object, component.Object, members.Object, deployment.Object,
                 resultCommitter.Object, PartyWithdrawal.Object);
-            Replicator = new ShipReplicatorFixture(context, Broker, engine.Object, Network.Object, TeamResolver.Object, Stations.Object,
-                arrivals: Arrivals).Replicator;
+            var core = new ShipReplicatorFixture(context, Broker, engine.Object, Network.Object, TeamResolver.Object, Stations.Object,
+                arrivals: Arrivals);
+            Replicator = core.Replicator;
+            Ledger = core.Ledger;
         }
 
         // Publishes a message whose handler hops to the game thread, and waits for the hop.

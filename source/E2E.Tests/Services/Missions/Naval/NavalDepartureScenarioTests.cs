@@ -47,7 +47,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         }
         Assert.Equal(1, b.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>()
             .Count(removal => removal.ShipId == hullB && removal.Reason == ShipRemovalReason.Retreat));
-        Assert.Equal(1, a.Ships.DepartedHulls(BattleSideEnum.Attacker));
+        Assert.Equal(1, a.Services.HullLedger.DepartedHulls(BattleSideEnum.Attacker));
 
         ResolveOnHost(a, BattleState.AttackerVictory);
         c.Call(() => c.Controller.ResultCommitter.ReportAcceptedResult(), VictoryConclusionDisabledMethods());
@@ -132,7 +132,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
             Assert.False(peer.Has(hullB));
             Assert.Equal("A", peer.Ship(pirate).CurrentAuthority);
         }
-        Assert.Equal(1, a.Ships.DepartedHulls(BattleSideEnum.Attacker));
+        Assert.Equal(1, a.Services.HullLedger.DepartedHulls(BattleSideEnum.Attacker));
         Assert.False(a.Hull(pirate).IsCopy);
         Assert.True((long)c.Stream(pirate)["accepted"]! > pirateStreamed);
         Assert.Equal(12f, c.Hull(pirate).Frame.origin.x, 3);
@@ -413,7 +413,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Same(b.Ship(hullA).Hull, b.Engine.DeckOf(ally[b])!.Hull);
         Assert.All(battle.Peers, peer => Assert.True(peer.Has(staying)));
         Assert.True((long)c.Stream(staying)["accepted"]! > streamedBefore);
-        Assert.All(battle.Peers, peer => Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Attacker)));
+        Assert.All(battle.Peers, peer => Assert.Equal(1, peer.Services.HullLedger.DepartedHulls(BattleSideEnum.Attacker)));
         Assert.Equal(0, concluded());
     }
 

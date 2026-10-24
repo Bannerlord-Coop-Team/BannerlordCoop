@@ -75,18 +75,10 @@ public interface IBattleShipReplicator : IDisposable
     void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding);
 
     /// <summary>
-    /// [Game thread] How many hulls left a side, with their owner or to a capture, for the end check's retreat rule.
-    /// </summary>
-    int DepartedHulls(BattleSideEnum side);
-
-    /// <summary>
     /// [Game thread] Moves a hull to <paramref name="newAuthority"/> at an ordered event every client applies (a host change, a
     /// capture): its sample and condition order restart, and <see cref="INavalHullAuthority.Transfer"/> moves the simulation.
     /// </summary>
     void TransferHull(NetworkShipInfo ship, string newAuthority, bool inPlace = false);
-
-    /// <summary>[Game thread] Counts a hull a capture took off <paramref name="side"/>, as vanilla's retreat rule sees it gone.</summary>
-    void CountCapturedFrom(BattleSideEnum side);
 
     /// <summary>
     /// [Game thread] Every client's half of hulls leaving the battle: seats are released, other owners' agents move to their own
@@ -131,17 +123,15 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattlePartyWithdrawal partyWithdrawal;
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly IBattleShipArrivals arrivals;
+    private readonly INavalSideHullLedger ledger;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
-    private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     // [Game thread] Players that left and have not entered again; a late record of theirs never spawns a hull here.
     private readonly HashSet<string> departedOwners = new HashSet<string>();
     // [Game thread] Hulls this client removed with a player who left, by ship id, with that player.
     private readonly Dictionary<Guid, string> leftWith = new Dictionary<Guid, string>();
-    // [Game thread] Hulls a captor's record brought back after such a removal, which already counted them gone from their side.
-    private readonly HashSet<Guid> reopenedForCaptor = new HashSet<Guid>();
     // [Game thread] An AI hull's latest condition from a controller that isn't its authority yet: the successor's first report
     // can come over the mesh before the server's host change reaches this client, and only goes out again on change.
     private readonly Dictionary<Guid, NetworkShipCondition> earlyHostConditions = new Dictionary<Guid, NetworkShipCondition>();
@@ -173,7 +163,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         IBattleShipConditionStream conditions,
         IAgentStationUseReplicator stations,
         INavalShipCaptureEngine captureEngine,
-        IBattleShipArrivals arrivals)
+        IBattleShipArrivals arrivals,
+        INavalSideHullLedger ledger)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -193,6 +184,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.stations = stations;
         this.captureEngine = captureEngine;
         this.arrivals = arrivals;
+        this.ledger = ledger;
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -312,8 +304,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         conditions.RestartAfterAuthorityMove(ship.ShipId);
     }
 
-    public void CountCapturedFrom(BattleSideEnum side) => departedHulls[side] = DepartedHulls(side) + 1;
-
     public void AnnounceHulls(IReadOnlyList<NetworkShipInfo> ships)
     {
         var records = ships.Where(IsOwnHull).Select(ship => engine.Describe(ship.Hull, ship)).ToArray();
@@ -408,13 +398,8 @@ public class BattleShipReplicator : IBattleShipReplicator
             ship.ShipId, reason, missionEnding ? ", mission ending" : "");
     }
 
-    public int DepartedHulls(BattleSideEnum side) => departedHulls.TryGetValue(side, out int count) ? count : 0;
-
-    private void CountDeparted(NetworkShipInfo ship)
-    {
-        var side = engine.SideOf(ship.Hull);
-        departedHulls[side] = DepartedHulls(side) + 1;
-    }
+    // Counts a hull leaving the battle as gone from the side it is on now.
+    private void CountDeparted(NetworkShipInfo ship) => ledger.CountDeparted(ship.ShipId, engine.SideOf(ship.Hull));
 
     private void Handle_NetworkShipRemoved(MessagePayload<NetworkShipRemoved> payload)
     {
@@ -734,13 +719,13 @@ public class BattleShipReplicator : IBattleShipReplicator
         && leftWith.TryGetValue(record.ShipId, out var leaver) && leaver != record.CaptorControllerId
         && Registry.StateOf(record.ShipId) == ShipLifecycle.Removed;
 
-    // Its earlier departure already counted it gone from its side, so its capture does not count again.
+    // Its earlier departure already counted it gone from its side, and the ledger counts a hull once per side, so its capture
+    // doesn't count again.
     private void ReopenForCaptor(BattleShipSpawnData record)
     {
         leftWith.TryGetValue(record.ShipId, out var leaver);
         Registry.TryReopen(record.ShipId);
         leftWith.Remove(record.ShipId);
-        reopenedForCaptor.Add(record.ShipId);
         Logger.Information("[NavalSync] Hull {ShipId} left here with {Leaver}, but {Captor} captured it first; spawning it again",
             record.ShipId, leaver, record.CaptorControllerId);
     }
@@ -860,7 +845,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     // the hull's capture count, so later confirms apply in order. A captured hull counts as gone from the side it was taken from.
     private void ApplyRecordedCapture(NetworkShipInfo ship, BattleShipSpawnData data)
     {
-        bool reopened = reopenedForCaptor.Remove(ship.ShipId);
         if (data.CaptureSequence == 0) return;
 
         // A prize that later lent its formation to another capture is both captured and orphaned.
@@ -868,8 +852,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             var capture = new HullCapture(data.CaptorControllerId, data.CapturedWithShipId, data.CapturedFromSide);
             Registry.TryMarkCaptured(ship.ShipId, capture, ship.Formation, data.CaptureSequence);
-            if (!reopened && IsBattleSide(data.CapturedFromSide) && data.CapturedFromSide != data.Side)
-                CountCapturedFrom(data.CapturedFromSide);
+            if (data.CapturedFromSide != data.Side) ledger.CountDeparted(ship.ShipId, data.CapturedFromSide);
             Logger.Information("[NavalSync] Hull {ShipId} was captured by {Captor} before it spawned here", ship.ShipId,
                 data.CaptorControllerId);
         }
@@ -881,9 +864,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Hull {ShipId} of {Owner} lost its formation to a capture before it spawned here",
             ship.ShipId, ship.CurrentAuthority);
     }
-
-    // An orphan's side reads as none; only a real side counts for the retreat rule.
-    private static bool IsBattleSide(BattleSideEnum side) => side == BattleSideEnum.Attacker || side == BattleSideEnum.Defender;
 
     // Who simulates a hull whose record waited: an AI hull moves with the host, a player's stays with its owner.
     private string CurrentAuthorityOf(NetworkShipInfo ship) =>
@@ -1141,8 +1121,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         removalsAccepted,
         removalsRejected,
         agentsMovedOffDepartedHulls,
-        departedAttackerHulls = DepartedHulls(BattleSideEnum.Attacker),
-        departedDefenderHulls = DepartedHulls(BattleSideEnum.Defender),
+        departedAttackerHulls = ledger.DepartedHulls(BattleSideEnum.Attacker),
+        departedDefenderHulls = ledger.DepartedHulls(BattleSideEnum.Defender),
         pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),
         heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
         heldSamples = heldShips.Values.Count(held => held.Sample != null),

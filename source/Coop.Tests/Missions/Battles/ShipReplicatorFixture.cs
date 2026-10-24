@@ -23,10 +23,11 @@ public sealed class ShipReplicatorFixture
         Arrivals = arrivals ?? new ImmediateShipArrivals();
         HullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, engine, context.TroopWithdrawal);
         AppliedHost = new NavalAppliedHost(broker, context.Session);
+        Ledger = new NavalSideHullLedger();
         Conditions = new BattleShipConditionStream(network, context.Session, engine, context.HostEpochPolicy, context.MissionContext);
         Replicator = new BattleShipReplicator(network, broker, context, engine, teamResolver ?? Mock.Of<IBattleTeamResolver>(),
             objectManager ?? Mock.Of<IObjectManager>(), HullAuthority, AppliedHost, Conditions, stations ?? Mock.Of<IAgentStationUseReplicator>(),
-            captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals);
+            captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals, Ledger);
     }
 
     /// <summary>The arrivals queue the replicator enqueues on; applies at once unless the test passed a real queue.</summary>
@@ -37,6 +38,9 @@ public sealed class ShipReplicatorFixture
 
     /// <summary>The host and epoch whose AI hull move this client applied.</summary>
     public NavalAppliedHost AppliedHost { get; }
+
+    /// <summary>The hulls that left each side.</summary>
+    public NavalSideHullLedger Ledger { get; }
 
     /// <summary>The hulls' damage state and reported reserve.</summary>
     public BattleShipConditionStream Conditions { get; }

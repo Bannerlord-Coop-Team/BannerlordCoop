@@ -20,6 +20,9 @@ public interface INavalBattleServices : IDisposable
     /// <summary>Registers, announces and streams the battle's hulls.</summary>
     IBattleShipReplicator ShipReplicator { get; }
 
+    /// <summary>The hulls that left each side, which the end check's retreat rule reads.</summary>
+    INavalSideHullLedger HullLedger { get; }
+
     /// <summary>Replicates in-mission ship captures, confirmed by each captured hull's authority.</summary>
     IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
@@ -95,6 +98,7 @@ public class NavalBattleServices : INavalBattleServices
         session = context.Session;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
         appliedHost = new NavalAppliedHost(messageBroker, context.Session);
+        HullLedger = new NavalSideHullLedger();
         Arrivals = new BattleShipArrivals();
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
             context.MissionContext);
@@ -102,10 +106,10 @@ public class NavalBattleServices : INavalBattleServices
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals);
+            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger);
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
         captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
-            hullAuthority, Arrivals);
+            hullAuthority, Arrivals, HullLedger);
         ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, captureEngine,
             hullAuthority, captureApplier, Arrivals);
 #if DEBUG
@@ -126,6 +130,8 @@ public class NavalBattleServices : INavalBattleServices
     }
 
     public IBattleShipReplicator ShipReplicator { get; }
+
+    public INavalSideHullLedger HullLedger { get; }
 
     public IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
