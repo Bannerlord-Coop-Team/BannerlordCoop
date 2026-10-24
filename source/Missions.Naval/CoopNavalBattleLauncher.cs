@@ -42,6 +42,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleLauncher>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly IBattleNetwork network;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
@@ -63,6 +64,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
+        IBattleNetwork network,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
@@ -98,6 +100,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
@@ -246,7 +249,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
-        var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
+        var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tacticRefresh));

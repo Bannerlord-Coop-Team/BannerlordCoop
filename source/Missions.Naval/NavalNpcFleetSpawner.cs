@@ -1,8 +1,11 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Missions.Battles;
+using Missions.Messages;
 using NavalDLC;
 using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.MissionLogics;
@@ -25,7 +28,7 @@ namespace Missions.Naval;
 /// and its deployment is over, this runs vanilla's late path: <c>FillShipsOfTeamParties</c>, <c>SetShipAssignment</c>,
 /// the side's deployment plan and <c>SpawnShip</c>, then crews the hulls the way the naval spawn logic crews a team.
 /// </summary>
-public interface INavalNpcFleetSpawner
+public interface INavalNpcFleetSpawner : IDisposable
 {
     /// <summary>[Game thread] Spawns the fleet once its conditions hold.</summary>
     void Tick();
@@ -48,52 +51,64 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string WaitingForHost = "waiting_for_host";
     internal const string WaitingForDeployment = "waiting_for_deployment";
     internal const string WaitingForReserve = "waiting_for_reserve";
-    internal const string AlreadyFielded = "already_fielded";
     internal const string Ready = "ready";
     internal const string Fielded = "fielded";
     internal const string Failed = "failed";
 
+    private readonly IBattleNetwork network;
+    private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly IBattleShipReplicator shipReplicator;
-    private readonly INetworkShipRegistry registry;
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly BattleSideEnum enemySide;
 
-    private bool done;
+    // The battle's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
+    private NetworkNpcFleetAttempted attempt;
+    private bool attemptedHere;
     private string state = WaitingForHost;
     private int hullsSpawned;
     private int troopsFielded;
     private string failure;
 
     public NavalNpcFleetSpawner(
+        IBattleNetwork network,
+        IMessageBroker messageBroker,
         IBattleSession session,
         IBattleShipReplicator shipReplicator,
-        INetworkShipRegistry registry,
         ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         BattleSideEnum enemySide)
     {
+        this.network = network;
+        this.messageBroker = messageBroker;
         this.session = session;
         this.shipReplicator = shipReplicator;
-        this.registry = registry;
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.enemySide = enemySide;
+
+        messageBroker.Subscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
+        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+    }
+
+    // Drops the attempt and entrant subscriptions with the mission.
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
+        messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
     /// <summary>
-    /// Whether the fleet can be fielded now. Only the battle host fields AI, only after its deployment (vanilla's
-    /// reinforcement-time spawn path), only with the NPC reserve in hand, and never when AI hulls already exist
-    /// (a promoted host inherits them).
+    /// Whether the fleet can be fielded now: by the battle host only, after its deployment (vanilla's reinforcement-time
+    /// spawn path) and with the NPC reserve in hand. Asked only until the battle's attempt is made.
     /// </summary>
-    internal static string Decide(bool isLocalHost, bool deploymentFinished, bool reservePopulated, int npcParties, bool npcHullsRegistered)
+    internal static string Decide(bool isLocalHost, bool deploymentFinished, bool reservePopulated, int npcParties)
     {
         if (!isLocalHost) return WaitingForHost;
-        if (npcHullsRegistered) return AlreadyFielded;
         if (!deploymentFinished) return WaitingForDeployment;
         if (!reservePopulated || npcParties == 0) return WaitingForReserve;
         return Ready;
@@ -106,25 +121,17 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     public void Tick()
     {
         var mission = Mission.Current;
-        if (done || mission == null) return;
+        if (HasAttempt || mission == null) return;
 
         bool isLocalHost = session.IsLocalHost;
         bool deploymentFinished = mission.IsDeploymentFinished;
-        bool npcHullsRegistered = isLocalHost && registry.Ships.Any(ship => ship.IsNpcParty);
-        var supplier = isLocalHost && deploymentFinished && !npcHullsRegistered ? EnemySupplier() : null;
+        var supplier = isLocalHost && deploymentFinished ? EnemySupplier() : null;
         bool reservePopulated = supplier?.IsPopulated == true;
         var parties = reservePopulated ? NpcParties(supplier) : new MBList<MapEventParty>();
-        state = Decide(isLocalHost, deploymentFinished, reservePopulated, parties.Count, npcHullsRegistered);
-        if (state == AlreadyFielded)
-        {
-            done = true;
-            return;
-        }
-
+        state = Decide(isLocalHost, deploymentFinished, reservePopulated, parties.Count);
         if (state != Ready) return;
 
-        // One attempt: it consumes reserve troops, so a failure is reported once instead of retried every tick.
-        done = true;
+        // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
         try
         {
             SpawnFleet(mission, supplier, parties);
@@ -135,16 +142,58 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             Logger.Error(exception, "[NavalBattle] Could not field the AI fleet of {MapEventId}", session.InstanceId);
         }
 
-        state = Outcome(hullsSpawned, failure);
+        attemptedHere = true;
+        Settle(new NetworkNpcFleetAttempted(enemySide, Outcome(hullsSpawned, failure) == Failed));
+        network.SendAll(attempt);
+    }
+
+    /// <summary>Whether the battle's attempt was made, here or by an earlier host.</summary>
+    internal bool HasAttempt => attempt != null;
+
+    // Latches the battle's attempt; its outcome is the spawner's state from then on.
+    private void Settle(NetworkNpcFleetAttempted attempted)
+    {
+        attempt = attempted;
+        state = attempted.Failed ? Failed : Fielded;
+    }
+
+    private void Handle_NetworkNpcFleetAttempted(MessagePayload<NetworkNpcFleetAttempted> payload)
+    {
+        var attempted = payload.What;
+        GameThread.RunSafe(() => AcceptAttempt(attempted), context: nameof(Handle_NetworkNpcFleetAttempted));
+    }
+
+    // [Game thread] An earlier host's attempt: a promoted client doesn't field again, and a failed side releases its hold.
+    internal void AcceptAttempt(NetworkNpcFleetAttempted attempted)
+    {
+        if (HasAttempt) return;
+
+        Settle(attempted);
+        Logger.Information("[NavalBattle] The {Side} AI fleet of {MapEventId} was already attempted by a battle host: {Outcome}",
+            attempted.Side, session.InstanceId, state);
+    }
+
+    private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
+    {
+        var entered = payload.What;
+        if (entered.InstanceId != null && entered.InstanceId != session.InstanceId) return;
+
+        GameThread.RunSafe(() => SendAttemptTo(entered.ControllerId), context: nameof(Handle_PeerEntered));
+    }
+
+    // [Game thread] The battle host passes the attempt to an entrant, which a later host change could promote.
+    internal void SendAttemptTo(string controllerId)
+    {
+        if (!HasAttempt || !session.IsLocalHost || session.IsOwn(controllerId)) return;
+
+        network.Send(controllerId, attempt);
     }
 
     // A failure after some hulls spawned still fails: those hulls have no crew, so the side would never read as fielded.
     internal static string Outcome(int hullsSpawned, string failure) => hullsSpawned > 0 && failure == null ? Fielded : Failed;
 
-    public BattleSideEnum FailedSide => FailedSideOf(state, enemySide);
-
-    internal static BattleSideEnum FailedSideOf(string state, BattleSideEnum enemySide) =>
-        state == Failed ? enemySide : BattleSideEnum.None;
+    // The attempt's side rather than this client's enemy side: in PvP the battle host's enemy is the other side's own.
+    public BattleSideEnum FailedSide => attempt?.Failed == true ? attempt.Side : BattleSideEnum.None;
 
     private void SpawnFleet(Mission mission, CoopTroopSupplier supplier, MBList<MapEventParty> parties)
     {
@@ -295,6 +344,8 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     {
         enemySide = enemySide.ToString(),
         state,
+        attemptedSide = attempt?.Side.ToString(),
+        attemptedHere,
         hullsSpawned,
         firstCrewBatch = troopsFielded,
         failure,
