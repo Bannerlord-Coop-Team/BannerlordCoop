@@ -16,9 +16,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// Decides inside the vanilla hull damage methods whether this client applies, sends or drops a hit, by
-/// <see cref="BattleShipDamageRouter.Route"/>. Static because the Harmony patches read it; the scopes are per thread
-/// because hull contact callbacks run on physics threads.
+/// Decides inside the vanilla hull damage methods whether this client applies, sends or drops a hit. Static for the Harmony
+/// patches, with per-thread scopes because hull contact callbacks run on physics threads.
 /// </summary>
 internal static class NavalShipDamageGate
 {
@@ -57,6 +56,7 @@ internal static class NavalShipDamageGate
         public void Dispose() => routedApplyDepth--;
     }
 
+    // Opens a routed apply, closed by disposing the returned scope.
     internal static RoutedApplyScope RoutedApply()
     {
         routedApplyDepth++;
@@ -67,15 +67,18 @@ internal static class NavalShipDamageGate
     internal static HitScope EnterHit(Agent attacker, Vec3 worldPoint)
     {
         var outer = hit;
-        var origin = BattleShipDamageRouter.AttackOrigin(attacker != null, attacker?.Controller == AgentControllerType.None);
+        var origin = BattleShipDamageRoutes.AttackOrigin(attacker != null, attacker?.Controller == AgentControllerType.None);
         hit = new HitScope(origin, attacker, worldPoint);
         return outer;
     }
 
+    // Restores the attack scope that was open before EnterHit.
     internal static void ExitHit(HitScope outer) => hit = outer;
 
+    // Opens the scope of a hull's queued contact impacts, which all came from this client's rammer.
     internal static void EnterQueuedContact() => queuedContactDepth++;
 
+    // Closes the queued contact scope.
     internal static void ExitQueuedContact() => queuedContactDepth--;
 
     /// <summary>Starts a hull's contact callback, whose hull is the rammer of any impact it queues. Returns the outer one.</summary>
@@ -86,6 +89,7 @@ internal static class NavalShipDamageGate
         return outer;
     }
 
+    // Restores the contact callback hull that was open before EnterContact.
     internal static void ExitContact(MissionShip outer) => contactShip = outer;
 
     /// <summary>Whether a hit method (hull, sails, fire) runs vanilla on <paramref name="ship"/>.</summary>
@@ -101,7 +105,7 @@ internal static class NavalShipDamageGate
     /// <summary>Whether DealCollisionDamage runs vanilla on <paramref name="ship"/>.</summary>
     internal static bool AllowsCollision(MissionShip ship, MissionShip hitter, bool isRamDamage, Vec3 point, float damage)
     {
-        var origin = BattleShipDamageRouter.CollisionOrigin(queuedContactDepth > 0, hitter == null || !NavalForeignHulls.Contains(hitter));
+        var origin = BattleShipDamageRoutes.CollisionOrigin(queuedContactDepth > 0, hitter == null || !NavalForeignHulls.Contains(hitter));
         return Allows(ship, origin, BattleShipDamageKind.Collision, damage, 0f, point, null, hitter, isRamDamage, -1);
     }
 
@@ -110,18 +114,19 @@ internal static class NavalShipDamageGate
     {
         var rammer = contactShip;
         if (!CoopNavalMissionScope.IsActive || rammer == null) return true;
-        if (BattleShipDamageRouter.KeepsContactCollision(!NavalForeignHulls.Contains(rammer))) return true;
+        if (!NavalForeignHulls.Contains(rammer)) return true;
 
         Interlocked.Increment(ref droppedContactCollisions);
         return false;
     }
 
+    // Runs vanilla when the route says so; otherwise skips it and publishes a hit to send to the hull's authority.
     private static bool Allows(MissionShip ship, BattleShipHitOrigin origin, BattleShipDamageKind kind, float damage,
         float inflictedDamage, Vec3 worldPoint, Agent attacker, MissionShip hitter, bool isRamDamage, int sailIndex)
     {
         if (!CoopNavalMissionScope.IsActive) return true;
 
-        var route = BattleShipDamageRouter.Route(!NavalForeignHulls.Contains(ship), routedApplyDepth > 0, origin);
+        var route = BattleShipDamageRoutes.Route(!NavalForeignHulls.Contains(ship), routedApplyDepth > 0, origin);
 #if DEBUG
         if (kind == BattleShipDamageKind.Collision) NavalContactProbe.CountCollisionRoute(route, isRamDamage);
 #endif

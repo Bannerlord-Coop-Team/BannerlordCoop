@@ -67,8 +67,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   re-seated while its point is still a station of its hull (R41a-2 W2). A deactivated machine is still seated, since its
   state is recomputed locally and can lag the owner's. A use published on an agent tick worker is announced on the game
   thread.
-- A hit on a hull that another client simulates is routed to that owner, which applies it once through the vanilla damage
-  method (`BattleShipDamageRouter`).
+- A hit on a hull that another client simulates is sent only to that hull's current authority, which applies it through the
+  vanilla damage method (`BattleShipDamageRouter`). A peer that no longer holds the hull drops it, so a hit applies at most
+  once across a host change or a capture.
 - An on-foot agent on a registered hull sends its pose hull-local (`NavalDeckPoses`). Vanilla's on-ship check has no
   distance (`MissionShip.GetIsAgentOnShip`) and `SteppedShip` latches through the jump-off cooldown, so a pose more than
   15 m outside the hull's physics box (`NavalShipEngine.TryGetFootprint`, `PhysicsBoundingBoxWithoutChildren`) goes as a
@@ -636,6 +637,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   the outcome on the hull's owner and is cosmetic elsewhere. A puppet that still dies here without its owner's death is
   logged as a Warning (`Puppet ... died here without a routed blow`); DEBUG counts the spared ones (`ramPuppetsSpared`).
   A client whose copy of the ram misses an impact the owner saw keeps its agents there alive (live-check in R42).
+- **Routed hits are at most once, and these windows lose one** (counted by reason in `inspect`'s `shipDamage.drops`):
+  - a hit sent to an authority that handed the hull on before it arrived (host change, capture, or a hit overtaking the
+    host change on another channel) is dropped as `not_authority`;
+  - a sender's hit on an AI hull while a host change's move is queued waits once behind that move (`deferred`), but a
+    host change still waiting for its game-thread hop goes to the old host;
+  - an old host that applies a hit just before its own move keeps it only if its next condition goes out first;
+  - hits still in the arrivals queue at `Dispose` are cleared. Fates are flushed from the applied state, so results never
+    see them.
 - **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
   re-assigned. The launcher still counts AI allies in vanilla's 8-ship side cap split, so their unfielded share is lost: a
   player with 6 ships next to an AI lord with 6 fields about 4.

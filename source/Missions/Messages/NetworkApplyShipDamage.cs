@@ -6,13 +6,14 @@ using TaleWorlds.Library;
 namespace Missions.Messages;
 
 /// <summary>
-/// Hitting client to peers over the mission mesh: a hit on a hull it does not simulate. Only the hull's current authority
-/// applies it, through the vanilla damage method of <see cref="Kind"/>; every other peer drops it.
+/// Hitting client to the hull's current authority over the mission mesh: a hit on a hull it does not simulate. The receiver
+/// applies it through the vanilla damage method of <see cref="Kind"/> while it still holds the hull, otherwise drops it.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkApplyShipDamage : IEvent
 {
     [ProtoMember(1)] public readonly Guid ShipId;
+    /// <summary>The hitting client; diagnostics only, the receiver's own authority decides the hit.</summary>
     [ProtoMember(2)] public readonly string SenderControllerId;
     [ProtoMember(3)] public readonly BattleShipDamageKind Kind;
     [ProtoMember(4)] public readonly float Damage;
@@ -28,12 +29,11 @@ public sealed class NetworkApplyShipDamage : IEvent
     [ProtoMember(11)] public readonly bool IsRamDamage;
     /// <summary>The hit sail's index in the hull's sails, or -1.</summary>
     [ProtoMember(12)] public readonly int SailIndex;
-    /// <summary>The sender's battle host epoch; an AI hull's owner applies only hits stamped with its own epoch.</summary>
+    /// <summary>Retired: a hit goes to one authority, so no epoch is stamped (always 0). Delete in a ProtoMember slot.</summary>
     [ProtoMember(13)] public readonly int HostEpoch;
 
     public NetworkApplyShipDamage(Guid shipId, string senderControllerId, BattleShipDamageKind kind, float damage,
-        float inflictedDamage, Vec3 localPoint, Guid attackerAgentId, Guid hitterShipId, bool isRamDamage, int sailIndex,
-        int hostEpoch)
+        float inflictedDamage, Vec3 localPoint, Guid attackerAgentId, Guid hitterShipId, bool isRamDamage, int sailIndex)
     {
         ShipId = shipId;
         SenderControllerId = senderControllerId;
@@ -47,7 +47,6 @@ public sealed class NetworkApplyShipDamage : IEvent
         HitterShipId = hitterShipId;
         IsRamDamage = isRamDamage;
         SailIndex = sailIndex;
-        HostEpoch = hostEpoch;
     }
 
     public Vec3 LocalPoint => new Vec3(LocalX, LocalY, LocalZ);

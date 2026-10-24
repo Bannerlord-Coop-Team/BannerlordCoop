@@ -4,18 +4,18 @@ using Common.Messaging;
 using Missions.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
 /// <summary>
-/// Routes hull damage to the client that simulates the hull, as <see cref="BattleDamageRouter"/> does for agents. The ship
-/// damage patches skip vanilla for a hit on another owner's hull and publish it; this sends it over the mesh, and the
-/// hull's current authority replays it through the vanilla damage method, so sinking and low-health events stay native.
+/// Sends a hit on another owner's hull to that hull's current authority only, which replays it through the vanilla damage
+/// method, so each hit applies at most once across a host change or a capture.
 /// </summary>
 public interface IBattleShipDamageRouter : IDisposable
 {
-    /// <summary>[Game thread] Sent, applied and dropped hits (diagnostics).</summary>
+    /// <summary>[Game thread] Sent, deferred and applied hits, and dropped ones by reason (diagnostics).</summary>
     object Inspect();
 }
 
@@ -32,8 +32,8 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     private readonly IAppliedHostEpoch hostEpoch;
     private readonly IBattleShipArrivals arrivals;
 
-    private long sent, applied, dropped;
-    private string lastDrop;
+    private readonly Dictionary<string, long> drops = new Dictionary<string, long>();
+    private long sent, deferred, applied;
     private bool disposed;
 
     public BattleShipDamageRouter(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
@@ -51,6 +51,7 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         messageBroker.Subscribe<NetworkApplyShipDamage>(Handle_NetworkApplyShipDamage);
     }
 
+    // Stops routing as the battle ends; hits still waiting in the arrivals are cleared with them.
     public void Dispose()
     {
         disposed = true;
@@ -60,28 +61,8 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
-    /// <summary>What a damage method does with a hit on a hull, given who simulates the hull and where the hit came from.</summary>
-    internal static BattleShipDamageRoute Route(bool isOwnHull, bool isRoutedApply, BattleShipHitOrigin origin)
-    {
-        if (isRoutedApply) return BattleShipDamageRoute.Vanilla;
-        if (origin == BattleShipHitOrigin.ReplayedHit) return BattleShipDamageRoute.Drop;
-        if (isOwnHull) return BattleShipDamageRoute.Vanilla;
-        return origin == BattleShipHitOrigin.LocalHit ? BattleShipDamageRoute.Send : BattleShipDamageRoute.Drop;
-    }
-
-    /// <summary>A puppet's missile or swing is a replay; the client that owns the attacker decides that hit.</summary>
-    internal static BattleShipHitOrigin AttackOrigin(bool hasAttacker, bool attackerIsPuppet) =>
-        hasAttacker && attackerIsPuppet ? BattleShipHitOrigin.ReplayedHit : BattleShipHitOrigin.LocalHit;
-
-    /// <summary>
-    /// A collision belongs to the rammer's owner: queued contact entries exist only for this client's rammers, and a ram
-    /// tip's impact counts only when its hull is this client's.
-    /// </summary>
-    internal static BattleShipHitOrigin CollisionOrigin(bool isQueuedContact, bool hitterIsOwn) =>
-        isQueuedContact || hitterIsOwn ? BattleShipHitOrigin.LocalHit : BattleShipHitOrigin.ReplayedHit;
-
-    /// <summary>A contact callback queues the impact on both hulls; only the rammer's owner keeps them.</summary>
-    internal static bool KeepsContactCollision(bool rammerIsOwn) => rammerIsOwn;
+    // A host change the session already read, whose AI hull move still waits in the arrivals queue.
+    private bool IsHostChangeQueued => session.HostEpoch != hostEpoch.AppliedHostEpoch;
 
     // [Game thread] Published synchronously from inside the skipped vanilla damage method.
     private void Handle_BattleShipHit(MessagePayload<BattleShipHit> payload)
@@ -91,31 +72,58 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         var hit = payload.What;
         if (!Registry.TryGetByHull(hit.Hull, out var ship))
         {
-            Drop("unregistered_hull", Guid.Empty);
+            Drop("unregistered_hull", Guid.Empty, session.OwnControllerId);
             return;
         }
 
         var damage = new NetworkApplyShipDamage(ship.ShipId, session.OwnControllerId, hit.Kind, hit.Damage, hit.InflictedDamage,
-            hit.LocalPoint, AgentIdOf(hit.Attacker), ShipIdOf(hit.Hitter), hit.IsRamDamage, hit.SailIndex, hostEpoch.AppliedHostEpoch);
+            hit.LocalPoint, AgentIdOf(hit.Attacker), ShipIdOf(hit.Hitter), hit.IsRamDamage, hit.SailIndex);
 
-        // Mid-swap the copy is still in place while this client already holds the hull's authority, so the hit lands here.
+        // Decided once behind the queued move, so the hit reaches the successor; never deferred a second time.
+        if (ship.FollowsBattleHost && IsHostChangeQueued)
+        {
+            deferred++;
+            arrivals.Enqueue(() => SendDeferred(damage), nameof(Handle_BattleShipHit));
+            return;
+        }
+
+        SendToAuthority(ship, damage);
+    }
+
+    // [Mission tick] Sends a hit held behind a queued host change to whoever holds the hull now.
+    private void SendDeferred(NetworkApplyShipDamage damage)
+    {
+        if (disposed) return;
+
+        if (!Registry.TryGet(damage.ShipId, out var ship))
+        {
+            Drop("unknown_ship", damage.ShipId, damage.SenderControllerId);
+            return;
+        }
+
+        SendToAuthority(ship, damage);
+    }
+
+    // [Game thread] Applies the hit here when this client already holds the hull (mid-swap), otherwise sends it to its authority.
+    private void SendToAuthority(NetworkShipInfo ship, NetworkApplyShipDamage damage)
+    {
         if (ship.CurrentAuthority == session.OwnControllerId)
         {
             Apply(ship, damage);
             return;
         }
 
-        network.SendAll(damage);
+        network.Send(ship.CurrentAuthority, damage);
         sent++;
     }
 
+    // Queues a received hit behind the host change and hull records that arrived before it.
     private void Handle_NetworkApplyShipDamage(MessagePayload<NetworkApplyShipDamage> payload)
     {
         var damage = payload.What;
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            // Behind the host change and hull records that arrived first, so the hull's authority is the one the sender saw.
             arrivals.Enqueue(() => ApplyNetworkDamage(damage), nameof(Handle_NetworkApplyShipDamage));
         }, context: nameof(Handle_NetworkApplyShipDamage));
     }
@@ -127,32 +135,29 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
 
         if (!Registry.TryGet(damage.ShipId, out var ship))
         {
-            Drop("unknown_ship", damage.ShipId);
+            Drop("unknown_ship", damage.ShipId, damage.SenderControllerId);
             return;
         }
 
-        var rejection = ValidateDamage(ship, session.OwnControllerId, damage, hostEpoch.AppliedHostEpoch);
+        var rejection = ValidateDamage(ship, session.OwnControllerId, damage);
         if (rejection != null)
         {
-            Drop(rejection, damage.ShipId);
+            Drop(rejection, damage.ShipId, damage.SenderControllerId);
             return;
         }
 
         Apply(ship, damage);
     }
 
-    /// <summary>Why a routed hit must be dropped, or null to apply it.</summary>
-    internal static string ValidateDamage(NetworkShipInfo ship, string ownControllerId, NetworkApplyShipDamage damage, int localEpoch)
+    /// <summary>Why a routed hit must be dropped, or null to apply it; a hull handed on since the hit was sent is not_authority.</summary>
+    internal static string ValidateDamage(NetworkShipInfo ship, string ownControllerId, NetworkApplyShipDamage damage)
     {
         if (ship.CurrentAuthority != ownControllerId) return "not_authority";
-
-        // An AI hull's owner changes with the host epoch; only the owner of the sender's epoch applies, so a hit
-        // sent across a migration lands at most once.
-        if (ship.FollowsBattleHost && damage.HostEpoch != 0 && localEpoch != 0 && damage.HostEpoch != localEpoch) return "stale_epoch";
         if (!damage.IsValid) return "invalid_damage";
         return null;
     }
 
+    // Replays the hit through the vanilla damage method, with its attacker and hitter resolved here.
     private void Apply(NetworkShipInfo ship, NetworkApplyShipDamage damage)
     {
         Agent attacker = null;
@@ -167,50 +172,27 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         applied++;
     }
 
-    private void Drop(string reason, Guid shipId)
+    // Counts a dropped hit by reason, so inspect tells a migration window from a removed hull.
+    private void Drop(string reason, Guid shipId, string senderControllerId)
     {
-        dropped++;
-        lastDrop = reason;
-        Logger.Debug("[NavalDamage] Dropped a hit on hull {ShipId}: {Reason}", shipId, reason);
+        drops.TryGetValue(reason, out long count);
+        drops[reason] = count + 1;
+        Logger.Debug("[NavalDamage] Dropped a hit on hull {ShipId} from {Sender}: {Reason}", shipId, senderControllerId, reason);
     }
 
+    // The attacking agent's registry id, or empty.
     private Guid AgentIdOf(Agent agent) =>
         agent != null && missionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info) ? info.AgentId : Guid.Empty;
 
+    // The hitting hull's ship id, or empty.
     private Guid ShipIdOf(MissionObject hull) =>
         hull != null && Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : Guid.Empty;
 
     public object Inspect() => new
     {
         sent,
+        deferred,
         applied,
-        dropped,
-        lastDrop,
+        drops = new Dictionary<string, long>(drops),
     };
-}
-
-/// <summary>Where a hull hit came from, as the ship damage patches see it.</summary>
-public enum BattleShipHitOrigin
-{
-    /// <summary>The hull's own tick (capsizing, burning): only its owner's counts.</summary>
-    SelfTick,
-
-    /// <summary>A hit this client decided: its own agent's attack, its own rammer, or a debug command.</summary>
-    LocalHit,
-
-    /// <summary>A puppet's replayed attack or another owner's rammer: that owner decides it.</summary>
-    ReplayedHit,
-}
-
-/// <summary>What a hull damage method does with a hit.</summary>
-public enum BattleShipDamageRoute
-{
-    /// <summary>Run vanilla: an own hull, or a routed hit or condition being applied.</summary>
-    Vanilla,
-
-    /// <summary>Skip vanilla and send the hit to the hull's owner.</summary>
-    Send,
-
-    /// <summary>Skip vanilla; another client decides this hit.</summary>
-    Drop,
 }

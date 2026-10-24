@@ -66,6 +66,7 @@ internal class ShipCollisionDamagePatch
         NavalShipDamageGate.AllowsCollision(__instance, hitterShip, isRamDamage, point, damage);
 }
 
+// Sail HP from weapons and fire missiles; a hit on another owner's sail goes to that owner.
 [HarmonyPatch(typeof(MissionShip), nameof(MissionShip.DealDamageToSails))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipSailDamagePatch
@@ -83,6 +84,7 @@ internal class ShipSailDamagePatch
     }
 }
 
+// Fire HP from fire hits; a hit on another owner's hull goes to that owner.
 [HarmonyPatch(typeof(MissionShip), nameof(MissionShip.DealFireDamage))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipFireDamagePatch
