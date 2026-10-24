@@ -101,6 +101,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   `INavalShipEngine` (`Missions/Battles/INavalShipEngine.cs`).
 - `Missions.Naval` implements it (`NavalShipEngine`), holds the launcher, the end logic and the patches, and registers them
   in `NavalMissionModule`. That module is loaded only while NavalDLC is active.
+- The `CoopNavalDlc` MSBuild property (`source/Directory.Build.props`, default: War Sails is installed) decides whether
+  `Missions.Naval`/`Coop.Naval` compile and ship. When it's false they build empty and `Coop`/`Coop.Tests` skip them.
+- `ModInformation.IsNavalDlcActive` is set once at startup: NavalDLC enabled and both naval assemblies shipped. The
+  module validator, the host warning and the server's naval battle gate all read it, so a build without the naval code
+  rejects NavalDLC clients as before.
 - `NavalBattleServices` composes the ship services per mission and ticks them in a fixed order: ships, fate reports,
   deck poses, stations, weapons, migration reserve.
 - The E2E harness implements the same interface with `FakeNavalShipEngine`, so the real replicators run headless.
@@ -677,7 +682,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
 - **Sea raids** still open the land raid scene.
-- **CI** has no NavalDLC, so release builds ship without `Missions.Naval.dll` (maintainer decision).
+- **CI** has no NavalDLC, so release builds ship without `Missions.Naval.dll` (maintainer decision) and reject NavalDLC
+  clients. What ships still follows the CI image; pass `-p:CoopNavalDlc=` in the release workflows to make it explicit.
 
 ## 7. Debug surface
 

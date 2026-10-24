@@ -127,8 +127,7 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            ModInformation.IsNavalDlcActive = moduleInfoProvider.GetModuleInfos()
-                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
+            ModInformation.IsNavalDlcActive = DetectNavalSupport(moduleInfoProvider);
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -155,7 +154,8 @@ namespace Coop
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
-                        "Unsupported module wwarning preference could not be saved"));
+                        "Unsupported module wwarning preference could not be saved"),
+                    ModInformation.IsNavalDlcActive);
             }
 
             if (ManagedServerConfig.IsManagedServer)
@@ -228,6 +228,20 @@ namespace Coop
             {
                 // Best effort — log housekeeping must never break startup.
             }
+        }
+
+        // Whether NavalDLC is enabled and this build shipped the coop naval assemblies next to Coop.dll.
+        private static bool DetectNavalSupport(IModuleInfoProvider moduleInfoProvider)
+        {
+            bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
+                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
+            if (!navalModuleEnabled) return false;
+
+            string assemblyDirectory = System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location);
+            if (ModInformation.IsNavalSupported(navalModuleEnabled, file => File.Exists(System.IO.Path.Combine(assemblyDirectory, file)))) return true;
+
+            Logger.Warning("NavalDLC is enabled but this build has no naval code, so NavalDLC is treated as unsupported");
+            return false;
         }
 
         private void SetupLogging()

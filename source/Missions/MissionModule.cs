@@ -28,7 +28,6 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
-using Serilog;
 using System.Collections.Generic;
 using System.IO;
 using Assembly = System.Reflection.Assembly;
@@ -51,10 +50,6 @@ public class MissionModule : Module
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
     internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
-    private const string NavalMissionsAssemblyFile = "Missions.Naval.dll";
-
-    private static readonly ILogger Logger = LogManager.GetLogger<MissionModule>();
-    private static bool navalMissionsAssemblyMissingLogged;
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -316,24 +311,12 @@ public class MissionModule : Module
             builder.RegisterAssemblyModules(navalAssembly);
     }
 
-    // A build made without War Sails installed leaves Missions.Naval.dll out, so naval battles stay unavailable.
+    // Loads Missions.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
     private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
     {
-        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), NavalMissionsAssemblyFile);
-        if (File.Exists(path))
-        {
-            assembly = Assembly.LoadFrom(path);
-            return true;
-        }
-
-        assembly = null;
-        if (!navalMissionsAssemblyMissingLogged)
-        {
-            navalMissionsAssemblyMissingLogged = true;
-            Logger.Warning("{File} is missing at {Path}; naval battles are unavailable", NavalMissionsAssemblyFile, path);
-        }
-
-        return false;
+        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), ModInformation.MissionsNavalAssemblyFile);
+        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        return assembly != null;
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
