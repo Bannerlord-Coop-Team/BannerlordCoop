@@ -579,7 +579,6 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             {
                 Campaign.Current.MainParty = party;
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-
             }
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
