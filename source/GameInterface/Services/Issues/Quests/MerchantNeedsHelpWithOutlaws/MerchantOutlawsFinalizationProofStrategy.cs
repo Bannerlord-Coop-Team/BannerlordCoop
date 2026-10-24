@@ -10,11 +10,9 @@ internal class MerchantOutlawsFinalizationProofStrategy : IFinalizationProofStra
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MerchantOutlawsFinalizationProofStrategy>();
 
-    internal const byte Success = 1;
-
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
-        if (!(quest is Quest merchantQuest) || proof != Success)
+        if (!(quest is Quest merchantQuest) || proof != (byte)MerchantOutlawsBranch.Success)
         {
             return false;
         }

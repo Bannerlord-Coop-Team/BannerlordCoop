@@ -10,14 +10,6 @@ namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patc
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class MerchantOutlawsOutcomePatches
 {
-    [HarmonyPatch(typeof(Quest), nameof(Quest.SuccessConsequences))]
-    [HarmonyPrefix]
-    private static bool SuccessPrefix(Quest __instance)
-    {
-        return !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
-            dispatcher.BeforeQuestBranch(__instance, MerchantOutlawsFinalizationProofStrategy.Success);
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.AddQuestStepLog))]
     [HarmonyPrefix]
     private static bool ProgressPrefix(Quest __instance)

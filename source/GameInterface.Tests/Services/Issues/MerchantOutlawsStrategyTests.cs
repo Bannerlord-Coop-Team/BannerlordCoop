@@ -28,7 +28,7 @@ public class MerchantOutlawsStrategyTests
     public void UnrelatedQuestOrProofCannotRunTheSuccessBranch()
     {
         var strategy = new MerchantOutlawsFinalizationProofStrategy();
-        Assert.False(strategy.TryRunBranch(null!, MerchantOutlawsFinalizationProofStrategy.Success));
+        Assert.False(strategy.TryRunBranch(null!, (byte)MerchantOutlawsBranch.Success));
         var quest = (Quest)FormatterServices.GetUninitializedObject(typeof(Quest));
         Assert.False(strategy.TryRunBranch(quest, byte.MaxValue));
     }

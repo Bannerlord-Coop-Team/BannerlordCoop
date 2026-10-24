@@ -44,4 +44,13 @@ internal class MerchantOutlawsAlternativeJournalPatches
 
         if (__instance is Issue && ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) progress.Send(__instance);
     }
+
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPostfix]
+    private static void FinalizedPostfix(IssueBase __instance)
+    {
+        if (ModInformation.IsServer && __instance is Issue && ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress))
+            progress.Forget(__instance);
+    }
+
 }

@@ -16,10 +16,13 @@ internal interface IMerchantOutlawsProgress
 {
     void Send(Quest quest, bool final = false);
     void Send(IssueBase issue);
+    void Forget(IssueBase issue);
 }
 
 internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
 {
+    private readonly Dictionary<IssueBase, (JournalLog[] Entries, int Progress, int Range)> journals =
+        new Dictionary<IssueBase, (JournalLog[], int, int)>();
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnerResolver ownerResolver;
     private readonly INetwork network;
@@ -58,9 +61,15 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
             }
         }
 
+        var tracked = new List<string>();
+        if (!final)
+        {
+            foreach (var party in Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).OfType<TaleWorlds.CampaignSystem.Party.MobileParty>())
+                if (objectManager.TryGetIdWithLogging(party, out var id)) tracked.Add(id);
+        }
+
         network.Send(peer, new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
-            quest._destroyedPartyCount, quest._recruitedPartyCount, ids.ToArray(),
-            final ? quest.JournalEntries.LastOrDefault()?.LogText?.ToString() ?? string.Empty : string.Empty));
+            quest._destroyedPartyCount, quest._recruitedPartyCount, ids.ToArray(), tracked.ToArray()));
     }
 
     public void Send(IssueBase issue)
@@ -70,9 +79,18 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
             !players.TryGetPeer(controllerId, out var peer) ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
 
+        var entries = issue.JournalEntries;
+        var current = entries[0].CurrentProgress;
+        var range = entries[0].Range;
+        if (journals.TryGetValue(issue, out var previous) && previous.Progress == current && previous.Range == range &&
+            previous.Entries.Length == entries.Count && previous.Entries.SequenceEqual(entries)) return;
+
         network.Send(peer, new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
-            0, 0, Array.Empty<string>(), string.Empty,
+            0, 0, Array.Empty<string>(), Array.Empty<string>(),
             issue.JournalEntries.Select(log => log.LogText?.ToString() ?? string.Empty).ToArray(),
-            issue.JournalEntries[0].CurrentProgress, issue.JournalEntries[0].Range));
+            current, range));
+        journals[issue] = (entries.ToArray(), current, range);
     }
+
+    public void Forget(IssueBase issue) => journals.Remove(issue);
 }

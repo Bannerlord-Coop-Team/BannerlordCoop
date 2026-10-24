@@ -414,8 +414,8 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(required, ownerQuest._questProgressLogTest.CurrentProgress);
         Assert.True(ownerQuest.IsFinalized);
-        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString().Contains(
-            ending == 0 ? "defeated all" : ending == 1 ? "recruited the rest" : "recruited the brigands") == true);
+        Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText?.ToString().Contains(
+            ending == 0 ? "defeated all" : ending == 1 ? "recruited the rest" : "recruited the brigands") == true));
         Server.Call(() =>
         {
             Assert.Equal(100 + serverQuest.RewardGold, Get<Hero>(Server, scenario.PlayerA.HeroId).Gold);
@@ -1102,6 +1102,13 @@ public class MerchantOutlawsTests : IDisposable
         Server.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
         Assert.Equal(2, ownerIssue.JournalEntries.Count);
         Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+        var unchangedDayCount = Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+        Server.Call(() =>
+        {
+            for (var day = 0; day < 200; day++) Campaign.Current.IssueManager.DailyTick();
+        }, TextHelpers);
+        Assert.Equal(unchangedDayCount, Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count());
+
         foreach (var client in new[] { ClientA, ClientB })
         {
             client.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
@@ -1125,7 +1132,7 @@ public class MerchantOutlawsTests : IDisposable
             Assert.Equal(fails ? 490f : 505f, Get<Town>(Server, townId).Prosperity);
             Assert.Equal(1, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(Server, companionId).CharacterObject));
         });
-        Assert.Contains(ownerIssue.JournalEntries, log => log.LogText?.ToString().Contains(fails ? "failed to resolve" : "had resolved") == true);
+        Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText?.ToString().Contains(fails ? "failed to resolve" : "had resolved") == true));
         AssertEndedEverywhere();
     }
 

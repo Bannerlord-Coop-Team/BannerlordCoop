@@ -5,6 +5,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -63,17 +64,21 @@ internal class MerchantOutlawsProgressHandler : IHandler
             var announce = hunted > quest._questPartyProgress && hunted < quest._totalPartyCount;
             quest._destroyedPartyCount = data.Destroyed;
             quest._recruitedPartyCount = data.Recruited;
-            foreach (var party in quest._validPartiesList)
-            {
-                if (quest.IsTracked(party)) quest.RemoveTrackedObject(party);
-            }
+            foreach (var party in Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).OfType<MobileParty>())
+                quest.RemoveTrackedObject(party);
 
             quest._validPartiesList.Clear();
             foreach (var id in data.PartyIds ?? Array.Empty<string>())
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(id, out var party)) continue;
                 quest._validPartiesList.Add(party);
-                if (!quest.IsTracked(party)) quest.AddTrackedObject(party);
+
+            }
+
+            foreach (var id in data.TrackedPartyIds ?? Array.Empty<string>())
+            {
+                if (objectManager.TryGetObjectWithLogging<MobileParty>(id, out var party) && !quest.IsTracked(party))
+                    quest.AddTrackedObject(party);
             }
 
             quest._questProgressLogTest?.UpdateCurrentProgress(hunted);
@@ -85,7 +90,6 @@ internal class MerchantOutlawsProgressHandler : IHandler
                 MBInformationManager.AddQuickInformation(notice);
             }
 
-            if (!string.IsNullOrEmpty(data.FinalLog)) quest.AddLog(new TextObject("{=!}" + data.FinalLog));
         }, context: nameof(MerchantOutlawsProgressHandler));
     }
 }

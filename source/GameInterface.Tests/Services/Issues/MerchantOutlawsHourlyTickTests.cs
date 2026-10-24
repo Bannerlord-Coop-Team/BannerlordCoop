@@ -21,6 +21,8 @@ public class MerchantOutlawsHourlyTickTests : IDisposable
         public void Send(Quest quest, bool final = false) => Calls++;
 
         public void Send(TaleWorlds.CampaignSystem.Issues.IssueBase issue) => Calls++;
+
+        public void Forget(TaleWorlds.CampaignSystem.Issues.IssueBase issue) { }
     }
 
     private readonly bool wasServer = ModInformation.IsServer;

@@ -80,7 +80,7 @@ internal class MerchantOutlawsEventPatches
     [HarmonyPostfix]
     private static void LeftPostfix(MobileParty party, Settlement settlement)
     {
-        if (!settlement.IsHideout) return;
+        if (party == null || !party.IsBandit || !settlement.IsHideout) return;
         RunAsOwners(quest =>
         {
             if (!quest._validPartiesList.Contains(party)) return;
