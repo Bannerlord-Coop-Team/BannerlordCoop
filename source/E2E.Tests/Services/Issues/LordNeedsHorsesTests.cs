@@ -239,6 +239,7 @@ public class LordNeedsHorsesTests : IDisposable
             party.MemberRoster.AddToCounts(troop, 10);
         });
         TestEnvironment.FlushCoalescer();
+        var membersBefore = OwnersMembers();
         if (delayedDone)
             ClientA.Resolve<E2E.Tests.Environment.TestNetworkRouter>().PauseLink(ClientA.NetPeer, Server.NetPeer);
         ClientA.Call(() =>
@@ -271,7 +272,7 @@ public class LordNeedsHorsesTests : IDisposable
             Assert.True(logic.DoneLogic(false));
         }, new[] { AccessTools.Method(typeof(Helpers.PartyScreenHelper), nameof(Helpers.PartyScreenHelper.OpenScreenAsQuest)) });
         TestEnvironment.FlushCoalescer();
-        Assert.Equal(delayedDone ? 10 : 7, OwnersMembers());
+        Assert.Equal(membersBefore - (delayedDone ? 0 : SentTroops), OwnersMembers());
         if (finalize)
         {
             Server.Call(() =>
@@ -293,7 +294,7 @@ public class LordNeedsHorsesTests : IDisposable
             router.DrainReady();
             TestEnvironment.FlushCoalescer();
         }
-        Assert.Equal(10, OwnersMembers());
+        Assert.Equal(membersBefore, OwnersMembers());
         ClientA.Call(() =>
         {
             Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
