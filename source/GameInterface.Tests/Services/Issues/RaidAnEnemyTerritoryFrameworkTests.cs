@@ -21,6 +21,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior
 
 namespace GameInterface.Tests.Services.Issues;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class RaidAnEnemyTerritoryFrameworkTests
 {
     [Fact]
