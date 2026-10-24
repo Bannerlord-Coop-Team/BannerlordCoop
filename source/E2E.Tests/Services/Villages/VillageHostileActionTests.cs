@@ -728,6 +728,7 @@ public class VillageHostileActionTests : MapEventTestBase
                     settlement._readyMilitia = 0.5f;
                     settlement.SettlementHitPoints = 1f;
                     hero.PartyBelongedTo = party;
+                    party.LeaderHero.CharacterObject.DefaultCharacterSkills = new MBCharacterSkills();
                 }
             });
         }
@@ -778,8 +779,9 @@ public class VillageHostileActionTests : MapEventTestBase
             mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
             manager._gameStates.Add(mapState);
             var behavior = new EncounterGameMenuBehavior();
-            Assert.True(behavior.ConsiderVillageSurrenderPossibility(),
-                $"attacker strength={PlayerEncounter.Battle.AttackerSide.Parties.Sum(p => p.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Village))}, defender strength={PlayerEncounter.Battle.DefenderSide.Parties.Sum(p => p.Party.GetCustomStrength(BattleSideEnum.Defender, MapEvent.PowerCalculationContext.Village))}, defending lords={PlayerEncounter.Battle.DefenderSide.Parties.Count(p => p.Party.MobileParty?.IsLordParty == true)}");
+            Assert.True(PlayerEncounter.Battle.IsRaid);
+            Assert.True(settlement.IsVillage);
+            Assert.True(behavior.ConsiderVillageSurrenderPossibility());
             Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Battle.PlayerSide);
             behavior.UpdateVillageHostileActionEncounter(null);
             Assert.Equal(0f, settlement.Militia);
@@ -4280,11 +4282,25 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.True(client.ObjectManager.TryGetObject<Clan>(boundOwnerClanId, out var boundOwnerClan));
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(boundOwnerHeroId, out var boundOwnerHero));
+                Assert.True(client.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(boundSettlementId, out var boundSettlement));
+                Assert.True(client.ObjectManager.TryGetObject<Town>(boundTownId, out var boundTown));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(boundOwnerKingdomId, out var boundOwnerKingdom));
 
                 using (new AllowedThread())
                 {
                     boundOwnerHero.Clan = boundOwnerClan;
                     boundOwnerClan.SetLeader(boundOwnerHero);
+                    boundSettlement.SetSettlementComponent(boundTown);
+                    boundOwnerClan.Kingdom = boundOwnerKingdom;
+                    boundOwnerKingdom.RulingClan = boundOwnerClan;
+                    boundTown.OwnerClan = boundOwnerClan;
+                    boundTown.IsOwnerUnassigned = false;
+                    settlement.Village = village;
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = boundSettlement;
+                    village.VillageState = Village.VillageStates.Normal;
+                    village.Hearth = 100f;
                 }
 
                 if (!client.ObjectManager.TryGetObject<PartyBase>(settlementPartyId!, out var settlementParty))
