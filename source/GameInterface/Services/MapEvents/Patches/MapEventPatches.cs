@@ -554,8 +554,7 @@ internal class MapEventPatches
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
 
-            if (!IsBattleModeBusy(__instance) &&
-                ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
+            if (ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
                 hostileActions.ResolveRaidDefenders(__instance);
 
             // Slow raids need campaign-map progress, but not while their battle mission is occupied.

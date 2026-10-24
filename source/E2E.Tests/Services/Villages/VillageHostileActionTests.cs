@@ -753,6 +753,9 @@ public class VillageHostileActionTests : MapEventTestBase
             party.MemberRoster.AddToCounts(troop, attackerCount);
             militia.MemberRoster.Clear();
             militia.MemberRoster.AddToCounts(troop, militiaCount);
+            VillageHostileFactionStanceHelper.ApplyWarStance(party.MapFaction, settlement.MapFaction);
+            Assert.True(party.MapFaction.IsAtWarWith(settlement.MapFaction));
+            Assert.True(settlement.MapFaction.IsAtWarWith(party.MapFaction));
             Server.Resolve<IVillageHostileActionInterface>().ApplyHostileAction(party, settlement, VillageHostileAction.Raid);
             var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
             militia.Party.MapEventSide = mapEvent.DefenderSide;
@@ -813,6 +816,24 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(eventId!, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
             Campaign.Current.MapTimeTracker._deltaTimeInTicks = CampaignTime.Hours(1f).NumTicks;
+            if (militiaCount > 0)
+            {
+                var defenderCount = mapEvent.DefenderSide.TroopCount;
+                Assert.True(ServerBattleModeArbiter.TryClaimMission(eventId!));
+                try
+                {
+                    Assert.False(Server.Resolve<IStalledMapEventResolver>().HasOccupiedBattleMission(mapEvent));
+                    Campaign.Current.MapEventManager.Tick();
+                    Assert.Equal(defenderCount, mapEvent.DefenderSide.TroopCount);
+                    Assert.Equal(militiaCount + 0.5f, settlement.Militia);
+                    Assert.Equal(1f, settlement.SettlementHitPoints);
+                    Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkChangeSettlementMilitia>());
+                }
+                finally
+                {
+                    ServerBattleModeArbiter.Release(eventId!);
+                }
+            }
             Campaign.Current.MapEventManager.Tick();
             if (!surrender)
             {
@@ -826,7 +847,9 @@ public class VillageHostileActionTests : MapEventTestBase
                 $"Native owner surrender left server defenders={mapEvent.DefenderSide.TroopCount}, militia={settlement.Militia}, hp={settlement.SettlementHitPoints}, state={mapEvent.State}");
             for (var i = 0; i < 25 && settlement.SettlementHitPoints == 1f; i++)
                 Campaign.Current.MapEventManager.Tick();
-            Assert.True(settlement.SettlementHitPoints < 1f);
+            var raid = (RaidEventComponent)mapEvent.Component;
+            Assert.True(settlement.SettlementHitPoints < 1f,
+                $"hp={settlement.SettlementHitPoints}, damage={raid.RaidDamage}, pendingDamage={raid._nextSettlementDamage}, deltaHours={CampaignTime.DeltaTime.ToHours}, looting={mapEvent.WasEverInLootingPhase}, finishCalled={mapEvent._isFinishCalled}, diplomaticFinish={mapEvent.DiplomaticallyFinished}, state={mapEvent.State}");
             Assert.True(((RaidEventComponent)mapEvent.Component).RaidDamage > 0);
             Server.Resolve<IVillageHostileActionInterface>().ResolveRaidDefenders(mapEvent);
         }, MapEventDisabledMethods);
@@ -843,9 +866,15 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(militiaId, out var militia));
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(eventId!, out var mapEvent));
                 Assert.Equal(surrender ? 0f : militiaCount + 0.5f, settlement.Militia);
                 Assert.Equal(surrender ? 0 : militiaCount, militia.MemberRoster.TotalManCount);
                 Assert.Equal(surrender, settlement.SettlementHitPoints < 1f);
+                if (surrender && militiaCount > 0)
+                {
+                    Assert.Null(militia.Party.MapEventSide);
+                    Assert.DoesNotContain(mapEvent.DefenderSide.Parties, party => party.Party == militia.Party);
+                }
             });
         }
     }

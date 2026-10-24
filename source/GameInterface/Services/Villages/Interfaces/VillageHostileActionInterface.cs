@@ -102,6 +102,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             !mapEvent.AttackerSide.MapFaction.IsAtWarWith(mapEvent.DefenderSide.MapFaction))
             return;
 
+        // An accepted mission owns the defenders while its first client is still loading.
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) ||
+            ServerBattleModeArbiter.IsClaimed(mapEventId))
+            return;
+
         var defenders = mapEvent.DefenderSide.Parties;
         bool emptyDefenders = defenders.All(party => party.Party.MemberRoster.TotalHealthyCount == 0);
         if (!emptyDefenders)
