@@ -61,6 +61,22 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
     public void RealLowPowerGiverDeathPreservesTheOwnersFullNativeCancellationHistory(bool savedHistory)
     {
         var (companionId, troopId) = herd.StartCompanions();
+        var upgradeId = herd.environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var troop = Object<CharacterObject>(instance, troopId);
+                    var upgrade = Object<CharacterObject>(instance, upgradeId);
+                    upgrade.Level = 21;
+                    upgrade.UpgradeTargets = Array.Empty<CharacterObject>();
+                    // Synthetic replicas skip XML initialization; an empty upgrade list also caps native XP at zero.
+                    troop.UpgradeTargets = new[] { upgrade };
+                    Assert.Equal(16, troop.Level);
+                    Assert.True(7 * troop.GetUpgradeXpCost(Object<MobileParty>(instance, Scenario.OtherPartyId).Party, 0) >= 828);
+                }
+            });
         var otherGiverId = Scenario.AddIssue();
         Scenario.ClientB.Call(() =>
         {
@@ -77,9 +93,20 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
             var troop = Object<CharacterObject>(Scenario.Server, troopId);
             var sent = Object<Hero>(Scenario.Server, Scenario.NotableId).Issue.AlternativeSolutionSentTroops;
             sent.AddToCounts(troop, 0, false, 1, 828);
-            Object<MobileParty>(Scenario.Server, Scenario.OtherPartyId).MemberRoster.AddToCounts(troop, 7, false, 1, 313);
+            Assert.Equal(828, sent.GetElementCopyAtIndex(sent.FindIndexOfTroop(troop)).Xp);
+            var other = Object<MobileParty>(Scenario.Server, Scenario.OtherPartyId).MemberRoster;
+            other.AddToCounts(troop, 7, false, 1, 313);
+            Assert.Equal(313, other.GetElementCopyAtIndex(other.FindIndexOfTroop(troop)).Xp);
         });
         herd.environment.FlushCoalescer();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var other = Object<MobileParty>(instance, Scenario.OtherPartyId).MemberRoster;
+                var troop = Object<CharacterObject>(instance, troopId);
+                Assert.Equal(instance == Scenario.ClientA ? 0 : 313,
+                    other.GetElementCopyAtIndex(other.FindIndexOfTroop(troop)).Xp);
+            });
 
         var otherEntries = new Dictionary<EnvironmentInstance, JournalLog[]>();
         var otherGold = new Dictionary<EnvironmentInstance, int>();
@@ -104,11 +131,13 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
 
             // The bootstrap suppresses ChangeState, including the native low-power replacement listeners.
             var changeState = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
-            var bootstrap = Assert.Single(Harmony.GetPatchInfo(changeState).Prefixes, patch => patch.owner == "Coop.Testing");
+            var prefixes = Harmony.GetPatchInfo(changeState).Prefixes.ToArray();
+            var prefixOrder = PatchProcessor.GetSortedPatchMethods(changeState, prefixes);
+            var bootstrap = Assert.Single(prefixes, patch => patch.owner == "Coop.Testing");
             var harmony = new Harmony(bootstrap.owner);
-            harmony.Unpatch(changeState, bootstrap.PatchMethod);
             try
             {
+                harmony.Unpatch(changeState, bootstrap.PatchMethod);
                 giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge);
                 KillCharacterAction.ApplyByDeathMarkForced(giver, false);
             }
@@ -119,7 +148,16 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
                     priority = bootstrap.priority,
                     before = bootstrap.before,
                     after = bootstrap.after,
+                    debug = bootstrap.debug,
                 });
+                var restored = Harmony.GetPatchInfo(changeState).Prefixes.ToArray();
+                var restoredBootstrap = Assert.Single(restored, patch => patch.owner == bootstrap.owner);
+                Assert.Equal(bootstrap.PatchMethod, restoredBootstrap.PatchMethod);
+                Assert.Equal(bootstrap.priority, restoredBootstrap.priority);
+                Assert.Equal(bootstrap.before, restoredBootstrap.before);
+                Assert.Equal(bootstrap.after, restoredBootstrap.after);
+                Assert.Equal(bootstrap.debug, restoredBootstrap.debug);
+                Assert.Equal(prefixOrder, PatchProcessor.GetSortedPatchMethods(changeState, restored));
             }
             Assert.False(giver.IsAlive);
             Assert.Null(giver.Issue);
@@ -131,76 +169,120 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
         }, new[] { AccessTools.Method(typeof(KillCharacterAction), nameof(KillCharacterAction.CreateObituary)) });
         herd.environment.FlushCoalescer();
 
-        LogEntryHistory loaded = null!;
-        if (savedHistory)
+        // Assert.Multiple runs every independent fact even while immediate history is a known product failure.
+        var checks = new List<Action>();
+        void Check(string fact, Action assertion) => checks.Add(() =>
         {
-            Scenario.Server.Call(() =>
+            try
             {
-                MBTextManager.SetTextVariable("COMPANION", new TextObject("Changed global companion"));
-                MBTextManager.SetTextVariable("ISSUE_GIVER", new TextObject("Changed global giver"));
-                var definitions = new DefinitionContext();
-                definitions.FillWithCurrentTypes();
-                Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
-                var save = new SaveContext(definitions);
-                var metadata = new MetaData();
-                Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
-                var driver = new InMemDriver();
-                Assert.Equal(SaveResult.Success, driver.Save("herd_alternative_cancel", 1, metadata, save.SaveData).GetAwaiter().GetResult().SaveResult);
-                var load = new LoadContext(definitions, driver);
-                Assert.True(load.Load(driver.Load("herd_alternative_cancel"), loadAsLateInitialize: true));
-                loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
-                Assert.NotSame(Campaign.Current.LogEntryHistory, loaded);
-            });
-        }
-
-        Scenario.ClientA.Call(() =>
-        {
-            var owner = Archive(savedHistory ? loaded : Campaign.Current.LogEntryHistory);
-            output.WriteLine("Owner raw history before UI: saved={0}, ended={1}, status={2}, stages={3}",
-                savedHistory, owner.IsEnded(), owner._lastIssueStatus, owner.GetEntries().Count());
-            Assert.True(owner.IsEnded(), "The owner's raw cancellation archive must be ended immediately, before opening the journal or rejoining.");
-            Assert.Equal(authoritative._lastIssueStatus, owner._lastIssueStatus);
-            Assert.Equal(authoritative._relatedObjectIds, owner._relatedObjectIds);
-            AssertHistory(authoritative.GetEntries(), owner.GetEntries());
+                assertion();
+                output.WriteLine("PASS {0}", fact);
+            }
+            catch (Exception exception)
+            {
+                output.WriteLine("FAIL {0}: {1}", fact, exception.Message);
+                throw;
+            }
         });
-        output.WriteLine("PASS full native owner history ({0})", savedHistory ? "SaveContext/InMemDriver/LoadContext" : "immediate");
 
-        // Keep mechanics after the history assertion so a red archive cannot imply these checks ran.
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Scenario.Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
-        herd.environment.FlushCoalescer();
-        Assert.Single(Scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        LogEntryHistory loaded = null!;
+        Check(savedHistory ? "full native owner history (SaveContext/InMemDriver/LoadContext)" : "full native owner history (immediate)", () =>
+        {
+            if (savedHistory)
+            {
+                Scenario.Server.Call(() =>
+                {
+                    MBTextManager.SetTextVariable("COMPANION", new TextObject("Changed global companion"));
+                    MBTextManager.SetTextVariable("ISSUE_GIVER", new TextObject("Changed global giver"));
+                    var definitions = new DefinitionContext();
+                    definitions.FillWithCurrentTypes();
+                    Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+                    var save = new SaveContext(definitions);
+                    var metadata = new MetaData();
+                    Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+                    var driver = new InMemDriver();
+                    Assert.Equal(SaveResult.Success, driver.Save("herd_alternative_cancel", 1, metadata, save.SaveData).GetAwaiter().GetResult().SaveResult);
+                    var load = new LoadContext(definitions, driver);
+                    Assert.True(load.Load(driver.Load("herd_alternative_cancel"), loadAsLateInitialize: true));
+                    loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+                    Assert.NotSame(Campaign.Current.LogEntryHistory, loaded);
+                });
+            }
+
+            Scenario.ClientA.Call(() =>
+            {
+                var owner = Archive(savedHistory ? loaded : Campaign.Current.LogEntryHistory);
+                output.WriteLine("Owner raw history before UI: saved={0}, ended={1}, status={2}, stages={3}",
+                    savedHistory, owner.IsEnded(), owner._lastIssueStatus, owner.GetEntries().Count());
+                Assert.True(owner.IsEnded(), "The owner's raw cancellation archive must be ended immediately, before opening the journal or rejoining.");
+                Assert.Equal(authoritative._lastIssueStatus, owner._lastIssueStatus);
+                Assert.Equal(authoritative._relatedObjectIds, owner._relatedObjectIds);
+                AssertHistory(authoritative.GetEntries(), owner.GetEntries());
+            });
+        });
+
+        Check("one cancellation finalization", () =>
+            Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome));
+        Check("hourly retry", () =>
+        {
+            Scenario.Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
+            herd.environment.FlushCoalescer();
+        });
+        Check("one finalization after hourly retry", () =>
+            Assert.Single(Scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()));
         foreach (var instance in Instances)
-            instance.Call(() =>
+        {
+            var endpoint = instance == Scenario.Server ? "server" : instance == Scenario.ClientA ? "owner A" : "bystander B";
+            Check($"{endpoint} cleared issue and ownership", () => instance.Call(() =>
             {
                 Assert.Null(Object<Hero>(instance, Scenario.NotableId).Issue);
                 Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(Scenario.NotableId, QuestScenario.IssueId, out _));
+            }));
+            Check($"{endpoint} returned troop counts, wounds and XP", () => instance.Call(() =>
+            {
                 var returned = Object<MobileParty>(instance, Scenario.OwnerPartyId).MemberRoster;
                 var troop = Object<CharacterObject>(instance, troopId);
                 var stack = returned.GetElementCopyAtIndex(returned.FindIndexOfTroop(troop));
-                Assert.Equal(40, stack.Number);
-                Assert.Equal(1, stack.WoundedNumber);
-                Assert.Equal(instance == Scenario.ClientB ? 0 : 828, stack.Xp);
-                Assert.Equal(1, returned.GetTroopCount(Object<Hero>(instance, companionId).CharacterObject));
-                Assert.Equal(Hero.CharacterStates.Active, Object<Hero>(instance, companionId).HeroState);
+                Assert.Multiple(
+                    () => Assert.Equal(40, stack.Number),
+                    () => Assert.Equal(1, stack.WoundedNumber),
+                    () => Assert.Equal(instance == Scenario.ClientB ? 0 : 828, stack.Xp));
+            }));
+            Check($"{endpoint} returned active companion once", () => instance.Call(() =>
+            {
+                var returned = Object<MobileParty>(instance, Scenario.OwnerPartyId).MemberRoster;
+                Assert.Multiple(
+                    () => Assert.Equal(1, returned.GetTroopCount(Object<Hero>(instance, companionId).CharacterObject)),
+                    () => Assert.Equal(Hero.CharacterStates.Active, Object<Hero>(instance, companionId).HeroState));
+            }));
+            Check($"{endpoint} unchanged bystander quest and gold", () => instance.Call(() =>
+            {
                 var other = Object<Hero>(instance, otherGiverId).Issue;
-                Assert.True(other.IsSolvingWithQuest);
-                AssertHistory(otherEntries[instance], other.IssueQuest?.JournalEntries ?? Enumerable.Empty<JournalLog>());
-                Assert.Equal(otherGold[instance], Object<Hero>(instance, Scenario.OtherHeroId).Gold);
+                Assert.Multiple(
+                    () => Assert.True(other.IsSolvingWithQuest),
+                    () => AssertHistory(otherEntries[instance], other.IssueQuest?.JournalEntries ?? Enumerable.Empty<JournalLog>()),
+                    () => Assert.Equal(otherGold[instance], Object<Hero>(instance, Scenario.OtherHeroId).Gold));
+            }));
+            Check($"{endpoint} unchanged bystander roster and XP", () => instance.Call(() =>
+            {
+                var troop = Object<CharacterObject>(instance, troopId);
                 var otherRoster = Object<MobileParty>(instance, Scenario.OtherPartyId).MemberRoster;
-                Assert.Equal(7, otherRoster.GetTroopCount(troop));
                 var otherStack = otherRoster.GetElementCopyAtIndex(otherRoster.FindIndexOfTroop(troop));
-                Assert.Equal(1, otherStack.WoundedNumber);
-                Assert.Equal(instance == Scenario.ClientA ? 0 : 313, otherStack.Xp);
-                if (instance == Scenario.Server)
-                    Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster());
-            });
-        Scenario.ClientB.Call(() =>
+                Assert.Multiple(
+                    () => Assert.Equal(7, otherRoster.GetTroopCount(troop)),
+                    () => Assert.Equal(1, otherStack.WoundedNumber),
+                    () => Assert.Equal(instance == Scenario.ClientA ? 0 : 313, otherStack.Xp));
+            }));
+        }
+        Check("empty pending alternative troop return", () => Scenario.Server.Call(() =>
+            Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster())));
+        Check("bystander has no owner archive", () => Scenario.ClientB.Call(() =>
         {
             Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
             if (savedHistory)
                 Assert.Empty(loaded.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
-        });
+        }));
+        Assert.Multiple(checks.ToArray());
         output.WriteLine("PASS one finalization, one companion/troop return after hourly retry, cleared ownership, controller XP, observer WithoutXP, and unchanged bystander quest/roster/gold");
     }
 
