@@ -73,12 +73,9 @@ internal class LootShipsHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.PartyHandle, out var party)) return;
 
-            var offered = new List<Ship>();
             foreach (var shipHandle in data.LootShipHandles ?? Array.Empty<uint>())
             {
                 if (!objectManager.TryGetObjectWithLogging<Ship>(shipHandle, out var ship)) continue;
-
-                offered.Add(ship);
 
                 // Matches (ship.Owner != PartyBase.MainParty) but for multiple players
                 if (ship.Owner == party.Party || ship.Owner.IsPlayerParty()) continue;
@@ -86,7 +83,7 @@ internal class LootShipsHandler : IHandler
                 DestroyShipAction.Apply(ship);
             }
 
-            lootShipHold.Release(party.Party, offered);
+            lootShipHold.Release(party.Party);
         }, context: nameof(Handle_NetworkDiscardLootShips));
     }
 }
