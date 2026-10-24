@@ -454,8 +454,8 @@ public class AcceptVisibilityTests : IDisposable
         Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
 
         Owner.Call(() => Owner.SimulateMessage(this, new NetworkIssueJournal(notableId, IssueId, false,
-            new[] { outcome == IssueOutcome.LordAcceptedCounterOffer
-                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog })));
+            new[] { new IssueJournalEntry(new JournalLog(CampaignTime.Now, outcome == IssueOutcome.LordAcceptedCounterOffer
+                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog)) })));
         Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 
