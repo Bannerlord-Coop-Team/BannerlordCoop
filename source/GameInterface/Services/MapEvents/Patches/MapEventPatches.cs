@@ -15,6 +15,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -552,6 +553,10 @@ internal class MapEventPatches
         if (__instance.IsRaidHostileAction())
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
+
+            if (!IsBattleModeBusy(__instance) &&
+                ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
+                hostileActions.ResolveRaidDefenders(__instance);
 
             // Slow raids need campaign-map progress, but not while their battle mission is occupied.
             if (__instance.IsActiveSlowVillageRaid())
