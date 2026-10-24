@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
 
@@ -13,11 +15,16 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueResolver resolver;
+    private readonly IControllerIdProvider controller;
 
-    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership)
+    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership,
+        IIssueResolver resolver, IControllerIdProvider controller)
     {
         this.messageBroker = messageBroker;
         this.ownership = ownership;
+        this.resolver = resolver;
+        this.controller = controller;
 
         messageBroker.Subscribe<NetworkIssueOwnershipSnapshot>(Handle_NetworkIssueOwnershipSnapshot);
     }
@@ -34,14 +41,21 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             return;
         }
 
+        GameThread.RunSafe(() => Apply(payload.What), context: nameof(IssueOwnershipSnapshotReceiver));
+    }
+
+    private void Apply(NetworkIssueOwnershipSnapshot snapshot)
+    {
         foreach (var remembered in ownership.GetAll())
         {
             ownership.Remove(remembered.IssueOwnerId);
         }
 
-        foreach (var owner in payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
+        foreach (var owner in snapshot.Owners ?? Array.Empty<IssueOwnershipData>())
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
+            if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))
+                issue.IsTriedToSolveBefore = owner.ControllerId == controller.ControllerId;
         }
     }
 }
