@@ -84,6 +84,7 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> PresentControllers = new HashSet<string>();
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
         // Withdrew from this battle and have not entered it again; their parties stay theirs, never the host's.
+        // Folds into one participant status with the sets above in #2181.
         public readonly HashSet<string> WithdrawnControllers = new HashSet<string>();
         public readonly HashSet<string> HostGrantedParties = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
