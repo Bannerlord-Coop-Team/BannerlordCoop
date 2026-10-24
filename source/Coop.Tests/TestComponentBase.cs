@@ -108,6 +108,7 @@ internal abstract class TestComponentBase
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
+        RegisterMock<ICoopCommandArgsFactory>(builder);
         RegisterMock<IGameInterface>(builder);
         var modConfig = new Mock<IModConfig>();
         modConfig.SetupGet(config => config.Data).Returns(new ModConfigData());

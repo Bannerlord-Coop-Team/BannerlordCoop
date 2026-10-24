@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
+using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
 
 namespace GameInterface.Services.Issues;
@@ -39,6 +40,7 @@ internal class IssuesModule : Module
             .As<ILesserNobleRevoltWorldEventService>()
             .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
+        builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
