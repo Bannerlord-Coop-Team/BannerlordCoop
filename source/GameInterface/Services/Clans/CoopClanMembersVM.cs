@@ -16,6 +16,7 @@ public class CoopClanMembersVM : ClanMembersVM
 {
     private readonly IClanMemberGrouping grouping;
     private readonly IClanLeaveRules leaveRules;
+    private readonly IPlayerDivorceRules divorceRules;
     private readonly IMessageBroker messageBroker;
 
     [DataSourceProperty]
@@ -26,11 +27,19 @@ public class CoopClanMembersVM : ClanMembersVM
         CurrentSelectedMember?.GetHero() is Hero hero && hero != Hero.MainHero &&
         hero.Clan == Hero.MainHero.Clan && hero.IsPlayerHero();
 
+    // The clan leader divorces through Manage Player, so this is only for the spouse who doesn't lead.
+    [DataSourceProperty]
+    public bool CanDivorceSpouse => Hero.MainHero?.Clan?.Leader != Hero.MainHero &&
+        divorceRules?.CanDivorce(Hero.MainHero, CurrentSelectedMember?.GetHero()) == true;
+
     [DataSourceProperty]
     public string LeaveClanText => GameTexts.FindText("str_coop_clan_leave").ToString();
 
     [DataSourceProperty]
     public string ManagePlayerText => GameTexts.FindText("str_coop_clan_manage_player").ToString();
+
+    [DataSourceProperty]
+    public string DivorceSpouseText => GameTexts.FindText("str_coop_clan_divorce").ToString();
 
     [DataSourceProperty]
     public MBBindingList<ClanLordItemVM> Players { get; } = new();
@@ -51,11 +60,12 @@ public class CoopClanMembersVM : ClanMembersVM
     public string OtherFamiliesText => GetGroupText("str_coop_clan_other_families", OtherFamilies.Count);
 
     public CoopClanMembersVM(Action onRefresh, Action<Hero> showHeroOnMap, IClanMemberGrouping grouping,
-        IClanLeaveRules leaveRules, IMessageBroker messageBroker)
+        IClanLeaveRules leaveRules, IPlayerDivorceRules divorceRules, IMessageBroker messageBroker)
         : base(onRefresh, showHeroOnMap)
     {
         this.grouping = grouping;
         this.leaveRules = leaveRules;
+        this.divorceRules = divorceRules;
         this.messageBroker = messageBroker;
         SortController._listsToControl.Insert(0, Players);
         SortController._listsToControl.Insert(2, OtherFamilies);
@@ -64,8 +74,17 @@ public class CoopClanMembersVM : ClanMembersVM
 
     public void ExecuteLeaveClan()
     {
-        if (CanLeaveClan)
-            messageBroker.Publish(this, new ClanMemberLeaveRequested(Hero.MainHero, Hero.MainHero));
+        if (!CanLeaveClan) return;
+
+        if (leaveRules.AreExpectingChild(Hero.MainHero, Hero.MainHero.Clan.Leader))
+        {
+            InformationManager.ShowInquiry(new InquiryData(LeaveClanText,
+                GameTexts.FindText("str_coop_clan_leave_expecting_child").ToString(),
+                true, false, GameTexts.FindText("str_ok").ToString(), null, null, null));
+            return;
+        }
+
+        messageBroker.Publish(this, new ClanMemberLeaveRequested(Hero.MainHero, Hero.MainHero));
     }
 
     public void ExecuteManagePlayer()
@@ -73,23 +92,53 @@ public class CoopClanMembersVM : ClanMembersVM
         if (!CanManagePlayer) return;
         var actor = Hero.MainHero;
         var member = CurrentSelectedMember.GetHero();
-        bool canRemove = leaveRules.CanRemove(actor, member);
+        bool expectingChild = leaveRules.AreExpectingChild(member, actor);
+        bool canRemove = leaveRules.CanRemove(actor, member) && !expectingChild;
+        var removeHint = expectingChild ? "str_coop_clan_leave_expecting_child"
+            : canRemove ? "str_coop_clan_remove_player_description" : "str_coop_clan_member_cannot_leave";
         var options = new List<InquiryElement>
         {
-            new InquiryElement(member, GameTexts.FindText("str_coop_clan_remove_player").ToString(), null,
-                canRemove, GameTexts.FindText(canRemove ? "str_coop_clan_remove_player_description"
-                    : "str_coop_clan_member_cannot_leave").ToString())
+            new InquiryElement(PlayerAction.Remove, GameTexts.FindText("str_coop_clan_remove_player").ToString(), null,
+                canRemove, GameTexts.FindText(removeHint).ToString())
         };
+        if (divorceRules.CanDivorce(actor, member))
+            options.Add(new InquiryElement(PlayerAction.Divorce, GameTexts.FindText("str_coop_clan_divorce").ToString(), null,
+                true, GameTexts.FindText("str_coop_clan_divorce_description").SetTextVariable("HERO", member.Name).ToString()));
+
         MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(
             GameTexts.FindText("str_coop_clan_manage_player_title").SetTextVariable("HERO", member.Name).ToString(),
             GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
                 GameTexts.FindText("str_coop_clan_manage_player_description"),
             options, true, 1, 1, GameTexts.FindText("str_coop_clan_manage_player_confirm").ToString(),
             GameTexts.FindText("str_cancel").ToString(),
-            _ =>
+            selected =>
             {
-                if (leaveRules.CanRemove(actor, member))
+                if (selected.FirstOrDefault()?.Identifier is PlayerAction.Divorce)
+                {
+                    if (divorceRules.CanDivorce(actor, member))
+                        messageBroker.Publish(this, new PlayerDivorceRequested(actor, member));
+                }
+                else if (leaveRules.CanRemove(actor, member) && !leaveRules.AreExpectingChild(member, actor))
                     messageBroker.Publish(this, new ClanMemberLeaveRequested(actor, member));
+            }, null));
+    }
+
+    public void ExecuteDivorceSpouse()
+    {
+        if (!CanDivorceSpouse) return;
+        var actor = Hero.MainHero;
+        var spouse = CurrentSelectedMember.GetHero();
+        InformationManager.ShowInquiry(new InquiryData(
+            GameTexts.FindText("str_coop_divorce_confirm_title").SetTextVariable("SPOUSE", spouse.Name).ToString(),
+            GameTexts.FindText("str_coop_clan_divorce_confirm_description")
+                .SetTextVariable("CLAN_NAME", actor.Clan?.Name)
+                .SetTextVariable("SPOUSE", spouse.Name).ToString(),
+            true, true, GameTexts.FindText("str_coop_divorce_confirm").ToString(),
+            GameTexts.FindText("str_cancel").ToString(),
+            () =>
+            {
+                if (divorceRules.CanDivorce(actor, spouse))
+                    messageBroker.Publish(this, new PlayerDivorceRequested(actor, spouse));
             }, null));
     }
 
@@ -97,6 +146,7 @@ public class CoopClanMembersVM : ClanMembersVM
     {
         OnPropertyChanged(nameof(CanLeaveClan));
         OnPropertyChanged(nameof(CanManagePlayer));
+        OnPropertyChanged(nameof(CanDivorceSpouse));
         OnPropertyChanged(nameof(LeaveClanText));
         OnPropertyChanged(nameof(ManagePlayerText));
     }
@@ -175,5 +225,11 @@ public class CoopClanMembersVM : ClanMembersVM
         return GameTexts.FindText("str_RANK_with_NUM_between_parenthesis")
             .SetTextVariable("RANK", GameTexts.FindText(groupTextId))
             .SetTextVariable("NUMBER", count).ToString();
+    }
+
+    private enum PlayerAction
+    {
+        Remove,
+        Divorce
     }
 }

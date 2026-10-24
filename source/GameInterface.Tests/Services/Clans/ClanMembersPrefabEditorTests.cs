@@ -73,6 +73,7 @@ public class ClanMembersPrefabEditorTests
     [Theory]
     [InlineData("ClanScreen.xml", "LeaveClanButton", "{ClanMembers}", "@CanLeaveClan", "ExecuteLeaveClan")]
     [InlineData("ClanMembers.xml", "ManagePlayerButton", "{..}", "@CanManagePlayer", "ExecuteManagePlayer")]
+    [InlineData("ClanMembers.xml", "DivorceSpouseButton", "{..}", "@CanDivorceSpouse", "ExecuteDivorceSpouse")]
     public void MembershipButtons_BindToMembersVmAndAreOnlyAddedOnce(string file, string id,
         string dataSource, string visibility, string command)
     {
