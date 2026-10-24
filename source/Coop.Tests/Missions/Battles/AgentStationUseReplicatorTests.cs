@@ -120,18 +120,60 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["departedHullReleases"]!);
     }
 
-    // R7: a use its owner sent before leaving can arrive after the departure; it is dropped, not retried.
+    // S12 A4 (NB §6 relayed catch-up): a relayed seat can beat its sender's entry, so it waits for the membership.
     [Fact]
-    public void TryApply_DropsAUseFromASenderNoLongerInTheMission()
+    public void TryApply_RetriesAUseFromASenderNotYetInTheMission()
     {
+        var crew = new RemoteCrew();
+        var members = new System.Collections.Generic.List<string> { "someone_else" };
+        var context = new Mock<IMissionContext>();
+        context.SetupGet(m => m.ControllersInMission).Returns(() => members.ToArray());
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, members: context.Object);
+        var use = Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner");
+
+        bool settledBeforeEntry = replicator.TryApply(use);
+        members.Add("owner");
+        bool settledAfterEntry = replicator.TryApply(use);
+
+        Assert.False(settledBeforeEntry);
+        Assert.True(settledAfterEntry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+        Assert.Equal(0, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+    }
+
+    // S12 A3: a joiner's seats go out from the tick, after the arrivals sent it the hull records they refer to.
+    [Fact]
+    public void PeerEntered_SendsTheJoinerTheOwnSeatsFromTheNextTick()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ships = new NetworkShipRegistry();
+        ships.TryRegister(new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!));
+        var point = CreatePoint();
         var engine = new Mock<INavalShipEngine>();
-        using var replicator = CreateReplicator(engine.Object, members: Members("someone_else"));
+        StationOf(engine, point, hull);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
+        var network = new Mock<IBattleNetwork>();
+        var deployment = new Mock<IBattleDeploymentCoordinator>();
+        deployment.SetupGet(d => d.IsCommitted).Returns(true);
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships, broker, network: network.Object,
+            deployment: deployment.Object);
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
+        replicator.Tick(0f);
 
-        bool settled = replicator.TryApply(Use(Guid.NewGuid(), Guid.NewGuid(), inUse: true, revision: 1, "owner"));
+        GameThread.Run(() => broker.Publish(this, new NetworkMissionPeerEntered("joiner", null)), blocking: true);
+        network.Verify(n => n.Send("joiner", It.IsAny<NetworkAgentStationUse>()), Times.Never);
+        replicator.Tick(0f);
+        replicator.Tick(0f);
 
-        Assert.True(settled);
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
-        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+        network.Verify(n => n.Send("joiner", It.Is<NetworkAgentStationUse>(use => use.AgentId == agentId && use.InUse)), Times.Once);
     }
 
     [Fact]
@@ -311,15 +353,16 @@ public class AgentStationUseReplicatorTests
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
-        IMissionContext? members = null)
+        IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
-        return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
-            component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>(), members ?? Members("owner", "old", "new"));
+        return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(),
+            Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
+            members ?? Members("owner", "old", "new"));
     }
 
     // The server-announced mission members the membership gate reads.

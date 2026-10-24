@@ -659,8 +659,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   (`CoopServer.Send`), but a peer's catch-up goes through `RelayPacketHandler` (`target.Send`), so a member's hull record
   can reach a joiner before the joiner learns that member is in the mission (R41a-2 E). The replicator now holds such a
   record until the owner is a member (log `Holding hull ... until it is a mission member`) and drops one from a departed
-  owner (`Dropped hull record ... of departed ...`). Weapon and seat catch-up may hit the same ordering gap; the relay
-  ordering itself is unchanged. The hold is not hit live yet: in R41a-3 the race didn't occur.
+  owner (`Dropped hull record ... of departed ...`). A station use from a sender that isn't a member yet waits under its
+  10 s pending lifetime; weapon catch-up may hit the same ordering gap. The relay ordering itself is unchanged. The hold is not hit live yet: in R41a-3 the race didn't occur.
 - **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (partly done, capture P0).** Hulls fielded after
   deployment (AI fleet, copies, swap replacements) now get the weapon AI, the helm's `OnDeploymentFinished` (standing
   point components, enemy helm AI-only, the logics its vacancy check reads) and `CrewSizeOnMainDeck`

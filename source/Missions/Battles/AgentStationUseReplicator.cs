@@ -56,6 +56,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly Dictionary<Guid, AuthorityStamp> appliedStamps = new Dictionary<Guid, AuthorityStamp>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
+    private readonly List<string> joinersAwaitingSeats = new List<string>();
     private float elapsed;
     // While this client deploys, copies are held back, so their crew's uses wait without aging.
     private float deploymentHeldAt;
@@ -169,6 +170,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         elapsed += Math.Max(0f, dt);
         if (engine.IsDeploymentMode) deploymentHeldAt = elapsed;
         PruneOwnSeats();
+        SendSeatsToJoiners();
         if (!seatsAnnounced && deployment.IsCommitted)
         {
             seatsAnnounced = true;
@@ -334,21 +336,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         if (!IsPendingExpired(elapsed, entry.ReceivedAt, deploymentHeldAt)) return false;
 
         dropped++;
-        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId} from {Sender}: agent or hull {ShipId} never arrived or the sender never owned the agent",
+        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId} from {Sender}: agent or hull {ShipId} never arrived, or the sender never owned the agent or joined the mission",
             entry.Use.Revision, entry.Use.AgentId, entry.Use.SenderControllerId, entry.Use.ShipId);
         return true;
     }
 
-    // [Game thread] True when settled (applied or dropped), false to retry while the agent or hull is still missing or
-    // this client has not yet moved the agent's authority to the sender (a new owner's uses can beat the local migration).
+    // [Game thread] True when settled (applied or dropped), false to retry while the agent, hull or sender's membership is still
+    // missing or this client has not yet moved the agent's authority to the sender (a new owner's uses can beat the migration).
     internal bool TryApply(NetworkAgentStationUse use)
     {
-        if (AuthorityStamp.ValidateMember(use.SenderControllerId, missionContext.ControllersInMission) != null)
-        {
-            dropped++;
-            return true;
-        }
-
         // Each owner numbers its own uses, so a use from a different sender than the last applied one starts a fresh order.
         appliedStamps.TryGetValue(use.AgentId, out var last);
         if (!use.Stamp.IsNewer(last))
@@ -361,6 +357,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         var agents = missionComponent.AgentRegistry;
         bool registered = agents.TryGetAgentInfo(use.AgentId, out var info) && info.Agent != null;
         if (!registered && !use.InUse) return SettleObsoleteRelease(use, "its puppet is not registered");
+
+        // A relayed seat catch-up can beat the sender's announced entry; a departed sender's uses expire or go with its hulls.
+        if (AuthorityStamp.ValidateMember(use.SenderControllerId, missionContext.ControllersInMission) != null) return false;
         if (!registered || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship)) return false;
 
         if (agents.IsLocallyControlled(info.Agent))
@@ -423,7 +422,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         applied++;
     }
 
-    // A joiner gets this client's current seats after the hull and crew records that precede them.
+    // Notes a joiner, whose seat catch-up the next tick sends.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         var entered = payload.What;
@@ -431,11 +430,27 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         GameThread.RunSafe(() =>
         {
-            if (disposed || !seatsAnnounced || session.IsOwn(entered.ControllerId)) return;
+            if (disposed || session.IsOwn(entered.ControllerId)) return;
 
-            foreach (var use in ownSeated.Values)
-                network.Send(entered.ControllerId, use);
+            joinersAwaitingSeats.Add(entered.ControllerId);
         }, context: nameof(Handle_PeerEntered));
+    }
+
+    // The ship replicator sends a joiner's hull and crew records from the arrivals at the start of this tick, so the seats
+    // follow them; a record that lands a frame later is absorbed by the joiner's pending retry. Before the deployment commit
+    // the commit's announcement covers the joiner.
+    private void SendSeatsToJoiners()
+    {
+        if (joinersAwaitingSeats.Count == 0) return;
+
+        if (seatsAnnounced)
+        {
+            foreach (var joiner in joinersAwaitingSeats)
+                foreach (var use in ownSeated.Values)
+                    network.Send(joiner, use);
+        }
+
+        joinersAwaitingSeats.Clear();
     }
 
     public string DescribeStation(Agent agent) => DescribeStation(agent?.CurrentlyUsedGameObject);
