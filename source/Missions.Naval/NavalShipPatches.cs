@@ -16,6 +16,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
 
 namespace Missions.Naval;
@@ -190,9 +191,11 @@ internal class CopyCrewLoadPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class NavalSidePlanScopePatch
 {
+    // Records the side whose initial plan is being made.
     [HarmonyPrefix]
     private static void Prefix(DefaultNavalMissionLogic __instance) => NavalPlayerDeploymentSlot.PlanningSide = __instance;
 
+    // Ends the initial plan scope, also when the plan throws.
     [HarmonyFinalizer]
     private static void Finalizer() => NavalPlayerDeploymentSlot.PlanningSide = null;
 }
@@ -202,6 +205,7 @@ internal class NavalSidePlanScopePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class PlayerFleetDeploymentSlotPatch
 {
+    // Moves the own PlayerTeam's initial plan back to its player slot; other teams and replans keep vanilla's offset.
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
     {
@@ -210,8 +214,13 @@ internal class PlayerFleetDeploymentSlotPatch
         var mission = Mission.Current;
         if (planningSide == null || rank <= 0 || mission == null || team != mission.PlayerTeam) return;
 
-        float teamRange = planningSide.GetTeamSpawnPathOffsetRange(mission.GetInitialSpawnPathData(team.Side).Path, team);
-        spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, teamRange);
+        var spawnPath = mission.GetInitialSpawnPathData(team.Side);
+        float ownTeamRange = planningSide.GetTeamSpawnPathOffsetRange(spawnPath.Path, team);
+        float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
+            .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
+        // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
+        spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, ownTeamRange,
+            longestTeamRange, -spawnPath.PivotOffset);
     }
 }
 
@@ -221,6 +230,7 @@ internal class PlayerFleetDeploymentSlotPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopOrderOfBattleShipLayoutPatch
 {
+    // Skips the saved layout load in a coop naval mission.
     [HarmonyPrefix]
     internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
 }
