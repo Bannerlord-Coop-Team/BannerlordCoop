@@ -740,6 +740,8 @@ public class VillageHostileActionTests : MapEventTestBase
                     settlement.SettlementHitPoints = 1f;
                     hero.PartyBelongedTo = party;
                     party.LeaderHero.CharacterObject.DefaultCharacterSkills = new MBCharacterSkills();
+                    party.ActualClan.Id = new MBGUID(1);
+                    settlement.OwnerClan.Kingdom.Id = new MBGUID(2);
                 }
             });
         }
