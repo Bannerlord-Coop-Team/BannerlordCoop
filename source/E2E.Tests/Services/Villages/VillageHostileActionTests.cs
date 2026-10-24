@@ -743,6 +743,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            defender.MemberRoster.Clear();
             defender.MemberRoster.AddToCounts(troop, 1);
             var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
             defender.Party.MapEventSide = mapEvent.DefenderSide;
