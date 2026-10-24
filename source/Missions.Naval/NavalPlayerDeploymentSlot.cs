@@ -54,9 +54,11 @@ internal static class NavalPlayerDeploymentSlot
     internal static float ShiftSpawnPathOffset(float vanillaOffset, int rank, float ownTeamRange, float longestTeamRange,
         float pathStartOffset)
     {
-        if (rank <= 0) return vanillaOffset;
-
-        float shifted = vanillaOffset - (rank * (longestTeamRange + InterTeamGap));
-        return Math.Min(vanillaOffset, Math.Max(shifted, pathStartOffset + ownTeamRange));
+        float spaced = SpacedSpawnPathOffset(vanillaOffset, rank, longestTeamRange);
+        return Math.Min(vanillaOffset, Math.Max(spaced, pathStartOffset + ownTeamRange));
     }
+
+    /// <summary>The own team's offset before the path clamp; a clamped slot sits closer than vanilla's gap to the fleet ahead.</summary>
+    internal static float SpacedSpawnPathOffset(float vanillaOffset, int rank, float longestTeamRange) =>
+        rank <= 0 ? vanillaOffset : vanillaOffset - (rank * (longestTeamRange + InterTeamGap));
 }

@@ -82,6 +82,21 @@ public class NavalPlayerDeploymentSlotTests
         Assert.Equal(VanillaOffset, offset);
     }
 
+    // The slot patch warns exactly when the clamp moves the slot off its spaced offset.
+    [Theory]
+    [InlineData(-500f, false)]
+    [InlineData(250f, true)]
+    public void SpacedSpawnPathOffset_DiffersFromTheSlot_OnlyWhenThePathClampEngages(float pathStart, bool clamped)
+    {
+        float ownRange = Range(45.85f);
+        float longest = Range(67.5f);
+
+        float spaced = NavalPlayerDeploymentSlot.SpacedSpawnPathOffset(VanillaOffset, 2, longest);
+        float slot = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, 2, ownRange, longest, pathStart);
+
+        Assert.Equal(clamped, slot != spaced);
+    }
+
     private static float Range(float shipLength) => NavalPlayerDeploymentSlot.LongestTeamRange(new[] { shipLength });
 
     private static float Offset(int rank, float ownRange, float longest) =>

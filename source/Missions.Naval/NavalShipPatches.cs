@@ -205,6 +205,8 @@ internal class NavalSidePlanScopePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class PlayerFleetDeploymentSlotPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerFleetDeploymentSlotPatch>();
+
     // Moves the own PlayerTeam's initial plan back to its player slot; other teams and replans keep vanilla's offset.
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
@@ -218,9 +220,14 @@ internal class PlayerFleetDeploymentSlotPatch
         float ownTeamRange = planningSide.GetTeamSpawnPathOffsetRange(spawnPath.Path, team);
         float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
             .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
+        float spaced = NavalPlayerDeploymentSlot.SpacedSpawnPathOffset(spawnPathOffset, rank, longestTeamRange);
         // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
-        spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, ownTeamRange,
+        float slot = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, ownTeamRange,
             longestTeamRange, -spawnPath.PivotOffset);
+        if (slot != spaced)
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path is too short for deployment rank {Rank}; this fleet " +
+                "is clamped to the path start, inside vanilla's gap to the fleet ahead or overlapping it", spawnPath.PathLength, rank);
+        spawnPathOffset = slot;
     }
 }
 
