@@ -22,7 +22,7 @@ internal class BasePathPatches
         if (string.IsNullOrEmpty(bannerlordDir))
             throw new InvalidOperationException($"{BannerlordDirVariable} is not set; run runmefirst.cmd to point it at the Bannerlord install.");
 
-        bool hasTrailingSeparator = bannerlordDir.EndsWith("/") || bannerlordDir.EndsWith("\\");
+        bool hasTrailingSeparator = bannerlordDir.EndsWith('/') || bannerlordDir.EndsWith('\\');
         __result = hasTrailingSeparator ? bannerlordDir : bannerlordDir + Path.DirectorySeparatorChar;
         return false;
     }
