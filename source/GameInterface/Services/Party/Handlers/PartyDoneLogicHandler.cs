@@ -222,6 +222,7 @@ internal class PartyDoneLogicHandler : IHandler
                 TryValidatePrisonerActionRosters(
                     releasedPrisonersRoster,
                     takenPrisonersRoster,
+                    recruitedPrisonersRoster,
                     signedRightPrisonerRosterData,
                     out takenHeroCharacterIds);
             if (!actionRostersAreValid)
@@ -479,6 +480,7 @@ internal class PartyDoneLogicHandler : IHandler
     private bool TryValidatePrisonerActionRosters(
         FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster,
+        FlattenedTroopRoster recruitedPrisonersRoster,
         TroopRosterData rightPrisonerRosterData,
         out HashSet<uint> takenHeroCharacterIds)
     {
@@ -486,6 +488,17 @@ internal class PartyDoneLogicHandler : IHandler
         var signedDeltas = (rightPrisonerRosterData.Data ?? Array.Empty<TroopRosterElementData>())
             .GroupBy(element => element.CharacterId)
             .ToDictionary(group => group.Key, group => group.Sum(element => element.Number));
+
+        // Recruits also leave the right prison roster, so add them back before matching releases and takes.
+        foreach (var element in recruitedPrisonersRoster)
+        {
+            if (element.Troop == null ||
+                !objectManager.TryGetHandleWithLogging(element.Troop, out var characterId))
+                continue;
+
+            signedDeltas.TryGetValue(characterId, out var delta);
+            signedDeltas[characterId] = delta + 1;
+        }
 
         return ActionsMatchDelta(releasedPrisonersRoster, signedDeltas, expectedSign: -1) &&
                ActionsMatchDelta(takenPrisonersRoster, signedDeltas, expectedSign: 1);

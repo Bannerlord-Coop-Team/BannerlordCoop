@@ -125,6 +125,13 @@ internal class BattleFinalizeHandler : IHandler
 
     private void Handle_NetworkMapEventFinalizeAttempted(MessagePayload<NetworkMapEventFinalizeAttempted> payload)
     {
+        // A leaving side leader closes its menu right after sending this and never asks again, so the whole
+        // finalize runs on the game thread and an expired one is queued again.
+        GameThread.RunCleanupSafe(() => FinalizeAttemptedOnGameThread(payload), context: nameof(Handle_NetworkMapEventFinalizeAttempted));
+    }
+
+    private void FinalizeAttemptedOnGameThread(MessagePayload<NetworkMapEventFinalizeAttempted> payload)
+    {
         var requester = payload.Who as NetPeer;
 
         if (TryLeaveSharedHideout(requester, payload.What.MapEventId))
@@ -296,12 +303,16 @@ internal class BattleFinalizeHandler : IHandler
     /// </summary>
     private string[] FinalizeAndCollectPlayers(MapEvent mapEvent, string[] knownPlayerPartyIds = null)
     {
-        if (!TryMarkFinalized(mapEvent))
-            return MapEventPlayerPartyCollector.Combine(knownPlayerPartyIds);
-
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
+            // Marked in the action, otherwise an expired call would keep the mark and refuse every later finalize.
+            if (!TryMarkFinalized(mapEvent))
+            {
+                playerPartyIds = MapEventPlayerPartyCollector.Combine(knownPlayerPartyIds);
+                return;
+            }
+
             try
             {
                 playerPartyIds = FinalizeOnGameThread(mapEvent, knownPlayerPartyIds);

@@ -34,7 +34,7 @@ internal class GameStateInterface : IGameStateInterface
     private readonly Action endGame;
 
     public GameStateInterface(IMessageBroker messageBroker)
-        : this(messageBroker, () => GameThread.Run(MBGameManager.EndGame, blocking: true))
+        : this(messageBroker, MBGameManager.EndGame)
     {
     }
 
@@ -151,7 +151,8 @@ internal class GameStateInterface : IGameStateInterface
 
     public void EndGame()
     {
-        endGame();
+        // A disconnect handled on the poller must still leave the campaign when this call expires before it starts.
+        GameThread.RunCleanupSafe(endGame);
         // MBGameManager.EndGame is async void, so returning here does not mean InitialState is
         // active yet. MainMenuEnteredPatch publishes once InitialState.OnActivate actually runs.
     }

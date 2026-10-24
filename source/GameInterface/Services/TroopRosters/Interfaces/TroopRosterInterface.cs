@@ -207,6 +207,21 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 long finalNumber = current.number + elementData.Number;
                 long finalWounded = current.wounded + elementData.WoundedNumber;
                 long finalXp = current.xp + elementData.Xp;
+                var appliedDelta = elementData;
+                if (EmptiesStackAtVanillaXpCap(roster, character, current, elementData, finalNumber, finalXp))
+                {
+                    troopRosterLogger.Debug(
+                        roster,
+                        "DROP-XP character={CharacterId} xpAboveCap={Xp}",
+                        elementData.CharacterId,
+                        finalXp);
+                    finalXp = 0;
+                    appliedDelta = new TroopRosterElementData(
+                        elementData.CharacterId,
+                        elementData.Number,
+                        elementData.WoundedNumber,
+                        0);
+                }
 
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
@@ -229,7 +244,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
                     return false;
                 }
 
-                elements.Add((roster, character, elementData));
+                elements.Add((roster, character, appliedDelta));
             }
         }
 
@@ -237,6 +252,27 @@ internal class TroopRosterInterface : ITroopRosterInterface
         ApplyDeltaElements(elements, applyAdditions: false);
         ApplyDeltaElements(elements, applyAdditions: true);
         return true;
+    }
+
+    // An xp-free count drop can leave the server above the vanilla xp cap that the client roster clamps to,
+    // so an emptying removal that spends exactly the capped xp only leaves xp vanilla would discard.
+    private static bool EmptiesStackAtVanillaXpCap(
+        TroopRoster roster,
+        CharacterObject character,
+        (int number, int wounded, int xp) current,
+        TroopRosterElementData delta,
+        long finalNumber,
+        long finalXp)
+    {
+        if (delta.Number >= 0 || finalNumber != 0 || finalXp <= 0 || roster.OwnerParty == null) return false;
+
+        var capped = new TroopRosterElement(character)
+        {
+            _number = current.number,
+            _xp = current.xp
+        };
+        roster.OwnerParty.OnXpChanged(roster, ref capped);
+        return -(long)delta.Xp == capped.Xp;
     }
 
     private void ApplyDeltaElements(

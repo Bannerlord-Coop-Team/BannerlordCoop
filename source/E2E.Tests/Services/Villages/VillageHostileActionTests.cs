@@ -2863,6 +2863,92 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void MultiPlayerRaid_BattleSimulationCancel_ThatTimesOutBeforeItStarts_EndsTheSessionOnTheNextPump()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        try
+        {
+            StartBattleSimulation(client, hostileAction);
+            Server.NetworkSentMessages.Clear();
+
+            // The cancel reaches the server's poller while nothing pumps, so its blocking teardown expires.
+            Server.Call(() =>
+            {
+                using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
+                var broker = Server.Resolve<IMessageBroker>();
+                Assert.Null(RunOnServerPoller(() =>
+                    broker.Publish(client.NetPeer, new NetworkCancelBattleSimulation(hostileAction.MapEventId))));
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+                Assert.True(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
+            }, MapEventDisabledMethods);
+            Server.PumpGameThread();
+
+            Assert.Equal(hostileAction.MapEventId,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>()).MapEventId);
+            Assert.Equal((int)BattleStartMode.Unclaimed,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>()).Mode);
+            Server.Call(() =>
+            {
+                Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
+    public void MultiPlayerRaid_BattleSimulationPacerDisconnect_ThatTimesOutBeforeItStarts_FinishesOnceOnTheNextPump()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        try
+        {
+            StartBattleSimulation(client, hostileAction);
+            Server.NetworkSentMessages.Clear();
+
+            Server.Call(() =>
+            {
+                // Simulation rounds can't resolve in the test campaign, so the battle is already decided and the
+                // disconnect only has to end the session.
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                mapEvent._battleState = BattleState.AttackerVictory;
+
+                using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
+                var handler = Server.Resolve<BattleSimulationRunHandler>();
+                Assert.Null(RunOnServerPoller(() => handler.Handle_PlayerDisconnected(
+                    new MessagePayload<Common.Network.Messages.PlayerDisconnected>(
+                        this, new Common.Network.Messages.PlayerDisconnected(client.NetPeer, default)))));
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            }, MapEventDisabledMethods);
+            Server.PumpGameThread();
+
+            Assert.Equal(hostileAction.MapEventId,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>()).MapEventId);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
+            }, MapEventDisabledMethods);
+
+            // The session was forgotten, so a late advance finds nothing to finish again.
+            client.Call(() => client.Resolve<INetwork>().SendAll(
+                new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1)), MapEventDisabledMethods);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
     public void RaidSimulation_WhenSecondPlayerJoins_OpensSimulationForJoiner()
     {
         var client = Clients.First();
@@ -3842,6 +3928,41 @@ public class VillageHostileActionTests : MapEventTestBase
             raiderMobilePartyId,
             raiderPartyId,
             target.OwnerFactionId);
+    }
+
+    private void StartBattleSimulation(EnvironmentInstance client, RaidMapEventContext hostileAction)
+    {
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Simulation,
+                hostileAction.MapEventId,
+                hostileAction.AttackerMobilePartyId)),
+            MapEventDisabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+    }
+
+    /// <summary>
+    /// Runs a receive on its own thread inside the current instance scope, as the network poller does, and returns
+    /// what it threw. The calling test thread is the marked game thread and waits here, so nothing pumps meanwhile.
+    /// </summary>
+    private static Exception? RunOnServerPoller(Action receive)
+    {
+        Exception? failure = null;
+        var poller = new Thread(() =>
+        {
+            try
+            {
+                receive();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }) { IsBackground = true };
+        poller.Start();
+        Assert.True(poller.Join(TimeSpan.FromSeconds(10)), "the poller did not return");
+        return failure;
     }
 
     private static BattleCreationFlags RaidFlags() => HostileActionFlags(VillageHostileAction.Raid);

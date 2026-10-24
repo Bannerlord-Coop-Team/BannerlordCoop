@@ -78,12 +78,11 @@ public class CreateCharacterState : ConnectionStateBase
         if (!heroInterface.TryGetRegistrationHandles(hero, out var registrationHandles))
         {
             Logger.Error("Failed to capture player graph handles; disconnecting the joining peer");
-            GameThread.RunSafe(() =>
+            GameThread.RunCleanupSafe(() =>
             {
                 var registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
                 playerCreationRollback.Rollback(player, registrationIds);
-            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
-            ConnectionLogic.Peer.Disconnect();
+            }, then: () => ConnectionLogic.Peer.Disconnect(), context: "CreateCharacterState.PlayerCreationRollback");
             return;
         }
 
@@ -121,19 +120,20 @@ public class CreateCharacterState : ConnectionStateBase
                 controllerId);
 
             var registrationIds = System.Array.Empty<string>();
-            GameThread.RunSafe(() =>
+            GameThread.RunCleanupSafe(() =>
             {
                 if (!playerManager.RemovePlayer(player))
                     Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
 
                 registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
                 playerCreationRollback.Rollback(player, registrationIds);
-            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
-
-            // Existing clients created this graph before setup ran. This final ordered message removes their
-            // player registration and every imported graph object after any setup-side cleanup broadcasts.
-            network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
-            ConnectionLogic.Peer.Disconnect();
+            }, then: () =>
+            {
+                // Existing clients created this graph before setup ran. This final ordered message removes their
+                // player registration and every imported graph object after any setup-side cleanup broadcasts.
+                network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
+                ConnectionLogic.Peer.Disconnect();
+            }, context: "CreateCharacterState.PlayerCreationRollback");
             return;
         }
 

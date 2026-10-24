@@ -260,15 +260,15 @@ internal class BattleSimulationRunHandler : IHandler
             activeSimulations.Remove(mapEventId);
         }
         
-        GameThread.RunSafe(() =>
-        { EndSimulationSession(simulation); }, blocking: true, context: nameof(Handle_NetworkCancelBattleSimulation));
-
-        if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
+        GameThread.RunCleanupSafe(() => EndSimulationSession(simulation), then: () =>
         {
-            network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
-            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
-        }
-        mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
+            if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
+            {
+                network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
+                network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+            }
+            mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
+        }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
     private bool TryGetRequestingParticipant(
         NetPeer requester,
@@ -877,7 +877,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// [Server] The pacing client dropped: finish and tear down any simulations it was driving so the
     /// swapped-in observer is restored and the tracking entry doesn't leak.
     /// </summary>
-    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    internal void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         if (ModInformation.IsClient)
             return;
@@ -893,7 +893,7 @@ internal class BattleSimulationRunHandler : IHandler
         if (orphaned.Count == 0)
             return;
 
-        GameThread.RunSafe(() =>
+        GameThread.RunCleanupSafe(() =>
         {
             foreach (var entry in orphaned)
             {
@@ -916,13 +916,14 @@ internal class BattleSimulationRunHandler : IHandler
                 // that the pacing client (which would have driven it to completion) is gone.
                 network.SendAll(new NetworkBattleSimulationFinished(entry.Key));
             }
-        }, blocking: true, context: nameof(Handle_PlayerDisconnected));
-
-        lock (simLock)
+        }, then: () =>
         {
-            foreach (var entry in orphaned)
-                activeSimulations.Remove(entry.Key);
-        }
+            lock (simLock)
+            {
+                foreach (var entry in orphaned)
+                    activeSimulations.Remove(entry.Key);
+            }
+        }, context: nameof(Handle_PlayerDisconnected));
     }
 
     /// <summary>
