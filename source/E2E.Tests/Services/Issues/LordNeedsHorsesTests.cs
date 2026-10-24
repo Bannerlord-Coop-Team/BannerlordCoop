@@ -253,6 +253,8 @@ public class LordNeedsHorsesTests : IDisposable
             Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
             new TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior()
                 .issue_offer_player_accept_alternative_4_consequence();
+            Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             var logic = new PartyScreenLogic();
             logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
                 giver.Issue.AlternativeSolutionSentTroops,

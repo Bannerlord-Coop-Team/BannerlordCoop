@@ -18,6 +18,8 @@ internal static class AlternativeSolutionPickerDriver
     {
         using (new MainHeroSubstitutionScope(owner, party))
         {
+            Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             client.Resolve<IAlternativeSolutionPicker>().Open(issue);
             var logic = new PartyScreenLogic();
             troop.UpgradeTargets ??= Array.Empty<CharacterObject>();
