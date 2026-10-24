@@ -25,6 +25,6 @@ public sealed class NavalRopeStatusCoopCommand : ICoopCommand
         if (naval == null)
             return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
 
-        return new CoopCommandResult(true, "NAVAL_ROPES " + JsonConvert.SerializeObject(naval.ShipReplicator.InspectRopes()));
+        return new CoopCommandResult(true, "NAVAL_ROPES " + JsonConvert.SerializeObject(naval.Services.ShipReplicator.InspectRopes()));
     }
 }

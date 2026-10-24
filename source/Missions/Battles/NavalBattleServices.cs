@@ -17,9 +17,7 @@ namespace Missions.Battles;
 /// </summary>
 public interface INavalBattleServices : IDisposable
 {
-    /// <summary>The hull operations the services share; its copies are stepped on the fixed physics tick.</summary>
-    INavalShipEngine Engine { get; }
-
+    /// <summary>Registers, announces and streams the battle's hulls.</summary>
     IBattleShipReplicator ShipReplicator { get; }
 
     /// <summary>Replicates in-mission ship captures, confirmed by each captured hull's authority.</summary>
@@ -31,14 +29,19 @@ public interface INavalBattleServices : IDisposable
     /// <summary>The hull and capture traffic that arrived since the last tick, applied first in the next one.</summary>
     IBattleShipArrivals Arrivals { get; }
 
+    /// <summary>Replicates which agent uses which ship station.</summary>
     IAgentStationUseReplicator StationUseReplicator { get; }
 
+    /// <summary>Places agents on the deck of the hull under them.</summary>
     INavalDeckPoses DeckPoses { get; }
 
+    /// <summary>Replicates the ship weapons' state and shots.</summary>
     IBattleShipWeaponReplicator ShipWeaponReplicator { get; }
 
+    /// <summary>Routes ship hits to the hull's authority.</summary>
     IBattleShipDamageRouter ShipDamageRouter { get; }
 
+    /// <summary>Fields a promoted host's recovered reserve onto its hulls.</summary>
     INavalMigrationReserveFielder MigrationReserveFielder { get; }
 
     /// <summary>Reports the campaign ship fates of the hulls this client simulates to the server.</summary>
@@ -49,11 +52,9 @@ public interface INavalBattleServices : IDisposable
 
     /// <summary>
     /// [Game thread] Applies the arrived hull and capture traffic, then ticks the water clock, the hull stream, its captures and
-    /// fate reports, the deck, station and weapon streams, then
-    /// <paramref name="beforeMigrationReserve"/>, then the migration reserve, so AI hulls fielded in between take recovered
-    /// reserve in the same tick.
+    /// fate reports, the deck, station and weapon streams, then the migration reserve.
     /// </summary>
-    void Tick(float dt, Action beforeMigrationReserve = null);
+    void Tick(float dt);
 
     /// <summary>
     /// [Game thread] Vanilla is about to remove <paramref name="hull"/>: its fate goes to the server and its removal to the
@@ -91,7 +92,6 @@ public class NavalBattleServices : INavalBattleServices
         this.messageBroker = messageBroker;
         this.asyncAgentTick = asyncAgentTick;
         session = context.Session;
-        Engine = shipEngine;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
         Arrivals = new BattleShipArrivals();
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
@@ -123,8 +123,6 @@ public class NavalBattleServices : INavalBattleServices
         messageBroker.Subscribe<BattleResultReporting>(Handle_BattleResultReporting);
     }
 
-    public INavalShipEngine Engine { get; }
-
     public IBattleShipReplicator ShipReplicator { get; }
 
     public IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
@@ -147,7 +145,7 @@ public class NavalBattleServices : INavalBattleServices
 
     public IBattleWaterClock WaterClock { get; }
 
-    public void Tick(float dt, Action beforeMigrationReserve = null)
+    public void Tick(float dt)
     {
 #if DEBUG
         captureWatch.NoteTick();
@@ -161,7 +159,6 @@ public class NavalBattleServices : INavalBattleServices
         DeckPoses.Tick(dt);
         StationUseReplicator.Tick(dt);
         ShipWeaponReplicator.Tick(dt);
-        beforeMigrationReserve?.Invoke();
         MigrationReserveFielder.Tick();
     }
 

@@ -249,7 +249,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
-            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tacticRefresh));
+            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), tacticRefresh));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ShipReplicator, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.ShipReplicator, tallyReader,
