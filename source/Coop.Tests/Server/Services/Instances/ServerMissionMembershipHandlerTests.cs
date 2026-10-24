@@ -302,6 +302,8 @@ public class ServerMissionMembershipHandlerTests
         var messageBroker = new TestMessageBroker();
         var playerManager = CreatePlayerManager(peer, "current");
         var missionManager = new MissionManager(playerManager.Object);
+        MissionMemberDeparted? departed = null;
+        messageBroker.Subscribe<MissionMemberDeparted>(payload => departed = payload.What);
         using var handler = new ServerMissionMembershipHandler(
             messageBroker, missionManager, new TestNetwork(), playerManager.Object, LandPolicy);
 
@@ -311,10 +313,15 @@ public class ServerMissionMembershipHandlerTests
 
         Assert.False(missionManager.TryGetControllers(InstanceId, out _));
         Assert.False(missionManager.TryGetRelayTarget(peer, InstanceId, "current", out _));
+        // A leave withdraws the party, on land as at sea.
+        Assert.True(departed.HasValue);
+        Assert.True(departed.Value.WasRetreat);
+        Assert.True(departed.Value.Withdraws);
     }
 
     // D4: a naval disconnect reaches the remaining members as a leave, so they withdraw the party as on a leave; a land one
-    // stays a disconnect for the host to adopt. The server's own handlers still see no retreat, so no final health came.
+    // stays a disconnect for the host to adopt. The server's own handlers see the withdrawal, but no retreat, so no final
+    // health came.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -342,6 +349,7 @@ public class ServerMissionMembershipHandlerTests
         Assert.Equal(naval ? 0 : 1, network.GetPeerMessagesFromType<MissionPeerDisconnected>(remaining).Count());
         Assert.True(departed.HasValue);
         Assert.False(departed.Value.WasRetreat);
+        Assert.Equal(naval, departed.Value.Withdraws);
     }
 
     [Fact]

@@ -1085,7 +1085,7 @@ internal class BattleHostHandler : IHandler
             // At sea a disconnect withdraws too: the player's hulls leave with it and a return is a late join (D4).
             objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent);
             bool newlyAbsent = false;
-            if (payload.What.WasRetreat || retentionPolicy.DisconnectWithdraws(mapEventId))
+            if (payload.What.Withdraws)
             {
                 if (mapEvent != null)
                     WithdrawPartyReserves(mapEventId, mapEvent, controllerId);
