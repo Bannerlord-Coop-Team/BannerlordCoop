@@ -27,6 +27,52 @@ public sealed class ArmySettlementOwnershipReplayTests : IDisposable
     [Theory]
     [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift)]
     [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege)]
+    public void ServerOwnershipEventStillSelectsTheArmyTarget(
+        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    {
+        var armyId = environment.CreateRegisteredObject<Army>();
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var townId = environment.CreateRegisteredObject<Town>();
+        var ownerId = environment.CreateRegisteredObject<Hero>();
+        var server = environment.Server;
+        server.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.QuestManager.Quests);
+            Assert.Empty(Campaign.Current.IssueManager.Issues);
+            var army = server.GetRegisteredObject<Army>(armyId);
+            var settlement = server.GetRegisteredObject<Settlement>(settlementId);
+            var town = server.GetRegisteredObject<Town>(townId);
+            var owner = server.GetRegisteredObject<Hero>(ownerId);
+            owner.Clan.InitMembers();
+            owner.Clan.SetLeader(owner);
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = owner.Clan;
+            army._armyGatheringStartTime = 0f;
+            army._aiBehaviorObject = settlement;
+            Assert.True(army.IsWaitingForArmyMembers());
+            Assert.NotSame(settlement.MapFaction, army.LeaderParty.MapFaction);
+            Assert.Null(army.LeaderParty.SiegeEvent);
+            Assert.Null(army.LeaderParty.MapEvent);
+        });
+
+        // Record entry into AI selection without requiring a native navigation mesh in this control.
+        using var nativeAi = new MethodCallRecorder(
+            AccessTools.Method(typeof(Army), nameof(Army.FindBestGatheringSettlementAndMoveTheLeader)));
+        server.Call(() =>
+        {
+            var army = server.GetRegisteredObject<Army>(armyId);
+            var settlement = server.GetRegisteredObject<Settlement>(settlementId);
+            var owner = server.GetRegisteredObject<Hero>(ownerId);
+            CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(
+                settlement, detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege,
+                owner, army.LeaderParty.LeaderHero, owner, detail);
+        });
+        Assert.Equal(1, nativeAi.CountFor(server));
+    }
+
+    [Theory]
+    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift)]
+    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege)]
     public void OwnershipReplayWithoutAnyQuestDoesNotRecalculateTheClientArmyTarget(
         ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
     {
