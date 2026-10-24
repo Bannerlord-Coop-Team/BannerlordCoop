@@ -552,7 +552,7 @@ internal class BattleJoinLeaveHandler : IHandler
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
 
-            // The server-approved departure releases this encounter without finalizing the continuing raid.
+            // Clear this before the later PlayerEncounter.Finish so it closes menus without finalizing the continuing raid.
             if (isMainParty && mapEvent.IsRaidHostileAction() && PlayerEncounter.Battle == mapEvent)
                 PlayerEncounter.Current._mapEvent = null;
 

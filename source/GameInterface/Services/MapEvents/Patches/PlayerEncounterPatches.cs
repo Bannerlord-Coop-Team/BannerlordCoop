@@ -360,12 +360,15 @@ internal class PlayerEncounterPatches
 
         // Receive callbacks must not finalize a live raid owned by this encounter.
         var mapEvent = PlayerEncounter.Battle;
-        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)
+        if (!mapEvent.IsLiveRaid())
             return true;
 
         if (CallOriginalPolicy.IsOriginalAllowed())
-            Logger.Debug("Ignored received raid encounter finish for {MapEventId}. {StackTrace}",
-                mapEvent.StringId, System.Environment.StackTrace);
+        {
+            if (Logger.IsEnabled(Serilog.Events.LogEventLevel.Debug))
+                Logger.Debug("Ignored received raid encounter finish for {MapEventId}. {StackTrace}",
+                    mapEvent.StringId, System.Environment.StackTrace);
+        }
         else
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
 

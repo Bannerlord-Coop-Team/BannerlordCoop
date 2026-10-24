@@ -139,12 +139,13 @@ internal class MapEventPatches
             return false;
 
         // A receive callback's AllowedThread does not authorize ending a server-owned raid.
-        if (ModInformation.IsClient && __instance.IsRaidHostileAction() &&
+        if (ModInformation.IsClient && __instance.IsLiveRaid() &&
             AllowedThread.IsThisThreadAllowed() &&
             !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
         {
-            Logger.Debug("Ignored received raid finalization for {MapEventId}. {StackTrace}",
-                __instance.StringId, System.Environment.StackTrace);
+            if (Logger.IsEnabled(Serilog.Events.LogEventLevel.Debug))
+                Logger.Debug("Ignored received raid finalization for {MapEventId}. {StackTrace}",
+                    __instance.StringId, System.Environment.StackTrace);
             return false;
         }
 
