@@ -32,9 +32,6 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
         var formerFormation = ship.Formation;
         RunVanillaSwap(ship, captor);
         TurnOffShiplessBehaviors(ship, formerFormation);
-        // Vanilla's swap hands both hulls an auto-updated controller; a copy keeps none, so it never steers itself here.
-        if (NavalForeignHulls.Contains(ship)) ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        if (NavalForeignHulls.Contains(captor)) captor.SetController(ShipControllerType.None, autoUpdateController: false);
         // As the helm's capture branch does once the swap ran.
         ship.InvalidateActiveFormationTroopOnShipCache();
         captor.InvalidateActiveFormationTroopOnShipCache();

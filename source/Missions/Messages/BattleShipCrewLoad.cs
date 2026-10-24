@@ -11,6 +11,7 @@ public sealed class BattleShipCrewLoad
     /// <summary>A known-empty deck: no agent stands on the owner's hull, so the copy takes no crew weight.</summary>
     public static readonly BattleShipCrewLoad Empty = new BattleShipCrewLoad(0f, Vec3.Zero);
 
+    // A load already checked by Create.
     private BattleShipCrewLoad(float mass, Vec3 localCentre)
     {
         Mass = mass;
