@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEvents;
@@ -62,6 +63,10 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     public void RefreshForRoster(TroopRoster roster)
     {
-        RefreshForMapEvent(roster?.OwnerParty?.MapEvent);
+        var party = roster?.OwnerParty;
+        var mapEvent = party?.MapEvent;
+        if (mapEvent == null && party?.MobileParty?.PartyComponent is MilitiaPartyComponent militia)
+            mapEvent = militia.Settlement?.Party.MapEvent;
+        RefreshForMapEvent(mapEvent);
     }
 }
