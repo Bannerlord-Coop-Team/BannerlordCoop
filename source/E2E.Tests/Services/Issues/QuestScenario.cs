@@ -33,6 +33,15 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
+    public QuestScenario(E2ETestEnvironment testEnvironment) : this(testEnvironment, (EnvironmentInstance _, Hero notable) => new AllowedIssue(notable, null))
+    {
+    }
+
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase> createIssue)
+        : this(testEnvironment, (_, notable) => createIssue(notable))
+    {
+    }
+
     public QuestScenario(E2ETestEnvironment testEnvironment, Func<EnvironmentInstance, Hero, IssueBase>? issueFactory = null)
     {
         this.testEnvironment = testEnvironment;
