@@ -53,6 +53,18 @@ public class BattleShipConditionStreamTests
         Assert.Equal("invalid_condition", BattleShipConditionStream.ValidateCondition(ship, Own, condition, 0, 0, InMission));
     }
 
+    [Theory]
+    [InlineData(true, true, 4, 3, true)]
+    [InlineData(true, true, 3, 3, false)]
+    [InlineData(false, true, 4, 3, false)]
+    [InlineData(true, false, 4, 3, false)]
+    public void IsEarlyHostCondition_OnlyAnAiHullsReportFromAnotherControllerAtANewerHostEpoch(bool followsHost,
+        bool fromAnotherAuthority, int conditionEpoch, int appliedEpoch, bool expected)
+    {
+        Assert.Equal(expected, BattleShipConditionStream.IsEarlyHostCondition(followsHost, fromAnotherAuthority, conditionEpoch,
+            appliedEpoch));
+    }
+
     private static BattleShipCondition Condition(float hitPoints) =>
         new BattleShipCondition(hitPoints, 300f, 100f, new[] { 80f, 80f, 80f, 80f, 80f, 80f }, 0);
 

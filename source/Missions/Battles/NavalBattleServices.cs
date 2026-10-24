@@ -80,6 +80,7 @@ public class NavalBattleServices : INavalBattleServices
     private readonly INavalHullAuthority hullAuthority;
     private readonly INavalAppliedHost appliedHost;
     private readonly IBattleShipSampleStream samples;
+    private readonly IBattleShipConditionStream conditions;
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
@@ -101,12 +102,11 @@ public class NavalBattleServices : INavalBattleServices
         appliedHost = new NavalAppliedHost(messageBroker, context.Session);
         HullLedger = new NavalSideHullLedger();
         Arrivals = new BattleShipArrivals();
-        var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
-            context.MissionContext);
+        var heldShips = new HeldShipBuffer();
+        conditions = new BattleShipConditionStream(network, messageBroker, context, shipEngine, appliedHost, heldShips, Arrivals);
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
-        var heldShips = new HeldShipBuffer();
         samples = new BattleShipSampleStream(network, messageBroker, context, shipEngine, conditions, heldShips);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, heldShips, samples);
@@ -234,6 +234,7 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.Dispose();
         ShipReplicator.Dispose();
         samples.Dispose();
+        conditions.Dispose();
         hullAuthority.Dispose();
         appliedHost.Dispose();
         Arrivals.Clear();

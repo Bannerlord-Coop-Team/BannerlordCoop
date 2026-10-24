@@ -177,14 +177,14 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
 
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 9));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 2, reserve: 9));
         harness.Replicator.Tick(BattleShipSampleStream.SampleLifetimeSeconds + 1.5f);
 
-        Assert.Equal(9, harness.Replicator.ReportedReserveOf(copy));
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(harness.OwnHull));
+        Assert.Equal(9, harness.Conditions.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(harness.OwnHull));
     }
 
     // A change of the reserve alone leaves the copy's hull state as it is.
@@ -194,11 +194,11 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 11));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 2, reserve: 11));
 
         harness.Engine.Verify(e => e.ApplyCondition(copy, It.IsAny<BattleShipCondition>()), Times.Once);
-        Assert.Equal(11, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(11, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // M9: the end tally counts a copy's reserve as its owner reports it and every other hull's from the engine.
@@ -211,11 +211,11 @@ public class BattleShipReplicatorTests
         harness.Engine.Setup(e => e.ReadSpawnableReserve(harness.OwnHull)).Returns(7);
         harness.Engine.Setup(e => e.ReadSpawnableReserve(unregistered)).Returns(4);
         harness.Engine.Setup(e => e.ReadSpawnableReserve(copy)).Returns(5);
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
 
-        Assert.Equal(7, harness.Replicator.HullReserve(harness.OwnHull));
-        Assert.Equal(12, harness.Replicator.HullReserve(copy));
-        Assert.Equal(4, harness.Replicator.HullReserve(unregistered));
+        Assert.Equal(7, harness.Conditions.HullReserve(harness.OwnHull));
+        Assert.Equal(12, harness.Conditions.HullReserve(copy));
+        Assert.Equal(4, harness.Conditions.HullReserve(unregistered));
     }
 
     [Fact]
@@ -223,14 +223,14 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
 
-        harness.Replicator.ForgetReportedReserveOf("someone_else");
-        int afterOtherLeft = harness.Replicator.ReportedReserveOf(copy);
-        harness.Replicator.ForgetReportedReserveOf(Peer);
+        harness.Conditions.ForgetReserveOf("someone_else");
+        int afterOtherLeft = harness.Conditions.ReportedReserveOf(copy);
+        harness.Conditions.ForgetReserveOf(Peer);
 
         Assert.Equal(12, afterOtherLeft);
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // M12 r1, R7: the departure comes over the campaign connection, so a condition the owner sent before leaving can arrive
@@ -240,19 +240,19 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
 
         harness.Members.Remove(Peer);
         harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 9));
-        int afterLateCondition = harness.Replicator.ReportedReserveOf(copy);
-        var lateReject = (string)Inspected(harness, ship.ShipId)["lastReject"]!;
+        harness.Conditions.Receive(PeerCondition(ship, 2, reserve: 9));
+        int afterLateCondition = harness.Conditions.ReportedReserveOf(copy);
+        var lateReject = (string)Inspected(harness, ship.ShipId)["conditionLastReject"]!;
         harness.Members.Add(Peer);
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 3, reserve: 4));
+        harness.Conditions.Receive(PeerCondition(ship, 3, reserve: 4));
 
         Assert.Equal(0, afterLateCondition);
-        Assert.Equal("condition_not_in_mission", lateReject);
-        Assert.Equal(4, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal("not_in_mission", lateReject);
+        Assert.Equal(4, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // R7: the same gate drops a departed owner's late sample; its hull keeps the frame it had.
@@ -348,12 +348,12 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
-        harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
+        harness.Conditions.Receive(PeerCondition(ship, 1, reserve: 12));
 
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 2, 0,
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 2, 0,
             new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk), 12));
 
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
     }
 
     [Fact]
@@ -361,13 +361,13 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
-        int beforeMove = harness.Replicator.ReportedReserveOf(copy);
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
+        int beforeMove = harness.Conditions.ReportedReserveOf(copy);
 
         harness.Replicator.TransferHostHulls("third_peer", harness.SessionEpoch);
 
         Assert.Equal(12, beforeMove);
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // R48 re-review: the successor's first report for an AI hull can come over the mesh before the server's host change; it is
@@ -378,14 +378,14 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: false);
         harness.Members.Add("third_peer");
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
 
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch + 1, Condition(100f), 7));
-        int beforeMove = harness.Replicator.ReportedReserveOf(copy);
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch + 1, Condition(100f), 7));
+        int beforeMove = harness.Conditions.ReportedReserveOf(copy);
         harness.Replicator.TransferHostHulls("third_peer", harness.SessionEpoch);
 
         Assert.Equal(12, beforeMove);
-        Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(7, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // R48 round 5 review: a host change lands in the session at once but moves the hulls from the queue; its assignment is not
@@ -404,13 +404,13 @@ public class BattleShipReplicatorTests
         harness.Broker.Publish(this, new BattleHostAssignmentApplied(new NetworkBattleHostAssigned(Instance, "third_peer", null, 2)));
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, "third_peer", 2));
         harness.Replicator.AcceptSpawnRecords(Array.Empty<BattleShipSpawnData>());
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, 2, Condition(100f), 7));
-        int beforeMove = harness.Replicator.ReportedReserveOf(copy);
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, "third_peer", 1, 2, Condition(100f), 7));
+        int beforeMove = harness.Conditions.ReportedReserveOf(copy);
         harness.Arrivals.ApplyAll();
 
         Assert.Equal(0, beforeMove);
         Assert.Equal("third_peer", ship.CurrentAuthority);
-        Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(7, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // R48 round 4 review: the epoch this client joined at counts as applied, so a report of that epoch from a controller that
@@ -422,10 +422,10 @@ public class BattleShipReplicatorTests
         harness.Members.Add("third_peer");
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
 
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(100f), 7));
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(100f), 7));
         harness.Replicator.TransferHostHulls("third_peer", harness.SessionEpoch);
 
-        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Conditions.ReportedReserveOf(copy));
     }
 
     // Fix item 7: the server's assignment always names the new host and its epoch; a change without either moves nothing,
@@ -445,15 +445,55 @@ public class BattleShipReplicatorTests
         Assert.Equal(HostEpoch, (int)JObject.FromObject(harness.Replicator.Inspect())["appliedHostEpoch"]!);
     }
 
-    [Theory]
-    [InlineData(true, "not_authority", 4, 3, true)]
-    [InlineData(true, "not_authority", 3, 3, false)]
-    [InlineData(false, "not_authority", 4, 3, false)]
-    [InlineData(true, "stale", 4, 3, false)]
-    public void IsEarlyHostCondition_OnlyAnAiHullsReportFromANewerHostEpoch(bool followsHost, string rejection, int conditionEpoch,
-        int appliedEpoch, bool expected)
+    // S14 A2 / S23: a host change lands in the session at once but moves the hulls from the queue. The old host's last
+    // condition, stamped with the epoch it still applies, is its hull's current state here until the move, and isn't resent.
+    [Fact]
+    public void OldHostsCondition_WhileAHostChangeIsQueued_StillApplies()
     {
-        Assert.Equal(expected, BattleShipReplicator.IsEarlyHostCondition(followsHost, rejection, conditionEpoch, appliedEpoch));
+        var harness = new Harness(committed: false, queuedArrivals: true);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
+        var sinking = new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk);
+
+        harness.SessionEpoch = HostEpoch + 1;
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, "third_peer", HostEpoch + 1));
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, sinking, 0));
+
+        harness.Engine.Verify(e => e.ApplyCondition(copy, sinking), Times.Once);
+        Assert.Equal(Peer, ship.CurrentAuthority);
+    }
+
+    // The conditions an owner sends follow the epoch its AI hull move applied, not the session's, which runs ahead of it.
+    [Fact]
+    public void OwnCondition_IsStampedWithTheAppliedHostEpoch()
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull)).Returns(Condition(100f));
+        harness.SessionEpoch = HostEpoch + 1;
+
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkShipCondition && ((NetworkShipCondition)m).HostEpoch == HostEpoch)), Times.Once);
+    }
+
+    // The move restarts an AI hull's condition order at the move's epoch, so a report of an older generation is stale.
+    [Fact]
+    public void ConditionOrder_AfterAHostMove_RestartsAtTheMovesEpoch()
+    {
+        var harness = new Harness(committed: false);
+        harness.Members.Add("third_peer");
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 3));
+
+        harness.SessionEpoch = HostEpoch + 1;
+        harness.Replicator.TransferHostHulls("third_peer", HostEpoch + 1);
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(50f), 3));
+        var olderGeneration = (string)Inspected(harness, ship.ShipId)["conditionLastReject"]!;
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch + 1, Condition(60f), 3));
+
+        Assert.Equal("stale_epoch", olderGeneration);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, It.Is<BattleShipCondition>(c => c.HitPoints == 50f)), Times.Never);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, It.Is<BattleShipCondition>(c => c.HitPoints == 60f)), Times.Once);
     }
 
     // A new owner of an AI hull reports its own reserve at its first check, even when it equals the last one reported.
@@ -462,7 +502,7 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: true);
         var (_, ship) = RegisterPeerCopy(harness, isNpcParty: true);
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
+        harness.Conditions.Receive(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
         harness.Engine.Setup(e => e.ReadCondition(It.IsAny<MissionObject>())).Returns(Condition(100f));
         harness.Engine.Setup(e => e.ReadSpawnableReserve(It.IsAny<MissionObject>())).Returns(12);
 
@@ -1341,15 +1381,15 @@ public class BattleShipReplicatorTests
         var newer = new NetworkShipCondition(ship.ShipId, Peer, 2, 0, Condition(600f));
         var older = new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(800f));
 
-        harness.Replicator.AcceptCondition(newer);
-        harness.Replicator.AcceptCondition(older);
+        harness.Conditions.Receive(newer);
+        harness.Conditions.Receive(older);
 
         harness.Engine.Verify(e => e.ApplyCondition(copy, newer.Condition), Times.Once);
         harness.Engine.Verify(e => e.ApplyCondition(copy, older.Condition), Times.Never);
         var inspected = JObject.FromObject(harness.Replicator.Inspect())["ships"]!
             .Single(entry => (Guid)entry["shipId"]! == ship.ShipId);
         Assert.Equal(2, (long)inspected["conditionRevision"]!);
-        Assert.Equal("condition_stale", (string)inspected["lastReject"]!);
+        Assert.Equal("stale", (string)inspected["conditionLastReject"]!);
     }
 
     [Fact]
@@ -1358,8 +1398,8 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: true);
         var shipId = Guid.NewGuid();
         var latest = new NetworkShipCondition(shipId, Peer, 3, 0, Condition(400f));
-        harness.Replicator.AcceptCondition(latest);
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(shipId, Peer, 2, 0, Condition(700f)));
+        harness.Conditions.Receive(latest);
+        harness.Conditions.Receive(new NetworkShipCondition(shipId, Peer, 2, 0, Condition(700f)));
         harness.Replicator.Tick(0.1f);
         harness.Engine.Verify(e => e.ApplyCondition(It.IsAny<MissionObject>(), It.IsAny<BattleShipCondition>()), Times.Never);
 
@@ -1447,8 +1487,8 @@ public class BattleShipReplicatorTests
         harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame));
         harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 3, frame));
         harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 2, frame));
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(record.ShipId, Peer, 1, 0, Condition(800f)));
-        harness.Replicator.AcceptCondition(latestCondition);
+        harness.Conditions.Receive(new NetworkShipCondition(record.ShipId, Peer, 1, 0, Condition(800f)));
+        harness.Conditions.Receive(latestCondition);
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
         var whileDeploying = JObject.FromObject(harness.Replicator.Inspect());
@@ -1482,7 +1522,7 @@ public class BattleShipReplicatorTests
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
         harness.Samples.Accept(new NetworkBattleShipSample(record.ShipId, Peer, 5, MovedFrame(), hostEpoch: HostEpoch - 1));
-        harness.Replicator.AcceptCondition(heldCondition);
+        harness.Conditions.Receive(heldCondition);
         harness.Replicator.Tick(0.1f);
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own, harness.SessionEpoch));
 
@@ -1516,7 +1556,7 @@ public class BattleShipReplicatorTests
             new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptCondition(sunk);
+        harness.Conditions.Receive(sunk);
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own, harness.SessionEpoch));
 
         deploying = false;
@@ -1543,7 +1583,7 @@ public class BattleShipReplicatorTests
             new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        harness.Replicator.AcceptCondition(heldCondition);
+        harness.Conditions.Receive(heldCondition);
         harness.Replicator.TransferHostHulls("successor", harness.SessionEpoch);
         deploying = false;
         harness.Replicator.Tick(0.016f);
@@ -1793,6 +1833,8 @@ public class BattleShipReplicatorTests
         public HeldShipBuffer HeldShips { get; }
         /// <summary>The hulls' 20 Hz samples.</summary>
         public BattleShipSampleStream Samples { get; }
+        /// <summary>The hulls' damage state and reported reserve.</summary>
+        public BattleShipConditionStream Conditions { get; }
         // Applies at once unless a test queues them: these tests drive the replicator alone, without the services tick.
         public IBattleShipArrivals Arrivals { get; }
         /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
@@ -1844,6 +1886,7 @@ public class BattleShipReplicatorTests
             Ledger = core.Ledger;
             HeldShips = core.HeldShips;
             Samples = core.Samples;
+            Conditions = core.Conditions;
         }
 
         // Publishes a message whose handler hops to the game thread, and waits for the hop.
