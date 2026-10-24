@@ -1,6 +1,10 @@
 ﻿using GameInterface.Services.MapEvents;
 using Common.Messaging;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies;
+using GameInterface.Services.Players;
+using Serilog;
+using Serilog.Events;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using TaleWorlds.CampaignSystem;
@@ -464,5 +468,56 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }
+    }
+
+    [Fact]
+    public void ReleaseEndedMapEventLinks_FirstCallbackThrows_ReleasesAndReportsRemainingParties()
+    {
+        // the first party's broadcast fails after the ended battle already cleared every party's side,
+        // so a second run could never find the rest again
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var logger = new CapturingLogger();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+
+            var cleaner = new MapEventLoadCleaner(
+                logger,
+                Server.Resolve<IMessageBroker>(),
+                Server.Resolve<IPlayerManager>(),
+                Server.ObjectManager,
+                Server.Resolve<IArmyDisbander>());
+            var reportedParties = new List<PartyBase>();
+
+            var releasedParties = cleaner.ReleaseEndedMapEventLinks(party =>
+            {
+                if (reportedParties.Count == 0)
+                {
+                    reportedParties.Add(party);
+                    throw new InvalidOperationException("broadcast failed");
+                }
+
+                reportedParties.Add(party);
+            });
+
+            Assert.Equal(2, releasedParties.Length);
+            Assert.Contains(attacker.Party, releasedParties);
+            Assert.Contains(defender.Party, releasedParties);
+            Assert.Equal(releasedParties, reportedParties);
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+
+        var warning = Assert.Single(logger.Events, logEvent => logEvent.Exception is InvalidOperationException);
+        Assert.Equal(LogEventLevel.Warning, warning.Level);
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<LogEvent> Events { get; } = new();
+
+        public void Write(LogEvent logEvent) => Events.Add(logEvent);
     }
 }

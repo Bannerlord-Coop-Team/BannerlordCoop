@@ -151,16 +151,26 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
         {
-            // Broadcast as each party is released, so a later group that throws can't swallow it.
+            // Broadcast as each party is released, so a later group that throws can't swallow it. The cleaner
+            // logs a failed broadcast and keeps going, so count the ones that reached the clients.
+            var broadcastCount = 0;
             var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks(releasedParty =>
             {
-                if (objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
-                    network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                if (!objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
+                    return;
+
+                network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                broadcastCount++;
             });
 
-            return releasedParties.Length == 0
-                ? null
-                : $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
+            if (releasedParties.Length == 0)
+                return null;
+
+            var line = $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
+            var unreported = releasedParties.Length - broadcastCount;
+            return unreported == 0
+                ? line
+                : $"{line} Could not tell clients about {unreported} of them, see the server log.";
         });
 
         if (party.Party?.MapEvent != null)

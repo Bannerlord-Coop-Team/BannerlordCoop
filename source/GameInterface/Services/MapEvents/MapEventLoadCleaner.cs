@@ -24,8 +24,7 @@ public interface IMapEventLoadCleaner
     void CleanUpLoadedMapEvents();
 
     // Releases every party still linked to a battle that already ended, calling onReleased for each one
-    // as it is released. Also run live by coop.unstuck, whose step reports a throw from onReleased; running it
-    // again releases the parties that were left.
+    // as it is released. A throw from onReleased is logged and the rest are still released. Also run live by coop.unstuck.
     PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased = null);
 }
 
@@ -166,7 +165,16 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
                 releasedParties.Add(party);
 
-                onReleased?.Invoke(party);
+                // The ended battle already cleared every party's side, so a later run could not find the remaining parties.
+                // One failed callback must not skip the parties after it.
+                try
+                {
+                    onReleased?.Invoke(party);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning(ex, "Could not report released party {PartyId} from ended map event {MapEventId}", party.Id, mapEvent.StringId);
+                }
             }
         }
 
