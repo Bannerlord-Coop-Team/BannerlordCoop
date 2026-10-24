@@ -97,7 +97,8 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
 
     private void Handle_Done(MessagePayload<PartyDoneLogicAttempted> payload)
     {
-        if (ModInformation.IsClient && pickers.TryGetValue(payload.What.LeftMemberRoster, out var picker))
+        if (ModInformation.IsClient && payload.What.LeftMemberRoster != null &&
+            pickers.TryGetValue(payload.What.LeftMemberRoster, out var picker))
             pickers[payload.What.LeftMemberRoster] = (picker.Issue, null);
     }
 

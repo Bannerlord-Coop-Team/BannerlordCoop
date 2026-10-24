@@ -362,8 +362,7 @@ public class AcceptVisibilityTests : IDisposable
         });
 
         Assert.Empty(otherQuestCompletions);
-        var update = Assert.Single(otherUpdates);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
     }
 
     [Fact]
