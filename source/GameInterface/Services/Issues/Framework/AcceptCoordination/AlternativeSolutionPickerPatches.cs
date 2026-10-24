@@ -10,6 +10,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>Keeps selection attribution at the issue conversation that opens the quest picker.</summary>
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class AlternativeSolutionPickerPatches
 {
     [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]

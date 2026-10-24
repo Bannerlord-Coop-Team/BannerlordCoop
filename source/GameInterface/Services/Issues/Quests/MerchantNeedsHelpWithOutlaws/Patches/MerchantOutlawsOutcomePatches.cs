@@ -7,6 +7,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssue
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class MerchantOutlawsOutcomePatches
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.SuccessConsequences))]

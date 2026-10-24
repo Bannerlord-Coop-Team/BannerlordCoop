@@ -3,6 +3,7 @@ using Common;
 using Common.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.LiveTesting;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Newtonsoft.Json;
 using System;
@@ -22,6 +23,7 @@ public sealed class ArmyRemovalFixtureViewCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
     private readonly IUiWidgetAdapter widgets;
+    private readonly ICommandObjectResolver resolver;
     private static GauntletMovieIdentifier movie;
     private static GauntletLayer layer;
     private static bool showing;
@@ -29,10 +31,11 @@ public sealed class ArmyRemovalFixtureViewCommand : ICoopCommand
     private static string partyId;
     private static string viewKind;
 
-    public ArmyRemovalFixtureViewCommand(IObjectManager objectManager, IUiWidgetAdapter widgets)
+    public ArmyRemovalFixtureViewCommand(IObjectManager objectManager, IUiWidgetAdapter widgets, ICommandObjectResolver resolver)
     {
         this.objectManager = objectManager;
         this.widgets = widgets;
+        this.resolver = resolver;
     }
 
     public string Prefix => "coop.debug.army";
@@ -42,7 +45,7 @@ public sealed class ArmyRemovalFixtureViewCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("action", "show, state or clear"),
-        new ExpectedArgs("partyId", "Registered party id for show.", isRequired: false),
+        new ExpectedArgs("partyId", "Party name or id for show; quote names with spaces.", isRequired: false),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -56,11 +59,14 @@ public sealed class ArmyRemovalFixtureViewCommand : ICoopCommand
         }
         if (args[0] == "show" && args.Count == 2)
         {
-            if (!objectManager.TryGetObject<MobileParty>(args[1], out var party) || party.LeaderHero == null)
+            var resolved = resolver.TryResolveMobileParty(args[1], out var party, out var resolveError);
+            if (!resolved && resolver.IsAmbiguous(resolveError))
+                return new CoopCommandResult(false, resolveError, "command_failed");
+            if (!resolved || party.LeaderHero == null)
                 return new CoopCommandResult(false, "The named lord party is missing.", "command_failed");
             var army = party.Army;
             bool joined = army != null && army.DoesLeaderPartyAndAttachedPartiesContain(party);
-            partyId = args[1];
+            partyId = objectManager.TryGetId(party, out var canonicalPartyId) ? canonicalPartyId : args[1];
             viewKind = joined ? "army" : "party";
             showing = true;
             try

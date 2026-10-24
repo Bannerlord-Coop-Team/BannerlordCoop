@@ -9,6 +9,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssue
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class MerchantOutlawsAlternativeJournalPatches
 {
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.OnAlternativeSolutionSolvedAndTroopsAreReturning))]

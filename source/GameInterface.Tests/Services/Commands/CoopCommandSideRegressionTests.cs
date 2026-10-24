@@ -3,6 +3,7 @@ using Common.Commands;
 #if DEBUG
 using Coop.Core.Common.Commands;
 #endif
+using GameInterface.Tests.Utils.Commands;
 using GameInterface;
 using Serilog;
 using System;
@@ -27,7 +28,7 @@ public class CoopCommandSideRegressionTests
         Assert.All(CorrectedCommandSides(), expected =>
         {
             Type commandType = Assert.Single(nestedTypes[(expected.OuterTypeName, expected.TypeName)]);
-            var command = (ICoopCommand)Activator.CreateInstance(commandType)!;
+            var command = CommandTestFactory.Create<ICoopCommand>(commandType);
 
             Assert.True(
                 expected.Side == command.Side,
@@ -118,7 +119,7 @@ public class CoopCommandSideRegressionTests
     private static ICoopCommand CreateCommand(string outerTypeName, string typeName)
     {
         Type commandType = GetCommandType(outerTypeName, typeName);
-        return (ICoopCommand)Activator.CreateInstance(commandType)!;
+        return CommandTestFactory.Create<ICoopCommand>(commandType);
     }
 
     private static Type GetCommandType(string outerTypeName, string typeName)

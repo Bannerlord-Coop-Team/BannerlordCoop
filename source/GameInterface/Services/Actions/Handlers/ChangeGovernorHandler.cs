@@ -7,7 +7,6 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -69,7 +68,7 @@ internal class ChangeGovernorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Town>(data.FortificationId, out var fortification)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
-            if (ModInformation.IsServer && !CanManageClan(obj.Who, fortification.OwnerClan)) return;
+            if (ModInformation.IsServer && !CanSenderManageClan(obj.Who, fortification.OwnerClan)) return;
 
             ChangeGovernorAction.ApplyInternal(fortification, governor);
 
@@ -93,7 +92,7 @@ internal class ChangeGovernorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
             if (ModInformation.IsServer &&
-                (governor.GovernorOf == null || !CanManageClan(obj.Who, governor.GovernorOf.OwnerClan))) return;
+                (governor.GovernorOf == null || !CanSenderManageClan(obj.Who, governor.GovernorOf.OwnerClan))) return;
 
             ChangeGovernorAction.ApplyGiveUpInternal(governor);
 
@@ -101,10 +100,11 @@ internal class ChangeGovernorHandler : IHandler
         });
     }
 
-    private bool CanManageClan(object sender, Clan clan)
+    private bool CanSenderManageClan(object sender, Clan clan)
     {
-        return sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
-            objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var actor) &&
-            permissions.CanManageClan(actor, clan);
+        if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
+
+        Logger.Warning("Ignoring a governor change for clan {ClanId} from a peer that does not lead it", clan?.StringId);
+        return false;
     }
 }

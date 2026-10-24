@@ -11,6 +11,7 @@ using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -140,6 +141,44 @@ public class AcceptVisibilityTests : IDisposable
         });
 
         return accepted;
+    }
+
+    [Fact]
+    public void QuestSolution_AnotherOwnersTimeoutDoesNotEndTheFirstOwnersArchive()
+    {
+        var giverAId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var giverBId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverAId, out var giverA));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverBId, out var giverB));
+            QuestBase questA;
+            QuestBase questB;
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverA, giverA.PartyBelongedTo))
+            {
+                questA = new UnstartedQuest("issue_owner_a_quest", giverA);
+            }
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverB, giverB.PartyBelongedTo))
+            {
+                questB = new UnstartedQuest("issue_owner_b_quest", giverB);
+            }
+
+            var archiveB = new JournalLogEntry(questB.Title, giverB, null, false, questB);
+            var archiveA = new JournalLogEntry(questA.Title, giverA, null, false, questA);
+            LogEntry.AddLogEntry(archiveB);
+            LogEntry.AddLogEntry(archiveA);
+            // B has no issue, so the journal finds its archive by quest StringId and takes the newest match.
+            // A's archive is newest, so with null quest ids B's ending would close A's archive.
+            var journal = new TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior();
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverB, giverB.PartyBelongedTo))
+            {
+                journal.OnQuestCompleted(questB, QuestBase.QuestCompleteDetails.Fail);
+            }
+
+            Assert.Equal(QuestBase.QuestCompleteDetails.Invalid, archiveA._questCompletionDetail);
+            Assert.Equal(QuestBase.QuestCompleteDetails.Fail, archiveB._questCompletionDetail);
+            Assert.NotEqual(questA.StringId, questB.StringId);
+        });
     }
 
     [Fact]
@@ -320,6 +359,8 @@ public class AcceptVisibilityTests : IDisposable
             Assert.Null(notable.Issue);
             Assert.Null(otherIssue.IssueQuest);
             Assert.False(otherIssue.IsTriedToSolveBefore);
+            Assert.Empty(otherIssue.JournalEntries);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(otherIssue)));
         });
 
         Assert.Empty(otherQuestCompletions);
@@ -367,6 +408,12 @@ public class AcceptVisibilityTests : IDisposable
         ListenForIssueUpdatesOnTheOtherClient();
 
         Other.SimulateMessage(this, new NetworkQuestSolutionAccepted(notableId, IssueId, OwnerControllerId, 1f, Array.Empty<byte>()));
+        IssueBase mirrorIssue = null;
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(notableId, out var mirror));
+            mirrorIssue = mirror.Issue;
+        });
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, IssueOutcome.QuestSuccess));
 
         Other.Call(() =>
@@ -375,8 +422,56 @@ public class AcceptVisibilityTests : IDisposable
             Assert.Null(notable.Issue);
         });
 
-        var update = Assert.Single(otherUpdates);
-        Assert.Equal(IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, update.Details);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
+        Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(mirrorIssue))));
+    }
+
+    // Sets the owner's state and ownership by hand. LordSolutionCoordinator.HandleStarted would also run
+    // StartIssueWithLordSolution under the difficulty override and then BeforeGameMenuOpened, which can open
+    // the merchant conversation or end the issue with a refused counter-offer.
+    private void StartLordSolutionOnTheOwner(IssueBase issue, string notableId)
+    {
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId));
+
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
+                issue.IsTriedToSolveBefore = true;
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(IssueOutcome.LordAcceptedCounterOffer)]
+    [InlineData(IssueOutcome.LordRefusedCounterOffer)]
+    public void LordSolution_OnlyTheOwnerLogsTheCounterOfferEnding(IssueOutcome outcome)
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerIssue = AddIssue(Owner, notableId);
+        var otherIssue = AddIssue(Other, notableId);
+        ListenForIssueUpdatesOnTheOtherClient();
+        StartLordSolutionOnTheOwner(ownerIssue, notableId);
+        Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
+
+        Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
+        Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
+
+        Owner.Call(() =>
+        {
+            Assert.Null(ownerIssue.IssueOwner.Issue);
+            Assert.Single(ownerIssue.JournalEntries);
+            Assert.True(ownerIssue.IsTriedToSolveBefore);
+        });
+
+        Other.Call(() =>
+        {
+            Assert.Null(otherIssue.IssueOwner.Issue);
+            Assert.Empty(otherIssue.JournalEntries);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(otherIssue)));
+        });
+
+        Assert.Empty(otherUpdates);
     }
 }
