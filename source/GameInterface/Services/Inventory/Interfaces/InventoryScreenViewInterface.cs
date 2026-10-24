@@ -1,5 +1,6 @@
 ﻿using SandBox.GauntletUI;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Inventory;
@@ -31,6 +32,8 @@ internal class InventoryScreenViewInterface : IInventoryScreenViewInterface
 
         view.IsRefreshed = false;
         view.AfterTransfer(logic, new List<TransferCommandResult> { result });
+        // AfterTransfer only reprices the category of a row that already existed, so a new row would leave it stale
+        view.UpdateCostOfItemsInCategory(new HashSet<ItemCategory> { element.Item.GetItemCategory() });
         view.RefreshInformationValues();
         if (current.Amount == 0) view.ExecuteRemoveZeroCounts();
         view.IsRefreshed = true;
