@@ -138,6 +138,16 @@ internal class MapEventPatches
         if (__instance.IsFinalized)
             return false;
 
+        // A receive callback's AllowedThread does not authorize ending a server-owned raid.
+        if (ModInformation.IsClient && __instance.IsRaidHostileAction() &&
+            AllowedThread.IsThisThreadAllowed() &&
+            !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+        {
+            Logger.Debug("Ignored received raid finalization for {MapEventId}. {StackTrace}",
+                __instance.StringId, System.Environment.StackTrace);
+            return false;
+        }
+
         if (ModInformation.IsServer)
             MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
@@ -166,6 +176,32 @@ internal class MapEventPatches
         // Keep the event registered while finalized handlers clear their per-event state.
         MessageBroker.Instance.Publish(__instance, new MapEventFinalized(__instance));
         MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
+    }
+
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyFinalizer]
+    private static Exception Finalizer_FinalizeEventAux(MapEvent __instance, Exception __exception)
+    {
+        // Vanilla sets WaitingRemoval before running listeners and detaching parties, so a throw past that point
+        // leaves every party linked to a battle the map event manager drops next tick (#3129).
+        if (__exception == null || ModInformation.IsClient || !__instance.IsFinalized)
+            return __exception;
+
+        Logger.Error(__exception, "Map event {MapEventId} failed while finalizing, releasing its parties", __instance.StringId);
+
+        if (!ContainerProvider.TryResolve<IMapEventLoadCleaner>(out var loadCleaner))
+            return __exception;
+
+        try
+        {
+            loadCleaner.ReleaseFailedFinalization(__instance);
+        }
+        catch (Exception releaseException)
+        {
+            Logger.Error(releaseException, "Could not release the parties of map event {MapEventId}", __instance.StringId);
+        }
+
+        return null;
     }
 
     [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
@@ -532,6 +568,18 @@ internal class MapEventPatches
         return true;
     }
 
+    [HarmonyPatch(nameof(MapEvent.Update))]
+    [HarmonyPostfix]
+    private static void PostfixUpdate(MapEvent __instance, bool __runOriginal)
+    {
+        // Only battles the gate above checked and handed to vanilla, not its setup or receive fast path.
+        if (!__runOriginal || __instance.IsFinalized || CallOriginalPolicy.IsOriginalAllowed())
+            return;
+
+        if (ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver))
+            resolver.TryResolve(__instance);
+    }
+
     private static bool RepairLeaderParties(MapEvent mapEvent)
     {
         if (mapEvent._sides == null || mapEvent._sides.Length < 2 ||
@@ -614,39 +662,18 @@ internal class MapEventPatches
     }
 
     /// <summary>A player party with no registered owner counts as connected, which keeps the battle waiting.</summary>
-    private static bool HasConnectedPlayerParty(MapEvent mapEvent)
-    {
-        // without the player manager, keep waiting like before
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent) =>
+        // without the resolver, keep waiting like before
+        !ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) ||
+        resolver.HasConnectedPlayerParty(mapEvent);
 
-        return mapEvent.InvolvedParties.Any(party =>
-            party != null &&
-            party.IsMobile &&
-            !party.MobileParty.IsControlledByThisInstance() &&
-            !playerManager.IsOwnerOfPartyDisconnected(party.MobileParty));
-    }
+    private static bool IsBattleModeBusy(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.IsBattleModeBusy(mapEvent);
 
-    private static bool IsBattleModeBusy(MapEvent mapEvent)
-    {
-        if (HasOccupiedBattleMission(mapEvent))
-            return true;
-
-        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
-            objectManager.TryGetId(mapEvent, out var mapEventId) &&
-            ServerBattleModeArbiter.TryGetMode(mapEventId, out var mode) &&
-            mode == BattleStartMode.Simulation;
-    }
-
-    private static bool HasOccupiedBattleMission(MapEvent mapEvent)
-    {
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
-            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry))
-            return false;
-
-        return ServerBattleModeArbiter.IsMissionClaimed(mapEventId) &&
-               membershipRegistry.IsInstanceOccupied(mapEventId);
-    }
+    private static bool HasOccupiedBattleMission(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.HasOccupiedBattleMission(mapEvent);
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MapEvent.Initialize))]

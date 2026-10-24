@@ -16,13 +16,17 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
 {
     private static readonly Dictionary<MethodBase, MethodCallRecorder> ActiveRecorders = new();
     private readonly Harmony harmony = new($"test-call-recorder-{Guid.NewGuid()}");
+    private readonly bool runOriginal;
     private readonly List<MethodInfo> methods = new();
     private readonly List<(object? Container, string? MenuId)> calls = new();
 
     public MethodCallRecorder(params MethodInfo[] targets) : this(Priority.Normal, targets) { }
 
-    public MethodCallRecorder(int priority, params MethodInfo[] targets)
+    public MethodCallRecorder(int priority, params MethodInfo[] targets) : this(priority, false, targets) { }
+
+    public MethodCallRecorder(int priority, bool runOriginal, params MethodInfo[] targets)
     {
+        this.runOriginal = runOriginal;
         try
         {
             foreach (var method in targets)
@@ -75,7 +79,8 @@ internal sealed class MethodCallRecorder : IMethodCallRecorder
     {
         // The container is restored across network calls; ambient game statics are not.
         GameInterface.ContainerProvider.TryGetContainer(out var container);
-        ActiveRecorders[method].calls.Add((container, menuId));
-        return false;
+        var recorder = ActiveRecorders[method];
+        recorder.calls.Add((container, menuId));
+        return recorder.runOriginal;
     }
 }
