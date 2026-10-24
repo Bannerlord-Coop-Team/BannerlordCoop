@@ -739,6 +739,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
             party.MemberRoster.AddToCounts(troop, 1000);
+            militia.MemberRoster.Clear();
             militia.MemberRoster.AddToCounts(troop, 16);
             Server.Resolve<IVillageHostileActionInterface>().ApplyHostileAction(party, settlement, VillageHostileAction.Raid);
             var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
@@ -774,6 +775,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(behavior.ConsiderVillageSurrenderPossibility());
             Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Battle.PlayerSide);
             behavior.UpdateVillageHostileActionEncounter(null);
+            Assert.Equal(0f, settlement.Militia);
         }, presentationMethods);
 
         Server.Call(() =>
