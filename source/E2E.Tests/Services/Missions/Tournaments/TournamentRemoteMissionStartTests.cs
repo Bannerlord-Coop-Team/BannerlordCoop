@@ -28,6 +28,7 @@ public class TournamentRemoteMissionStartTests : MissionTestEnvironment
 
         client.Call(() =>
         {
+            BannerManager.Initialize();
             var mission = fixture.CreateMission(client);
             mission.Shell._missionMode = MissionMode.StartUp;
             mission.Shell._listeners = new List<IMissionListener>();
