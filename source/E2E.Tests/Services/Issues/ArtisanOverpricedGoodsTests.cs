@@ -335,8 +335,13 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     public void StaleDirectAccept_DoesNotReplaceAnAcceptedLordSolution()
     {
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        using var notifications = new MethodCallRecorder(
+            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithQuest()));
 
+        Assert.Equal(1, notifications.CountFor(ClientA));
+        Assert.Equal(0, notifications.CountFor(ClientB));
+        Assert.Equal(0, notifications.CountFor(Server));
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
         ClientA.Call(() =>
         {
