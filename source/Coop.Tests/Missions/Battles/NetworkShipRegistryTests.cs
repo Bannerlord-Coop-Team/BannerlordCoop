@@ -160,15 +160,6 @@ public class NetworkShipRegistryTests
         Assert.False(registry.IsGone(Guid.NewGuid()));
     }
 
-    [Theory]
-    [InlineData(1, false)]
-    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts - 1, false)]
-    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts, true)]
-    public void IsForeignHullSpawnExhausted_StopsRetryingAfterTheBoundedAttempts(int attempts, bool expected)
-    {
-        Assert.Equal(expected, BattleShipReplicator.IsForeignHullSpawnExhausted(attempts));
-    }
-
     // Capture 2.3 step 3: crew identity is formation-based, so after vanilla's swap the captor's formation names the prize,
     // whose crew and reinforcements it now holds, and the captor's old hull answers for no formation.
     [Fact]

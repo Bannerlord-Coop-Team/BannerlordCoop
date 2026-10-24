@@ -874,15 +874,11 @@ public class BattleShipCaptureReplicatorTests
 
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
-            var epochs = new HostEpochPolicy();
-            var context = new BattleContext(Session.Object, Mock.Of<IBattleDeploymentCoordinator>(), component.Object, epochs,
-                Mock.Of<IBattleResultCommitter>(), Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(),
-                Mock.Of<IBattlePartyWithdrawal>());
-            HullAuthority = new NavalHullAuthority(Session.Object, component.Object, Engine.Object, context.TroopWithdrawal);
-            Ships = new BattleShipReplicator(Network.Object, Broker, context, Engine.Object, Mock.Of<IBattleTeamResolver>(),
-                Mock.Of<IObjectManager>(), HullAuthority,
-                new BattleShipConditionStream(Network.Object, Session.Object, Engine.Object, epochs, members.Object),
-                Mock.Of<IAgentStationUseReplicator>(), CaptureEngine.Object, Arrivals);
+            var context = ShipReplicatorFixture.Context(Session.Object, component.Object, members.Object);
+            var core = new ShipReplicatorFixture(context, Broker, Engine.Object, Network.Object, captureEngine: CaptureEngine.Object,
+                arrivals: Arrivals);
+            HullAuthority = core.HullAuthority;
+            Ships = core.Replicator;
             Applier = new ShipCaptureApplier(Network.Object, Relay.Object, Broker, context, Engine.Object, CaptureEngine.Object, Ships,
                 HullAuthority, Arrivals);
             Exchange = new BattleShipCaptureReplicator(Network.Object, Broker, context, Engine.Object, CaptureEngine.Object,

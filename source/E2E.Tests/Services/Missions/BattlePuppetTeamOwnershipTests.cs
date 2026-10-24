@@ -6,6 +6,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using Coop.Tests.Missions.Battles;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
@@ -594,17 +595,11 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         IBattleTeamResolver teams, GameInterface.Services.ObjectManager.IObjectManager objectManager,
         IBattleShipArrivals arrivals)
     {
-        var epochs = new HostEpochPolicy();
         var members = new Mock<IMissionContext>();
         members.SetupGet(m => m.ControllersInMission).Returns(new[] { "host" });
-        var context = new BattleContext(session, deployment, missionComponent, epochs, Mock.Of<IBattleResultCommitter>(),
-            Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(),
-            Mock.Of<IBattlePartyWithdrawal>());
-        return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
-            new NavalHullAuthority(session, missionComponent, engine, context.TroopWithdrawal),
-            new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs, members.Object),
-            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>(),
-            arrivals);
+        var context = ShipReplicatorFixture.Context(session, missionComponent, members.Object, deployment);
+        return new ShipReplicatorFixture(context, broker, engine, teamResolver: teams, arrivals: arrivals,
+            objectManager: objectManager).Replicator;
     }
 
     [Fact]

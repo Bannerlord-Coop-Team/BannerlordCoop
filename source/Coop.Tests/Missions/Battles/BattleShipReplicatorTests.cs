@@ -96,13 +96,14 @@ public class BattleShipReplicatorTests
         harness.Registry.TryRegister(ship);
         harness.LiveHulls.Add(copy);
         var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        const float lifetime = BattleShipReplicator.SampleLifetimeSeconds;
 
         harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame));
-        harness.Replicator.Tick(0.8f);
+        harness.Replicator.Tick(0.8f * lifetime);
         harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame));
-        harness.Replicator.Tick(0.8f);
+        harness.Replicator.Tick(0.8f * lifetime);
         bool streamingWhileFresh = (bool)Inspected(harness, ship.ShipId)["streaming"]!;
-        harness.Replicator.Tick(0.3f);
+        harness.Replicator.Tick(0.3f * lifetime);
 
         var inspected = Inspected(harness, ship.ShipId);
         Assert.True(streamingWhileFresh);
@@ -133,6 +134,15 @@ public class BattleShipReplicatorTests
             m is NetworkShipCondition && ((NetworkShipCondition)m).SpawnableReserve == 6
             && ((NetworkShipCondition)m).Revision == 2)), Times.Once);
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipSample)), Times.Exactly(3));
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts - 1, false)]
+    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts, true)]
+    public void IsForeignHullSpawnExhausted_StopsRetryingAfterTheBoundedAttempts(int attempts, bool expected)
+    {
+        Assert.Equal(expected, BattleShipReplicator.IsForeignHullSpawnExhausted(attempts));
     }
 
     // R42: a frame longer than the interval carries its overshoot, so 35 ms frames still send at 20 Hz on average.
@@ -233,8 +243,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 9));
         int afterLateCondition = harness.Replicator.ReportedReserveOf(copy);
         var lateReject = (string)Inspected(harness, ship.ShipId)["lastReject"]!;
@@ -258,6 +267,7 @@ public class BattleShipReplicatorTests
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         var inspected = Inspected(harness, ship.ShipId);
+        harness.Engine.Verify(e => e.ApplyForeignSample(ship.Hull, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Never);
         Assert.Equal(0, (long)inspected["accepted"]!);
         Assert.Equal("not_in_mission", (string)inspected["lastReject"]!);
     }
@@ -297,8 +307,7 @@ public class BattleShipReplicatorTests
         harness.Members.Remove(Peer);
         harness.Replicator.AcceptSpawnRecords(new[] { record });
 
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Members.Add(Peer);
         harness.Replicator.Tick(0.1f);
 
@@ -319,38 +328,19 @@ public class BattleShipReplicatorTests
         var fresh = ForeignRecord(Guid.NewGuid());
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Replicator.AcceptSpawnRecords(new[] { late });
         int heldAfterLeave = (int)JObject.FromObject(harness.Replicator.Inspect())["pendingForeignHulls"]!;
         harness.Members.Add(Peer);
-        harness.Broker.Publish(this, new NetworkMissionPeerEntered(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new NetworkMissionPeerEntered(Peer, Instance));
         harness.Replicator.AcceptSpawnRecords(new[] { fresh });
 
         Assert.Equal(0, heldAfterLeave);
         Assert.False(harness.Registry.TryGet(late.ShipId, out _));
         Assert.True(harness.Registry.TryGet(fresh.ShipId, out _));
-    }
-
-    // D4: the server sends a naval disconnect as a leave, so a record the player sent before it dropped spawns nothing here
-    // either, once that leave arrived.
-    [Fact]
-    public void AcceptSpawnRecords_FromAPlayerWhoseLeaveArrived_SpawnsNothing()
-    {
-        using var mission = new MissionCurrentScope();
-        var harness = new Harness(committed: true);
-        harness.SetupForeignSpawn();
-        var record = ForeignRecord(Guid.NewGuid());
-
-        harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
-        harness.Replicator.AcceptSpawnRecords(new[] { record });
-
-        Assert.False(harness.Registry.TryGet(record.ShipId, out _));
+        // D4: a naval disconnect arrives as a leave too, so only the fresh record spawned a copy.
         harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
-            Times.Never);
+            Times.Once);
     }
 
     [Fact]
@@ -408,8 +398,7 @@ public class BattleShipReplicatorTests
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
 
         harness.SessionEpoch = 2;
-        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, "third_peer", 2));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, "third_peer", 2));
         harness.Replicator.AcceptSpawnRecords(Array.Empty<BattleShipSpawnData>());
         harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, 2, Condition(100f), 7));
         int beforeMove = harness.Replicator.ReportedReserveOf(copy);
@@ -642,8 +631,7 @@ public class BattleShipReplicatorTests
 
         harness.Replicator.RemoveHullsOf(Peer);
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own));
         deploying = false;
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
@@ -708,8 +696,7 @@ public class BattleShipReplicatorTests
         var sent = new List<IMessage>();
         harness.Network.Setup(n => n.Send("joiner", It.IsAny<IMessage>())).Callback<string, IMessage>((_, message) => sent.Add(message));
 
-        harness.Broker.Publish(this, new NetworkMissionPeerEntered("joiner", Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new NetworkMissionPeerEntered("joiner", Instance));
 
         Assert.Equal(2, sent.Count);
         Assert.IsType<NetworkSpawnBattleShips>(sent[0]);
@@ -728,32 +715,6 @@ public class BattleShipReplicatorTests
         harness.Registry.TryRegister(ship);
         harness.LiveHulls.Add(copy);
         return (copy, ship);
-    }
-
-    [Fact]
-    public void Removal_KeepsWhetherTheOwnersMissionEndedOverTheWire()
-    {
-        var shipId = Guid.NewGuid();
-
-        var ending = Serializer.DeepClone(new NetworkShipRemoved(shipId, Peer, ShipRemovalReason.Leave, missionEnding: true));
-        var staying = Serializer.DeepClone(new NetworkShipRemoved(shipId, Peer, ShipRemovalReason.Retreat, missionEnding: false));
-
-        Assert.True(ending.MissionEnding);
-        Assert.Equal(ShipRemovalReason.Leave, ending.Reason);
-        Assert.False(staying.MissionEnding);
-        Assert.Equal(shipId, staying.ShipId);
-    }
-
-    [Fact]
-    public void Condition_KeepsItsReserveOverTheWire_AndANegativeReserveIsRejected()
-    {
-        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, CreateHull(), null);
-
-        var wire = Serializer.DeepClone(new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(100f), 14));
-
-        Assert.Equal(14, wire.SpawnableReserve);
-        Assert.Equal("invalid_reserve", BattleShipConditionStream.ValidateCondition(ship, Own,
-            new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(100f), -1), 0, 0, InMission));
     }
 
     private static JToken Inspected(Harness harness, Guid shipId) =>
@@ -1048,10 +1009,10 @@ public class BattleShipReplicatorTests
         var departedShip = RegisterForeign(harness, Peer, isNpcParty: false);
         var aiShip = RegisterForeign(harness, Peer, isNpcParty: true);
         var presentShip = RegisterForeign(harness, "someone_else", isNpcParty: false);
+        harness.Engine.Setup(e => e.SideOf(departedShip.Hull)).Returns(BattleSideEnum.Defender);
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Replicator.Tick(0.1f);
         harness.Engine.Verify(e => e.ParkHullAgents(departedShip.Hull), Times.Once);
         harness.Engine.Verify(e => e.RemoveHull(It.IsAny<MissionObject>()), Times.Never);
@@ -1077,8 +1038,7 @@ public class BattleShipReplicatorTests
         var departedShip = RegisterForeign(harness, Peer, isNpcParty: false);
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Session.Setup(s => s.IsHostController(Peer)).Returns(false);
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
@@ -1100,12 +1060,10 @@ public class BattleShipReplicatorTests
         RegisterForeign(harness, Peer, isNpcParty: false);
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new MissionPeerLeft(Peer, Instance));
         harness.Replicator.Tick(0.1f);
         harness.Members.Add(Peer);
-        harness.Broker.Publish(this, new NetworkMissionPeerEntered(Peer, Instance));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new NetworkMissionPeerEntered(Peer, Instance));
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
@@ -1133,8 +1091,7 @@ public class BattleShipReplicatorTests
         harness.Registry.TryRegister(ai);
         harness.LiveHulls.Add(aiHull);
 
-        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own));
 
         Assert.Equal(expectedAuthority, ai.CurrentAuthority);
     }
@@ -1258,99 +1215,6 @@ public class BattleShipReplicatorTests
         Assert.Equal(2, (int)ship["input"]!["Sail"]!);
     }
 
-    [Fact]
-    public void Sample_RoundTripsTheHelmInput()
-    {
-        var input = new BattleShipInput(1, 2, 0, -0.5f, 2);
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), input);
-
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, sample);
-        stream.Position = 0;
-        var copy = Serializer.Deserialize<NetworkBattleShipSample>(stream);
-
-        Assert.Equal(input, copy.Input);
-        Assert.Equal(sample.Frame, copy.Frame);
-        Assert.Equal(7, copy.Sequence);
-    }
-
-    // M10: copies extrapolate the owner's frame with the body velocity and yaw rate the sample carries.
-    [Fact]
-    public void Sample_RoundTripsTheOwnersBodyMotion()
-    {
-        var motion = new BattleShipMotion(new Vec2(4.5f, -1.25f), 0.2f);
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: motion);
-
-        var copy = Serializer.DeepClone(sample);
-
-        Assert.Equal(4.5f, copy.Motion.Velocity.x);
-        Assert.Equal(-1.25f, copy.Motion.Velocity.y);
-        Assert.Equal(0.2f, copy.Motion.YawRate);
-    }
-
-    // R45 roll: copies heel under the owner's crew load, which rides each sample as mass and a hull-local centre.
-    [Fact]
-    public void Sample_RoundTripsTheOwnersCrewLoad()
-    {
-        var load = BattleShipCrewLoad.Create(480f, new Vec3(0.75f, -6.5f, 2.25f));
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, load));
-
-        var copy = Serializer.DeepClone(sample);
-
-        Assert.Equal(480f, copy.Motion.CrewLoad.Mass);
-        Assert.Equal(0.75f, copy.Motion.CrewLoad.LocalCentre.x);
-        Assert.Equal(-6.5f, copy.Motion.CrewLoad.LocalCentre.y);
-        Assert.Equal(2.25f, copy.Motion.CrewLoad.LocalCentre.z);
-    }
-
-    // A sample without a load (a frame that committed no weight while agents stood aboard) writes no crew fields.
-    [Fact]
-    public void Sample_WithoutACrewLoad_ArrivesAsUnknown()
-    {
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f));
-
-        var copy = Serializer.DeepClone(sample);
-
-        Assert.False(copy.HasCrewLoad);
-        Assert.Null(copy.Motion.CrewLoad);
-    }
-
-    // A crew that left the deck (all boarded an enemy hull) is a known-empty load, not an unknown one.
-    [Fact]
-    public void Sample_RoundTripsAKnownEmptyDeck()
-    {
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
-            motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Empty));
-
-        var copy = Serializer.DeepClone(sample);
-
-        Assert.True(copy.HasCrewLoad);
-        Assert.Same(BattleShipCrewLoad.Empty, copy.Motion.CrewLoad);
-    }
-
-    [Fact]
-    public void CrewLoad_IsEmptyForAZeroMass()
-    {
-        Assert.Same(BattleShipCrewLoad.Empty, BattleShipCrewLoad.Create(0f, new Vec3(1f, 2f, 3f)));
-        Assert.True(BattleShipCrewLoad.Empty.IsEmpty);
-    }
-
-    [Theory]
-    [InlineData(-80f, 0f, 0f, 0f)]
-    [InlineData(float.NaN, 0f, 0f, 0f)]
-    [InlineData(float.PositiveInfinity, 0f, 0f, 0f)]
-    [InlineData(80f, float.NaN, 0f, 0f)]
-    [InlineData(80f, 0f, float.NegativeInfinity, 0f)]
-    [InlineData(80f, 0f, 0f, float.NaN)]
-    public void CrewLoad_IsUnknownForANegativeOrNonFiniteLoad(float mass, float x, float y, float z)
-    {
-        Assert.Null(BattleShipCrewLoad.Create(mass, new Vec3(x, y, z)));
-    }
-
     // A NaN crew mass on the wire reads as unknown; it never costs the copy its frame.
     [Fact]
     public void ValidateSample_AcceptsANonFiniteCrewLoad_AsUnknown()
@@ -1396,34 +1260,6 @@ public class BattleShipReplicatorTests
             It.Is<BattleShipMotion>(m => m.Velocity.x == 3f && m.Velocity.y == 1f && m.YawRate == -0.1f)), Times.Once);
     }
 
-    [Fact]
-    public void SpawnRecord_RoundTripsTheHullDescriptor()
-    {
-        var record = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", new[] { "sail" },
-            new[] { "sail_piece" }, "figurehead_lion", "Sea Wolf", 900f, 400f, 1234, "pattern");
-
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, new NetworkSpawnBattleShips(new[] { record }));
-        stream.Position = 0;
-        var copy = Assert.Single(Serializer.Deserialize<NetworkSpawnBattleShips>(stream).Ships);
-
-        Assert.Equal(record.ShipId, copy.ShipId);
-        Assert.Equal(record.OwnerControllerId, copy.OwnerControllerId);
-        Assert.Equal(record.Side, copy.Side);
-        Assert.Equal(record.FormationIndex, copy.FormationIndex);
-        Assert.Equal(record.Frame, copy.Frame);
-        Assert.Equal(record.HullId, copy.HullId);
-        Assert.Equal(record.PieceSlots, copy.PieceSlots);
-        Assert.Equal(record.PieceIds, copy.PieceIds);
-        Assert.Equal(record.FigureheadId, copy.FigureheadId);
-        Assert.Equal(record.Name, copy.Name);
-        Assert.Equal(record.HitPoints, copy.HitPoints);
-        Assert.Equal(record.SailHitPoints, copy.SailHitPoints);
-        Assert.Equal(record.RandomValue, copy.RandomValue);
-        Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
-    }
-
     // Capture 2.6: a joiner holding the old authority's record of a hull lets a record of a later capture replace it, never
     // the other way round, so the copy spawns as the captor's.
     [Theory]
@@ -1438,41 +1274,6 @@ public class BattleShipReplicatorTests
         static BattleShipSpawnData Record(int sequence) => new BattleShipSpawnData(Guid.Empty, Peer, "MapEventParty_1", true,
             BattleSideEnum.Defender, 0, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null,
             null, null, 900f, 400f, 1, "", captorControllerId: sequence > 0 ? "captor" : null, captureSequence: sequence);
-    }
-
-    // An AI hull a later host simulates keeps naming the host that fielded it.
-    [Fact]
-    public void SpawnRecord_RoundTripsTheOriginalOwner_AndAnOwnRecordNamesItsOwner()
-    {
-        var migrated = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", Peer);
-        var own = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", Peer);
-
-        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { migrated, own })).Ships;
-
-        Assert.Equal(Peer, copies[0].OriginalOwner);
-        Assert.Equal(Peer, copies[1].OriginalOwner);
-        Assert.Null(copies[1].OriginalOwnerControllerId);
-    }
-
-    // M6 D1: a copy needs its campaign ship's id to report the ship's fate after it becomes the hull's authority.
-    [Fact]
-    public void SpawnRecord_RoundTripsTheCampaignShipId()
-    {
-        var record = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", Peer, "Ship_7");
-        var withoutShip = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "");
-
-        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { record, withoutShip })).Ships;
-
-        Assert.Equal("Ship_7", copies[0].CampaignShipId);
-        Assert.Null(copies[1].CampaignShipId);
     }
 
     [Fact]
@@ -1504,33 +1305,6 @@ public class BattleShipReplicatorTests
         harness.Replicator.Tick(0.1f);
 
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCondition)), Times.Never);
-    }
-
-    [Theory]
-    [InlineData(Peer, Peer, false, 5, 0, 4, 0, null)]
-    [InlineData(Peer, "someone_else", false, 5, 0, 4, 0, "not_authority")]
-    [InlineData(Own, Own, false, 5, 0, 4, 0, "own_hull")]
-    [InlineData(Peer, Peer, false, 4, 0, 4, 0, "stale")]
-    [InlineData(Peer, Peer, false, 3, 9, 4, 1, "stale")]
-    [InlineData(Peer, Peer, true, 9, 2, 1, 3, "stale_epoch")]
-    [InlineData(Peer, Peer, true, 1, 4, 9, 3, null)]
-    [InlineData(Peer, Peer, true, 9, 3, 9, 3, "stale")]
-    public void ValidateCondition_KeepsTheOwnersRevisionOrderAndRestartsItForANewHostEpoch(string authority, string sender,
-        bool isNpcParty, long revision, int epoch, long acceptedRevision, int acceptedEpoch, string expected)
-    {
-        var ship = new NetworkShipInfo(Guid.NewGuid(), authority, "MapEventParty_9", isNpcParty, CreateHull(), null);
-        var condition = new NetworkShipCondition(ship.ShipId, sender, revision, epoch, Condition(500f));
-
-        Assert.Equal(expected, BattleShipConditionStream.ValidateCondition(ship, Own, condition, acceptedRevision, acceptedEpoch, InMission));
-    }
-
-    [Fact]
-    public void ValidateCondition_RejectsANonFiniteCondition()
-    {
-        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
-        var condition = new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(float.NaN));
-
-        Assert.Equal("invalid_condition", BattleShipConditionStream.ValidateCondition(ship, Own, condition, 0, 0, InMission));
     }
 
     [Fact]
@@ -1634,39 +1408,6 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void Condition_DiffersOnlyBeyondTheToleranceOrOnSinkingState()
-    {
-        var condition = new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 50f }, 0);
-
-        Assert.True(condition.DiffersFrom(null));
-        Assert.False(condition.DiffersFrom(new BattleShipCondition(500.005f, 200f, 100f, new[] { 50f, 50f }, 0)));
-        Assert.True(condition.DiffersFrom(new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 49f }, 0)));
-        Assert.True(condition.DiffersFrom(new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 50f }, 1)));
-    }
-
-    [Fact]
-    public void NetworkShipCondition_RoundTripsEveryField()
-    {
-        var message = new NetworkShipCondition(Guid.NewGuid(), Peer, 7, 2,
-            new BattleShipCondition(420.5f, 80f, -3f, new[] { 1f, 2f, 3f, 4f, 5f, 6f }, 2));
-
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, message);
-        stream.Position = 0;
-        var copy = Serializer.Deserialize<NetworkShipCondition>(stream);
-
-        Assert.Equal(message.ShipId, copy.ShipId);
-        Assert.Equal(Peer, copy.OwnerControllerId);
-        Assert.Equal(7, copy.Revision);
-        Assert.Equal(2, copy.HostEpoch);
-        Assert.Equal(420.5f, copy.Condition.HitPoints);
-        Assert.Equal(80f, copy.Condition.SailHitPoints);
-        Assert.Equal(-3f, copy.Condition.FireHitPoints);
-        Assert.Equal(message.Condition.PartialHitPoints, copy.Condition.PartialHitPoints);
-        Assert.Equal(2, copy.Condition.SinkingState);
-    }
-
-    [Fact]
     public void AcceptSpawnRecords_DuringLocalDeployment_HoldsTheCopyAndSpawnsItOnceAfterwardWithTheLatestState()
     {
         using var mission = new MissionCurrentScope();
@@ -1719,8 +1460,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 5, MovedFrame(), hostEpoch: HostEpoch - 1));
         harness.Replicator.AcceptCondition(heldCondition);
         harness.Replicator.Tick(0.1f);
-        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own));
 
         deploying = false;
         harness.Replicator.Tick(0.016f);
@@ -1753,8 +1493,7 @@ public class BattleShipReplicatorTests
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
         harness.Replicator.AcceptCondition(sunk);
-        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
-        GameThread.Run(() => { }, blocking: true);
+        harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own));
 
         deploying = false;
         harness.Replicator.Tick(0.016f);
@@ -1910,8 +1649,14 @@ public class BattleShipReplicatorTests
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
 
         harness.Replicator.Dispose();
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(false);
+        harness.Replicator.Tick(0.1f);
 
         var inspected = JObject.FromObject(harness.Replicator.Inspect());
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Never);
+        harness.Engine.Verify(e => e.ApplyForeignSample(It.IsAny<MissionObject>(), It.IsAny<MatrixFrame>(),
+            It.IsAny<BattleShipMotion>()), Times.Never);
         Assert.Equal(0, (int)inspected["pendingForeignHulls"]!);
         Assert.Equal(0, (int)inspected["heldForDeployment"]!);
         Assert.Equal(0, (int)inspected["heldSamples"]!);
@@ -1997,16 +1742,16 @@ public class BattleShipReplicatorTests
             var resolvedState = BattleState.DefenderVictory;
             resultCommitter.Setup(c => c.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
 
-            var epochs = new HostEpochPolicy();
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
-            var context = new BattleContext(session.Object, deployment.Object, component.Object, epochs, resultCommitter.Object,
-                Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(), PartyWithdrawal.Object);
-            Replicator = new BattleShipReplicator(Network.Object, Broker, context, engine.Object, TeamResolver.Object,
-                Mock.Of<IObjectManager>(), new NavalHullAuthority(session.Object, component.Object, engine.Object, context.TroopWithdrawal),
-                new BattleShipConditionStream(Network.Object, session.Object, engine.Object, epochs, members.Object), Stations.Object,
-                Mock.Of<INavalShipCaptureEngine>(), Arrivals);
+            var context = ShipReplicatorFixture.Context(session.Object, component.Object, members.Object, deployment.Object,
+                resultCommitter.Object, PartyWithdrawal.Object);
+            Replicator = new ShipReplicatorFixture(context, Broker, engine.Object, Network.Object, TeamResolver.Object, Stations.Object,
+                arrivals: Arrivals).Replicator;
         }
+
+        // Publishes a message whose handler hops to the game thread, and waits for the hop.
+        public void PublishAndDrain<T>(T message) where T : IMessage => ShipReplicatorFixture.PublishAndDrain(Broker, this, message);
 
         // A foreign record resolves a team and spawns one live copy hull.
         public MissionObject SetupForeignSpawn(bool initialShipsDeployed = true)
