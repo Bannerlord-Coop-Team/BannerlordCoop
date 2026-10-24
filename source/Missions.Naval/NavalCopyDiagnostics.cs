@@ -83,13 +83,16 @@ internal sealed class CopyDiagnostics
     private bool hasSmoothedAlong;
     private int lastSign;
 
+    /// <summary>Planar distance to the owner's estimated position in metres.</summary>
     public RollingWindow Distance { get; } = new RollingWindow();
 
+    /// <summary>Heading difference to the owner's estimated yaw in degrees.</summary>
     public RollingWindow HeadingDegrees { get; } = new RollingWindow();
 
     /// <summary>Height difference to the owner's sample, which the local water decides.</summary>
     public RollingWindow Heave { get; } = new RollingWindow();
 
+    /// <summary>Size of each steering step's velocity change in m/s.</summary>
     public RollingWindow Correction { get; } = new RollingWindow();
 
     /// <summary>The along-heading position error to the target, low-passed over tau; its sign changes over the window count as oscillations.</summary>
@@ -170,6 +173,7 @@ internal sealed class CopyDiagnostics
         },
     };
 
+    /// <summary>The value rounded to 3 decimals for the inspect output.</summary>
     internal static float Round(float value) => (float)Math.Round(value, 3);
 }
 #endif

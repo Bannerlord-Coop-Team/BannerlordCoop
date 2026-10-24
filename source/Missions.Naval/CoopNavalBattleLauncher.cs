@@ -71,6 +71,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IBattleAgentBudget agentBudget,
         ICoopShipSnapshotBuilder shipSnapshotBuilder,
         INavalSteeredCopies steeredCopies,
+        // The engine and the behaviour must share one per-battle copy set; a plain engine injection would track copies nobody steers.
         Func<INavalSteeredCopies, INavalShipEngine> shipEngines,
         INavalShipCaptureEngine captureEngine,
         INavalBattleServicesFactory servicesFactory,

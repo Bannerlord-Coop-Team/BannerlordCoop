@@ -169,9 +169,11 @@ internal class CopyCrewLoadPatch
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
-        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy) || copy.CrewLoad == null) return true;
+        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy)) return true;
 
+        // One read of the volatile load, which the game thread replaces with each sample.
         var ownerLoad = copy.CrewLoad;
+        if (ownerLoad == null) return true;
         if (ownerLoad.IsEmpty) return false;
 
         var localCentre = ownerLoad.LocalCentre;

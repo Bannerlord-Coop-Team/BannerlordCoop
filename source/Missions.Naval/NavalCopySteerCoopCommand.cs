@@ -10,7 +10,7 @@ namespace Missions.Naval;
 // coop.debug.naval.copy_steer softzone=1 tau=0.3 lead=0.15
 /// <summary>
 /// DEBUG: shows or tunes this client's steered copy knobs; every copy reads them on its next physics step, and they hold
-/// across battles until the game restarts.
+/// across battles until this client leaves the session.
 /// </summary>
 public sealed class NavalCopySteerCoopCommand : ICoopCommand
 {

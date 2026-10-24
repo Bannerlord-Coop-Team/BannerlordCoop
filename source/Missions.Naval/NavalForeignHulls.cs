@@ -78,6 +78,7 @@ internal static class NavalForeignHulls
             ByPhysics = byPhysics;
         }
 
+        // Every copy hull.
         public HashSet<MissionShip> Hulls { get; }
 
         // Each copy by its hull's physics script, for the crew load patch, which only sees the NavalPhysics.
