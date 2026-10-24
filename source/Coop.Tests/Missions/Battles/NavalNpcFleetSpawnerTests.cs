@@ -36,12 +36,13 @@ public class NavalNpcFleetSpawnerTests
     }
 
     [Theory]
-    [InlineData(0, NavalNpcFleetSpawner.Failed)]
-    [InlineData(1, NavalNpcFleetSpawner.Fielded)]
-    [InlineData(3, NavalNpcFleetSpawner.Fielded)]
-    public void Outcome_ReportsAFailedAttemptInsteadOfStayingReady(int hullsSpawned, string expected)
+    [InlineData(0, null, NavalNpcFleetSpawner.Failed)]
+    [InlineData(0, "no hull spawned", NavalNpcFleetSpawner.Failed)]
+    [InlineData(2, "NullReferenceException: crewing threw", NavalNpcFleetSpawner.Failed)]
+    [InlineData(3, null, NavalNpcFleetSpawner.Fielded)]
+    public void Outcome_FailsAnAttemptThatThrewEvenAfterItsHullsSpawned(int hullsSpawned, string failure, string expected)
     {
-        Assert.Equal(expected, NavalNpcFleetSpawner.Outcome(hullsSpawned));
+        Assert.Equal(expected, NavalNpcFleetSpawner.Outcome(hullsSpawned, failure));
     }
 
     [Theory]

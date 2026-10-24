@@ -135,10 +135,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             Logger.Error(exception, "[NavalBattle] Could not field the AI fleet of {MapEventId}", session.InstanceId);
         }
 
-        state = Outcome(hullsSpawned);
+        state = Outcome(hullsSpawned, failure);
     }
 
-    internal static string Outcome(int hullsSpawned) => hullsSpawned > 0 ? Fielded : Failed;
+    // A failure after some hulls spawned still fails: those hulls have no crew, so the side would never read as fielded.
+    internal static string Outcome(int hullsSpawned, string failure) => hullsSpawned > 0 && failure == null ? Fielded : Failed;
 
     public BattleSideEnum FailedSide => FailedSideOf(state, enemySide);
 
