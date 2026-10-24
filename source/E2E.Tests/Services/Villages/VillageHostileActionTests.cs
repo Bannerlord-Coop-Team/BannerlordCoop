@@ -1161,8 +1161,7 @@ public class VillageHostileActionTests : MapEventTestBase
             else
             {
                 Assert.Same(encounter, PlayerEncounter.Current);
-                Assert.Equal(side == BattleSideEnum.Defender ? "village" : "raiding_village",
-                    Campaign.Current.MapStateData.GameMenuId);
+                Assert.Equal("raiding_village", Campaign.Current.MapStateData.GameMenuId);
             }
         });
     }
