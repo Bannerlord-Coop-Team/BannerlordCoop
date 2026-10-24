@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships.Data;
 using Common.Network.Messages;
+using Missions.Battles;
 using Missions.Messages;
 using Moq;
 using TaleWorlds.CampaignSystem;
@@ -115,6 +116,25 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         Assert.True(sunkGoneAtLoot);
         foreach (var client in Clients)
             Assert.False(client.ObjectManager.TryGetObject<Ship>(sunkId, out _));
+    }
+
+    // M6 D4: a battle that finalizes without a result commit (abandoned, orphaned) still writes what its members reported,
+    // from the finalize postfix while the map event is still registered.
+    [Fact]
+    public void FinalizeWithoutACommit_WritesTheHeldFates_ToEveryMachine()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
+        var shipId = GiveShip(PlayerPartyOf("A"));
+        SendFates(a, battle, hostEpoch: 1, revision: 1, new BattleShipFate(shipId, 520f, 130f, false));
+
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).FinalizeEvent(), MapEventDisabledMethods);
+
+        Assert.Equal(0, concluded());
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(520f, ship.HitPoints, 2);
+            Assert.Equal(130f, ship.SailHitPoints, 2);
+        });
     }
 
     // A promoted host numbers its AI fates from one again at the newer epoch, and the departed host's late fates are refused.
@@ -367,7 +387,7 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         return prize;
     }
 
-    private const float BattleShipFateReporterInterval = 2f;
+    private const float BattleShipFateReporterInterval = BattleShipFateReporter.ReportIntervalSeconds;
 
     // A registered ship at full condition, given to the party through the vanilla production ownership path on the server.
     private string GiveShip(string mobilePartyId)

@@ -434,9 +434,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   the rest (`LootShipsHandler`) work after the finalize. The discard releases the hold; a held ship nobody took is
   destroyed when its looter disconnects, or after a 2 hour fallback for a loot screen that never closes (the ship screen
   comes after the troop and item loot and any conversations).
-- **Server log (Information, `[NavalSync]`, one line per ship).** The applier logs `Boatswain <hero> of <party> gains <xp>
-  skill XP for ship <id>`, `Ship <id> of <party> sank in battle; destroying it (hp, sail)` and `Ship <id> of <party> keeps
-  its battle condition: hp <old> -> <new>, sail <old> -> <new>`. The loot path logs `Loot ship <id> of <loser> went to no
+- **Server log (Information, `[NavalSync]`, one line per ship).** The applier logs `Ship <id> of <party> grants its Boatswain
+  XP for <n> mitigated damage`, `Ship <id> of <party> sank in battle; destroying it (hp, sail)` and `Ship <id> of <party>
+  keeps its battle condition: hp <old> -> <new>, sail <old> -> <new>`. The loot path logs `Loot ship <id> of <loser> went to no
   winner; the battle results destroy it` (a postfix on the distribution, `NavalLootShipDistributionLogPatches`), and
   the hold logs `Holding loot ship`, `Released loot ship <id> held for <looter>: taken by <party> | discarded ...` and
   `Destroying unclaimed loot ship <id> held for <looter>: <reason>`.
@@ -594,7 +594,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - the PvP loser's ships vanish (R39).
 - **Ship fate limits (M6).** A hard drop loses up to 2 s of HP changes (a sink always goes out at once). The ships of an
   AI party that a non-host player fields with its own team are refused, since only the host may report AI ships. A
-  fate that arrives after the results were calculated is dropped.
+  fate that arrives after the results were calculated is dropped. A reporter counts a fate's mitigated damage as sent, so
+  the Boatswain XP of a fate the server refuses (an old host's at a stale epoch, a sender already out of the battle) is
+  lost; its HP and sunk state come back with the next fate, since those are absolute.
 - **Ram damage has one writer.** A ram exists only on a hull with a bow ram piece (`MissionShip._ram`; the preset hull
   `northern_light_ship` has no bow slot, so use `ram=n`). `RamTickPatch` replaces `MissionShipRam.OnTick` on every
   client with one implementation: only the rammer's owner deals the hit, routed to the target's owner when the target is

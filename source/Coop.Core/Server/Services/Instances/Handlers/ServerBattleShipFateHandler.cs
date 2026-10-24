@@ -37,6 +37,7 @@ public class ServerBattleShipFateHandler : IHandler
     private readonly IBattleShipFateLedger ledger;
     private readonly IBattleShipFateApplier applier;
 
+    // Takes the services that resolve the sender and battle, the ledger that holds the fates and the applier that writes them.
     public ServerBattleShipFateHandler(
         IMessageBroker messageBroker,
         IMissionManager missionManager,
@@ -60,6 +61,7 @@ public class ServerBattleShipFateHandler : IHandler
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
+    // Drops the handler's subscriptions.
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkBattleShipFates>(Handle_NetworkBattleShipFates);
@@ -72,10 +74,10 @@ public class ServerBattleShipFateHandler : IHandler
     // runs; the record is queued behind the sender's earlier messages, so a departure it sent after these fates applies them.
     private void Handle_NetworkBattleShipFates(MessagePayload<NetworkBattleShipFates> payload)
     {
-        if (ModInformation.IsClient || payload.Who is not NetPeer peer) return;
+        if (payload.Who is not NetPeer peer) return;
 
         var message = payload.What;
-        if (!TryGetCurrentController(peer, out var controllerId))
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             Logger.Warning("[NavalSync] Dropped ship fates for {Instance}: the sender is not a registered player's current peer",
                 message.InstanceId);
@@ -83,18 +85,6 @@ public class ServerBattleShipFateHandler : IHandler
         }
 
         GameThread.RunSafe(() => Record(controllerId, message), context: nameof(Handle_NetworkBattleShipFates));
-    }
-
-    // The controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
-    private bool TryGetCurrentController(NetPeer peer, out string controllerId)
-    {
-        controllerId = null;
-        if (!playerManager.TryGetPlayer(peer, out var player) || !playerManager.TryGetPeer(player.ControllerId, out var currentPeer)
-            || !ReferenceEquals(currentPeer, peer))
-            return false;
-
-        controllerId = player.ControllerId;
-        return true;
     }
 
     // [Game thread] Holds each fate of a ship the sender may report for, while the battle is open and the sender is in it.
@@ -188,10 +178,10 @@ public class ServerBattleShipFateHandler : IHandler
     // Resolves the sender on the poll thread like its fates, which follow on the same channel, so the record precedes them.
     private void Handle_NetworkBattleShipCaptured(MessagePayload<NetworkBattleShipCaptured> payload)
     {
-        if (ModInformation.IsClient || payload.Who is not NetPeer peer) return;
+        if (payload.Who is not NetPeer peer) return;
 
         var message = payload.What;
-        if (!TryGetCurrentController(peer, out var controllerId))
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             Logger.Warning("[NavalSync] Dropped a ship capture for {Instance}: the sender is not a registered player's current peer",
                 message.InstanceId);
@@ -227,12 +217,11 @@ public class ServerBattleShipFateHandler : IHandler
     private static void DropFate(BattleShipFate fate, string controllerId, string reason) =>
         Logger.Warning("[NavalSync] Dropped the fate of ship {ShipId} from {Controller}: {Reason}", fate.CampaignShipId,
             controllerId, reason);
+
     // A departing player's ships, and the ones it captured and took along, take their fates now, so a return or a later result
     // reads them; an emptied battle takes all.
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
-        if (ModInformation.IsClient) return;
-
         var departure = payload.What;
         GameThread.RunSafe(() => ApplyDeparture(departure), context: nameof(Handle_MissionMemberDeparted));
     }
@@ -249,7 +238,13 @@ public class ServerBattleShipFateHandler : IHandler
             return;
         }
 
-        if (!playerManager.TryGetPlayer(departure.ControllerId, out var player)) return;
+        if (!playerManager.TryGetPlayer(departure.ControllerId, out var player))
+        {
+            Logger.Warning("[NavalSync] Departure of {Controller} from {Instance} applied no fates: no registered player",
+                departure.ControllerId, departure.InstanceId);
+            return;
+        }
+
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
 
         applier.ApplyParty(mapEvent, party.Party, departure.ControllerId);
@@ -259,8 +254,6 @@ public class ServerBattleShipFateHandler : IHandler
     // are done with then.
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
     {
-        if (ModInformation.IsClient) return;
-
         var mapEvent = payload.What.MapEvent;
         GameThread.RunSafe(() =>
         {

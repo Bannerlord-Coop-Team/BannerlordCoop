@@ -39,12 +39,10 @@ public class BattleShipFateApplier : IBattleShipFateApplier
     // Smaller HP differences are float noise, so the ship keeps its value and no write replicates.
     private const float Tolerance = 0.01f;
 
-    // Vanilla's Boatswain XP per point of mitigated ship damage (NavalSkillLevellingManager.OnShipDamaged), for the log only.
-    private const float BoatswainXpPerMitigatedPoint = 0.1f;
-
     private readonly IBattleShipFateLedger ledger;
     private readonly IObjectManager objectManager;
 
+    // Takes the ledger holding the reported fates and the object manager that resolves their ships.
     public BattleShipFateApplier(IBattleShipFateLedger ledger, IObjectManager objectManager)
     {
         this.ledger = ledger;
@@ -53,41 +51,45 @@ public class BattleShipFateApplier : IBattleShipFateApplier
 
     // A capture never changes the campaign owner, so the owner's departure skips a ship another player captured: that one leaves
     // with its captor, whose departure (or the commit or finalize) applies its fate.
-    public void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId) =>
-        Apply(mapEvent, mapEventId =>
-        {
-            var captured = ledger.CapturedBy(mapEventId, controllerId);
-            return (shipId, ship) => captured.Contains(shipId) || (ship.Owner == party && DepartsWithOwner(ledger.CaptorOf(mapEventId, shipId)));
-        });
-
-    /// <summary>Whether a departing owner's ship takes its fate with it: only while no other player holds it captured.</summary>
-    internal static bool DepartsWithOwner(string captorControllerId) => captorControllerId == null;
-
-    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, mapEventId => (shipId, ship) => true);
-
-    // Resolves each held ship once. A fate whose ship is already gone (destroyed by a finalize, a loot discard) or ownerless is
-    // taken and dropped, so the ledger never keeps it; vanilla's destroy and every HP write expect an owned ship.
-    private void Apply(MapEvent mapEvent, Func<string, Func<string, Ship, bool>> selectorFor)
+    public void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId)
     {
-        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || !ledger.HasFates(mapEventId)) return;
+        if (!TryGetHeldBattle(mapEvent, out var mapEventId)) return;
 
-        var selects = selectorFor(mapEventId);
+        var captured = ledger.CapturedBy(mapEventId, controllerId);
+        Apply(mapEventId, (shipId, ship) =>
+            captured.Contains(shipId) || (ship.Owner == party && ledger.CaptorOf(mapEventId, shipId) == null));
+    }
 
-        var ships = new Dictionary<string, Ship>();
-        var fates = ledger.Take(mapEventId, fate =>
-        {
-            if (!objectManager.TryGetObject<Ship>(fate.CampaignShipId, out var ship) || ship.Owner == null) return true;
-            if (!selects(fate.CampaignShipId, ship)) return false;
+    // Applies every fate the battle holds.
+    public void ApplyAll(MapEvent mapEvent)
+    {
+        if (!TryGetHeldBattle(mapEvent, out var mapEventId)) return;
 
-            ships[fate.CampaignShipId] = ship;
-            return true;
-        });
+        Apply(mapEventId, (shipId, ship) => true);
+    }
+
+    // The map event's registry id, when the ledger holds fates of it.
+    private bool TryGetHeldBattle(MapEvent mapEvent, out string mapEventId)
+    {
+        mapEventId = null;
+        return mapEvent != null && objectManager.TryGetId(mapEvent, out mapEventId) && ledger.HasFates(mapEventId);
+    }
+
+    // Takes the selected fates and writes them. A fate whose ship is already gone (destroyed by a finalize, a loot discard) or
+    // ownerless is taken and dropped, so the ledger never keeps it; vanilla's destroy and every HP write expect an owned ship.
+    private void Apply(string mapEventId, Func<string, Ship, bool> selects)
+    {
+        var fates = ledger.Take(mapEventId, fate => !TryGetOwnedShip(fate, out var ship) || selects(fate.CampaignShipId, ship));
 
         foreach (var fate in fates)
         {
-            if (ships.TryGetValue(fate.CampaignShipId, out var ship)) TryApplyFate(ship, fate);
+            if (TryGetOwnedShip(fate, out var ship)) TryApplyFate(ship, fate);
         }
     }
+
+    // The fate's campaign ship, while it is registered and has an owner.
+    private bool TryGetOwnedShip(BattleShipFate fate, out Ship ship) =>
+        objectManager.TryGetObject(fate.CampaignShipId, out ship) && ship.Owner != null;
 
     // The fates already left the ledger, so a throw from one ship's writes must not skip the others or, at the commit, the
     // battle's results.
@@ -131,10 +133,8 @@ public class BattleShipFateApplier : IBattleShipFateApplier
     {
         if (fate.MitigatedDamage <= 0f) return;
 
-        var boatswain = ship.Owner.MobileParty?.GetEffectiveRoleHolder(PartyRole.FirstMate);
-        Logger.Information("[NavalSync] Boatswain {Hero} of {Owner} gains {Xp} skill XP for ship {ShipId} ({MitigatedDamage} mitigated damage)",
-            boatswain?.StringId ?? "none", ship.Owner.Id, fate.MitigatedDamage * BoatswainXpPerMitigatedPoint, fate.CampaignShipId,
-            fate.MitigatedDamage);
+        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} grants its Boatswain XP for {MitigatedDamage} mitigated damage",
+            fate.CampaignShipId, ship.Owner.Id, fate.MitigatedDamage);
         SkillLevelingManager.OnShipDamaged(ship, fate.MitigatedDamage, 0f);
     }
 }

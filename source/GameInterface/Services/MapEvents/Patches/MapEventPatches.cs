@@ -279,7 +279,8 @@ internal class MapEventPatches
             return false;
 
         // Vanilla writes naval damage into the campaign ships live; coop holds the reported fates until now, so sunk ships are
-        // destroyed and survivors carry their battle HP before the results and the ship loot read them.
+        // destroyed and survivors carry their battle HP before the results and the ship loot read them. NB §3 lists every
+        // apply point.
         if (ContainerProvider.TryResolve<IBattleShipFateApplier>(out var fateApplier))
             fateApplier.ApplyAll(__instance);
 
