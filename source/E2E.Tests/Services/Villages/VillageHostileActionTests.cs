@@ -4176,8 +4176,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Same(quest._raidedVillagesTrackLog, Assert.Single(quest.JournalEntries));
                 Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
             }
-        }, MapEventDisabledMethods.Append(AccessTools.Method(
-            typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest), "SetDialogs")));
+        // Synthetic givers have no encyclopedia entry; acceptance and journal creation still run.
+        }, MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(Helpers.StringHelpers), nameof(Helpers.StringHelpers.GetCharacterProperties)))
+            .Append(AccessTools.Method(
+                typeof(RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest), "SetDialogs")));
     }
 
     private static void AssertRaidQuestProgress(EnvironmentInstance instance, string giverId, string settlementId)
