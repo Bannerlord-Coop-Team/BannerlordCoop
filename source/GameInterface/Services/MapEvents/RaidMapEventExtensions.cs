@@ -1,4 +1,4 @@
-using GameInterface.Services.MobileParties.Extensions;
+﻿using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents;
@@ -29,6 +29,11 @@ public static class RaidMapEventExtensions
     public static bool IsRaidHostileAction(this MapEvent mapEvent)
     {
         return mapEvent?.Component is RaidEventComponent;
+    }
+
+    public static bool IsLiveRaid(this MapEvent mapEvent)
+    {
+        return mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized;
     }
 
     public static bool IsVillageHostileActionWithMultiplePlayerParties(this MapEvent mapEvent)
