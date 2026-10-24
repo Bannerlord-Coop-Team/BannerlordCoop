@@ -2,7 +2,6 @@
 using Common.Util;
 using GameInterface.Services.TownMarketDatas.Patches;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.GameState;
@@ -28,7 +27,6 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 {
     private const string PendingChangesResetMessage = "Inventory updated. Pending changes reset.";
     private readonly ConditionalWeakTable<InventoryLogic, InventoryBaseline> inventoryBaselines = new();
-    private readonly HashSet<InventoryLogic> pendingRefreshes = new();
     private readonly Action<InventoryLogic> refreshInventory;
 
     public InventoryScreenRosterRefresher() : this(RefreshInventory) { }
@@ -78,7 +76,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
             baseline.Rosters[side].AddToCounts(element, amount);
             logic._rostersBackup[side].AddToCounts(element, amount);
             roster.AddToCounts(element, amount);
-            QueueRefresh(logic);
+            QueueRefresh(logic, baseline);
         }
         return true;
     }
@@ -98,7 +96,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
             baseline.Rosters[side].Clear();
             logic._rostersBackup[side].Clear();
             roster.Clear();
-            QueueRefresh(logic);
+            QueueRefresh(logic, baseline);
         }
         return true;
     }
@@ -118,6 +116,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         public readonly ItemRoster[] Rosters;
         public readonly InventoryLogic.PartyEquipment PlayerEquipment;
         public readonly InventoryLogic.PartyEquipment OtherPartyEquipment;
+        public bool RefreshQueued;
 
         public InventoryBaseline(InventoryLogic logic)
         {
@@ -129,19 +128,13 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 
     // A town tick sends one update per item and the client drains them in one frame;
     // rebuilding the inventory view for each one froze the trade screen, so rebuild once.
-    private void QueueRefresh(InventoryLogic logic)
+    private void QueueRefresh(InventoryLogic logic, InventoryBaseline baseline)
     {
-        lock (pendingRefreshes)
-        {
-            if (!pendingRefreshes.Add(logic)) return;
-        }
-
+        if (baseline.RefreshQueued) return;
+        baseline.RefreshQueued = true;
         GameThread.EnqueueSafe(() =>
         {
-            lock (pendingRefreshes)
-            {
-                pendingRefreshes.Remove(logic);
-            }
+            baseline.RefreshQueued = false;
             refreshInventory(logic);
         });
     }

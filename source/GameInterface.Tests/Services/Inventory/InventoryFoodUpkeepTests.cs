@@ -4,7 +4,6 @@ using GameInterface.Services.Inventory.Interfaces;
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -214,14 +213,14 @@ public class InventoryFoodUpkeepTests
         int refreshes = 0;
         var inventory = new InventoryScreenRosterRefresher(refreshed =>
         {
-            if (ReferenceEquals(refreshed, logic)) Interlocked.Increment(ref refreshes);
+            if (ReferenceEquals(refreshed, logic)) refreshes++;
         });
         inventory.CaptureInventoryBaseline(logic);
 
         int applied = ApplyInOneDrain(inventory, logic, grain, 200);
 
         Assert.Equal(200, applied);
-        Assert.Equal(1, Volatile.Read(ref refreshes));
+        Assert.Equal(1, refreshes);
         Assert.Equal(210, Count(logic._rosters[0], grain));
         Assert.Equal(210, Count(logic._rostersBackup[0], grain));
         logic._rostersBackup[0].Clear();
@@ -229,7 +228,7 @@ public class InventoryFoodUpkeepTests
         Assert.Equal(210, Count(logic._rostersBackup[0], grain));
 
         ApplyInOneDrain(inventory, logic, grain, 3);
-        Assert.Equal(2, Volatile.Read(ref refreshes));
+        Assert.Equal(2, refreshes);
     }
 
     [Fact]
