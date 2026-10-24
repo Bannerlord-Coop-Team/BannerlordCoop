@@ -15,8 +15,8 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleShipSampleStream : IDisposable
 {
-    /// <summary>[Mission tick] Advances the stream's clock, which times the sample lifetime.</summary>
-    void Advance(float dt);
+    /// <summary>[Mission tick] Advances the stream's clock and applies the latest sample each hull received since the last tick.</summary>
+    void ApplyReceived(float dt);
 
     /// <summary>[Mission tick] Sends every own hull's sample and changed condition once per send interval.</summary>
     void SendOwn(float dt);
@@ -64,6 +64,8 @@ public class BattleShipSampleStream : IBattleShipSampleStream
     private readonly IHeldShipBuffer heldShips;
 
     private readonly Dictionary<Guid, ShipSampleStream> streams = new Dictionary<Guid, ShipSampleStream>();
+    // [Game thread] The last sample each hull received since the last tick; a 20 Hz stream only needs the newest one applied.
+    private readonly Dictionary<Guid, NetworkBattleShipSample> received = new Dictionary<Guid, NetworkBattleShipSample>();
     private float sendElapsed;
     private float elapsed;
 
@@ -86,21 +88,35 @@ public class BattleShipSampleStream : IBattleShipSampleStream
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
-    // Drops the subscription.
-    public void Dispose() => messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
+    // Drops the subscription and the samples not applied yet.
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
+        received.Clear();
+    }
 
-    // Applies a sample from the game-thread drain; a closure queued before the mission ended finds no mission.
+    // Kept for the mission tick: a sample connects and breaks ropes, which the async agent and team tick reads, so it must not
+    // apply from the game-thread drain (R48 L6). It also finds a spawn record that arrived ahead of it already applied.
     private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
     {
         var sample = payload.What;
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            Accept(sample);
+            received[sample.ShipId] = sample;
         }, context: nameof(Handle_NetworkBattleShipSample));
     }
 
-    public void Advance(float dt) => elapsed += Math.Max(0f, dt);
+    public void ApplyReceived(float dt)
+    {
+        elapsed += Math.Max(0f, dt);
+        if (received.Count == 0) return;
+
+        var samples = received.Values.ToArray();
+        received.Clear();
+        foreach (var sample in samples)
+            Accept(sample);
+    }
 
     public void SendOwn(float dt)
     {
@@ -210,7 +226,11 @@ public class BattleShipSampleStream : IBattleShipSampleStream
         stream.AcceptedEpoch = 0;
     }
 
-    public void Forget(Guid shipId) => streams.Remove(shipId);
+    public void Forget(Guid shipId)
+    {
+        streams.Remove(shipId);
+        received.Remove(shipId);
+    }
 
     public ShipSampleStream StateOf(Guid shipId) => streams.TryGetValue(shipId, out var stream) ? stream : null;
 

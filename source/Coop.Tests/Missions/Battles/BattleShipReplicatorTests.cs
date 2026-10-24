@@ -1652,6 +1652,62 @@ public class BattleShipReplicatorTests
             Times.Once);
     }
 
+    // Fix item 8: a sample's ropes connect and break attachments, which the async agent and team tick reads, so a sample off
+    // the mesh applies from the mission tick, not from the game-thread drain.
+    [Fact]
+    public void SampleOffTheMesh_AppliesOnTheNextTick_NotFromTheDrain()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+
+        harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
+        harness.Engine.Verify(e => e.ApplyRopes(copy, It.IsAny<BattleRopeState[]>(), It.IsAny<Func<Guid, MissionObject>>(), false),
+            Times.Never);
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Never);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.ApplyRopes(copy, It.IsAny<BattleRopeState[]>(), It.IsAny<Func<Guid, MissionObject>>(), false),
+            Times.Once);
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Once);
+    }
+
+    // Only the newest of the samples that came within one frame is applied; the older ones are superseded.
+    [Fact]
+    public void SamplesOffTheMesh_WithinOneFrame_ApplyOnlyTheLatest()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+
+        harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
+        harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 2, MovedFrame()));
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Once);
+        Assert.Equal(2, (long)Inspected(harness, ship.ShipId)["accepted"]!);
+    }
+
+    // A sample whose spawn record came just before it, still in the arrivals queue, used to be dropped as unknown; applied
+    // from the tick, it finds the copy the record spawned.
+    [Fact]
+    public void SampleOffTheMesh_BehindItsQueuedSpawnRecord_AppliesToTheNewCopy()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: false, queuedArrivals: true);
+        var copy = harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+
+        harness.PublishAndDrain(new NetworkSpawnBattleShips(new[] { record }));
+        harness.PublishAndDrain(new NetworkBattleShipSample(record.ShipId, Peer, 1, MovedFrame()));
+        harness.Arrivals.ApplyAll();
+        harness.Replicator.Tick(0.1f);
+
+        Assert.True(harness.Registry.TryGet(record.ShipId, out _));
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Once);
+        Assert.Equal(1, (long)Inspected(harness, record.ShipId)["accepted"]!);
+    }
+
     [Fact]
     public void AcceptSample_ForAShipWithNoWaitingRecord_RejectsItAsUnknown()
     {
