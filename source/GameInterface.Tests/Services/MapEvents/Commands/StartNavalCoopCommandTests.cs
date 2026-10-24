@@ -4,7 +4,7 @@ using Common.Commands;
 using System.Collections;
 using System.Collections.Generic;
 using Xunit;
-using StartNavalCoopCommand = GameInterface.Services.Villages.Commands.MapEventDebugCommands.StartNavalCoopCommand;
+using GameInterface.Services.MapEvents.NavalScenarios;
 
 namespace GameInterface.Tests.Services.MapEvents.Commands;
 
