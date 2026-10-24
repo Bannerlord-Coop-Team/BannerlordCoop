@@ -109,6 +109,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
                 party.Party.MemberRoster = roster;
                 roster.OwnerParty = party.Party;
                 owner.PartyBelongedTo = party;
+                issue.IsTriedToSolveBefore = true;
             }
             using (new MainHeroSubstitutionScope(owner, party))
             {
