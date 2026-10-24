@@ -1102,6 +1102,13 @@ public class MerchantOutlawsTests : IDisposable
         Server.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
         Assert.Equal(2, ownerIssue.JournalEntries.Count);
         Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+        Server.Call(() =>
+        {
+            var issue = Get<Hero>(Server, scenario.NotableId).Issue;
+            issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(1);
+            issue.JournalEntries[0].UpdateCurrentProgress(issue.JournalEntries[0].Range);
+            Campaign.Current.IssueManager.DailyTick();
+        }, TextHelpers);
         var unchangedDayCount = Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
         Server.Call(() =>
         {
