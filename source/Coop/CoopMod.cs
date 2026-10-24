@@ -235,10 +235,10 @@ namespace Coop
         {
             bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
                 .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
-            if (!navalModuleEnabled) return false;
-
             string assemblyDirectory = System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location);
-            if (ModInformation.IsNavalSupported(navalModuleEnabled, file => File.Exists(System.IO.Path.Combine(assemblyDirectory, file)))) return true;
+            bool supported = ModInformation.IsNavalSupported(navalModuleEnabled,
+                file => File.Exists(System.IO.Path.Combine(assemblyDirectory, file)));
+            if (supported || !navalModuleEnabled) return supported;
 
             Logger.Warning("NavalDLC is enabled but this build has no naval code, so NavalDLC is treated as unsupported");
             return false;
