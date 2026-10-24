@@ -584,7 +584,8 @@ public class LadysKnightOutTests : IDisposable
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         byte[] serverStart = Array.Empty<byte>();
         scenario.Server.Call(() => serverStart = scenario.Server.SerializeForWire(
-            Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries).LogText));
+            new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, false,
+                new[] { Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries).LogText })));
         scenario.ClientA.Call(() =>
         {
             var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
@@ -593,7 +594,8 @@ public class LadysKnightOutTests : IDisposable
             var start = Assert.Single(issue.JournalEntries).LogText;
             var giver = Assert.IsType<TextObject>(start.Attributes["ISSUE_OWNER"]);
             Assert.Equal("Test Lady Clan", Assert.IsType<TextObject>(giver.Attributes["FACTION"]).Value);
-            Assert.Equal(scenario.ClientA.DeserializeFromWire<TextObject>(serverStart).ToString(), start.ToString());
+            var snapshot = scenario.ClientA.DeserializeFromWire<NetworkIssueJournal>(serverStart);
+            Assert.Equal(Assert.Single(snapshot.Logs).ToString(), start.ToString());
             var history = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry.IsRelatedTo(issue)));
             Assert.False(history.IsEnded());
