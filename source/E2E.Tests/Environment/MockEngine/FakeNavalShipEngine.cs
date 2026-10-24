@@ -154,18 +154,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public BattleShipMotion ReadMotion(MissionObject hull) => Of(hull).Motion;
 
-    public void TickCopies(float fixedDt)
-    {
-    }
-
-    public void SnapCopies()
-    {
-    }
-
-    public void ForgetHull(MissionObject hull)
-    {
-    }
-
     public BattleShipInput ReadInput(MissionObject hull) => Of(hull).Input;
 
     public void ApplyInput(MissionObject hull, BattleShipInput input) => Of(hull).Input = input;

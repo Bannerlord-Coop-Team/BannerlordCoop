@@ -47,6 +47,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly IBattleAgentBudget agentBudget;
     private readonly ICoopShipSnapshotBuilder shipSnapshotBuilder;
     private readonly INavalShipEngine shipEngine;
+    private readonly INavalSteeredCopies steeredCopies;
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly INavalBattleServicesFactory servicesFactory;
     private readonly IPlayerManager playerManager;
@@ -57,6 +58,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
+    private readonly CopySteeringKnobs steeringKnobs;
 #endif
 
     public CoopNavalBattleLauncher(
@@ -65,7 +67,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
         ICoopShipSnapshotBuilder shipSnapshotBuilder,
-        INavalShipEngine shipEngine,
+        INavalSteeredCopies steeredCopies,
+        // The engine and the behaviour must share one per-battle copy set; a plain engine injection would track copies nobody steers.
+        Func<INavalSteeredCopies, INavalShipEngine> shipEngines,
         INavalShipCaptureEngine captureEngine,
         INavalBattleServicesFactory servicesFactory,
         IPlayerManager playerManager,
@@ -74,19 +78,23 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalFormationTacticRefresh tacticRefresh
 #if DEBUG
         , INavalScenarioState scenarioState,
-        INavalDebugHulls debugHulls
+        INavalDebugHulls debugHulls,
+        CopySteeringKnobs steeringKnobs
 #endif
         )
     {
 #if DEBUG
         this.scenarioState = scenarioState;
         this.debugHulls = debugHulls;
+        this.steeringKnobs = steeringKnobs;
 #endif
         this.playerManager = playerManager;
         this.tickFailureLogs = tickFailureLogs;
         this.asyncAgentTick = asyncAgentTick;
         this.tacticRefresh = tacticRefresh;
-        this.shipEngine = shipEngine;
+        // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
+        this.steeredCopies = steeredCopies;
+        shipEngine = shipEngines(steeredCopies);
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
@@ -210,8 +218,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         AttachNavalServices(mission, playerSide.GetOppositeSide());
 #if DEBUG
         var debugController = mission.GetMissionBehavior<CoopBattleController>();
-        if (shipEngine is NavalShipEngine navalEngine)
-            mission.AddMissionBehavior(new NavalCopyProbeLogic(debugController.MissionComponent.ShipRegistry, navalEngine.SteeredCopies));
+        mission.AddMissionBehavior(new NavalCopyProbeLogic(debugController.MissionComponent.ShipRegistry, steeredCopies, steeringKnobs));
         mission.AddMissionBehavior(new NavalWaterProbeLogic(debugController.Session, debugController.MissionComponent.ShipRegistry,
             tickFailureLogs()));
         AttachScenario(mission, mapEventId);
@@ -241,8 +248,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>(),
-            tickFailureLogs(), tacticRefresh));
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
+            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tacticRefresh));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.ShipReplicator, services.MigrationReserveFielder));
     }

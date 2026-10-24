@@ -89,6 +89,7 @@ internal class LateHullDeploymentPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignShipOrderTickPatch
 {
+    // Skips the ship order's tick on a copy.
     [HarmonyPrefix]
     private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
 }
@@ -98,6 +99,7 @@ internal class ForeignShipOrderTickPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignShipRetreatOrderPatch
 {
+    // Refuses a retreat order on a copy.
     [HarmonyPrefix]
     private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
 }
@@ -107,20 +109,25 @@ internal class ForeignShipRetreatOrderPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignShipDetachmentsPatch
 {
+    // Skips the detachment management on a copy.
     [HarmonyPrefix]
     private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
 }
 
-// Vanilla hands every non-player hull to AI when deployment ends; foreign copies stay uncontrolled.
-[HarmonyPatch(typeof(DefaultNavalMissionLogic), nameof(DefaultNavalMissionLogic.OnDeploymentFinished))]
+// A copy has no controller: its owner steers it. Vanilla hands a hull one, with auto update re-armed, at init, at deployment end,
+// when it burns or sinks and in the capture swap; a copy keeps none. A captor's own prize is forgotten before the swap runs.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.SetController))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignHullControllerPatch
 {
-    [HarmonyPostfix]
-    private static void Postfix()
+    // Turns any controller write on a copy into no controller without auto update.
+    [HarmonyPrefix]
+    private static void Prefix(MissionShip __instance, ref ShipControllerType controllerType, ref bool autoUpdateController)
     {
-        foreach (var ship in NavalForeignHulls.All)
-            ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        if (!NavalForeignHulls.Contains(__instance)) return;
+
+        controllerType = ShipControllerType.None;
+        autoUpdateController = false;
     }
 }
 
@@ -130,6 +137,7 @@ internal class ForeignHullControllerPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CopyPairCollisionFilterPatch
 {
+    // Refuses the contact between two copies; anything else runs vanilla's filter.
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
     {
@@ -162,9 +170,11 @@ internal class CopyCrewLoadPatch
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
-        bool isCopy = NavalForeignHulls.TryGetCopy(__instance, out var copy);
-        var ownerLoad = copy?.CrewLoad;
-        if (!AppliesOwnerLoad(isCopy, ownerLoad)) return true;
+        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy)) return true;
+
+        // One read of the volatile load, which the game thread replaces with each sample.
+        var ownerLoad = copy.CrewLoad;
+        if (ownerLoad == null) return true;
         if (ownerLoad.IsEmpty) return false;
 
         var localCentre = ownerLoad.LocalCentre;
@@ -175,14 +185,14 @@ internal class CopyCrewLoadPatch
         return false;
     }
 
-    /// <summary>Whether a hull takes its owner's crew load: only a copy whose owner sent one.</summary>
-    internal static bool AppliesOwnerLoad(bool isCopy, BattleShipCrewLoad ownerLoad) => isCopy && ownerLoad != null;
-
     /// <summary>Vanilla's crew weight force: the mass times the hull's step weight multiplier times gravity.</summary>
     internal static Vec3 WeightForce(float mass, float stepAgentWeightMultiplier) =>
         mass * stepAgentWeightMultiplier * MBGlobals.GravitationalAcceleration;
 
-    /// <summary>Vanilla's check that the crew centre lies within the hull's physics box, which it skips the force without.</summary>
+    /// <summary>
+    /// Vanilla's check that a point in the hull body's frame lies within its physics box: an agent outside it isn't weighed,
+    /// and a crew centre outside it applies no force.
+    /// </summary>
     internal static bool IsInsideHull(BoundingBox box, Vec3 localCentre) => box.PointInsideBox(localCentre, BoxEpsilon);
 }
 

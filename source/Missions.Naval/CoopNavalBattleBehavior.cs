@@ -21,6 +21,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     internal const int AgentDropThreshold = 10;
 
     private readonly INavalBattleServices services;
+    private readonly INavalSteeredCopies steeredCopies;
     private readonly NavalShipsLogic shipsLogic;
     private readonly Action tickNpcFleet;
     private readonly INavalTickFailureLog fixedTickFailures;
@@ -28,10 +29,11 @@ public class CoopNavalBattleBehavior : MissionLogic
     private int lastAgentCount = -1;
     private bool retreated;
 
-    public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic,
-        INavalTickFailureLog fixedTickFailures, INavalFormationTacticRefresh tacticRefresh)
+    public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
+        NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalFormationTacticRefresh tacticRefresh)
     {
         this.services = services;
+        this.steeredCopies = steeredCopies;
         NpcFleetSpawner = npcFleetSpawner;
         tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
@@ -73,7 +75,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         base.OnMissionTick(dt);
         // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
-        services.Engine.SnapCopies();
+        steeredCopies.ApplySnaps();
         services.Tick(dt, tickNpcFleet);
         // After the services tick, whose arrivals and fleet fielding spawn the hulls this checks.
         tacticRefresh.Apply();
@@ -97,7 +99,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         base.OnFixedMissionTick(fixedDt);
         try
         {
-            services.Engine.TickCopies(fixedDt);
+            steeredCopies.Tick(fixedDt);
         }
         catch (Exception exception)
         {
@@ -136,7 +138,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     private void OnShipRemoved(MissionShip ship)
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
-        services.Engine.ForgetHull(ship);
+        steeredCopies.Forget(ship);
         NavalRopes.ForgetTarget(shipsLogic.AllShips, ship);
         if (shipsLogic.IsMissionEnding) return;
 

@@ -10,7 +10,7 @@ public class NavalCopySteeringTests
 {
     private const float Dt = 1f / 60f;
 
-    private static CopySteeringKnobs Knobs(params string[] knobs)
+    internal static CopySteeringKnobs Knobs(params string[] knobs)
     {
         var result = new CopySteeringKnobs();
         foreach (var knob in knobs)
@@ -23,7 +23,7 @@ public class NavalCopySteeringTests
     }
 
     // A level frame whose forward axis points at the given yaw, counter-clockwise from +x as CopySteering.YawOf reads it.
-    private static MatrixFrame Frame(float x, float y, float yaw)
+    internal static MatrixFrame Frame(float x, float y, float yaw)
     {
         var forward = new Vec3((float)Math.Cos(yaw), (float)Math.Sin(yaw), 0f);
         var side = new Vec3(forward.y, -forward.x, 0f);
@@ -137,8 +137,8 @@ public class NavalCopySteeringTests
         var step = steering.Compute(Dt, new Vec3(0f, 11f, 0f), 0f, Vec2.Zero, 0f);
 
         Assert.True(step.Snap);
-        Assert.Equal(0f, step.SnapFrame.origin.y, 3);
-        Assert.Equal(1, steering.Snaps);
+        Assert.True(steering.IsSnapQueued);
+        Assert.Equal(0f, steering.TakeSnapFrame().origin.y, 3);
     }
 
     // M10 fix C5: the snap frame takes the extrapolated heading with the extrapolated position, not the sample's heading.
@@ -149,9 +149,10 @@ public class NavalCopySteeringTests
 
         var step = steering.Compute(0.1f, new Vec3(0f, 20f, 0f), 0f, Vec2.Zero, 0f);
 
+        var frame = steering.TakeSnapFrame();
         Assert.True(step.Snap);
-        Assert.Equal(steering.Target.Position.x, step.SnapFrame.origin.x, 3);
-        Assert.Equal(steering.Target.Yaw, CopySteering.YawOf(step.SnapFrame.rotation.f), 3);
+        Assert.Equal(steering.Target.Position.x, frame.origin.x, 3);
+        Assert.Equal(steering.Target.Yaw, CopySteering.YawOf(frame.rotation.f), 3);
         Assert.Equal(0.5f, steering.FeedForwardYawRate);
     }
 
@@ -168,7 +169,7 @@ public class NavalCopySteeringTests
 
         Assert.Equal(40f, frame.origin.x, 3);
         Assert.False(next.Snap);
-        Assert.Equal(1, steering.Snaps);
+        Assert.False(steering.IsSnapQueued);
     }
 
     [Fact]
@@ -192,13 +193,15 @@ public class NavalCopySteeringTests
 
         // The copy sits near the new sample already, so only the jump between samples can snap it.
         steering.ObserveOwner(Frame(40f, 0f, 0f), new Vec2(5f, 0f), 0f);
+        bool queuedByTheJump = steering.IsSnapQueued;
         var jump = steering.Compute(Dt, new Vec3(40f, 0f, 0f), 0f, new Vec2(5f, 0f), 0f);
+        var frame = steering.TakeSnapFrame();
         var after = steering.Compute(Dt, new Vec3(40f, 0f, 0f), 0f, new Vec2(5f, 0f), 0f);
 
+        Assert.True(queuedByTheJump);
         Assert.True(jump.Snap);
-        Assert.InRange(jump.SnapFrame.origin.x, 40f, 40.2f);
+        Assert.InRange(frame.origin.x, 40f, 40.2f);
         Assert.False(after.Snap);
-        Assert.Equal(1, steering.Snaps);
         Assert.Equal(5f, steering.FeedForwardVelocity.x);
     }
 
@@ -219,128 +222,6 @@ public class NavalCopySteeringTests
         Assert.False(steering.IsOwnerStale);
     }
 
-    [Fact]
-    public void Compute_CountsSignChangesOfThePositionErrorAlongTheHeadingAsOscillations()
-    {
-        var steering = Observed(Knobs("lead=0"), 0f, Vec2.Zero);
-
-        // Each position is held for a second, well past the smoothing's tau.
-        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
-        HoldCopyAt(steering, new Vec3(1f, 0f, 0f));
-        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
-        // A sideways error has no component along the heading, so it keeps the last sign.
-        HoldCopyAt(steering, new Vec3(0f, -1f, 0f));
-        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
-
-        Assert.Equal(2, steering.Oscillations);
-    }
-
-    // Steps the steering for one second with the copy held at a fixed position.
-    private static void HoldCopyAt(CopySteering steering, Vec3 origin)
-    {
-        for (int tick = 0; tick < 60; tick++) steering.Compute(Dt, origin, 0f, Vec2.Zero, 0f);
-    }
-
-    // R43 S1: the target jumps at each sample arrival by the arrival jitter times the speed; a hull moving smoothly with the
-    // owner never crosses its target, so the raw error's flips are no oscillation.
-    [Fact]
-    public void Compute_JitteredArrivalAt10MpsOnASmoothHullCountsNoOscillation()
-    {
-        var run = RunJitteredArrival(ringingMetres: 0f);
-
-        Assert.True(run.RawFlips > 10, $"{run.RawFlips} raw flips; the model no longer reproduces the R43 artifact");
-        Assert.Equal(0, run.Oscillations);
-    }
-
-    // A copy really swinging 0.5 m about its target every 2 s under the same jitter still counts its crossings.
-    [Fact]
-    public void Compute_JitteredArrivalAt10MpsStillCountsRealRinging()
-    {
-        var run = RunJitteredArrival(ringingMetres: 0.5f);
-
-        Assert.InRange(run.Oscillations, 15, 21);
-    }
-
-    // An owner at 10 m/s sending every 50 ms on its own frames, arriving 0 to 20 ms late on 60 Hz copy frames, and a copy
-    // that follows the owner smoothly at the target's mean offset, plus an optional sine ringing of the given amplitude.
-    private static (int RawFlips, long Oscillations) RunJitteredArrival(float ringingMetres)
-    {
-        const float speed = 10f;
-        float meanOffset = MeanTargetOffset(speed);
-        var steering = new CopySteering(Knobs("lead=0"));
-        var sends = JitteredSends(new Random(43));
-        int next = 0;
-        int rawFlips = 0;
-        int lastRawSign = 0;
-        for (int tick = 0; tick < 20 * 60; tick++)
-        {
-            float time = tick * Dt;
-            while (next < sends.Count && sends[next].ArrivesAt <= time)
-            {
-                steering.ObserveOwner(Frame(speed * sends[next].SentAt, 0f, 0f), new Vec2(speed, 0f), 0f);
-                next++;
-            }
-
-            if (next == 0) continue;
-            float ringing = ringingMetres * (float)Math.Sin(Math.PI * time);
-            var step = steering.Compute(Dt, new Vec3((speed * time) + meanOffset + ringing, 0f, 0f), 0f, new Vec2(speed, 0f), 0f);
-            if (Math.Abs(step.ErrorAlongHeading) < CopySteering.OscillationDeadbandMetres) continue;
-
-            int sign = Math.Sign(step.ErrorAlongHeading);
-            if (lastRawSign != 0 && sign != lastRawSign) rawFlips++;
-            lastRawSign = sign;
-        }
-
-        return (rawFlips, steering.Oscillations);
-    }
-
-    // The along-heading error a copy exactly on the owner sees on average, so the modelled copy sits on the target's mean.
-    private static float MeanTargetOffset(float speed)
-    {
-        var steering = new CopySteering(Knobs("lead=0"));
-        var sends = JitteredSends(new Random(43));
-        int next = 0;
-        float sum = 0f;
-        int samples = 0;
-        for (int tick = 0; tick < 20 * 60; tick++)
-        {
-            float time = tick * Dt;
-            while (next < sends.Count && sends[next].ArrivesAt <= time)
-            {
-                steering.ObserveOwner(Frame(speed * sends[next].SentAt, 0f, 0f), new Vec2(speed, 0f), 0f);
-                next++;
-            }
-
-            if (next == 0) continue;
-            sum += steering.Compute(Dt, new Vec3(speed * time, 0f, 0f), 0f, new Vec2(speed, 0f), 0f).ErrorAlongHeading;
-            samples++;
-        }
-
-        return sum / samples;
-    }
-
-    // The owner's sends: every 50 ms on owner frames of 12 to 22 ms, each arriving 0 to 20 ms after it was sent.
-    private static System.Collections.Generic.List<(float SentAt, float ArrivesAt)> JitteredSends(Random random)
-    {
-        var sends = new System.Collections.Generic.List<(float, float)>();
-        float ownerTime = 0f;
-        float accumulated = 0f;
-        float lastArrival = 0f;
-        while (ownerTime < 21f)
-        {
-            float frame = 0.012f + ((float)random.NextDouble() * 0.01f);
-            ownerTime += frame;
-            accumulated += frame;
-            if (accumulated < 0.05f) continue;
-
-            accumulated = Math.Min(accumulated - 0.05f, 0.05f);
-            lastArrival = Math.Max(lastArrival, ownerTime + ((float)random.NextDouble() * 0.02f));
-            sends.Add((ownerTime, lastArrival));
-        }
-
-        return sends;
-    }
-
     // R41b F4: an owner sampled at 20 Hz with jittered arrival, followed straight and through a constant-rate turn.
     [Theory]
     [InlineData(0f)]
@@ -351,6 +232,7 @@ public class NavalCopySteeringTests
         var copy = new SimulatedCopy(owner.PositionAt(0f), owner.VelocityAt(0f), 0f, yawRate);
         // The lead covers the modelled 80 ms transit, which the sample's age on this clock misses.
         var steering = new CopySteering(Knobs("lead=0.08"));
+        var diagnostics = new CopyDiagnostics();
         var random = new Random(41);
         const float latency = 0.08f;
         int nextSample = 0;
@@ -369,20 +251,28 @@ public class NavalCopySteeringTests
                 nextArrival = Math.Max(nextArrival, (nextSample * BattleShipSendInterval) + latency + jitter);
             }
 
-            copy.Step(steering.Compute(Dt, copy.Origin, copy.Yaw, copy.Velocity, copy.YawRate), Dt);
+            copy.Step(Steer(steering, diagnostics, copy), Dt);
             if (time < 2f) continue;
 
             driftSum += (copy.Origin.AsVec2 - owner.PositionAt(time)).Length;
             driftSamples++;
         }
 
-        Assert.Equal(0, steering.Oscillations);
-        Assert.Equal(0, steering.Snaps);
+        Assert.Equal(0, diagnostics.Oscillations);
+        Assert.False(steering.IsSnapQueued);
         // Inside the soft zone; a live copy's replayed rudder also turns its velocity, which this model leaves to the steering.
         Assert.True(driftSum / driftSamples < 0.4f, $"mean drift {driftSum / driftSamples} m");
     }
 
     private const float BattleShipSendInterval = 0.05f;
+
+    // One steering step from the modelled copy's state, recorded the way NavalSteeredCopies records it (default tau).
+    private static CopySteeringStep Steer(CopySteering steering, CopyDiagnostics diagnostics, SimulatedCopy copy)
+    {
+        var step = steering.Compute(Dt, copy.Origin, copy.Yaw, copy.Velocity, copy.YawRate);
+        diagnostics.RecordStep(0f, Dt, new CopySteeringKnobs().TauSeconds, step);
+        return step;
+    }
 
     [Fact]
     public void Knobs_DefaultToNoLead()
@@ -400,6 +290,7 @@ public class NavalCopySteeringTests
         var owner = new SimulatedOwner(speed, 0f);
         var copy = new SimulatedCopy(owner.PositionAt(0f), owner.VelocityAt(0f), 0f, 0f);
         var steering = new CopySteering(Knobs(FormattableString.Invariant($"lead={lead}")));
+        var diagnostics = new CopyDiagnostics();
         var random = new Random(42);
         int nextSample = 0;
         float nextArrival = 0f;
@@ -418,7 +309,7 @@ public class NavalCopySteeringTests
                 nextArrival = Math.Max(nextArrival, (nextSample * BattleShipSendInterval) + ((float)random.NextDouble() * 0.01f));
             }
 
-            copy.Step(steering.Compute(Dt, copy.Origin, copy.Yaw, copy.Velocity, copy.YawRate), Dt);
+            copy.Step(Steer(steering, diagnostics, copy), Dt);
             if (time < 5f) continue;
 
             // The step moved the copy to the end of this tick.
@@ -428,7 +319,7 @@ public class NavalCopySteeringTests
 
         float alongMean = alongSum / samples;
         Assert.True(Math.Abs(alongMean - (speed * lead)) < 0.1f, $"along-track mean {alongMean} m, lead {lead} s");
-        Assert.Equal(0, steering.Oscillations);
+        Assert.Equal(0, diagnostics.Oscillations);
     }
 
     // R42: the probe measures drift against where the owner is, so a tuned lead doesn't count as drift.
@@ -446,57 +337,6 @@ public class NavalCopySteeringTests
         Assert.Equal(0.2f * 0.1f, early.Yaw, 4);
         Assert.Equal(10f + (5f * (0.1f + 0.3f)), earlyTarget, 3);
         Assert.Equal(10f + (5f * CopySteering.MaxExtrapolationSeconds), steering.OwnerEstimate.Position.x, 3);
-    }
-
-    [Fact]
-    public void Compute_ASteadyOffsetIsNoOscillation()
-    {
-        var steering = Observed(Knobs(), 0f, Vec2.Zero);
-        var random = new Random(7);
-
-        // Held 0.3 m behind the target with 0.15 m of noise, so the error never reaches the far side of the deadband.
-        for (int tick = 0; tick < 600; tick++)
-            steering.Compute(Dt, new Vec3(-0.3f + (((float)random.NextDouble() - 0.5f) * 0.3f), 0f, 0f), 0f, Vec2.Zero, 0f);
-
-        Assert.Equal(0, steering.Oscillations);
-    }
-
-    // R42: the old counter flipped on the velocity correction, which thrust noise on a copy sitting on its target alternates.
-    [Fact]
-    public void Compute_ThrustNoiseOnTargetIsNoOscillation()
-    {
-        var steering = Observed(Knobs(), 0f, new Vec2(5f, 0f));
-        var random = new Random(9);
-        int correctionFlips = 0;
-        int lastCorrectionSign = 0;
-
-        for (int tick = 1; tick <= 600; tick++)
-        {
-            if (tick % 3 == 0) steering.ObserveOwner(Frame(5f * tick * Dt, 0f, 0f), new Vec2(5f, 0f), 0f);
-            float onTarget = steering.Target.Position.x + (5f * Dt);
-            float thrust = tick % 2 == 0 ? 0.3f : -0.3f;
-            var step = steering.Compute(Dt, new Vec3(onTarget + (((float)random.NextDouble() - 0.5f) * 0.1f), 0f, 0f), 0f,
-                new Vec2(5f + thrust, 0f), 0f);
-
-            int correctionSign = Math.Sign(step.DeltaVelocity.x);
-            if (correctionSign != 0 && lastCorrectionSign != 0 && correctionSign != lastCorrectionSign) correctionFlips++;
-            if (correctionSign != 0) lastCorrectionSign = correctionSign;
-        }
-
-        Assert.True(correctionFlips > 100, $"{correctionFlips} correction flips");
-        Assert.Equal(0, steering.Oscillations);
-    }
-
-    [Fact]
-    public void Compute_CountsACopyRingingAboutItsTarget()
-    {
-        var steering = Observed(Knobs(), 0f, Vec2.Zero);
-
-        // 0.5 m either side of the target once a second for 5 s: it crosses at every half second before the end.
-        for (int tick = 1; tick <= 300; tick++)
-            steering.Compute(Dt, new Vec3(-0.5f * (float)Math.Sin(2 * Math.PI * tick * Dt), 0f, 0f), 0f, Vec2.Zero, 0f);
-
-        Assert.Equal(9, steering.Oscillations);
     }
 
     [Fact]
