@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 using GameInterface.Services.Players;
@@ -33,6 +34,8 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     private const string IssueName = "LandLordCompanyOfTroubleIssue";
     private const string IssueId = "issue_company_of_trouble";
     private const string OwnerControllerId = "player-A";
+    private const string OtherIssueId = "issue_company_of_trouble_2";
+    private const string OtherControllerId = "player-B";
 
     private static readonly MethodBase[] CharacterLinks = AccessTools.GetDeclaredMethods(typeof(StringHelpers))
         .Where(method => method.Name == nameof(StringHelpers.SetCharacterProperties))
@@ -489,6 +492,124 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
+    public void DismissingAQuestNobodyOwns_LeavesAnotherPlayersMercenaries()
+    {
+        var otherLordId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var otherHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        GiveMercenaries(4);
+        GiveTheLordTheIssue(Server, otherLordId, OtherIssueId);
+        var otherMercenaries = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(OtherControllerId, otherHeroId, otherPartyId, "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherLordId, out var otherLord));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var otherParty));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
+
+            using (new AllowedThread())
+            {
+                otherHero._partyBelongedTo = otherParty;
+            }
+
+            otherParty.MemberRoster.AddToCounts(troop, 3);
+            AttachQuest(otherLord, troop, companyTroopCount: 3);
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(otherLordId, OtherIssueId, OtherControllerId));
+            AttachQuest(Server, companyTroopCount: 4);
+
+            lord.Issue.IssueFinalized();
+
+            otherMercenaries = otherParty.MemberRoster.GetTroopCount(troop);
+        });
+        Server.PumpGameThread();
+
+        Assert.Equal(0, MercenariesIn(Server));
+        Assert.Equal(3, otherMercenaries);
+    }
+
+    [Fact]
+    public void AllTheMercenariesDyingInABattle_PaysTheOwnerAndSucceeds()
+    {
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        var goldBefore = GoldOfOwner();
+        Quest quest = null!;
+
+        Server.Call(() => quest = (Quest)AttachQuest(Server, companyTroopCount: 3).IssueQuest);
+        EndFightOnServer(enemyPartyId, BattleState.AttackerVictory);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(500, GoldOfOwner() - goldBefore);
+        Assert.Equal(5, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void SellingOnTheOwnersClient_OnlyAsksTheServer()
+    {
+        GiveMercenaries(3);
+        var goldBefore = GoldOfOwnerOn(Owner);
+
+        Owner.Call(() =>
+        {
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
+            MakeTheOwnersPartyTheMainParty(Owner);
+
+            quest.persuasion_complete_with_company_of_trouble_on_consequence();
+        }, CharacterLinks);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal(goldBefore, GoldOfOwnerOn(Owner));
+        Assert.Equal(3, MercenariesIn(Owner));
+    }
+
+    [Fact]
+    public void LettingTheCompanyLeaveOnTheOwnersClient_OnlyAsksTheServer()
+    {
+        GiveMercenaries(3);
+
+        Owner.Call(() =>
+        {
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
+            MakeTheOwnersPartyTheMainParty(Owner);
+
+            quest.CompanyLeftQuestFail();
+        }, CharacterLinks);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal(3, MercenariesIn(Owner));
+    }
+
+    [Fact]
+    public void FoodTheftOnTheOwnersClient_OnlyAsksTheServer()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            ownerParty.ItemRoster.AddToCounts(DefaultItems.Grain, 3);
+        });
+        TestEnvironment.FlushCoalescer();
+        var grainBefore = GrainIn(Owner);
+
+        Owner.Call(() =>
+        {
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 3).IssueQuest;
+            MakeTheOwnersPartyTheMainParty(Owner);
+
+            quest.TryToStealItemFromPlayer();
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestLandLordCompanyOfTroubleFoodTheft>());
+        Assert.Equal(grainBefore, GrainIn(Owner));
+    }
+
+    [Fact]
     public void TheLeaveDialog_OpensForMercenariesInTheOwnersParty()
     {
         Assert.True(CompanyDialogOpens(conversationPartyId: ownerPartyId));
@@ -560,13 +681,15 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         return mapEvent;
     }
 
-    private int GoldOfOwner()
+    private int GoldOfOwner() => GoldOfOwnerOn(Server);
+
+    private int GoldOfOwnerOn(EnvironmentInstance instance)
     {
         var gold = 0;
 
-        Server.Call(() =>
+        instance.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             gold = ownerHero.Gold;
         });
 
@@ -578,6 +701,16 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
         {
             Assert.True(Descriptor().FinalizationProofStrategy.TryRunBranch(quest, (byte)branch));
+        }
+    }
+
+    private void MakeTheOwnersPartyTheMainParty(EnvironmentInstance instance)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+
+        using (new AllowedThread())
+        {
+            Campaign.Current.MainParty = ownerParty;
         }
     }
 
@@ -634,6 +767,11 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Assert.True(instance.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
         Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
 
+        return AttachQuest(lord, troop, companyTroopCount);
+    }
+
+    private static IssueBase AttachQuest(Hero lord, CharacterObject troop, int companyTroopCount)
+    {
         var quest = (Quest)RuntimeHelpers.GetUninitializedObject(typeof(Quest));
         quest.QuestGiver = lord;
         quest._troubleCharacterObject = troop;
@@ -652,16 +790,18 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         return descriptor;
     }
 
-    private void GiveTheLordTheIssue(EnvironmentInstance instance)
+    private void GiveTheLordTheIssue(EnvironmentInstance instance) => GiveTheLordTheIssue(instance, lordId, IssueId);
+
+    private static void GiveTheLordTheIssue(EnvironmentInstance instance, string issueLordId, string issueId)
     {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueLordId, out var lord));
 
             using (new AllowedThread())
             {
                 var issue = new Issue(lord);
-                issue.StringId = IssueId;
+                issue.StringId = issueId;
                 issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
 
                 Campaign.Current.IssueManager._issues.Add(lord, issue);
