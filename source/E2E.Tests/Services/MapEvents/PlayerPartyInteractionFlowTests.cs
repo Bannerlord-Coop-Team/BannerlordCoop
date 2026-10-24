@@ -2856,6 +2856,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             playerPartyId,
             siege.SettlementId,
             enterSettlement: false);
+        AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
         client.NetworkSentMessages.Clear();
         Server.NetworkSentMessages.Clear();
         client.Call(() =>
