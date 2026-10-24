@@ -101,7 +101,6 @@ public class RaidAnEnemyTerritoryTests : IDisposable
 
             Assert.True(quest.IsOngoing);
         });
-
     }
 
     private void RegisterOwner()
