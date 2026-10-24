@@ -29,19 +29,23 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     private readonly IBattleSession session;
     private readonly ICoopMissionComponent missionComponent;
     private readonly INavalShipEngine engine;
+    private readonly IAppliedHostEpoch hostEpoch;
+    private readonly IBattleShipArrivals arrivals;
 
     private long sent, applied, dropped;
     private string lastDrop;
     private bool disposed;
 
     public BattleShipDamageRouter(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
-        ICoopMissionComponent missionComponent, INavalShipEngine engine)
+        ICoopMissionComponent missionComponent, INavalShipEngine engine, IAppliedHostEpoch hostEpoch, IBattleShipArrivals arrivals)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.missionComponent = missionComponent;
         this.engine = engine;
+        this.hostEpoch = hostEpoch;
+        this.arrivals = arrivals;
 
         messageBroker.Subscribe<BattleShipHit>(Handle_BattleShipHit);
         messageBroker.Subscribe<NetworkApplyShipDamage>(Handle_NetworkApplyShipDamage);
@@ -92,7 +96,7 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         }
 
         var damage = new NetworkApplyShipDamage(ship.ShipId, session.OwnControllerId, hit.Kind, hit.Damage, hit.InflictedDamage,
-            hit.LocalPoint, AgentIdOf(hit.Attacker), ShipIdOf(hit.Hitter), hit.IsRamDamage, hit.SailIndex, session.HostEpoch);
+            hit.LocalPoint, AgentIdOf(hit.Attacker), ShipIdOf(hit.Hitter), hit.IsRamDamage, hit.SailIndex, hostEpoch.AppliedHostEpoch);
 
         // Mid-swap the copy is still in place while this client already holds the hull's authority, so the hit lands here.
         if (ship.CurrentAuthority == session.OwnControllerId)
@@ -111,7 +115,8 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            ApplyNetworkDamage(damage);
+            // Behind the host change and hull records that arrived first, so the hull's authority is the one the sender saw.
+            arrivals.Enqueue(() => ApplyNetworkDamage(damage), nameof(Handle_NetworkApplyShipDamage));
         }, context: nameof(Handle_NetworkApplyShipDamage));
     }
 
@@ -126,7 +131,7 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
             return;
         }
 
-        var rejection = ValidateDamage(ship, session.OwnControllerId, damage, session.HostEpoch);
+        var rejection = ValidateDamage(ship, session.OwnControllerId, damage, hostEpoch.AppliedHostEpoch);
         if (rejection != null)
         {
             Drop(rejection, damage.ShipId);

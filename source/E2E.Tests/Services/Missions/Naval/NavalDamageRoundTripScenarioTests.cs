@@ -40,6 +40,7 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
 
         b.Call(() => b.Network.SendAll(new NetworkApplyShipDamage(pirate, "B", BattleShipDamageKind.Hull, 30f, 0f, Vec3.Zero,
             Guid.Empty, Guid.Empty, false, -1, battle.HostEpoch - 1)));
+        battle.ApplyArrivals();
 
         Assert.Empty(a.Hull(pirate).AppliedDamage);
         Assert.Equal(FakeNavalShipEngine.FullHitPoints, a.Hull(pirate).HitPoints, 3);

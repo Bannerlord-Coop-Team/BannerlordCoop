@@ -26,7 +26,7 @@ namespace Missions.Battles;
 /// with its owner (retreat, leave or disconnect) is removed on every client, after its seats and deck are cleared; only the
 /// AI hulls move to the next battle host.
 /// </summary>
-public interface IBattleShipReplicator : IDisposable
+public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
 {
     /// <summary>[Game thread] Announce hulls, stream own samples and expire stale ones for this frame.</summary>
     void Tick(float dt);
@@ -420,6 +420,9 @@ public class BattleShipReplicator : IBattleShipReplicator
             ship.ShipId, reason, missionEnding ? ", mission ending" : "");
     }
 
+    // The epoch whose AI hull move applied last, or the one this client joined at.
+    public int AppliedHostEpoch => appliedHostEpoch;
+
     public int DepartedHulls(BattleSideEnum side) => departedHulls.TryGetValue(side, out int count) ? count : 0;
 
     private void CountDeparted(NetworkShipInfo ship)
@@ -666,7 +669,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Handle_NetworkBattleRopeFinal(MessagePayload<NetworkBattleRopeFinal> payload)
     {
         var final = payload.What;
-        GameThread.RunSafe(() => AcceptFinalRopes(final), context: nameof(Handle_NetworkBattleRopeFinal));
+        // Sent once, so it waits behind the hull record it may need, which also applies from the arrivals queue.
+        GameThread.RunSafe(() => arrivals.Enqueue(() => AcceptFinalRopes(final), nameof(Handle_NetworkBattleRopeFinal)),
+            context: nameof(Handle_NetworkBattleRopeFinal));
     }
 
     // A departed host's held final ropes are replayed on purpose before its AI hulls move, so they skip the membership gate.

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -13,6 +14,7 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+[Collection("Mission.Current")]
 public class BattleShipDamageRouterTests
 {
     private const string Own = "local";
@@ -197,6 +199,57 @@ public class BattleShipDamageRouterTests
         Assert.Equal(4, copy.HostEpoch);
     }
 
+    // Architecture review: a hit routed to the new AI host can arrive after the host change reached this client but before the
+    // change's queued hull move applied; it waits in the arrivals queue behind that move and applies once the hull is this
+    // client's, instead of being dropped as not_authority.
+    [Fact]
+    public void RoutedHit_ArrivingBeforeTheQueuedHostChange_AppliesOnceTheHullMoves()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Peer, isNpcParty: true);
+        harness.Arrivals.Enqueue(() =>
+        {
+            ship.CurrentAuthority = Own;
+            harness.AppliedEpoch = HostEpoch + 1;
+        }, "host change");
+        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, 10f, hostEpoch: HostEpoch + 1);
+
+        harness.Broker.Publish(this, damage);
+        GameThread.Run(() => { }, blocking: true);
+        harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
+            It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Arrivals.ApplyAll();
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(ship.Hull, damage, null, null), Times.Once);
+    }
+
+    // Hits are checked against the epoch whose hull move this client applied, not the session's, which runs a queued move ahead.
+    [Fact]
+    public void RoutedHit_IsCheckedAgainstTheAppliedHostEpoch_NotTheSessions()
+    {
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Own, isNpcParty: true);
+        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, 10f, hostEpoch: HostEpoch);
+
+        harness.Router.ApplyNetworkDamage(damage);
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(ship.Hull, damage, null, null), Times.Once);
+    }
+
+    // A local hit on another client's hull is stamped with the applied host epoch, which the authority checks it against.
+    [Fact]
+    public void LocalHit_OnAnotherClientsHull_IsStampedWithTheAppliedHostEpoch()
+    {
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Peer, isNpcParty: true);
+
+        harness.Broker.Publish(this, Hit(ship.Hull, BattleShipDamageKind.Hull, 10f));
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkApplyShipDamage
+            && ((NetworkApplyShipDamage)m).HostEpoch == HostEpoch)), Times.Once);
+    }
+
     private static BattleShipHit Hit(MissionObject hull, BattleShipDamageKind kind, float damage) =>
         new BattleShipHit(hull, kind, damage, 0f, Vec3.Zero, null, null, false, -1);
 
@@ -211,8 +264,11 @@ public class BattleShipDamageRouterTests
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         public BattleShipDamageRouter Router { get; }
+        public BattleShipArrivals Arrivals { get; } = new BattleShipArrivals();
+        /// <summary>The host epoch whose hull move this client applied; a test moves it as a queued host change applies.</summary>
+        public int AppliedEpoch { get; set; } = HostEpoch;
 
-        public Harness()
+        public Harness(int sessionEpoch = HostEpoch)
         {
             var component = new Mock<ICoopMissionComponent>();
             component.SetupGet(c => c.ShipRegistry).Returns(Registry);
@@ -220,9 +276,12 @@ public class BattleShipDamageRouterTests
 
             var session = new Mock<IBattleSession>();
             session.SetupGet(s => s.OwnControllerId).Returns(Own);
-            session.SetupGet(s => s.HostEpoch).Returns(HostEpoch);
+            session.SetupGet(s => s.HostEpoch).Returns(sessionEpoch);
+            var appliedEpoch = new Mock<IAppliedHostEpoch>();
+            appliedEpoch.SetupGet(e => e.AppliedHostEpoch).Returns(() => AppliedEpoch);
 
-            Router = new BattleShipDamageRouter(Network.Object, Broker, session.Object, component.Object, Engine.Object);
+            Router = new BattleShipDamageRouter(Network.Object, Broker, session.Object, component.Object, Engine.Object,
+                appliedEpoch.Object, Arrivals);
         }
 
         public NetworkShipInfo Register(string authority, bool isNpcParty)
