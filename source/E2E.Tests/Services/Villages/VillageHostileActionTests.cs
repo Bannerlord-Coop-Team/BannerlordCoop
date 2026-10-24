@@ -752,6 +752,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out eventId));
         }, MapEventDisabledMethods);
 
+        TestEnvironment.FlushCoalescer();
         SetMockPlayerEncounter(owner, mapEventId: eventId);
         var presentationMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
@@ -760,7 +761,12 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(owner.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(militiaId, out var militia));
             Assert.True(owner.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(party.MemberRoster.TotalHealthyCount >= 1000);
+            Assert.Equal(16, militia.MemberRoster.TotalHealthyCount);
+            Assert.True(militia.IsMilitia);
+            Assert.False(militia.IsLordParty);
             using (new AllowedThread())
             {
                 Campaign.Current.MainParty = party;
@@ -772,7 +778,8 @@ public class VillageHostileActionTests : MapEventTestBase
             mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
             manager._gameStates.Add(mapState);
             var behavior = new EncounterGameMenuBehavior();
-            Assert.True(behavior.ConsiderVillageSurrenderPossibility());
+            Assert.True(behavior.ConsiderVillageSurrenderPossibility(),
+                $"attacker strength={PlayerEncounter.Battle.AttackerSide.Parties.Sum(p => p.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Village))}, defender strength={PlayerEncounter.Battle.DefenderSide.Parties.Sum(p => p.Party.GetCustomStrength(BattleSideEnum.Defender, MapEvent.PowerCalculationContext.Village))}, defending lords={PlayerEncounter.Battle.DefenderSide.Parties.Count(p => p.Party.MobileParty?.IsLordParty == true)}");
             Assert.Equal(BattleSideEnum.Attacker, PlayerEncounter.Battle.PlayerSide);
             behavior.UpdateVillageHostileActionEncounter(null);
             Assert.Equal(0f, settlement.Militia);
