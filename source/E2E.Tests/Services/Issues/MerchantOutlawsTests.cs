@@ -136,6 +136,38 @@ public class MerchantOutlawsTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    [Fact]
+    public void HideoutBanditsStayUntrackedWhenAcceptedAndProgressIsReplayed()
+    {
+        Accept();
+        string[] hideoutParties = null;
+        Server.Call(() =>
+        {
+            var quest = Quest(Server);
+            hideoutParties = quest._validPartiesList.Where(party => party.CurrentSettlement ==
+                Get<Settlement>(Server, hideoutSettlementId)).Select(party =>
+                {
+                    Assert.False(quest.IsTracked(party));
+                    Assert.True(Server.ObjectManager.TryGetId(party, out var id));
+                    return id;
+                }).ToArray();
+            Assert.NotEmpty(hideoutParties);
+            Server.Resolve<IMerchantOutlawsProgress>().Send(quest);
+        });
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            foreach (var id in hideoutParties)
+            {
+                var party = Get<MobileParty>(ClientA, id);
+                Assert.Contains(party, Quest(ClientA)._validPartiesList);
+                Assert.False(Quest(ClientA).IsTracked(party));
+                Assert.False(Campaign.Current.VisualTrackerManager.CheckTracked(party));
+            }
+        });
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(500)]
