@@ -4,6 +4,8 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
+using ProtoBuf;
+using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -127,6 +129,48 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         AssertObserverHasNoArchive();
     }
 
+    [Theory]
+    [InlineData(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest)]
+    [InlineData(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest)]
+    public void AlternativeCompletion_PreservesNativeTextTemplatesAndAttributes(IssueBase.IssueUpdateDetails ending)
+    {
+        var logTime = new CampaignTime(456L);
+        var person = new TextObject("Companion {NAME}", new Dictionary<string, object> { ["NAME"] = "Suvys" });
+        var text = new TextObject("Mission for {PERSON}: {COUNT}", new Dictionary<string, object>
+        {
+            ["PERSON"] = person,
+            ["COUNT"] = 3,
+        });
+        var task = new TextObject("Return {DAYS}", new Dictionary<string, object> { ["DAYS"] = 4 });
+        scenario.Server.Call(() => issues[scenario.Server].AddLog(new JournalLog(logTime, text, task, 3, 4)));
+
+        EndOnServer(ending);
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        AssertObserverHasNoArchive();
+        scenario.ClientA.Call(() =>
+        {
+            var archive = archives[scenario.ClientA];
+            Assert.True(archive.IsEnded());
+            var entries = archive.GetEntries().ToArray();
+            Assert.Equal(2, entries.Length);
+            var progress = entries[0];
+            Assert.Equal(logTime.NumTicks, progress.LogTime.NumTicks);
+            Assert.Equal(3, progress.CurrentProgress);
+            Assert.Equal(4, progress.Range);
+            Assert.Equal(text.ToString(), progress.LogText.ToString());
+            Assert.Equal(task.ToString(), progress.TaskName.ToString());
+            Assert.Equal(text.Value, progress.LogText.Value);
+            Assert.Equal(2, progress.LogText.Attributes.Count);
+            Assert.Equal(3, Assert.IsType<int>(progress.LogText.Attributes["COUNT"]));
+            var actualPerson = Assert.IsType<TextObject>(progress.LogText.Attributes["PERSON"]);
+            Assert.Equal(person.Value, actualPerson.Value);
+            Assert.Equal("Suvys", Assert.IsType<string>(actualPerson.Attributes["NAME"]));
+            Assert.Equal(task.Value, progress.TaskName.Value);
+            Assert.Equal(4, Assert.IsType<int>(progress.TaskName.Attributes["DAYS"]));
+            Assert.Equal(EndingText(ending).ToString(), entries[1].LogText.ToString());
+        });
+    }
+
     [Fact]
     public void AlternativeCompletion_RefusesStaleIdentityAndNonEndingStatus()
     {
@@ -142,6 +186,31 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             Assert.Same(issues[scenario.ClientA], issues[scenario.ClientA].IssueOwner.Issue);
             Assert.False(archives[scenario.ClientA].IsEnded());
         });
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("", "")]
+    [InlineData("Previous text", "Previous task")]
+    public void AlternativeJournal_ReplaysPreviousPayloadWithoutNativeText(string text, string task)
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new PreviousJournalEntry { Text = text, TaskName = task });
+        stream.Position = 0;
+        var received = Serializer.Deserialize<AlternativeSolutionJournalEntry>(stream);
+        var log = received.ToJournalLog();
+
+        Assert.Null(received.NativeText);
+        Assert.Null(received.NativeTaskName);
+        Assert.Equal(text, log.LogText?.Value);
+        Assert.Equal(task, log.TaskName?.Value);
+    }
+
+    [ProtoContract]
+    private class PreviousJournalEntry
+    {
+        [ProtoMember(2)] public string Text { get; set; }
+        [ProtoMember(3)] public string TaskName { get; set; }
     }
 
     private void EndOnServer(IssueBase.IssueUpdateDetails ending)

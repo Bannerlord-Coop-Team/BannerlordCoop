@@ -32,8 +32,8 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))`. Clients replay what the
    server announced and never roll or pay anything again.
 2. A quest with a `FinalizationProofStrategy` ends through its branch, not a generic `QuestSuccess`, which skips
-   the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
-   `QuestSuccess` for your descriptor.
+   the branch method where vanilla pays. `FinalizationCoordinator` rejects that generic request whenever
+   `descriptor.FinalizationProofStrategy != null`; a separate descriptor marker is not needed.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
    `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`.
@@ -59,10 +59,12 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    clan's kingdom change, still sends its ending to the server as a request.
 9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`
-   runs the listener with that exact name and parameter types on every running registered quest, as its owner through
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed`, `OnHeroKilled` and `OnMapEventStarted`.
+   `Framework/Dispatch/QuestEventRelay.cs` runs the listener with that exact name and parameter types on every
+   running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
-   listener names as strings because `Framework/` cannot name quest types.
+   listener names as strings because `Framework/` cannot name quest types. `OnMapEventStarted` only relays
+   forcing supplies or volunteers, not ordinary battles or raids.
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.
@@ -93,6 +95,13 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 
 Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI'd framework service like
 `IOutcomeDispatcher`, so they can be tested without Harmony.
+
+`IssueCancellationCoordinator` handles registered giver deaths and issue cancellation as the owner. When the
+owner has no party or the sent troops cannot return, it retains the issue and retries hourly. Its pending set
+belongs to the session's DI scope and is never saved. A missing owner uses `ActiveIssueDismisser` to release
+the issue and any disabled companion. Clients only cancel when replaying `NetworkIssueFinalized`, and do not
+run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
+issue cancellation does not announce it a second time.
 
 ## Verification
 
