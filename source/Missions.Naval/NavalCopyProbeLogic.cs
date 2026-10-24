@@ -18,6 +18,7 @@ public class NavalCopyProbeLogic : MissionLogic
 {
     private readonly INetworkShipRegistry registry;
     private readonly INavalSteeredCopies steeredCopies;
+    private readonly CopySteeringKnobs knobs;
     private readonly Dictionary<MissionShip, HullOutline> outlines = new Dictionary<MissionShip, HullOutline>();
     private readonly RollingWindow frameMilliseconds = new RollingWindow();
     private readonly RollingWindow steerMilliseconds = new RollingWindow();
@@ -27,13 +28,14 @@ public class NavalCopyProbeLogic : MissionLogic
     private bool collectionCountsTaken;
     private long fixedTicks;
 
-    public NavalCopyProbeLogic(INetworkShipRegistry registry, INavalSteeredCopies steeredCopies)
+    public NavalCopyProbeLogic(INetworkShipRegistry registry, INavalSteeredCopies steeredCopies, CopySteeringKnobs knobs)
     {
         this.registry = registry;
         this.steeredCopies = steeredCopies;
+        this.knobs = knobs;
     }
 
-    /// <summary>The steered copies whose knobs <c>copy_steer</c> tunes.</summary>
+    /// <summary>The battle's steered copies, which the inspect summary reads the drift of.</summary>
     internal INavalSteeredCopies SteeredCopies => steeredCopies;
 
     public override void OnMissionTick(float dt)
@@ -169,7 +171,7 @@ public class NavalCopyProbeLogic : MissionLogic
         return new
         {
             fixedTicks,
-            knobs = steeredCopies.Knobs.ToString(),
+            knobs = knobs.ToString(),
             frameCost = new
             {
                 meanMs = CopyDiagnostics.Round(frameMilliseconds.Mean),

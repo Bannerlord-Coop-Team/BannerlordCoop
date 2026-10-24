@@ -47,6 +47,10 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
             .InstancePerDependency();
+        // One set of knobs per client, so a copy_steer tuning holds across battles.
+        builder.RegisterType<CopySteeringKnobs>()
+            .AsSelf()
+            .InstancePerLifetimeScope();
         // Registered after MissionModule's AgentFormationAssigner, so it is the one resolved.
         builder.RegisterType<NavalAgentFormationAssigner>()
             .As<IAgentFormationAssigner>()

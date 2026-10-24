@@ -49,8 +49,8 @@ public class NavalShipEngine : INavalShipEngine
         this.copyWeaponStates = copyWeaponStates;
     }
 
-    /// <summary>This engine's copies and their steering knobs (the DEBUG probe and copy_steer read them).</summary>
-    internal INavalSteeredCopies SteeredCopies { get; }
+    // This battle's copies, which the launcher hands to the behaviour that steers them.
+    private INavalSteeredCopies SteeredCopies { get; }
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
@@ -111,8 +111,7 @@ public class NavalShipEngine : INavalShipEngine
         var frame = NetworkBattleShipSample.ToFrame(data.Frame);
         var ship = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
 
-        // The owner decides this hull: no local controller and no auto controller; its body is steered toward the samples.
-        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        // The owner decides this hull: no local controller; its body is steered toward the samples.
         SteeredCopies.Track(ship);
         OpenEmptyEnemyHelm(ship, Mission.Current?.PlayerTeam);
         formation = ship.Formation;
@@ -137,9 +136,7 @@ public class NavalShipEngine : INavalShipEngine
 
     public void ReleaseHull(MissionObject hull)
     {
-        var ship = (MissionShip)hull;
-        SteeredCopies.Track(ship);
-        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        SteeredCopies.Track((MissionShip)hull);
     }
 
     // A steered copy keeps its dynamic body, so dropping it from the copy set is all a new authority needs to simulate it.
@@ -499,8 +496,9 @@ public class NavalShipEngine : INavalShipEngine
         if (physics == null || !ship.GameEntity.IsValid) return null;
 
         float mass = physics._committedTotalMass;
-        return CrewLoadOf(mass, physics._committedWeightedAgentsPosition, ship.GameEntity.GetBodyWorldTransform(),
-            mass > 0f || HasAgentAboard(ship));
+        var body = ship.GameEntity.GetBodyWorldTransform();
+        return CrewLoadOf(mass, physics._committedWeightedAgentsPosition, body,
+            mass > 0f || HasAgentAboard(ship, physics.PhysicsBoundingBoxWithoutChildren, body));
     }
 
     /// <summary>
@@ -514,27 +512,17 @@ public class NavalShipEngine : INavalShipEngine
         return agentAboard ? null : BattleShipCrewLoad.Empty;
     }
 
-    // Whether an active agent stands on the hull, the agents vanilla's AgentNavalComponent.OnTick weighs it with.
-    private static bool HasAgentAboard(MissionShip ship)
+    // Whether vanilla weighs an agent on the hull: an active agent stepped on it (AgentNavalComponent.OnTick) whose position
+    // lies inside the hull's physics box (NavalPhysics.AddAgentWeightAndPositionInformation).
+    private static bool HasAgentAboard(MissionShip ship, BoundingBox physicsBox, MatrixFrame body)
     {
-        var mission = Mission.Current;
-        if (mission == null) return false;
-
-        foreach (var agent in mission.Agents)
+        foreach (var agent in Mission.Current.Agents)
         {
-            if (agent.IsActive() && agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship) return true;
+            if (!agent.IsActive() || agent.GetComponent<AgentNavalComponent>()?.SteppedShip != ship) continue;
+            if (CopyCrewLoadPatch.IsInsideHull(physicsBox, body.TransformToLocal(agent.Position))) return true;
         }
 
         return false;
-    }
-
-    public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);
-
-    public void SnapCopies() => SteeredCopies.ApplySnaps();
-
-    public void ForgetHull(MissionObject hull)
-    {
-        if (hull is MissionShip ship) SteeredCopies.Forget(ship);
     }
 
     public BattleShipInput ReadInput(MissionObject hull)
@@ -880,9 +868,6 @@ public class NavalShipEngine : INavalShipEngine
 
             ApplySinkingState(ship, (SinkingState)condition.SinkingState, isCopy);
         }
-
-        // PrepareForAbandonment and SetSinkingState leave the hull an auto-updated controller; a copy keeps none.
-        if (isCopy) ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
 
     private static void ApplyPartialHitPoints(MissionShip ship, float[] partialHitPoints)
