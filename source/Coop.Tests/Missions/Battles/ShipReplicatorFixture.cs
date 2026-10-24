@@ -12,7 +12,7 @@ namespace Coop.Tests.Missions.Battles;
 /// Builds the ship replicator over the hull core it composes, the way <see cref="NavalBattleServices"/> does, so the replicator
 /// tests construct it in one place.
 /// </summary>
-public sealed class ShipReplicatorFixture
+internal sealed class ShipReplicatorFixture
 {
     // Composes the hull core on the context's session, mission component and epoch policy; unset collaborators are mocks.
     public ShipReplicatorFixture(BattleContext context, IMessageBroker broker, INavalShipEngine engine, IBattleNetwork network = null,

@@ -53,6 +53,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(12f, h.Hull(prize).Frame.origin.x, 3);
         Assert.Equal(12f, o.Hull(prize).Frame.origin.x, 3);
         o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, lateSampleFromH));
+        battle.ApplyArrivals();
         Assert.Equal("not_authority", (string)o.Stream(prize)["lastReject"]!);
 
         // A hit on the prize goes to the captor, and every client ends at its HP.

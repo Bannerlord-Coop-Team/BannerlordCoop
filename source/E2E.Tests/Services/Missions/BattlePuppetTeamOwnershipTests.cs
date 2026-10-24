@@ -6,7 +6,6 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using Coop.Tests.Missions.Battles;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
@@ -590,6 +589,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         });
     }
 
+    // Built here rather than with Coop.Tests' ShipReplicatorFixture: loading a Coop.Tests type runs its module initializer,
+    // whose game-loop pump thread crashes this process's own game-thread marking.
     private static BattleShipReplicator CreateShipReplicator(IMessageBroker broker, IBattleSession session,
         IBattleDeploymentCoordinator deployment, ICoopMissionComponent missionComponent, INavalShipEngine engine,
         IBattleTeamResolver teams, GameInterface.Services.ObjectManager.IObjectManager objectManager,
@@ -597,9 +598,17 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
     {
         var members = new Mock<IMissionContext>();
         members.SetupGet(m => m.ControllersInMission).Returns(new[] { "host" });
-        var context = ShipReplicatorFixture.Context(session, missionComponent, members.Object, deployment);
-        return new ShipReplicatorFixture(context, broker, engine, teamResolver: teams, arrivals: arrivals,
-            objectManager: objectManager).Replicator;
+        var context = new BattleContext(session, deployment, missionComponent, new HostEpochPolicy(), Mock.Of<IBattleResultCommitter>(),
+            Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(), Mock.Of<IBattlePartyWithdrawal>());
+        var network = Mock.Of<IBattleNetwork>();
+        var appliedHost = new NavalAppliedHost(broker, session);
+        var heldShips = new HeldShipBuffer();
+        var conditions = new BattleShipConditionStream(network, broker, context, engine, appliedHost, heldShips, arrivals);
+        var samples = new BattleShipSampleStream(network, broker, context, engine, conditions, heldShips, arrivals);
+        return new BattleShipReplicator(network, broker, context, engine, teams, objectManager,
+            new NavalHullAuthority(session, missionComponent, engine, context.TroopWithdrawal), appliedHost, conditions,
+            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>(), arrivals, new NavalSideHullLedger(), heldShips,
+            samples);
     }
 
     [Fact]
