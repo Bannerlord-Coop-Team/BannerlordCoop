@@ -275,7 +275,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             ? GetIdentity(previousSelection)
             : default;
 
-        logic.OnReset(false);
+        PartyScreenLockPreserver.Reset(partyVm, () => logic.OnReset(false));
 
         if (!restoreSelection) return;
 
