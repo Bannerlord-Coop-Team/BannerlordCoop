@@ -693,7 +693,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | Command | Side | What it does |
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. Refuses while a listed player is still in a battle mission (leave it and finish the post-battle screens first), and heals each listed player's hero to full. |
-| `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
+| `scenario_status` | client | Preset steps, knobs (`entry`, `ram`, `reserve` and `drop` included) and `battle.hulls[]` with owner, AI flag, weapon and ram. |
 | `inspect [summary\|brief]` | client | `summary` (or `brief`) prints a `NAVAL_INSPECT_SUMMARY` header (instance, own id, host, epoch, deployment, hull count, the deck puppets' last/max deck error, DEBUG `copyOnCopy`) and one line per hull: the 8-digit id that the hull commands take, hull type, owner (`(npc)` for an AI hull), authority, HP, sail HP, `afloat`/`sinking`/`sunk`, `copy=own\|steered\|written`, and in DEBUG the copy's drift mean/max and `fatesSent`. Without it, the full JSON: session, host epoch, hull streams (per hull `followsHost`, `captor`, `captureSequence`, `orphan`, `side`, `formation`), `shipCapture` (`captureRequests`, `captureRejections` by reason, `captureExpired`, `pendingRequests` with `waitedSeconds`, and `applied`: `capturesApplied`, `recordsApplied`, `confirmsDropped`, `duplicateConfirms`, `captureConflicts`, `heldConfirms`), `ships[].captureTimer`, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`); and `ships[].fatesSent`, the campaign ship fates this client sent for the hull (M6). |
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
@@ -736,7 +736,8 @@ first player before the map event, and so before the scenario message, exists. S
 that has stayed open 2 s, as `coop.debug.map_event.complete_encounter_meeting` does, until the scenario message arrives
 (R42 needed that command by hand on the engaged client). While the
 engage step waits, each distinct stack that resets the fleet's movement is logged once. `scenario_status` reports the
-re-issue count and whether the fallback ran.
+re-issue count and whether the fallback ran. A failed engage, or one a newer scenario replaced, gives the fleet its campaign
+AI back (`DoNotMakeNewDecisions` off).
 
 `blockade` prefers a free lord already at war with the town's and the players' factions. Failing that, it takes the nearest
 free lord of a third faction and declares the missing wars with `DeclareWarAction.ApplyByDefault`, logged as
@@ -755,8 +756,10 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `who=host|nonhost` who disconnects;
 - `drop=hard|leave` for `migration`: `hard` (default) has the server drop the player's connection at once, the real
   disconnect path; `leave` goes to the main menu, which the battle sees as a leave. Who drops is fixed by the first host
-  each client sees, so the successor never drops too. A player that reconnects while the battle runs gets the scenario
-  again with its disconnect done and re-enters through Attack, or presses Ready if a mission start already pulled it in;
+  each client sees, so the successor never drops too. The disconnect step is done once the leave or drop request ran, and
+  fails (with the rejoin) when its console command is missing. A player that reconnects while the battle runs gets the
+  scenario again with its disconnect done and re-enters through Attack, or presses Ready if a mission start already
+  pulled it in;
 - `town=id` for `blockade`;
 - `weapons=n` (0 to 4) arms the first n ships of every player and of the AI fleet with `fore_ballista`, swapping in a Battle
   Knarr where a hull has no fore slot.

@@ -135,7 +135,7 @@ public class NavalScenarioStagerTests
     [Fact]
     public void PlayersStillInBattle_WithoutMissionMembership_RefusesNothing()
     {
-        var stager = new NavalScenarioStager(null, null, null, null, null);
+        var stager = new NavalScenarioStager(null, null, null, null, null, null, null);
 
         Assert.Null(stager.PlayersStillInBattle(new[] { "testclient1" }));
     }
@@ -146,7 +146,7 @@ public class NavalScenarioStagerTests
         var membership = new Mock<IMissionMembershipRegistry>();
         membership.Setup(registry => registry.IsControllerInMission(It.IsAny<string>()))
             .Returns<string>(controllerId => Array.IndexOf(inMission, controllerId) >= 0);
-        return new NavalScenarioStager(null, network, null, null, null, membership.Object);
+        return new NavalScenarioStager(null, network, null, null, null, null, null, membership.Object);
     }
 
     private const NavalScenarioStager.BlockadeLordStanding Excluded = NavalScenarioStager.BlockadeLordStanding.Excluded;

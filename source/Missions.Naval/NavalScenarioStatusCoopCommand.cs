@@ -38,6 +38,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
+    // Reports this machine's scenario as one NAVAL_SCENARIO_STATUS JSON line.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         var config = state.Current;
@@ -62,9 +63,12 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 delay = config.DelaySeconds,
                 reconnect = config.ReconnectSeconds,
                 who = config.DisconnectBattleHost ? config.DisconnectNonHost ? "nonhost" : "host" : null,
-                entry = config.CampaignEngage ? "campaign_engage" : config.Blockade ? "blockade_attack" : "start_battle_action",
-                town = config.Blockade ? config.BlockadeTownId : null,
+                drop = config.DisconnectBattleHost ? config.GracefulDisconnect ? "leave" : "hard" : null,
+                entry = EntryName(config.Entry),
+                town = config.Entry == NavalScenarioEntry.Blockade ? config.BlockadeTownId : null,
                 weapons = config.ArmedShipsPerParty,
+                ram = config.RammedShipsPerParty,
+                reserve = config.ReserveTroops,
             },
             pending = state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).Select(step => step.Name).ToArray(),
             steps = state.Steps.Select(step => new { name = step.Name, status = step.Status.ToString(), detail = step.Detail }).ToArray(),
@@ -73,6 +77,15 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
 
         return new CoopCommandResult(true, "NAVAL_SCENARIO_STATUS " + JsonConvert.SerializeObject(status));
     }
+
+    // The status line's name for how the scenario's map event starts.
+    private static string EntryName(NavalScenarioEntry entry) => entry switch
+    {
+        NavalScenarioEntry.Duel => "duel",
+        NavalScenarioEntry.Encounter => "campaign_engage",
+        NavalScenarioEntry.Blockade => "blockade_attack",
+        _ => "start_battle_action",
+    };
 
     // The server runs no mission, so its phase follows the map event: claimed for a mission, then finalized.
     private void AdvanceServerPhase(NavalScenarioConfig config)
