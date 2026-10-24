@@ -41,8 +41,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
 {
     // The harness has no map navigation mesh; real issue construction still runs against the bound town.
     private readonly MethodCallRecorder randomSettlement = new(AccessTools.Method(typeof(SettlementHelper), nameof(SettlementHelper.FindRandomSettlement)));
-    private readonly E2ETestEnvironment environment;
-    private readonly QuestScenario scenario;
+    internal readonly E2ETestEnvironment environment;
+    internal readonly QuestScenario scenario;
     private readonly string villageId;
     private readonly string townId;
     private readonly string targetId;
@@ -694,7 +694,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         ClientA.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
 
-    private (string CompanionId, string TroopId) StartCompanions()
+    internal (string CompanionId, string TroopId) StartCompanions()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
