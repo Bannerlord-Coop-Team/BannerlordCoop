@@ -1,5 +1,4 @@
 ﻿using Common.Logging;
-using GameInterface.Services.Players;
 using Missions.Battles;
 using Serilog;
 using System;
@@ -32,15 +31,16 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly INavalNpcFleetSpawner npcFleet;
     private readonly IBattleShipReplicator shipReplicator;
     private readonly INavalSideTallyReader tallyReader;
-    private readonly IPlayerManager playerManager;
-    private readonly NavalPlayerHeroGrace heroGrace = new NavalPlayerHeroGrace();
+    private readonly INavalPlayerHeroGrace heroGrace;
 
     private bool endChecksReleased;
+    private float nextHeroScanAt;
 
-    // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls and the side tally.
+    // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls, the side tally and the
+    // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
         INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalSideTallyReader tallyReader,
-        IPlayerManager playerManager)
+        INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
@@ -48,7 +48,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         this.npcFleet = npcFleet;
         this.shipReplicator = shipReplicator;
         this.tallyReader = tallyReader;
-        this.playerManager = playerManager;
+        this.heroGrace = heroGrace;
     }
 
     // Holds vanilla's end checks at deployment finish; the tick releases them.
@@ -69,6 +69,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
                 endChecksReleased = BothSidesFielded();
 
             CanCheckForEndCondition = session.IsLocalHost && endChecksReleased;
+            ObserveHeroes();
         }
 
         base.OnMissionTick(dt);
@@ -108,7 +109,6 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
 
         // Vanilla graces only the local main agent's side, so in PvP the other player's side lost while its hero fought.
         // The result stays raw, so vanilla's contested-island timing runs as it does for its own graced side.
-        ObserveLivePlayerHeroes();
         float now = Mission.CurrentTime;
         playerHullsOutOfAction = playerOutOfAction && heroGrace.HasExpired(playerSide, now);
         enemyHullsOutOfAction = enemyOutOfAction && heroGrace.HasExpired(enemySide, now);
@@ -217,31 +217,35 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return KeepsRetreat(shipReplicator.DepartedHulls(side), hullsLeft);
     }
 
-    // The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
-    // abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
+    /// <summary>
+    /// The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
+    /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
+    /// </summary>
+    internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
+        BattleSideEnum failedFleetSide) =>
+        CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
+            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
+
+    // Whether both sides fielded here, or the side whose AI fleet failed counts as fielded.
     private bool BothSidesFielded()
     {
         CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
         var failedFleetSide = npcFleet.FailedSide;
-        bool released = CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
-            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
+        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSide);
         if (released && failedFleetSide != BattleSideEnum.None)
             Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Side} AI fleet failed to field",
                 session.InstanceId, failedFleetSide);
         return released;
     }
 
-    // Records each side with a live player hero here; a player's hero is the agent of its registered character.
-    private void ObserveLivePlayerHeroes()
+    // Every client scans for live member heroes about once a second, so a promoted host starts with the grace history.
+    private void ObserveHeroes()
     {
-        var heroCharacterIds = new HashSet<string>(playerManager.Players.Select(player => player.CharacterObjectId));
         float now = Mission.CurrentTime;
-        foreach (var agent in Mission.Agents)
-        {
-            if (!agent.IsHuman || !agent.IsActive() || agent.Team == null || agent.Character == null) continue;
+        if (now < nextHeroScanAt) return;
 
-            if (heroCharacterIds.Contains(agent.Character.StringId)) heroGrace.ObserveLiveHero(agent.Team.Side, now);
-        }
+        nextHeroScanAt = now + 1f;
+        heroGrace.Observe(Mission.Agents, now);
     }
 
     // One side's tally over this client's hulls, with every live human of its teams, swimmers included.

@@ -372,7 +372,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - a sunk or departed hull's reserve doesn't count.
 - **Player hero grace.** Vanilla lets the local main agent's side lose to hulls out of action only once that agent was down
   for 20 s, and gives the other side no wait. Coop keeps that wait for each side's player heroes (`NavalPlayerHeroGrace`),
-  so in PvP neither side loses while one of its players still fights; an AI side still has none.
+  so in PvP neither side loses while one of its players still fights; an AI side still has none. Only current mission
+  members' heroes count, matched by the character's registry id, and every client scans for them once a second, so a
+  promoted host keeps the history.
 - **Other clients** end with the host's replicated result. A side counts as retreated only once hulls left it, with their
   players or to a capture, and none is left. So capturing the last enemy hull ends the battle as an enemy retreat after
   vanilla's 5 s, as in vanilla (`MissionResult.CreateSuccessful(..., enemyRetreated: true)`); the committer reports only the

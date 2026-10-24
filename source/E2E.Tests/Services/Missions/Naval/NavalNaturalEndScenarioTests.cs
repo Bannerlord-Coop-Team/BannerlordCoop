@@ -113,6 +113,34 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsDepleted);
     }
 
+    // The end check counts each hull's crew from the live human agents the engine places on it; one crewing no hull counts
+    // for none.
+    [Fact]
+    public void CrewByHull_CountsTheLiveAgentsEachHullCrews()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out _, out _);
+        var hull = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.CommitAll();
+        battle.TickAll();
+        var crew = new[]
+        {
+            a.RegisterAgent(Guid.NewGuid(), "A", a.Mission.AttackerTeam),
+            a.RegisterAgent(Guid.NewGuid(), "A", a.Mission.AttackerTeam),
+        };
+        var swimmer = a.RegisterAgent(Guid.NewGuid(), "A", a.Mission.AttackerTeam);
+        foreach (var agent in crew)
+            a.Engine.AssignCrew(agent, a.Ship(hull).Hull);
+
+        a.Call(() =>
+        {
+            var crewByHull = new NavalSideTallyReader(a.Engine, a.Ships, a.MigrationReserve)
+                .CrewByHull(crew.Append(swimmer));
+
+            Assert.Equal(2, Assert.Single(crewByHull).Value);
+            Assert.Same(a.Ship(hull).Hull, crewByHull.Keys.Single());
+        });
+    }
+
     // vs_pirates fought to the end: B's hits sink both AI hulls on the host, every client sees them sunk, the pirate side is
     // out of action although its swimmers live, and the host's result concludes the battle once.
     [Fact]
