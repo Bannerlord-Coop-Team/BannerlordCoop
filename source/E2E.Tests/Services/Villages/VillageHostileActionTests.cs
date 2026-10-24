@@ -718,6 +718,10 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                var morale = new Mock<TaleWorlds.CampaignSystem.ComponentInterfaces.PartyMoraleModel>();
+                morale.Setup(model => model.GetEffectivePartyMorale(It.IsAny<MobileParty>(), It.IsAny<bool>()))
+                    .Returns(new ExplainedNumber(50f));
+                Campaign.Current.Models.PartyMoraleModel = morale.Object;
                 using (new AllowedThread())
                 {
                     component.Settlement = settlement;
