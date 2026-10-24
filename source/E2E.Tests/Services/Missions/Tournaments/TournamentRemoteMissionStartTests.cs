@@ -15,23 +15,27 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions.Tournaments;
 
+/// <summary>Checks remote tournament startup after replicated spawning.</summary>
 public class TournamentRemoteMissionStartTests : MissionTestEnvironment
 {
     public TournamentRemoteMissionStartTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact]
-    public void ReceivedManifest_WithSpawnedLocalFighter_LeavesStartupMode()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReceivedManifest_WithSpawnedMatch_EntersBattleMode(bool localFighter)
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
-        SetControllerId(client, "fighter");
+        SetControllerId(client, localFighter ? "fighter" : "watcher");
 
         client.Call(() =>
         {
             BannerManager.Initialize();
             var mission = fixture.CreateMission(client);
             mission.Shell._missionMode = MissionMode.StartUp;
-            mission.Shell._listeners = new List<IMissionListener>();
+            var listener = new Mock<IMissionListener>();
+            mission.Shell._listeners = new List<IMissionListener> { listener.Object };
             var controller = client.Resolve<CoopTournamentController>();
             Assert.True(controller.Session.TryApplyState(
                 "session", "mission", 7, 1, "match", "host", Array.Empty<string>()));
@@ -56,8 +60,9 @@ public class TournamentRemoteMissionStartTests : MissionTestEnvironment
             new TournamentNativeBracketHydrator(objects.Object).Apply(behavior, snapshot);
             var fight = ObjectHelper.SkipConstructor<CoopTournamentFightMissionController>();
 
-            Agent agent = mission.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.Player));
-            mission.MainAgent = agent;
+            AgentControllerType control = localFighter ? AgentControllerType.Player : AgentControllerType.None;
+            Agent agent = mission.SpawnAgent(new AgentBuildData(character).Controller(control));
+            if (localFighter) mission.MainAgent = agent;
             Guid agentId = Guid.NewGuid();
             var registry = client.Resolve<INetworkAgentRegistry>();
             Assert.True(registry.TryRegisterAgent("fighter", agentId, agent));
@@ -79,10 +84,18 @@ public class TournamentRemoteMissionStartTests : MissionTestEnvironment
             apply.Invoke(controller, null);
 
             Assert.Same(behavior.CurrentMatch, fight._match);
-            Assert.Same(agent, mission.MainAgent);
+            Assert.Same(localFighter ? agent : null, mission.MainAgent);
             Assert.True(agent.IsActive());
-            Assert.Equal(AgentControllerType.Player, agent.Controller);
-            Assert.NotEqual(MissionMode.StartUp, mission.Shell.Mode);
+            Assert.Equal(control, agent.Controller);
+            Assert.Equal(MissionMode.Battle, mission.Shell.Mode);
+
+            SetField(controller, "pendingApplyManifest", manifest);
+            apply.Invoke(controller, null);
+
+            Assert.Equal(MissionMode.Battle, mission.Shell.Mode);
+            Assert.Same(agent, Assert.Single(mission.Agents));
+            listener.Verify(value => value.OnMissionModeChange(MissionMode.StartUp, true), Times.Once);
+            listener.VerifyNoOtherCalls();
         });
     }
 
