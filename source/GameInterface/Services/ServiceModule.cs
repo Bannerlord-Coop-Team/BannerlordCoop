@@ -26,17 +26,17 @@ internal class ServiceModule : Module
                 builder.RegisterType<LocationConversationTracker>()
                     .AsSelf()
                     .As<ILocationConversationTracker>()
-                    .InstancePerLifetimeScope()
+                    .SingleInstance()
                     .AutoActivate();
                 continue;
             }
 
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         foreach (var type in GetAuditors())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         foreach (var type in GetGameAbstractions())
@@ -49,7 +49,7 @@ internal class ServiceModule : Module
             {
                 Logger.Verbose("Registering {type} GameInterface Service", type.Name);
 
-                builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
+                builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
             }
             else
             {

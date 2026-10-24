@@ -23,21 +23,21 @@ internal class IssuesModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterType<QuestFeatureFlag>().As<IQuestFeatureFlag>().InstancePerDependency();
-        builder.RegisterType<QuestTypeRegistry>().As<IQuestTypeRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueResolver>().As<IIssueResolver>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<QuestTypeRegistry>().As<IQuestTypeRegistry>().SingleInstance();
+        builder.RegisterType<IssueResolver>().As<IIssueResolver>().SingleInstance();
+        builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().SingleInstance();
+        builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().SingleInstance();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
-        builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
-        builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
         builder.RegisterType<LesserNobleRevoltWorldEventService>()
             .As<ILesserNobleRevoltWorldEventService>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();
 
@@ -45,7 +45,7 @@ internal class IssuesModule : Module
             .Where(IsQuestPiece)
             .AsSelf()
             .AsImplementedInterfaces()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         base.Load(builder);
     }
