@@ -380,6 +380,9 @@ public class NavalScenarioStager : INavalScenarioStager
     private void ReleaseEngage(MobileParty enemy)
     {
         resetTracer.Stop(enemy);
+        // A player conversation's hold owns the flag now and gives it back when the conversation ends.
+        if (ConversationPartyHold.IsInPlayerConversation(enemy)) return;
+
         enemy.Ai.DoNotMakeNewDecisions = false;
         enemy.Ai.RethinkAtNextHourlyTick = true;
     }

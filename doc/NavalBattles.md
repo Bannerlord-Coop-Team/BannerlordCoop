@@ -679,7 +679,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - `NavalScenarioStager` (about 820 lines) should split into encounter, blockade and fleet-outfitter classes behind DI;
   - one staleness constant should serve both the replicator's `SampleLifetimeSeconds` and `CopySteering.StaleSeconds`;
   - `CoopNavalBattleBehavior` should get the engine directly instead of through `INavalBattleServices.Engine`;
-  - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves;
+  - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves; delete it
+    (`NavalEngageResetTracer` and `NavalEngageResetTracePatch`) once the `encounter` preset passes live (G5);
   - `RamTickPatch` replaces vanilla `MissionShipRam.OnTick` on every client (with `NavalRamKills.ApplyImpact`), so
     re-check the whole replacement against it on every DLC update;
   - the next cut of `NavalShipEngine` is the hull-swap trio (`ParkHullAgents`, `ReplaceHull`, `BoardHullAgents`).

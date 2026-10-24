@@ -44,14 +44,12 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
         var config = state.Current;
         if (config == null) return new CoopCommandResult(true, "NAVAL_SCENARIO_STATUS none");
 
-        if (ModInformation.IsServer) AdvanceServerPhase(config);
-
         var status = new
         {
             preset = config.Preset,
             scenario = config.ScenarioId,
             mapEvent = config.MapEventId,
-            phase = state.Phase.ToString(),
+            phase = (ModInformation.IsServer ? ServerPhaseOf(config) : state.Phase).ToString(),
             players = config.ControllerIds,
             knobs = new
             {
@@ -87,16 +85,18 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
         _ => "start_battle_action",
     };
 
-    // The server runs no mission, so its phase follows the map event: claimed for a mission, then finalized.
-    private void AdvanceServerPhase(NavalScenarioConfig config)
+    // The server runs no mission, so the phase it reports follows the map event (claimed for a mission, then finalized),
+    // read without moving the state's own phase.
+    private NavalScenarioPhase ServerPhaseOf(NavalScenarioConfig config)
     {
-        // The encounter preset's map event is still to come from the campaign AI.
-        if (string.IsNullOrEmpty(config.MapEventId)) return;
+        // An ended scenario stays ended, and the encounter preset's map event may still be to come from the campaign AI.
+        if (state.Phase == NavalScenarioPhase.Ended || string.IsNullOrEmpty(config.MapEventId)) return state.Phase;
 
         if (!objectManager.TryGetObject(config.MapEventId, out MapEvent mapEvent) || mapEvent.IsFinalized)
-            state.Advance(NavalScenarioPhase.Ended);
-        else if (ServerBattleModeArbiter.IsMissionClaimed(config.MapEventId))
-            state.Advance(NavalScenarioPhase.Fighting);
+            return NavalScenarioPhase.Ended;
+        if (ServerBattleModeArbiter.IsMissionClaimed(config.MapEventId) && state.Phase < NavalScenarioPhase.Fighting)
+            return NavalScenarioPhase.Fighting;
+        return state.Phase;
     }
 
     // The counters coop.debug.naval.inspect reports, for this client's copy of the scenario's battle.

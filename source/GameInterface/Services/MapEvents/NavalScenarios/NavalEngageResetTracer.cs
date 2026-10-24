@@ -9,7 +9,8 @@ namespace GameInterface.Services.MapEvents.NavalScenarios;
 
 /// <summary>
 /// [Game thread, server] DEBUG: logs each distinct call stack that resets the encounter preset's engaging fleet's movement
-/// while its engage step waits, to name what replaces the engage order (R41b P4).
+/// while its engage step waits, to name what replaces the engage order (R41b P4). Delete it with its patch once the
+/// encounter preset passes live (G5).
 /// </summary>
 public interface INavalEngageResetTracer
 {

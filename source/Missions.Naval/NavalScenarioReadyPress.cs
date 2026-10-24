@@ -31,8 +31,6 @@ public class NavalScenarioReadyPress : INavalScenarioReadyPress
 
     public NavalScenarioReadyPress(Action<Action> enqueueOutsideTick)
     {
-        if (enqueueOutsideTick == null) throw new ArgumentNullException(nameof(enqueueOutsideTick));
-
         this.enqueueOutsideTick = enqueueOutsideTick;
     }
 

@@ -387,24 +387,26 @@ public class NavalScenarioMissionLogic : MissionLogic
         // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
         // this session's container.
         if (config.GracefulDisconnect)
-            GameThread.EnqueueSafe(() => CompleteDisconnect(RunConsoleCommand(DisconnectCommand), outcome), context: nameof(Disconnect));
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RunConsoleCommand(DisconnectCommand), outcome, reconnectSeconds),
+                context: nameof(Disconnect));
         else
-            GameThread.EnqueueSafe(() => CompleteDisconnect(RequestHardDrop(), outcome), context: nameof(Disconnect));
-        Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
-            GameThread.RunSafe(Reconnect, context: nameof(Disconnect)));
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RequestHardDrop(), outcome, reconnectSeconds), context: nameof(Disconnect));
     }
 
-    // Records the disconnect step once its leave or drop ran; a missing leave command fails it and the rejoin with it.
-    private void CompleteDisconnect(bool ran, string detail)
+    // Records the disconnect step once its leave or drop ran and only then starts the reconnect timer; a missing leave
+    // command fails the step and the rejoin with it.
+    private void CompleteDisconnect(bool ran, string detail, float reconnectSeconds)
     {
-        if (ran)
+        if (!ran)
         {
-            Complete(NavalScenarioState.DisconnectStep, true, detail);
+            Complete(NavalScenarioState.DisconnectStep, false, $"{DisconnectCommand} is not a console command");
+            Complete(NavalScenarioState.RejoinStep, false, "this client never disconnected");
             return;
         }
 
-        Complete(NavalScenarioState.DisconnectStep, false, $"{DisconnectCommand} is not a console command");
-        Complete(NavalScenarioState.RejoinStep, false, "this client never disconnected");
+        Complete(NavalScenarioState.DisconnectStep, true, detail);
+        Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
+            GameThread.RunSafe(Reconnect, context: nameof(CompleteDisconnect)));
     }
 
     // Runs the reconnect; a missing command fails the rejoin, since this client would never come back.

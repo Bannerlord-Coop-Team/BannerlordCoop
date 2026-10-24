@@ -52,6 +52,7 @@ public sealed class NavalScenarioConfig
     [ProtoMember(14)]
     public bool LateJoin { get; set; }
 
+    // 20 and 21 are retired: they were the encounter and blockade flags Entry replaced.
     [ProtoMember(15)]
     public NavalScenarioEntry Entry { get; set; }
 
