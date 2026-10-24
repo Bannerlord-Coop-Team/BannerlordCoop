@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -76,7 +77,7 @@ internal class LandLordCompanyOfTroubleFinalizePatches
 
         if (!ownerResolver.TryResolveOwnerHero(__instance, out _))
         {
-            RemoveLeftovers(quest);
+            RemoveLeftovers(quest, ownerResolver);
             return;
         }
 
@@ -89,12 +90,15 @@ internal class LandLordCompanyOfTroubleFinalizePatches
         });
     }
 
-    private static void RemoveLeftovers(Quest quest)
+    private static void RemoveLeftovers(Quest quest, IIssueOwnerResolver ownerResolver)
     {
+        // Every company quest uses the same character, so another player's mercenaries must be left alone
+        var otherQuestParties = OtherQuestParties(quest, ownerResolver);
+
         foreach (var party in MobileParty.All.ToList())
         {
             var count = party.MemberRoster.GetTroopCount(quest._troubleCharacterObject);
-            if (party != quest._companyOfTroubleParty && count > 0)
+            if (party != quest._companyOfTroubleParty && count > 0 && !otherQuestParties.Contains(party))
             {
                 party.MemberRoster.AddToCounts(quest._troubleCharacterObject, -count);
             }
@@ -104,5 +108,30 @@ internal class LandLordCompanyOfTroubleFinalizePatches
         {
             RemoveCompany(quest._companyOfTroubleParty);
         }
+    }
+
+    private static HashSet<MobileParty> OtherQuestParties(Quest quest, IIssueOwnerResolver ownerResolver)
+    {
+        var parties = new HashSet<MobileParty>();
+
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+        {
+            if (!(issue.IssueQuest is Quest other) || other == quest || !other.IsOngoing)
+            {
+                continue;
+            }
+
+            if (other._companyOfTroubleParty != null)
+            {
+                parties.Add(other._companyOfTroubleParty);
+            }
+
+            if (ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) && ownerHero.PartyBelongedTo != null)
+            {
+                parties.Add(ownerHero.PartyBelongedTo);
+            }
+        }
+
+        return parties;
     }
 }
