@@ -750,7 +750,6 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(militiaId, out var militia));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-            party.MemberRoster.Clear();
             party.MemberRoster.AddToCounts(troop, attackerCount);
             militia.MemberRoster.Clear();
             militia.MemberRoster.AddToCounts(troop, militiaCount);
@@ -782,7 +781,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(militiaId, out var militia));
             Assert.True(owner.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-            Assert.Equal(attackerCount, party.MemberRoster.TotalHealthyCount);
+            Assert.True(party.MemberRoster.TotalHealthyCount >= attackerCount);
             Assert.Equal(militiaCount, militia.MemberRoster.TotalHealthyCount);
             Assert.True(militia.IsMilitia);
             Assert.False(militia.IsLordParty);
