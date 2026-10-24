@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using Moq;
 using System;
+using System.IO;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements;
 using GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
@@ -122,6 +123,23 @@ public class RaidAnEnemyTerritoryFrameworkTests
         {
             ModInformation.IsServer = previousRole;
         }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(7)]
+    public void AcceptanceRejectsATruncatedDeadline(int length)
+    {
+        var strategy = new RaidAnEnemyTerritoryQuestSolutionAcceptStrategy();
+        Assert.Throws<InvalidDataException>(() => strategy.Apply(IssueWith(UninitializedQuest()), new byte[length]));
+    }
+
+    [Fact]
+    public void CreationRejectsATruncatedKingdomBeforeConstructingAnIssue()
+    {
+        var strategy = new RaidAnEnemyTerritoryCreationCaptureStrategy(Mock.Of<IObjectManager>());
+        Assert.Throws<InvalidDataException>(() => strategy.CreateIssue(null, new byte[] { 3, 65 }));
     }
 
     private static IssueBase IssueWith(Quest quest)

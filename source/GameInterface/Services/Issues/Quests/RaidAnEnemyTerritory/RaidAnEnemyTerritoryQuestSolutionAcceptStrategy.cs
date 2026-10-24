@@ -29,9 +29,14 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
 
     public void Apply(IssueBase issue, byte[] captured)
     {
-        if (!(issue.IssueQuest is Quest quest) || captured == null || captured.Length == 0)
+        if (!(issue.IssueQuest is Quest quest))
         {
             return;
+        }
+
+        if (captured == null || captured.Length < sizeof(long))
+        {
+            throw new InvalidDataException("The raid quest acceptance is missing its deadline");
         }
 
         using (var stream = new MemoryStream(captured))

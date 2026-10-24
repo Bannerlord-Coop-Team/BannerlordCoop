@@ -31,7 +31,10 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
     public IssueBase CreateIssue(Hero issueOwner, byte[] captured)
     {
         var enemyKingdomId = Read(captured);
-        objectManager.TryGetObjectWithLogging<Kingdom>(enemyKingdomId, out var enemyKingdom);
+        if (!objectManager.TryGetObjectWithLogging<Kingdom>(enemyKingdomId, out var enemyKingdom))
+        {
+            throw new InvalidOperationException("The raid issue enemy kingdom could not be resolved");
+        }
 
         var issue = new Issue(issueOwner);
         EnemyKingdomField.SetValue(issue, enemyKingdom);
@@ -75,10 +78,25 @@ internal sealed class RaidAnEnemyTerritoryCreationCaptureStrategy : ICreationCap
 
     private static string Read(byte[] captured)
     {
-        using (var stream = new MemoryStream(captured ?? Array.Empty<byte>()))
-        using (var reader = new BinaryReader(stream))
+        if (captured == null || captured.Length == 0)
         {
-            return reader.ReadString();
+            throw new InvalidDataException("The raid issue capture is missing its enemy kingdom");
+        }
+        try
+        {
+            using (var stream = new MemoryStream(captured))
+            using (var reader = new BinaryReader(stream))
+            {
+                return reader.ReadString();
+            }
+        }
+        catch (EndOfStreamException exception)
+        {
+            throw new InvalidDataException("The raid issue capture has a truncated enemy kingdom", exception);
+        }
+        catch (FormatException exception)
+        {
+            throw new InvalidDataException("The raid issue capture has an invalid enemy kingdom length", exception);
         }
     }
 }

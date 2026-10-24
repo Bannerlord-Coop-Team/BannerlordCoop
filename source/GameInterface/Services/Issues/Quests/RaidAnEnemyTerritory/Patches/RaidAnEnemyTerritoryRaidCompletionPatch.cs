@@ -76,7 +76,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             !ownerResolver.TryGetOwnerControllerId(quest.QuestGiver?.Issue, out var controllerId) ||
             !playerManager.TryGetPlayer(controllerId, out var player) ||
             !ContainerProvider.TryResolve<IObjectManager>(out var ownerObjects) ||
-            !ownerObjects.TryGetObject(player.MobilePartyId, out MobileParty ownerParty) ||
+            !ownerObjects.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty ownerParty) ||
             (!ownerResolver.TryResolveOwnerHero(quest.QuestGiver?.Issue, out var ownerHero) ||
                 (ownerParty != attackerParty && ownerHero.PartyBelongedTo != attackerParty)))
         {
@@ -107,10 +107,11 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
         var villageIds = new List<string>();
         foreach (var raidedVillage in quest._raidedVillages)
         {
-            if (objectManager.TryGetId(raidedVillage, out var raidedVillageId))
+            if (!objectManager.TryGetIdWithLogging(raidedVillage, out var raidedVillageId))
             {
-                villageIds.Add(raidedVillageId);
+                return;
             }
+            villageIds.Add(raidedVillageId);
         }
         var entries = quest.JournalEntries.Select(log => new RaidAnEnemyTerritoryJournalEntry
         {
