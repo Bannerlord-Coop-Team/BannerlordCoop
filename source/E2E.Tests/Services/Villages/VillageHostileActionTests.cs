@@ -714,6 +714,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var componentId = TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var lordId = defendingLord ? TestEnvironment.CreateRegisteredObject<MobileParty>() : null;
+        var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
         string? eventId = null;
 
         foreach (var instance in Clients.Append(Server))
@@ -725,6 +726,9 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<VillageType>(villageTypeId, out var villageType));
+                var grain = GetNativeItemObject("grain");
+                Assert.NotNull(grain);
                 var morale = new Mock<TaleWorlds.CampaignSystem.ComponentInterfaces.PartyMoraleModel>();
                 morale.Setup(model => model.GetEffectivePartyMorale(It.IsAny<MobileParty>(), It.IsAny<bool>()))
                     .Returns(new ExplainedNumber(50f));
@@ -742,6 +746,8 @@ public class VillageHostileActionTests : MapEventTestBase
                     party.LeaderHero.CharacterObject.DefaultCharacterSkills = new MBCharacterSkills();
                     party.ActualClan.Id = new MBGUID(1);
                     settlement.OwnerClan.Kingdom.Id = new MBGUID(2);
+                    villageType._productions = new MBList<(ItemObject, float)> { (grain, 120f) };
+                    settlement.Village.VillageType = villageType;
                 }
             });
         }
