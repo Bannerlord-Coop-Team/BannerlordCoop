@@ -781,7 +781,7 @@ public class BattleShipCaptureReplicatorTests
 
         Assert.Equal(1, harness.Ships.DepartedHulls(BattleSideEnum.Defender));
         Assert.Equal(0, harness.Ships.DepartedHulls(BattleSideEnum.Attacker));
-#if DEBUG
+#if COOP_NAVAL
         Assert.True(global::Missions.Naval.CoopNavalBattleEndLogic.KeepsRetreat(harness.Ships.DepartedHulls(BattleSideEnum.Defender),
             hullsLeft: 0));
 #endif

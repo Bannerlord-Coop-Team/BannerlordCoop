@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using System;
 using Missions.Naval;
 using Xunit;

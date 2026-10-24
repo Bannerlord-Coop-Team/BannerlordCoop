@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using GameInterface.Policies;
 using HarmonyLib;
 using Missions.Naval;

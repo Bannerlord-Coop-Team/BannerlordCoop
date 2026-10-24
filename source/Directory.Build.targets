@@ -1,0 +1,10 @@
+<Project>
+  <!-- Coop.sln can't condition a project, so without War Sails the naval projects build as empty
+       assemblies that nothing references instead of failing on the missing NavalDLC types. -->
+  <ItemGroup Condition="'$(CoopNavalDlc)' != 'true' And ('$(MSBuildProjectName)' == 'Missions.Naval' Or '$(MSBuildProjectName)' == 'Coop.Naval')">
+    <Compile Remove="$(MSBuildProjectDirectory)\**\*.cs" />
+    <Reference Remove="NavalDLC;NavalDLC.View;NavalDLC.GauntletUI;NavalDLC.ViewModelCollection" />
+    <Publicize Remove="@(Publicize)" />
+    <DoNotPublicize Remove="@(DoNotPublicize)" />
+  </ItemGroup>
+</Project>

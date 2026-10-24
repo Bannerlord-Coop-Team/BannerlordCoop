@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;

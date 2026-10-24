@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Autofac;
 using Missions.Battles;
 using Missions.Naval;

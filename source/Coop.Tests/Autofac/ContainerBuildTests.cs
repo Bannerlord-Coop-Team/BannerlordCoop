@@ -17,6 +17,8 @@ using Missions;
 #if DEBUG
 using GameInterface.Services.MapEvents;
 using Missions.Battles;
+#endif
+#if COOP_NAVAL
 using Missions.Naval;
 #endif
 using System.Collections.Generic;
@@ -86,7 +88,7 @@ namespace Coop.Tests.Autofac
 #endif
         }
 
-#if DEBUG
+#if COOP_NAVAL
         [Fact]
         public void Client_Container_WithNavalMissionModule_Build()
         {

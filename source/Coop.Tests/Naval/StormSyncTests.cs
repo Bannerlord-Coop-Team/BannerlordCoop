@@ -1,4 +1,4 @@
-﻿#if DEBUG
+﻿#if COOP_NAVAL
 using Coop.Naval.Storms.Interfaces;
 using Coop.Naval.Storms.Patches;
 using HarmonyLib;
