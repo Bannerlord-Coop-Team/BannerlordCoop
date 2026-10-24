@@ -493,7 +493,6 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 ownerParty.MemberRoster.AddToCounts(companion.CharacterObject, -1);
 
                 issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-
             }
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
