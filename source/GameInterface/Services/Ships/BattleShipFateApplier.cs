@@ -85,7 +85,21 @@ public class BattleShipFateApplier : IBattleShipFateApplier
 
         foreach (var fate in fates)
         {
-            if (ships.TryGetValue(fate.CampaignShipId, out var ship)) ApplyFate(ship, fate);
+            if (ships.TryGetValue(fate.CampaignShipId, out var ship)) TryApplyFate(ship, fate);
+        }
+    }
+
+    // The fates already left the ledger, so a throw from one ship's writes must not skip the others or, at the commit, the
+    // battle's results.
+    private static void TryApplyFate(Ship ship, BattleShipFate fate)
+    {
+        try
+        {
+            ApplyFate(ship, fate);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "[NavalSync] Applying the fate of ship {ShipId} failed; its fate is dropped", fate.CampaignShipId);
         }
     }
 
