@@ -17,7 +17,8 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Rafts.Interfaces;
 
 /// <summary>
-/// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore.
+/// Server-only: strands a player's party released from captivity at sea and keeps its fleet until it washes ashore or
+/// leaves its raft at sea.
 /// </summary>
 public interface IPlayerRaftFleetInterface : IGameAbstraction
 {
@@ -30,6 +31,11 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     /// Gives a party that washed ashore back the fleet it had when it was stranded.
     /// </summary>
     void ReturnFleet(MobileParty party);
+
+    /// <summary>
+    /// Ends a player party's raft state where it is at sea and gives back its fleet unanchored, as the naval scenario staging does.
+    /// </summary>
+    void LeaveRaftAtSea(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -100,6 +106,20 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         // Same as RaftStateCampaignBehavior.player_raft_state_end_continue_on_consequence
         party.Anchor.SetPosition(new CampaignVec2(new Vec2(fleet.AnchorX, fleet.AnchorY), fleet.AnchorIsOnLand));
         party.Anchor.SetLastUsedDisembarkPosition(new CampaignVec2(new Vec2(fleet.DisembarkX, fleet.DisembarkY), fleet.DisembarkIsOnLand));
+    }
+
+    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
+    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
+    public void LeaveRaftAtSea(MobileParty party)
+    {
+        if (!party.IsInRaftState) return;
+
+        party.IsInRaftState = false;
+        party.Ai.EnableAi();
+        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
+        ReturnFleet(party);
+        // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
+        party.Anchor.ResetPosition();
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

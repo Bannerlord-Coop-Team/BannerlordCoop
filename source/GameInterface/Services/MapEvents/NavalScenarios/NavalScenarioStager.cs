@@ -214,20 +214,8 @@ public class NavalScenarioStager : INavalScenarioStager
         if (rafted.Count == 0) return;
 
         foreach (var party in players.Where(party => party.IsInRaftState))
-            LeaveRaft(party);
+            raftFleets.LeaveRaftAtSea(party);
         log.Append(" leftRaft=").Append(string.Join(",", rafted));
-    }
-
-    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
-    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
-    private void LeaveRaft(MobileParty party)
-    {
-        party.IsInRaftState = false;
-        party.Ai.EnableAi();
-        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
-        raftFleets.ReturnFleet(party);
-        // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
-        party.Anchor.ResetPosition();
     }
 
     // The nearest hostile AI fleet at sea, a pirate (bandit) one when there is one.
