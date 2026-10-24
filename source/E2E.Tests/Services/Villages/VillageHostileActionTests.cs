@@ -1637,6 +1637,11 @@ public class VillageHostileActionTests : MapEventTestBase
         var (ownerHeroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
         var giverId = trackRaidQuest ? TestEnvironment.CreateRegisteredObject<Hero>() : null;
+        if (trackRaidQuest)
+        {
+            TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        }
         var gatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
         var insidePosition = new CampaignVec2(new Vec2(40f, 24f), true);
         string? mapEventId = null;
