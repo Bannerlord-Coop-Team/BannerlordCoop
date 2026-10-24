@@ -676,7 +676,6 @@ public class BattleShipCaptureReplicatorTests
         var harness = new Harness();
         var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
         var prizeId = Guid.NewGuid();
-        harness.Registry.MarkAwaiting(prizeId);
 
         harness.Applier.AcceptConfirm(new NetworkShipCaptured(prizeId, Captor, captorShip.ShipId, Host, 1, 0, 0));
         for (int second = 0; second < 120; second++)

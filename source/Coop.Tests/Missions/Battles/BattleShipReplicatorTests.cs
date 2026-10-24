@@ -285,11 +285,11 @@ public class BattleShipReplicatorTests
         harness.Members.Remove(Peer);
         harness.Replicator.AcceptSpawnRecords(new[] { record });
         harness.Replicator.Tick(0.1f);
-        var stateWhileHeld = harness.Registry.StateOf(record.ShipId);
+        bool heldWhileNotAMember = harness.HeldShips.IsAwaitingRecord(record.ShipId);
         harness.Members.Add(Peer);
         harness.Replicator.Tick(0.1f);
 
-        Assert.Equal(ShipLifecycle.Awaiting, stateWhileHeld);
+        Assert.True(heldWhileNotAMember);
         Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
         Assert.Equal(Peer, ship.CurrentAuthority);
         harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
@@ -618,7 +618,7 @@ public class BattleShipReplicatorTests
         var (aiCopy, ai) = RegisterPeerCopy(harness, isNpcParty: true);
         var waiting = ForeignRecord(Guid.NewGuid());
         harness.Replicator.AcceptSpawnRecords(new[] { waiting });
-        bool waitingBefore = harness.Registry.StateOf(waiting.ShipId) == ShipLifecycle.Awaiting;
+        bool waitingBefore = harness.HeldShips.IsAwaitingRecord(waiting.ShipId);
 
         harness.Replicator.RemoveHullsOf(Peer);
         deploying = false;
@@ -1581,7 +1581,7 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void AcceptSpawnRecords_MarksAWaitingRecordAwaitingInTheRegistryUntilItsCopySpawns()
+    public void AcceptSpawnRecords_HoldsAWaitingRecordUntilItsCopySpawns()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
@@ -1591,11 +1591,12 @@ public class BattleShipReplicatorTests
         var record = ForeignRecord(Guid.NewGuid());
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
-        var whileHeld = harness.Registry.StateOf(record.ShipId);
+        bool whileHeld = harness.HeldShips.IsAwaitingRecord(record.ShipId);
         deploying = false;
         harness.Replicator.Tick(0.016f);
 
-        Assert.Equal(ShipLifecycle.Awaiting, whileHeld);
+        Assert.True(whileHeld);
+        Assert.False(harness.HeldShips.IsAwaitingRecord(record.ShipId));
         Assert.Equal(ShipLifecycle.Registered, harness.Registry.StateOf(record.ShipId));
     }
 
@@ -1622,6 +1623,11 @@ public class BattleShipReplicatorTests
         Assert.Equal(0, (int)inspected["heldSamples"]!);
         harness.Engine.Verify(e => e.SpawnForeignHull(record, It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
             Times.Exactly(BattleShipReplicator.ForeignHullSpawnAttempts));
+
+        // A later record of the ship retries it, and the buffers waiting for its hull hold its traffic again meanwhile.
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        Assert.False(harness.Registry.IsGone(record.ShipId));
+        Assert.True(harness.HeldShips.IsAwaitingRecord(record.ShipId));
     }
 
     [Fact]
@@ -1727,6 +1733,8 @@ public class BattleShipReplicatorTests
         public BattleShipReplicator Replicator { get; }
         /// <summary>The hulls that left each side.</summary>
         public NavalSideHullLedger Ledger { get; }
+        /// <summary>What arrived for ships not registered yet.</summary>
+        public HeldShipBuffer HeldShips { get; }
         // Applies at once unless a test queues them: these tests drive the replicator alone, without the services tick.
         public IBattleShipArrivals Arrivals { get; }
         /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
@@ -1776,6 +1784,7 @@ public class BattleShipReplicatorTests
                 arrivals: Arrivals);
             Replicator = core.Replicator;
             Ledger = core.Ledger;
+            HeldShips = core.HeldShips;
         }
 
         // Publishes a message whose handler hops to the game thread, and waits for the hop.

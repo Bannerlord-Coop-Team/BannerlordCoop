@@ -91,21 +91,18 @@ public class NetworkShipRegistryTests
     }
 
     [Fact]
-    public void StateOf_FollowsAForeignHullFromItsWaitingRecordToRegisteredAndRemoved()
+    public void StateOf_FollowsAForeignHullFromUnknownToRegisteredAndRemoved()
     {
         var registry = new NetworkShipRegistry();
         var ship = new NetworkShipInfo(Guid.NewGuid(), "peer", "MapEventParty_2", false, CreateHull(), null);
         var unknown = registry.StateOf(ship.ShipId);
 
-        registry.MarkAwaiting(ship.ShipId);
-        var awaiting = registry.StateOf(ship.ShipId);
         registry.TryRegister(ship);
-        registry.MarkAwaiting(ship.ShipId);
+        registry.MarkSpawnFailed(ship.ShipId);
         var registered = registry.StateOf(ship.ShipId);
         registry.Remove(ship.ShipId);
 
         Assert.Equal(ShipLifecycle.Unknown, unknown);
-        Assert.Equal(ShipLifecycle.Awaiting, awaiting);
         Assert.Equal(ShipLifecycle.Registered, registered);
         Assert.Equal(ShipLifecycle.Removed, registry.StateOf(ship.ShipId));
     }
@@ -115,7 +112,6 @@ public class NetworkShipRegistryTests
     {
         var registry = new NetworkShipRegistry();
         var shipId = Guid.NewGuid();
-        registry.MarkAwaiting(shipId);
 
         registry.MarkSpawnFailed(shipId);
 
@@ -130,16 +126,33 @@ public class NetworkShipRegistryTests
     {
         var registry = new NetworkShipRegistry();
         var shipId = Guid.NewGuid();
-        registry.MarkAwaiting(shipId);
-        bool goneWhileAwaiting = registry.IsGone(shipId);
+        bool goneWhileUnknown = registry.IsGone(shipId);
 
         registry.MarkRemoved(shipId);
-        registry.MarkAwaiting(shipId);
+        registry.RetrySpawn(shipId);
         registry.MarkSpawnFailed(shipId);
 
-        Assert.False(goneWhileAwaiting);
+        Assert.False(goneWhileUnknown);
         Assert.Equal(ShipLifecycle.Removed, registry.StateOf(shipId));
         Assert.True(registry.IsGone(shipId));
+    }
+
+    // A fresh record of a ship whose spawn was given up makes its buffers wait for the hull again.
+    [Fact]
+    public void RetrySpawn_ClearsAGivenUpSpawn_AndNothingElse()
+    {
+        var registry = new NetworkShipRegistry();
+        var failed = Guid.NewGuid();
+        var removed = Guid.NewGuid();
+        registry.MarkSpawnFailed(failed);
+        registry.MarkRemoved(removed);
+
+        registry.RetrySpawn(failed);
+        registry.RetrySpawn(removed);
+
+        Assert.Equal(ShipLifecycle.Unknown, registry.StateOf(failed));
+        Assert.False(registry.IsGone(failed));
+        Assert.Equal(ShipLifecycle.Removed, registry.StateOf(removed));
     }
 
     [Fact]
@@ -227,12 +240,12 @@ public class NetworkShipRegistryTests
     {
         var registry = new NetworkShipRegistry();
         var removed = Guid.NewGuid();
-        var waiting = Guid.NewGuid();
+        var failed = Guid.NewGuid();
         registry.MarkRemoved(removed);
-        registry.MarkAwaiting(waiting);
+        registry.MarkSpawnFailed(failed);
 
         Assert.True(registry.TryReopen(removed));
-        Assert.False(registry.TryReopen(waiting));
+        Assert.False(registry.TryReopen(failed));
         Assert.Equal(ShipLifecycle.Unknown, registry.StateOf(removed));
         Assert.True(registry.TryRegister(new NetworkShipInfo(removed, "captor", null, false, CreateHull(), null)));
     }

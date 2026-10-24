@@ -106,7 +106,7 @@ public class NavalBattleServices : INavalBattleServices
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger);
+            hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, new HeldShipBuffer());
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
         captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
             hullAuthority, Arrivals, HullLedger);

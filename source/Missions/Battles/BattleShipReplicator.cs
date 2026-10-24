@@ -124,10 +124,10 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly IBattleShipArrivals arrivals;
     private readonly INavalSideHullLedger ledger;
+    // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
+    private readonly IHeldShipBuffer heldShips;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
-    // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
-    private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     // [Game thread] Players that left and have not entered again; a late record of theirs never spawns a hull here.
     private readonly HashSet<string> departedOwners = new HashSet<string>();
     // [Game thread] Hulls this client removed with a player who left, by ship id, with that player.
@@ -137,7 +137,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, NetworkShipCondition> earlyHostConditions = new Dictionary<Guid, NetworkShipCondition>();
     // [Game thread] Departed players whose party withdrawal waits for their hulls to settle, with whether each was the host.
     private readonly Dictionary<string, bool> pendingWithdrawals = new Dictionary<string, bool>();
-    private long recordsHeld;
     private bool spawnRecordsSent;
     private float sendElapsed;
     private float elapsed;
@@ -164,7 +163,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         IAgentStationUseReplicator stations,
         INavalShipCaptureEngine captureEngine,
         IBattleShipArrivals arrivals,
-        INavalSideHullLedger ledger)
+        INavalSideHullLedger ledger,
+        IHeldShipBuffer heldShips)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -185,6 +185,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.captureEngine = captureEngine;
         this.arrivals = arrivals;
         this.ledger = ledger;
+        this.heldShips = heldShips;
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -418,7 +419,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(removal.ShipId, out var ship))
         {
-            if (heldShips.TryGetValue(removal.ShipId, out var held) && held.Record != null
+            if (heldShips.TryGet(removal.ShipId, out var held) && held.Record != null
                 && held.Record.OwnerControllerId != removal.OwnerControllerId)
             {
                 removalsRejected++;
@@ -503,9 +504,9 @@ public class BattleShipReplicator : IBattleShipReplicator
             leftWith[ship.ShipId] = controllerId;
         RemoveHulls(departing, ShipRemovalReason.Leave, DepartingCrew.All);
 
-        foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.FollowsBattleHost
-            && entry.Value.Record.OwnerControllerId == controllerId).ToArray())
-            Prune(entry.Key);
+        foreach (var held in heldShips.All.Where(held => held.Record != null && !held.Record.FollowsBattleHost
+            && held.Record.OwnerControllerId == controllerId).ToArray())
+            Prune(held.ShipId);
     }
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
@@ -570,8 +571,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             if (Registry.StateOf(condition.ShipId) == ShipLifecycle.Removed) return;
 
-            var held = Held(condition.ShipId);
-            if (held.Condition == null || condition.Stamp.IsNewer(held.Condition.Stamp)) held.Condition = condition;
+            heldShips.Of(condition.ShipId).HoldCondition(condition);
             return;
         }
 
@@ -644,7 +644,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(final.ShipId, out var ship))
         {
-            if (Registry.StateOf(final.ShipId) == ShipLifecycle.Awaiting) Held(final.ShipId).FinalRopes = final;
+            if (heldShips.IsAwaitingRecord(final.ShipId)) heldShips.Of(final.ShipId).FinalRopes = final;
             else finalRopesRejected++;
             return;
         }
@@ -698,11 +698,12 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place; only a record
             // of a capture the held one predates replaces it.
-            var held = Held(record.ShipId);
+            var held = heldShips.Of(record.ShipId);
             if (held.Record != null && !IsNewerRecord(record, held.Record)) continue;
 
-            held.Record = record;
-            held.RecordOrder = ++recordsHeld;
+            heldShips.HoldRecord(held, record);
+            // A record of a ship whose spawn was given up makes the buffers waiting for its hull hold its traffic again.
+            Registry.RetrySpawn(record.ShipId);
         }
 
         DrainHeldRecords();
@@ -730,38 +731,24 @@ public class BattleShipReplicator : IBattleShipReplicator
             record.ShipId, leaver, record.CaptorControllerId);
     }
 
-    private HeldShip Held(Guid shipId)
-    {
-        if (!heldShips.TryGetValue(shipId, out var held))
-        {
-            held = new HeldShip();
-            heldShips.Add(shipId, held);
-        }
-
-        return held;
-    }
-
     // Records spawn first, in arrival order; then a condition held for a hull that registered without a record goes on.
     private void DrainHeldShips()
     {
-        if (heldShips.Count == 0) return;
-
         DrainHeldRecords();
-        foreach (var entry in heldShips.Where(entry => entry.Value.Record == null).ToArray())
+        foreach (var held in heldShips.All.Where(held => held.Record == null).ToArray())
         {
-            if (!Registry.TryGet(entry.Key, out _)) continue;
+            if (!Registry.TryGet(held.ShipId, out _)) continue;
 
-            heldShips.Remove(entry.Key);
-            if (entry.Value.Condition != null) AcceptCondition(entry.Value.Condition);
+            heldShips.Remove(held.ShipId);
+            if (held.Condition != null) AcceptCondition(held.Condition);
         }
     }
 
+    // Spawns the copies whose records can spawn now, in the order the records arrived; the rest keep waiting.
     private void DrainHeldRecords()
     {
-        foreach (var held in heldShips.Values.Where(held => held.Record != null).OrderBy(held => held.RecordOrder).ToArray())
-        {
-            if (!TrySpawnForeignHull(held)) Registry.MarkAwaiting(held.Record.ShipId);
-        }
+        foreach (var held in heldShips.WaitingRecords())
+            TrySpawnForeignHull(held);
     }
 
     // [Game thread] True when the record is settled (spawned or dropped), false to retry next tick.
@@ -947,7 +934,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(sample.ShipId, out var ship))
         {
-            if (Registry.StateOf(sample.ShipId) == ShipLifecycle.Awaiting) HoldSample(sample);
+            if (heldShips.IsAwaitingRecord(sample.ShipId)) heldShips.Of(sample.ShipId).HoldSample(sample);
             // Also a sample whose spawn record still waits in the arrivals queue: dropped, as the owner streams at 20 Hz, so the
             // next one lands about 50 ms later, once the record applied.
             else GetStream(sample.ShipId).Reject("unknown_ship");
@@ -1037,12 +1024,6 @@ public class BattleShipReplicator : IBattleShipReplicator
             conditions.ForgetReserve(ship.ShipId);
     }
 
-    private void HoldSample(NetworkBattleShipSample sample)
-    {
-        var held = Held(sample.ShipId);
-        if (held.Sample == null || sample.Stamp.IsNewer(held.Sample.Stamp)) held.Sample = sample;
-    }
-
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
         long acceptedSequence, int acceptedEpoch, IReadOnlyCollection<string> controllersInMission)
@@ -1123,9 +1104,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         agentsMovedOffDepartedHulls,
         departedAttackerHulls = ledger.DepartedHulls(BattleSideEnum.Attacker),
         departedDefenderHulls = ledger.DepartedHulls(BattleSideEnum.Defender),
-        pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),
-        heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
-        heldSamples = heldShips.Values.Count(held => held.Sample != null),
+        pendingForeignHulls = heldShips.All.Count(held => held.Record != null),
+        heldForDeployment = heldShips.All.Count(held => held.HeldForDeployment),
+        heldSamples = heldShips.All.Count(held => held.Sample != null),
         pendingWithdrawals = pendingWithdrawals.Keys.ToArray(),
         ships = Registry.Ships.Select(ship =>
         {
@@ -1175,32 +1156,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         finalRopesRejected,
         stations = engine.InspectRopes(Registry.Ships.Select(ship => ship.Hull).ToArray(), ShipIdOf),
     };
-
-    /// <summary>
-    /// A ship not registered here yet: its waiting spawn record and the owner's latest condition, sample and final ropes,
-    /// applied in that order once the copy spawns.
-    /// </summary>
-    private sealed class HeldShip
-    {
-        public BattleShipSpawnData Record;
-        /// <summary>The record's place in arrival order, so copies spawn in the order their records came.</summary>
-        public long RecordOrder;
-        public NetworkShipCondition Condition;
-        public NetworkBattleShipSample Sample;
-        public NetworkBattleRopeFinal FinalRopes;
-        public int FailedAttempts;
-        public float RetryAt;
-        public bool HeldForDeployment;
-        public bool HeldForMembership;
-
-        public void SettleRecord()
-        {
-            Record = null;
-            FailedAttempts = 0;
-            HeldForDeployment = false;
-            HeldForMembership = false;
-        }
-    }
 
     private sealed class ShipStream
     {

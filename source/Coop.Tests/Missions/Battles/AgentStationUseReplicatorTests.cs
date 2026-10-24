@@ -201,7 +201,6 @@ public class AgentStationUseReplicatorTests
         var ships = new NetworkShipRegistry();
         using var replicator = CreateReplicator(Mock.Of<INavalShipEngine>(), Mock.Of<INetworkAgentRegistry>(), ships);
         replicator.AcceptUse(Use(Guid.NewGuid(), shipId, inUse: true, revision: 1, "owner"));
-        ships.MarkAwaiting(shipId);
         replicator.Tick(0.1f);
         long droppedWhileAwaiting = (long)JObject.FromObject(replicator.Inspect())["dropped"]!;
 
