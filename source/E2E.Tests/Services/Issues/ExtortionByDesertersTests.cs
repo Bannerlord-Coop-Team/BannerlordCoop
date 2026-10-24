@@ -300,7 +300,7 @@ public class ExtortionByDesertersTests : IDisposable
             raider.MapEventSide = raid.AttackerSide;
             quest.QuestSettlement.Party.MapEventSide = raid.DefenderSide;
             log = (attacker == 0 ? quest.OnQuestFailed2LogText :
-                attacker == 1 ? quest.OnQuestFailed3LogText : quest.OnQuestCancel2LogText).ToString();
+                attacker == 1 ? quest.OnQuestFailed3LogText : quest.OnQuestCancel2LogText).Value;
 
             AssertQuestPenalty(quest, relationChange,
                 () => CampaignEventDispatcher.Instance.OnVillageBeingRaided(quest.QuestSettlement.Village));
@@ -345,7 +345,7 @@ public class ExtortionByDesertersTests : IDisposable
             ownerParty._position = new CampaignVec2(Vec2.Zero, true);
             deserters._position = new CampaignVec2(new Vec2(lostSight ? 10f : 0f, 0f), true);
             Assert.Equal(lostSight, deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f);
-            log = quest.OnQuestFailed1LogText.ToString();
+            log = quest.OnQuestFailed1LogText.Value;
 
             AssertQuestPenalty(quest, -10, () =>
             {
@@ -404,14 +404,14 @@ public class ExtortionByDesertersTests : IDisposable
     {
         Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         var state = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
-            state => state.Log == log);
+            state => state.Log?.Value == log);
         Assert.Equal(QuestScenario.ControllerA, state.ControllerId);
-        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
-        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log?.Value == log);
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log?.Value == log);
         Owner.Call(() =>
         {
             Assert.True(ownerQuest.IsFinalized);
-            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText?.Value == log);
         });
         Other.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, item => item is Quest));
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
@@ -836,7 +836,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(ownerQuest._defenderMobileParty);
             Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
             Assert.Single(ownerQuest.JournalEntries,
-                entry => entry.LogText.ToString() == ownerQuest.OnDeserterPartyDefeatedLogText.ToString());
+                entry => entry.LogText?.Value == ownerQuest.OnDeserterPartyDefeatedLogText.Value);
         }, TextLinks);
     }
 
@@ -1298,7 +1298,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(otherDeserters.Ai.DoNotMakeNewDecisions);
             Assert.True(ownership.TryGetOwner(secondId, "second_deserters", out var secondOwner));
             Assert.Equal(QuestScenario.ControllerB, secondOwner);
-            log = Assert.Single(quest.JournalEntries).LogText.ToString();
+            log = Assert.Single(quest.JournalEntries).LogText.Value;
             Assert.Contains("died", log);
         }, TextLinks);
         Assert.Equal(IssueOutcome.QuestCancel,
@@ -1306,17 +1306,17 @@ public class ExtortionByDesertersTests : IDisposable
         Owner.Call(() =>
         {
             Assert.True(ownerQuest.IsFinalized);
-            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText?.Value == log);
             Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
         });
         Other.Call(() =>
         {
             Assert.Same(otherQuest, Assert.Single(Campaign.Current.QuestManager.Quests));
             Assert.True(otherQuest.IsOngoing);
-            Assert.DoesNotContain(otherQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+            Assert.DoesNotContain(otherQuest.JournalEntries, entry => entry.LogText?.Value == log);
         });
-        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
-        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log?.Value == log);
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log?.Value == log);
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Empty(Other.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         foreach (var client in new[] { Owner, Other })
