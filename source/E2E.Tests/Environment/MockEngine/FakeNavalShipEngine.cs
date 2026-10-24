@@ -45,6 +45,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     /// <summary>The ship id the registry holds a hull under, or null; names hulls in removal invariant failures.</summary>
     public Func<MissionObject, Guid?>? RegisteredShipId { get; set; }
 
+    /// <summary>Raised for every hull this engine spawns, with its formation, as the NavalShipsLogic.SpawnShip postfix does.</summary>
+    public Action<MissionObject, Formation?>? Spawned { get; set; }
+
     public IReadOnlyList<MissionObject> Hulls => hulls.Where(hull => !hull.IsRemoved).Select(hull => hull.Hull).ToList();
 
     public bool IsDeploymentMode { get; set; }
@@ -82,11 +85,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
             Formation = team == null ? null : FormationOf(team, formationIndex),
         };
         hulls.Add(hull);
+        Spawned?.Invoke(hull.Hull, hull.Formation);
         return hull;
     }
 
-    // NavalShipsLogic.FindFirstFormationWithoutShip: a copy takes its team's first formation no live hull holds here.
-    private int FirstFreeFormation(Team team)
+    /// <summary>The first formation of <paramref name="team"/> no live hull here holds, as vanilla's team setup fills them.</summary>
+    public int FirstFreeFormation(Team team)
     {
         var taken = hulls.Where(hull => !hull.IsRemoved && hull.Team == team && hull.Formation != null)
             .Select(hull => hull.FormationIndex).ToHashSet();
@@ -139,6 +143,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         if (ArmsCopies) copy.ArmWeapon();
         hulls.Add(copy);
         formation = copy.Formation!;
+        Spawned?.Invoke(copy.Hull, copy.Formation);
         return copy.Hull;
     }
 
@@ -278,10 +283,13 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public bool CanBeTakenOver(MissionObject hull) => !Of(hull).CannotBeTakenOver;
 
-    // Like the live engine: everyone aboard is parked, and the hull's crew elsewhere is listed without being moved.
+    // Like the live engine: everyone aboard is parked, and the hull's crew elsewhere is listed without being moved; a removed
+    // hull's entity is gone, so it parks nobody.
     public IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull)
     {
         var fake = Of(hull);
+        if (fake.IsRemoved) return Array.Empty<HullSwapAgent>();
+
         fake.Parkings++;
         var parked = fake.Seats.Values
             .Select(agent => new HullSwapAgent(agent, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero))
@@ -324,12 +332,15 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     /// <summary>Lent ship assignment slots still holding a hull; vanilla's removal clears each one again.</summary>
     public int LentSlotsHeld => lentSlots.Count;
 
+    // Like the live engine, a removed hull's entity is gone, so there is nothing to replace.
     public MissionObject ReplaceHull(MissionObject hull)
     {
         if (ReplaceHullThrows) throw new InvalidOperationException("The fake hull could not be replaced.");
         if (ReplaceHullFails) return null!;
 
         var old = Of(hull);
+        if (old.IsRemoved) return null!;
+
         CheckClearForRemoval(old, "replaced");
         old.IsRemoved = true;
         var fresh = new FakeHull(MissionTestObjects.CreateHull(), old.Side, old.FormationIndex, isCopy: false)
@@ -350,6 +361,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
             crews[agent] = fresh;
         foreach (var agent in parkedFrom.Where(entry => entry.Value == old).Select(entry => entry.Key).ToList())
             parkedFrom[agent] = fresh;
+        Spawned?.Invoke(fresh.Hull, fresh.Formation);
         return fresh.Hull;
     }
 
@@ -418,9 +430,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public void ReleaseHullStations(MissionObject hull) => Of(hull).Seats.Clear();
 
+    // Like the live engine, a hull already removed is left alone, so a second removal changes none of its removal records.
     public void RemoveHull(MissionObject hull)
     {
         var fake = Of(hull);
+        if (fake.IsRemoved) return;
+
         CheckClearForRemoval(fake, "removed");
         fake.CrewActiveAtRemoval = CrewOf(fake).Count();
         fake.ParkingsBeforeRemoval = fake.Parkings;

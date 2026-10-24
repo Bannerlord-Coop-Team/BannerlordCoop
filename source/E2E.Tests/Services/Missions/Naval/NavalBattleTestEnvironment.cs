@@ -160,6 +160,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         private readonly NavalBattleTestEnvironment environment;
         private readonly MissionEngineFixture fixture = new();
         private readonly Dictionary<string, NavalPeer> peers = new();
+        private readonly NavalLoggedFailures failures = new();
 
         public NavalBattle(NavalBattleTestEnvironment environment, string mapEventId, string[] successionOrder, int hostEpoch)
         {
@@ -179,6 +180,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public Dictionary<string, (EnvironmentInstance Instance, BattleSideEnum Side)> Players { get; } = new();
 
         public NavalPeer this[string id] => peers[id];
+
+        /// <summary>Lets the logged errors containing <paramref name="fragment"/> pass, for a scenario that provokes them.</summary>
+        public void ExpectLoggedFailure(string fragment) => failures.Expect(fragment);
 
         /// <summary>The clients on the mesh.</summary>
         public IEnumerable<NavalPeer> Peers => peers.Values.Where(peer => peer.Network.IsStarted);
@@ -205,7 +209,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 controller.Session.TryBegin(MapEventId);
                 instance.Resolve<IBattleHostRegistry>().Set(MapEventId, new BattleHostAssignment(HostId, Successors, HostEpoch));
                 var members = new NavalMissionMembers(instance.Resolve<IMessageBroker>(), Peers.Select(other => other.Id));
-                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(id), members);
+                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(id), members, failures);
             });
 
             // The server introduces an entrant and every member to each other.
@@ -305,7 +309,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
 
         public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null, int? formationIndex = null) =>
-            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId, formationIndex);
+            owner.FieldOwnHull(position, PartyIds[owner.Id], campaignShipId, formationIndex);
 
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null,
             string? campaignShipId = null) =>
@@ -327,31 +331,36 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
 
         /// <summary>
-        /// Tears the battle down after a last removal invariant check on every client, which fails the scenario. Skipped once a
-        /// tick failed it, since throwing here would hide that failure. A violation found here still replaces an ordinary assert
-        /// failure the test body threw.
+        /// Tears the battle down, failing the scenario on a last removal invariant violation or logged failure (teardown's
+        /// included) unless a tick already failed it; a failure found here replaces an ordinary assert the test body threw.
         /// </summary>
         public void Dispose()
         {
             var violations = new List<Exception>();
-            bool alreadyFailed = peers.Values.Any(peer => peer.Engine.HasFailedRemovalInvariant);
+            bool alreadyFailed = failures.HasFailed || peers.Values.Any(peer => peer.Engine.HasFailedRemovalInvariant);
             foreach (var peer in alreadyFailed ? Enumerable.Empty<NavalPeer>() : peers.Values)
-            {
-                try
-                {
-                    peer.Call(peer.Engine.AssertRemovalInvariant);
-                }
-                catch (Exception exception)
-                {
-                    violations.Add(exception);
-                }
-            }
+                Collect(violations, () => peer.Call(peer.Engine.AssertRemovalInvariant));
 
             foreach (var peer in peers.Values)
                 peer.Instance.Call(peer.DisposeShipServices);
+            if (!alreadyFailed) Collect(violations, failures.AssertNone);
+            failures.Dispose();
             BattleSpawnGate.EndBattle();
             fixture.Dispose();
             if (violations.Count > 0) throw new AggregateException(violations);
+        }
+
+        // Runs one teardown check, keeping its failure so the remaining checks and the teardown still run.
+        private static void Collect(List<Exception> violations, Action check)
+        {
+            try
+            {
+                check();
+            }
+            catch (Exception exception)
+            {
+                violations.Add(exception);
+            }
         }
     }
 
@@ -411,10 +420,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
     protected sealed class NavalPeer
     {
         private readonly Dictionary<Agent, string> agentNames = new(ReferenceEqualityComparer.Instance);
+        private readonly NavalLoggedFailures failures;
 
         public NavalPeer(string id, BattleSideEnum side, EnvironmentInstance instance, MockMission mission,
-            CoopBattleController controller, FakeNavalShipEngine engine, NavalMissionMembers members)
+            CoopBattleController controller, FakeNavalShipEngine engine, NavalMissionMembers members, NavalLoggedFailures failures)
         {
+            this.failures = failures;
             Members = members;
             Id = id;
             Side = side;
@@ -424,6 +435,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Engine = engine;
             engine.AgentName = agent => agentNames.TryGetValue(agent, out var name) ? name : null;
             engine.RegisteredShipId = hull => Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : null;
+            engine.Spawned = (hull, formation) => Broker.Publish(hull, new ShipSpawnedInBattle(hull, formation));
             Network = instance.Resolve<MockBattleNetwork>();
             Broker = instance.Resolve<IMessageBroker>();
             var reinforcements = new Mock<IReinforcementFielder>();
@@ -468,13 +480,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
         /// <summary>
-        /// One naval services tick in the live order, then the removal invariant check on this client; this harness fields no
-        /// NPC fleet.
+        /// One naval services tick in the live order (no NPC fleet here), then the removal invariant and logged failure checks.
         /// </summary>
         public void Tick(float dt = TickSeconds) => Call(() =>
         {
             Services.Tick(dt);
             Engine.AssertRemovalInvariant();
+            failures.AssertNone();
         });
 
         /// <summary>The arrivals, capture and station steps of the services tick alone, without advancing clocks.</summary>
@@ -501,21 +513,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public void Commit() => Call(() => Controller.Deployment.OnLocalDeploymentFinished());
 
         /// <summary>
-        /// A hull vanilla's team setup fielded for this client, registered as the spawn postfix does; it stands for the party's
-        /// campaign ship <paramref name="campaignShipId"/> when given, and with a <paramref name="formationIndex"/> it takes
-        /// that formation of the player team, as a captor's hull needs.
+        /// A hull vanilla's team setup fielded for this client on <paramref name="formationIndex"/> (else the first free one) of
+        /// its player team, which the replicator registers from the spawn event; it stands for <paramref name="campaignShipId"/>.
         /// </summary>
-        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null,
-            int? formationIndex = null)
+        public Guid FieldOwnHull(Vec3 position, string mapEventPartyId, string? campaignShipId = null, int? formationIndex = null)
         {
-            var shipId = Guid.NewGuid();
+            var shipId = Guid.Empty;
             Call(() =>
             {
-                var team = formationIndex == null ? null
-                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
-                var hull = Engine.Field(side, position, formationIndex ?? 0, team);
+                var team = Mission.PlayerTeam.Shell;
+                var hull = Engine.Field(Side, position, formationIndex ?? Engine.FirstFreeFormation(team), team);
                 hull.CampaignShipId = campaignShipId;
-                Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, hull.Formation)));
+                Assert.True(Registry.TryGetByHull(hull.Hull, out var ship), $"{Id} registered no own hull from the spawn event");
+                Assert.Equal((Id, mapEventPartyId, false), (ship.CurrentAuthority, ship.MapEventPartyId, ship.IsNpcParty));
+                shipId = ship.ShipId;
             });
             return shipId;
         }
@@ -552,6 +563,14 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             bool has = false;
             Call(() => has = Registry.TryGet(shipId, out _));
             return has;
+        }
+
+        /// <summary>The ship ids this client's registry holds, in a stable order.</summary>
+        public Guid[] RegisteredShipIds()
+        {
+            Guid[] ids = null!;
+            Call(() => ids = Registry.Ships.Select(ship => ship.ShipId).OrderBy(id => id).ToArray());
+            return ids;
         }
 
         /// <summary>This client's local hull for a ship id.</summary>
