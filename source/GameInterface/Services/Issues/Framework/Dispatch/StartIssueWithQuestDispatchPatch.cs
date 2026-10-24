@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -11,10 +12,24 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithQuest))]
 internal class StartIssueWithQuestDispatchPatch
 {
-    [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance)
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance, ref bool __result)
     {
-        if (ModInformation.IsServer)
+        if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed() &&
+            !__instance.IsOngoingWithoutQuest && ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) &&
+            registry.IsRegistered(__instance.GetType()))
+        {
+            // IssueManager treats false as a failed offer and finalizes the existing issue.
+            __result = true;
+            return false;
+        }
+        return true;
+    }
+
+    [HarmonyPostfix]
+    private static void Postfix(IssueBase __instance, bool __runOriginal)
+    {
+        if (ModInformation.IsServer || !__runOriginal)
         {
             return;
         }

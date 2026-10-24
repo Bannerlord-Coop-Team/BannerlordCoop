@@ -185,7 +185,7 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative ||
+        if (issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
@@ -357,6 +357,7 @@ internal class FinalizationCoordinator : IHandler
         // issue updates for an issue this player never took. A lord solution has no quest on the owner either.
         if (!isOwner && quest == null)
         {
+            issue.IsTriedToSolveBefore = false;
             issue.IssueFinalized();
             return;
         }
@@ -438,12 +439,12 @@ internal class FinalizationCoordinator : IHandler
                 issue.IssueFinalized();
                 return true;
             case IssueOutcome.LordAcceptedCounterOffer:
-                if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferAcceptLog));
                 issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithBetrayal, Hero.MainHero);
                 return true;
             case IssueOutcome.LordRefusedCounterOffer:
-                if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferRefuseLog));
                 issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, Hero.MainHero);
                 return true;
             default:
                 return false;

@@ -55,8 +55,13 @@ public class QuestSolutionAcceptRaceTests : IDisposable
     [Fact]
     public void TheSecondPlayerToAcceptIsRejectedAndItsStrayQuestIsCancelledWithoutEndingTheIssue()
     {
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        // The second player is still looking at the offer when the first acceptance wins.
+        router.PauseLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
         scenario.Accept(scenario.ClientA);
         scenario.Accept(scenario.ClientB);
+        router.ResumeLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
+        TestEnvironment.FlushCoalescer();
 
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
