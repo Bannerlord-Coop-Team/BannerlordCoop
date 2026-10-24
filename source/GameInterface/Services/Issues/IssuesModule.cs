@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using System;
+using GameInterface.Services.Issues.Quests.RevenueFarming;
 
 namespace GameInterface.Services.Issues;
 
@@ -46,6 +47,9 @@ internal class IssuesModule : Module
             .AsSelf()
             .AsImplementedInterfaces()
             .InstancePerLifetimeScope();
+
+        builder.RegisterType<RevenueFarmingSessionStore>().As<IRevenueFarmingSessionStore>().InstancePerLifetimeScope();
+        builder.RegisterType<RevenueFarmingActions>().As<IRevenueFarmingActions>().InstancePerDependency();
 
         base.Load(builder);
     }
