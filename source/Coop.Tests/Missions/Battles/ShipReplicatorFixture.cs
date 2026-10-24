@@ -26,7 +26,7 @@ public sealed class ShipReplicatorFixture
         Ledger = new NavalSideHullLedger();
         HeldShips = new HeldShipBuffer();
         Conditions = new BattleShipConditionStream(network, broker, context, engine, AppliedHost, HeldShips, Arrivals);
-        Samples = new BattleShipSampleStream(network, broker, context, engine, Conditions, HeldShips);
+        Samples = new BattleShipSampleStream(network, broker, context, engine, Conditions, HeldShips, Arrivals);
         Replicator = new BattleShipReplicator(network, broker, context, engine, teamResolver ?? Mock.Of<IBattleTeamResolver>(),
             objectManager ?? Mock.Of<IObjectManager>(), HullAuthority, AppliedHost, Conditions, stations ?? Mock.Of<IAgentStationUseReplicator>(),
             captureEngine ?? Mock.Of<INavalShipCaptureEngine>(), Arrivals, Ledger, HeldShips, Samples);

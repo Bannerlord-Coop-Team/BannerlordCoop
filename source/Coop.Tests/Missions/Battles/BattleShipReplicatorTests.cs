@@ -1693,36 +1693,38 @@ public class BattleShipReplicatorTests
     }
 
     // Fix item 8: a sample's ropes connect and break attachments, which the async agent and team tick reads, so a sample off
-    // the mesh applies from the mission tick, not from the game-thread drain.
+    // the mesh applies from the arrivals the mission tick drains, not from the game-thread drain.
     [Fact]
-    public void SampleOffTheMesh_AppliesOnTheNextTick_NotFromTheDrain()
+    public void SampleOffTheMesh_AppliesFromTheArrivals_NotFromTheDrain()
     {
         using var mission = new MissionCurrentScope();
-        var harness = new Harness(committed: false);
+        var harness = new Harness(committed: false, queuedArrivals: true);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
         harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
         harness.Engine.Verify(e => e.ApplyRopes(copy, It.IsAny<BattleRopeState[]>(), It.IsAny<Func<Guid, MissionObject>>(), false),
             Times.Never);
         harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Never);
-        harness.Replicator.Tick(0.1f);
+        harness.Arrivals.ApplyAll();
 
         harness.Engine.Verify(e => e.ApplyRopes(copy, It.IsAny<BattleRopeState[]>(), It.IsAny<Func<Guid, MissionObject>>(), false),
             Times.Once);
         harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Once);
     }
 
-    // Only the newest of the samples that came within one frame is applied; the older ones are superseded.
+    // Only the newest of the samples that came within one frame is applied, from one queued arrival per hull, so the queue
+    // doesn't grow with the 20 Hz stream.
     [Fact]
     public void SamplesOffTheMesh_WithinOneFrame_ApplyOnlyTheLatest()
     {
         using var mission = new MissionCurrentScope();
-        var harness = new Harness(committed: false);
+        var harness = new Harness(committed: false, queuedArrivals: true);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
         harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
         harness.PublishAndDrain(new NetworkBattleShipSample(ship.ShipId, Peer, 2, MovedFrame()));
-        harness.Replicator.Tick(0.1f);
+        Assert.Equal(1, harness.Arrivals.Count);
+        harness.Arrivals.ApplyAll();
 
         harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Once);
         Assert.Equal(2, (long)Inspected(harness, ship.ShipId)["accepted"]!);

@@ -302,11 +302,10 @@ public class BattleShipReplicator : IBattleShipReplicator
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        samples.Advance(dt);
         WithdrawSettledParties();
         hullAuthority.Tick();
         PruneRemovedHulls();
-        // After the arrivals and the prune, so a sample finds its record applied and no hull that left takes one.
-        samples.ApplyReceived(dt);
         DrainHeldShips();
 
         if (!spawnRecordsSent && deployment.IsCommitted)

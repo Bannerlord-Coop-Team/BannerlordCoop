@@ -107,7 +107,7 @@ public class NavalBattleServices : INavalBattleServices
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
-        samples = new BattleShipSampleStream(network, messageBroker, context, shipEngine, conditions, heldShips);
+        samples = new BattleShipSampleStream(network, messageBroker, context, shipEngine, conditions, heldShips, Arrivals);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, heldShips, samples);
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.

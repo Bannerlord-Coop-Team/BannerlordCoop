@@ -15,8 +15,8 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleShipSampleStream : IDisposable
 {
-    /// <summary>[Mission tick] Advances the stream's clock and applies the latest sample each hull received since the last tick.</summary>
-    void ApplyReceived(float dt);
+    /// <summary>[Mission tick] Advances the stream's clock, which times the sample lifetime.</summary>
+    void Advance(float dt);
 
     /// <summary>[Mission tick] Sends every own hull's sample and changed condition once per send interval.</summary>
     void SendOwn(float dt);
@@ -62,16 +62,18 @@ public class BattleShipSampleStream : IBattleShipSampleStream
     private readonly INavalShipEngine engine;
     private readonly IBattleShipConditionStream conditions;
     private readonly IHeldShipBuffer heldShips;
+    private readonly IBattleShipArrivals arrivals;
 
     private readonly Dictionary<Guid, ShipSampleStream> streams = new Dictionary<Guid, ShipSampleStream>();
-    // [Game thread] The last sample each hull received since the last tick; a 20 Hz stream only needs the newest one applied.
+    // [Game thread] The last sample each hull received that the arrivals haven't applied yet; a 20 Hz stream only needs the
+    // newest one, so each hull has at most one arrival queued.
     private readonly Dictionary<Guid, NetworkBattleShipSample> received = new Dictionary<Guid, NetworkBattleShipSample>();
     private float sendElapsed;
     private float elapsed;
 
     // Subscribes to the hull samples of this battle's mesh.
     public BattleShipSampleStream(IBattleNetwork network, IMessageBroker messageBroker, BattleContext context, INavalShipEngine engine,
-        IBattleShipConditionStream conditions, IHeldShipBuffer heldShips)
+        IBattleShipConditionStream conditions, IHeldShipBuffer heldShips, IBattleShipArrivals arrivals)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -82,6 +84,7 @@ public class BattleShipSampleStream : IBattleShipSampleStream
         this.engine = engine;
         this.conditions = conditions;
         this.heldShips = heldShips;
+        this.arrivals = arrivals;
 
         messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
     }
@@ -95,28 +98,31 @@ public class BattleShipSampleStream : IBattleShipSampleStream
         received.Clear();
     }
 
-    // Kept for the mission tick: a sample connects and breaks ropes, which the async agent and team tick reads, so it must not
-    // apply from the game-thread drain (R48 L6). It also finds a spawn record that arrived ahead of it already applied.
+    // Applied from the arrivals: a sample connects and breaks ropes, which the async agent and team tick reads, so it must not
+    // apply from the game-thread drain (R48 L6), and a spawn record that arrived ahead of it applies first.
     private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
     {
         var sample = payload.What;
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
+
+            bool queued = received.ContainsKey(sample.ShipId);
             received[sample.ShipId] = sample;
+            if (!queued) arrivals.Enqueue(() => ApplyReceived(sample.ShipId), nameof(Handle_NetworkBattleShipSample));
         }, context: nameof(Handle_NetworkBattleShipSample));
     }
 
-    public void ApplyReceived(float dt)
+    // [Mission tick] Applies the newest sample the hull received since its arrival was queued.
+    private void ApplyReceived(Guid shipId)
     {
-        elapsed += Math.Max(0f, dt);
-        if (received.Count == 0) return;
+        if (!received.TryGetValue(shipId, out var sample)) return;
 
-        var samples = received.Values.ToArray();
-        received.Clear();
-        foreach (var sample in samples)
-            Accept(sample);
+        received.Remove(shipId);
+        Accept(sample);
     }
+
+    public void Advance(float dt) => elapsed += Math.Max(0f, dt);
 
     public void SendOwn(float dt)
     {
