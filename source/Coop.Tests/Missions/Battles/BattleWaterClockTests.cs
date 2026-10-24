@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Tests.Stubs;
 using GameInterface.Utils;
 using Missions;
 using Missions.Battles;
@@ -13,7 +14,7 @@ namespace Coop.Tests.Missions.Battles;
 public class BattleWaterClockTests
 {
     private readonly Mock<IBattleNetwork> network = new();
-    private readonly Mock<IMessageBroker> messageBroker = new();
+    private readonly StubMessageBroker messageBroker = new();
     private readonly Mock<IBattleSession> session = new();
     private readonly FakeWaterClock waterClock = new();
     private readonly BattleWaterClock clock;
@@ -22,7 +23,7 @@ public class BattleWaterClockTests
     {
         session.SetupGet(s => s.HostEpoch).Returns(2);
         session.SetupGet(s => s.InstanceId).Returns("battle");
-        clock = new BattleWaterClock(network.Object, messageBroker.Object, session.Object, new HostEpochPolicy(), waterClock,
+        clock = new BattleWaterClock(network.Object, messageBroker, session.Object, new HostEpochPolicy(), waterClock,
             new BattleWaterTimeEstimator());
     }
 
@@ -51,7 +52,7 @@ public class BattleWaterClockTests
 
         clock.Start();
 
-        Assert.True(waterClock.IsOverriding);
+        Assert.True(waterClock.IsRedirected);
         Assert.Equal(BattleWaterClock.BattleStartWaterTime, waterClock.BeganAt);
     }
 
@@ -162,27 +163,65 @@ public class BattleWaterClockTests
     {
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
-        session.SetupGet(s => s.HostEpoch).Returns(3);
-        session.SetupGet(s => s.HostControllerId).Returns("new-host");
-        waterClock.Vanilla = 1010f;
 
-        clock.Tick(0.016f);
+        messageBroker.Publish(this, new BattleHostMigrated("battle", "old-host", "new-host", 3));
 
         network.Verify(n => n.Send("new-host", It.Is<NetworkBattleWaterTime>(m => !m.FromHost && m.HostEpoch == 3 && m.WaterTime == 0f)),
             Times.Once);
     }
 
     [Fact]
-    public void Client_OnTheFirstHostAssignment_SendsNothing()
+    public void Client_IgnoresAnotherBattlesHostChange()
     {
-        session.SetupGet(s => s.HostEpoch).Returns(0);
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
-        session.SetupGet(s => s.HostEpoch).Returns(1);
 
-        clock.Tick(0.016f);
+        messageBroker.Publish(this, new BattleHostMigrated("other-battle", "old-host", "new-host", 3));
 
         network.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void PromotedHost_SendsNoReportToItself()
+    {
+        waterClock.Vanilla = 1000f;
+        clock.Tick(0.016f);
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+
+        messageBroker.Publish(this, new BattleHostMigrated("battle", "old-host", "me", 3));
+
+        network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void PromotedHost_CatchesUpToAReportThatArrivedBeforeItsOwnAssignment()
+    {
+        waterClock.Vanilla = 1000f;
+        clock.Tick(0.016f);
+
+        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 3, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime(2500f, 3, fromHost: false));
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        session.SetupGet(s => s.HostEpoch).Returns(3);
+        waterClock.Vanilla = 1000.5f;
+        clock.Tick(0.016f);
+
+        Assert.Equal(3000.5f, waterClock.WrittenTime);
+    }
+
+    [Fact]
+    public void Client_DropsAReportForAnEpochItAlreadyHolds()
+    {
+        waterClock.Vanilla = 1000f;
+        clock.Tick(0.016f);
+
+        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 2, fromHost: false));
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        session.SetupGet(s => s.HostEpoch).Returns(3);
+        waterClock.Vanilla = 1000.5f;
+        clock.Tick(0.016f);
+
+        Assert.Equal(0.5f, waterClock.WrittenTime);
     }
 
     [Fact]
@@ -222,7 +261,7 @@ public class BattleWaterClockTests
         clock.Dispose();
 
         Assert.Equal(1, waterClock.Ends);
-        Assert.False(waterClock.IsOverriding);
+        Assert.False(waterClock.IsRedirected);
     }
 
     [Fact]
@@ -257,7 +296,7 @@ public class BattleWaterClockTests
 
         string line = global::Missions.Naval.NavalWaterClockCoopCommand.Describe(waterClock, clock);
 
-        Assert.StartsWith("NAVAL_WATER_CLOCK installed=true overriding=true", line);
+        Assert.StartsWith("NAVAL_WATER_CLOCK installed=true redirected=true", line);
         Assert.Contains("written=1002.500 vanilla=1000.000 offset=2.500", line);
         Assert.Contains("battle=naval host=false hostTime=true samples=1", line);
     }
@@ -276,7 +315,7 @@ public class BattleWaterClockTests
 
         public bool IsInstalled => Installed;
 
-        public bool IsOverriding { get; private set; }
+        public bool IsRedirected { get; private set; }
 
         public string Status => Installed ? "installed" : "disabled: test";
 
@@ -290,14 +329,14 @@ public class BattleWaterClockTests
             return Installed;
         }
 
-        public bool TryBeginOverride(float waterTime)
+        public bool TryRedirect(float waterTime)
         {
             if (!Installed) return false;
             Begins++;
             if (RefuseOverride) return false;
             BeganAt = waterTime;
             WrittenTime = waterTime;
-            IsOverriding = true;
+            IsRedirected = true;
             return true;
         }
 
@@ -308,11 +347,11 @@ public class BattleWaterClockTests
             WrittenTime = waterTime;
         }
 
-        public void EndOverride()
+        public void Restore()
         {
-            if (!IsOverriding) return;
+            if (!IsRedirected) return;
             Ends++;
-            IsOverriding = false;
+            IsRedirected = false;
         }
     }
 }

@@ -475,7 +475,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R41a retreat, leave and disconnect live validation | done (R41a, R41a-2, R41a-3) |
 | R41b probes | done, D3 decided |
 | M10a ram and contact (steered copies) | in progress, R42 next |
-| M10w water clock sync (shared battle wave time) | done in code, pending live check |
+| M10w water clock sync (shared battle wave time) | done, live-verified in R45 |
 | M10b plank crossing and melee | pending, needs M10a |
 | M6 results parity (fates, Boatswain XP, loot hold) | done in code, R45 next |
 | M6 in-mission capture | done in code, R46 next |
@@ -522,7 +522,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   be built (`AddPhysics(isStatic)` left no static body). Kinematic and static copies and `copy_body` were deleted.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
-- **Waves are synced (water clock, 2026-10-21, pending live check).** This supersedes "copies float on local water".
+- **Waves are synced (water clock, 2026-10-21, live-verified in R45).** This supersedes "copies float on local water".
+  R45 measured the water 0.022 m mean apart, with no backward step through two host changes and a late join.
   R42 found that wave height follows the engine's accumulated mission timer, which adds up every mission a client has
   run, so clients with different mission histories saw different wave phases (1.54 m mean apart in
   `battle_terrain_opensea_southern`; aligned on the probe's `total` the two clients' water matched to 0.003 m). The
@@ -534,7 +535,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   (Windows, client role; it refuses a server or headless build), and only when its signature matches exactly once;
   otherwise it logs the match count and DLL identity and waves stay vanilla. The redirect is switched on only while a
   coop naval battle runs (only from the game thread, the thread that runs the load) and switched back first thing at
-  mission end, so other scenes run vanilla code. The campaign map's view may stay registered under the mission
+  mission end, so other scenes run vanilla code. `0x1DA870`'s only caller chain is `0x9B820`, the frame tick `0x53950`
+  and the `rglFrame_move_task`, one frame task at a time, which also runs the managed tick after the water update, so a
+  swap from `AfterStart` or mission end can't race the site. The campaign map's view may stay registered under the mission
   (`MapScreen` toggles its scene view itself, and `0x9B820` has no enabled-view check), so map water can read battle
   time while the battle runs; that is hidden and cosmetic, and map water right after a battle is a live check.
   - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`
@@ -553,11 +556,15 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     once to a peer entering the battle. From `AfterStart` on, a client's written time never runs backwards: a host time
     more than 2 s of mission time (20 water units) ahead jumps forward, at once for the first host time and the first
     after a host change, otherwise only when all of the last 3 samples are that far ahead. Everything else is slewed
-    at 75% to 125% speed toward the largest offset of the last 3 samples (transit only makes an offset look smaller).
+    at 75% to 125% speed toward a target smoothed (0.3 per sample) toward the largest offset of the last 3 samples
+    (transit only makes an offset look smaller).
   - A promoted host keeps its current offset, so it continues from its own water time. Election ignores water time, so
-    a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change every client
-    therefore sends its own time to the new host once, and the host jumps forward to any client time more than 2 s
-    ahead; the clients' backward gap to the lagging host only lasts until then.
+    a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change
+    (`BattleHostMigrated`) every client therefore sends its own time to the new host once, and the host jumps forward to
+    any client time more than 2 s ahead; the clients' backward gap to the lagging host only lasts until then. The report
+    travels the mission mesh and the assignment the server channel, so a report that arrives first is held and applied
+    on the new host's first tick at that epoch. `NavalWaterClockScenarioTests` covers this across instances with an
+    in-memory water clock.
   - The ship wake renderer reads the same clock at `0x1DAB69` (1e-5 scale, seconds) and is not patched, so wake effects
     stay on each client's local clock.
   - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of

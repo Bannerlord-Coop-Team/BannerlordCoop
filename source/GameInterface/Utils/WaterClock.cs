@@ -10,7 +10,7 @@ public interface IWaterClock
     bool IsInstalled { get; }
 
     /// <summary>Whether the engine currently reads the owned time instead of its own clock.</summary>
-    bool IsOverriding { get; }
+    bool IsRedirected { get; }
 
     /// <summary>Why the patch is or isn't installed.</summary>
     string Status { get; }
@@ -25,13 +25,13 @@ public interface IWaterClock
     bool TryReadVanillaMissionTime(out float waterTime);
 
     /// <summary>[Game thread] Writes <paramref name="waterTime"/>, then makes the engine read it instead of its own clock.</summary>
-    bool TryBeginOverride(float waterTime);
+    bool TryRedirect(float waterTime);
 
     /// <summary>[Game thread] Sets the water time the engine reads on its next scene update.</summary>
     void SetWaterTime(float waterTime);
 
     /// <summary>[Game thread] Gives the engine its own clock back.</summary>
-    void EndOverride();
+    void Restore();
 }
 
 /// <inheritdoc cref="IWaterClock"/>
@@ -39,7 +39,7 @@ public class WaterClock : IWaterClock
 {
     public bool IsInstalled => NativeWaterClockPatch.IsActive;
 
-    public bool IsOverriding => NativeWaterClockPatch.IsRedirected;
+    public bool IsRedirected => NativeWaterClockPatch.IsRedirected;
 
     public string Status => NativeWaterClockPatch.Status;
 
@@ -49,9 +49,9 @@ public class WaterClock : IWaterClock
 
     public bool TryReadVanillaMissionTime(out float waterTime) => NativeWaterClockPatch.TryReadVanillaMissionTime(out waterTime);
 
-    public bool TryBeginOverride(float waterTime) => NativeWaterClockPatch.TryRedirect(waterTime);
+    public bool TryRedirect(float waterTime) => NativeWaterClockPatch.TryRedirect(waterTime);
 
     public void SetWaterTime(float waterTime) => NativeWaterClockPatch.SetWaterTime(waterTime);
 
-    public void EndOverride() => NativeWaterClockPatch.Restore();
+    public void Restore() => NativeWaterClockPatch.Restore();
 }
