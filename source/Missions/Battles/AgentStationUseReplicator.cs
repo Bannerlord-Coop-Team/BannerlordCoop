@@ -63,8 +63,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private bool applyingRemote;
     // A game-thread closure queued before Dispose still runs; it must not send or seat for a torn-down battle.
     private bool disposed;
-    private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
-        withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats;
+    // dropped counts uses that were lost; staleUses (superseded) and obsoleteReleases (nothing left to release) are expected.
+    private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, localPuppetReleases, pinned, ownerReleases,
+        sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -114,9 +115,11 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         if (!agents.IsLocallyControlled(change.Agent))
         {
-            // Only the owner's stream may move a puppet off a station; anything else is a local desync worth seeing.
-            if (!applyingRemote && !change.InUse)
+            // Only the owner's stream may move a puppet off a station; anything else is a local desync worth seeing. A dying
+            // puppet's own removal releases it (vanilla Agent.OnRemove), and by then its state is no longer active.
+            if (!applyingRemote && !change.InUse && engine.IsAlive(change.Agent))
             {
+                unownedPuppetReleases++;
                 Logger.Warning("[NavalSync] Puppet {AgentId} left a station locally, not by its owner", info.AgentId);
             }
             return;
@@ -304,9 +307,22 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     {
         if (!missionComponent.ShipRegistry.IsGone(entry.Use.ShipId)) return false;
 
+        // The removal already let the crew go here; their releases, sent after the removal, have nothing left to do.
+        if (!entry.Use.InUse) return SettleObsoleteRelease(entry.Use, "its hull left the mission");
+
         dropped++;
         Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} could not spawn here or left the mission",
             entry.Use.Revision, entry.Use.AgentId, entry.Use.ShipId);
+        return true;
+    }
+
+    // A release whose puppet or hull is already gone; its stamp still orders the sender's older uses, so none of them seats later.
+    private bool SettleObsoleteRelease(NetworkAgentStationUse use, string reason)
+    {
+        appliedStamps[use.AgentId] = use.Stamp;
+        obsoleteReleases++;
+        Logger.Debug("[NavalSync] Settled station release {Revision} of agent {AgentId} on hull {ShipId}: {Reason}",
+            use.Revision, use.AgentId, use.ShipId, reason);
         return true;
     }
 
@@ -333,29 +349,32 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             return true;
         }
 
+        // Each owner numbers its own uses, so a use from a different sender than the last applied one starts a fresh order.
+        appliedStamps.TryGetValue(use.AgentId, out var last);
+        if (!use.Stamp.IsNewer(last))
+        {
+            staleUses++;
+            return true;
+        }
+
+        // A puppet that died or withdrew has no seat to leave, and one not spawned yet has none to take.
         var agents = missionComponent.AgentRegistry;
-        if (!agents.TryGetAgentInfo(use.AgentId, out var info) || info.Agent == null
-            || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship))
-            return false;
+        bool registered = agents.TryGetAgentInfo(use.AgentId, out var info) && info.Agent != null;
+        if (!registered && !use.InUse) return SettleObsoleteRelease(use, "its puppet is not registered");
+        if (!registered || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship)) return false;
 
         if (agents.IsLocallyControlled(info.Agent))
         {
-            dropped++;
+            staleUses++;
             return true;
         }
 
         if (info.CurrentAuthority != use.SenderControllerId) return false;
 
-        // Each owner numbers its own uses, so a use from a different sender than the last applied one starts a fresh order.
-        appliedStamps.TryGetValue(use.AgentId, out var last);
-        if (!use.Stamp.IsNewer(last))
-        {
-            dropped++;
-            return true;
-        }
-
         if (engine.IsHullRemoved(ship.Hull))
         {
+            if (!use.InUse) return SettleObsoleteRelease(use, "its hull left the mission");
+
             dropped++;
             Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} left the mission",
                 use.Revision, use.AgentId, use.ShipId);
@@ -435,6 +454,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         sent,
         applied,
         dropped,
+        staleUses,
+        obsoleteReleases,
+        unownedPuppetReleases,
         localPuppetReleases,
         pinned,
         ownerReleases,

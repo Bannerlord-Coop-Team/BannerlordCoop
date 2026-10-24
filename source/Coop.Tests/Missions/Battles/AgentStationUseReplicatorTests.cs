@@ -540,6 +540,108 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["sinkingSafetyNetReleases"]!);
     }
 
+    // R48: seating from the game-thread queue overlapped the engine's async agent tick, so a received use waits for the tick.
+    [Fact]
+    public void AcceptUse_SeatsThePuppetOnlyFromTheNextTick()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+
+        replicator.Tick(0f);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+    }
+
+    // S12 D1: the death deregisters a seated puppet before the owner's release applies, which then has nothing to do.
+    [Fact]
+    public void Tick_SettlesTheReleaseOfAPuppetThatDiedSeated_AndRejectsItsOlderUses()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        crew.Registered = false;
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+        var settled = JObject.FromObject(replicator.Inspect());
+        crew.Registered = true;
+        bool olderSettled = replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+
+        Assert.Equal(0, (int)settled["pending"]!);
+        Assert.Equal(0, (long)settled["dropped"]!);
+        Assert.Equal(1, (long)settled["obsoleteReleases"]!);
+        Assert.True(olderSettled);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["staleUses"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), false), Times.Never);
+    }
+
+    // S12 D2: the owner sends its crew's releases after the hull removal, which already let the crew go here.
+    [Fact]
+    public void Tick_SettlesACrewReleaseThatArrivesAfterItsHullLeft_ButDropsASeat()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        crew.Ships.Remove(crew.ShipId);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.AcceptUse(Use(Guid.NewGuid(), crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (int)inspected["pending"]!);
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(1, (long)inspected["dropped"]!);
+    }
+
+    // S12 D1: vanilla's removal releases a dying puppet's station, which is no desync; a live puppet's local release is one.
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void AnnounceStationUse_CountsAPuppetsLocalReleaseOnlyWhileItLives(bool alive, long expected)
+    {
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(alive);
+        var broker = new MessageBroker();
+        using var replicator = crew.CreateReplicator(broker);
+
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(crew.Agent, crew.Point, inUse: false)), blocking: true);
+
+        Assert.Equal(expected, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+    }
+
+    // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
+    private sealed class RemoteCrew
+    {
+        public RemoteCrew()
+        {
+            Agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            var info = new CoopAgentInfo("owner", "owner", "battle", Agent, AgentId, 1);
+            Registry.Setup(r => r.TryGetAgentInfo(AgentId, out info)).Returns(() => Registered);
+            Registry.Setup(r => r.TryGetAgentInfo(Agent, out info)).Returns(() => Registered);
+            Ships.TryRegister(new NetworkShipInfo(ShipId, "owner", "party", isNpcParty: false, Hull, null!));
+            Engine.Setup(e => e.ResolveStation(Hull, "oar", 0)).Returns(Point);
+        }
+
+        public Guid AgentId { get; } = Guid.NewGuid();
+        public Guid ShipId { get; } = Guid.NewGuid();
+        public Agent Agent { get; }
+        public bool Registered { get; set; } = true;
+        public Mock<INetworkAgentRegistry> Registry { get; } = new Mock<INetworkAgentRegistry>();
+        public NetworkShipRegistry Ships { get; } = new NetworkShipRegistry();
+        public MissionObject Hull { get; } = ShipTestHulls.Create();
+        public UsableMissionObject Point { get; } = CreatePoint();
+        public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
+
+        public AgentStationUseReplicator CreateReplicator(MessageBroker? broker = null) =>
+            AgentStationUseReplicatorTests.CreateReplicator(Engine.Object, Registry.Object, Ships, broker);
+    }
+
     private static NetworkAgentStationUse Use(Guid agentId, Guid shipId, bool inUse, long revision, string sender) =>
         new NetworkAgentStationUse(agentId, shipId, "oar", 0, inUse, revision, sender);
 }
