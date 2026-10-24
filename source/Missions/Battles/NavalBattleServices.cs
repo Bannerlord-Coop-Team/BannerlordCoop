@@ -111,11 +111,11 @@ public class NavalBattleServices : INavalBattleServices
 #endif
         DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
-            context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
+            context.MissionComponent.ShipRegistry, shipEngine, hullAuthority);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, ShipReplicator, Arrivals);
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
+            shipEngine, hullAuthority, context.HostEpochPolicy, context.MissionContext);
         FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
         WaterClock = new BattleWaterClock(network, messageBroker, context.Session, context.HostEpochPolicy, waterClock,
             new BattleWaterTimeEstimator());

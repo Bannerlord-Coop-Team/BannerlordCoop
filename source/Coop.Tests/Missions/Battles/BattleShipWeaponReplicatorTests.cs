@@ -36,7 +36,7 @@ public class BattleShipWeaponReplicatorTests
         var own = harness.Register(Own, isNpcParty: false);
         harness.Register(Peer, isNpcParty: false);
         var swapping = harness.Register(Own, isNpcParty: true);
-        harness.Ships.Setup(s => s.IsReplacingHull(swapping.Ship.ShipId)).Returns(true);
+        harness.HullAuthority.Setup(a => a.IsReplacing(swapping.Ship.ShipId)).Returns(true);
         IReadOnlyCollection<MissionObject> simulated = null;
         harness.Engine.Setup(e => e.SetSimulatedWeapons(It.IsAny<IReadOnlyCollection<MissionObject>>()))
             .Callback<IReadOnlyCollection<MissionObject>>(weapons => simulated = weapons);
@@ -346,7 +346,7 @@ public class BattleShipWeaponReplicatorTests
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
         public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
         public Mock<INetworkAgentRegistry> Agents { get; } = new Mock<INetworkAgentRegistry>();
-        public Mock<IBattleShipReplicator> Ships { get; } = new Mock<IBattleShipReplicator>();
+        public Mock<INavalHullAuthority> HullAuthority { get; } = new Mock<INavalHullAuthority>();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         /// <summary>The server-announced mission members the membership gate reads.</summary>
@@ -369,7 +369,7 @@ public class BattleShipWeaponReplicatorTests
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
 
             Replicator = new BattleShipWeaponReplicator(Network.Object, Broker, session.Object, component.Object, Engine.Object,
-                Ships.Object, new HostEpochPolicy(), members.Object);
+                HullAuthority.Object, new HostEpochPolicy(), members.Object);
         }
 
         /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>.</summary>

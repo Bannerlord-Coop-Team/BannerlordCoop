@@ -37,19 +37,19 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
     private readonly IReinforcementFielder reinforcementFielder;
     private readonly INetworkShipRegistry registry;
     private readonly INavalShipEngine engine;
-    private readonly IBattleShipReplicator shipReplicator;
+    private readonly INavalHullAuthority hullAuthority;
     private readonly List<CoopAgentOrigin>[] pending = { new List<CoopAgentOrigin>(), new List<CoopAgentOrigin>() };
     private int recovered;
     private int fielded;
 
     public NavalMigrationReserveFielder(IBattleSession session, IReinforcementFielder reinforcementFielder,
-        INetworkShipRegistry registry, INavalShipEngine engine, IBattleShipReplicator shipReplicator)
+        INetworkShipRegistry registry, INavalShipEngine engine, INavalHullAuthority hullAuthority)
     {
         this.session = session;
         this.reinforcementFielder = reinforcementFielder;
         this.registry = registry;
         this.engine = engine;
-        this.shipReplicator = shipReplicator;
+        this.hullAuthority = hullAuthority;
     }
 
     public void Tick()
@@ -70,7 +70,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
                     taken.Count, side);
             }
 
-            FieldPending(side, hulls.Where(ship => !shipReplicator.IsReplacingHull(ship.ShipId)).ToList());
+            FieldPending(side, hulls.Where(ship => !hullAuthority.IsReplacing(ship.ShipId)).ToList());
         }
     }
 

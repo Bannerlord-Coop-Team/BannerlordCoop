@@ -61,9 +61,6 @@ public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
     /// </summary>
     int HullReserve(MissionObject hull);
 
-    /// <summary>[Game thread] Whether an AI hull this client took over is still being replaced by a simulated one.</summary>
-    bool IsReplacingHull(Guid shipId);
-
     /// <summary>
     /// [Game thread] Sends the own hulls' rope state once more as the mission ends, while the hulls are still live; samples
     /// end with the mission, so peers would otherwise keep the last sample.
@@ -339,8 +336,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!ship.FollowsBattleHost || !IsOwnHull(ship)) return "The hull is not an AI hull this client simulates.";
         return hullAuthority.Replace(shipId);
     }
-
-    public bool IsReplacingHull(Guid shipId) => hullAuthority.IsReplacing(shipId);
 
     public void Tick(float dt)
     {
