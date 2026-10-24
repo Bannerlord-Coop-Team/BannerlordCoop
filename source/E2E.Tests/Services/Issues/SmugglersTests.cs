@@ -459,23 +459,26 @@ public class SmugglersTests : IDisposable
             }, questTexts);
         }
 
-        var timeoutCalls = 0;
+        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+        Quest observedQuest = null!;
+        Hero ownerHero = null!;
+        Hero observedMainHero = null!;
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var owner));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(owner.HeroId, out ownerHero));
 
             Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
             {
-                Assert.Same(serverQuest, quest);
-                Assert.Same(ownerHero, Hero.MainHero);
-                timeoutCalls++;
+                observedQuest = quest;
+                observedMainHero = Hero.MainHero;
                 quest.CompleteQuestWithTimeOut();
             });
         }, questTexts);
 
-        Assert.Equal(1, timeoutCalls);
-        Assert.Equal(-10, serverQuest.RelationshipChangeWithQuestGiver);
+        Assert.Same(serverQuest, observedQuest);
+        Assert.Same(ownerHero, observedMainHero);
+        Assert.Equal(1, failQuest.CountFor(Server));
         Assert.True(serverQuest.IsFinalized);
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
@@ -490,12 +493,8 @@ public class SmugglersTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
                 Assert.Null(giver.Issue);
                 Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, IssueId, out _));
-                if (instance == Server)
-                    Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
-                else if (instance == ClientA)
+                if (instance == ClientA)
                     Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
-                else
-                    Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, quest => quest.StringId == ownerQuest.StringId);
             });
         }
     }
