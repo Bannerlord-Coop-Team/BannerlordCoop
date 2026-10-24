@@ -36,7 +36,7 @@ public class NavalPlayerHeroGraceTests
     {
         var grace = Grace();
 
-        grace.ObserveLiveHumans(new[] { (Others, Character("pirate")) }, now: 0f);
+        grace.ObserveLiveHumans(new[] { (Others, (BasicCharacterObject)Character("pirate")) }, now: 0f);
 
         Assert.True(grace.HasExpired(Others, now: 0f));
     }
@@ -106,13 +106,13 @@ public class NavalPlayerHeroGraceTests
     {
         var character = Character(stringId);
         string registryId = "CharacterObject_" + stringId;
-        objectManager.Setup(m => m.TryGetId(character, out registryId)).Returns(true);
+        objectManager.Setup(m => m.TryGetObject(registryId, out character)).Returns(true);
         var player = new Player(controllerId, "Hero_" + stringId, "Party_" + stringId, "Clan_" + stringId, registryId);
         playerManager.Setup(m => m.TryGetPlayer(controllerId, out player)).Returns(true);
         return character;
     }
 
-    private static BasicCharacterObject Character(string stringId)
+    private static CharacterObject Character(string stringId)
     {
         var character = (CharacterObject)RuntimeHelpers.GetUninitializedObject(typeof(CharacterObject));
         character.StringId = stringId;

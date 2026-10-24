@@ -3,6 +3,7 @@ using GameInterface.Services.Players;
 using Missions.Services.Network;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -59,32 +60,31 @@ public class NavalPlayerHeroGrace : INavalPlayerHeroGrace
         !lastLiveHeroAt.TryGetValue(side, out float seenAt) || now - seenAt > HeroConsideredDeadSeconds;
 
     /// <summary>
-    /// Records the side of each live human whose character is a current member's hero, matched by the character's registry
-    /// id, which is what <c>Player.CharacterObjectId</c> holds.
+    /// Records the side of each live human whose character is a current member's hero character, the object its player's
+    /// <c>CharacterObjectId</c> (a registry id, not the StringId) resolves to.
     /// </summary>
     internal void ObserveLiveHumans(IEnumerable<(BattleSideEnum Side, BasicCharacterObject Character)> liveHumans, float now)
     {
-        var heroCharacterIds = MemberHeroCharacterIds();
-        if (heroCharacterIds.Count == 0) return;
+        var heroes = MemberHeroCharacters();
+        if (heroes.Count == 0) return;
 
         foreach (var (side, character) in liveHumans)
         {
-            if (character == null || !objectManager.TryGetId(character, out var characterId)) continue;
-
-            if (heroCharacterIds.Contains(characterId)) lastLiveHeroAt[side] = now;
+            if (heroes.Any(hero => ReferenceEquals(hero, character))) lastLiveHeroAt[side] = now;
         }
     }
 
-    // The hero character ids of this client and every other member of the mission.
-    private HashSet<string> MemberHeroCharacterIds()
+    // The hero characters of this client and every other member, resolved once per scan.
+    private List<CharacterObject> MemberHeroCharacters()
     {
-        var ids = new HashSet<string>();
+        var heroes = new List<CharacterObject>();
         foreach (var controllerId in missionContext.ControllersInMission.Append(session.OwnControllerId))
         {
-            if (controllerId != null && playerManager.TryGetPlayer(controllerId, out var player) && player.CharacterObjectId != null)
-                ids.Add(player.CharacterObjectId);
+            if (controllerId != null && playerManager.TryGetPlayer(controllerId, out var player)
+                && player.CharacterObjectId != null && objectManager.TryGetObject(player.CharacterObjectId, out CharacterObject hero))
+                heroes.Add(hero);
         }
 
-        return ids;
+        return heroes;
     }
 }
