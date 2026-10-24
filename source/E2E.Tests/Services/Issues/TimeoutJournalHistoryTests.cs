@@ -63,6 +63,35 @@ public class TimeoutJournalHistoryTests : IDisposable
     }
 
     [Fact]
+    public void AcceptanceUsesTheServersExactAbsoluteDeadlineDespiteDifferentCampaignClocks()
+    {
+        var ownerNow = CampaignTime.Days(100f).NumTicks + 123;
+        var serverNow = CampaignTime.Days(103f).NumTicks + 987;
+        long originalOwnerDue = 0;
+        long expectedServerDue = 0;
+        scenario.ClientA.Call(() =>
+        {
+            Campaign.Current.MapTimeTracker._numTicks = ownerNow;
+            originalOwnerDue = CampaignTime.DaysFromNow(20f).NumTicks;
+        });
+        scenario.Server.Call(() =>
+        {
+            Campaign.Current.MapTimeTracker._numTicks = serverNow;
+            expectedServerDue = CampaignTime.DaysFromNow(20f).NumTicks;
+        });
+        Assert.NotEqual(originalOwnerDue, expectedServerDue);
+
+        Accept();
+
+        output.WriteLine("owner creation due={0}; server creation due={1}; owner accepted due={2}; server accepted due={3}",
+            originalOwnerDue, expectedServerDue, ownerQuest.QuestDueTime.NumTicks, serverQuest.QuestDueTime.NumTicks);
+        Assert.Equal(expectedServerDue, serverQuest.QuestDueTime.NumTicks);
+        Assert.Equal(serverQuest.QuestDueTime.NumTicks, ownerQuest.QuestDueTime.NumTicks);
+        scenario.ClientA.Call(() => Assert.Equal(ownerNow, Campaign.Current.MapTimeTracker.NumTicks));
+        scenario.Server.Call(() => Assert.Equal(serverNow, Campaign.Current.MapTimeTracker.NumTicks));
+    }
+
+    [Fact]
     public void AcceptanceRetainsTheOwnersIntroductionOnTheServerBeforeSaving()
     {
         Accept();
