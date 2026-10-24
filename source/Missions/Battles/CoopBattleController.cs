@@ -16,6 +16,8 @@ using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -86,7 +88,6 @@ public class CoopBattleController : CoopMissionController
     private readonly IBattleHostRegistry hostRegistryRef;
     private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
-    private int lastResultSnapshotEpochReported;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -348,35 +349,33 @@ public class CoopBattleController : CoopMissionController
         damageRouter.Tick(dt);
     }
 
-    // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
-    // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
+    // Whether the battle is live and both sides fielded here, a side whose reserve was abandoned excepted.
     private bool BattleReadyForEndChecks()
     {
-        bool attackerFielded = false;
-        bool defenderFielded = false;
-        foreach (var team in Mission.Teams)
-        {
-            if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) continue;
-            if (team.Side == BattleSideEnum.Attacker && attackerFielded) continue;
-            if (team.Side == BattleSideEnum.Defender && defenderFielded) continue;
-
-            foreach (var agent in team.ActiveAgents)
-            {
-                if (!agent.IsHuman) continue;
-                if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
-                else defenderFielded = true;
-                break;
-            }
-
-            if (attackerFielded && defenderFielded) break;
-        }
-
+        SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
         return ShouldReleaseEndConditionHold(
             Deployment.IsActivated,
             attackerFielded,
             defenderFielded,
             BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
             BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+    }
+
+    /// <summary>
+    /// Whether each side has a team with a live human agent here; puppets qualify, since they join teams like any agent.
+    /// Mirrors CoopBattleDepletionPatch's live-agent count; the land and naval end-condition holds both read it.
+    /// </summary>
+    public static void SidesFielded(IEnumerable<Team> teams, out bool attackerFielded, out bool defenderFielded)
+    {
+        attackerFielded = false;
+        defenderFielded = false;
+        foreach (var team in teams)
+        {
+            if (!team.ActiveAgents.Any(agent => agent.IsHuman)) continue;
+
+            if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
+            else if (team.Side == BattleSideEnum.Defender) defenderFielded = true;
+        }
     }
 
     /// <summary>
@@ -624,11 +623,9 @@ public class CoopBattleController : CoopMissionController
 
         ClearAppliedPendingResultSnapshot();
         ResultCommitter.AcceptResolvedState(snapshot.BattleState);
-        if (Deployment.IsCommitted && lastResultSnapshotEpochReported != snapshot.HostEpoch)
-        {
+        // The committer reports a result once per state and host epoch, so a repeated snapshot sends nothing.
+        if (Deployment.IsCommitted)
             ResultCommitter.ReportAcceptedResult();
-            lastResultSnapshotEpochReported = snapshot.HostEpoch;
-        }
     }
 
     private void ClearAppliedPendingResultSnapshot()

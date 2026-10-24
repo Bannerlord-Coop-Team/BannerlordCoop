@@ -364,11 +364,15 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   `NavalBattleEndLogic`, but only the battle host checks the end, and only once both sides fielded troops. That hold is
   latched on every client, so a successor starts released.
 - **Tally.** Side depletion and hulls out of action are counted by `NavalSideTally` (`Missions/Battles/NavalSideTally.cs`)
-  with vanilla's rules:
+  with vanilla's rules, over the hulls `NavalSideTallyReader` gathers through the engine (the E2E scenarios count through
+  the same reader):
   - every live human counts, swimmers included;
-  - crew counts only on afloat hulls;
+  - crew counts only on afloat hulls, by the hull its formation crews, since a copy's `NavalShipAgents` is empty;
   - reserve is what each owner reported for its hull;
   - a sunk or departed hull's reserve doesn't count.
+- **Player hero grace.** Vanilla lets the local main agent's side lose to hulls out of action only once that agent was down
+  for 20 s, and gives the other side no wait. Coop keeps that wait for each side's player heroes (`NavalPlayerHeroGrace`),
+  so in PvP neither side loses while one of its players still fights; an AI side still has none.
 - **Other clients** end with the host's replicated result. A side counts as retreated only once hulls left it, with their
   players or to a capture, and none is left. So capturing the last enemy hull ends the battle as an enemy retreat after
   vanilla's 5 s, as in vanilla (`MissionResult.CreateSuccessful(..., enemyRetreated: true)`); the committer reports only the
@@ -636,7 +640,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - A client that took a PvP victim's hull out with the victim and then gets the captor's records spawns the prize again,
     but the captor's crew puppets it already had stay in the orphan's old formation, not the prize's (no swap ran there).
   - A late joiner counts only a hull's last capture as a hull gone from its side (the record carries only that one), so its
-    retreat tally misses an earlier capture of a hull that was taken again.
+    retreat tally misses an earlier capture of a hull that was taken again. It also never counts hulls that left with
+    their players before it joined; if it becomes host, such a side ends as depleted once its last swimmers are gone,
+    instead of vanilla's 5 s retreat.
   - A captor's request can expire (5 s, the player hears that nobody answered) while its confirm still waits somewhere on
     the way; the capture applies when it arrives, without another message.
   - A PvP victim's formation keeps vanilla's record pointing at the captor's orphan, so a later reinforcement of the victim

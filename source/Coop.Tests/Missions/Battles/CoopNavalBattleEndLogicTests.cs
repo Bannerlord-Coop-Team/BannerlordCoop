@@ -74,31 +74,6 @@ public class CoopNavalBattleEndLogicTests
             BattleState.DefenderPullBack, BattleSideEnum.Defender));
     }
 
-    [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, false)]
-    public void ShouldCheckEnd_OnlyOnTheHostOnceBothSidesFielded(bool isLocalHost, bool released, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldCheckEnd(isLocalHost, released));
-    }
-
-    // K3: a failed AI fleet never fields its side, which would otherwise hold the end checks, and the battle, open forever.
-    [Theory]
-    [InlineData(true, true, false, BattleSideEnum.None, false)]
-    [InlineData(true, true, false, BattleSideEnum.Defender, true)]
-    [InlineData(true, false, true, BattleSideEnum.Attacker, true)]
-    [InlineData(true, true, false, BattleSideEnum.Attacker, false)]
-    [InlineData(false, true, false, BattleSideEnum.Defender, false)]
-    [InlineData(true, false, false, BattleSideEnum.Defender, false)]
-    [InlineData(true, true, true, BattleSideEnum.None, true)]
-    public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool activated, bool attackerFielded, bool defenderFielded,
-        BattleSideEnum failedFleetSide, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded, failedFleetSide));
-    }
-
     [Fact]
     public void SideTally_UsesVanillasOutOfActionTroopCount()
     {
@@ -106,12 +81,10 @@ public class CoopNavalBattleEndLogicTests
     }
 
     [Fact]
-    public void DescribeResult_NamesVictoryDefeatAndNone()
+    public void HeroGrace_UsesVanillasMainAgentConsideredDeadDuration()
     {
-        Assert.Equal("victory", CoopNavalBattleEndLogic.DescribeResult(new MissionResult(BattleState.AttackerVictory, true, false, false)));
-        Assert.Equal("defeat", CoopNavalBattleEndLogic.DescribeResult(new MissionResult(BattleState.AttackerVictory, false, true, false)));
-        Assert.Equal("none", CoopNavalBattleEndLogic.DescribeResult(new MissionResult()));
-        Assert.Equal("none", CoopNavalBattleEndLogic.DescribeResult(null));
+        Assert.Equal(TaleWorlds.MountAndBlade.NavalBattleEndLogic.MainAgentConsideredDeadDuration,
+            NavalPlayerHeroGrace.HeroConsideredDeadSeconds);
     }
 
     [Fact]

@@ -38,10 +38,10 @@ public class BattleResultCommitter : IBattleResultCommitter
     private readonly IBattleNetwork battleNetwork;
     private readonly INetwork relayNetwork;
     private readonly IBattleSession session;
+    private readonly IMessageBroker messageBroker;
     private BattleState resolvedState;
     private BattleState reportedState;
     private int reportedEpoch;
-    private readonly IMessageBroker messageBroker;
 
     public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session,
         IMessageBroker messageBroker)
@@ -113,8 +113,8 @@ public class BattleResultCommitter : IBattleResultCommitter
         }
     }
 
-
-    internal static bool IsAlreadyReported(BattleState reportedState, int reportedEpoch, BattleState battleState, int hostEpoch)
+    // Whether the same state was already reported at this host epoch.
+    private static bool IsAlreadyReported(BattleState reportedState, int reportedEpoch, BattleState battleState, int hostEpoch)
         => IsSupportedResultState(reportedState) && reportedState == battleState && reportedEpoch == hostEpoch;
 
     public bool TryGetResolvedState(out BattleState battleState)

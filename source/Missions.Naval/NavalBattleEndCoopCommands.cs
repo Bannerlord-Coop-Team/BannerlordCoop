@@ -20,6 +20,7 @@ public sealed class NavalWinCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
+    // Forces a victory for the host's side.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => Force(playerVictory: true, "NAVAL_WIN");
 
     /// <summary>[Game thread] Latches the outcome on the host's end logic; the mission's next end check reports it.</summary>
@@ -39,6 +40,7 @@ public sealed class NavalWinCoopCommand : ICoopCommand
             "; the host's next end check concludes it and the result snapshot carries it to the peers");
     }
 
+    // A failed command result carrying the reason.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
 }
 
@@ -56,6 +58,7 @@ public sealed class NavalLoseCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
+    // Forces a defeat for the host's side.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => NavalWinCoopCommand.Force(playerVictory: false, "NAVAL_LOSE");
 }
 #endif

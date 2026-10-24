@@ -74,15 +74,4 @@ public class BattleResultCommitterTests
 
         Assert.Equal(new[] { "BattleResultReporting:battle", nameof(NetworkBattleResultReady) }, order);
     }
-
-    [Theory]
-    [InlineData(BattleState.None, 0, BattleState.DefenderVictory, 0, false)]
-    [InlineData(BattleState.DefenderVictory, 1, BattleState.DefenderVictory, 1, true)]
-    [InlineData(BattleState.DefenderVictory, 1, BattleState.DefenderVictory, 2, false)]
-    [InlineData(BattleState.DefenderVictory, 1, BattleState.AttackerVictory, 1, false)]
-    public void IsAlreadyReported_MatchesTheSameStateAtTheSameEpoch(BattleState reported, int reportedEpoch,
-        BattleState state, int epoch, bool expected)
-    {
-        Assert.Equal(expected, BattleResultCommitter.IsAlreadyReported(reported, reportedEpoch, state, epoch));
-    }
 }

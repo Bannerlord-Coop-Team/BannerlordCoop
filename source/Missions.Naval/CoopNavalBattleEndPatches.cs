@@ -10,6 +10,7 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopNavalSideDepletionPatch
 {
+    // Answers with the coop end logic's tally; a naval mission without it keeps vanilla's depletion.
     [HarmonyPrefix]
     private static bool Prefix(DefaultNavalMissionAgentSpawnLogic __instance, BattleSideEnum side, ref bool __result)
     {
@@ -26,6 +27,7 @@ internal class CoopNavalSideDepletionPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopNavalShipCapturePatch
 {
+    // Skips the captured-ship list for the coop end logic only.
     [HarmonyPrefix]
     private static bool Prefix(NavalBattleEndLogic __instance) => __instance is not CoopNavalBattleEndLogic;
 }
@@ -35,6 +37,7 @@ internal class CoopNavalShipCapturePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopNavalHullsOutOfActionPatch
 {
+    // Answers with the coop end logic's hull count and player hero grace; vanilla's own end logic runs unchanged.
     [HarmonyPrefix]
     private static bool Prefix(NavalBattleEndLogic __instance, BattleSideEnum playerSide, BattleSideEnum enemySide,
         ref bool playerShipsOutOfAction, ref bool enemyShipsOutOfAction, ref bool __result)

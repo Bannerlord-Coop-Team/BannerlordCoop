@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Players;
 using Missions.Battles;
-using NavalDLC.Missions.Objects;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -19,9 +19,8 @@ internal enum NavalBattleOutcome
 }
 
 /// <summary>
-/// Vanilla <see cref="NavalBattleEndLogic"/> where only the battle host detects the end, since crew tracking and reserves
-/// live on each hull's owner; other clients end with the host's replicated result. A side retreats only once its players'
-/// hulls left with them and none is left; ship capture stays off.
+/// Vanilla <see cref="NavalBattleEndLogic"/> where only the battle host detects the end, over replicated hull state; other
+/// clients end with the host's result. A side retreats only once its players' hulls left with them and none is left.
 /// </summary>
 public class CoopNavalBattleEndLogic : NavalBattleEndLogic
 {
@@ -32,27 +31,34 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalNpcFleetSpawner npcFleet;
     private readonly IBattleShipReplicator shipReplicator;
-    private readonly INavalMigrationReserveFielder migrationReserve;
+    private readonly INavalSideTallyReader tallyReader;
+    private readonly IPlayerManager playerManager;
+    private readonly NavalPlayerHeroGrace heroGrace = new NavalPlayerHeroGrace();
 
     private bool endChecksReleased;
 
+    // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls and the side tally.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalMigrationReserveFielder migrationReserve)
+        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalSideTallyReader tallyReader,
+        IPlayerManager playerManager)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
         this.npcFleet = npcFleet;
         this.shipReplicator = shipReplicator;
-        this.migrationReserve = migrationReserve;
+        this.tallyReader = tallyReader;
+        this.playerManager = playerManager;
     }
 
+    // Holds vanilla's end checks at deployment finish; the tick releases them.
     public override void OnDeploymentFinished()
     {
         base.OnDeploymentFinished();
         CanCheckForEndCondition = false;
     }
 
+    // Lets only the battle host run vanilla's end checks, once both sides fielded, and cancels retreats coop doesn't keep.
     public override void OnMissionTick(float dt)
     {
         if (Mission.IsDeploymentFinished)
@@ -62,13 +68,14 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             if (!endChecksReleased)
                 endChecksReleased = BothSidesFielded();
 
-            CanCheckForEndCondition = ShouldCheckEnd(session.IsLocalHost, endChecksReleased);
+            CanCheckForEndCondition = session.IsLocalHost && endChecksReleased;
         }
 
         base.OnMissionTick(dt);
         ClearRetreat();
     }
 
+    // Ends the mission with the resolved result where there is one; a non-host never concludes by itself.
     public override bool MissionEnded(ref MissionResult missionResult)
     {
         ClearRetreat();
@@ -86,18 +93,26 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     }
 
     /// <summary>[Game thread] Coop replacement for the spawn logic's side depletion.</summary>
-    internal bool IsSideDepletedHere(BattleSideEnum side) => Tally(side, LiveHumansByFormation()).IsDepleted;
+    internal bool IsSideDepletedHere(BattleSideEnum side) => Tally(side, NavalSideTallyReader.NoCrew).IsDepleted;
 
-    /// <summary>[Game thread] Coop replacement for vanilla's per-hull out-of-action check.</summary>
+    /// <summary>
+    /// [Game thread] Coop replacement for vanilla's per-hull out-of-action check; a side's out-of-action hulls defeat it only
+    /// once its player heroes' grace is over.
+    /// </summary>
     internal bool AreAnySideHullsOutOfAction(BattleSideEnum playerSide, BattleSideEnum enemySide,
         out bool playerHullsOutOfAction, out bool enemyHullsOutOfAction)
     {
-        var crewByFormation = LiveHumansByFormation();
-        var player = Tally(playerSide, crewByFormation);
-        var enemy = Tally(enemySide, crewByFormation);
-        playerHullsOutOfAction = player.IsOutOfAction;
-        enemyHullsOutOfAction = enemy.IsOutOfAction;
-        return playerHullsOutOfAction || enemyHullsOutOfAction;
+        var crewByHull = tallyReader.CrewByHull(Mission.Agents);
+        bool playerOutOfAction = Tally(playerSide, crewByHull).IsOutOfAction;
+        bool enemyOutOfAction = Tally(enemySide, crewByHull).IsOutOfAction;
+
+        // Vanilla graces only the local main agent's side, so in PvP the other player's side lost while its hero fought.
+        // The result stays raw, so vanilla's contested-island timing runs as it does for its own graced side.
+        ObserveLivePlayerHeroes();
+        float now = Mission.CurrentTime;
+        playerHullsOutOfAction = playerOutOfAction && heroGrace.HasExpired(playerSide, now);
+        enemyHullsOutOfAction = enemyOutOfAction && heroGrace.HasExpired(enemySide, now);
+        return playerOutOfAction || enemyOutOfAction;
     }
 
 #if DEBUG
@@ -112,7 +127,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     /// <summary>[Game thread] End state for coop.debug.naval.inspect.</summary>
     internal object Inspect()
     {
-        var crewByFormation = LiveHumansByFormation();
+        var crewByHull = tallyReader.CrewByHull(Mission.Agents);
         var result = Mission.MissionResult;
         return new
         {
@@ -121,7 +136,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             checking = CanCheckForEndCondition,
             sides = new[] { BattleSideEnum.Attacker, BattleSideEnum.Defender }.Select(side =>
             {
-                var tally = Tally(side, crewByFormation);
+                var tally = Tally(side, crewByHull);
                 return new
                 {
                     side = side.ToString(),
@@ -141,18 +156,6 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             committed = resultCommitter.TryGetResolvedState(out var committedState) ? committedState.ToString() : null,
         };
     }
-
-    /// <summary>
-    /// The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
-    /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
-    /// </summary>
-    internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
-        BattleSideEnum failedFleetSide) =>
-        CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
-            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
-
-    /// <summary>Whether this client runs the end checks: the battle host, once both sides have fielded troops.</summary>
-    internal static bool ShouldCheckEnd(bool isLocalHost, bool endChecksReleased) => isLocalHost && endChecksReleased;
 
     /// <summary>
     /// The outcome this client's mission ends with: a resolved result once deployment is over, otherwise null on the host
@@ -182,6 +185,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return NavalBattleOutcome.None;
     }
 
+    // Names the mission result for the inspect dump and the DEBUG win/lose commands.
     internal static string DescribeResult(MissionResult result)
     {
         if (result?.PlayerVictory == true) return "victory";
@@ -195,6 +199,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     /// </summary>
     internal static bool KeepsRetreat(int departedHulls, int hullsLeft) => departedHulls > 0 && hullsLeft == 0;
 
+    // Cancels vanilla's retreat of a side that coop doesn't count as retreated.
     private void ClearRetreat()
     {
         var playerSide = Mission.PlayerTeam?.Side ?? BattleSideEnum.None;
@@ -203,6 +208,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         if (!IsRetreatedSide(playerSide)) _isPlayerSideRetreating = false;
     }
 
+    // Whether hulls left the side with their owners and none of its hulls is left here.
     private bool IsRetreatedSide(BattleSideEnum side)
     {
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return false;
@@ -211,41 +217,35 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return KeepsRetreat(shipReplicator.DepartedHulls(side), hullsLeft);
     }
 
+    // The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
+    // abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
     private bool BothSidesFielded()
     {
-        bool attackerFielded = false;
-        bool defenderFielded = false;
-        foreach (var team in Mission.Teams)
-        {
-            if (!team.ActiveAgents.Any(agent => agent.IsHuman)) continue;
-            if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
-            else if (team.Side == BattleSideEnum.Defender) defenderFielded = true;
-        }
-
+        CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
         var failedFleetSide = npcFleet.FailedSide;
-        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSide);
+        bool released = CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
+            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
         if (released && failedFleetSide != BattleSideEnum.None)
             Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Side} AI fleet failed to field",
                 session.InstanceId, failedFleetSide);
         return released;
     }
 
-    // A copy's crew are puppets in the hull's formation, which the copy's NavalShipAgents never tracks.
-    private Dictionary<Formation, int> LiveHumansByFormation()
+    // Records each side with a live player hero here; a player's hero is the agent of its registered character.
+    private void ObserveLivePlayerHeroes()
     {
-        var counts = new Dictionary<Formation, int>();
+        var heroCharacterIds = new HashSet<string>(playerManager.Players.Select(player => player.CharacterObjectId));
+        float now = Mission.CurrentTime;
         foreach (var agent in Mission.Agents)
         {
-            if (!agent.IsHuman || !agent.IsActive() || agent.Formation == null) continue;
+            if (!agent.IsHuman || !agent.IsActive() || agent.Team == null || agent.Character == null) continue;
 
-            counts.TryGetValue(agent.Formation, out int count);
-            counts[agent.Formation] = count + 1;
+            if (heroCharacterIds.Contains(agent.Character.StringId)) heroGrace.ObserveLiveHero(agent.Team.Side, now);
         }
-
-        return counts;
     }
 
-    private NavalSideTally Tally(BattleSideEnum side, Dictionary<Formation, int> crewByFormation)
+    // One side's tally over this client's hulls, with every live human of its teams, swimmers included.
+    private NavalSideTally Tally(BattleSideEnum side, IReadOnlyDictionary<MissionObject, int> crewByHull)
     {
         int liveHumans = 0;
         foreach (var team in Mission.Teams)
@@ -253,18 +253,6 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             if (team.Side == side) liveHumans += team.ActiveAgents.Count(agent => agent.IsHuman);
         }
 
-        // Reserve a promoted host recovered still waits for a hull, yet keeps the side alive.
-        return NavalSideTally.Count(side, liveHumans, HullCounts(crewByFormation), migrationReserve.PendingReserve(side));
-    }
-
-    private IEnumerable<NavalHullCount> HullCounts(Dictionary<Formation, int> crewByFormation)
-    {
-        foreach (MissionShip ship in _navalShipsLogic.AllShips)
-        {
-            if (ship.Team == null) continue;
-
-            int crew = ship.Formation != null && crewByFormation.TryGetValue(ship.Formation, out int count) ? count : 0;
-            yield return new NavalHullCount(ship.Team.Side, ship.IsSunk, crew, shipReplicator.HullReserve(ship));
-        }
+        return tallyReader.Count(side, liveHumans, crewByHull);
     }
 }

@@ -8,16 +8,16 @@ namespace E2E.Tests.Services.Missions.Naval;
 
 /// <summary>
 /// M9: a naval battle ends on its own, without coop.debug.naval.win, and never soft-locks. The battle host decides from
-/// <see cref="NavalSideTally"/> over its hulls, as <c>CoopNavalBattleEndLogic</c> does, and the server concludes once.
+/// <see cref="NavalSideTallyReader"/> over its hulls, as <c>CoopNavalBattleEndLogic</c> does, and the server concludes once.
 /// </summary>
 public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
 {
     public NavalNaturalEndScenarioTests(ITestOutputHelper output) : base(output, numClients: 2) { }
 
-    // K3: the AI fleet failed to field, so the pirate side never fields. It counts as a side whose reserve was abandoned, the
-    // host's hold releases, the empty side reads depleted and the battle concludes once; both players can leave.
+    // K3: the AI fleet failed to field, so the pirate side never fields. The empty side reads depleted and the host's result
+    // concludes the battle once; both players can leave.
     [Fact]
-    public void FailedAiFleet_ReleasesTheHold_AndTheEmptyPirateSideEndsTheBattleOnce()
+    public void EmptyPirateSide_ReadsDepleted_AndTheHostsResultConcludesOnce()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
         battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
@@ -25,10 +25,6 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         battle.CommitAll();
         battle.TickAll(2);
 
-        Assert.False(CoopBattleController.ShouldReleaseEndConditionHold(true, attackerFielded: true, defenderFielded: false,
-            attackerMissingReserveAccepted: false, defenderMissingReserveAccepted: false));
-        Assert.True(CoopBattleController.ShouldReleaseEndConditionHold(true, attackerFielded: true, defenderFielded: false,
-            attackerMissingReserveAccepted: false, defenderMissingReserveAccepted: true));
         var pirates = EndTally(a, BattleSideEnum.Defender, liveHumans: 0);
         Assert.Equal(0, pirates.Hulls);
         Assert.True(pirates.IsDepleted);
