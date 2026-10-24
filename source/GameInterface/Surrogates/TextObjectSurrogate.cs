@@ -29,9 +29,13 @@ internal struct TextObjectSurrogate
     [ProtoMember(6)]
     public string[] NullAttributes { get; set; }
 
+    [ProtoMember(7)]
+    public bool HasAttributes { get; set; }
+
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
+        HasAttributes = textObject?.Attributes != null;
         TextObjectAttributes = new();
         IntAttributes = new();
         StringAttributes = new();
@@ -66,13 +70,17 @@ internal struct TextObjectSurrogate
 
     public static implicit operator TextObjectSurrogate(TextObject textObject)
     {
+        if ((object)textObject == null)
+            return default;
+
         return new TextObjectSurrogate(textObject);
     }
 
     public static implicit operator TextObject(TextObjectSurrogate surrogate)
     {
-        // Keep null attributes instead of initializing an empty dictionary
-        if (surrogate.TextObjectAttributes == null 
+        // Legacy payloads without attribute fields default to null; their null/empty distinction was not sent.
+        if (!surrogate.HasAttributes
+            && surrogate.TextObjectAttributes == null
             && surrogate.IntAttributes == null
             && surrogate.StringAttributes == null
             && surrogate.FloatAttributes == null
