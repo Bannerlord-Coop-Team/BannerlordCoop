@@ -642,11 +642,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
-- **Player deployment slots.** Each player fleet after the first on a side is spaced by the deepest possible fleet (1.1
-  times the longest ship deployment length in the game data) plus vanilla's 32 m gap, so mixed fleets don't overlap on a
-  path long enough for the side's fleets. On a shorter path the clamp puts every clamped rank at `-PivotOffset + ownRange`,
-  so those fleets overlap (logged as a Warning naming the rank and path length); vanilla would instead pack the teams
-  forward from the path start. Unlike vanilla, the slot also doesn't skip blocked path segments.
+- **Player deployment slots.** When a side has more than one player, every client lays out all the side's player fleets
+  with vanilla's `ComputeTeamDeploymentOffsets`, each fleet as deep as the deepest possible one (1.1 times the longest
+  ship deployment length in the game data) with vanilla's 32 m gap, and takes its own rank's slot. So every client gets
+  the same layout, blocked segments are skipped, and when nothing fits behind the side base (R49: the spawn point sat near
+  the path start) the fleets are packed forward from the path start as vanilla does. A Warning is logged only when even
+  that doesn't fit. The side base comes from `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens with the
+  ship count each client assigns (only its own fleet) above two ships, so players whose fleets differ in size above two
+  hulls can derive different bases; the `Deployment slot` Information line logs the base on each client.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
   one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E) and R41a-3 (W2, D, E); the condition catch-up is
   E2E-only. Not hit live yet: an item pickup on a rejoined client in W2 (pickups by the returner's agents ran in R41a-3

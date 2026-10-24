@@ -217,26 +217,34 @@ internal class PlayerFleetDeploymentSlotPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerFleetDeploymentSlotPatch>();
 
-    // Moves the own PlayerTeam's initial plan back to its player slot; other teams and replans keep vanilla's offset.
+    // Moves the own PlayerTeam's initial plan to its player slot when the side has more than one player; other teams and
+    // replans keep vanilla's offset.
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
     {
         var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
         int rank = NavalPlayerDeploymentSlot.Rank;
+        int playerCount = NavalPlayerDeploymentSlot.PlayerCount;
         var mission = Mission.Current;
-        if (planningSide == null || rank <= 0 || mission == null || team != mission.PlayerTeam) return;
+        if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 
         var spawnPath = mission.GetInitialSpawnPathData(team.Side);
-        float ownTeamRange = planningSide.GetTeamSpawnPathOffsetRange(spawnPath.Path, team);
         float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
             .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
-        float spaced = NavalPlayerDeploymentSlot.SpacedSpawnPathOffset(spawnPathOffset, rank, longestTeamRange);
+        // The same side base vanilla's MakeDeploymentPlansForSide hands its team placement.
+        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(spawnPath,
+            planningSide._shipsLogic.ComputeSpawnPathDeploymentOffset(spawnPath.Path), out float baseOffset, out _);
+        var layout = NavalPlayerDeploymentSlot.PlaceSideFleets(spawnPath, baseOffset, playerCount, longestTeamRange);
+        float slot = layout[rank];
+        Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, side base " +
+            "{BaseOffset}, slot {Slot} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
+            baseOffset, slot, spawnPath.PivotOffset, spawnPath.PathLength);
         // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
-        float slot = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, ownTeamRange,
-            longestTeamRange, -spawnPath.PivotOffset);
-        if (slot != spaced)
-            Logger.Warning("[NavalBattle] The {PathLength} m spawn path is too short for deployment rank {Rank}; this fleet " +
-                "is clamped to the path start, inside vanilla's gap to the fleet ahead or overlapping it", spawnPath.PathLength, rank);
+        if (!NavalPlayerDeploymentSlot.FitsPath(layout, longestTeamRange, -spawnPath.PivotOffset))
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for {PlayerCount} player fleets; " +
+                "fleet {Rank} at {Slot} (vanilla {VanillaOffset}, side base {BaseOffset}, pivot {PivotOffset}) can overlap " +
+                "another player's fleet", spawnPath.PathLength, playerCount, rank, slot, spawnPathOffset, baseOffset,
+                spawnPath.PivotOffset);
         spawnPathOffset = slot;
     }
 }

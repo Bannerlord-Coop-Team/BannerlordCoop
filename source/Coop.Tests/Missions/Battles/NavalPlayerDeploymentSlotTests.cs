@@ -1,6 +1,10 @@
 ﻿#if COOP_NAVAL
 using Missions.Naval;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.Serialization;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -15,11 +19,13 @@ public class NavalPlayerDeploymentSlotTests
 
     // The game's shortest, middle and longest ship deployment lengths (mission_ships.xml).
     private static readonly float[] GameShipLengths = { 35f, 45.85f, 67.5f };
-    private const float VanillaOffset = 400f;
-    private const float PathStart = -500f;
+    private static readonly float Longest = NavalPlayerDeploymentSlot.LongestTeamRange(GameShipLengths);
+
+    // NavalShipsLogic.ComputeSpawnPathDeploymentOffset for a battle with two ships or fewer: -400 / 2 + 1.
+    private const float SmallBattleDeploymentOffset = -199f;
 
     [Fact]
-    public void RankOf_FirstPlayerOfTheSide_KeepsTheVanillaSlot()
+    public void RankOf_FirstPlayerOfTheSide_IsTheFrontSlot()
     {
         Assert.Equal(0, NavalPlayerDeploymentSlot.RankOf(Side, FirstPlayer, Players.Contains));
     }
@@ -31,75 +37,97 @@ public class NavalPlayerDeploymentSlotTests
     }
 
     [Fact]
+    public void PlayerCountOf_SkipsAiParties()
+    {
+        Assert.Equal(2, NavalPlayerDeploymentSlot.PlayerCountOf(Side, Players.Contains));
+    }
+
+    [Fact]
     public void LongestTeamRange_IsVanillasMarginOnTheLongestShip()
     {
-        Assert.Equal(1.1f * 67.5f, NavalPlayerDeploymentSlot.LongestTeamRange(GameShipLengths), 3);
+        Assert.Equal(1.1f * 67.5f, Longest, 3);
     }
 
+    // R49: the spawn point sat near the path start, so vanilla's side base was the path start and nothing fit behind it.
     [Theory]
-    [InlineData(67.5f, 35f, 45.85f)]
-    [InlineData(67.5f, 67.5f, 35f)]
-    [InlineData(35f, 67.5f, 35f)]
-    [InlineData(45.85f, 35f, 67.5f)]
-    public void ShiftSpawnPathOffset_MixedFleets_KeepVanillasGapBetweenEveryRank(float first, float second, float third)
+    [InlineData(100f)]
+    [InlineData(150f)]
+    public void PlaceSideFleets_BaseAtThePathStart_PacksTheFleetsForwardWithoutOverlap(float pivotOffset)
     {
-        float longest = NavalPlayerDeploymentSlot.LongestTeamRange(GameShipLengths);
-        float[] ranges = { Range(first), Range(second), Range(third) };
+        var path = FreePath(2000f, pivotOffset);
 
-        for (int rank = 1; rank < ranges.Length; rank++)
-        {
-            float aheadOffset = Offset(rank - 1, ranges[rank - 1], longest);
-            float ownOffset = Offset(rank, ranges[rank], longest);
+        var layout = Layout(path, playerCount: 2);
 
-            Assert.True(aheadOffset - ranges[rank - 1] - ownOffset >= NavalPlayerDeploymentSlot.InterTeamGap - 0.001f,
-                $"rank {rank} fleet starts {aheadOffset - ranges[rank - 1] - ownOffset} m behind the fleet ahead");
-        }
+        Assert.True(layout[1] - Longest >= -pivotOffset - 0.01f, $"fleet 1 starts {layout[1] - Longest}, before the path");
+        Assert.True(layout[0] - Longest - layout[1] >= NavalPlayerDeploymentSlot.InterTeamGap - 0.01f,
+            $"fleet 0 at {layout[0]} and fleet 1 at {layout[1]} are closer than vanilla's gap");
+        Assert.True(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -pivotOffset));
     }
 
     [Fact]
-    public void ShiftSpawnPathOffset_FirstRank_KeepsTheVanillaOffset()
+    public void PlaceSideFleets_RoomBehindTheBase_KeepsTheFrontFleetOnVanillasSlot()
     {
-        Assert.Equal(VanillaOffset, NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, 0, Range(35f), Range(67.5f), PathStart));
+        var path = FreePath(2000f, 1000f);
+        float baseOffset = SideBase(path);
+        DefaultBattleMissionAgentSpawnLogic.ComputeTeamDeploymentOffsets(path, baseOffset, NavalPlayerDeploymentSlot.InterTeamGap,
+            new[] { Longest }, out var vanillaSingleTeam);
+
+        var layout = Layout(path, playerCount: 3);
+
+        Assert.Equal(vanillaSingleTeam[0], layout[0], 3);
+        Assert.Equal(layout[0] - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[1], 3);
+        Assert.Equal(layout[1] - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[2], 3);
+        Assert.True(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -1000f));
     }
 
     [Fact]
-    public void ShiftSpawnPathOffset_ShortPath_KeepsTheWholeFleetOnThePath()
+    public void PlaceSideFleets_BlockedSegmentBehindTheBase_SkipsItLikeVanilla()
     {
-        float ownRange = Range(45.85f);
-        float pathStart = VanillaOffset - 150f;
+        var path = Path(2000f, 1000f, (-1000f, -250f), (-230f, 1000f));
 
-        float offset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, 3, ownRange, Range(67.5f), pathStart);
+        var layout = Layout(path, playerCount: 2);
 
-        Assert.Equal(pathStart + ownRange, offset, 3);
+        Assert.Equal(-250f, layout[0], 3);
+        Assert.Equal(-250f - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[1], 3);
     }
 
     [Fact]
-    public void ShiftSpawnPathOffset_PathShorterThanTheFleet_NeverMovesItAheadOfVanilla()
+    public void FitsPath_PathTooShortForTheFleets_IsFalse()
     {
-        float offset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, 1, Range(67.5f), Range(67.5f),
-            VanillaOffset - 10f);
+        var path = FreePath(150f, 75f);
 
-        Assert.Equal(VanillaOffset, offset);
+        var layout = Layout(path, playerCount: 2);
+
+        Assert.False(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -75f));
     }
 
-    // The slot patch warns exactly when the clamp moves the slot off its spaced offset.
-    [Theory]
-    [InlineData(-500f, false)]
-    [InlineData(250f, true)]
-    public void SpacedSpawnPathOffset_DiffersFromTheSlot_OnlyWhenThePathClampEngages(float pathStart, bool clamped)
+    private static float[] Layout(SpawnPathData path, int playerCount) =>
+        NavalPlayerDeploymentSlot.PlaceSideFleets(path, SideBase(path), playerCount, Longest);
+
+    // Vanilla's deploying side base, as DefaultNavalMissionLogic.MakeDeploymentPlansForSide derives it.
+    private static float SideBase(SpawnPathData path)
     {
-        float ownRange = Range(45.85f);
-        float longest = Range(67.5f);
-
-        float spaced = NavalPlayerDeploymentSlot.SpacedSpawnPathOffset(VanillaOffset, 2, longest);
-        float slot = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, 2, ownRange, longest, pathStart);
-
-        Assert.Equal(clamped, slot != spaced);
+        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(path, SmallBattleDeploymentOffset, out float deploying, out _);
+        return deploying;
     }
 
-    private static float Range(float shipLength) => NavalPlayerDeploymentSlot.LongestTeamRange(new[] { shipLength });
+    private static SpawnPathData FreePath(float pathLength, float pivotOffset) =>
+        Path(pathLength, pivotOffset, (-pivotOffset, pathLength - pivotOffset));
 
-    private static float Offset(int rank, float ownRange, float longest) =>
-        NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(VanillaOffset, rank, ownRange, longest, PathStart);
+    // SpawnPathData's constructor reads a native Path, so the test sets the fields the placement reads.
+    private static SpawnPathData Path(float pathLength, float pivotOffset, params (float start, float end)[] freeSegments)
+    {
+        var path = (SpawnPathData)FormatterServices.GetUninitializedObject(typeof(SpawnPathData));
+        var segments = new MBList<(float startOffset, float endOffset)>();
+        foreach (var segment in freeSegments) segments.Add(segment);
+        SetField(path, nameof(SpawnPathData.PathLength), pathLength);
+        SetField(path, nameof(SpawnPathData.PivotOffset), pivotOffset);
+        SetField(path, "_freeSegments", segments);
+        return path;
+    }
+
+    private static void SetField(SpawnPathData path, string name, object value) =>
+        typeof(SpawnPathData).GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .SetValue(path, value);
 }
 #endif
