@@ -23,10 +23,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread, battle host] Fields the AI (NPC) enemy fleet late. A coop naval battle opens with an empty enemy
-/// ship list because the NPC reserve only reaches the elected host after the mission loaded, so once the host has it
-/// and its deployment is over, this runs vanilla's late path: <c>FillShipsOfTeamParties</c>, <c>SetShipAssignment</c>,
-/// the side's deployment plan and <c>SpawnShip</c>, then crews the hulls the way the naval spawn logic crews a team.
+/// [Game thread] Fields the AI (NPC) enemy fleet late, once per battle and on the battle host only, because the NPC reserve
+/// reaches the elected host after the mission loaded. Every client keeps the attempt's outcome.
 /// </summary>
 public interface INavalNpcFleetSpawner : IDisposable
 {
@@ -40,7 +38,7 @@ public interface INavalNpcFleetSpawner : IDisposable
     object Inspect();
 }
 
-/// <inheritdoc cref="INavalNpcFleetSpawner"/>
+/// <summary>Runs vanilla's late ship assignment, side plan, spawn and team crewing for the AI fleet, and latches the attempt.</summary>
 public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalNpcFleetSpawner>();
@@ -102,10 +100,8 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
-    /// <summary>
-    /// Whether the fleet can be fielded now: by the battle host only, after its deployment (vanilla's reinforcement-time
-    /// spawn path) and with the NPC reserve in hand. Asked only until the battle's attempt is made.
-    /// </summary>
+    /// <summary>Whether the fleet can be fielded now: by the battle host, after its deployment (vanilla's reinforcement-time
+    /// spawn path), with the NPC reserve in hand.</summary>
     internal static string Decide(bool isLocalHost, bool deploymentFinished, bool reservePopulated, int npcParties)
     {
         if (!isLocalHost) return WaitingForHost;
@@ -118,17 +114,15 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal static int ShipCount(int deploymentLimit, int ships, int troops, int freeFormations) =>
         Math.Max(0, Math.Min(Math.Min(deploymentLimit, ships), Math.Min(troops, Math.Min(freeFormations, MaxShipFormations))));
 
+    // Fields the fleet on the first tick Decide allows, then latches the attempt and sends it to the peers.
     public void Tick()
     {
         var mission = Mission.Current;
         if (HasAttempt || mission == null) return;
 
-        bool isLocalHost = session.IsLocalHost;
-        bool deploymentFinished = mission.IsDeploymentFinished;
-        var supplier = isLocalHost && deploymentFinished ? EnemySupplier() : null;
-        bool reservePopulated = supplier?.IsPopulated == true;
-        var parties = reservePopulated ? NpcParties(supplier) : new MBList<MapEventParty>();
-        state = Decide(isLocalHost, deploymentFinished, reservePopulated, parties.Count);
+        var supplier = EnemySupplier();
+        var parties = NpcParties(supplier);
+        state = Decide(session.IsLocalHost, mission.IsDeploymentFinished, supplier?.IsPopulated == true, parties.Count);
         if (state != Ready) return;
 
         // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
@@ -195,6 +189,8 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     // The attempt's side rather than this client's enemy side: in PvP the battle host's enemy is the other side's own.
     public BattleSideEnum FailedSide => attempt?.Failed == true ? attempt.Side : BattleSideEnum.None;
 
+    // Picks the ships, crew and formations the way vanilla's naval start does, then spawns and crews them; a step that can't
+    // go on leaves its reason in failure.
     private void SpawnFleet(Mission mission, CoopTroopSupplier supplier, MBList<MapEventParty> parties)
     {
         var shipsLogic = mission.GetMissionBehavior<NavalShipsLogic>();
@@ -230,32 +226,45 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             return;
         }
 
-        for (int index = 0; index < count; index++)
-            shipsLogic.SetShipAssignment(team.TeamSide, formations[index].FormationIndex, ships[index].snapshot);
-
-        try
-        {
-            // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
-            NavalLateDeploymentPlan.MakeForSide(navalLogic, enemySide);
-            SpawnAssignedHulls(shipsLogic, planning, team, formations.Take(count).ToList(), ships, parties);
-        }
-        finally
-        {
-            // An assignment without a hull would count as a ship in every later plan and spawn query.
-            foreach (var formation in formations.Take(count))
-            {
-                if (shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShip == null)
-                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
-            }
-        }
-
+        AssignAndSpawnHulls(shipsLogic, navalLogic, planning, team, formations.Take(count).ToList(), ships, parties);
         if (hullsSpawned == 0)
         {
             failure = "no hull spawned";
             return;
         }
 
-        // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
+        CrewFleet(agentsLogic, team, troops);
+    }
+
+    // Assigns a ship to each formation, makes the side's late plan and spawns the hulls; an assignment left without a hull
+    // is cleared.
+    private void AssignAndSpawnHulls(NavalShipsLogic shipsLogic, DefaultNavalMissionLogic navalLogic,
+        NavalMissionDeploymentPlanningLogic planning, Team team, List<Formation> formations,
+        List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties)
+    {
+        for (int index = 0; index < formations.Count; index++)
+            shipsLogic.SetShipAssignment(team.TeamSide, formations[index].FormationIndex, ships[index].snapshot);
+
+        try
+        {
+            // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
+            NavalLateDeploymentPlan.MakeForSide(navalLogic, enemySide);
+            SpawnAssignedHulls(shipsLogic, planning, team, formations, ships, parties);
+        }
+        finally
+        {
+            // An assignment without a hull would count as a ship in every later plan and spawn query.
+            foreach (var formation in formations)
+            {
+                if (shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShip == null)
+                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
+            }
+        }
+    }
+
+    // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
+    private void CrewFleet(NavalAgentsLogic agentsLogic, Team team, MBList<IAgentOriginBase> troops)
+    {
         var teamSide = team.TeamSide;
         agentsLogic.AddTroopOrigins(teamSide, troops);
         agentsLogic.AutoComputeDesiredTroopCountsPerShip(teamSide);
@@ -268,6 +277,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             hullsSpawned, troopsFielded, team.TeamSide);
     }
 
+    // Spawns each assigned formation's hull at its plan frame, under AI control, and registers it for the peers.
     private void SpawnAssignedHulls(NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning, Team team,
         List<Formation> formations, List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties)
     {
@@ -292,31 +302,28 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         }
     }
 
+    // The enemy side's supplier of this battle; it holds the NPC reserve once the server sent it to the battle host.
     private CoopTroopSupplier EnemySupplier() =>
         CoopTroopSupplierRegistry.GetSuppliers(session.InstanceId).FirstOrDefault(supplier => supplier.Side == enemySide);
 
-    // The reserve's parties this host owns that no player owns.
+    // The reserve's parties with troops left that no player owns, by the player registry the server's fate rule reads.
     private MBList<MapEventParty> NpcParties(CoopTroopSupplier supplier)
     {
-        var playerParties = new HashSet<PartyBase>();
-        foreach (var player in playerManager.Players)
-        {
-            if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                playerParties.Add(party.Party);
-        }
-
         var parties = new MBList<MapEventParty>();
+        if (supplier == null) return parties;
+
         foreach (var (partyId, remaining) in supplier.GetRemainingByParty())
         {
             if (remaining <= 0 || !objectManager.TryGetObject<MapEventParty>(partyId, out var party)) continue;
-            if (party.Party == null || playerParties.Contains(party.Party)) continue;
+            if (party.Party == null || playerManager.Contains(party.Party.MobileParty)) continue;
             parties.Add(party);
         }
 
         return parties;
     }
 
-    // Round-robin over the parties, up to vanilla's crew capacity for the team's ships.
+    // Round-robin over the NPC parties up to vanilla's crew capacity, not SupplyOneTroop: the host's reserve also holds the
+    // party of a player who dropped from the battle (BattleTroopReserveBuilder), and its troops stay off the AI fleet.
     private MBList<IAgentOriginBase> PullTroops(CoopTroopSupplier supplier, MBList<MapEventParty> parties, int maximum)
     {
         var partyIds = parties.Select(party => objectManager.TryGetId(party, out var id) ? id : null).Where(id => id != null).ToList();
@@ -334,6 +341,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         return troops;
     }
 
+    // The reserve id of the party that owns a fielded ship, for the hull's spawn record and fate report.
     private string PartyIdOf(MBList<MapEventParty> parties, PartyBase owner)
     {
         var party = parties.FirstOrDefault(candidate => candidate.Party == owner);
