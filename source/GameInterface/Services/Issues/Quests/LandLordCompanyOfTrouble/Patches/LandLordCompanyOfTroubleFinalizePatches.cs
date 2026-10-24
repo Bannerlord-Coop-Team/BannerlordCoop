@@ -31,6 +31,8 @@ internal class LandLordCompanyOfTroubleFinalizePatches
             return;
         }
 
+        // Cleared first, otherwise destroying it reads as someone else killing the company and fails the quest being ended
+        __instance._companyOfTroubleParty = null;
         GameThread.RunSafe(() => RemoveCompany(company), context: nameof(LandLordCompanyOfTroubleFinalizePatches));
     }
 

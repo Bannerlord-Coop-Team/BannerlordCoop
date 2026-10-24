@@ -38,6 +38,12 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
     private static void SellCompany(Quest quest)
     {
         quest.UpdateCompanyTroopCount();
+        if (quest._companyOfTroubleParty != null || quest._companyTroopCount == 0)
+        {
+            Logger.Warning("The owner of {quest} has no mercenaries left to sell", quest.StringId);
+            return;
+        }
+
         quest._demandGold = 1000 + (quest._companyTroopCount * 150);
         quest.persuasion_complete_with_company_of_trouble_on_consequence();
     }

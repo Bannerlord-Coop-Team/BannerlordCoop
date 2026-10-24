@@ -148,6 +148,25 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
+    public void SellingTheCompany_AfterItTurnedHostile_DoesNotPayOrEndTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        var goldBefore = GoldOfOwner();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            var quest = CompanyTurnedHostile(companyPartyId);
+
+            RunBranchAsOwner(ownerHero, quest, LandLordCompanyOfTroubleBranch.SuccessBySellingCompany);
+        }, CharacterLinks);
+
+        Assert.Equal(goldBefore, GoldOfOwner());
+        Assert.Equal(0, questEndings.Count);
+    }
+
+    [Fact]
     public void LettingTheCompanyLeave_RemovesThemOnceAndFailsTheQuest()
     {
         GiveMercenaries(6);
@@ -314,6 +333,26 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Server.PumpGameThread();
 
         Assert.False(company.IsActive);
+    }
+
+    [Fact]
+    public void EndingAnOwnedQuest_DestroysTheHostileCompanyWithoutFailingTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        MobileParty company = null!;
+
+        Server.Call(() =>
+        {
+            var quest = CompanyTurnedHostile(companyPartyId);
+            company = quest._companyOfTroubleParty;
+
+            quest.OnFinalize();
+        });
+        Server.PumpGameThread();
+
+        Assert.False(company.IsActive);
+        Assert.Equal(0, questEndings.Count);
     }
 
     [Fact]
