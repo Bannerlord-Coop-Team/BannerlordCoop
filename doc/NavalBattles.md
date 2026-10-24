@@ -383,7 +383,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   for 20 s, and gives the other side no wait. Coop keeps that wait for each side's player heroes (`NavalPlayerHeroGrace`),
   so in PvP neither side loses while one of its players still fights; an AI side still has none. Only current mission
   members' heroes count, matched by the character's registry id, and every client scans for them once a second, so a
-  promoted host keeps the history.
+  promoted host keeps the history. Unlike vanilla, which ends a depleted side at once, the side depletion check waits for
+  the same grace (maintainer decision after R49), so a side whose last living human was its player hero still holds about
+  20 s after the hero went down.
 - **Other clients** end with the host's replicated result. A side counts as retreated only once hulls left it, with their
   players or to a capture, and none is left. So capturing the last enemy hull ends the battle as an enemy retreat after
   vanilla's 5 s, as in vanilla (`MissionResult.CreateSuccessful(..., enemyRetreated: true)`); the committer reports only the
