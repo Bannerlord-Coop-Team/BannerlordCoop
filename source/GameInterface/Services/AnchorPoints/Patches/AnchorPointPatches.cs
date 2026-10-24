@@ -110,9 +110,11 @@ internal class AnchorPointPatches
         return ModInformation.IsClient && anchorPoint.Owner != null && anchorPoint.Owner == MobileParty.MainParty;
     }
 
-    // Port menu options like call fleet and set sail read the anchor
+    // Port menu options like call fleet and set sail read the anchor; MapState.OnActivate refreshes it after a mission
     private static void RefreshCurrentMenu()
     {
+        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+
         var menuContext = Campaign.Current.CurrentMenuContext;
         if (menuContext == null) return;
 
@@ -128,6 +130,7 @@ internal class AnchorPointMenuRefreshPatch
     private static void Postfix(MenuContext __instance)
     {
         if (ModInformation.IsServer) return;
+        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
 
         var anchor = MobileParty.MainParty?.Anchor;
         if (anchor == null || !anchor.IsMovingToPoint) return;
