@@ -24,6 +24,7 @@ internal class ClientStayAliveCancelGatePatch
         }
 
         explanation = new TextObject("{=!}{EXPLANATION}");
+        explanation.SetTextVariable("EXPLANATION", new TextObject("{=str_coop_issue_no_longer_needed}Never mind, I no longer need help with that."));
         __result = false;
         return false;
     }

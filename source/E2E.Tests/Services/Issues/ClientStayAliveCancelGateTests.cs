@@ -53,6 +53,19 @@ public class ClientStayAliveCancelGateTests : IDisposable
     }
 
     [Fact]
+    public void AClientRefusedAnIssueThatFailsToStayAlive_IsGivenARefusalText()
+    {
+        preconditions.FailStayAlive(Client);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.False(notable.Issue.CheckPreconditions(notable, out var explanation));
+            Assert.Equal("Never mind, I no longer need help with that.", explanation.ToString());
+        });
+    }
+
+    [Fact]
     public void TheServerCheckingAnIssueThatFailsToStayAlive_StillEndsIt()
     {
         preconditions.FailStayAlive(Server);
