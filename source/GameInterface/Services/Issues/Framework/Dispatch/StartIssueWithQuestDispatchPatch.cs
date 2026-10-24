@@ -5,6 +5,8 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -19,6 +21,8 @@ internal class StartIssueWithQuestDispatchPatch
             !__instance.IsOngoingWithoutQuest && ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) &&
             registry.IsRegistered(__instance.GetType()))
         {
+            MBInformationManager.AddQuickInformation(new TextObject(
+                "{=str_coop_issue_quest_unavailable}This issue is no longer available as a quest."));
             // IssueManager treats false as a failed offer and finalizes the existing issue.
             __result = true;
             return false;

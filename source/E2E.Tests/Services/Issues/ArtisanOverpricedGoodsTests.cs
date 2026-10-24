@@ -129,6 +129,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution();
         });
 
+        Assert.Equal(2f, Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>()).Difficulty);
         Assert.Equal(2f, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()).Difficulty);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Equal(2f, Get<Hero>(instance, scenario.NotableId).Issue._issueDifficultyMultiplier));
@@ -609,6 +610,10 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             else issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
         });
         environment.FlushCoalescer();
+        var decision = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+            request => request.Operation != LordSolutionOperation.Start);
+        Assert.Equal(acceptMerchant ? LordSolutionOperation.AcceptCounterOffer : LordSolutionOperation.RefuseCounterOffer, decision.Operation);
+        Assert.Equal(0f, decision.Difficulty);
         var outcome = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome;
         Assert.Equal(acceptMerchant ? IssueOutcome.LordAcceptedCounterOffer : IssueOutcome.LordRefusedCounterOffer, outcome);
         AssertFinished(acceptMerchant ? 2470 : 2530, acceptMerchant ? 10000 : 10900);

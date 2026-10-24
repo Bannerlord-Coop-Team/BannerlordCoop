@@ -267,7 +267,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue.IsTriedToSolveBefore = false;
 
             // With no winner the server still offers the issue, so undo the local accept
-            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
+            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
+            if (!hasOwner)
             {
                 issue._issueState = IssueBase.IssueState.Ongoing;
             }
@@ -278,7 +279,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             }
 
             journal.DiscardArchive(issue);
-            if (data.IssueDueTimeTicks.HasValue && !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
+            if (data.IssueDueTimeTicks.HasValue && !hasOwner)
                 issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }

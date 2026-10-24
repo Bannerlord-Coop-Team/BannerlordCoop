@@ -77,7 +77,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             // Vanilla decides when the merchant conversation ends, then reopens the menu before the server replies.
             if (operation != LordSolutionOperation.Start) pendingDecisions.Add(issue);
             network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation,
-                Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier()));
+                operation == LordSolutionOperation.Start ? Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier() : 0f));
         }
         return false;
     }
