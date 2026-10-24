@@ -36,6 +36,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.UI.Notifications.Patches;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
@@ -698,6 +699,127 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             AssertHostileActionMapEvent(client, mapEventId!, componentId!, expectedComponentType, target.VillageId, expectedVillageState);
         }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RaidSurrender_AfterEncounterInit_TransitionsOnlyOwnerWhenAuthoritativeStateArrives(bool militiaLast, bool rosterLast)
+    {
+        var owner = Clients.First();
+        var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(owner, "PlayerOne");
+        var target = CreateVillageTarget();
+        var defenderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        if (rosterLast)
+        {
+            var componentId = TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+                    Assert.True(instance.ObjectManager.TryGetObject<MilitiaPartyComponent>(componentId, out var component));
+                    Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                    using (new AllowedThread())
+                    {
+                        component.Settlement = settlement;
+                        component.MobileParty = defender;
+                        defender.SetPartyComponent(component, false);
+                        settlement.MilitiaPartyComponent = component;
+                    }
+                });
+            }
+        }
+        string? eventId = null;
+        string? sideId = null;
+        string? eventPartyId = null;
+        uint settlementHandle = 0;
+        uint rosterHandle = 0;
+        uint troopHandle = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            defender.MemberRoster.AddToCounts(troop, 1);
+            var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
+            defender.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out eventId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out sideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties.Single(p => p.Party == defender.Party), out eventPartyId));
+            Assert.True(Server.ObjectManager.TryGetHandle(settlement, out settlementHandle));
+            Assert.True(Server.ObjectManager.TryGetHandle(defender.MemberRoster, out rosterHandle));
+            Assert.True(Server.ObjectManager.TryGetHandle(troop, out troopHandle));
+        }, MapEventDisabledMethods);
+        TestEnvironment.FlushCoalescer();
+        SetMockPlayerEncounter(owner, mapEventId: eventId);
+        var raidInitializations = new Dictionary<EnvironmentInstance, int>();
+        foreach (var client in Clients)
+        {
+            raidInitializations[client] = 0;
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                settlement._readyMilitia = 0.5f;
+                var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+                starter.AddGameMenu("encounter", "Encounter", _ => { });
+                starter.AddGameMenu("raiding_village", "Raiding village", _ => raidInitializations[client]++);
+                var state = Game.Current.GameStateManager.CreateState<MapState>();
+                state._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+                state._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+                Game.Current.GameStateManager._gameStates.Add(state);
+                if (client != owner) return;
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Campaign.Current.MainParty = party;
+                Game.Current.PlayerTroop = hero.CharacterObject;
+                new EncounterGameMenuBehavior().UpdateVillageHostileActionEncounter(null);
+                Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+            }, MapEventDisabledMethods);
+        }
+
+        var removal = new NetworkRemoveMapEventParty(sideId!, eventPartyId!);
+        var militia = new NetworkChangeSettlementMilitia(settlementHandle, 0f);
+        foreach (var client in Clients)
+        {
+            if (militiaLast) client.SimulateMessage(Server.NetPeer, removal);
+            else client.SimulateMessage(Server.NetPeer, militia);
+            client.Call(() => Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId));
+            if (militiaLast) client.SimulateMessage(Server.NetPeer, militia);
+            else client.SimulateMessage(Server.NetPeer, removal);
+            if (rosterLast)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+                    Assert.Null(defender.MapEvent);
+                    Assert.Equal(1, defender.MemberRoster.TotalManCount);
+                    Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                });
+                client.SimulateMessage(Server.NetPeer, new NetworkTroopRosterElementBatch(rosterHandle, troopHandle,
+                    new[] { TroopRosterElementOperation.AddCounts(-1, 0, 0, true) }));
+            }
+            for (int i = 0; i < 200; i++)
+            {
+                client.SimulateMessage(Server.NetPeer, removal);
+                client.SimulateMessage(Server.NetPeer, militia);
+            }
+            client.SimulateMessage(Server.NetPeer, new NetworkRemoveMapEventParty(string.Empty, string.Empty));
+            client.SimulateMessage(Server.NetPeer, new NetworkChangeSettlementMilitia(0, 0f));
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(eventId!, out var mapEvent));
+                Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
+                Assert.Equal(client == owner ? "raiding_village" : "encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                Assert.Equal(client == owner ? 1 : 0, raidInitializations[client]);
+            });
+        }
+        Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkRemoveMapEventParty>());
+        Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkChangeSettlementMilitia>());
     }
 
     [Theory]
