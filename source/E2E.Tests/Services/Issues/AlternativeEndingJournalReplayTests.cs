@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -10,6 +11,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -80,6 +84,79 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     {
         EndOnServer(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest);
         AssertObserverHasNoArchive();
+    }
+
+    [Fact]
+    public void NativeAlternativeCancellationEndsTheOwnersJournalBeforeDetachment()
+    {
+        var rosterId = environment.CreateRegisteredObject<TroopRoster>();
+        var logTime = new CampaignTime(456L);
+        var person = new TextObject("Companion {NAME}", new Dictionary<string, object> { ["NAME"] = "Suvys" });
+        var text = new TextObject("Mission for {PERSON}: {COUNT}", new Dictionary<string, object>
+        {
+            ["PERSON"] = person,
+            ["COUNT"] = 3,
+        });
+        var task = new TextObject("Return {DAYS}", new Dictionary<string, object> { ["DAYS"] = 4 });
+        scenario.Server.Call(() =>
+        {
+            var issue = issues[scenario.Server];
+            var owner = scenario.Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+            var party = scenario.Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            var roster = scenario.Server.GetRegisteredObject<TroopRoster>(rosterId);
+            using (new AllowedThread())
+            {
+                party.Party.MemberRoster = roster;
+                roster.OwnerParty = party.Party;
+                owner.PartyBelongedTo = party;
+            }
+            using (new MainHeroSubstitutionScope(owner, party))
+            {
+                issue.AddLog(new JournalLog(logTime, text, task, 3, 4, LogType.Discreate));
+                issue.CompleteIssueWithCancel();
+            }
+            Assert.Null(issue.IssueOwner.Issue);
+            var archive = archives[scenario.Server];
+            Assert.True(archive.IsEnded());
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
+            var returned = Assert.Single(archive.GetEntries(), entry => entry.LogText.GetID() == "V5Za6d4h");
+            Assert.Equal("{=V5Za6d4h}Your troops have returned from their mission.", returned.LogText.Value);
+            Assert.Equal(2, archive.GetEntries().Count());
+        });
+        environment.FlushCoalescer();
+
+        // This standalone transport test has no giver-death finalization dependency.
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        scenario.ClientB.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+            (JournalLogEntry entry) => entry.IsRelatedTo(issues[scenario.ClientB]))));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Same(issues[scenario.ClientA], issues[scenario.ClientA].IssueOwner.Issue);
+            var archive = archives[scenario.ClientA];
+            Assert.True(archive.IsEnded());
+            Assert.True(archive.IsEndedUnsuccessfully());
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
+            var entries = archive.GetEntries().ToArray();
+            Assert.Equal(2, entries.Length);
+            var progress = entries[0];
+            Assert.Equal(logTime.NumTicks, progress.LogTime.NumTicks);
+            Assert.Equal(3, progress.CurrentProgress);
+            Assert.Equal(4, progress.Range);
+            Assert.Equal(LogType.Discreate, progress.Type);
+            Assert.Equal(text.Value, progress.LogText.Value);
+            Assert.Equal(2, progress.LogText.Attributes.Count);
+            Assert.Equal(3, Assert.IsType<int>(progress.LogText.Attributes["COUNT"]));
+            var actualPerson = Assert.IsType<TextObject>(progress.LogText.Attributes["PERSON"]);
+            Assert.Equal(person.Value, actualPerson.Value);
+            Assert.Equal("Suvys", Assert.IsType<string>(actualPerson.Attributes["NAME"]));
+            Assert.Equal(task.Value, progress.TaskName.Value);
+            Assert.Equal(4, Assert.IsType<int>(progress.TaskName.Attributes["DAYS"]));
+            Assert.Equal("{=V5Za6d4h}Your troops have returned from their mission.", entries[1].LogText.Value);
+        });
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, journal.Ending);
+        Assert.Equal(QuestScenario.IssueId, journal.IssueId);
+        Assert.Equal(scenario.NotableId, journal.IssueOwnerId);
     }
 
     [Fact]
