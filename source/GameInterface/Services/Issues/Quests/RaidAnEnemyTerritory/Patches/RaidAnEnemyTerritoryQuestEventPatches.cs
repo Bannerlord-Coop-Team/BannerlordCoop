@@ -48,24 +48,11 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
             (Settlement)__args[0], (bool)__args[1], (Hero)__args[2], (Hero)__args[3],
             (Hero)__args[4], (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)__args[5]));
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void OnWarDeclaredPostfix(object[] __args) =>
-        RunAsOwners(quest => quest.OnWarDeclared(
-            (IFaction)__args[0], (IFaction)__args[1], (DeclareWarAction.DeclareWarDetail)__args[2]));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMakePeace))]
     [HarmonyPostfix]
     private static void OnMakePeacePostfix(object[] __args) =>
         RunAsOwners(quest => quest.OnMakePeace(
             (IFaction)__args[0], (IFaction)__args[1], (MakePeaceAction.MakePeaceDetail)__args[2]));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void OnClanChangedKingdomPostfix(object[] __args) =>
-        RunAsOwners(quest => quest.OnClanChangedKingdom(
-            (Clan)__args[0], (Kingdom)__args[1], (Kingdom)__args[2],
-            (ChangeKingdomAction.ChangeKingdomActionDetail)__args[3], (bool)__args[4]));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.DailyTick))]
     [HarmonyPostfix]
