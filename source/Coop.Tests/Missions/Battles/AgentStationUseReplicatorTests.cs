@@ -353,7 +353,8 @@ public class AgentStationUseReplicatorTests
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
-        IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null)
+        IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null,
+        IBattleSession? session = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
@@ -361,7 +362,7 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(),
-            Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
+            session ?? Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
             members ?? Members("owner", "old", "new"));
     }
 
@@ -658,13 +659,46 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(expected, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
     }
 
+    // S12 A5: a puppet adopted in place while seated keeps its seat as this client's own, announced under this client's stamp.
+    [Fact]
+    public void RefreshAppliedSeats_MakesAPuppetAdoptedWhileSeatedAnOwnSeat()
+    {
+        var crew = new RemoteCrew();
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.Agent)).Returns(() => crew.Info.CurrentAuthority == "local");
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.AgentId)).Returns(() => crew.Info.CurrentAuthority == "local");
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(true);
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(s => s.OwnControllerId).Returns("local");
+        var deployment = new Mock<IBattleDeploymentCoordinator>();
+        deployment.SetupGet(d => d.IsCommitted).Returns(true);
+        var network = new Mock<IBattleNetwork>();
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, network: network.Object,
+            deployment: deployment.Object, session: session.Object);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 4, "owner"));
+        replicator.Tick(0f);
+        bool ownBeforeAdoption = replicator.IsOwnSeat(crew.AgentId);
+
+        crew.Info.CurrentAuthority = "local";
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.False(ownBeforeAdoption);
+        Assert.True(replicator.IsOwnSeat(crew.AgentId));
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(1, (long)inspected["adoptedSeats"]!);
+        network.Verify(n => n.SendAll(It.Is<NetworkAgentStationUse>(use =>
+            use.AgentId == crew.AgentId && use.InUse && use.Revision == 1 && use.SenderControllerId == "local")), Times.Once);
+    }
+
     // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
     private sealed class RemoteCrew
     {
         public RemoteCrew()
         {
             Agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-            var info = new CoopAgentInfo("owner", "owner", "battle", Agent, AgentId, 1);
+            var info = Info = new CoopAgentInfo("owner", "owner", "battle", Agent, AgentId, 1);
             Registry.Setup(r => r.TryGetAgentInfo(AgentId, out info)).Returns(() => Registered);
             Registry.Setup(r => r.TryGetAgentInfo(Agent, out info)).Returns(() => Registered);
             Ships.TryRegister(new NetworkShipInfo(ShipId, "owner", "party", isNpcParty: false, Hull, null!));
@@ -674,6 +708,7 @@ public class AgentStationUseReplicatorTests
         public Guid AgentId { get; } = Guid.NewGuid();
         public Guid ShipId { get; } = Guid.NewGuid();
         public Agent Agent { get; }
+        public CoopAgentInfo Info { get; }
         public bool Registered { get; set; } = true;
         public Mock<INetworkAgentRegistry> Registry { get; } = new Mock<INetworkAgentRegistry>();
         public NetworkShipRegistry Ships { get; } = new NetworkShipRegistry();

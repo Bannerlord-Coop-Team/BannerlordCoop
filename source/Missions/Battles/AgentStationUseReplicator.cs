@@ -66,7 +66,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private bool disposed;
     // dropped counts uses that were lost; staleUses (superseded) and obsoleteReleases (nothing left to release) are expected.
     private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, localPuppetReleases, pinned, ownerReleases,
-        sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats;
+        sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
+        adoptedSeats;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -222,6 +223,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 if (alive && !ownedHere && hullSinking) ReleaseFromSinkingHull(entry.Key, seat);
                 else if (alive && !registered && engine.IsSeated(seat.Agent, seat.Point)) ReleaseWithdrawn(entry.Key, seat);
                 else if (alive && hullRemoved) ForgetRemovedHullSeat(entry.Key);
+                else if (alive && ownedHere && engine.IsSeated(seat.Agent, seat.Point)) AdoptSeat(entry.Key, seat);
                 continue;
             }
 
@@ -288,6 +290,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     {
         removedHullSeats++;
         Logger.Warning("[NavalSync] Puppet {AgentId}'s station is on a hull that left the mission; no longer seating it there", agentId);
+    }
+
+    // A puppet adopted while seated is this client's from now on: announcing its seat withholds its movement and actions, and
+    // peers and joiners get the seat under this client's stamp.
+    private void AdoptSeat(Guid agentId, AppliedSeat seat)
+    {
+        AnnounceStationUse(new AgentStationUseChanged(seat.Agent, seat.Point, inUse: true));
+        if (IsOwnSeat(agentId)) adoptedSeats++;
     }
 
     // Removal in an ended mission skips vanilla's station release, so a withdrawn puppet must not stay a machine's user.
@@ -481,6 +491,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         removedHullSeats,
         departedHullReleases,
         detachedSeats,
+        adoptedSeats,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
