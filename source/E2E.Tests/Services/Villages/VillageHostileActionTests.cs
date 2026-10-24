@@ -1727,8 +1727,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
                 if (trackRaidQuest)
                 {
-                    AttachRaidQuest(Server, giverId!, ownerHeroId, mobilePartyId, target.SettlementId);
-                    AttachRaidQuest(client, giverId!, ownerHeroId, mobilePartyId, target.SettlementId);
+                    AttachRaidQuest(Server, giverId!, ownerHeroId, mobilePartyId, target.SettlementId, target.OwnerFactionId);
+                    AttachRaidQuest(client, giverId!, ownerHeroId, mobilePartyId, target.SettlementId, target.OwnerFactionId);
                 }
                 CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, (winner, component) =>
                 {
@@ -4137,14 +4137,16 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     private void AttachRaidQuest(EnvironmentInstance instance, string giverId, string ownerHeroId,
-        string ownerPartyId, string settlementId)
+        string ownerPartyId, string settlementId, string enemyKingdomId)
     {
+        // Synthetic givers have no encyclopedia entry; acceptance and journal creation still run.
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
             Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, "raid_map_event", "PlayerOne"));
 
             using (new AllowedThread())
@@ -4159,7 +4161,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Campaign.Current.IssueManager._issues.Add(giver, issue);
                 giver.OnIssueCreatedForHero(issue);
                 var quest = new RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest(
-                    "raid_map_event_quest", giver, CampaignTime.DaysFromNow(60), (Kingdom)settlement.MapFaction);
+                    "raid_map_event_quest", giver, CampaignTime.DaysFromNow(60), enemyKingdom);
                 issue.IssueQuest = quest;
                 if (instance != Server)
                 {
@@ -4176,7 +4178,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Same(quest._raidedVillagesTrackLog, Assert.Single(quest.JournalEntries));
                 Assert.Equal(0, quest._raidedVillagesTrackLog.CurrentProgress);
             }
-        // Synthetic givers have no encyclopedia entry; acceptance and journal creation still run.
         }, MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(Helpers.StringHelpers), nameof(Helpers.StringHelpers.GetCharacterProperties)))
             .Append(AccessTools.Method(
