@@ -745,6 +745,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            defender.MemberRoster.Clear();
             defender.MemberRoster.AddToCounts(troop, 1);
             var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
             defender.Party.MapEventSide = mapEvent.DefenderSide;
@@ -803,6 +804,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 client.SimulateMessage(Server.NetPeer, new NetworkTroopRosterElementBatch(rosterHandle, troopHandle,
                     new[] { TroopRosterElementOperation.AddCounts(-1, 0, 0, true) }));
             }
+            client.Call(() =>
+            {
+                Assert.Equal(client == owner ? "raiding_village" : "encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                Assert.Equal(client == owner ? 1 : 0, raidInitializations[client]);
+            });
             for (int i = 0; i < 200; i++)
             {
                 client.SimulateMessage(Server.NetPeer, removal);
