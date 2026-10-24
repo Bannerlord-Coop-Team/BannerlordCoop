@@ -1,5 +1,9 @@
 ﻿using Autofac;
 using Common.Network;
+using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Conversation;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -7,6 +11,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Quests.Smugglers;
 using GameInterface.Services.Issues.Quests.Smugglers.Patches;
 using GameInterface.Services.Players;
@@ -134,11 +139,145 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void Persuasion_IsRunOnTheServerForTheOwner()
+    public void LivePersuasionSession_AllowsExactlyOneServerSuccess()
     {
+        StartPersuasionSession();
         ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
-
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
         Assert.Equal(1, succeedQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void PersuasionSuccess_FinalizesOnceAndReplaysTheOwnersStartedQuest()
+    {
+        succeedQuest.Dispose();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        Quest ownerQuest = null!;
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(townId, out var town));
+                var issue = IssueOf(instance);
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(town);
+                    issue.IssueOwner.StayingInSettlement = settlement;
+                    var quest = new Quest("smugglers_completion", issue.IssueOwner, settlement, settlement, 1f, CampaignTime.Never, RewardGold);
+                    issue.IssueQuest = quest;
+                    if (instance == ClientA)
+                    {
+                        quest.StartQuest();
+                        ownerQuest = quest;
+                    }
+                }
+            });
+        }
+
+        StartPersuasionSession();
+        ClientA.Call(() => ownerQuest.SucceedQuest(null));
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+        ClientA.Call(() => Assert.True(ownerQuest.IsFinalized));
+        Server.SimulateMessage(ClientA.NetPeer, new RequestQuestBranch(issueOwnerId, IssueId, (byte)SmugglersBranch.SuccessByPersuasion));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void ConversationEnd_InvalidatesPersuasionSession()
+    {
+        StartPersuasionSession();
+        Server.SimulateMessage(ClientA.NetPeer, new NetworkConversationEnded());
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(0, succeedQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void OldConversationEnd_DoesNotInvalidateTheNewPersuasionSession()
+    {
+        StartPersuasionSession("conversation-B");
+        Server.SimulateMessage(ClientA.NetPeer, new NetworkConversationEnded("conversation-A"));
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(1, succeedQuest.CountFor(Server));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MapPersuasion_RequiresAnEngagementWithTheTarget(bool engaged)
+    {
+        StartPersuasionSession(engaged ? "map-persuasion" : null, onMap: true);
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(engaged ? 1 : 0, succeedQuest.CountFor(Server));
+    }
+
+    private void StartPersuasionSession(string? requestId = null, bool onMap = false)
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var ownerPartyId = string.Empty;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var player));
+            ownerPartyId = player.MobilePartyId;
+        });
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    ownerParty.CurrentSettlement = onMap ? null : settlement;
+                    smugglers.CurrentSettlement = onMap ? null : settlement;
+                    QuestOf(instance)._smugglerParty = smugglers;
+                }
+            });
+        }
+        if (requestId != null)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var target));
+                Assert.True(Server.ObjectManager.TryGetId(ownerParty.Party, out var ownerBaseId));
+                Assert.True(Server.ObjectManager.TryGetId(target.Party, out var targetBaseId));
+                Assert.True(Server.Resolve<ConversationPartyTracker>().TryBeginEngagement(
+                    ClientA.NetPeer, ownerBaseId, targetBaseId, false, requestId: requestId));
+            });
+        }
+        ClientA.Call(() => ClientA.Resolve<IPersuasionSessionService>().Start(QuestOf(ClientA), QuestOf(ClientA)._smugglerParty));
+    }
+
+    [Fact]
+    public void PersuasionWithoutALiveSession_IsRejected()
+    {
+        ClientA.Call(() =>
+        {
+            var quest = QuestOf(ClientA);
+            quest.SucceedQuest(null);
+        });
+
+        Assert.Equal(0, succeedQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void PersuasionWithoutALiveSession_DuplicateSuccessDoesNotFinalize()
+    {
+        ClientA.Call(() =>
+        {
+            var quest = QuestOf(ClientA);
+            quest.SucceedQuest(null);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        ClientA.Call(() => QuestOf(ClientA)?.SucceedQuest(null));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]

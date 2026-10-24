@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
 
@@ -18,17 +20,39 @@ internal class SmugglersBranchPatches
             return true;
         }
 
-        // The server pays the bribe as the owner, leaving the encounter is this client's part
         PlayerEncounter.LeaveEncounter = true;
         return false;
     }
 
-    // On a client only the persuasion reaches SucceedQuest, the fight is decided on the server and the bribe is patched above
+    [HarmonyPatch(typeof(Quest), nameof(Quest.persuasion_start_with_smugglers_on_consequence))]
+    [HarmonyPostfix]
+    private static void PersuasionStarted(Quest __instance)
+    {
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<IPersuasionSessionService>(out var sessions))
+        {
+            sessions.Start(__instance, __instance._smugglerParty);
+        }
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.SucceedQuest))]
     [HarmonyPrefix]
-    private static bool SuccessByPersuasionPrefix(Quest __instance)
+    private static bool SuccessByPersuasionPrefix(Quest __instance) =>
+        BeforeBranch(__instance, SmugglersBranch.SuccessByPersuasion);
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.persuasion_complete_with_smugglers_on_consequence))]
+    [HarmonyPrefix]
+    private static bool CompletePersuasion(Quest __instance)
     {
-        return BeforeBranch(__instance, SmugglersBranch.SuccessByPersuasion);
+        if (ModInformation.IsServer)
+        {
+            return true;
+        }
+
+        // Send success before conversation cleanup invalidates the session.
+        __instance.SucceedQuest(null);
+        PlayerEncounter.LeaveEncounter = true;
+        ConversationManager.EndPersuasion();
+        return false;
     }
 
     private static bool BeforeBranch(Quest quest, SmugglersBranch branch)

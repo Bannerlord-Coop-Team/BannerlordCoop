@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
+using GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods;
 using System;
 
 namespace GameInterface.Services.Issues;
@@ -32,6 +33,8 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.Register(context => context.Resolve<PersuasionSessionService>()).As<IPersuasionSessionService>();
+        builder.Register(context => context.Resolve<GangLeaderGoodsService>()).As<IGangLeaderGoodsService>();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
             .InstancePerLifetimeScope();
