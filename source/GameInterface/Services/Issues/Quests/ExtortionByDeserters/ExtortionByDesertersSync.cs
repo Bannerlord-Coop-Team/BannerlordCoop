@@ -56,7 +56,7 @@ internal class ExtortionByDesertersSync : IHandler
 
     public void Dispose() => broker.Unsubscribe<NetworkExtortionByDesertersState>(Handle);
 
-    public void Send(Quest quest, string log = "", bool ambush = false,
+    public void Send(Quest quest, TextObject log = null, bool ambush = false,
         ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
         if (ModInformation.IsClient)
@@ -115,7 +115,7 @@ internal class ExtortionByDesertersSync : IHandler
                 if (!quest.IsTracked(quest.QuestGiver)) quest.AddTrackedObject(quest.QuestGiver);
                 if (!quest.IsTracked(quest.QuestSettlement)) quest.AddTrackedObject(quest.QuestSettlement);
             }
-            if (!string.IsNullOrEmpty(data.Log)) quest.AddLog(new TextObject(data.Log));
+            if (!TextObject.IsNullOrEmpty(data.Log)) quest.AddLog(data.Log);
             switch ((ExtortionByDesertersNotice)data.Notice)
             {
                 case ExtortionByDesertersNotice.DesertersNoticedPlayer:

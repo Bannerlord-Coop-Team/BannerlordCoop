@@ -39,7 +39,7 @@ internal class ExtortionByDesertersRewardPatches
         if (ModInformation.IsServer && __instance is Quest quest &&
             ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync))
         {
-            sync.Send(quest, text.ToString());
+            sync.Send(quest, text);
         }
     }
 
