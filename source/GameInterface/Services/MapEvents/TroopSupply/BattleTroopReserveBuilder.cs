@@ -479,7 +479,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         return entries;
     }
 
-    // A reserve without its player hero can't be allocated on a naval deck (R41a-2 S), so a left-out hero is logged.
+    // Logs a hero this builder skips (routed, killed or wounded); a hero knocked out earlier isn't in the roster at all.
     private static void LogSkippedHero(MapEventParty party, CharacterObject character, string reason)
     {
         if (character?.IsHero != true) return;

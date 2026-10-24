@@ -609,7 +609,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   logged as a Warning (`Puppet ... died here without a routed blow`); DEBUG counts the spared ones (`ramPuppetsSpared`).
   A client whose copy of the ram misses an impact the owner saw keeps its agents there alive (live-check in R42).
 - **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
-  re-assigned.
+  re-assigned. The launcher still counts AI allies in vanilla's 8-ship side cap split, so their unfielded share is lost: a
+  player with 6 ships next to an AI lord with 6 fields about 4.
+- **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
+  and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
+  client's `NavalOrderOfBattleCampaignBehavior` after each battle.
+- **Player deployment slots.** Each player fleet after the first on a side is spaced by the deepest possible fleet (1.1
+  times the longest ship deployment length in the game data) plus vanilla's 32 m gap, so mixed fleets never overlap. The
+  slot is kept on the spawn path but, unlike vanilla, doesn't skip blocked path segments.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
   one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E) and R41a-3 (W2, D, E); the condition catch-up is
   E2E-only. Not hit live yet: an item pickup on a rejoined client in W2 (pickups by the returner's agents ran in R41a-3
