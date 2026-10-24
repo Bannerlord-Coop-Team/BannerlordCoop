@@ -1,7 +1,10 @@
-﻿using GameInterface.Services.Inventory.Handlers;
+﻿using Common;
+using GameInterface.Services.Inventory.Handlers;
 using GameInterface.Services.Inventory.Interfaces;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -12,6 +15,12 @@ namespace GameInterface.Tests.Services.Inventory;
 /// <summary>Food changes must survive inventory cancellation and stale confirmation.</summary>
 public class InventoryFoodUpkeepTests
 {
+    static InventoryFoodUpkeepTests()
+    {
+        // Starts the shared game loop pump (see GameThreadPumpTests).
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
     [Theory]
     [InlineData(5, -2, 3)]
     [InlineData(1, -1, 0)]
@@ -196,6 +205,34 @@ public class InventoryFoodUpkeepTests
     }
 
     [Fact]
+    public void ManyMarketUpdatesInOneDrain_RebuildTheTradeScreenOnce()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        logic._rosters[0].AddToCounts(grain, 10);
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
+        int refreshes = 0;
+        var inventory = new InventoryScreenRosterRefresher(refreshed =>
+        {
+            if (ReferenceEquals(refreshed, logic)) Interlocked.Increment(ref refreshes);
+        });
+        inventory.CaptureInventoryBaseline(logic);
+
+        int applied = ApplyInOneDrain(inventory, logic, grain, 200);
+
+        Assert.Equal(200, applied);
+        Assert.Equal(1, Volatile.Read(ref refreshes));
+        Assert.Equal(210, Count(logic._rosters[0], grain));
+        Assert.Equal(210, Count(logic._rostersBackup[0], grain));
+        logic._rostersBackup[0].Clear();
+        inventory.RestoreInventoryBackup(logic);
+        Assert.Equal(210, Count(logic._rostersBackup[0], grain));
+
+        ApplyInOneDrain(inventory, logic, grain, 3);
+        Assert.Equal(2, Volatile.Read(ref refreshes));
+    }
+
+    [Fact]
     public void UnrelatedRoster_IsNotAppliedByInventory()
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
@@ -216,6 +253,23 @@ public class InventoryFoodUpkeepTests
         logic._rostersBackup[0] = new ItemRoster();
         logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
         return logic;
+    }
+
+    // Applies the updates inside one game thread action, like the client draining a town tick,
+    // then waits one more drain so any queued refresh has run.
+    private static int ApplyInOneDrain(InventoryScreenRosterRefresher inventory, InventoryLogic logic,
+        EquipmentElement item, int updates)
+    {
+        int applied = 0;
+        GameThread.Run(() =>
+        {
+            for (int i = 0; i < updates; i++)
+            {
+                if (inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], item, 1)) applied++;
+            }
+        }, blocking: true);
+        GameThread.Run(() => { }, blocking: true);
+        return applied;
     }
 
     private static int Count(ItemRoster roster, EquipmentElement item)
