@@ -136,6 +136,46 @@ public class MerchantOutlawsTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(500)]
+    public void HourlyBanditAdditionsSendOneFinalSnapshotFromAnEmptyTargetList(int count)
+    {
+        Accept();
+        var partyIds = Enumerable.Range(0, count).Select(_ => environment.CreateRegisteredObject<MobileParty>()).ToArray();
+        var clanId = environment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Quest(Server).RemoveAllTrackedObjects();
+                Quest(Server)._validPartiesList.Clear();
+                var clan = Get<Clan>(Server, clanId);
+                clan.IsBanditFaction = true;
+                foreach (var id in partyIds)
+                {
+                    var party = Get<MobileParty>(Server, id);
+                    party.IsBandit = true;
+                    party.ActualClan = clan;
+                    party.CurrentSettlement = Get<Settlement>(Server, settlementId);
+                }
+            }
+        });
+        var sentBefore = Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+        var ownerBefore = ClientA.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+
+        Server.Call(() => Server.Resolve<IMerchantOutlawsHourlyTick>().Tick(
+            partyIds.Select(id => Get<MobileParty>(Server, id))), TextHelpers);
+        environment.FlushCoalescer();
+
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Skip(sentBefore));
+        Assert.Equal(partyIds.OrderBy(id => id), snapshot.PartyIds.OrderBy(id => id));
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>().Skip(ownerBefore));
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+        Server.Call(() => Assert.Equal(count, Quest(Server)._validPartiesList.Count));
+        ClientA.Call(() => Assert.Equal(count, Quest(ClientA)._validPartiesList.Count));
+    }
+
     [Fact]
     public void CreationUsesTheServersHideoutAndIdentityOnBothClients()
     {

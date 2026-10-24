@@ -34,12 +34,14 @@ internal class MerchantOutlawsHourlyTick : IMerchantOutlawsHourlyTick
 
         dispatcher.RunAsOwners<Quest>(quest =>
         {
+            var changed = false;
             foreach (var party in bandits)
             {
                 var wasValid = quest._validPartiesList.Contains(party);
                 quest.HourlyTickParty(party);
-                if (wasValid != quest._validPartiesList.Contains(party)) progress.Send(quest);
+                changed |= wasValid != quest._validPartiesList.Contains(party);
             }
+            if (changed) progress.Send(quest);
         });
     }
 }
