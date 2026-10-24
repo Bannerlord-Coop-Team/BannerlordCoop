@@ -45,8 +45,9 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    check what reacts to `AddLog`, `OnIssueUpdated` and `OnQuestCompleted`.
 8. A client never ends a registered quest or issue on its own under `AllowedThread`. A listener still fires inside a
    replay (a war, an army's removal, a settlement entry), and `OutcomeDispatcher.BeforeQuestOutcome` and
-   `BeforeIssueOutcome` drop that ending unless `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
-   clan's kingdom change, still sends its ending to the server as a request.
+   `BeforeIssueOutcome` drop that ending unless `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`).
+   A quest listener outside `AllowedThread`, like a clan's kingdom change, still sends its ending to the server as a
+   request. An issue ending there is dropped.
 9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
    `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`

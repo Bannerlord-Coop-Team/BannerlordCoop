@@ -36,8 +36,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         var issue = IssueManager.GetIssueOfQuest(quest);
         var registered = issue != null && registry.IsRegistered(issue.GetType());
 
-        // A vanilla listener replayed on a client can end a quest there, only the server's ending may
-        if (registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive)
+        if (IsClientEndingOutsideReplay(registered))
         {
             return false;
         }
@@ -63,8 +62,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
         var registered = registry.IsRegistered(issue.GetType());
 
-        // A vanilla listener replayed on a client, like entering a settlement, can end a stale issue there, only the server's ending may
-        if (registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive)
+        if (IsClientEndingOutsideReplay(registered))
         {
             return false;
         }
@@ -167,6 +165,12 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
 
         messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
+    }
+
+    // A vanilla listener replayed on a client, like a war or a settlement entry, can end a quest or issue there, only the server's ending may
+    private static bool IsClientEndingOutsideReplay(bool registered)
+    {
+        return registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive;
     }
 
     public void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase
