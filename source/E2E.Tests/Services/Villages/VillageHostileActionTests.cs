@@ -699,6 +699,80 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RaidSurrender_AfterEncounterInit_TransitionsOnlyOwnerWhenAuthoritativeStateArrives(bool militiaLast)
+    {
+        var owner = Clients.First();
+        var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(owner, "PlayerOne");
+        var target = CreateVillageTarget();
+        var defenderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string? eventId = null;
+        string? sideId = null;
+        string? eventPartyId = null;
+        uint settlementHandle = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            defender.MemberRoster.AddToCounts(troop, 1);
+            var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
+            defender.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out eventId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out sideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties.Single(p => p.Party == defender.Party), out eventPartyId));
+            Assert.True(Server.ObjectManager.TryGetHandle(settlement, out settlementHandle));
+        }, MapEventDisabledMethods);
+        TestEnvironment.FlushCoalescer();
+        SetMockPlayerEncounter(owner, mapEventId: eventId);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                settlement._readyMilitia = 0.5f;
+                var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+                starter.AddGameMenu("encounter", "Encounter", _ => { });
+                starter.AddGameMenu("raiding_village", "Raiding village", _ => { });
+                var state = Game.Current.GameStateManager.CreateState<MapState>();
+                state._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+                state._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+                Game.Current.GameStateManager._gameStates.Add(state);
+                if (client != owner) return;
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Campaign.Current.MainParty = party;
+                Game.Current.PlayerTroop = hero.CharacterObject;
+                new EncounterGameMenuBehavior().UpdateVillageHostileActionEncounter(null);
+                Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+            }, MapEventDisabledMethods);
+        }
+
+        var removal = new NetworkRemoveMapEventParty(sideId!, eventPartyId!);
+        var militia = new NetworkChangeSettlementMilitia(settlementHandle, 0f);
+        foreach (var client in Clients)
+        {
+            if (militiaLast) client.SimulateMessage(Server.NetPeer, removal);
+            else client.SimulateMessage(Server.NetPeer, militia);
+            client.Call(() => Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId));
+            if (militiaLast) client.SimulateMessage(Server.NetPeer, militia);
+            else client.SimulateMessage(Server.NetPeer, removal);
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(eventId!, out var mapEvent));
+                Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
+                Assert.Equal(client == owner ? "raiding_village" : "encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+            });
+        }
+        Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkRemoveMapEventParty>());
+        Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkChangeSettlementMilitia>());
+    }
+
+    [Theory]
     [InlineData(1000, 16, false, true)]
     [InlineData(1, 16, false, false)]
     [InlineData(1000, 16, true, false)]
