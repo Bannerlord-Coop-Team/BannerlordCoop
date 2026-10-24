@@ -35,6 +35,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.UI.Notifications.Patches;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
@@ -699,9 +700,10 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void RaidSurrender_AfterEncounterInit_TransitionsOnlyOwnerWhenAuthoritativeStateArrives(bool militiaLast)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RaidSurrender_AfterEncounterInit_TransitionsOnlyOwnerWhenAuthoritativeStateArrives(bool militiaLast, bool rosterLast)
     {
         var owner = Clients.First();
         var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
@@ -709,10 +711,32 @@ public class VillageHostileActionTests : MapEventTestBase
         var target = CreateVillageTarget();
         var defenderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        if (rosterLast)
+        {
+            var componentId = TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+                    Assert.True(instance.ObjectManager.TryGetObject<MilitiaPartyComponent>(componentId, out var component));
+                    Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                    using (new AllowedThread())
+                    {
+                        component.Settlement = settlement;
+                        component.MobileParty = defender;
+                        defender.SetPartyComponent(component, false);
+                        settlement.MilitiaPartyComponent = component;
+                    }
+                });
+            }
+        }
         string? eventId = null;
         string? sideId = null;
         string? eventPartyId = null;
         uint settlementHandle = 0;
+        uint rosterHandle = 0;
+        uint troopHandle = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -726,6 +750,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out sideId));
             Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties.Single(p => p.Party == defender.Party), out eventPartyId));
             Assert.True(Server.ObjectManager.TryGetHandle(settlement, out settlementHandle));
+            Assert.True(Server.ObjectManager.TryGetHandle(defender.MemberRoster, out rosterHandle));
+            Assert.True(Server.ObjectManager.TryGetHandle(troop, out troopHandle));
         }, MapEventDisabledMethods);
         TestEnvironment.FlushCoalescer();
         SetMockPlayerEncounter(owner, mapEventId: eventId);
@@ -763,6 +789,18 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Call(() => Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId));
             if (militiaLast) client.SimulateMessage(Server.NetPeer, militia);
             else client.SimulateMessage(Server.NetPeer, removal);
+            if (rosterLast)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<MobileParty>(defenderId, out var defender));
+                    Assert.Null(defender.MapEvent);
+                    Assert.Equal(1, defender.MemberRoster.TotalManCount);
+                    Assert.Equal("encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                });
+                client.SimulateMessage(Server.NetPeer, new NetworkTroopRosterElementBatch(rosterHandle, troopHandle,
+                    new[] { TroopRosterElementOperation.AddCounts(-1, 0, 0, true) }));
+            }
             for (int i = 0; i < 200; i++)
             {
                 client.SimulateMessage(Server.NetPeer, removal);
