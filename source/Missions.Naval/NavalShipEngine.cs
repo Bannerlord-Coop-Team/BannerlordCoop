@@ -495,8 +495,9 @@ public class NavalShipEngine : INavalShipEngine
         if (physics == null || !ship.GameEntity.IsValid) return null;
 
         float mass = physics._committedTotalMass;
-        return CrewLoadOf(mass, physics._committedWeightedAgentsPosition, ship.GameEntity.GetBodyWorldTransform(),
-            mass > 0f || HasAgentAboard(ship));
+        var body = ship.GameEntity.GetBodyWorldTransform();
+        return CrewLoadOf(mass, physics._committedWeightedAgentsPosition, body,
+            mass > 0f || HasAgentAboard(ship, physics.PhysicsBoundingBoxWithoutChildren, body));
     }
 
     /// <summary>
@@ -510,15 +511,14 @@ public class NavalShipEngine : INavalShipEngine
         return agentAboard ? null : BattleShipCrewLoad.Empty;
     }
 
-    // Whether an active agent stands on the hull, the agents vanilla's AgentNavalComponent.OnTick weighs it with.
-    private static bool HasAgentAboard(MissionShip ship)
+    // Whether vanilla weighs an agent on the hull: an active agent stepped on it (AgentNavalComponent.OnTick) whose position
+    // lies inside the hull's physics box (NavalPhysics.AddAgentWeightAndPositionInformation).
+    private static bool HasAgentAboard(MissionShip ship, BoundingBox physicsBox, MatrixFrame body)
     {
-        var mission = Mission.Current;
-        if (mission == null) return false;
-
-        foreach (var agent in mission.Agents)
+        foreach (var agent in Mission.Current.Agents)
         {
-            if (agent.IsActive() && agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship) return true;
+            if (!agent.IsActive() || agent.GetComponent<AgentNavalComponent>()?.SteppedShip != ship) continue;
+            if (CopyCrewLoadPatch.IsInsideHull(physicsBox, body.TransformToLocal(agent.Position))) return true;
         }
 
         return false;

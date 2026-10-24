@@ -33,10 +33,13 @@ public interface INavalShipEngine
 
     MatrixFrame GetFrame(MissionObject hull);
 
-    /// <summary>[Game thread] Takes the owner's latest sample of a copy as the target its steering closes on.</summary>
+    /// <summary>
+    /// [Game thread] Takes the owner's latest sample of a copy as the target its steering closes on, and the owner's crew load
+    /// the copy heels under.
+    /// </summary>
     void ApplyForeignSample(MissionObject hull, MatrixFrame frame, BattleShipMotion motion);
 
-    /// <summary>The hull body's planar velocity and yaw rate, sent with its samples.</summary>
+    /// <summary>The hull body's planar velocity, yaw rate and committed crew load, sent with its samples.</summary>
     BattleShipMotion ReadMotion(MissionObject hull);
 
     /// <summary>The hull's effective helm input this frame.</summary>

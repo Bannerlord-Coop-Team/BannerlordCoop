@@ -36,6 +36,7 @@ public sealed class NetworkBattleShipSample : IEvent
     /// <summary>Whether the sample carries a crew load at all; a zero <see cref="CrewMass"/> then means a known-empty deck.</summary>
     [ProtoMember(16)] public readonly bool HasCrewLoad;
 
+    /// <summary>One sample; the motion is flattened into the velocity, yaw rate and crew load members.</summary>
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
         BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0, BattleShipMotion motion = default)
     {
@@ -62,6 +63,7 @@ public sealed class NetworkBattleShipSample : IEvent
 
     public bool HasValidFrame => IsValidFrame(Frame);
 
+    /// <summary>The sampled motion rebuilt from the wire members; a crew load that isn't finite or is negative arrives as unknown.</summary>
     public BattleShipMotion Motion => new BattleShipMotion(new Vec2(VelocityX, VelocityY), YawRate,
         HasCrewLoad ? BattleShipCrewLoad.Create(CrewMass, new Vec3(CrewLocalX, CrewLocalY, CrewLocalZ)) : null);
 

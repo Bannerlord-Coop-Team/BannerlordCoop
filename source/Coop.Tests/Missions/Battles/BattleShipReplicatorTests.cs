@@ -1306,7 +1306,7 @@ public class BattleShipReplicatorTests
         Assert.Equal(2.25f, copy.Motion.CrewLoad.LocalCentre.z);
     }
 
-    // An older sender writes no crew fields; the copy then keeps vanilla's own crew weight.
+    // A sample without a load (a frame that committed no weight while agents stood aboard) writes no crew fields.
     [Fact]
     public void Sample_WithoutACrewLoad_ArrivesAsUnknown()
     {

@@ -34,9 +34,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   than the owner's crew (R45: copies of AI-crewed hulls heeled 2.5-4.2 degrees off). Each sample carries the owner's
   committed crew mass and centre in the hull body's frame (`BattleShipCrewLoad`), and `CopyCrewLoadPatch` applies that
   load on a copy instead of its puppets', with vanilla's in-hull check. A copy weighs its own puppets until the first
-  sample with a load (an older sender never sends one). An owner with nobody aboard, such as a crew that boarded an
-  enemy hull, sends an empty load and the copy takes no crew weight. A sample without a load (a frame that committed
-  none while agents stood aboard) and a stale owner keep the last load. Own hulls run vanilla. One rule decides a copy's mode at
+  sample with a load. An owner with nobody vanilla weighs aboard (an active agent stepped on the hull and inside its
+  physics box), such as a crew that boarded an enemy hull, sends an empty load and the copy takes no crew weight. A
+  sample without a load (a frame that committed none while weighed agents stood aboard) and a stale owner keep the
+  last load. Own hulls run vanilla. One rule decides a copy's mode at
   every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
   simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` and the mission-end
   reset are the only writers of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing
@@ -566,13 +567,15 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of
     clock lag at about 0.015 m mean water difference.
   - Copies still float on local buoyancy, but the local water now matches the owner's, so a copy's heave, pitch and
-    roll should match its owner's too. They are pass/fail candidates again for the drift criteria, pending a live run
-    that shows `water_probe` water diffs near 0 in open sea. R45 confirmed the water (0.02 m) and heave (0.02-0.05 m
-    mean), but copies of AI-crewed hulls rolled 1.9-4.3 degrees off, from the puppets' weight (see section 1); the crew
-    load fix followed. Once a live run verifies it, roll is pass/fail per copy over windows of at least 60 s without
-    sinking, snap or ram contact, on the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees,
-    and a gain of 0.9 to 1.1 (slope of the copy's roll on the owner's, both de-meaned). If AI galleys still show a
-    gain above 1.2 while `water_probe` logs matching crew loads, roll stays report-only.
+    roll match its owner's too. R45 confirmed the water (0.02 m) and heave (0.02-0.05 m mean), but copies of AI-crewed
+    hulls rolled 1.9-4.3 degrees off, from the puppets' weight (see section 1). With the crew load fix, R46 measured
+    copies' crew mass and centre equal to the owner's and free-hull roll at mean <= 0.06 degrees, sd <= 0.51 degrees,
+    gain 0.99-1.01. Roll is pass/fail per free copy over windows of at least 60 s without sinking, snap, ram contact or
+    a rope, on the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees, and a gain of 0.9 to 1.1
+    (slope of the copy's roll on the owner's, both de-meaned). Roped hulls are excluded, see the next item.
+  - **Roped hulls still roll off.** R46 measured roll sd 1.7-4.4 degrees and a gain up to 1.56 on copies tied by ropes,
+    even with an empty deck, so it is the rope and contact force on copies, not the crew load. Roll stays report-only for
+    a roped copy until that follow-up lands.
   - `coop.debug.naval.water_clock` reports the patch status, the written and vanilla water time, their offset and the
     battle's offset estimate.
   - **Each game-version port must re-check the signature** and update it if it no longer matches: the scene field

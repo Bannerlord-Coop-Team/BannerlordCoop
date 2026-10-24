@@ -169,9 +169,9 @@ internal class CopyCrewLoadPatch
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
-        bool isCopy = NavalForeignHulls.TryGetCopy(__instance, out var copy);
-        var ownerLoad = copy?.CrewLoad;
-        if (!AppliesOwnerLoad(isCopy, ownerLoad)) return true;
+        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy) || copy.CrewLoad == null) return true;
+
+        var ownerLoad = copy.CrewLoad;
         if (ownerLoad.IsEmpty) return false;
 
         var localCentre = ownerLoad.LocalCentre;
@@ -182,14 +182,14 @@ internal class CopyCrewLoadPatch
         return false;
     }
 
-    /// <summary>Whether a hull takes its owner's crew load: only a copy whose owner sent one.</summary>
-    internal static bool AppliesOwnerLoad(bool isCopy, BattleShipCrewLoad ownerLoad) => isCopy && ownerLoad != null;
-
     /// <summary>Vanilla's crew weight force: the mass times the hull's step weight multiplier times gravity.</summary>
     internal static Vec3 WeightForce(float mass, float stepAgentWeightMultiplier) =>
         mass * stepAgentWeightMultiplier * MBGlobals.GravitationalAcceleration;
 
-    /// <summary>Vanilla's check that the crew centre lies within the hull's physics box, which it skips the force without.</summary>
+    /// <summary>
+    /// Vanilla's check that a point in the hull body's frame lies within its physics box: an agent outside it isn't weighed,
+    /// and a crew centre outside it applies no force.
+    /// </summary>
     internal static bool IsInsideHull(BoundingBox box, Vec3 localCentre) => box.PointInsideBox(localCentre, BoxEpsilon);
 }
 
