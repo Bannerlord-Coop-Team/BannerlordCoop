@@ -801,6 +801,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 client.SimulateMessage(Server.NetPeer, new NetworkTroopRosterElementBatch(rosterHandle, troopHandle,
                     new[] { TroopRosterElementOperation.AddCounts(-1, 0, 0, true) }));
             }
+            client.Call(() =>
+            {
+                Assert.Equal(client == owner ? "raiding_village" : "encounter", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+                Assert.Equal(client == owner ? 1 : 0, raidInitializations[client]);
+            });
             for (int i = 0; i < 200; i++)
             {
                 client.SimulateMessage(Server.NetPeer, removal);
