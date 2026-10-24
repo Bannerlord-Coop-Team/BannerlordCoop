@@ -10,12 +10,10 @@ public readonly struct IssueOutcomeObserved : IEvent
 {
     public readonly IssueBase Issue;
     public readonly IssueOutcome Outcome;
-    public readonly TaleWorlds.Localization.TextObject JournalLog;
 
-    public IssueOutcomeObserved(IssueBase issue, IssueOutcome outcome, TaleWorlds.Localization.TextObject journalLog = null)
+    public IssueOutcomeObserved(IssueBase issue, IssueOutcome outcome)
     {
         Issue = issue;
         Outcome = outcome;
-        JournalLog = journalLog;
     }
 }

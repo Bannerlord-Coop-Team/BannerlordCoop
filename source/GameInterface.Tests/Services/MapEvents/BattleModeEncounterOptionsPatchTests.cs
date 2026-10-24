@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -23,6 +24,28 @@ public class BattleModeEncounterOptionsPatchTests
             Assert.Contains(
                 patched,
                 method => method.Name.Contains("game_menu_encounter_abandon_army_on_condition"));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Theory]
+    [InlineData("game_menu_join_encounter_help_attackers_on_condition")]
+    [InlineData("game_menu_join_encounter_help_defenders_on_condition")]
+    public void HarmonyPatch_JoinEncounterConditionsGetEncounterMenuFinalizer(string conditionName)
+    {
+        var harmony = new Harmony(nameof(HarmonyPatch_JoinEncounterConditionsGetEncounterMenuFinalizer) + conditionName);
+        try
+        {
+            harmony.CreateClassProcessor(typeof(RaidJoinEncounterConditionPatch)).Patch();
+
+            var condition = AccessTools.Method(typeof(EncounterGameMenuBehavior), conditionName);
+            var patches = Harmony.GetPatchInfo(condition);
+
+            Assert.NotNull(patches);
+            Assert.Contains(patches.Finalizers, patch => patch.owner == harmony.Id);
         }
         finally
         {

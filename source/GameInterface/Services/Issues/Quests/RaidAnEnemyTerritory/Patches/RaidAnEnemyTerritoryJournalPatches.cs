@@ -37,6 +37,7 @@ public sealed class RaidAnEnemyTerritoryJournalSaveableTypeDefiner : SaveableTyp
 }
 
 [HarmonyPatch(typeof(JournalLogsCampaignBehavior), "CreateRelatedLog", new[] { typeof(IssueBase) })]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryJournalCreationPatch
 {
     [HarmonyPrefix]
@@ -64,6 +65,7 @@ internal sealed class RaidAnEnemyTerritoryJournalCreationPatch
 }
 
 [HarmonyPatch(typeof(QuestsVM), MethodType.Constructor, typeof(Action))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryJournalViewPatch
 {
     [ThreadStatic] internal static bool IsBuildingJournal;
@@ -80,6 +82,7 @@ internal sealed class RaidAnEnemyTerritoryJournalViewPatch
 }
 
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsOngoing), MethodType.Getter)]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryActiveJournalPatch
 {
     [HarmonyPostfix]
@@ -102,6 +105,7 @@ internal sealed class RaidAnEnemyTerritoryActiveJournalPatch
 }
 
 [HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryCompletedJournalPatch
 {
     [HarmonyPostfix]

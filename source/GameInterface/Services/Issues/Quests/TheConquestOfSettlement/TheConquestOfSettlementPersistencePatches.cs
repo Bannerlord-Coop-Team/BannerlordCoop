@@ -4,6 +4,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class TheConquestOfSettlementPersistencePatches
 {

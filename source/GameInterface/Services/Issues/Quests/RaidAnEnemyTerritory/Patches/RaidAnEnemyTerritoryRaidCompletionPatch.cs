@@ -20,6 +20,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<RaidAnEnemyTerritoryRaidCompletionPatch>();

@@ -37,6 +37,7 @@ public class PlayerCaptivityReleasePositionTests
     private readonly Mock<INetwork> network = new();
     private readonly Mock<ITroopRosterInterface> troopRosterInterface = new();
     private readonly Mock<IVillageHostileActionInterface> villageHostileActionInterface = new();
+    private readonly Mock<IRecruitmentSideEffects> recruitmentSideEffects = new();
     private readonly Mock<IPlayerManager> playerManager = new();
     private readonly PartyDoneLogicHandler handler;
 
@@ -52,6 +53,7 @@ public class PlayerCaptivityReleasePositionTests
             network.Object,
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
+            recruitmentSideEffects.Object,
             playerManager.Object);
     }
 
