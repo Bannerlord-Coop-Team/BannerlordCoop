@@ -15,9 +15,13 @@ public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientComma
     [ProtoMember(2)]
     public readonly string IssueId;
 
-    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId)
+    [ProtoMember(3)]
+    public readonly long? IssueDueTimeTicks;
+
+    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId, long? issueDueTimeTicks = null)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
+        IssueDueTimeTicks = issueDueTimeTicks;
     }
 }

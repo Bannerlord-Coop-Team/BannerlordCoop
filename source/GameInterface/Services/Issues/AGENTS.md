@@ -35,10 +35,11 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
    `QuestSuccess` for your descriptor.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
-   keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
-   `NetworkIssueFinalized`. `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside
-   `IssueBase.CheckPreconditions` so vanilla's one-issue-per-type check counts only the player's own issues, so a
-   stale mirror changes whether a player can accept.
+   keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
+   `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`.
+   `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside `IssueBase.CheckPreconditions` so
+   vanilla's one-issue-per-type check counts only the player's own issues, so a stale mirror changes whether a player
+   can accept.
 4. A non-owner client ends with the issue marked taken (`_issueState` set) and nothing else: no quest, no
    `AddLog`, no `OnIssueUpdated`, `IsTriedToSolveBefore` left false (vanilla uses it to pick the solver). For sent
    troops `AlternativeSolutionAcceptCoordinator.AddPlaceholderLog` also puts an empty entry straight into

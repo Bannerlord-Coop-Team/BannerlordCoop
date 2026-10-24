@@ -23,8 +23,12 @@ public interface IMapEventLoadCleaner
     // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
     void CleanUpLoadedMapEvents();
 
-    // Releases every party still linked to a battle that already ended. Also run live by coop.unstuck.
-    PartyBase[] ReleaseEndedMapEventLinks();
+    // Releases every party still linked to a battle that already ended, calling onReleased for each one
+    // as it is released. Also run live by coop.unstuck.
+    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
+
+    // Releases the parties of a battle whose finalize threw after it already ended, and publishes its end for the clients.
+    void ReleaseFailedFinalization(MapEvent mapEvent);
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -34,19 +38,22 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IArmyDisbander armyDisbander;
+    private readonly IStalledMapEventResolver stalledMapEventResolver;
 
     public MapEventLoadCleaner(
         ILogger logger,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IArmyDisbander armyDisbander)
+        IArmyDisbander armyDisbander,
+        IStalledMapEventResolver stalledMapEventResolver)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.armyDisbander = armyDisbander;
+        this.stalledMapEventResolver = stalledMapEventResolver;
     }
 
     public void CleanUpLoadedMapEvents()
@@ -106,30 +113,20 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             }
         }
 
-        ReleaseEndedMapEventLinks();
+        // A save can hold an AI battle left with no healthy troops on one side, which nothing ends on its own.
+        stalledMapEventResolver.ResolveStalledMapEvents();
+        ReleaseEndedMapEventLinks(_ => { });
     }
 
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    public PartyBase[] ReleaseEndedMapEventLinks()
+    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
     {
-        if (Campaign.Current?.MapEventManager == null)
-            return Array.Empty<PartyBase>();
-
         var releasedParties = new List<PartyBase>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
-        var parties = Campaign.Current.CampaignObjectManager.MobileParties
-            .Where(mobileParty => mobileParty != null)
-            .Select(mobileParty => mobileParty.Party)
-            .Concat(Settlement.All
-                .Where(settlement => settlement != null)
-                .Select(settlement => settlement.Party))
-            .Where(party => party != null)
-            .ToArray();
 
-        var endedMapEvents = parties
-            .Where(party => party.MapEventSide?.MapEvent != null)
+        var endedMapEvents = GetLinkedParties()
             .GroupBy(party => party.MapEventSide.MapEvent)
             .Where(group => group.Key.IsFinalized || !liveMapEvents.Contains(group.Key))
             .ToArray();
@@ -137,12 +134,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         foreach (var group in endedMapEvents)
         {
             var mapEvent = group.Key;
-            var linkedParties = group.ToArray();
-
-            logger.Warning(
-                "Releasing {PartyCount} parties from ended map event {MapEventId}",
-                linkedParties.Length,
-                mapEvent.StringId);
 
             // The battle already ended, so mark it finalized before detaching. Removing the last
             // party then cannot run FinalizeEvent again and replay its results.
@@ -152,24 +143,66 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 mapEvent.State = MapEventState.WaitingRemoval;
             }
 
-            RepairPartySideLinks(mapEvent);
-            DetachFromFinalizedEvent(mapEvent);
-
-            foreach (var party in linkedParties)
-            {
-                // A link the event's sides never listed has no membership left to remove.
-                if (ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
-                    party._mapEventSide = null;
-
-                var mobileParty = party.MobileParty;
-                if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
-                    mobileParty.ResetNavigationToHold();
-
-                releasedParties.Add(party);
-            }
+            releasedParties.AddRange(ReleaseLinkedParties(mapEvent, group.ToArray(), onReleased));
         }
 
         return releasedParties.ToArray();
+    }
+
+    // FinalizeEventAux sets WaitingRemoval before its listeners, the component's OnFinalize and the party
+    // detach, so none of those ran. Redo the village state and the detach, without replaying results.
+    public void ReleaseFailedFinalization(MapEvent mapEvent)
+    {
+        ResetVillageState(mapEvent);
+
+        var linkedParties = GetLinkedParties()
+            .Where(party => ReferenceEquals(party.MapEventSide.MapEvent, mapEvent))
+            .ToArray();
+        ReleaseLinkedParties(mapEvent, linkedParties, _ => { });
+    }
+
+    private static PartyBase[] GetLinkedParties() =>
+        Campaign.Current.CampaignObjectManager.MobileParties
+            .Where(mobileParty => mobileParty != null)
+            .Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All
+                .Where(settlement => settlement != null)
+                .Select(settlement => settlement.Party))
+            .Where(party => party?.MapEventSide?.MapEvent != null)
+            .ToArray();
+
+    private PartyBase[] ReleaseLinkedParties(MapEvent mapEvent, PartyBase[] linkedParties, Action<PartyBase> onReleased)
+    {
+        logger.Warning(
+            "Releasing {PartyCount} parties from ended map event {MapEventId}",
+            linkedParties.Length,
+            mapEvent.StringId);
+
+        RepairPartySideLinks(mapEvent);
+        DetachFromFinalizedEvent(mapEvent);
+
+        foreach (var party in linkedParties)
+        {
+            // A link the event's sides never listed has no membership left to remove.
+            if (ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
+                party._mapEventSide = null;
+
+            var mobileParty = party.MobileParty;
+            if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                mobileParty.ResetNavigationToHold();
+
+            // A failed broadcast must not leave the rest of the parties linked to the ended battle.
+            try
+            {
+                onReleased(party);
+            }
+            catch (Exception ex)
+            {
+                logger.Warning(ex, "Could not report released party {PartyId} from ended map event {MapEventId}", party.Id, mapEvent.StringId);
+            }
+        }
+
+        return linkedParties;
     }
 
     // WaitingRemoval skips the component's OnBeforeFinalize and OnFinalize, the only calls that move
