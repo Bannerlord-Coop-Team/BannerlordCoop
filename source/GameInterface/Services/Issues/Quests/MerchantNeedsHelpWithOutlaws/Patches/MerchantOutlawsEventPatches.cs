@@ -55,17 +55,12 @@ internal class MerchantOutlawsEventPatches
         });
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void HourlyPostfix(MobileParty mobileParty)
+    private static void HourlyPostfix()
     {
-        if (!mobileParty.IsBandit) return;
-        RunAsOwners(quest =>
-        {
-            var wasValid = quest._validPartiesList.Contains(mobileParty);
-            quest.HourlyTickParty(mobileParty);
-            if (wasValid != quest._validPartiesList.Contains(mobileParty)) Send(quest);
-        });
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IMerchantOutlawsHourlyTick>(out var hourly))
+            hourly.Tick(MobileParty.All);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]

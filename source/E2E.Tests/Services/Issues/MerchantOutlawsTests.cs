@@ -300,7 +300,7 @@ public class MerchantOutlawsTests : IDisposable
                 party.CurrentSettlement = Get<Settlement>(Server, settlementId);
             }
 
-            CampaignEventDispatcher.Instance.HourlyTickParty(party);
+            Server.Resolve<IMerchantOutlawsHourlyTick>().Tick(new[] { party });
         }, TextHelpers);
 
         Server.Call(() =>
