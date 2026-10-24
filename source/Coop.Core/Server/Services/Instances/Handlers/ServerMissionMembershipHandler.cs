@@ -78,7 +78,7 @@ public class ServerMissionMembershipHandler : IHandler
         // Keep a previous visit's queued leave ahead of the next visit's authorization.
         GameThread.RunSafe(() =>
         {
-            if (TryGetCurrentController(peer, out var controllerId) &&
+            if (playerManager.TryGetCurrentController(peer, out var controllerId) &&
                 missionManager.TryAuthorizeIntroduction(peer, controllerId, request.InstanceId, request.RequestId, out var token))
             {
                 network.Send(peer, new NetworkMissionIntroductionAuthorized(request.InstanceId, request.RequestId, token));
@@ -92,7 +92,7 @@ public class ServerMissionMembershipHandler : IHandler
             return;
 
         var message = payload.What;
-        if (!TryGetCurrentController(peer, out var controllerId))
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             Logger.Debug("Ignoring mission entry for instance {Instance} from stale or unregistered peer {Peer}",
                 message.InstanceId, peer);
@@ -168,7 +168,7 @@ public class ServerMissionMembershipHandler : IHandler
             return;
 
         var message = payload.What;
-        if (!TryGetCurrentController(peer, out var controllerId))
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             Logger.Debug("Ignoring mission leave for instance {Instance} from stale or unregistered peer {Peer}",
                 message.InstanceId, peer);
@@ -197,20 +197,6 @@ public class ServerMissionMembershipHandler : IHandler
             foreach (var departure in departures)
                 PublishDeparture(departure, wasRetreat: false);
         }, context: nameof(Handle_PlayerDisconnected));
-    }
-
-    private bool TryGetCurrentController(NetPeer peer, out string controllerId)
-    {
-        controllerId = null;
-        if (!playerManager.TryGetPlayer(peer, out var player) ||
-            !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
-            !object.ReferenceEquals(currentPeer, peer))
-        {
-            return false;
-        }
-
-        controllerId = player.ControllerId;
-        return true;
     }
 
     // [Game thread] Tells the remaining members and the server's own handlers that a member left. A naval disconnect goes
