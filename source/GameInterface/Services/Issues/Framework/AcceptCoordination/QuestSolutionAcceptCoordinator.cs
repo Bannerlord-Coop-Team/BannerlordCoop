@@ -251,7 +251,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             data.IssueId,
             player.ControllerId,
             data.DifficultyMultiplier,
-            data.Captured));
+            data.Captured,
+            issue.IssueQuest?.QuestDueTime.NumTicks ?? 0,
+            issue.IssueQuest != null));
     }
 
     // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
@@ -309,17 +311,18 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
 
             // The accepting player already ran the accept locally
-            if (data.ControllerId == controllerIdProvider.ControllerId)
+            if (data.ControllerId != controllerIdProvider.ControllerId)
             {
-                return;
+                // No quest object here, its dialogs would answer this player's conversations too
+                issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
+                issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                issue.IssueDueTime = CampaignTime.Never;
+
+                descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
             }
 
-            // No quest object here, its dialogs would answer this player's conversations too
-            issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
-            issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
-            issue.IssueDueTime = CampaignTime.Never;
-
-            descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
+            if (data.HasQuestDueTime && issue.IssueQuest != null)
+                issue.IssueQuest.ChangeQuestDueTime(new CampaignTime(data.QuestDueTimeTicks));
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }
 
