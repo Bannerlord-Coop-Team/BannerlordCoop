@@ -1,5 +1,7 @@
 ﻿using Common;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -8,7 +10,7 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEvents;
 
-internal interface IEncounterMenuConditionRefresher
+public interface IEncounterMenuConditionRefresher
 {
     void RefreshForMapEvent(MapEvent mapEvent);
     void RefreshForRoster(TroopRoster roster);
@@ -28,6 +30,18 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         // The encounter can hold the event before the main party's own attach lands (and the other way round).
         if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
             return;
+
+        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && !mapEvent.HasWinner &&
+            PlayerEncounter.Battle == mapEvent && MobileParty.MainParty?.Party.MapEventSide == mapEvent.AttackerSide &&
+            mapEvent.DefenderSide.TroopCount == 0 && mapEvent.MapEventSettlement?.Militia == 0f &&
+            Game.Current?.GameStateManager.ActiveState is MapState { MapConversationActive: false })
+        {
+            // Surrender can arrive after encounter init; wait for both defender and militia replay.
+            if (PlayerEncounter.InsideSettlement)
+                PlayerEncounter.LeaveSettlement();
+            GameMenu.ActivateGameMenu("raiding_village");
+            return;
+        }
 
         if (NeedsEncounterMenuReinit(mapEvent))
         {
