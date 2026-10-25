@@ -274,6 +274,19 @@ public class PartyScreenRosterRefresherTests
         Assert.Equal(-1, logic._initialData.RightPrisonerRoster.FindIndexOfTroop(prisoner));
     }
 
+    /// <summary>
+    /// With no party screen in the stack the change goes straight to the live roster.
+    /// </summary>
+    [Fact]
+    public void GetOpenLogic_NoPartyState_ReturnsNull()
+    {
+        var gameStates = new GameStateManager(null, GameStateManager.GameStateManagerType.Game);
+        gameStates._gameStates.Add(ObjectHelper.SkipConstructor<TaleWorlds.MountAndBlade.MissionState>());
+
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(gameStates));
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(null));
+    }
+
     private static void Release(TroopRoster roster, CharacterObject troop)
     {
         roster.AddToCounts(troop, -roster.GetTroopCount(troop), false, 0, 0, true);

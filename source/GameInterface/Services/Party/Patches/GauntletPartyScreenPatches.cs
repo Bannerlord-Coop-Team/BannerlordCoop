@@ -14,8 +14,8 @@ internal class GauntletPartyScreenPatches
         if (ModInformation.IsServer) return;
         if (__instance._dataSource?.IsInConversation != true) return;
 
-        // PartyScreenRosterRefresher kept the screen data current during the talk, but the rows
-        // weren't on top to refresh.
+        // PartyScreenRosterRefresher kept the screen data current during the talk while the rows were
+        // hidden, and the Done Reset(true) on resume skips rebuilding them, so rebuild them here.
         __instance._partyState.PartyScreenLogic.OnReset(false);
     }
 }
