@@ -20,17 +20,15 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly ITroopRosterInterface rosters;
-    private readonly IAlternativeSolutionTroopValidator troops;
     private readonly IPlayerManager players;
-    private readonly Dictionary<(string Hero, string Giver, string Issue), (NetPeer Peer, TroopRoster Troops)> selections = new();
+    private readonly Dictionary<(string Hero, string Giver, string Issue), (NetPeer Peer, Dictionary<CharacterObject, TroopRosterElement> Troops)> selections = new();
 
     public AlternativeSolutionCommitments(IMessageBroker broker, IObjectManager objects,
-        ITroopRosterInterface rosters, IAlternativeSolutionTroopValidator troops, IPlayerManager players)
+        ITroopRosterInterface rosters, IPlayerManager players)
     {
         this.broker = broker;
         this.objects = objects;
         this.rosters = rosters;
-        this.troops = troops;
         this.players = players;
         broker.Subscribe<PartyDoneLogicApplied>(Handle_Applied);
         broker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
@@ -49,8 +47,8 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         foreach (var element in rosters.UnpackTroopRosterData(delta))
         {
             if (element.Character.IsHero) continue;
-            var available = selection.Troops == null ? default : selection.Troops.GetTroopRoster()
-                .FirstOrDefault(value => value.Character == element.Character);
+            var available = selection.Troops != null && selection.Troops.TryGetValue(element.Character, out var committed)
+                ? committed : default;
             if (available.Character == null) available = new TroopRosterElement(element.Character);
             if (-element.Number > available.Number || -element.WoundedNumber > available.WoundedNumber ||
                 -element.Xp > available.Xp) return false;
@@ -61,17 +59,17 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
     public TroopRosterElementData[] Consume(string heroId, string issueOwnerId, string issueId, TroopRosterElementData[] requested)
     {
         var key = (heroId, issueOwnerId, issueId);
-        var result = TroopRoster.CreateDummyTroopRoster();
+        var result = new Dictionary<CharacterObject, TroopRosterElement>();
         if (selections.TryGetValue(key, out var selection))
         {
             selections.Remove(key);
-            result.Add(selection.Troops);
+            foreach (var element in selection.Troops.Values) result.Add(element.Character, element);
         }
         foreach (var element in rosters.UnpackTroopRosterData(new TroopRosterData(requested ?? System.Array.Empty<TroopRosterElementData>())))
         {
-            if (element.Character.IsHero) result.Add(element);
+            if (element.Character.IsHero) Add(result, element);
         }
-        return troops.ToData(result);
+        return ToData(result.Values);
     }
 
     public void ReturnForIssue(string issueOwnerId, string issueId)
@@ -80,7 +78,7 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         {
             selections.Remove(entry.Key);
             if (!objects.TryGetObjectWithLogging<Hero>(entry.Key.Hero, out var hero) || hero.PartyBelongedTo == null) continue;
-            troops.ReturnTroopsToParty(hero.PartyBelongedTo, troops.ToData(entry.Value.Troops));
+            foreach (var element in entry.Value.Troops.Values) hero.PartyBelongedTo.MemberRoster.Add(element);
         }
     }
 
@@ -91,12 +89,11 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         if (!players.TryGetPlayer(data.Requester, out var player)) return;
         var key = (player.HeroId, data.IssueOwnerId, data.IssueId);
         if (!selections.TryGetValue(key, out var selection))
-            selection = (data.Requester, TroopRoster.CreateDummyTroopRoster());
+            selection = (data.Requester, new Dictionary<CharacterObject, TroopRosterElement>());
         foreach (var element in rosters.UnpackTroopRosterData(data.MemberDelta))
         {
             if (element.Character.IsHero) continue;
-            selection.Troops.AddToCounts(element.Character, element.Number,
-                woundedCount: element.WoundedNumber, xpChange: element.Xp);
+            Add(selection.Troops, element);
         }
         selections[key] = (data.Requester, selection.Troops);
     }
@@ -110,8 +107,38 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
             {
                 selections.Remove(entry.Key);
                 if (!objects.TryGetObjectWithLogging<Hero>(entry.Key.Hero, out var hero) || hero.PartyBelongedTo == null) continue;
-                troops.ReturnTroopsToParty(hero.PartyBelongedTo, troops.ToData(entry.Value.Troops));
+                foreach (var element in entry.Value.Troops.Values) hero.PartyBelongedTo.MemberRoster.Add(element);
             }
         }, context: nameof(AlternativeSolutionCommitments));
     }
+
+    private static void Add(Dictionary<CharacterObject, TroopRosterElement> selection, TroopRosterElement delta)
+    {
+        if (!selection.TryGetValue(delta.Character, out var current) && delta.Number + delta.WoundedNumber <= 0) return;
+        if (current.Character == null) current = new TroopRosterElement(delta.Character);
+        var number = current.Number + delta.Number;
+        if (number == 0)
+        {
+            selection.Remove(delta.Character);
+            return;
+        }
+        selection[delta.Character] = new TroopRosterElement(delta.Character)
+        {
+            Number = number,
+            WoundedNumber = System.Math.Min(number, current.WoundedNumber + delta.WoundedNumber),
+            Xp = current.Xp + delta.Xp,
+        };
+    }
+
+    private TroopRosterElementData[] ToData(IEnumerable<TroopRosterElement> selection)
+    {
+        var result = new List<TroopRosterElementData>();
+        foreach (var element in selection)
+        {
+            if (objects.TryGetHandleWithLogging(element.Character, out var handle))
+                result.Add(new TroopRosterElementData(handle, element.Number, element.WoundedNumber, element.Xp));
+        }
+        return result.ToArray();
+    }
+
 }
