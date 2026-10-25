@@ -1,5 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
 using System;
@@ -158,10 +160,15 @@ internal class ExtortionByDesertersWorldPatches
         var deserters = __instance._deserterMobileParty;
         if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
 
-        var owner = Hero.MainHero.PartyBelongedTo?.Party;
+        // Native capture clears the hero's membership before this battle callback runs.
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+            !players.TryGetPlayer(Hero.MainHero, out var player) ||
+            !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
+            !objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty)) return false;
+        var owner = ownerParty.Party;
         // Like vanilla, a battle without the owner, such as the village militia's, leaves the quest alone here;
         // the FinalizeEventAux postfix cancels it if the deserters were destroyed.
-        if (owner == null || !mapEvent.InvolvedParties.Contains(owner)) return false;
+        if (!mapEvent.InvolvedParties.Contains(owner)) return false;
 
         __instance._deserterBattleFinalizedForTheFirstTime = true;
         if (mapEvent.WinningSide == owner.Side)

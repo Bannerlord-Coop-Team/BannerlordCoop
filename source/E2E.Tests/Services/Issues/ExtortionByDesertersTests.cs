@@ -850,6 +850,8 @@ public class ExtortionByDesertersTests : IDisposable
             AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty)));
         using var rewards = new MethodCallRecorder(Priority.First, true,
             AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)));
+        using var ended = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(Quest), nameof(Quest.MapEventEnded)));
         string deserterId = null!;
         Server.Call(() =>
         {
@@ -889,6 +891,7 @@ public class ExtortionByDesertersTests : IDisposable
             battle.FinalizeEventAux();
 
             Assert.True(battle.IsFinalized);
+            Assert.Equal(1, ended.CountFor(Server));
             Assert.Equal(State.DesertersDefeatedPlayer, quest._currentState);
             Assert.True(quest.IsOngoing);
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(deserterId, out var registeredDeserters));
