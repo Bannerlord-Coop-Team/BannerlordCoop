@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd.Patches;
