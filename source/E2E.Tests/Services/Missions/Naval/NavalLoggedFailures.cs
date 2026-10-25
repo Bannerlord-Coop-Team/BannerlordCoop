@@ -12,7 +12,7 @@ public sealed class NavalLoggedFailures : IDisposable
 {
     // A naval log line, or a caught exception thrown from a naval type (the RunSafe wrapper names no feature).
     private static readonly Regex NavalFailure = new(
-        @"^\[Naval|\bat Missions\.(Naval\.|Battles\.(BattleShip|Naval|ShipCapture|AgentStationUse|NetworkShip|BattleWaterClock))",
+        @"^\[Naval|\bat Missions\.(Naval\.|Battles\.(BattleShip|Naval|ShipCapture|AgentStationUse|NetworkShip|BattleWater)|Agents\.(Handlers\.)?NavalDeck)",
         RegexOptions.Multiline | RegexOptions.Compiled);
 
     private readonly int threadId = System.Environment.CurrentManagedThreadId;
