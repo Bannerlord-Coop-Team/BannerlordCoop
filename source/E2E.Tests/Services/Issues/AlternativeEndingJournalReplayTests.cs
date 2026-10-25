@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using Common.Network;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -79,11 +80,15 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         var message = new NetworkAlternativeSolutionJournal(scenario.NotableId, QuestScenario.IssueId,
             IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest,
             expected.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray());
-        for (var delivery = 0; delivery < 2; delivery++)
+        scenario.Server.Call(() =>
         {
-            scenario.ClientA.SimulateMessage(scenario.Server, message);
-            scenario.ClientB.SimulateMessage(scenario.Server, message);
-        }
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPeer(QuestScenario.ControllerA, out var peer));
+            scenario.Server.Resolve<INetwork>().Send(peer, message);
+        });
+        environment.FlushCoalescer();
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        scenario.ClientA.SimulateMessage(scenario.Server, message);
+        scenario.ClientB.SimulateMessage(scenario.Server, message);
         Assert.Empty(updates);
         AssertObserverHasNoArchive();
         scenario.ClientA.Call(() =>
@@ -106,6 +111,8 @@ public class AlternativeEndingJournalReplayTests : IDisposable
                     Assert.Equal(expected[index].TaskName?.Value, entries[index].TaskName?.Value);
                 }
                 Assert.Equal(text.ToString(), entries[0].LogText.ToString());
+                Assert.Null(entries[1].LogText);
+                Assert.Null(entries[1].TaskName);
                 var person = Assert.IsType<TextObject>(entries[0].LogText.Attributes["PERSON"]);
                 Assert.Equal("Suvys", person.Attributes["NAME"]);
                 Assert.Equal(3, entries[0].LogText.Attributes["COUNT"]);
