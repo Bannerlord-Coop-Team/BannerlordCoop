@@ -11,6 +11,7 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 /// precondition check cancels the issue when that fails, which on a client removed the offer on that machine only.
 /// The server alone rerolls or ends the issue and sends the new targets to the clients.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ScoutEnemyGarrisonsStayAlivePatches
 {

@@ -55,7 +55,8 @@ public class LocationPuppetSpawnerTests
             Mock.Of<IBattleAgentBudget>(),
             Mock.Of<ILocationAgentSpawnBatchCodec>(),
             Mock.Of<ILocationAuthorityMigrator>(),
-            Mock.Of<ILocationControllerWithdrawalState>());
+            Mock.Of<ILocationControllerWithdrawalState>(),
+            Mock.Of<ILocationNpcAuthorityState>());
 
         int previousGameThreadId = GameThread.Instance.GameThreadId;
         GameThread.Instance.MarkGameThread();

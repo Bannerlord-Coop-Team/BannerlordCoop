@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Issues.Framework.Interface;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.CampaignService.Statistics.Interfaces;
@@ -43,6 +44,8 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IAlternativeSolutionPicker picker;
+    private readonly IAlternativeSolutionCommitments commitments;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
     private readonly IPlayerManager playerManager;
     private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
@@ -53,6 +56,8 @@ internal class PartyDoneLogicHandler : IHandler
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
         IVillageHostileActionInterface villageHostileActionInterface,
+        IAlternativeSolutionPicker picker,
+        IAlternativeSolutionCommitments commitments,
         IRecruitmentSideEffects recruitmentSideEffects,
         IPlayerManager playerManager,
         IStatisticsCampaignBehaviorInterface statisticsInterface)
@@ -62,6 +67,8 @@ internal class PartyDoneLogicHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.picker = picker;
+        this.commitments = commitments;
         this.recruitmentSideEffects = recruitmentSideEffects;
         this.playerManager = playerManager;
         this.statisticsInterface = statisticsInterface;
@@ -120,6 +127,10 @@ internal class PartyDoneLogicHandler : IHandler
                 objectManager);
         }
 
+        string issueOwnerId = null;
+        string issueId = null;
+        picker.TryGetIssue(obj.What.LeftMemberRoster, out issueOwnerId, out issueId);
+
         var message = new NetworkCompleteDoneLogic(
             mainHeroId,
             FlattenedTroopSerializer.Serialize(obj.What.ReleasedPrisonersRoster, objectManager),
@@ -143,7 +154,7 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId
+            obj.What.ForceTransferId, issueOwnerId, issueId
         );
 
         network.SendAll(message);
@@ -293,7 +304,9 @@ internal class PartyDoneLogicHandler : IHandler
             // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
-                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
+                if ((!string.IsNullOrEmpty(message.IssueId) &&
+                    !commitments.CanApply(requester, message.IssueOwnerId, message.IssueId, message.LeftMemberRosterData)) ||
+                    !troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
                 {
                     logger.Warning(
                         "Rejected party changes for {MainHeroId}: {Reason}",
@@ -306,6 +319,8 @@ internal class PartyDoneLogicHandler : IHandler
                     return;
                 }
             }
+            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.LeftMemberRosterData,
+                message.MainHeroId, message.IssueOwnerId, message.IssueId));
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             if (message.ApplyReleasedAndTakenPrisonerActions)
