@@ -140,5 +140,4 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         }
         return result.ToArray();
     }
-
 }
