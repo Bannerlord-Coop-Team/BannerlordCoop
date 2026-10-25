@@ -432,6 +432,7 @@ public class CoopTournamentController : CoopMissionController
         agentSpawner.ApplyManifest(manifest, snapshot, session);
         CaptureManifestAgents(manifest);
         RefreshNativeFightState();
+        Mission.Current.SetMissionMode(MissionMode.Battle, true);
         if (latestRuntimeState?.MatchId == manifest.MatchId)
             ApplyRuntimeState(latestRuntimeState);
         DrainPendingTournamentPackets();

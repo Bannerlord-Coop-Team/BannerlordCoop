@@ -43,6 +43,7 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
+using Moq;
 using System.Reflection;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
@@ -70,7 +71,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Services.MapEvents;
 
-public class PlayerPartyInteractionFlowTests : MapEventTestBase
+public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 {
     private static Action? beforePvpNotificationDrain;
 
@@ -2928,11 +2929,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                         playerParty.Party,
                         BattleSideEnum.Defender));
 
+                    PayBreakIn(client, playerParty, settlement);
                     Server.SimulateMessage(client.NetPeer, breakInRequest);
                 },
                 MapEventDisabledMethods);
         }
 
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
         Assert.Equal(

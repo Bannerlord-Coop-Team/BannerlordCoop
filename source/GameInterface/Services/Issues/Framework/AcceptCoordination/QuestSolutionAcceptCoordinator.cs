@@ -235,6 +235,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)
@@ -289,7 +291,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
-        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
+        long? dueTime = issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) &&
+            issue.IsOngoingWithoutQuest ? issue.IssueDueTime.NumTicks : (long?)null;
+        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId, dueTime));
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -364,6 +368,10 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             {
                 strayQuest.CompleteQuestWithCancel();
             }
+
+            journal.DiscardArchive(issue);
+            if (data.IssueDueTimeTicks.HasValue && !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
+                issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }
 }
