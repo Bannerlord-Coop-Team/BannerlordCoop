@@ -248,7 +248,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         text.SetTextVariable("NAME", "Suvys");
         var task = new TextObject("{=acceptance_task}Return {DAYS}");
         task.SetTextVariable("DAYS", 4);
-        var native = new JournalLog(new CampaignTime(123L), text, task, 2, 4, TaleWorlds.Core.LogType.Text);
+        var native = new JournalLog(new CampaignTime(123L), text, task, 2, 4, LogType.Text);
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, new AlternativeSolutionJournalEntry(native));
         stream.Position = 0;
@@ -269,7 +269,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         [ProtoMember(3)] public string TaskName { get; set; }
         [ProtoMember(4)] public int Progress { get; set; }
         [ProtoMember(5)] public int Range { get; set; }
-        [ProtoMember(6)] public TaleWorlds.Core.LogType Type { get; set; }
+        [ProtoMember(6)] public LogType Type { get; set; }
     }
 
     private void EndOnServer(IssueBase.IssueUpdateDetails ending)
