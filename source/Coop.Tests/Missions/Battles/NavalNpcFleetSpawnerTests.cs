@@ -87,10 +87,10 @@ public class NavalNpcFleetSpawnerTests
 
     [Theory]
     [InlineData(true, true, "joiner", true)]
-    [InlineData(true, false, "joiner", false)]
+    [InlineData(true, false, "joiner", true)]
     [InlineData(false, true, "joiner", false)]
     [InlineData(true, true, Own, false)]
-    public void SendAttemptTo_OnlyTheBattleHostPassesTheAttemptToAnEntrant(bool attempted, bool isLocalHost, string entrant,
+    public void SendAttemptTo_EveryClientHoldingTheAttemptPassesItToAnotherEntrant(bool attempted, bool isLocalHost, string entrant,
         bool sends)
     {
         var harness = new Harness(BattleSideEnum.Defender) { IsLocalHost = isLocalHost };

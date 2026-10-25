@@ -193,6 +193,8 @@ public class CoopNavalBattleBehavior : MissionLogic
             Logger.Error(exception, "[NavalSync] Disposing the naval services threw; the naval statics are reset anyway");
         }
 
+        NpcFleetSpawner.Dispose();
+
         NavalRopes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();

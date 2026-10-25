@@ -18,8 +18,10 @@ internal class LateDeploymentPlanNotificationPatch
 /// <summary>[Game thread] Makes a battle side's deployment plan after deployment, without notifying mission listeners.</summary>
 internal static class NavalLateDeploymentPlan
 {
+    // Whether the late plan is being made now, which the notification patch reads.
     internal static bool IsMaking { get; private set; }
 
+    // Makes the side's deployment plan with the notification patch silencing it, also when the plan throws.
     internal static void MakeForSide(DefaultNavalMissionLogic navalLogic, BattleSideEnum side)
     {
         IsMaking = true;

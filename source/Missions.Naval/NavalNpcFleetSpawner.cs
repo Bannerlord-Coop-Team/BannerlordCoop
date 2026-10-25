@@ -151,6 +151,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         state = attempted.Failed ? Failed : Fielded;
     }
 
+    // [Poller] Hands an earlier host's attempt to the game thread, where the spawner's state lives.
     private void Handle_NetworkNpcFleetAttempted(MessagePayload<NetworkNpcFleetAttempted> payload)
     {
         var attempted = payload.What;
@@ -167,6 +168,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             attempted.Side, session.InstanceId, state);
     }
 
+    // [Poller] Hands an entrant of this battle to the game thread, which sends it the attempt.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         var entered = payload.What;
@@ -175,10 +177,10 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         GameThread.RunSafe(() => SendAttemptTo(entered.ControllerId), context: nameof(Handle_PeerEntered));
     }
 
-    // [Game thread] The battle host passes the attempt to an entrant, which a later host change could promote.
+    // [Game thread] Every client holding the attempt passes it to an entrant, so one entering during a host change still gets it.
     internal void SendAttemptTo(string controllerId)
     {
-        if (!HasAttempt || !session.IsLocalHost || session.IsOwn(controllerId)) return;
+        if (!HasAttempt || session.IsOwn(controllerId)) return;
 
         network.Send(controllerId, attempt);
     }
@@ -348,6 +350,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         return party != null && objectManager.TryGetId(party, out var id) ? id : null;
     }
 
+    // The spawner's state and the battle's attempt, for the naval inspect command.
     public object Inspect() => new
     {
         enemySide = enemySide.ToString(),
