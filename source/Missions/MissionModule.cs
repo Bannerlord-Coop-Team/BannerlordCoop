@@ -235,6 +235,7 @@ public class MissionModule : Module
 #if DEBUG
         builder.RegisterType<Diagnostics.MissionInspection>().As<Diagnostics.IMissionInspection>().InstancePerDependency();
 #endif
+        builder.RegisterType<BattleHostSuccession>().As<IBattleHostSuccession>().InstancePerDependency();
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()

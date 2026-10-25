@@ -28,6 +28,18 @@ public class BattleHostAssignment
         IsNaval = isNaval;
         KeptAfterResult = keptAfterResult;
     }
+
+    /// <summary>The same host and hosting generation with another successor line.</summary>
+    public BattleHostAssignment WithSuccessors(IReadOnlyList<string> successorControllerIds) =>
+        new BattleHostAssignment(HostControllerId, successorControllerIds, Epoch, IsNaval, KeptAfterResult);
+
+    /// <summary>The same assignment, kept after its naval host left with the result.</summary>
+    public BattleHostAssignment AsKeptAfterResult() =>
+        new BattleHostAssignment(HostControllerId, SuccessorControllerIds, Epoch, IsNaval, keptAfterResult: true);
+
+    /// <summary>The next hosting generation under a promoted host, still at sea when this one was.</summary>
+    public BattleHostAssignment PromotedTo(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch) =>
+        new BattleHostAssignment(hostControllerId, successorControllerIds, epoch, IsNaval);
 }
 
 /// <summary>
