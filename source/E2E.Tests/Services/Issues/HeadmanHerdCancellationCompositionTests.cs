@@ -116,8 +116,14 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
             Assert.Null(issue.IssueQuest);
             var archive = Archive(Campaign.Current.LogEntryHistory);
             Assert.Equal(IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, archive._lastIssueStatus);
+            var ownerLog = Assert.Single(archive.GetEntries());
+            Assert.Equal(expected[0].CurrentProgress, ownerLog.CurrentProgress);
+            Assert.Equal(expected[0].Range, ownerLog.Range);
+            Assert.Equal(expected[0].Type, ownerLog.Type);
+            AssertText(expected[0].LogText, ownerLog.LogText);
+            AssertText(expected[0].TaskName, ownerLog.TaskName);
             output.WriteLine("Server acceptance ticks {0}; owner acceptance ticks {1}; server/owner clocks {2}/{3}",
-                expected[0].LogTime.NumTicks, Assert.Single(archive.GetEntries()).LogTime.NumTicks, serverNow, ownerNow);
+                expected[0].LogTime.NumTicks, ownerLog.LogTime.NumTicks, serverNow, ownerNow);
             AssertHistory(expected, archive.GetEntries());
             AssertHistory(expected, issue.JournalEntries);
         });
