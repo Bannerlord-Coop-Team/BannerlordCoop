@@ -262,7 +262,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         // Re-deliver the real proof twice after completion, or after an insufficient-inventory refusal.
         for (var retry = 0; retry < 2; retry++)
         {
-            ClientA.Call(() => ClientA.SendMessageToServer(request));
+            Server.SimulateMessage(ClientA.NetPeer, ClientA.SerializeForWire(request));
             environment.FlushCoalescer();
         }
 
