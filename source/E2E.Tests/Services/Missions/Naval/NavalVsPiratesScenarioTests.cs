@@ -85,4 +85,24 @@ public class NavalVsPiratesScenarioTests : NavalBattleTestEnvironment
         Assert.False((bool)b.Stream(hullA)["streaming"]!);
         Assert.Equal("expired", (string)b.Stream(hullA)["lastReject"]!);
     }
+
+    // M10a: a copy is steered from the owner's body velocity and yaw rate, which ride every sample.
+    [Fact]
+    public void VsPirates_OwnersBodyMotion_RidesItsSamples_IntoTheCopy()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        var a = battle["A"];
+        var b = battle["B"];
+        battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(30f, 0f, 0f));
+        battle.CommitAll();
+        battle.TickAll();
+        b.Hull(hullB).Motion = new BattleShipMotion(new Vec2(4f, -1f), 0.1f);
+
+        battle.TickAll(2);
+
+        Assert.Equal(4f, a.Hull(hullB).Motion.Velocity.x);
+        Assert.Equal(-1f, a.Hull(hullB).Motion.Velocity.y);
+        Assert.Equal(0.1f, a.Hull(hullB).Motion.YawRate);
+    }
 }
