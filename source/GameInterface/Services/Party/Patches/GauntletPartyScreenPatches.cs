@@ -1,37 +1,15 @@
-﻿using Common;
+﻿﻿using Common;
 using Common.Util;
 using HarmonyLib;
 using SandBox.GauntletUI;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
 namespace GameInterface.Services.Party.Patches;
 
 [HarmonyPatch]
 internal class GauntletPartyScreenPatches
 {
-    [ThreadStatic]
-    private static CharacterObject conversationCharacter;
-
-    [ThreadStatic]
-    private static bool conversationCharacterIsPrisoner;
-
-    [HarmonyPatch(typeof(PartyVM), nameof(PartyVM.ExecuteOpenConversation))]
-    [HarmonyPrefix]
-    public static void ExecuteOpenConversationPrefix(PartyVM __instance)
-    {
-        if (ModInformation.IsServer) return;
-
-        var currentCharacter = __instance.CurrentCharacter;
-        if (currentCharacter?.Character == null) return;
-
-        conversationCharacter = currentCharacter.Character;
-        conversationCharacterIsPrisoner = currentCharacter.IsPrisoner;
-    }
-
     [HarmonyPatch(typeof(GauntletPartyScreen), nameof(GauntletPartyScreen.OnResume))]
     [HarmonyPrefix]
     public static void OnResumePrefix(GauntletPartyScreen __instance)
@@ -39,53 +17,39 @@ internal class GauntletPartyScreenPatches
         if (ModInformation.IsServer) return;
         if (__instance._dataSource?.IsInConversation != true) return;
 
-        var character = conversationCharacter;
-        bool isPrisoner = conversationCharacterIsPrisoner;
-        conversationCharacter = null;
-        conversationCharacterIsPrisoner = false;
-        if (character == null) return;
-
-        var partyScreenLogic = __instance._partyState.PartyScreenLogic;
-        RemoveConversationCharacter(partyScreenLogic, character, isPrisoner);
+        RebaseOnOwnerRosters(__instance._partyState.PartyScreenLogic);
     }
 
-    private static void RemoveConversationCharacter(
-        PartyScreenLogic partyScreenLogic,
-        CharacterObject character,
-        bool isPrisoner)
+    /// <summary>
+    /// Rebuilds the screen data from the parties' live rosters after a conversation.
+    /// </summary>
+    /// <remarks>
+    /// The server can change any roster during the talk, e.g. freeing the lord's clan members when he
+    /// joins, and the screen copies miss those changes because the party screen isn't the active state.
+    /// Vanilla then runs DoneLogic, whose Reset would put the stale troops back into the live rosters.
+    /// A conversation only starts with no pending changes, so the live rosters are the right baseline.
+    /// </remarks>
+    internal static void RebaseOnOwnerRosters(PartyScreenLogic logic)
     {
-        var partyRoster = isPrisoner
-            ? partyScreenLogic.RightOwnerParty.PrisonRoster
-            : partyScreenLogic.RightOwnerParty.MemberRoster;
-        if (partyRoster.GetTroopCount(character) > 0) return;
-
-        var initialRoster = isPrisoner
-            ? partyScreenLogic._initialData.RightPrisonerRoster
-            : partyScreenLogic._initialData.RightMemberRoster;
-        var currentRoster = isPrisoner
-            ? partyScreenLogic.CurrentData.RightPrisonerRoster
-            : partyScreenLogic.CurrentData.RightMemberRoster;
-        var savedRoster = partyScreenLogic._savedData == null
-            ? null
-            : isPrisoner
-                ? partyScreenLogic._savedData.RightPrisonerRoster
-                : partyScreenLogic._savedData.RightMemberRoster;
-
         using (new AllowedThread())
         {
-            RemoveCharacter(initialRoster, character);
-            RemoveCharacter(currentRoster, character);
-            if (savedRoster != null) RemoveCharacter(savedRoster, character);
+            CopyLiveRoster(logic.RightOwnerParty?.MemberRoster, logic.CurrentData.RightMemberRoster);
+            CopyLiveRoster(logic.RightOwnerParty?.PrisonRoster, logic.CurrentData.RightPrisonerRoster);
+            CopyLiveRoster(logic.LeftOwnerParty?.MemberRoster, logic.CurrentData.LeftMemberRoster);
+            CopyLiveRoster(logic.LeftOwnerParty?.PrisonRoster, logic.CurrentData.LeftPrisonerRoster);
+
+            logic._initialData.CopyFromScreenData(logic.CurrentData);
+            if (logic._savedData != null) logic.SavePartyScreenData();
         }
 
-        partyScreenLogic.OnReset(false);
+        logic.OnReset(false);
     }
 
-    private static void RemoveCharacter(TroopRoster roster, CharacterObject character)
+    private static void CopyLiveRoster(TroopRoster live, TroopRoster visible)
     {
-        int count = roster.GetTroopCount(character);
-        if (count > 0) roster.RemoveTroop(character, count);
-        roster.RemoveZeroCounts();
-        roster.InitializeCachedData();
+        if (live == null || visible == null || ReferenceEquals(live, visible)) return;
+
+        visible.Clear();
+        visible.Add(live);
     }
 }
