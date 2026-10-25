@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using GameInterface.Services.Party;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,8 +51,9 @@ public class PartyScreenRosterRefresherTests
         visible.AddToCounts(character, -4);
         logic.CurrentData.LeftMemberRoster.AddToCounts(character, 4);
         int notificationCount = 0;
+        var lockPreserver = new RecordingLockPreserver();
 
-        var applied = CreateRefresher().TryApply(
+        var applied = CreateRefresher(lockPreserver).TryApply(
             logic,
             visible,
             character,
@@ -66,6 +68,7 @@ public class PartyScreenRosterRefresherTests
         Assert.True(applied);
         Assert.Equal(1, notificationCount);
         Assert.False(logic.IsThereAnyChanges());
+        Assert.Same(logic, Assert.Single(lockPreserver.Resets));
         AssertRoster(logic.CurrentData.RightMemberRoster, character, 3, 1);
         AssertRoster(logic._initialData.RightMemberRoster, character, 3, 1);
         Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
@@ -122,7 +125,8 @@ public class PartyScreenRosterRefresherTests
         authoritative.AddToCounts(character, 5, false, 1);
         visible.AddToCounts(character, -2);
         var refresher = new PartyScreenRosterRefresher(
-            new FixedBaselineProvider(logic._initialData.RightMemberRoster));
+            new FixedBaselineProvider(logic._initialData.RightMemberRoster),
+            new RecordingLockPreserver());
 
         var applied = refresher.TryApply(logic, authoritative, character, Heal, () => { });
 
@@ -322,8 +326,10 @@ public class PartyScreenRosterRefresherTests
         return logic;
     }
 
-    private static PartyScreenRosterRefresher CreateRefresher()
-        => new PartyScreenRosterRefresher(new PartyScreenRosterBaselineProvider());
+    private static PartyScreenRosterRefresher CreateRefresher(RecordingLockPreserver lockPreserver = null)
+        => new PartyScreenRosterRefresher(
+            new PartyScreenRosterBaselineProvider(),
+            lockPreserver ?? new RecordingLockPreserver());
 
     private static void Heal(TroopRoster roster, CharacterObject troop)
     {
@@ -342,6 +348,17 @@ public class PartyScreenRosterRefresherTests
         Assert.True(index >= 0);
         Assert.Equal(number, roster.GetElementNumber(index));
         Assert.Equal(wounded, roster.GetElementWoundedNumber(index));
+    }
+
+    private sealed class RecordingLockPreserver : IPartyScreenLockPreserver
+    {
+        public List<PartyScreenLogic> Resets { get; } = new List<PartyScreenLogic>();
+
+        public void Reset(PartyScreenLogic logic, Action reset)
+        {
+            Resets.Add(logic);
+            reset();
+        }
     }
 
     private sealed class FixedBaselineProvider : IPartyScreenRosterBaselineProvider
