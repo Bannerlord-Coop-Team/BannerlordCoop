@@ -1,0 +1,56 @@
+{
+  "pr": 3957,
+  "publication": "pr-evidence/3957",
+  "originalPngBytes": true,
+  "sourceLimit": "9e10 accepted dependency waiver;2d461 current forcedfailure",
+  "images": [
+    {
+      "path": "9e10-007-immediate-native-return-testclient-testclient.png",
+      "sha256": "806a54911063915ee98743ae8f6153276aaae786ac5e0d9d167ac1ed6ad77182",
+      "bytes": 1150144,
+      "caption": "TroopsDelivered setup: Lucon requests four trained archers for Mecalovea Castle.",
+      "sourceResult": "final-live-9e10-passive-conversation-result",
+      "sourcePath": "artifacts/screenshots/007-immediate-native-return-testclient-testclient.png"
+    },
+    {
+      "path": "9e10-008-immediate-native-return-testclient2-testclient2.png",
+      "sha256": "53e476c288305d839218ce7a4975baaf142f852f6d7f7f4563456aaafd549086",
+      "bytes": 1190231,
+      "caption": "Companion success: Suvys returns after delivering troops, and the owner receives 2,100 denars.",
+      "sourceResult": "final-live-9e10-passive-conversation-result",
+      "sourcePath": "artifacts/screenshots/008-immediate-native-return-testclient2-testclient2.png"
+    },
+    {
+      "path": "9e10-011-natural-timeout-immediate-testclient-testclient.png",
+      "sha256": "c2a90d9d8403e85a017f12f06195c12590144c2dadb881d2301e9662428c308d",
+      "bytes": 1193362,
+      "caption": "Natural timeout: the delivery quest expires after the original thirty-day deadline.",
+      "sourceResult": "final-live-9e10-passive-conversation-result",
+      "sourcePath": "artifacts/screenshots/011-natural-timeout-immediate-testclient-testclient.png"
+    },
+    {
+      "path": "2d461-008-immediate-forced-native-failure-owner-testclient2.png",
+      "sha256": "48d1e35d295a491e7450d4129e1f6b03b4ef10974f20988e4e0d35983a3502e1",
+      "bytes": 1152267,
+      "caption": "Companion failure: Suvys is named once, and seven troops return safely.",
+      "sourceResult": "live-companion-failure-campaign-guard2d461-result",
+      "sourcePath": "artifacts/screenshots/008-immediate-forced-native-failure-owner-testclient2.png"
+    },
+    {
+      "path": "2d461-012-after-observer-real-rejoin-owner-testclient2.png",
+      "sha256": "d8f3d6290b19ab9aa3ef1389075aa7efd87a3316df89165b9319e03d9cd2c3a2",
+      "bytes": 1151481,
+      "caption": "After both rejoins, the owner retains the complete named Suvys failure journal.",
+      "sourceResult": "live-companion-failure-campaign-guard2d461-result",
+      "sourcePath": "artifacts/screenshots/012-after-observer-real-rejoin-owner-testclient2.png"
+    },
+    {
+      "path": "2d461-011-after-observer-real-rejoin-observer-testclient.png",
+      "sha256": "89a117d75e211c639f59a551c5a55611de644b12f7d4a7496483d5a70a2a0e68",
+      "bytes": 1117492,
+      "caption": "Observer isolation: the other player still sees no garrison journal after both rejoins.",
+      "sourceResult": "live-companion-failure-campaign-guard2d461-result",
+      "sourcePath": "artifacts/screenshots/011-after-observer-real-rejoin-observer-testclient.png"
+    }
+  ]
+}
