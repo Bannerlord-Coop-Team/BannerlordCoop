@@ -92,7 +92,12 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         scenario.ClientA.SimulateMessage(scenario.Server, message);
         scenario.ClientB.SimulateMessage(scenario.Server, message);
         Assert.Empty(updates);
-        AssertObserverHasNoArchive();
+        scenario.ClientB.Call(() =>
+        {
+            Assert.Same(issues[scenario.ClientB], issues[scenario.ClientB].IssueOwner.Issue);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issues[scenario.ClientB])));
+        });
         scenario.ClientA.Call(() =>
         {
             var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
