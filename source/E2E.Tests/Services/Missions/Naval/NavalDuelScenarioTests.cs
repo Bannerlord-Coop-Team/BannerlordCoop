@@ -38,4 +38,27 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(75f, a.Hull(hullB).HitPoints, 3);
         Assert.Equal(60f, b.Hull(hullA).HitPoints, 3);
     }
+
+    // Every spawn raises the spawn event, and only a hull on this client's PlayerTeam is its own: each player's hull registers
+    // once under its owner and party, and the copy of the other's hull is known only by its record's id.
+    [Fact]
+    public void Duel_OwnHullsRegisterFromTheSpawnEvent_AndTheCopiesAddNoOwnHull()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        Assert.Equal(new[] { hullA }, a.RegisteredShipIds());
+        Assert.Equal(new[] { hullB }, b.RegisteredShipIds());
+
+        battle.CommitAll();
+        battle.TickAll();
+
+        var both = new[] { hullA, hullB }.OrderBy(id => id).ToArray();
+        Assert.Equal(both, a.RegisteredShipIds());
+        Assert.Equal(both, b.RegisteredShipIds());
+        Assert.Equal(("B", battle.PartyIds["B"], false), (a.Ship(hullB).CurrentAuthority, a.Ship(hullB).MapEventPartyId,
+            a.Ship(hullB).IsNpcParty));
+    }
 }
