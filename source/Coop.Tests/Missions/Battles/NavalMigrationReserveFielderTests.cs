@@ -155,10 +155,10 @@ public class NavalMigrationReserveFielderTests
                     return taken;
                 });
 
-            var replicator = new Mock<IBattleShipReplicator>();
-            replicator.Setup(r => r.IsReplacingHull(It.IsAny<Guid>())).Returns((Guid shipId) => Replacing.Contains(shipId));
+            var hullAuthority = new Mock<INavalHullAuthority>();
+            hullAuthority.Setup(a => a.IsReplacing(It.IsAny<Guid>())).Returns((Guid shipId) => Replacing.Contains(shipId));
 
-            Fielder = new NavalMigrationReserveFielder(session.Object, Reinforcements.Object, Registry, engine.Object, replicator.Object);
+            Fielder = new NavalMigrationReserveFielder(session.Object, Reinforcements.Object, Registry, engine.Object, hullAuthority.Object);
         }
 
         public Mock<IReinforcementFielder> Reinforcements { get; } = new();
