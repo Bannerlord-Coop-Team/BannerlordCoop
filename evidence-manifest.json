@@ -1,0 +1,54 @@
+{
+    "sourceHead":  "498cadd5954ac31ad3c82c45c85d5c549ca4b7ea",
+    "sourceTree":  "f5fc35ac2a7ce533f15d8116b32111fbc2c31a20",
+    "files":  [
+                  {
+                      "name":  "498-loss-owner.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/loss-result/artifacts/screenshots/019-loss-after-journal-testclient-both-clients-testclient.png",
+                      "jobId":  "live-3777-rl-f06252558f98",
+                      "sha256":  "fca6691f0d20bd6bfee6fce902054adb78a135fa52d9187d333dd6c7a906ee09",
+                      "gitBlob":  "7be192fe9a000b00c627b7004f2b86fe4fa3b940",
+                      "bytes":  1122824
+                  },
+                  {
+                      "name":  "498-loss-bystander.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/loss-result/artifacts/screenshots/022-loss-after-journal-testclient2-both-clients-testclient2.png",
+                      "jobId":  "live-3777-rl-f06252558f98",
+                      "sha256":  "db06ca6b3c5e2f4798d866f00705b48ce614745c8e3f3e82bdef365aa9122cbb",
+                      "gitBlob":  "864dc2c03edb7a570215a35656f1553b46512e51",
+                      "bytes":  1123481
+                  },
+                  {
+                      "name":  "498-rejoin-owner.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/rejoin-corrected-result/artifacts/screenshots/008-rejoin-waiting-quest-dismissed-owner-and-nonowner-journals-after-testclient.png",
+                      "jobId":  "live-3777-rl-2eb1b20ec39c",
+                      "sha256":  "bd780869bd8b16b1727af6e9d4a4162c9a0aa7ba104fa7f1af49afb199ee6ac2",
+                      "gitBlob":  "3e31af5723649145419d88bbad401afa11fb5749",
+                      "bytes":  1103251
+                  },
+                  {
+                      "name":  "498-rejoin-bystander.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/rejoin-corrected-result/artifacts/screenshots/009-rejoin-waiting-quest-dismissed-owner-and-nonowner-journals-after-testclient2.png",
+                      "jobId":  "live-3777-rl-2eb1b20ec39c",
+                      "sha256":  "a5d62b29487dcdc1beaddba584067d14870381459ca97637dcf06c4d67679f40",
+                      "gitBlob":  "ff3b44893116de7cf55b00b5f5171fb9bce33cff",
+                      "bytes":  1118924
+                  },
+                  {
+                      "name":  "498-companion-failure-owner.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/failure-result/artifacts/screenshots/023-alt-after-journal-testclient-both-clients-testclient.png",
+                      "jobId":  "live-3777-rl-ae00f43e4ff6",
+                      "sha256":  "63bc47e9629d2e7d9fb08bc0ff3ee04dd7d3ebcc0f9b921731db01841f08b886",
+                      "gitBlob":  "f1386cbd8dd413eab193e06098f70ea04bd38129",
+                      "bytes":  1184086
+                  },
+                  {
+                      "name":  "498-companion-failure-bystander.png",
+                      "source":  "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3777/remote/498-campaign/failure-result/artifacts/screenshots/026-alt-after-journal-testclient2-both-clients-testclient2.png",
+                      "jobId":  "live-3777-rl-ae00f43e4ff6",
+                      "sha256":  "72b56b483512334c1c47707abae24fcf526e226c9290d7453e5900abd64fd09d",
+                      "gitBlob":  "c602680ed8213f9b6318e248c56c6b67fdbd5d96",
+                      "bytes":  1066382
+                  }
+              ]
+}
