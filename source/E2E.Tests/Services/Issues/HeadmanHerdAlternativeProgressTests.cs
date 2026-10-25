@@ -26,10 +26,15 @@ public class HeadmanHerdAlternativeProgressTests
 
     public HeadmanHerdAlternativeProgressTests(ITestOutputHelper output) => this.output = output;
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ConcurrentNativeAlternativesRetainTheSameReturnDayProgress(bool periodicDay)
+    [Fact]
+    public void PausedUnpairedServerDailyTickAdvancesOnlyTheServerReturnDayCounter()
+        => AssertNativeProgress(periodicDay: false);
+
+    [Fact]
+    public void PairedNativePeriodicDayKeepsBothOwnersReturnDayHistoriesSynchronized()
+        => AssertNativeProgress(periodicDay: true);
+
+    private void AssertNativeProgress(bool periodicDay)
     {
         lock (GameInstance.@lock)
         {
@@ -175,6 +180,7 @@ public class HeadmanHerdAlternativeProgressTests
 
         var ending = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.AlternativeSolution, ending.Outcome);
+        Assert.Equal(otherGiver, ending.IssueOwnerId);
         var report = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>(),
             message => message.Ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest);
         Assert.Equal(otherGiver, report.IssueOwnerId);
@@ -182,6 +188,7 @@ public class HeadmanHerdAlternativeProgressTests
         Assert.Contains("Phestos", report.Entries[1].Text);
         Assert.DoesNotContain("Shulun", report.Entries[1].Text);
         JournalLog[] afterA = null!;
+        JournalLog[] failureB = null!;
         scenario.Server.Call(() =>
         {
             var issueA = Get<Hero>(scenario.Server, scenario.NotableId).Issue;
@@ -195,6 +202,12 @@ public class HeadmanHerdAlternativeProgressTests
             }, afterA);
             Assert.Equal(sentXp, StackXp(Get<MobileParty>(scenario.Server, scenario.OtherPartyId).MemberRoster,
                 Get<CharacterObject>(scenario.Server, troop)));
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(ending.IssueId)));
+            Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, archive._lastIssueStatus);
+            Assert.True(archive.IsEnded());
+            failureB = archive.GetEntries().ToArray();
+            Assert.Equal(2, failureB.Length);
         });
         foreach (var instance in instances)
             instance.Call(() =>
@@ -207,6 +220,12 @@ public class HeadmanHerdAlternativeProgressTests
                 Assert.Equal(controls[instance].OtherGold, Get<Hero>(instance, scenario.OtherHeroId).Gold);
                 if (!periodicDay) Assert.Equal(controls[instance].Clock, CampaignTime.Now.NumTicks);
                 Assert.Null(Get<Hero>(instance, otherGiver).Issue);
+                var issueA = Get<Hero>(instance, scenario.NotableId).Issue;
+                Assert.True(issueA.IsSolvingWithAlternative);
+                Assert.Null(issueA.IssueQuest);
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, issueA.StringId, out var owner));
+                Assert.Equal(QuestScenario.ControllerA, owner);
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(otherGiver, ending.IssueId, out _));
             });
         scenario.ClientB.Call(() =>
         {
@@ -214,6 +233,7 @@ public class HeadmanHerdAlternativeProgressTests
             Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, archive._lastIssueStatus);
             Assert.True(archive.IsEnded());
             Assert.Equal(2, archive.GetEntries().Count());
+            HeadmanHerdCancellationCompositionTests.AssertHistory(failureB, archive.GetEntries());
             var party = Get<MobileParty>(scenario.ClientB, scenario.OtherPartyId);
             Assert.Equal(8, party.MemberRoster.GetTroopCount(Get<CharacterObject>(scenario.ClientB, troop)));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(Get<Hero>(scenario.ClientB, companionB).CharacterObject));
@@ -222,8 +242,12 @@ public class HeadmanHerdAlternativeProgressTests
         scenario.ClientA.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
             log => log._relatedObjectIds.Contains(ending.IssueId))));
         output.WriteLine($"Native Return Days oracle: periodicDay={periodicDay}, server=1; paused R7 runs only one global server callback. No animal count or foreign owner scope writes this field.");
-        scenario.ClientA.Call(() => HeadmanHerdCancellationCompositionTests.AssertHistory(afterA,
-            Get<Hero>(scenario.ClientA, scenario.NotableId).Issue.JournalEntries));
+        scenario.ClientA.Call(() =>
+        {
+            var history = Get<Hero>(scenario.ClientA, scenario.NotableId).Issue.JournalEntries;
+            Assert.Equal(periodicDay ? 1 : 0, Assert.Single(history).CurrentProgress);
+            HeadmanHerdCancellationCompositionTests.AssertHistory(periodicDay ? afterA : baselineA, history);
+        });
 
         void Accept(EnvironmentInstance client, string giverId, string heroId, string partyId, string companionId)
         {
