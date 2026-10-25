@@ -124,7 +124,7 @@ public class NavalBattleServices : INavalBattleServices
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, appliedHost, Arrivals);
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, hullAuthority, context.HostEpochPolicy, context.MissionContext);
+            shipEngine, hullAuthority, context.HostEpochPolicy, context.MissionContext, Arrivals);
         FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
         WaterClock = new BattleWaterClock(network, messageBroker, context.Session, context.HostEpochPolicy, waterClock,
             new BattleWaterTimeEstimator());

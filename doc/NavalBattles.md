@@ -59,8 +59,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   owner's velocity forward after the same time.
 - `BattleShipConditionStream` sends a hull's damage state (HP, sails, fire, sinking) and its fieldable reserve whenever
   either changes. A late joiner gets the last one on entry.
-- `BattleShipWeaponReplicator` sends a ship weapon's aim and ammo state at 10 Hz plus each shot. A copy replays the shot
-  with a projectile that deals no damage.
+- `BattleShipWeaponReplicator` checks a ship weapon's aim, state and ammo at 10 Hz and sends them when they change and again
+  each second, plus each shot. A copy replays the shot with a projectile that deals no damage; the real hit reaches the struck
+  hull's owner through `BattleShipDamageRouter`. A copy taken over in place starts loaded with the reload's bolt spent.
 - `AgentStationUseReplicator` sends seat and release events (helm, oars, weapon). Puppets are seated on copies the way the
   owner seated them. A dropped item on a deck is no station: its pickup goes through `WeaponPickupHandler`, the use and
   release patches never publish it, `NavalShipEngine` neither describes nor resolves it as a station, and a seat is only
@@ -132,11 +133,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 - Hull-addressed naval messages that are sent once, or that depend on queued state, apply from the arrivals queue
   (`IBattleShipArrivals`) at the start of the next naval services tick, in arrival order: spawn records, removals, departures,
-  entries, host changes, conditions, final ropes, routed damage and capture requests, confirms and records. The game-thread
-  queue drains while the engine's async agent and team tick runs, which reads the hull state these change (R48 L6).
+  entries, host changes, conditions, final ropes, routed damage, ship weapon shots and states, and capture requests, confirms
+  and records. The game-thread queue drains while the engine's async agent and team tick runs, which reads the hull state
+  these change (R48 L6).
 - Samples go through the same queue, merged to one queued arrival per hull that applies the newest sample; a sample for a
-  hull whose record still waits is held with the record. Weapon state still applies on receipt. Station use is kept pending
-  and applied by its replicator's tick.
+  hull whose record still waits is held with the record. Station use is kept pending and applied by its replicator's tick.
 - Routed damage to AI hulls is stamped and checked with the host epoch whose hull move this client applied
   (`IAppliedHostEpoch`), which trails the session's epoch by the queued move of a host change.
 

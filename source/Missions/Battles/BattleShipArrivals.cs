@@ -6,9 +6,9 @@ using System.Collections.Generic;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Hull-addressed traffic whose apply changes hull, rope, formation or crew state, applied from the next naval tick
-/// in arrival order, since the game-thread queue drains while the async agent tick reads that state (R48 L6). A continuous stream
-/// (samples) keeps one queued arrival per hull that applies its newest message.
+/// [Game thread] Hull-addressed traffic whose apply changes hull, rope, formation, crew or ship weapon state, applied from the
+/// next naval tick in arrival order, since the game-thread queue drains while the async agent tick reads that state (R48 L6).
+/// A continuous stream (samples) keeps one queued arrival per hull that applies its newest message.
 /// </summary>
 public interface IBattleShipArrivals
 {

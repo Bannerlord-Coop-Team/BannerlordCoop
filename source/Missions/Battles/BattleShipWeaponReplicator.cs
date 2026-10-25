@@ -13,11 +13,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Replicates ship siege weapons (ballista, fire ballista, mangonel) by hull authority. Only the hull's owner simulates its
-/// weapon, so a copy's local AI never aims, loads or fires it. The owner sends the weapon's aim, state and ammo when they
-/// change and every projectile it launches, keyed by ship id and weapon path; peers replay them on their copy. A replayed
-/// projectile is presentation only: the owner's own projectile decides the hit, which reaches the struck hull's owner
-/// through <see cref="BattleShipDamageRouter"/>.
+/// Replicates ship siege weapons by hull authority: only the hull's owner simulates its weapon and sends its state and each
+/// shot, keyed by ship id and weapon path, which peers replay on their copy.
 /// </summary>
 public interface IBattleShipWeaponReplicator : IDisposable
 {
@@ -34,6 +31,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private static readonly ILogger Logger = LogManager.GetLogger<BattleShipWeaponReplicator>();
 
     internal const float SendIntervalSeconds = 0.1f;
+    // Weapon state goes out on change; this resend lets a peer that dropped a state around a host change catch up.
+    internal const float KeyframeSeconds = 1f;
     // A grapeshot volley launches several projectiles in one frame; their release swing and sound play once.
     internal const float VolleySeconds = 0.25f;
 
@@ -45,6 +44,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private readonly INavalHullAuthority hullAuthority;
     private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IMissionContext missionContext;
+    private readonly IBattleShipArrivals arrivals;
 
     private readonly Dictionary<Guid, WeaponStream> streams = new Dictionary<Guid, WeaponStream>();
     // The latest state of a hull that is not spawned here yet, applied once it registers.
@@ -58,9 +58,10 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
     public BattleShipWeaponReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
         ICoopMissionComponent missionComponent, INavalShipEngine engine, INavalHullAuthority hullAuthority, IHostEpochPolicy hostEpochPolicy,
-        IMissionContext missionContext)
+        IMissionContext missionContext, IBattleShipArrivals arrivals)
     {
         this.missionContext = missionContext;
+        this.arrivals = arrivals;
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
@@ -75,6 +76,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
+    // Drops the subscriptions and the held states, and hands weapon simulation back to the defaults.
     public void Dispose()
     {
         if (disposed) return;
@@ -90,22 +92,22 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
+    // Restarts and fills the streams before the simulation claim, so a stream's IsOwn always matches the weapons simulated here.
     public void Tick(float dt)
     {
         if (disposed) return;
 
         elapsed += Math.Max(0f, dt);
-        RefreshWeapons();
+        RestartChangedStreams();
+        FindMissingWeapons();
         UpdateSimulatedWeapons();
         DrainPendingStates();
         SendOwnStates(dt);
     }
 
     // A hull swap rebinds the ship to a fresh hull, and an authority move changes who simulates and numbers the states, so both
-    // restart the stream.
-    // A hull without a weapon is looked up again, in case it registered before its weapon was found. Only Tick refreshes, right
-    // before the simulation claim, so a stream's IsOwn always matches the weapons this client simulates.
-    private void RefreshWeapons()
+    // restart the stream; a removed hull's stream goes.
+    private void RestartChangedStreams()
     {
         foreach (var shipId in streams.Keys.ToArray())
         {
@@ -115,24 +117,55 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         foreach (var ship in Registry.Ships)
         {
             bool isOwn = IsSimulatedHere(ship);
-            if (!streams.TryGetValue(ship.ShipId, out var stream) || stream.Hull != ship.Hull || stream.IsOwn != isOwn
-                || stream.Authority != ship.CurrentAuthority)
-            {
-                stream = new WeaponStream(ship.Hull, isOwn, ship.CurrentAuthority, stream?.SentRevision ?? 0);
-                streams[ship.ShipId] = stream;
-            }
+            if (streams.TryGetValue(ship.ShipId, out var stream) && stream.Hull == ship.Hull && stream.IsOwn == isOwn
+                && stream.Authority == ship.CurrentAuthority)
+                continue;
 
-            if (stream.Weapon == null && engine.TryGetWeapon(ship.Hull, out var weapon, out var key))
-            {
-                stream.Weapon = weapon;
-                stream.Key = key;
-            }
+            if (stream != null && stream.Hull == ship.Hull && !stream.IsOwn && isOwn) CarryCopyState(stream);
+            streams[ship.ShipId] = new WeaponStream(ship.Hull, isOwn, ship.CurrentAuthority, stream?.SentRevision ?? 0);
         }
     }
 
+    // A copy this client takes over in place (a capture's adopt) starts simulating from its owner's last state, loaded with the
+    // reload's bolt spent, as a swap carries it; applied while the weapon is still a copy, before the simulation claim.
+    private void CarryCopyState(WeaponStream copy)
+    {
+        var carried = CarriedState(copy.Applied);
+        if (copy.Weapon == null || carried == null) return;
+
+        engine.ApplyWeaponState(copy.Weapon, carried, copy.Applied);
+    }
+
+    /// <summary>
+    /// The state a weapon taken over mid-reload starts from: loaded, with one bolt fewer, since vanilla spends the reload's
+    /// bolt only once it ends. Null for a loaded weapon or none, which keeps its state.
+    /// </summary>
+    internal static BattleShipWeaponState CarriedState(BattleShipWeaponState applied)
+    {
+        const int idle = (int)RangedSiegeWeapon.WeaponState.Idle;
+        if (applied == null || applied.WeaponState == idle) return null;
+
+        return new BattleShipWeaponState(applied.Direction, applied.ReleaseAngle, idle, Math.Max(0, applied.AmmoCount - 1));
+    }
+
+    // A hull that registered before its weapon was found is looked up again.
+    private void FindMissingWeapons()
+    {
+        foreach (var ship in Registry.Ships)
+        {
+            if (!streams.TryGetValue(ship.ShipId, out var stream) || stream.Weapon != null) continue;
+            if (!engine.TryGetWeapon(ship.Hull, out var weapon, out var key)) continue;
+
+            stream.Weapon = weapon;
+            stream.Key = key;
+        }
+    }
+
+    // Whether this client simulates the hull's weapon: it holds the hull's authority and the hull isn't being swapped.
     private bool IsSimulatedHere(NetworkShipInfo ship) =>
         ship.CurrentAuthority == session.OwnControllerId && !hullAuthority.IsReplacing(ship.ShipId);
 
+    // Hands the engine the weapons this client simulates whenever that set changes.
     private void UpdateSimulatedWeapons()
     {
         var own = streams.Values.Where(stream => stream.IsOwn && stream.Weapon != null).Select(stream => stream.Weapon).ToList();
@@ -143,6 +176,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         Logger.Information("[NavalSync] This client now simulates {Count} ship weapon(s)", own.Count);
     }
 
+    // Sends each own weapon's state when it changed, or again once a keyframe interval passed, at most every send interval.
     private void SendOwnStates(float dt)
     {
         sendElapsed += Math.Max(0f, dt);
@@ -155,9 +189,10 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
             if (!stream.IsOwn || stream.Weapon == null) continue;
 
             var state = engine.ReadWeaponState(stream.Weapon);
-            if (state == null || !state.DiffersFrom(stream.Sent)) continue;
+            if (state == null || !(state.DiffersFrom(stream.Sent) || elapsed - stream.SentAt >= KeyframeSeconds)) continue;
 
             stream.Sent = state;
+            stream.SentAt = elapsed;
             stream.SentRevision++;
             network.SendAll(new NetworkShipWeaponState(entry.Key, stream.Key, session.OwnControllerId, stream.SentRevision,
                 session.HostEpoch, state));
@@ -182,6 +217,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         shotsSent++;
     }
 
+    // The stream, and its ship id, whose weapon is this one.
     private bool TryFindStream(MissionObject weapon, out Guid shipId, out WeaponStream stream)
     {
         foreach (var entry in streams)
@@ -198,13 +234,15 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         return false;
     }
 
+    // Queues an owner's shot for the next naval tick, in order with its states and the hull traffic: its replay adds a missile
+    // to the mission, which native code reads.
     private void Handle_NetworkShipWeaponShot(MessagePayload<NetworkShipWeaponShot> payload)
     {
         var shot = payload.What;
         GameThread.RunSafe(() =>
         {
             if (disposed || Mission.Current == null) return;
-            AcceptShot(shot);
+            arrivals.Enqueue(() => AcceptShot(shot), nameof(Handle_NetworkShipWeaponShot));
         }, context: nameof(Handle_NetworkShipWeaponShot));
     }
 
@@ -268,19 +306,21 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         return agents.IsLocallyControlled(shooterAgentId) ? null : info.Agent;
     }
 
+    // Counts a dropped shot and names why.
     private void DropShot(string reason)
     {
         shotsDropped++;
         lastDrop = "shot_" + reason;
     }
 
+    // Queues an owner's weapon state for the next naval tick, behind the shot that caused it.
     private void Handle_NetworkShipWeaponState(MessagePayload<NetworkShipWeaponState> payload)
     {
         var state = payload.What;
         GameThread.RunSafe(() =>
         {
             if (disposed || Mission.Current == null) return;
-            AcceptState(state);
+            arrivals.Enqueue(() => AcceptState(state), nameof(Handle_NetworkShipWeaponState));
         }, context: nameof(Handle_NetworkShipWeaponState));
     }
 
@@ -318,6 +358,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         statesApplied++;
     }
 
+    // Counts a dropped state and names why.
     private void DropState(string reason)
     {
         statesDropped++;
@@ -337,6 +378,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         return null;
     }
 
+    // Applies the held states of hulls that spawned since, and forgets those of hulls that never will.
     private void DrainPendingStates()
     {
         if (pendingStates.Count == 0) return;
@@ -357,6 +399,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         }
     }
 
+    // The hull's weapon, when its key is the one the message names.
     private bool TryGetWeaponOf(NetworkShipInfo ship, string weaponKey, out MissionObject weapon)
     {
         weapon = streams.TryGetValue(ship.ShipId, out var stream) && stream.Key == weaponKey ? stream.Weapon : null;
@@ -408,6 +451,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         }).ToArray(),
     };
 
+    // One hull's weapon as this client sees it: who simulates it, and what was sent or applied for it.
     private sealed class WeaponStream
     {
         public WeaponStream(MissionObject hull, bool isOwn, string authority, long sentRevision)
@@ -428,6 +472,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         /// <summary>The owner's last sent state and its revision, which carries over a restart so peers keep accepting it.</summary>
         public BattleShipWeaponState Sent { get; set; }
         public long SentRevision { get; set; }
+        /// <summary>This client's replicator clock when the last state went out.</summary>
+        public float SentAt { get; set; }
         /// <summary>A copy's last applied state, its revision and its host epoch.</summary>
         public BattleShipWeaponState Applied { get; set; }
         public long AppliedRevision { get; set; }

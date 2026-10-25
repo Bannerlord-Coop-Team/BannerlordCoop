@@ -88,6 +88,63 @@ public class BattleShipWeaponReplicatorTests
         harness.Engine.Verify(e => e.ReadWeaponState(It.Is<MissionObject>(weapon => weapon != own.Weapon)), Times.Never);
     }
 
+    // S18 A3: an unchanged state goes out again each keyframe, so a peer that dropped one around a host change catches up.
+    [Fact]
+    public void Tick_ResendsAnUnchangedOwnState_EachKeyframe()
+    {
+        var harness = new Harness();
+        var own = harness.Register(Own, isNpcParty: false);
+        harness.Engine.Setup(e => e.ReadWeaponState(own.Weapon)).Returns(new BattleShipWeaponState(0.2f, 0.1f, 0, 5));
+
+        for (int tick = 0; tick < 12; tick++)
+            harness.Replicator.Tick(BattleShipWeaponReplicator.SendIntervalSeconds);
+
+        Assert.Equal(new long[] { 1, 2 }, harness.Sent<NetworkShipWeaponState>().Select(state => state.Revision));
+    }
+
+    // S18 D1: a copy caught mid-reload and taken over in place (a capture's adopt) starts loaded with the reload's bolt spent,
+    // as a swap carries it, instead of loaded with every bolt; the carry applies before this client claims the weapon.
+    [Fact]
+    public void Tick_TakingOverACopyMidReloadInPlace_CarriesItLoadedWithOneBoltFewer()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false);
+        var reloading = new BattleShipWeaponState(0.3f, 0.1f, (int)RangedSiegeWeapon.WeaponState.Reloading, 3);
+        var calls = new List<string>();
+        harness.Engine.Setup(e => e.ApplyWeaponState(copy.Weapon, It.IsAny<BattleShipWeaponState>(), It.IsAny<BattleShipWeaponState>()))
+            .Callback<MissionObject, BattleShipWeaponState, BattleShipWeaponState>((_, state, _) =>
+                calls.Add($"apply {state.WeaponState}/{state.AmmoCount}"));
+        harness.Engine.Setup(e => e.SetSimulatedWeapons(It.IsAny<IReadOnlyCollection<MissionObject>>()))
+            .Callback<IReadOnlyCollection<MissionObject>>(weapons => calls.Add($"simulate {weapons.Count}"));
+        harness.Replicator.Tick(0.01f);
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0, reloading));
+
+        copy.Ship.CurrentAuthority = Own;
+        harness.Replicator.Tick(0.01f);
+
+        Assert.Equal(new[] { "simulate 0", "apply 7/3", "apply 0/2", "simulate 1" }, calls);
+    }
+
+    [Theory]
+    [InlineData((int)RangedSiegeWeapon.WeaponState.Reloading, 3, 2)]
+    [InlineData((int)RangedSiegeWeapon.WeaponState.WaitingAfterShooting, 1, 0)]
+    [InlineData((int)RangedSiegeWeapon.WeaponState.Reloading, 0, 0)]
+    public void CarriedState_IsLoadedWithTheReloadsBoltSpent(int weaponState, int ammo, int expectedAmmo)
+    {
+        var carried = BattleShipWeaponReplicator.CarriedState(new BattleShipWeaponState(0.3f, 0.1f, weaponState, ammo));
+
+        Assert.Equal((int)RangedSiegeWeapon.WeaponState.Idle, carried.WeaponState);
+        Assert.Equal(expectedAmmo, carried.AmmoCount);
+        Assert.Equal(0.3f, carried.Direction);
+    }
+
+    [Fact]
+    public void CarriedState_KeepsALoadedWeaponOrNone()
+    {
+        Assert.Null(BattleShipWeaponReplicator.CarriedState(new BattleShipWeaponState(0.3f, 0.1f, 0, 3)));
+        Assert.Null(BattleShipWeaponReplicator.CarriedState(null));
+    }
+
     [Fact]
     public void LocalFire_OfAnOwnWeapon_SendsTheShotByShipAndWeaponKey()
     {
@@ -369,7 +426,7 @@ public class BattleShipWeaponReplicatorTests
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
 
             Replicator = new BattleShipWeaponReplicator(Network.Object, Broker, session.Object, component.Object, Engine.Object,
-                HullAuthority.Object, new HostEpochPolicy(), members.Object);
+                HullAuthority.Object, new HostEpochPolicy(), members.Object, new BattleShipArrivals());
         }
 
         /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>.</summary>
