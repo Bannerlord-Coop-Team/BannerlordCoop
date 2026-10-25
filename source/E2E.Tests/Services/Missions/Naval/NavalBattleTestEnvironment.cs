@@ -522,7 +522,21 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Call(() =>
             {
                 var team = Mission.PlayerTeam.Shell;
-                var hull = Engine.Field(Side, position, formationIndex ?? Engine.FirstFreeFormation(team), team);
+                // The replicator reads the own map event party off the main party, which is this client's player party live.
+                Assert.True(Instance.Resolve<IPlayerManager>().TryGetPlayer(Id, out var player));
+                Assert.True(Instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                var previousMainParty = Campaign.Current.MainParty;
+                Campaign.Current.MainParty = party;
+                FakeHull hull;
+                try
+                {
+                    hull = Engine.Field(Side, position, formationIndex ?? Engine.FirstFreeFormation(team), team);
+                }
+                finally
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                }
+
                 hull.CampaignShipId = campaignShipId;
                 Assert.True(Registry.TryGetByHull(hull.Hull, out var ship), $"{Id} registered no own hull from the spawn event");
                 Assert.Equal((Id, mapEventPartyId, false), (ship.CurrentAuthority, ship.MapEventPartyId, ship.IsNpcParty));

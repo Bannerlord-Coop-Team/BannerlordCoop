@@ -97,13 +97,14 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         return Enumerable.Range(0, 8).First(index => !taken.Contains(index));
     }
 
-    // The headless team's formation shell, carrying its index as a live Formation does.
+    // The headless team's formation shell, carrying its team and index as a live Formation does (both readonly fields).
     private static Formation? FormationOf(Team team, int formationIndex)
     {
         if (!MockTeam.ForShell(team, out var mockTeam)) return null;
 
         var formation = mockTeam.GetFormation((FormationClass)formationIndex).Shell;
         AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex)).SetValue(formation, (FormationClass)formationIndex);
+        AccessTools.Field(typeof(Formation), nameof(Formation.Team)).SetValue(formation, team);
         return formation;
     }
 
