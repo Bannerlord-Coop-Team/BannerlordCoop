@@ -61,6 +61,36 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
     [Fact]
     public void RealAlternativeAcceptanceRetainsTheServersNativeHistoryDespiteDifferentCampaignClocks()
     {
+        lock (GameInstance.@lock)
+        {
+            var now = AccessTools.PropertyGetter(typeof(CampaignTime), nameof(CampaignTime.Now));
+            var prefixes = Harmony.GetPatchInfo(now).Prefixes.ToArray();
+            var order = PatchProcessor.GetSortedPatchMethods(now, prefixes);
+            var bootstrap = Assert.Single(prefixes, patch => patch.owner == "Coop.Testing");
+            var harmony = new Harmony(bootstrap.owner);
+            try
+            {
+                // The bootstrap's zero clock hides the real acceptance-time difference.
+                harmony.Unpatch(now, bootstrap.PatchMethod);
+                AssertNativeAlternativeAcceptanceHistory();
+            }
+            finally
+            {
+                harmony.Patch(now, prefix: new HarmonyMethod(bootstrap.PatchMethod)
+                {
+                    priority = bootstrap.priority,
+                    before = bootstrap.before,
+                    after = bootstrap.after,
+                    debug = bootstrap.debug,
+                });
+                var restored = Harmony.GetPatchInfo(now).Prefixes.ToArray();
+                Assert.Equal(order, PatchProcessor.GetSortedPatchMethods(now, restored));
+            }
+        }
+    }
+
+    private void AssertNativeAlternativeAcceptanceHistory()
+    {
         const long serverNow = 79212767691569;
         const long ownerNow = 79212782128047;
         const long observerNow = ownerNow + 5000000;
@@ -69,7 +99,11 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
         {
             var instance = Instances[index];
             var ticks = clocks[index];
-            instance.Call(() => Campaign.Current.MapTimeTracker._numTicks = ticks);
+            instance.Call(() =>
+            {
+                Campaign.Current.MapTimeTracker._numTicks = ticks;
+                Assert.Equal(ticks, CampaignTime.Now.NumTicks);
+            });
         }
 
         herd.StartCompanions();
