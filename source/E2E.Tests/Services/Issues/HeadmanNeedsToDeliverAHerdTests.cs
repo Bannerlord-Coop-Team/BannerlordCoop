@@ -735,6 +735,16 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Server.Call(() =>
+        {
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            Assert.Equal(40, issue.AlternativeSolutionSentTroops.GetTroopCount(Object<CharacterObject>(Server, troopId)));
+            Assert.Equal(1, issue.AlternativeSolutionSentTroops.GetTroopCount(Object<Hero>(Server, companionId).CharacterObject));
+            Assert.Equal(41, issue.AlternativeSolutionSentTroops.TotalManCount);
+            Assert.Equal(0, Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId)));
+            Assert.Empty(Server.Resolve<IAlternativeSolutionCommitments>().Consume(scenario.OwnerHeroId,
+                scenario.NotableId, QuestScenario.IssueId, Array.Empty<GameInterface.Services.TroopRosters.Data.TroopRosterElementData>()));
+        });
 
         return (companionId, troopId);
     }
