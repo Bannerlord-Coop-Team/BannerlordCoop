@@ -64,7 +64,8 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     // A host change the session already read, whose AI hull move still waits in the arrivals queue.
     private bool IsHostChangeQueued => session.HostEpoch != hostEpoch.AppliedHostEpoch;
 
-    // [Game thread] Published synchronously from inside the skipped vanilla damage method.
+    // [Game thread] Published synchronously from inside the skipped vanilla damage method, which runs from Mission.RegisterBlow or a
+    // ship, ram or naval logic tick (contact callbacks only queue), so the arrivals queue needs no lock here.
     private void Handle_BattleShipHit(MessagePayload<BattleShipHit> payload)
     {
         if (disposed) return;
