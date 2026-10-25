@@ -193,6 +193,13 @@ public class HeadmanHerdSuccessionTests
                 scenario.Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
                 herd.environment.FlushCoalescer();
                 Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+                var inherited = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<NetworkPlayerCharacterChangedAfterHeirSelection>());
+                scenario.Server.SimulateMessage(scenario.ClientA.NetPeer, scenario.ClientA.SerializeForWire(inherited));
+                herd.environment.FlushCoalescer();
+                foreach (var instance in instances)
+                    instance.Call(() => Assert.Equal(23, Object<MobileParty>(instance, successorPartyId).ItemRoster
+                        .Where(element => element.EquipmentElement.Item == Object<ItemObject>(instance, livestockId)).Sum(element => element.Amount)));
+                Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             });
             Assert.Multiple(checks.ToArray());
         }
