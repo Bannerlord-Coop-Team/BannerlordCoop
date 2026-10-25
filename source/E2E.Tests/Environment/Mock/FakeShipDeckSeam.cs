@@ -5,7 +5,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Environment.Mock;
 
-/// <summary>An <see cref="IShipDeckSeam"/> driven by test delegates; an unset delegate captures, resolves or seats nothing.</summary>
+/// <summary>An <see cref="IShipDeckSeam"/> driven by test delegates; an unset delegate captures or resolves nothing.</summary>
 public sealed class FakeShipDeckSeam : IShipDeckSeam
 {
     /// <summary>The hull, hull-local position and deck speed of an owned agent, or null when it is on no hull.</summary>
@@ -14,9 +14,7 @@ public sealed class FakeShipDeckSeam : IShipDeckSeam
     /// <summary>The local hull frame a received deck pose is relative to, or null when it does not resolve.</summary>
     public Func<Agent, Guid, MatrixFrame?>? Resolve { get; set; }
 
-    public Func<CoopAgentInfo, bool>? IsSeated { get; set; }
-
-    public bool TryCaptureDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
+    public bool TryCaptureDeck(CoopAgentInfo info, Vec3 worldPosition, float time, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
     {
         var pose = Capture?.Invoke(info, worldPosition);
         deckShip = pose?.Ship ?? Guid.Empty;
@@ -31,6 +29,4 @@ public sealed class FakeShipDeckSeam : IShipDeckSeam
         hullFrame = frame ?? default;
         return frame != null;
     }
-
-    public bool IsSeatedAtStation(CoopAgentInfo info) => IsSeated?.Invoke(info) == true;
 }

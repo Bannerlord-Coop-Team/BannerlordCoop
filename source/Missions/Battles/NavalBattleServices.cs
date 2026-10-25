@@ -118,7 +118,7 @@ public class NavalBattleServices : INavalBattleServices
 #if DEBUG
         captureApplier.CaptureApplied += OnCaptureApplied;
 #endif
-        DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
+        DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, hullAuthority);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
@@ -167,7 +167,6 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.Tick(dt);
         ShipCaptureReplicator.Tick(dt);
         FateReporter.Tick(dt);
-        DeckPoses.Tick(dt);
         StationUseReplicator.Tick(dt);
         ShipWeaponReplicator.Tick(dt);
         MigrationReserveFielder.Tick();

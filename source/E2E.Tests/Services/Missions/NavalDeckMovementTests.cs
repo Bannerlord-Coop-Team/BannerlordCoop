@@ -340,7 +340,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         WithOwnedSailor(fixture, (handler, mirror, network) =>
         {
             bool seated = false;
-            handler.ConfigureShipDeck(new FakeShipDeckSeam { IsSeated = info => seated });
+            handler.ConfigureStationSeats(new FakeShipStationSeats { IsSeated = id => seated });
 
             handler.PollMovement(0f);
             seated = true;

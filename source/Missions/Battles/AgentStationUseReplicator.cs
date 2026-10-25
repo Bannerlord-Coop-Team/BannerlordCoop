@@ -11,11 +11,18 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
+/// <summary>The agents this client seated at a ship station, whose movement and actions the handlers leave to the station.</summary>
+public interface IShipStationSeats
+{
+    /// <summary>[Game thread] Whether this client seated the agent.</summary>
+    bool IsOwnSeat(Guid agentId);
+}
+
 /// <summary>
 /// Replicates ship station use: the owner of an agent sends every use and release of a hull's usable point, and peers
 /// seat or release their puppet on the same point of their hull. Agents seated by their owner send no world movement.
 /// </summary>
-public interface IAgentStationUseReplicator : IDisposable
+public interface IAgentStationUseReplicator : IShipStationSeats, IDisposable
 {
     /// <summary>[Mission tick] Applies received uses, announces own seats at the deployment commit and to joiners, and re-pins
     /// applied seats.</summary>
@@ -23,9 +30,6 @@ public interface IAgentStationUseReplicator : IDisposable
 
     /// <summary>[Game thread] The station an agent uses on a registered hull, or null (diagnostics).</summary>
     string DescribeStation(Agent agent);
-
-    /// <summary>Whether this client seated the agent, so the ship deck seam withholds its movement and actions.</summary>
-    bool IsOwnSeat(Guid agentId);
 
     /// <summary>
     /// [Game thread] Lets every puppet this client seated on <paramref name="hull"/> go before the hull leaves the mission, so no
@@ -73,7 +77,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
         adoptedSeats;
 
-    // Subscribes to this client's use and release patches, the owners' uses and mission entries.
+    // Subscribes to this client's use and release patches, the owners' uses and mission entries, and gives the movement and
+    // action handlers its seats.
     public AgentStationUseReplicator(
         IBattleNetwork network,
         IMessageBroker messageBroker,
@@ -94,15 +99,19 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         messageBroker.Subscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Subscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        missionComponent.AgentMovementHandler.ConfigureStationSeats(this);
+        missionComponent.AgentActionHandler.ConfigureStationSeats(this);
     }
 
-    // Stops the subscriptions; a closure queued before this does nothing.
+    // Stops the subscriptions and takes the seats off the handlers; a closure queued before this does nothing.
     public void Dispose()
     {
         disposed = true;
         messageBroker.Unsubscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Unsubscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        missionComponent.AgentMovementHandler.ConfigureStationSeats(null);
+        missionComponent.AgentActionHandler.ConfigureStationSeats(null);
     }
 
     // [Any thread] Published by the use/release patches, which also run on an agent tick worker; the seats and revisions it
