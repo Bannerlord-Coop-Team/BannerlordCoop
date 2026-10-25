@@ -414,7 +414,7 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
     private static JournalLogEntry Archive(LogEntryHistory history) => Assert.Single(history.GetGameActionLogs<JournalLogEntry>(
         entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
 
-    private static void AssertHistory(IEnumerable<JournalLog> expected, IEnumerable<JournalLog> actual)
+    internal static void AssertHistory(IEnumerable<JournalLog> expected, IEnumerable<JournalLog> actual)
     {
         var left = expected.ToArray();
         var right = actual.ToArray();
