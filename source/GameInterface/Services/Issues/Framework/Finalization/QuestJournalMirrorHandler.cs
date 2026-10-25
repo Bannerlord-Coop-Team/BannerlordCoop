@@ -11,6 +11,7 @@ using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -25,7 +26,7 @@ public readonly struct QuestJournalProgressChanged : IEvent
     public QuestJournalProgressChanged(JournalLog log) => Log = log;
 }
 
-/// <summary>Observes a native journal append on the owner's running quest.</summary>
+/// <summary>Observes a native journal mutation on the owner's running quest.</summary>
 public readonly struct QuestJournalChanged : IEvent
 {
     public readonly QuestBase Quest;
@@ -44,6 +45,7 @@ internal class QuestJournalMirrorHandler : IHandler
     private readonly IQuestTypeRegistry registry;
     private readonly IControllerIdProvider controller;
     private readonly IPlayerManager players;
+    private readonly ConditionalWeakTable<QuestBase, HashSet<JournalLog>> ownerEntries = new();
 
     public QuestJournalMirrorHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnershipRegistry ownership, IQuestTypeRegistry registry,
@@ -102,13 +104,14 @@ internal class QuestJournalMirrorHandler : IHandler
                 issue.IssueQuest == null || !issue.IssueQuest.IsOngoing ||
                 !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
 
-            if (!Reconcile(issue.IssueQuest, data.Entries ?? Array.Empty<IssueJournalEntry>())) return;
+            if (!Reconcile(issue.IssueQuest, data.Entries ?? Array.Empty<IssueJournalEntry>(),
+                ownerEntries.GetOrCreateValue(issue.IssueQuest))) return;
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
                 CampaignEventDispatcher.Instance.OnQuestLogAdded(issue.IssueQuest, true);
         }, context: nameof(QuestJournalMirrorHandler));
     }
 
-    private static bool Reconcile(QuestBase quest, IssueJournalEntry[] entries)
+    private static bool Reconcile(QuestBase quest, IssueJournalEntry[] entries, HashSet<JournalLog> previousOwnerEntries)
     {
         var remaining = quest.JournalEntries.ToList();
         var ordered = new List<JournalLog>();
@@ -129,7 +132,11 @@ internal class QuestJournalMirrorHandler : IHandler
                 updates.Add((existing, entry.Progress));
             }
         }
-        ordered.AddRange(remaining);
+        // Only omitted stages previously mirrored from the owner are removals; retain unseen authoritative stages.
+        var currentOwnerEntries = ordered.ToArray();
+        ordered.AddRange(remaining.Where(log => !previousOwnerEntries.Contains(log)));
+        previousOwnerEntries.Clear();
+        previousOwnerEntries.UnionWith(currentOwnerEntries);
         if (ordered.SequenceEqual(quest.JournalEntries) && updates.All(update => update.Log.CurrentProgress == update.Progress)) return false;
         foreach (var update in updates) update.Log.UpdateCurrentProgress(update.Progress);
         quest._journalEntries.Clear();

@@ -180,6 +180,59 @@ public class EndingJournalTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void RemovedOwnerLogDoesNotReturnAtEndingOrInSavedHistory(bool sendLaterSnapshot)
+    {
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        JournalLog progress = null!;
+        JournalLog removed = null!;
+        var removedText = new TextObject("All required crafting materials collected");
+        var serverText = new TextObject("Authoritative stage not yet observed by the owner");
+        scenario.Server.Call(() => serverQuest.AddLog(serverText));
+        scenario.ClientA.Call(() =>
+        {
+            progress = ownerQuest.AddDiscreteLog(new TextObject("Collect crafting materials"),
+                new TextObject("Materials"), 1, 1);
+            removed = ownerQuest.AddLog(removedText);
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() => Assert.Single(serverQuest.JournalEntries,
+            log => log.LogText.Value == removedText.Value));
+
+        scenario.ClientA.Call(() =>
+        {
+            progress.UpdateCurrentProgress(0);
+            ownerQuest.RemoveLog(removed);
+            Assert.DoesNotContain(removed, ownerQuest.JournalEntries);
+            if (sendLaterSnapshot) ownerQuest.AddLog(new TextObject("Later owner progress"));
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+
+        scenario.ClientA.Call(() =>
+        {
+            Assert.DoesNotContain(ownerQuest.JournalEntries, log => log.LogText.Value == removedText.Value);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.Value == serverText.Value);
+            Assert.Equal(0, Assert.Single(ownerQuest.JournalEntries,
+                log => log.LogText.Value == "Collect crafting materials").CurrentProgress);
+        });
+        scenario.Server.Call(() =>
+        {
+            Assert.DoesNotContain(serverQuest.JournalEntries, log => log.LogText.Value == removedText.Value);
+            Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == serverText.Value);
+        });
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void ReorderedStagesWithSharedTemplatesKeepTheirOwnProgress(bool identicalVariables)
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
