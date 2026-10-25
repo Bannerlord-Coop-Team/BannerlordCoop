@@ -10,9 +10,11 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipBallistaShotCapturePatch
 {
+    // Opens the shot's capture context for this ballista.
     [HarmonyPrefix]
     private static void Prefix(ShipBallista __instance) => SiegeWeaponFireContext.Begin(__instance);
 
+    // Closes the capture context, also when the shot throws.
     [HarmonyFinalizer]
     private static void Finalizer() => SiegeWeaponFireContext.End();
 }
