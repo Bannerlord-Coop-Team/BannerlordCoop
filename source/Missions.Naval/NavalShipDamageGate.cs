@@ -1,15 +1,11 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Missions.Battles;
 using Missions.Messages;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.ShipActuators;
-using Serilog;
 using System;
-using System.Collections.Concurrent;
 using System.Threading;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -21,17 +17,13 @@ namespace Missions.Naval;
 /// </summary>
 internal static class NavalShipDamageGate
 {
-    private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalShipDamageGate));
-
     [ThreadStatic] private static int routedApplyDepth;
     [ThreadStatic] private static HitScope hit;
     [ThreadStatic] private static int queuedContactDepth;
     [ThreadStatic] private static MissionShip contactShip;
+    [ThreadStatic] private static bool inRoutedRamApply;
 
     private static long suppressedHits, droppedContactCollisions;
-#if DEBUG
-    private static readonly ConcurrentDictionary<(int, int), int> contactLogTimes = new ConcurrentDictionary<(int, int), int>();
-#endif
 
     /// <summary>The attack a hull damage method runs under: who decided it, its attacker and its world position.</summary>
     internal readonly struct HitScope
@@ -102,12 +94,32 @@ internal static class NavalShipDamageGate
             attacker ?? scope.Attacker, null, false, sailIndex);
     }
 
-    /// <summary>Whether DealCollisionDamage runs vanilla on <paramref name="ship"/>.</summary>
+    /// <summary>
+    /// Whether DealCollisionDamage runs vanilla on <paramref name="ship"/>. A ram it skips still gives this client's agents vanilla's
+    /// ram morale, so every client that sees the impact applies it once to its own agents (puppets aren't AI-controlled).
+    /// </summary>
     internal static bool AllowsCollision(MissionShip ship, MissionShip hitter, bool isRamDamage, Vec3 point, float damage)
     {
         var origin = BattleShipDamageRoutes.CollisionOrigin(queuedContactDepth > 0, hitter == null || !NavalForeignHulls.Contains(hitter));
-        return Allows(ship, origin, BattleShipDamageKind.Collision, damage, 0f, point, null, hitter, isRamDamage, -1);
+        if (Allows(ship, origin, BattleShipDamageKind.Collision, damage, 0f, point, null, hitter, isRamDamage, -1)) return true;
+
+        if (isRamDamage) ship._moraleInteractionLogic?.OnShipRammed(hitter, ship);
+        return false;
     }
+
+    /// <summary>Opens a collision method's scope, marking a routed ram apply. Returns the outer one.</summary>
+    internal static bool EnterCollision(bool isRamDamage)
+    {
+        var outer = inRoutedRamApply;
+        inRoutedRamApply = isRamDamage && routedApplyDepth > 0;
+        return outer;
+    }
+
+    // Restores the collision scope that was open before EnterCollision.
+    internal static void ExitCollision(bool outer) => inRoutedRamApply = outer;
+
+    /// <summary>Whether vanilla's ram morale runs: never in a routed ram apply, since each client gave its own agents theirs.</summary>
+    internal static bool AllowsRamMorale() => !inRoutedRamApply;
 
     /// <summary>Whether the running contact callback may queue an impact; only the rammer's owner keeps it.</summary>
     internal static bool KeepsContactCollision()
@@ -172,31 +184,6 @@ internal static class NavalShipDamageGate
         return -1;
     }
 
-#if DEBUG
-    // Probe: how often hull contact callbacks fire against copies, at most once a second per hull pair.
-    internal static void LogHullContact(MissionShip ship, WeakGameEntity other)
-    {
-        if (!CoopNavalMissionScope.IsActive || !other.IsValid) return;
-
-        var otherShip = other.GetFirstScriptWithNameHash(MissionShip.MissionShipScriptNameHash) as MissionShip;
-        if (otherShip == null || (!NavalForeignHulls.Contains(ship) && !NavalForeignHulls.Contains(otherShip))) return;
-        NavalContactProbe.CountContact(ship, otherShip);
-
-        var key = (ship.Index, otherShip.Index);
-        int now = Environment.TickCount;
-        if (contactLogTimes.TryGetValue(key, out int last) && now - last < 1000) return;
-        contactLogTimes[key] = now;
-
-        Logger.Debug("[NavalDamage] Hull contact callback on {Ship} (foreign {ShipForeign}, body active {ShipActive}) against " +
-            "{Other} (foreign {OtherForeign}, body active {OtherActive})",
-            Describe(ship), NavalForeignHulls.Contains(ship), ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation(),
-            Describe(otherShip), NavalForeignHulls.Contains(otherShip), otherShip.GameEntity.HasDynamicRigidBodyAndActiveSimulation());
-    }
-
-    private static string Describe(MissionShip ship) =>
-        "#" + ship.Index + " " + ship.ShipOrigin?.Hull?.StringId + " " + ship.Team?.TeamSide + "/" + ship.Formation?.FormationIndex;
-#endif
-
     /// <summary>[Game thread] Suppressed hits and dropped contact impacts on this client (diagnostics).</summary>
     internal static object Inspect() => new
     {
@@ -209,8 +196,5 @@ internal static class NavalShipDamageGate
     {
         Interlocked.Exchange(ref suppressedHits, 0);
         Interlocked.Exchange(ref droppedContactCollisions, 0);
-#if DEBUG
-        contactLogTimes.Clear();
-#endif
     }
 }

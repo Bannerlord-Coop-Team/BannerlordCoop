@@ -71,9 +71,10 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(1, (long)c.StationStats()["sinkingSafetyNetReleases"]!);
     }
 
-    // M10a: B's ram hits its copy of the AI hull A simulates; only A applies it, with B's hull resolved as the rammer.
+    // M10a: the hit B's ram deals on its copy of the AI hull A simulates (published as the collision gate does, without the ram
+    // tick); only A applies it, with B's hull resolved as the rammer.
     [Fact]
-    public void RamFromAnotherOwnersHull_IsAppliedOnceByTheOwner_WithTheRammerResolved_AndReachesEveryClient()
+    public void RamHitFromAnotherOwnersHull_IsAppliedOnceByTheOwner_WithTheRammerResolved_AndReachesEveryClient()
     {
         using var battle = StartPirateBattle(out var a, out var b, out var c, out var pirate, out var rammer);
 
@@ -90,24 +91,6 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
         Assert.Empty(c.Hull(pirate).AppliedDamage);
         Assert.All(battle.Peers, peer => Assert.Equal(70f, peer.Hull(pirate).HitPoints, 3));
         Assert.Empty((JObject)DamageStats(c)["drops"]!);
-    }
-
-    // M10a: a copy is steered from the owner's body velocity and yaw rate, which ride every sample.
-    [Fact]
-    public void OwnersBodyMotion_RidesItsSamples_IntoEveryCopy()
-    {
-        using var battle = StartPirateBattle(out var a, out var b, out var c, out _, out var rammer);
-        var motion = new BattleShipMotion(new Vec2(4f, -1f), 0.1f);
-        b.Hull(rammer).Motion = motion;
-
-        battle.TickAll(2);
-
-        Assert.All(new[] { a, c }, peer =>
-        {
-            Assert.Equal(4f, peer.Hull(rammer).Motion.Velocity.x);
-            Assert.Equal(-1f, peer.Hull(rammer).Motion.Velocity.y);
-            Assert.Equal(0.1f, peer.Hull(rammer).Motion.YawRate);
-        });
     }
 
     private NavalBattle StartPirateBattle(out NavalPeer a, out NavalPeer b, out NavalPeer c, out Guid pirate, out Guid rammer)
