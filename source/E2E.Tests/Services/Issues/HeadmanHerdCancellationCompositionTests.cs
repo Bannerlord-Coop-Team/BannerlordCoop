@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.UI.Notifications;
@@ -55,6 +56,71 @@ public class HeadmanHerdCancellationCompositionTests : IDisposable
                     MBTextManager.TextContext._variables.Add(variable.Key, variable.Value);
             }
         }
+    }
+
+    [Fact]
+    public void RealAlternativeAcceptanceRetainsTheServersNativeHistoryDespiteDifferentCampaignClocks()
+    {
+        const long serverNow = 79212767691569;
+        const long ownerNow = 79212782128047;
+        const long observerNow = ownerNow + 5000000;
+        var clocks = new[] { serverNow, ownerNow, observerNow };
+        for (var index = 0; index < Instances.Length; index++)
+        {
+            var instance = Instances[index];
+            var ticks = clocks[index];
+            instance.Call(() => Campaign.Current.MapTimeTracker._numTicks = ticks);
+        }
+
+        herd.StartCompanions();
+        herd.environment.FlushCoalescer();
+        var accepted = Assert.Single(Scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(Scenario.NotableId, accepted.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, accepted.IssueId);
+        Assert.Equal(QuestScenario.ControllerA, accepted.ControllerId);
+        Assert.Equal(QuestScenario.ControllerA, Scenario.OwnerOnServer());
+        Assert.Empty(Scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        JournalLog[] expected = null!;
+        Scenario.Server.Call(() =>
+        {
+            var issue = Object<Hero>(Scenario.Server, Scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Null(issue.IssueQuest);
+            var log = Assert.Single(issue.JournalEntries);
+            Assert.Equal(serverNow, log.LogTime.NumTicks);
+            Assert.NotEmpty(log.LogText.Value);
+            Assert.Equal("VFO7rMzK", log.TaskName.GetID());
+            var archive = Archive(Campaign.Current.LogEntryHistory);
+            Assert.Equal(IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, archive._lastIssueStatus);
+            expected = archive.GetEntries().ToArray();
+            Assert.Single(expected);
+            AssertHistory(issue.JournalEntries, expected);
+        });
+        for (var index = 0; index < Instances.Length; index++)
+        {
+            var instance = Instances[index];
+            var ticks = clocks[index];
+            instance.Call(() => Assert.Equal(ticks, CampaignTime.Now.NumTicks));
+        }
+        Scenario.ClientB.Call(() =>
+        {
+            Assert.Equal(QuestScenario.ControllerB, Scenario.ClientB.Resolve<IControllerIdProvider>().ControllerId);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
+        });
+        Scenario.ClientA.Call(() =>
+        {
+            Assert.Equal(QuestScenario.ControllerA, Scenario.ClientA.Resolve<IControllerIdProvider>().ControllerId);
+            var issue = Object<Hero>(Scenario.ClientA, Scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Null(issue.IssueQuest);
+            var archive = Archive(Campaign.Current.LogEntryHistory);
+            Assert.Equal(IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, archive._lastIssueStatus);
+            output.WriteLine("Server acceptance ticks {0}; owner acceptance ticks {1}; server/owner clocks {2}/{3}",
+                expected[0].LogTime.NumTicks, Assert.Single(archive.GetEntries()).LogTime.NumTicks, serverNow, ownerNow);
+            AssertHistory(expected, archive.GetEntries());
+            AssertHistory(expected, issue.JournalEntries);
+        });
     }
 
     [Theory]

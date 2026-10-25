@@ -717,14 +717,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         });
         environment.FlushCoalescer();
 
-        // The party-picker's authoritative roster delta arrives before the accept request.
-        Server.Call(() =>
-        {
-            Party(Server, QuestScenario.ControllerA).MemberRoster.AddToCounts(Object<Hero>(Server, companionId).CharacterObject, -1);
-            Party(Server, QuestScenario.ControllerA).MemberRoster.AddToCounts(Object<CharacterObject>(Server, troopId), -40);
-        });
-        environment.FlushCoalescer();
-
         ClientA.Call(() =>
         {
             using (OwnerScope(ClientA, QuestScenario.ControllerA))
@@ -735,8 +727,9 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 using (new AllowedThread())
                 {
                     issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 40);
                 }
+                AlternativeSolutionPickerDriver.Commit(ClientA, issue, Object<Hero>(ClientA, scenario.OwnerHeroId),
+                    Party(ClientA, QuestScenario.ControllerA), troop, 40);
                 issue.StartIssueWithAlternativeSolution();
             }
         });
