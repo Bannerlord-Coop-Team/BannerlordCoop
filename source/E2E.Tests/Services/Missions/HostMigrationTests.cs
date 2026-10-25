@@ -85,11 +85,13 @@ public class HostMigrationTests : MissionTestEnvironment
             new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
     }
 
+    // At sea, where only an applied conclusion (or a reported result) keeps the host, so this checks the Applied filter.
     [Fact]
     public void HostDepartsAfterAnUnappliedConclusion_StillPromotes()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
         var clients = Clients.ToArray();
+        PlaceMapEvent(mapEventId, atSea: true);
         EnterBattle(clients[0], mapEventId);
         EnterBattle(clients[1], mapEventId);
         CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: false);
