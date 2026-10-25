@@ -78,7 +78,10 @@ internal class GauntletPartyScreenPatches
             if (savedRoster != null) RemoveCharacter(savedRoster, character);
         }
 
-        partyScreenLogic.OnReset(false);
+        if (ContainerProvider.TryResolve<IPartyScreenLockPreserver>(out var lockPreserver))
+            lockPreserver.Reset(partyScreenLogic, () => partyScreenLogic.OnReset(false));
+        else
+            partyScreenLogic.OnReset(false);
     }
 
     private static void RemoveCharacter(TroopRoster roster, CharacterObject character)
