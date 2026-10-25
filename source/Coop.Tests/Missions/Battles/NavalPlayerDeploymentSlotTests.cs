@@ -21,9 +21,6 @@ public class NavalPlayerDeploymentSlotTests
     private static readonly float[] GameShipLengths = { 35f, 45.85f, 67.5f };
     private static readonly float Longest = NavalPlayerDeploymentSlot.LongestTeamRange(GameShipLengths);
 
-    // NavalShipsLogic.ComputeSpawnPathDeploymentOffset for a battle with two ships or fewer: -400 / 2 + 1.
-    private const float SmallBattleDeploymentOffset = -199f;
-
     [Fact]
     public void RankOf_FirstPlayerOfTheSide_IsTheFrontSlot()
     {
@@ -46,6 +43,31 @@ public class NavalPlayerDeploymentSlotTests
     public void LongestTeamRange_IsVanillasMarginOnTheLongestShip()
     {
         Assert.Equal(1.1f * 67.5f, Longest, 3);
+    }
+
+    // NavalShipsLogic.ComputeSpawnPathDeploymentOffset for two ships or fewer: -min(path, 400) / 2 + 1.
+    [Theory]
+    [InlineData(2000f, -199f)]
+    [InlineData(300f, -149f)]
+    public void SharedDeploymentOffset_IsVanillasSmallBattleOffset(float pathLength, float expected)
+    {
+        Assert.Equal(expected, NavalPlayerDeploymentSlot.SharedDeploymentOffset(pathLength), 3);
+    }
+
+    // R49 fix review C1: vanilla's offset deepens with the ships this client assigned, which is only its own fleet, so a
+    // 4-hull rank 0 and a 1-hull rank 1 derived bases 70 m apart and rank 1's bow sat 40 m inside rank 0's fleet.
+    [Fact]
+    public void SlotFor_TwoClientsWithFleetsOfDifferentSizes_DeriveOneLayout()
+    {
+        var path = FreePath(2000f, 1000f);
+        float bigFleetRange = NavalPlayerDeploymentSlot.LongestTeamRange(new[] { 67.5f });
+
+        float front = NavalPlayerDeploymentSlot.SlotFor(path, 0, 2, Longest, out float frontBase, out _);
+        float behind = NavalPlayerDeploymentSlot.SlotFor(path, 1, 2, Longest, out float behindBase, out _);
+
+        Assert.Equal(frontBase, behindBase, 3);
+        Assert.True(front - bigFleetRange - behind >= NavalPlayerDeploymentSlot.InterTeamGap - 0.01f,
+            $"rank 1 at {behind} is inside vanilla's gap behind rank 0's fleet at {front}");
     }
 
     // R49: the spawn point sat near the path start, so vanilla's side base was the path start and nothing fit behind it.
@@ -104,10 +126,11 @@ public class NavalPlayerDeploymentSlotTests
     private static float[] Layout(SpawnPathData path, int playerCount) =>
         NavalPlayerDeploymentSlot.PlaceSideFleets(path, SideBase(path), playerCount, Longest);
 
-    // Vanilla's deploying side base, as DefaultNavalMissionLogic.MakeDeploymentPlansForSide derives it.
+    // The deploying side base SlotFor lays the fleets from, vanilla's base for the shared offset.
     private static float SideBase(SpawnPathData path)
     {
-        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(path, SmallBattleDeploymentOffset, out float deploying, out _);
+        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(path,
+            NavalPlayerDeploymentSlot.SharedDeploymentOffset(path.PathLength), out float deploying, out _);
         return deploying;
     }
 

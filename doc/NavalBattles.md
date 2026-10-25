@@ -646,12 +646,18 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
 - **Player deployment slots.** When a side has more than one player, every client lays out all the side's player fleets
   with vanilla's `ComputeTeamDeploymentOffsets`, each fleet as deep as the deepest possible one (1.1 times the longest
-  ship deployment length in the game data) with vanilla's 32 m gap, and takes its own rank's slot. So every client gets
-  the same layout, blocked segments are skipped, and when nothing fits behind the side base (R49: the spawn point sat near
-  the path start) the fleets are packed forward from the path start as vanilla does. A Warning is logged only when even
-  that doesn't fit. The side base comes from `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens with the
-  ship count each client assigns (only its own fleet) above two ships, so players whose fleets differ in size above two
-  hulls can derive different bases; the `Deployment slot` Information line logs the base on each client.
+  ship deployment length in the game data) with vanilla's 32 m gap, and takes its own rank's slot
+  (`NavalPlayerDeploymentSlot.SlotFor`). The side base comes from vanilla's `ComputeDeploymentBaseOffsets` fed with the
+  small-battle offset (-min(path, 400) / 2 + 1), not with `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens
+  with the ships this client assigned (only its own fleet) and so differed between players with more than two hulls. So
+  every client derives the same layout, blocked segments are skipped, and when nothing fits behind the side base (R49: the
+  spawn point sat near the path start) the fleets are packed forward from the path start as vanilla does. A Warning is
+  logged only when even that doesn't fit; the `Deployment slot` Information line logs the base and the slot on each client.
+  Known limits (M11, 3+ players per side):
+  - the forward packing of three or more fleets can reach the enemy's line (four 74 m fleets put the front one 5 m from
+    the opposing base), and the fit check doesn't look at the opposing base;
+  - the player count is the side's registered player parties when each client opens the mission, so a late joiner counts
+    one more party than the clients that opened before it, and in the forward packing every slot moves with that count.
 - **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
   AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
   on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a

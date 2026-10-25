@@ -231,16 +231,12 @@ internal class PlayerFleetDeploymentSlotPatch
         var spawnPath = mission.GetInitialSpawnPathData(team.Side);
         float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
             .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
-        // The same side base vanilla's MakeDeploymentPlansForSide hands its team placement.
-        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(spawnPath,
-            planningSide._shipsLogic.ComputeSpawnPathDeploymentOffset(spawnPath.Path), out float baseOffset, out _);
-        var layout = NavalPlayerDeploymentSlot.PlaceSideFleets(spawnPath, baseOffset, playerCount, longestTeamRange);
-        float slot = layout[rank];
+        float slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, playerCount, longestTeamRange, out float baseOffset,
+            out bool fits);
         Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, side base " +
             "{BaseOffset}, slot {Slot} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
             baseOffset, slot, spawnPath.PivotOffset, spawnPath.PathLength);
-        // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
-        if (!NavalPlayerDeploymentSlot.FitsPath(layout, longestTeamRange, -spawnPath.PivotOffset))
+        if (!fits)
             Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for {PlayerCount} player fleets; " +
                 "fleet {Rank} at {Slot} (vanilla {VanillaOffset}, side base {BaseOffset}, pivot {PivotOffset}) can overlap " +
                 "another player's fleet", spawnPath.PathLength, playerCount, rank, slot, spawnPathOffset, baseOffset,

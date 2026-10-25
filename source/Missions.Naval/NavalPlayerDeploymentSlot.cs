@@ -18,6 +18,9 @@ internal static class NavalPlayerDeploymentSlot
     // DefaultNavalMissionLogic.GetTeamSpawnPathOffsetRange's margin on a team's longest ship deployment length.
     internal const float TeamRangeMargin = 1.1f;
 
+    // NavalShipsLogic.ComputeSpawnPathDeploymentOffset's distance between the two sides for a battle of two ships or fewer.
+    internal const float SmallBattleSideDistance = 400f;
+
     // Float slack for the layout fit check; vanilla's placement adds and subtracts the same ranges.
     private const float FitTolerance = 0.01f;
 
@@ -58,6 +61,27 @@ internal static class NavalPlayerDeploymentSlot
     /// <summary>The deepest team range any fleet can have, from every ship's deployment length in the game data.</summary>
     internal static float LongestTeamRange(IEnumerable<float> shipDeploymentLengths) =>
         TeamRangeMargin * shipDeploymentLengths.DefaultIfEmpty(0f).Max();
+
+    /// <summary>
+    /// Vanilla's side deployment offset for a battle of two ships or fewer. Vanilla deepens it with the ships it assigned, and in
+    /// coop each client assigns only its own fleet, so a side with several players takes this value every client shares.
+    /// </summary>
+    internal static float SharedDeploymentOffset(float pathLength) => (-Math.Min(pathLength, SmallBattleSideDistance) / 2f) + 1f;
+
+    /// <summary>
+    /// The own fleet's offset at <paramref name="rank"/>: vanilla's side base from the shared offset, then the side's layout,
+    /// so every client derives the same one. Also gives the base and whether the layout fits the path.
+    /// </summary>
+    internal static float SlotFor(SpawnPathData spawnPath, int rank, int playerCount, float longestTeamRange, out float sideBase,
+        out bool fits)
+    {
+        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(spawnPath, SharedDeploymentOffset(spawnPath.PathLength),
+            out sideBase, out _);
+        var layout = PlaceSideFleets(spawnPath, sideBase, playerCount, longestTeamRange);
+        // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
+        fits = FitsPath(layout, longestTeamRange, -spawnPath.PivotOffset);
+        return layout[rank];
+    }
 
     /// <summary>
     /// Every player fleet's front offset by rank, from vanilla's team placement with each fleet as deep as the deepest one,
