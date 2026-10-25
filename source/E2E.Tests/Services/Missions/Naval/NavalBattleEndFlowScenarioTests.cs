@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
+using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -59,7 +61,7 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         AssertHost(Server, battle.MapEventId, "A", "B");
         AssertHost(b.Instance, battle.MapEventId, "A", "B");
         Assert.Equal(0, concluded());
-        // B holds the result, so its naval mission takes over no AI hull from the departed host.
+        // The server kept A as host, so no host change reaches B and it takes over no AI hull from A.
         Assert.Equal("A", b.Ship(pirate).CurrentAuthority);
         b.Ticks(3);
         Assert.True(b.Hull(pirate).IsCopy);
@@ -92,6 +94,26 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0, concluded());
 
         LeaveMission(battle, b);
+        Assert.Equal(1, concluded());
+        AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // Q7: the host resolves and leaves while a member stays in the mission without reporting. Past the kept-host deadline
+    // the server concludes with the host's report instead of holding the battle open for the silent member.
+    [Fact]
+    public void HostLeavesFirst_AndAMemberStaysSilent_TheDeadlineConcludesWithTheHostsReport()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
+        a.Commit();
+        battle.TickAll();
+        Server.Call(() => Server.Resolve<ServerBattleCompletionHandler>().KeptHostReportTimeout = TimeSpan.Zero);
+
+        ReportWin(a);
+        LeaveMission(battle, a);
+        Assert.Equal(0, concluded());
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()),
+            VictoryConclusionDisabledMethods());
         Assert.Equal(1, concluded());
         AssertMapEventRemoved(battle.MapEventId);
     }

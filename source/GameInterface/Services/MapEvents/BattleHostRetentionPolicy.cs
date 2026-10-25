@@ -5,8 +5,8 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// [Server] What a naval battle keeps when its host or a member leaves (D4, R41a). Every rule answers false for a land
-/// battle, whose host migration and disconnect adoption (BR-014, BR-031) stay as they are.
+/// [Server, game thread] The naval departure rules (D4, R41a); each answers false for a land battle. Whether a host is kept
+/// lives on its assignment (<see cref="BattleHostAssignment.KeptAfterResult"/>), set by the host succession.
 /// </summary>
 public interface IBattleHostRetentionPolicy
 {
@@ -16,10 +16,7 @@ public interface IBattleHostRetentionPolicy
     /// <summary>The host stays host when it leaves after it reported a result, or after the map event applied one.</summary>
     bool KeepsHostAfterResult(string mapEventId, bool hasResult);
 
-    /// <summary>The host's resolved report still concludes the battle after it left, and outlives a later host change.</summary>
-    bool KeepsDepartedHostReport(string mapEventId);
-
-    /// <summary>[Game thread] The host's own finalize waits for the server's conclusion, which it would otherwise drop.</summary>
+    /// <summary>The host's own finalize waits for the server's conclusion, which it would otherwise drop.</summary>
     bool DefersHostFinalize(string mapEventId);
 
     /// <summary>A host kept after its result may not enter again, as that would reset the result it reported.</summary>
@@ -41,8 +38,6 @@ public class BattleHostRetentionPolicy : IBattleHostRetentionPolicy
     public bool DisconnectWithdraws(string mapEventId) => IsNaval(mapEventId);
 
     public bool KeepsHostAfterResult(string mapEventId, bool hasResult) => hasResult && IsNaval(mapEventId);
-
-    public bool KeepsDepartedHostReport(string mapEventId) => IsNaval(mapEventId);
 
     public bool DefersHostFinalize(string mapEventId) =>
         objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent)

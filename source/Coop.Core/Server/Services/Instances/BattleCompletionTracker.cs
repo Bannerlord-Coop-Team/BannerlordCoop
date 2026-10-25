@@ -1,15 +1,15 @@
-﻿using GameInterface.Services.MapEvents;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Instances;
 
 /// <summary>
-/// Reconciles per-client battle results against the server's current mission membership, keeping a departed host's report
-/// where <see cref="IBattleHostRetentionPolicy.KeepsDepartedHostReport"/> says so.
+/// Reconciles per-client battle results against the server's current mission membership. A kept host's report still counts
+/// after it left, and once the wait for members expired the host's report alone concludes the battle.
 /// </summary>
 public interface IBattleCompletionTracker
 {
+    /// <summary>Records a member's report and tries to conclude; <paramref name="hostKept"/> is the assignment's kept flag.</summary>
     bool TryRecordResult(
         string instanceId,
         string controllerId,
@@ -19,15 +19,18 @@ public interface IBattleCompletionTracker
         string hostControllerId,
         int hostEpoch,
         out BattleState concludedState,
-        bool canConclude = true);
+        bool canConclude = true,
+        bool hostKept = false);
 
+    /// <summary>Tries to conclude from the reports already in; <paramref name="hostKept"/> is the assignment's kept flag.</summary>
     bool TryReconcile(
         string instanceId,
         IReadOnlyCollection<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
         out BattleState concludedState,
-        bool canConclude = true);
+        bool canConclude = true,
+        bool hostKept = false);
 
     bool TryConcludeAbandoned(
         string instanceId,
@@ -36,6 +39,10 @@ public interface IBattleCompletionTracker
         out int memberCount);
 
     void HostAssigned(string instanceId, string hostControllerId, int hostEpoch);
+
+    /// <summary>Stops waiting for unmatched members, so the host's report alone concludes the battle (Q7).</summary>
+    void StopWaitingForMembers(string instanceId);
+
     void MemberDeparted(string instanceId, string controllerId);
     void ResetMember(string instanceId, string controllerId, bool isFirstMember);
     void Clear(string instanceId);
@@ -48,12 +55,8 @@ public class BattleCompletionTracker : IBattleCompletionTracker
     private readonly Dictionary<string, Dictionary<string, BattleResultReport>> reports = new();
     private readonly Dictionary<string, HashSet<string>> participants = new();
     private readonly Dictionary<string, BattleResultReport> authoritativeReports = new();
-    private readonly IBattleHostRetentionPolicy retentionPolicy;
-
-    public BattleCompletionTracker(IBattleHostRetentionPolicy retentionPolicy)
-    {
-        this.retentionPolicy = retentionPolicy;
-    }
+    // Battles whose wait for their members expired, so the host's report concludes them alone.
+    private readonly HashSet<string> membersNotAwaited = new();
 
     public bool TryRecordResult(
         string instanceId,
@@ -64,7 +67,8 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         string hostControllerId,
         int hostEpoch,
         out BattleState concludedState,
-        bool canConclude = true)
+        bool canConclude = true,
+        bool hostKept = false)
     {
         concludedState = BattleState.None;
         if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(controllerId) ||
@@ -95,7 +99,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             RememberAuthoritativeReport(instanceId, controllerId, hostControllerId, hostEpoch, report);
 
             return canConclude &&
-                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
+                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, hostKept, out concludedState);
         }
     }
 
@@ -105,7 +109,8 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         string hostControllerId,
         int hostEpoch,
         out BattleState concludedState,
-        bool canConclude = true)
+        bool canConclude = true,
+        bool hostKept = false)
     {
         concludedState = BattleState.None;
         if (string.IsNullOrEmpty(instanceId) || currentMembers == null)
@@ -124,7 +129,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
                 RememberAuthoritativeReport(instanceId, hostControllerId, hostControllerId, hostEpoch, hostReport);
 
             return canConclude &&
-                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, out concludedState);
+                TryConclude(instanceId, instanceReports, members, hostControllerId, hostEpoch, hostKept, out concludedState);
         }
     }
 
@@ -150,14 +155,9 @@ public class BattleCompletionTracker : IBattleCompletionTracker
                 return false;
             }
 
-            foreach (var controllerId in instanceParticipants)
-            {
-                if (!instanceReports.TryGetValue(controllerId, out var report) ||
-                    report.BattleState != authoritativeReport.BattleState)
-                {
-                    return false;
-                }
-            }
+            if (!membersNotAwaited.Contains(instanceId) &&
+                !AllReportsMatch(instanceReports, instanceParticipants, authoritativeReport.BattleState))
+                return false;
 
             concludedState = authoritativeReport.BattleState;
             hostEpoch = authoritativeReport.HostEpoch;
@@ -171,19 +171,25 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(hostControllerId))
             return;
 
-        bool keepsDepartedHostReport = retentionPolicy.KeepsDepartedHostReport(instanceId);
         lock (gate)
         {
             // A new hosting generation must report at its own epoch. Retained reports still count toward
             // participant consensus, but cannot stand in for the new host's final state and siege snapshot.
-            // A naval host's resolved report stays until the new host reports, so an emptied instance concludes with it.
-            if (!keepsDepartedHostReport &&
-                authoritativeReports.TryGetValue(instanceId, out var report) &&
+            if (authoritativeReports.TryGetValue(instanceId, out var report) &&
                 (report.ControllerId != hostControllerId || report.HostEpoch != hostEpoch))
             {
                 authoritativeReports.Remove(instanceId);
             }
         }
+    }
+
+    public void StopWaitingForMembers(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return;
+
+        lock (gate)
+            membersNotAwaited.Add(instanceId);
     }
 
     public void ResetMember(string instanceId, string controllerId, bool isFirstMember)
@@ -235,32 +241,43 @@ public class BattleCompletionTracker : IBattleCompletionTracker
             ClearInternal(instanceId);
     }
 
-    // The current host's report at its epoch, matched by every current member; a kept naval host may have left already.
+    // The current host's report at its epoch, matched by every current member unless the wait for them expired; a kept
+    // host may have left already.
     private bool TryConclude(
         string instanceId,
         Dictionary<string, BattleResultReport> instanceReports,
         HashSet<string> currentMembers,
         string hostControllerId,
         int hostEpoch,
+        bool hostKept,
         out BattleState concludedState)
     {
         concludedState = BattleState.None;
         if (string.IsNullOrEmpty(hostControllerId) ||
-            (!currentMembers.Contains(hostControllerId) && !retentionPolicy.KeepsDepartedHostReport(instanceId)) ||
+            (!currentMembers.Contains(hostControllerId) && !hostKept) ||
             !instanceReports.TryGetValue(hostControllerId, out var hostReport) ||
             hostReport.HostEpoch != hostEpoch)
         {
             return false;
         }
 
-        foreach (var member in currentMembers)
+        if (!membersNotAwaited.Contains(instanceId) && !AllReportsMatch(instanceReports, currentMembers, hostReport.BattleState))
+            return false;
+
+        concludedState = hostReport.BattleState;
+        return true;
+    }
+
+    // Whether every given member reported the given state.
+    private static bool AllReportsMatch(Dictionary<string, BattleResultReport> instanceReports, IEnumerable<string> members,
+        BattleState battleState)
+    {
+        foreach (var member in members)
         {
-            if (!instanceReports.TryGetValue(member, out var memberReport) ||
-                memberReport.BattleState != hostReport.BattleState)
+            if (!instanceReports.TryGetValue(member, out var memberReport) || memberReport.BattleState != battleState)
                 return false;
         }
 
-        concludedState = hostReport.BattleState;
         return true;
     }
 
@@ -295,6 +312,7 @@ public class BattleCompletionTracker : IBattleCompletionTracker
         reports.Remove(instanceId);
         participants.Remove(instanceId);
         authoritativeReports.Remove(instanceId);
+        membersNotAwaited.Remove(instanceId);
     }
 
     private readonly struct BattleResultReport

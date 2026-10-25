@@ -398,12 +398,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   reconciles every mission member, then concludes the map event once. Casualties come from each agent's owner
   (`BattleCasualtyHandler`), since the host's vanilla casualty accounting is off.
 - **The host stays once it reported (R41a).** A naval host that reported a resolved result is not replaced when it
-  leaves. Its report still concludes the battle once the remaining members match it, and an instance that empties
-  without them concludes with it (`BattleCompletionTracker`). Until then the server refuses the departed host's own
-  finalize, which would drop the result, and its Attack, which would reset it, and leaves it out of another member's
-  mission start (`BattleMissionStartHandler`); the conclusion closes its encounter. These rules live in one place,
-  `IBattleHostRetentionPolicy` (`GameInterface/Services/MapEvents/BattleHostRetentionPolicy.cs`). Land still promotes a
-  successor that must report again.
+  leaves: `BattleHostSuccession` marks its assignment `KeptAfterResult`, and the server is the only side that decides
+  this. Its report still concludes the battle once the remaining members match it, and an instance that empties without
+  them concludes with it (`BattleCompletionTracker`). A member that stays without matching it gets about 2 minutes
+  (`ServerBattleCompletionHandler.KeptHostReportTimeout`), then the host's report concludes the battle alone (Q7). Until
+  then the server refuses the departed host's own finalize, which would drop the result, and its Attack, which would
+  reset it, and leaves it out of another member's mission start (`BattleMissionStartHandler`); the conclusion closes its
+  encounter. The naval-only rules are in `IBattleHostRetentionPolicy`. Land still promotes a successor that must report
+  again.
 - **A missing own reserve ends the mission.** `CoopNavalSetupGuard` checks the reserve in `EarlyStart` and ends the
   mission from its first `OnPreDisplayMissionTick` (an `EndMission` in `EarlyStart` is undone by `Mission.AfterStart`).
   A player team with no troops gets no ship, and a reserve without the player hero (a wounded hero left out of the
@@ -727,8 +729,6 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   singleplayer, the late-hull refresh above re-reads every fielded ballista's list whenever any hull spawns later (a copy, an
   AI fleet, a swap replacement), so after such a spawn the prize does target its new enemies' hulls. Its gunner also stops
   within 7 m of an enemy (`Ballista.EnemyRangeToStopUsing`). R46 L1's idle prize matched the vanilla part.
-- **Silent member after the host left.** A naval battle whose host reported and left concludes once the remaining
-  members match its report or leave; there is no timeout for a member that stays in the mission without reporting.
 - **Follow-ups from the D4 review (not done):**
   - a hull's `OriginalOwnerControllerId` (`BattleShipSpawnData`, `NetworkShipInfo.OriginalOwner`) only feeds logs and
     `inspect` now that hand-back is gone;

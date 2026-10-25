@@ -20,7 +20,6 @@ public class BattleHostRetentionPolicyTests
         var policy = Create(new BattleHostAssignment("host", Array.Empty<string>(), epoch: 1, isNaval: naval));
 
         Assert.Equal(naval, policy.DisconnectWithdraws(MapEventId));
-        Assert.Equal(naval, policy.KeepsDepartedHostReport(MapEventId));
         Assert.Equal(naval, policy.KeepsHostAfterResult(MapEventId, hasResult: true));
         Assert.False(policy.KeepsHostAfterResult(MapEventId, hasResult: false));
         Assert.False(policy.DefersHostFinalize(MapEventId));
