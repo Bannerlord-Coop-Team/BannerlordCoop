@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.Objects;
