@@ -58,10 +58,14 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenRosterRefresher>();
     private readonly IPartyScreenRosterBaselineProvider baselineProvider;
+    private readonly IPartyScreenLockPreserver lockPreserver;
 
-    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider)
+    public PartyScreenRosterRefresher(
+        IPartyScreenRosterBaselineProvider baselineProvider,
+        IPartyScreenLockPreserver lockPreserver)
     {
         this.baselineProvider = baselineProvider;
+        this.lockPreserver = lockPreserver;
     }
 
     public bool TryApply(
@@ -266,7 +270,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         }
     }
 
-    private static void RefreshScreen(PartyScreenLogic logic)
+    private void RefreshScreen(PartyScreenLogic logic)
     {
         var partyVm = GetPartyVm(logic);
         var previousSelection = partyVm?.CurrentCharacter;
@@ -275,7 +279,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             ? GetIdentity(previousSelection)
             : default;
 
-        PartyScreenLockPreserver.Reset(partyVm, () => logic.OnReset(false));
+        lockPreserver.Reset(logic, () => logic.OnReset(false));
 
         if (!restoreSelection) return;
 
@@ -295,7 +299,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         replacement.UpdateRecruitable();
     }
 
-    private static void RefreshTroop(
+    private void RefreshTroop(
         PartyScreenLogic logic,
         TroopRoster baseline,
         CharacterObject character,

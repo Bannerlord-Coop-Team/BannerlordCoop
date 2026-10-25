@@ -163,9 +163,10 @@ internal class PartyScreenLogicPatches
                 InCommit = true;
                 try
                 {
-                    PartyScreenLockPreserver.Reset(
-                        Campaign.Current?.GetCampaignBehavior<IViewDataTracker>(),
-                        () => __instance.Reset(true));
+                    if (ContainerProvider.TryResolve<IPartyScreenLockPreserver>(out var lockPreserver))
+                        lockPreserver.Reset(__instance, () => __instance.Reset(true));
+                    else
+                        __instance.Reset(true);
 
                     //__instance.FireCampaignRelatedEvents(); // Managed on server
                     __instance.SetPartyGoldChangeAmount(0);

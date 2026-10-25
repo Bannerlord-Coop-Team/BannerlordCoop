@@ -46,11 +46,10 @@ internal class GauntletPartyScreenPatches
         if (character == null) return;
 
         var partyScreenLogic = __instance._partyState.PartyScreenLogic;
-        RemoveConversationCharacter(__instance._dataSource, partyScreenLogic, character, isPrisoner);
+        RemoveConversationCharacter(partyScreenLogic, character, isPrisoner);
     }
 
     private static void RemoveConversationCharacter(
-        PartyVM partyVm,
         PartyScreenLogic partyScreenLogic,
         CharacterObject character,
         bool isPrisoner)
@@ -79,7 +78,10 @@ internal class GauntletPartyScreenPatches
             if (savedRoster != null) RemoveCharacter(savedRoster, character);
         }
 
-        PartyScreenLockPreserver.Reset(partyVm, () => partyScreenLogic.OnReset(false));
+        if (ContainerProvider.TryResolve<IPartyScreenLockPreserver>(out var lockPreserver))
+            lockPreserver.Reset(partyScreenLogic, () => partyScreenLogic.OnReset(false));
+        else
+            partyScreenLogic.OnReset(false);
     }
 
     private static void RemoveCharacter(TroopRoster roster, CharacterObject character)
