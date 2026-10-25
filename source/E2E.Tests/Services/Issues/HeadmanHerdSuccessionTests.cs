@@ -57,6 +57,12 @@ public class HeadmanHerdSuccessionTests
                 oldHero.SetBirthDay(CampaignTime.YearsFromNow(-45));
                 oldHero.Clan.SetLeader(oldHero);
                 oldHero.Clan._banner = new Banner();
+                // Synthetic equipment contains unregistered items; this inventory case does not inherit equipment.
+                for (var slot = 0; slot < 12; slot++)
+                {
+                    oldHero.BattleEquipment[slot] = EquipmentElement.Invalid;
+                    oldHero.CivilianEquipment[slot] = EquipmentElement.Invalid;
+                }
                 var heir = Object<Hero>(instance, heirId);
                 heir.Occupation = Occupation.Lord;
                 heir.SetBirthDay(CampaignTime.YearsFromNow(-20));
@@ -67,6 +73,10 @@ public class HeadmanHerdSuccessionTests
                 Assert.Same(heir, party.LeaderHero);
                 party.ItemRoster.Clear();
             });
+        scenario.Server.Call(() => Object<MobileParty>(scenario.Server, successorPartyId).ItemRoster.Clear());
+        herd.environment.FlushCoalescer();
+        foreach (var instance in instances)
+            instance.Call(() => Assert.Empty(Object<MobileParty>(instance, successorPartyId).ItemRoster));
 
         herd.Accept(scenario.ClientA);
         var otherGiverId = scenario.AddIssue();
