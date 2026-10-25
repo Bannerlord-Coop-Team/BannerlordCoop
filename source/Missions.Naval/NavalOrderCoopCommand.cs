@@ -146,7 +146,13 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
 
     // A hull's active ship order, or none.
     private static string ShipOrderOf(MissionShip ship) =>
-        ship != null && ship.IsShipOrderActive ? ship.ShipOrder.MovementOrderEnum.ToString() : "none";
+        ship != null && ship.IsShipOrderActive ? ShipOrderName(ship.ShipOrder.MovementOrderEnum) : "none";
+
+    /// <summary>
+    /// The ship order's name; Follow shares its value with the StaticOrderCount marker, which enum ToString picks first.
+    /// </summary>
+    internal static string ShipOrderName(ShipOrder.ShipMovementOrderEnum order) =>
+        order == ShipOrder.ShipMovementOrderEnum.Follow ? nameof(ShipOrder.ShipMovementOrderEnum.Follow) : order.ToString();
 
     // Swimming or diving, the movement modes vanilla's capture vacancy counts as off the deck.
     private static bool IsSwimming(Agent agent)

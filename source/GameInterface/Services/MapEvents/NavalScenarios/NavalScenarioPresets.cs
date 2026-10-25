@@ -135,6 +135,12 @@ public static class NavalScenarioPresets
     /// <summary>A medium hull with a bow slot, which replaces a ship ram=n must fit that has none.</summary>
     public const string RamHullId = "empire_medium_ship";
 
+    /// <summary>
+    /// A heavy hull with 40 crew places below deck (120 crew, 80 on deck), which replaces a plain ship with none for reserve=n;
+    /// the default hull and the Battle Knarr carry their whole crew on deck, so they hold no reserve.
+    /// </summary>
+    public const string ReserveHullId = "empire_heavy_ship";
+
     public static IReadOnlyList<NavalScenarioPreset> All { get; } = new[]
     {
         new NavalScenarioPreset

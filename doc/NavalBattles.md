@@ -384,7 +384,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   for 20 s, and gives the other side no wait. Coop keeps that wait for each side's player heroes (`NavalPlayerHeroGrace`),
   so in PvP neither side loses while one of its players still fights; an AI side still has none. Only current mission
   members' heroes count, matched by the character's registry id, and every client scans for them once a second, so a
-  promoted host keeps the history.
+  promoted host keeps the history. Unlike vanilla, which ends a depleted side at once, the side depletion check waits for
+  the same grace (maintainer decision after R49), so a side whose last living human was its player hero still holds about
+  20 s after the hero went down.
 - **Other clients** end with the host's replicated result. A side counts as retreated only once hulls left it, with their
   players or to a capture, and none is left. So capturing the last enemy hull ends the battle as an enemy retreat after
   vanilla's 5 s, as in vanilla (`MissionResult.CreateSuccessful(..., enemyRetreated: true)`); the committer reports only the
@@ -643,11 +645,27 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.
-- **Player deployment slots.** Each player fleet after the first on a side is spaced by the deepest possible fleet (1.1
-  times the longest ship deployment length in the game data) plus vanilla's 32 m gap, so mixed fleets don't overlap on a
-  path long enough for the side's fleets. On a shorter path the clamp puts every clamped rank at `-PivotOffset + ownRange`,
-  so those fleets overlap (logged as a Warning naming the rank and path length); vanilla would instead pack the teams
-  forward from the path start. Unlike vanilla, the slot also doesn't skip blocked path segments.
+- **Player deployment slots.** When a side has more than one player, every client lays out all the side's player fleets
+  with vanilla's `ComputeTeamDeploymentOffsets`, each fleet as deep as the deepest possible one (1.1 times the longest
+  ship deployment length in the game data) with vanilla's 32 m gap, and takes its own rank's slot
+  (`NavalPlayerDeploymentSlot.SlotFor`). The side base comes from vanilla's `ComputeDeploymentBaseOffsets` fed with the
+  small-battle offset (-min(path, 400) / 2 + 1), not with `NavalShipsLogic.ComputeSpawnPathDeploymentOffset`, which deepens
+  with the ships this client assigned (only its own fleet) and so differed between players with more than two hulls. So
+  every client derives the same layout, blocked segments are skipped, and when nothing fits behind the side base (R49: the
+  spawn point sat near the path start) the fleets are packed forward from the path start as vanilla does. A Warning is
+  logged only when even that doesn't fit; the `Deployment slot` Information line logs the base and the slot on each client.
+  Known limits (M11, 3+ players per side):
+  - the forward packing of three or more fleets can reach the enemy's line (four 74 m fleets put the front one 5 m from
+    the opposing base), and the fit check doesn't look at the opposing base;
+  - the player count is the side's registered player parties when each client opens the mission, so a late joiner counts
+    one more party than the clients that opened before it, and in the forward packing every slot moves with that count.
+- **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
+  AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
+  on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a
+  1.12 m radius) and a torn read of the engine's agent grid: a cell head read while an agent moved to the next cell. The
+  managed lock only serializes readers, so no managed check can prevent it. The trigger was the slot overlap above, which
+  threw crews across cells next to floating objects. Skipping the solver would also turn off vanilla's agent push on
+  floating objects, so it's left as is; the next freeze needs a watchdog-timed dump (§7 ProcDump).
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
   one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E) and R41a-3 (W2, D, E); the condition catch-up is
   E2E-only. Not hit live yet: an item pickup on a rejoined client in W2 (pickups by the returner's agents ran in R41a-3
@@ -751,7 +769,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `clear_crew <ship>` | hull's authority | Kills the hull's formation's units (the main agent excepted) and empties its reserve through vanilla, so the deaths replicate and the hull is vacant for a capture; vanilla's vacancy query refreshes within 5 s. |
 | `capture <ship> [force [twice]] \| status <ship>` | client | Moves the main agent to an enemy hull's helm (or this client's own orphan's) and takes it the way the use key does, so vanilla's 3 s timer runs and its end goes to the hull's authority; refuses with the helm gate that fails. `status` reports the authority, captor, orphan flag, `CaptureTimer`, how long this client's request waited and every helm gate (`enemy`, `vacantHere`, `connected`, `usableByMain`, `disabledForPlayers`). `force` publishes what vanilla's elapsed timer publishes (`ShipCaptureTimerElapsed`) with the main agent's hull, past this copy's helm gates, so the authority's own refusal (`NotVacant`, `Busy`, `SwapUnavailable`) answers it; a request already waiting for the hull is reported and not sent again. `force twice` forces two in the same frame, so the second meets the first one still waiting (one `NAVAL_CAPTURE_TWICE` line with both outcomes). |
 | `swim <ship>` | client | Leaves any station and puts the main agent on the water 4 m off the hull's starboard side, midway along it, so swimming, follow-me orders from the water and a swimmer's capture vacancy can be staged. |
-| `order <followme\|charge\|hold>` | client | Issues the order through the player's order controller, as the order menu does. Follow-me goes to the formations vanilla's select-all picks: every selectable formation except the one whose hull the main agent captains, because vanilla's `SetNavalFollowOrder` skips the hull being followed. So a ship follow order only shows on a second hull of the player's; with one hull, follow-me leaves its ship order unchanged. Charge and hold go to the main agent's formation alone. One `NAVAL_ORDER` line with the main formation's movement order, its hull's ship order, the main agent's formation ship, whether it swims and `selected=[formation:ship=N:shipOrder=X,...]` for every selected formation; a throw inside vanilla's order is reported as `threw=`. |
+| `order <followme\|charge\|hold>` | client | Issues the order through the player's order controller, as the order menu does. Follow-me goes to the formations vanilla's select-all picks: every selectable formation except the one whose hull the main agent captains, because vanilla's `SetNavalFollowOrder` skips the hull being followed. So a ship follow order only shows on a second hull of the player's; with one hull, follow-me leaves its ship order unchanged. Charge and hold go to the main agent's formation alone. One `NAVAL_ORDER` line with the main formation's movement order, its hull's ship order, the main agent's formation ship, whether it swims and `selected=[formation:ship=N:shipOrder=X,...]` for every selected formation; a throw inside vanilla's order is reported as `threw=`. Vanilla's naval hold (`NavalOrderController.SetOrder(StandYourGround)`) only stops the ships (`SetNavalStop`), so a shipless, swimming formation keeps its earlier movement order (R49: `movementOrder=Charge` after `charge` then `hold`); that's the formation's real order, not a misprint. |
 | `fire <weapon-ship> <target-ship> [status]` | client simulating the weapon | Snaps the weapon hull's ship ballista onto the target hull's `ShipTargetMissionObject` and calls vanilla's `Shoot`, so the bolt goes out through the same capture and replication path as an AI shot (`shipWeapons.shotsSent` here, `shotsReplayed` on peers). Needs a gunner and a loaded weapon (`Idle`). `status` shoots nothing and reports state, ammo, gunner, `disabledForAi` (an enemy within the 7 m stop range), distance, `inArc` (`CanShootAtPoint`) and `aiWouldShoot` (`CanShootAtThreat`: line of fire, friendly hulls, the nearest agent on a flat shot). |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is
@@ -806,9 +824,14 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
   (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
   defaults to `ram=1`.
-- `reserve=n` (0 to 200) tops every player's healthy troops (wounded don't count), and those of the AI fleet a start_naval
-  preset fights (not the `encounter` or `blockade` enemy), up to n past the crew capacity of all the party's ships, so at
-  least n wait in reserve to reinforce, for example after a capture's orphan is removed (`boarding reserve=20`, `duel reserve=20`).
+- `reserve=n` (0 to 200) gives every player, and the AI fleet a start_naval preset fights (not the `encounter` or `blockade`
+  enemy), n troops in hull reserve to reinforce, for example after a capture's orphan is removed (`boarding hulls=2
+  reserve=20`, `duel ships=2 reserve=20`). It runs after `weapons=n` and `ram=n`, which swap hulls. Vanilla fields at most
+  the ships' total crew (`GetMaximumDeployableTroopCountForTeam`) and puts the troops past the deck crew below deck as each
+  hull's reserve, so a troop past the total crew never fights in vanilla either. The default hull and the Battle Knarr
+  carry their whole crew on deck, so the stager swaps plain roomless ships for an `empire_heavy_ship` (40 places below
+  deck) until n fit, then tops the healthy troops (wounded don't count) up to the deck crew plus n. A ballista or ram hull
+  is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.
@@ -838,8 +861,14 @@ A scenario client whose Ready press throws (R42 crash 2's first symptom) logs th
 
 ### ProcDump
 
-- Don't use `-h`. It false-fired while the game was loading, stopped after its dump count, and in R40 didn't fire on a
-  3-minute freeze.
-- `-e` is refused while the TaleWorlds watchdog is attached. The watchdog takes its own crash dump.
-- On a freeze, take `procdump64 -accepteula -ma <pid>` by hand, ideally twice a few seconds apart.
+- Don't use `-h`. It fires only when `IsHungAppWindow` reports a hung window: it false-fired on a busy loading screen, and
+  it never fires on a crash, because the TaleWorlds watchdog (attached as the debugger) holds the unhandled exception and
+  freezes every thread while its crash dialog waits (R40 3 minutes, R49 9 minutes, `Responding=False` at 0 CPU).
+- `-e` is refused while the watchdog is attached. The watchdog takes its own crash dump once the dialog is answered.
+- Watch `C:\ProgramData\Mount and Blade II Bannerlord\logs\watchdog_log_<pid>.txt` (copied into each case's `logs/`): the line
+  `Crash occurred. Asking for dump.` means a crash, not a hang. Take `procdump64 -accepteula -ma <pid>` at once, while
+  the process is frozen at the fault, then leave the dialog to the user, whose answer lets the watchdog write its dump
+  with the exception record.
+- Without that line, a client `Coop_client.log` silent for 15 s during a battle (it logs every second) is the freeze
+  signal: take two `-ma` dumps a few seconds apart and check the watchdog log again.
 - `dotnet-dump` only shows managed frames. A native crash needs cdb: `cdb -z <dmp> -c "!analyze -v; ~0k; q"`.
