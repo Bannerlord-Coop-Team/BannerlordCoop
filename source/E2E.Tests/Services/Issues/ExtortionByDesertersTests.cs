@@ -840,6 +840,108 @@ public class ExtortionByDesertersTests : IDisposable
         }, TextLinks);
     }
 
+    [Fact]
+    public void CapturedOwnerLoss_FinalizesProgressAndCleansDefendersOnce()
+    {
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var ownerEntries = ownerQuest.JournalEntries.Count;
+        using var cleanup = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty)));
+        using var rewards = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)));
+        string deserterId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OtherHeroId, out var other));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OtherPartyId, out var otherParty));
+            var ownerBefore = (owner.Gold, owner.Clan.Renown, quest.QuestGiver.GetRelation(owner));
+            var otherBefore = (other.Gold, other.Clan.Renown, quest.QuestGiver.GetRelation(other));
+            var otherRoster = otherParty.MemberRoster.GetTroopRoster().ToArray();
+            var entries = quest.JournalEntries.Count;
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            foreach (var party in new[] { deserters, defenders })
+                party.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
+            ownerParty.MemberRoster.AddToCounts(owner.CharacterObject, 1);
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            deserters.SetPartyUsedByQuest(true);
+            Assert.True(Server.ObjectManager.TryGetId(deserters, out deserterId));
+            var battle = CreateBattle(deserters, defenders.Party, false);
+            ownerParty.MapEventSide = battle.DefenderSide;
+            battle.SetOverrideWinner(BattleSideEnum.Attacker);
+
+            TakePrisonerAction.Apply(deserters.Party, owner);
+
+            Assert.True(owner.IsPrisoner);
+            Assert.Null(owner.PartyBelongedTo);
+            Assert.Same(deserters.Party, owner.PartyBelongedToAsPrisoner);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var registeredOwnerParty));
+            Assert.Same(ownerParty, registeredOwnerParty);
+            Assert.Contains(ownerParty.Party, battle.InvolvedParties);
+            Assert.Equal(BattleSideEnum.Defender, ownerParty.Party.Side);
+            Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
+            output.WriteLine("Native capture cleared owner membership; canonical registered owner party remains in the losing side.");
+
+            battle.FinalizeEventAux();
+
+            Assert.True(battle.IsFinalized);
+            Assert.Equal(State.DesertersDefeatedPlayer, quest._currentState);
+            Assert.True(quest.IsOngoing);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(deserterId, out var registeredDeserters));
+            Assert.Same(deserters, registeredDeserters);
+            Assert.Same(deserters, quest._deserterMobileParty);
+            Assert.True(deserters.IsActive);
+            Assert.True(deserters.IsCurrentlyUsedByAQuest);
+            Assert.Equal(quest.QuestSettlement, deserters.TargetSettlement);
+            Assert.False(defenders.IsActive);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.False(quest._deserterBattleFinalizedForTheFirstTime);
+            Assert.Equal(entries, quest.JournalEntries.Count);
+            battle.FinalizeEventAux();
+            Assert.Equal(entries, quest.JournalEntries.Count);
+            Assert.Single(Server.InternalMessages.GetMessages<DestroyPartyApplied>(), message => message.DefeatedParty == defenders);
+            Assert.DoesNotContain(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
+                message => message.DefeatedParty == ownerParty || message.DefeatedParty == otherParty || message.DefeatedParty == deserters);
+            Assert.Equal(ownerBefore, (owner.Gold, owner.Clan.Renown, quest.QuestGiver.GetRelation(owner)));
+            Assert.Equal(otherBefore, (other.Gold, other.Clan.Renown, quest.QuestGiver.GetRelation(other)));
+            Assert.Equal(otherRoster, otherParty.MemberRoster.GetTroopRoster().ToArray());
+            Assert.True(otherParty.IsActive);
+            Assert.Same(otherParty, other.PartyBelongedTo);
+        }, TextLinks.Concat(new[]
+        {
+            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
+        }));
+        Assert.Equal(1, cleanup.CountFor(Server));
+        Assert.Equal(0, rewards.Count);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var states = Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>()
+            .Where(state => state.State == (int)State.DesertersDefeatedPlayer).ToArray();
+        var finalState = Assert.Single(states, state => string.IsNullOrEmpty(state.DefenderId));
+        Assert.Equal(deserterId, finalState.DeserterId);
+        Assert.Equal(QuestScenario.ControllerA, finalState.ControllerId);
+        Assert.All(states, state =>
+        {
+            Assert.Equal((byte)ExtortionByDesertersNotice.None, state.Notice);
+            Assert.True(TextObject.IsNullOrEmpty(state.Log));
+        });
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.State == (int)State.DesertersDefeatedPlayer && string.IsNullOrEmpty(state.DefenderId));
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.State == (int)State.DesertersDefeatedPlayer);
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsOngoing);
+            Assert.Equal(State.DesertersDefeatedPlayer, ownerQuest._currentState);
+            Assert.Null(ownerQuest._defenderMobileParty);
+            Assert.Equal(ownerEntries, ownerQuest.JournalEntries.Count);
+        });
+    }
+
     private Quest DefeatDeserters()
     {
         Accept();
