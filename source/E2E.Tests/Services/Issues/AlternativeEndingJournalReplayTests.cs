@@ -207,7 +207,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         foreach (var message in new[]
         {
             new NetworkAlternativeSolutionJournal(scenario.NotableId, "old_issue", IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, null!),
-            new NetworkAlternativeSolutionJournal(scenario.NotableId, QuestScenario.IssueId, IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, null!),
+            new NetworkAlternativeSolutionJournal(scenario.NotableId, QuestScenario.IssueId, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, null!),
         })
             scenario.ClientA.SimulateMessage(scenario.Server, message);
 
@@ -236,11 +236,35 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         Assert.Equal(task, log.TaskName?.Value);
     }
 
+    [Fact]
+    public void AlternativeJournal_PreviousReadersKeepAllSixRenderedFields()
+    {
+        var text = new TextObject("{=acceptance_compat}Troops for {NAME}");
+        text.SetTextVariable("NAME", "Suvys");
+        var task = new TextObject("{=acceptance_task}Return {DAYS}");
+        task.SetTextVariable("DAYS", 4);
+        var native = new JournalLog(new CampaignTime(123L), text, task, 2, 4, TaleWorlds.Core.LogType.Text);
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, new AlternativeSolutionJournalEntry(native));
+        stream.Position = 0;
+        var previous = Serializer.Deserialize<PreviousJournalEntry>(stream);
+        Assert.Equal(123L, previous.Time);
+        Assert.Equal(text.ToString(), previous.Text);
+        Assert.Equal(task.ToString(), previous.TaskName);
+        Assert.Equal(2, previous.Progress);
+        Assert.Equal(4, previous.Range);
+        Assert.Equal(native.Type, previous.Type);
+    }
+
     [ProtoContract]
     private class PreviousJournalEntry
     {
+        [ProtoMember(1)] public long Time { get; set; }
         [ProtoMember(2)] public string Text { get; set; }
         [ProtoMember(3)] public string TaskName { get; set; }
+        [ProtoMember(4)] public int Progress { get; set; }
+        [ProtoMember(5)] public int Range { get; set; }
+        [ProtoMember(6)] public TaleWorlds.Core.LogType Type { get; set; }
     }
 
     private void EndOnServer(IssueBase.IssueUpdateDetails ending)
