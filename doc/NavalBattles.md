@@ -736,10 +736,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     `HostOwnedOfflineControllers`, `WithdrawnControllers`), which should become one status per controller;
   - `BattleHostHandler` is too big: membership and the health withdrawal should move out into their own services.
 - **Follow-ups from the R41a-2 review (not done):**
-  - `BattleAuthorityMigrator.DespawnPartyTroops` repeats `BattleTroopWithdrawal.Deregister` per agent; hoist it into the
-    withdrawal and inject that;
   - the ship replicator's `departedOwners` is a second membership view next to `IMissionContext`, which could own it;
-  - `BattleShipReplicator.cs` (about 1090 lines) and `BattleAuthorityMigrator.cs` (about 860) are too big and should be
+  - `BattleShipReplicator.cs` (about 1090 lines) and `BattleAuthorityMigrator.cs` (about 694) are too big and should be
     split;
   - the `migration` preset fixes who drops by the first host each client sees, so a client whose mission starts only
     after the host dropped would take the successor for it.
