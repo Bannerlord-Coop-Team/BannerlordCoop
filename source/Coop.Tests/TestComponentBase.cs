@@ -159,6 +159,9 @@ internal abstract class TestComponentBase
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
+        // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,
+        // which the real containers get from GameInterfaceModule.
+        builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
