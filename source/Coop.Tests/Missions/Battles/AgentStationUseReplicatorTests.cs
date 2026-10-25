@@ -120,18 +120,78 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["departedHullReleases"]!);
     }
 
-    // R7: a use its owner sent before leaving can arrive after the departure; it is dropped, not retried.
+    // S12 A4 (NB §6 relayed catch-up): a relayed seat can beat its sender's entry, so it waits for the membership.
     [Fact]
-    public void TryApply_DropsAUseFromASenderNoLongerInTheMission()
+    public void TryApply_RetriesAUseFromASenderNotYetInTheMission()
     {
+        var crew = new RemoteCrew();
+        var members = new System.Collections.Generic.List<string> { "someone_else" };
+        var context = new Mock<IMissionContext>();
+        context.SetupGet(m => m.ControllersInMission).Returns(() => members.ToArray());
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, members: context.Object);
+        var use = Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner");
+
+        bool settledBeforeEntry = replicator.TryApply(use);
+        members.Add("owner");
+        bool settledAfterEntry = replicator.TryApply(use);
+
+        Assert.False(settledBeforeEntry);
+        Assert.True(settledAfterEntry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+        Assert.Equal(0, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+    }
+
+    // S12 R1: a departed host's last use for an agent this client adopted settles as stale at once, not with the expiry Warning.
+    [Fact]
+    public void Tick_DropsADepartedHostsInFlightUseForAnAdoptedAgentWithoutWaiting()
+    {
+        var crew = new RemoteCrew();
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.Agent)).Returns(true);
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, members: Members("someone_else"));
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 7, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (int)inspected["pending"]!);
+        Assert.Equal(1, (long)inspected["staleUses"]!);
+        Assert.Equal(0, (long)inspected["dropped"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    // S12 A3: a joiner's seats go out from the tick, after the arrivals sent it the hull records they refer to.
+    [Fact]
+    public void PeerEntered_SendsTheJoinerTheOwnSeatsFromTheNextTick()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ships = new NetworkShipRegistry();
+        ships.TryRegister(new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!));
+        var point = CreatePoint();
         var engine = new Mock<INavalShipEngine>();
-        using var replicator = CreateReplicator(engine.Object, members: Members("someone_else"));
+        StationOf(engine, point, hull);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
+        var network = new Mock<IBattleNetwork>();
+        var deployment = new Mock<IBattleDeploymentCoordinator>();
+        deployment.SetupGet(d => d.IsCommitted).Returns(true);
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships, broker, network: network.Object,
+            deployment: deployment.Object);
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
+        replicator.Tick(0f);
 
-        bool settled = replicator.TryApply(Use(Guid.NewGuid(), Guid.NewGuid(), inUse: true, revision: 1, "owner"));
+        GameThread.Run(() => broker.Publish(this, new NetworkMissionPeerEntered("joiner", null)), blocking: true);
+        network.Verify(n => n.Send("joiner", It.IsAny<NetworkAgentStationUse>()), Times.Never);
+        replicator.Tick(0f);
+        replicator.Tick(0f);
 
-        Assert.True(settled);
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
-        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+        network.Verify(n => n.Send("joiner", It.Is<NetworkAgentStationUse>(use => use.AgentId == agentId && use.InUse)), Times.Once);
     }
 
     [Fact]
@@ -201,7 +261,6 @@ public class AgentStationUseReplicatorTests
         var ships = new NetworkShipRegistry();
         using var replicator = CreateReplicator(Mock.Of<INavalShipEngine>(), Mock.Of<INetworkAgentRegistry>(), ships);
         replicator.AcceptUse(Use(Guid.NewGuid(), shipId, inUse: true, revision: 1, "owner"));
-        ships.MarkAwaiting(shipId);
         replicator.Tick(0.1f);
         long droppedWhileAwaiting = (long)JObject.FromObject(replicator.Inspect())["dropped"]!;
 
@@ -311,15 +370,17 @@ public class AgentStationUseReplicatorTests
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
-        IMissionContext? members = null)
+        IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null,
+        IBattleSession? session = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
-        return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
-            component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>(), members ?? Members("owner", "old", "new"));
+        return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(),
+            session ?? Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
+            members ?? Members("owner", "old", "new"));
     }
 
     // The server-announced mission members the membership gate reads.
@@ -538,6 +599,142 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["ownerReleases"]!);
         Assert.Equal(1, (long)inspected["sinkingUseReleases"]!);
         Assert.Equal(1, (long)inspected["sinkingSafetyNetReleases"]!);
+    }
+
+    // R48: seating from the game-thread queue overlapped the engine's async agent tick, so a received use waits for the tick.
+    [Fact]
+    public void AcceptUse_SeatsThePuppetOnlyFromTheNextTick()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+
+        replicator.Tick(0f);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+    }
+
+    // S12 D1: the death deregisters a seated puppet before the owner's release applies, which then has nothing to do.
+    [Fact]
+    public void Tick_SettlesTheReleaseOfAPuppetThatDiedSeated_AndRejectsItsOlderUses()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        crew.Registered = false;
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+        var settled = JObject.FromObject(replicator.Inspect());
+        crew.Registered = true;
+        bool olderSettled = replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+
+        Assert.Equal(0, (int)settled["pending"]!);
+        Assert.Equal(0, (long)settled["dropped"]!);
+        Assert.Equal(1, (long)settled["obsoleteReleases"]!);
+        Assert.True(olderSettled);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["staleUses"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Once);
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), false), Times.Never);
+    }
+
+    // S12 D2: the owner sends its crew's releases after the hull removal, which already let the crew go here.
+    [Fact]
+    public void Tick_SettlesACrewReleaseThatArrivesAfterItsHullLeft_ButDropsASeat()
+    {
+        var crew = new RemoteCrew();
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        crew.Ships.Remove(crew.ShipId);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.AcceptUse(Use(Guid.NewGuid(), crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (int)inspected["pending"]!);
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(1, (long)inspected["dropped"]!);
+    }
+
+    // S12 D1: vanilla's removal releases a dying puppet's station, which is no desync; a live puppet's local release is one.
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void AnnounceStationUse_CountsAPuppetsLocalReleaseOnlyWhileItLives(bool alive, long expected)
+    {
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(alive);
+        var broker = new MessageBroker();
+        using var replicator = crew.CreateReplicator(broker);
+
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(crew.Agent, crew.Point, inUse: false)), blocking: true);
+
+        Assert.Equal(expected, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+    }
+
+    // S12 A5: a puppet adopted in place while seated keeps its seat as this client's own, announced under this client's stamp.
+    [Fact]
+    public void RefreshAppliedSeats_MakesAPuppetAdoptedWhileSeatedAnOwnSeat()
+    {
+        var crew = new RemoteCrew();
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.Agent)).Returns(() => crew.Info.CurrentAuthority == "local");
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.AgentId)).Returns(() => crew.Info.CurrentAuthority == "local");
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(true);
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(s => s.OwnControllerId).Returns("local");
+        var deployment = new Mock<IBattleDeploymentCoordinator>();
+        deployment.SetupGet(d => d.IsCommitted).Returns(true);
+        var network = new Mock<IBattleNetwork>();
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, network: network.Object,
+            deployment: deployment.Object, session: session.Object);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 4, "owner"));
+        replicator.Tick(0f);
+        bool ownBeforeAdoption = replicator.IsOwnSeat(crew.AgentId);
+
+        crew.Info.CurrentAuthority = "local";
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.False(ownBeforeAdoption);
+        Assert.True(replicator.IsOwnSeat(crew.AgentId));
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(1, (long)inspected["adoptedSeats"]!);
+        network.Verify(n => n.SendAll(It.Is<NetworkAgentStationUse>(use =>
+            use.AgentId == crew.AgentId && use.InUse && use.Revision == 1 && use.SenderControllerId == "local")), Times.Once);
+    }
+
+    // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
+    private sealed class RemoteCrew
+    {
+        public RemoteCrew()
+        {
+            Agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            var info = Info = new CoopAgentInfo("owner", "owner", "battle", Agent, AgentId, 1);
+            Registry.Setup(r => r.TryGetAgentInfo(AgentId, out info)).Returns(() => Registered);
+            Registry.Setup(r => r.TryGetAgentInfo(Agent, out info)).Returns(() => Registered);
+            Ships.TryRegister(new NetworkShipInfo(ShipId, "owner", "party", isNpcParty: false, Hull, null!));
+            Engine.Setup(e => e.ResolveStation(Hull, "oar", 0)).Returns(Point);
+        }
+
+        public Guid AgentId { get; } = Guid.NewGuid();
+        public Guid ShipId { get; } = Guid.NewGuid();
+        public Agent Agent { get; }
+        public CoopAgentInfo Info { get; }
+        public bool Registered { get; set; } = true;
+        public Mock<INetworkAgentRegistry> Registry { get; } = new Mock<INetworkAgentRegistry>();
+        public NetworkShipRegistry Ships { get; } = new NetworkShipRegistry();
+        public MissionObject Hull { get; } = ShipTestHulls.Create();
+        public UsableMissionObject Point { get; } = CreatePoint();
+        public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
+
+        public AgentStationUseReplicator CreateReplicator(MessageBroker? broker = null) =>
+            AgentStationUseReplicatorTests.CreateReplicator(Engine.Object, Registry.Object, Ships, broker);
     }
 
     private static NetworkAgentStationUse Use(Guid agentId, Guid shipId, bool inUse, long revision, string sender) =>

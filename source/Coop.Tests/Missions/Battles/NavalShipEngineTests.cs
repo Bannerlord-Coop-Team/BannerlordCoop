@@ -77,7 +77,7 @@ public class NavalShipEngineTests
     }
 
     // Capture P0 2.1: an enemy copy's helm opens to the player while its formation has no unit, as vanilla opens an emptied
-    // enemy helm; an own-side copy, a filled formation or a mission without a player team keep the late hull patch's setting.
+    // enemy helm; an own-side copy, a filled formation or a mission without a player team keep the late hull deployment's setting.
     [Theory]
     [InlineData(true, false, 0, true)]
     [InlineData(true, true, 0, false)]

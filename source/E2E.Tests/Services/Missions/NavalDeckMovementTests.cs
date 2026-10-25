@@ -70,7 +70,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             mirror.LookDirection = new Vec3(1f, 0f, 0f);
             mirror.InputVector = new Vec2(0f, 1f);
             var data = new AgentData(source);
-            if (onDeck) data.StampDeck(HullId, 1, Local, 1.5f);
+            if (onDeck) OnDeck(ref data, HullId, Local, 1.5f);
             return data;
         }
 
@@ -186,7 +186,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
                 receiver.Handler.ConfigureShipDeck(null);
             receiver.Resolves = condition != "unresolved_hull";
             AgentData data = receiver.Data(true, Vec3.Zero);
-            if (condition == "non_finite_pose") data.StampDeck(receiver.HullId, 1, new Vec3(float.NaN, 0f, 0f), 1f);
+            if (condition == "non_finite_pose") OnDeck(ref data, receiver.HullId, new Vec3(float.NaN, 0f, 0f), 1f);
 
             receiver.Receive(data, condition == "index_outside_table" ? Array.Empty<Guid>() : null);
             receiver.Tick();
@@ -257,6 +257,128 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             Assert.Equal(3f, world.Speed);
             Assert.Equal(1, (long)JObject.FromObject(handler.InspectShipDecks())["stamped"]!);
         });
+    }
+
+    // S13 D2: a deck pose that can't resolve drops the walking target and halts the puppet, as an evicted deck target does.
+    [Theory]
+    [InlineData("no_resolver")]
+    [InlineData("unresolved_hull")]
+    [InlineData("index_outside_table")]
+    public void RejectedDeckPacket_HaltsAPuppetThatWasWalking(string condition)
+    {
+        using var fixture = new MissionEngineFixture();
+        WithReceiver(fixture, receiver =>
+        {
+            Vec3 world = receiver.Mirror.Position + new Vec3(3f, 0f, 0f);
+            receiver.Receive(receiver.Data(false, world));
+            receiver.Tick();
+            receiver.Mirror.InputVector = new Vec2(0f, 1f);
+
+            if (condition == "no_resolver") receiver.Handler.ConfigureShipDeck(null);
+            receiver.Resolves = condition != "unresolved_hull";
+            receiver.Receive(receiver.Data(true, Vec3.Zero), condition == "index_outside_table" ? Array.Empty<Guid>() : null);
+
+            Assert.False(receiver.HasTarget);
+            Assert.Equal(Vec2.Zero, receiver.Mirror.InputVector);
+            AssertNear(receiver.Mirror.Position.AsVec2, receiver.Mirror.LastTargetPosition);
+        });
+    }
+
+    // S13 D3 (R43: one puppet teleported 2034 times): a deck puppet out of reach teleports once per owner update, then walks.
+    // The puppet stays 7 m off its target, past the 6 m snap and under the DEBUG large-error log, which reads native state.
+    [Fact]
+    public void DeckPuppet_TeleportsAtMostOncePerOwnerUpdate()
+    {
+        using var fixture = new MissionEngineFixture();
+        WithReceiver(fixture, receiver =>
+        {
+            receiver.Receive(receiver.Data(true, Vec3.Zero));
+            receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
+            receiver.Tick();
+            receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
+            receiver.Tick();
+            receiver.Tick();
+            int afterOneUpdate = receiver.Mirror.TeleportToPositionCalls;
+
+            receiver.Receive(receiver.Data(true, Vec3.Zero));
+            receiver.Tick();
+
+            Assert.Equal(1, afterOneUpdate);
+            Assert.Equal(2, receiver.Mirror.TeleportToPositionCalls);
+            Assert.Equal(2, (long)receiver.Deck["interpolator"]!["deckTeleports"]!);
+        });
+    }
+
+    // S13 A1: a deck agent's send decision compares its hull-local pose, so hull bob alone doesn't resend it every sample.
+    [Fact]
+    public void OwnedDeckAgent_StandingStillOnABobbingHull_SendsOnlyWhenItsDeckPoseMoves()
+    {
+        using var fixture = new MissionEngineFixture();
+        WithOwnedSailor(fixture, (handler, mirror, network) =>
+        {
+            Vec3 local = new Vec3(2f, 0f, 0f);
+            handler.ConfigureShipDeck(new FakeShipDeckSeam { Capture = (info, world) => (HullOf, local, 0f) });
+
+            handler.PollMovement(0f);
+            mirror.Position = mirror.Position + new Vec3(0f, 0f, 0.05f);
+            handler.PollMovement(0.1f);
+            int whileStill = network.NetworkSentPackets.GetPackets<MovementPacket>().Count();
+            local = new Vec3(2.5f, 0f, 0f);
+            handler.PollMovement(0.1f);
+
+            Assert.Equal(1, whileStill);
+            Assert.Equal(2, network.NetworkSentPackets.GetPackets<MovementPacket>().Count());
+            Assert.Equal(3, (long)JObject.FromObject(handler.InspectShipDecks())["stamped"]!);
+        });
+    }
+
+    // S13 D5: a seated agent sends no movement, and its first sample after leaving the station goes out at once.
+    [Fact]
+    public void OwnedSeatedAgent_SendsNoMovement_AndItsFirstSampleAfterLeavingGoesOutAtOnce()
+    {
+        using var fixture = new MissionEngineFixture();
+        WithOwnedSailor(fixture, (handler, mirror, network) =>
+        {
+            bool seated = false;
+            handler.ConfigureStationSeats(new FakeShipStationSeats { IsSeated = id => seated });
+
+            handler.PollMovement(0f);
+            seated = true;
+            handler.PollMovement(0.1f);
+            int whileSeated = network.NetworkSentPackets.GetPackets<MovementPacket>().Count();
+            seated = false;
+            handler.PollMovement(0.1f);
+
+            Assert.Equal(1, whileSeated);
+            Assert.Equal(2, network.NetworkSentPackets.GetPackets<MovementPacket>().Count());
+            Assert.Equal(1, (long)JObject.FromObject(handler.InspectShipDecks())["seatedWithheld"]!);
+        });
+    }
+
+    private static readonly Guid HullOf = Guid.NewGuid();
+
+    // An owned on-foot sailor registered to this client, with its handler and the sent-packet log.
+    private void WithOwnedSailor(MissionEngineFixture fixture, Action<IAgentMovementHandler, MirrorAgent, MockBattleNetwork> test)
+    {
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            Agent sailor = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(sailor, out var mirror));
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", Guid.NewGuid(), 1, sailor));
+            mirror.Position = new Vec3(12f, 0f, 0f);
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            test(peer.Resolve<ICoopMissionComponent>().AgentMovementHandler, mirror, network);
+        });
+    }
+
+    // Makes a received record a deck pose at the hull table's first entry.
+    private static void OnDeck(ref AgentData data, Guid ship, Vec3 local, float speed)
+    {
+        data.CaptureDeck(ship, local, speed);
+        data.IndexDeck(1);
     }
 
     private static void AssertNear(Vec2 expected, Vec2 actual)

@@ -3,6 +3,7 @@ using Common.Commands;
 using Common.Messaging;
 using Missions.Messages;
 using Missions.Battles;
+using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using System;
 using System.Globalization;
@@ -64,7 +65,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         if (error != null) return Failed(error);
         if (!registry.TryGet(shipId, out var info) || info.Hull is not MissionShip hull) return Failed("The hull is not a naval ship.");
 
-        var gates = HelmGates.Read(naval.Engine, main, hull, IsOwnOrphan(info, controller.Session.OwnControllerId));
+        var gates = HelmGates.Read(main, hull, IsOwnOrphan(info, controller.Session.OwnControllerId));
         if (mode == CaptureMode.Status) return Status(naval, info, gates);
         if (mode == CaptureMode.Force) return Force(naval, main, info);
         if (mode == CaptureMode.ForceTwice) return ForceTwice(naval, main, info);
@@ -100,6 +101,16 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         return !IsWord(args[0], StatusWord) && IsWord(args[1], ForceWord) && IsWord(args[2], TwiceWord);
     }
 
+    // The hull the agent's formation crews, as vanilla pairs a formation with its ship, or null.
+    private static MissionShip CrewHullOf(Agent agent)
+    {
+        var formation = agent?.Formation;
+        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
+        if (formation == null || shipsLogic == null) return null;
+
+        return shipsLogic.GetShip(formation, out var ship) ? ship : null;
+    }
+
     // A case-insensitive keyword match.
     private static bool IsWord(string value, string word) => string.Equals(value?.Trim(), word, StringComparison.OrdinalIgnoreCase);
 
@@ -111,10 +122,10 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
     // exactly as after a real timer; a request already waiting for that hull is reported, not sent again.
     private static CoopCommandResult Force(CoopNavalBattleBehavior naval, Agent main, NetworkShipInfo info)
     {
-        if (naval.Engine.CrewHullOf(main) == null)
+        if (CrewHullOf(main) == null)
             return Failed("NAVAL_CAPTURE ship=" + info.ShipId + " force: the main agent crews no hull to capture with.");
 
-        var replicator = naval.ShipCaptureReplicator;
+        var replicator = naval.Services.ShipCaptureReplicator;
         float? waiting = replicator.PendingRequestAge(info.ShipId);
         if (waiting.HasValue)
             return Failed(string.Format(CultureInfo.InvariantCulture, "NAVAL_CAPTURE ship={0} force: a request to {1} has waited {2:0.00} s; " +
@@ -160,7 +171,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
     private static CoopCommandResult Status(CoopNavalBattleBehavior naval, NetworkShipInfo info, HelmGates gates)
     {
         var helm = ((MissionShip)info.Hull).ShipControllerMachine;
-        float? waited = naval.ShipCaptureReplicator.PendingRequestAge(info.ShipId);
+        float? waited = naval.Services.ShipCaptureReplicator.PendingRequestAge(info.ShipId);
         return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
             "NAVAL_CAPTURE_STATUS ship={0} authority={1} captor={2} orphan={3} timer={4:0.00} requestWaited={5} {6}",
             info.ShipId, info.CurrentAuthority, info.CaptorControllerId ?? "none", info.IsOrphaned, helm?.CaptureTimer ?? -1f,
@@ -208,11 +219,11 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
 
         // Reads every gate from the local hulls; the main agent's own hull is the one its formation crews. This client's own
         // orphan has no team but counts as takeable, as the authority's NotEnemy rule treats it.
-        public static HelmGates Read(INavalShipEngine engine, Agent main, MissionShip hull, bool ownOrphan)
+        public static HelmGates Read(Agent main, MissionShip hull, bool ownOrphan)
         {
             var helm = hull.ShipControllerMachine;
             var point = helm?.PilotStandingPoint;
-            var mainHull = engine.CrewHullOf(main) as MissionShip;
+            var mainHull = CrewHullOf(main);
             return new HelmGates(
                 hasHelm: point != null,
                 isEnemy: ownOrphan || (hull.Team != null && main.Team != null && hull.Team.IsEnemyOf(main.Team)),

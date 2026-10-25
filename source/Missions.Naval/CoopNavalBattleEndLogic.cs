@@ -29,7 +29,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalNpcFleetSpawner npcFleet;
-    private readonly IBattleShipReplicator shipReplicator;
+    private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
 
@@ -39,14 +39,14 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalSideTallyReader tallyReader,
+        INavalNpcFleetSpawner npcFleet, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
         INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
         this.npcFleet = npcFleet;
-        this.shipReplicator = shipReplicator;
+        this.hullLedger = hullLedger;
         this.tallyReader = tallyReader;
         this.heroGrace = heroGrace;
     }
@@ -93,8 +93,19 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return base.MissionEnded(ref missionResult);
     }
 
-    /// <summary>[Game thread] Coop replacement for the spawn logic's side depletion.</summary>
-    internal bool IsSideDepletedHere(BattleSideEnum side) => Tally(side, NavalSideTallyReader.NoCrew).IsDepleted;
+    /// <summary>
+    /// [Game thread] Coop replacement for the spawn logic's side depletion; like the out-of-action check, it defeats a side
+    /// only once its player heroes' grace is over.
+    /// </summary>
+    internal bool IsSideDepletedHere(BattleSideEnum side) =>
+        DefeatsSide(Tally(side, NavalSideTallyReader.NoCrew).IsDepleted, heroGrace, side, Mission.CurrentTime);
+
+    /// <summary>
+    /// Whether a depleted side loses at <paramref name="now"/>: vanilla ends a depleted side at once, but a side whose last
+    /// living human was a player hero is held as long as that hero's grace runs (maintainer decision after R49).
+    /// </summary>
+    internal static bool DefeatsSide(bool depleted, INavalPlayerHeroGrace heroGrace, BattleSideEnum side, float now) =>
+        depleted && heroGrace.HasExpired(side, now);
 
     /// <summary>
     /// [Game thread] Coop replacement for vanilla's per-hull out-of-action check; a side's out-of-action hulls defeat it only
@@ -214,7 +225,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return false;
 
         int hullsLeft = _navalShipsLogic.AllShips.Count(ship => ship.Team != null && ship.Team.Side == side);
-        return KeepsRetreat(shipReplicator.DepartedHulls(side), hullsLeft);
+        return KeepsRetreat(hullLedger.DepartedHulls(side), hullsLeft);
     }
 
     /// <summary>

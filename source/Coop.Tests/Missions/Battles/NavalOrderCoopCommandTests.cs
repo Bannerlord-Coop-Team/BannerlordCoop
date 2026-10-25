@@ -2,6 +2,7 @@
 using Common.Commands;
 using Missions.Naval;
 using Moq;
+using NavalDLC.Missions;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -19,6 +20,16 @@ public class NavalOrderCoopCommandTests
     {
         Assert.True(NavalOrderCoopCommand.TryParseOrder(value, out var orderType));
         Assert.Equal(expected, orderType);
+    }
+
+    // R49: follow-me printed shipOrder=StaticOrderCount, the enum's first name for Follow's value.
+    [Theory]
+    [InlineData(ShipOrder.ShipMovementOrderEnum.Follow, "Follow")]
+    [InlineData(ShipOrder.ShipMovementOrderEnum.Stop, "Stop")]
+    [InlineData(ShipOrder.ShipMovementOrderEnum.Engage, "Engage")]
+    public void ShipOrderName_NamesFollowNotItsCountAlias(ShipOrder.ShipMovementOrderEnum order, string expected)
+    {
+        Assert.Equal(expected, NavalOrderCoopCommand.ShipOrderName(order));
     }
 
     [Theory]

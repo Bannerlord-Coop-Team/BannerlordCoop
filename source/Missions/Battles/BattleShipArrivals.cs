@@ -6,9 +6,9 @@ using System.Collections.Generic;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Hull-addressed naval messages that are sent once, or that depend on queued state, applied from the next naval
-/// tick in arrival order: spawn records, removals, departures, entries, host changes, conditions, final ropes, routed damage and
-/// capture traffic. The game-thread queue drains while the engine's async agent tick runs, and these change what it reads (R48 L6).
+/// [Game thread] Hull-addressed traffic whose apply changes hull, rope, formation, crew or ship weapon state, applied from the
+/// next naval tick in arrival order, since the game-thread queue drains while the async agent tick reads that state (R48 L6).
+/// A continuous stream (samples) keeps one queued arrival per hull that applies its newest message.
 /// </summary>
 public interface IBattleShipArrivals
 {

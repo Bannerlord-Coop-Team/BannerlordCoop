@@ -7,46 +7,31 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
 /// <summary>
-/// DEBUG: whether hulls touch copies on this client: ram raycast hits, hull contact callbacks, how the collision damage they
-/// cause is routed, and the closest approach of every hull pair. Counters are written from physics threads, so they are
-/// interlocked; the approaches are written on the game thread. Cleared at mission end.
+/// DEBUG: hull contact callbacks against copies, how collision and ram damage is routed, and every hull pair's closest
+/// approach. Counters are interlocked because contact callbacks run on physics threads. Cleared at mission end.
 /// </summary>
 internal static class NavalContactProbe
 {
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalContactProbe));
 
-    private static long ramRayHitsOnCopies, ramRayDamagePointsOnCopies, ramRayHitsByCopies;
     private static long contactOwnOnCopy, contactCopyOnOwn, contactCopyOnCopy, copyPairsFiltered;
     private static long collisionVanilla, collisionSent, collisionDropped, ramVanilla, ramSent, ramDropped;
-    private static long routedCollisionApplies, ramTicksGatedOnCopies, ramPuppetsSpared;
+    private static long routedCollisionApplies, ramPuppetsSpared;
 
     private static readonly Dictionary<(Guid, Guid), HullPairApproach> approaches = new Dictionary<(Guid, Guid), HullPairApproach>();
 
-    /// <summary>[Physics thread] A ram's raycast this fixed step: the ship it hit and whether it found a damage point.</summary>
-    internal static void CountRamCheck(MissionShip rammer, MissionShip target, bool hasPoint)
+    /// <summary>[Physics thread] A hull contact callback of <paramref name="ship"/> against another hull, counted when a copy takes part.</summary>
+    internal static void CountContact(MissionShip ship, WeakGameEntity otherEntity)
     {
-        if (!CoopNavalMissionScope.IsActive || rammer == null || target == null) return;
+        if (!CoopNavalMissionScope.IsActive || !otherEntity.IsValid) return;
+        if (!(otherEntity.GetFirstScriptWithNameHash(MissionShip.MissionShipScriptNameHash) is MissionShip other)) return;
 
-        if (NavalForeignHulls.Contains(rammer))
-        {
-            Interlocked.Increment(ref ramRayHitsByCopies);
-            return;
-        }
-
-        if (!NavalForeignHulls.Contains(target)) return;
-
-        Interlocked.Increment(ref ramRayHitsOnCopies);
-        if (hasPoint) Interlocked.Increment(ref ramRayDamagePointsOnCopies);
-    }
-
-    /// <summary>[Physics thread] A hull contact callback of <paramref name="ship"/> against <paramref name="other"/>.</summary>
-    internal static void CountContact(MissionShip ship, MissionShip other)
-    {
         bool shipIsCopy = NavalForeignHulls.Contains(ship);
         bool otherIsCopy = NavalForeignHulls.Contains(other);
         if (shipIsCopy && otherIsCopy) Interlocked.Increment(ref contactCopyOnCopy);
@@ -73,9 +58,6 @@ internal static class NavalContactProbe
                 return;
         }
     }
-
-    /// <summary>[Game thread] A copy's ram hit was shown here and left to the rammer's owner.</summary>
-    internal static void CountGatedCopyRamTick() => Interlocked.Increment(ref ramTicksGatedOnCopies);
 
     /// <summary>[Game thread] A ram impact here left another owner's puppet alive for its owner to kill.</summary>
     internal static void CountSparedRamPuppet(Agent puppet)
@@ -138,12 +120,6 @@ internal static class NavalContactProbe
             copy = NavalForeignHulls.Contains(hull.Hull),
             hasRam = hull.Hull._ram != null,
         }).ToArray(),
-        ramRaycast = new
-        {
-            hitsOnCopies = Interlocked.Read(ref ramRayHitsOnCopies),
-            damagePointsOnCopies = Interlocked.Read(ref ramRayDamagePointsOnCopies),
-            hitsByCopies = Interlocked.Read(ref ramRayHitsByCopies),
-        },
         contactCallbacks = new
         {
             ownOnCopy = Interlocked.Read(ref contactOwnOnCopy),
@@ -160,7 +136,6 @@ internal static class NavalContactProbe
             ramSent = Interlocked.Read(ref ramSent),
             ramDropped = Interlocked.Read(ref ramDropped),
             routedApplies = Interlocked.Read(ref routedCollisionApplies),
-            ramTicksGatedOnCopies = Interlocked.Read(ref ramTicksGatedOnCopies),
             ramPuppetsSpared = Interlocked.Read(ref ramPuppetsSpared),
         },
         closestApproach = InspectApproaches(),
@@ -168,9 +143,6 @@ internal static class NavalContactProbe
 
     internal static void Clear()
     {
-        Interlocked.Exchange(ref ramRayHitsOnCopies, 0);
-        Interlocked.Exchange(ref ramRayDamagePointsOnCopies, 0);
-        Interlocked.Exchange(ref ramRayHitsByCopies, 0);
         Interlocked.Exchange(ref contactOwnOnCopy, 0);
         Interlocked.Exchange(ref contactCopyOnOwn, 0);
         Interlocked.Exchange(ref contactCopyOnCopy, 0);
@@ -182,7 +154,6 @@ internal static class NavalContactProbe
         Interlocked.Exchange(ref ramSent, 0);
         Interlocked.Exchange(ref ramDropped, 0);
         Interlocked.Exchange(ref routedCollisionApplies, 0);
-        Interlocked.Exchange(ref ramTicksGatedOnCopies, 0);
         Interlocked.Exchange(ref ramPuppetsSpared, 0);
         approaches.Clear();
     }

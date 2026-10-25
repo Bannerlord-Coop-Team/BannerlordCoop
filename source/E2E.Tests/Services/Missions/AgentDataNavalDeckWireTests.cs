@@ -39,7 +39,8 @@ public sealed class AgentDataNavalDeckWireTests
         Guid firstHull = Guid.NewGuid();
         Guid secondHull = Guid.NewGuid();
         var data = default(AgentData);
-        data.StampDeck(secondHull, 2, new Vec3(1.25f, -3.5f, 0.75f), 1.5f);
+        data.CaptureDeck(secondHull, new Vec3(1.25f, -3.5f, 0.75f), 1.5f);
+        data.IndexDeck(2);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
 
         var restored = Assert.IsType<MovementPacket>(serializer.Deserialize(serializer.Serialize(
@@ -76,7 +77,8 @@ public sealed class AgentDataNavalDeckWireTests
     public void DeckIndexOutsideTheHullTable_ResolvesToNoHull(int index)
     {
         var data = default(AgentData);
-        data.StampDeck(Guid.NewGuid(), index, Vec3.Zero, 0f);
+        data.CaptureDeck(Guid.NewGuid(), Vec3.Zero, 0f);
+        data.IndexDeck(index);
 
         data.ResolveDeckShip(new[] { Guid.NewGuid(), Guid.NewGuid() });
 
@@ -93,7 +95,8 @@ public sealed class AgentDataNavalDeckWireTests
     public void InvalidDeckPose_IsNotValid(int index, float localX, float speed)
     {
         var data = default(AgentData);
-        data.StampDeck(Guid.NewGuid(), index, new Vec3(localX, 0f, 0f), speed);
+        data.CaptureDeck(Guid.NewGuid(), new Vec3(localX, 0f, 0f), speed);
+        data.IndexDeck(index);
 
         Assert.False(data.HasValidDeck);
     }

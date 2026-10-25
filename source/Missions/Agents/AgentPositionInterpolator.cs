@@ -79,33 +79,26 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private float elapsed;
     private long updateSequence;
     private NavalDeckFrameResolver navalDeckFrame;
-    private long deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports;
-    private readonly NavalDeckErrorMetric deckError = new NavalDeckErrorMetric();
-    // Puppets whose target moved onto a new deck since their last deck error sample.
-    private readonly HashSet<Agent> deckPlacements = new HashSet<Agent>();
+    private readonly NavalDeckDiagnostics deckDiagnostics;
     // The owner update each deck puppet last teleported for; a target still out of reach after that is walked to (R43: 2034).
     private readonly Dictionary<Agent, long> _deckTeleportSequences = new Dictionary<Agent, long>();
-#if DEBUG
-    // DEBUG: an error past this is no lag but a pose read against the wrong hull or a parked agent (R41b, 206 to 561 m).
-    private const float DeckErrorLogMetres = 20f;
-    private const float DeckErrorLogIntervalSeconds = 5f;
-    private readonly Dictionary<Agent, float> deckErrorLoggedAt = new Dictionary<Agent, float>();
-#endif
 
     public AgentPositionInterpolator() : this(null) { }
 
     internal AgentPositionInterpolator(INetworkAgentRegistry agentRegistry)
     {
         this.agentRegistry = agentRegistry;
+        deckDiagnostics = new NavalDeckDiagnostics(agentRegistry);
     }
 
     public void SetRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null) return;
-        if (HasDeckTarget(agent)) deckTransitions++;
+        if (HasDeckTarget(agent)) deckDiagnostics.LeftDeck();
         StoreRiderTarget(agent, data);
     }
 
+    // Stores a world target from the owner's pose, replacing any earlier one.
     private void StoreRiderTarget(Agent agent, AgentData data)
     {
         _targets[agent] = new TargetFrame(
@@ -128,9 +121,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         foreach (Agent agent in _targets.Where(pair => pair.Value.Deck.HasValue).Select(pair => pair.Key).ToList())
             _targets.Remove(agent);
         navalDeckFrame = resolver;
-        deckTargetsSet = deckTransitions = deckTicks = deckEvictions = deckTeleports = 0;
-        deckError.Reset();
-        deckPlacements.Clear();
+        deckDiagnostics.Reset();
         _deckTeleportSequences.Clear();
     }
 
@@ -140,23 +131,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         if (agent == null || navalDeckFrame == null || !navalDeckFrame(agent, data.DeckShip, out MatrixFrame hull))
             return false;
         bool hasTarget = _targets.TryGetValue(agent, out TargetFrame previous);
-        if (hasTarget && !previous.Deck.HasValue) deckTransitions++;
-        if (!hasTarget || previous.Deck?.Ship != data.DeckShip) deckPlacements.Add(agent);
+        deckDiagnostics.TargetSet(agent, replacedWorldTarget: hasTarget && !previous.Deck.HasValue,
+            onNewDeck: !hasTarget || previous.Deck?.Ship != data.DeckShip);
         StoreRiderTarget(agent, data);
         _targets[agent] = _targets[agent].WithDeck(new NavalDeckTarget(data.DeckShip, data.DeckLocal, hull,
             data.MovementDirection, data.LookDirection));
-        deckTargetsSet++;
         return true;
     }
 
-    internal object InspectNavalDeck() => new
-    {
-        tracked = _targets.Values.Count(target => target.Deck.HasValue), deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports,
-        lastDeckError = deckError.Last, maxDeckError = deckError.Max, deckSamplesSkipped = deckError.Skipped,
-        measurement = "Horizontal puppet-to-target error in the current follower hull frame, sampled before each native target write; " +
-            "a teleport's or a new deck placement's sample is skipped (deckSamplesSkipped), the puppet is still at its old spot then."
-    };
+    // The deck diagnostics for the naval inspect command.
+    internal object InspectNavalDeck() => deckDiagnostics.Inspect(_targets.Values.Count(target => target.Deck.HasValue));
 
+    // Whether the puppet's current target is a deck pose.
     private bool HasDeckTarget(Agent agent) => _targets.TryGetValue(agent, out TargetFrame target) && target.Deck.HasValue;
 
     // Takes the deck puppet's one teleport for this owner update; false when it already teleported for it.
@@ -210,7 +196,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetMountedRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null || data.MountData == null) return;
-        if (HasDeckTarget(agent)) deckTransitions++;
+        if (HasDeckTarget(agent)) deckDiagnostics.LeftDeck();
         _targets[agent] = new TargetFrame(
             data.Position,
             new ContinuousState(
@@ -272,7 +258,18 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         _targets.Remove(agent);
         _mountedGuardProcessedSequences.Remove(agent);
         _deckTeleportSequences.Remove(agent);
-        deckPlacements.Remove(agent);
+        deckDiagnostics.Forget(agent);
+    }
+
+    /// <summary>[Game thread] Forgets the puppet's target and, if it had one, halts it, so it keeps no walk input or seek point
+    /// from the dropped pose; a mounted puppet is left to its mount.</summary>
+    internal void ForgetAndHalt(Agent agent)
+    {
+        if (agent == null) return;
+
+        bool hadTarget = _targets.ContainsKey(agent);
+        Forget(agent);
+        if (hadTarget && agent.MountAgent == null) HaltDeckPuppet(agent);
     }
 
     public bool TryGetTargetMovementFlags(
@@ -323,31 +320,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
-        deckPlacements.Clear();
         _deckTeleportSequences.Clear();
-#if DEBUG
-        deckErrorLoggedAt.Clear();
-#endif
+        deckDiagnostics.Clear();
     }
-
-#if DEBUG
-    // DEBUG: names the agent, its deck pose and what it stands on when the error is large, at most every few seconds per agent.
-    private void LogLargeDeckError(Agent agent, NavalDeckTarget deck, in MatrixFrame hull, float error)
-    {
-        if (error <= DeckErrorLogMetres) return;
-        if (deckErrorLoggedAt.TryGetValue(agent, out float loggedAt) && elapsed - loggedAt < DeckErrorLogIntervalSeconds) return;
-
-        deckErrorLoggedAt[agent] = elapsed;
-        var stepped = agent.GetSteppedEntity();
-        var support = stepped.IsValid ? stepped.Root : WeakGameEntity.Invalid;
-        Guid agentId = agentRegistry != null && agentRegistry.TryGetAgentInfo(agent, out var info) ? info.AgentId : Guid.Empty;
-        // Agent exposes no IsPhysicsForceClosed getter; a parked agent shows as z near 500.
-        Logger.Warning("[NavalDeck] Deck error {Error:0.0} m for agent {AgentId} ({Index}) on deck ship {Ship}: local {Local}, " +
-            "hull origin {HullOrigin}, agent at {Position}, standing on {Support} at {SupportOrigin}",
-            error, agentId, agent.Index, deck.Ship, deck.Local, hull.origin, agent.Position,
-            support.IsValid ? support.Name : "nothing", support.IsValid ? support.GlobalPosition : Vec3.Invalid);
-    }
-#endif
 
     private long GetNextUpdateSequence()
     {
@@ -438,14 +413,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             bool deckTeleport = false;
             if (deck)
             {
-                deckTicks++;
                 deckTeleport = ExceedsSnapDistance(agent, target.Position) && ClaimDeckTeleport(agent, target.UpdateSequence);
-                float error = pair.Value.Deck.Value.HorizontalError(hull, agent.Position);
-                bool placement = deckPlacements.Remove(agent);
-                deckError.Record(error, placement || deckTeleport);
-#if DEBUG
-                LogLargeDeckError(agent, pair.Value.Deck.Value, hull, error);
-#endif
+                deckDiagnostics.Sample(agent, pair.Value.Deck.Value, hull, deckTeleport, elapsed);
             }
 
             // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
@@ -467,7 +436,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 MoveTowardTarget(agent, target);
             else
             {
-                if (deck) deckTeleports++;
+                if (deck) deckDiagnostics.Teleported();
                 Teleport(agent, target);
             }
             target.AgentState.Apply(agent);
@@ -478,16 +447,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             foreach (Agent agent in _evict)
             {
                 bool deckEvicted = HasDeckTarget(agent);
-                _targets.Remove(agent);
-#if DEBUG
-                deckErrorLoggedAt.Remove(agent);
-#endif
-                _mountedGuardProcessedSequences.Remove(agent);
-                deckPlacements.Remove(agent);
-                _deckTeleportSequences.Remove(agent);
+                Forget(agent);
                 if (deckEvicted)
                 {
-                    deckEvictions++;
+                    deckDiagnostics.Evicted();
                     HaltDeckPuppet(agent);
                 }
             }
@@ -700,6 +663,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         // A deck-relative pose; the stored world position is only its receive-time fallback.
         public NavalDeckTarget? Deck { get; private set; }
 
+        // A copy of this target that follows the given deck pose.
         public TargetFrame WithDeck(NavalDeckTarget deck)
         {
             TargetFrame copy = this;

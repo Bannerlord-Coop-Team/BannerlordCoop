@@ -17,6 +17,18 @@ public static class AgentExtensions
         return networkAgentRegistry.IsLocallyControlled(agent);
     }
 
+    /// <summary>Whether another client owns this agent: it is networked here and not controlled here.</summary>
+    public static bool IsPuppet(this Agent agent)
+    {
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)) return false;
+
+        bool isRegistered = registry.TryGetAgentInfo(agent, out _);
+        return IsPuppet(isRegistered, isRegistered && registry.IsLocallyControlled(agent));
+    }
+
+    /// <summary>A networked agent this client doesn't control is another owner's puppet.</summary>
+    internal static bool IsPuppet(bool isRegistered, bool isLocallyControlled) => isRegistered && !isLocallyControlled;
+
     public static Vec2 GetLastInputVector(this Agent agent)
     {
         return agentAdditions.GetOrCreateValue(agent).LastInputVector;

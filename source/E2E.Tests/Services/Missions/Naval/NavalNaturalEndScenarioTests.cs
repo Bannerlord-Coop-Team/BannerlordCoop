@@ -83,7 +83,7 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         battle.CommitAll();
         battle.TickAll(2);
 
-        a.Tick(BattleShipReplicator.SampleLifetimeSeconds + 1f);
+        a.Tick(BattleShipSampleStream.SampleLifetimeSeconds + 1f);
 
         var players = EndTally(a, BattleSideEnum.Attacker, liveHumans: 0);
         Assert.False((bool)a.Stream(hullB)["streaming"]!);
