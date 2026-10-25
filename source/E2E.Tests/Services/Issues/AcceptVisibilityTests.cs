@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -209,6 +210,7 @@ public class AcceptVisibilityTests : IDisposable
             // Only the placeholder the daily tick reads, the sender's real entry is not copied
             Assert.Single(otherIssue.JournalEntries);
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
+            Campaign.Current.IssueManager.DailyTick();
         });
 
         Assert.Empty(otherUpdates);
@@ -362,8 +364,7 @@ public class AcceptVisibilityTests : IDisposable
         });
 
         Assert.Empty(otherQuestCompletions);
-        var update = Assert.Single(otherUpdates);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
     }
 
     [Fact]

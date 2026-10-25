@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
+using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using System;
@@ -29,8 +30,12 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
+        builder.Register(context => context.Resolve<AlternativeSolutionCommitments>()).As<IAlternativeSolutionCommitments>();
+        builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()

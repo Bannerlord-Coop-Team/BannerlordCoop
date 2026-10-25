@@ -29,9 +29,10 @@ internal interface IServerPlayerUnstuck
 {
     /// <summary>
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
-    /// party (not only the player's) still linked to a battle that already ended, then moves a free
-    /// party off a map spot it cannot move from, each step guarded independently, and sends the result
-    /// to the player's connection when it has one. Runs on the game thread.
+    /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
+    /// healthy troops on one side, then moves a free party off a map spot it cannot move from, each step
+    /// guarded independently, and sends the result to the player's connection when it has one. Runs on
+    /// the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -50,6 +51,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IPartyNavigationRepair partyNavigationRepair;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
+    private readonly IStalledMapEventResolver stalledMapEventResolver;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -59,7 +61,8 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         ISettlementInterface settlementInterface,
         ISiegeEventInterface siegeEventInterface,
         IPartyNavigationRepair partyNavigationRepair,
-        IMapEventLoadCleaner mapEventLoadCleaner)
+        IMapEventLoadCleaner mapEventLoadCleaner,
+        IStalledMapEventResolver stalledMapEventResolver)
     {
         this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
@@ -69,6 +72,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         this.settlementInterface = settlementInterface;
         this.siegeEventInterface = siegeEventInterface;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
+        this.stalledMapEventResolver = stalledMapEventResolver;
     }
 
     public string[] Apply(Player player, bool includeCaptivity)
@@ -151,16 +155,26 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         // all, lords and garrisons too, since they can block a town for everyone.
         TryStep(actions, "ended battle release", () =>
         {
-            // Broadcast as each party is released, so a later group that throws can't swallow it.
+            // Broadcast as each party is released, so a later group that throws can't swallow it. The cleaner
+            // logs a failed broadcast and keeps going, so count the ones that reached the clients.
+            var broadcastCount = 0;
             var releasedParties = mapEventLoadCleaner.ReleaseEndedMapEventLinks(releasedParty =>
             {
-                if (objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
-                    network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                if (!objectManager.TryGetIdWithLogging(releasedParty, out var releasedPartyId))
+                    return;
+
+                network.SendAll(new NetworkPartyLeftBattle(releasedPartyId, finishLocalMenus: false));
+                broadcastCount++;
             });
 
-            return releasedParties.Length == 0
-                ? null
-                : $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
+            if (releasedParties.Length == 0)
+                return null;
+
+            var line = $"Released {releasedParties.Length} parties still linked to a battle that already ended.";
+            var unreported = releasedParties.Length - broadcastCount;
+            return unreported == 0
+                ? line
+                : $"{line} Could not tell clients about {unreported} of them, see the server log.";
         });
 
         if (party.Party?.MapEvent != null)
@@ -175,6 +189,15 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 return "Removed the party from its map event.";
             });
         }
+
+        // After the player left, so a battle that only the player kept waiting can end too.
+        TryStep(actions, "stalled battle resolve", () =>
+        {
+            var resolved = stalledMapEventResolver.ResolveStalledMapEvents();
+            return resolved == 0
+                ? null
+                : $"Ended {resolved} battles left with no healthy troops on one side.";
+        });
 
         // Last, so a party the exits above just freed is checked at its final spot.
         TryStep(actions, "map position repair", () =>
