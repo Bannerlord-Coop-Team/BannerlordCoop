@@ -437,8 +437,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     instance empties or the battle finalizes without a commit (everything left), and in `MapEventPatches.Prefix_OnBattleWon`
     before the results and the loot read the ships.
   - A party left without ships gets its raft from vanilla at `MapEventEnded` (Jordan's raft patches run on the server).
-  - Clients hold `RefreshMenuOptions` while a mission is current (`MissionMenuRefreshHoldPatch`), because the applied
-    HP reaches players still in the battle; `MapState.OnActivate` refreshes the menu on return.
+  - The client menu refreshes on ship HP, anchor and sea-state writes (`ShipHitPointsPatches`, `AnchorPointPatches`,
+    `MobilePartyBehaviorHandler`) skip while a mission is current, because the applied HP reaches players still in the
+    battle; `MapState.OnActivate` refreshes the menu on return.
 - **Not written back:** the captured-ship list vanilla `OnMissionEnd` builds (patched off by `CoopNavalShipCapturePatch`;
   it lists every losing hull still in the mission, captured in it or not). Only a disengage reads it, so a decisive result
   already matches vanilla, and disengage parity is M6c. In-mission capture changes no campaign owner in vanilla either; it
@@ -614,8 +615,6 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - ship loot and distribution are his. M6 adds, for his review, one `LootShipHold.Hold` call in
     `MapEventResultsInterface.LootDefeatedPartyShips` (and a constructor parameter); `LootShipsHandler` and
     `PortScreenChangesHandler` needed no change, since the offered ships keep their handles;
-  - suggested: his `ShipHitPointsPatches` postfix should skip the refresh during a mission or with a null menu (M6 guards
-    it from `MissionMenuRefreshHoldPatch`, which goes once his postfix skips);
   - disengage loot in `MapEventResultsInterface` (M6c);
   - AI parties' ships must be registered for their fates to apply (a missing one logs `Failed to get Ship`);
   - the PvP loser's ships vanish (R39).
