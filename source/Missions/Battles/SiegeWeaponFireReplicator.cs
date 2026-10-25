@@ -186,7 +186,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             return;
         }
 
-        PlayFireAnimation(weapon);
+        RangedSiegeWeaponPresentation.PlayFireAnimation(weapon);
     }
 
     private void BufferNetworkFire(NetworkSiegeWeaponFired msg)
@@ -252,21 +252,6 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         return null;
     }
 
-    // Vanilla plays FireAnimations on the machine's skeleton owners when it enters WaitingBeforeProjectileLeaving
-    // (RangedSiegeWeapon.OnRangedSiegeWeaponStateChange); a peer never reaches that state, so drive it directly.
-    internal static void PlayFireAnimation(RangedSiegeWeapon weapon)
-    {
-        var skeletons = weapon.SkeletonOwnerObjects;
-        var animations = weapon.FireAnimations;
-        if (skeletons == null || animations == null) return;
-
-        for (int i = 0; i < skeletons.Length && i < animations.Length; i++)
-        {
-            if (skeletons[i] == null || string.IsNullOrEmpty(animations[i])) continue;
-            skeletons[i].SetAnimationAtChannelSynched(animations[i], 0);
-        }
-    }
-
     private bool TrySpawnProjectile(RangedSiegeWeapon weapon, NetworkSiegeWeaponFired msg)
     {
         if (string.IsNullOrEmpty(msg.MissileItemId) || msg.ShooterAgentId == Guid.Empty) return true;
@@ -284,7 +269,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             // The simulator's crew agent may not exist here (an unattributed puppet); the stone must still
             // fly. Any inert puppet keeps the blow-drop guarantee — it keys on Controller.None, not on the
             // shooter's identity. AddCustomMissile cannot take a null shooter.
-            shooter = FindStandInShooter();
+            shooter = RangedSiegeWeaponPresentation.FindStandInShooter();
             if (shooter == null) return false;
         }
 
@@ -295,16 +280,6 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         var missileWeapon = new MissionWeapon(missileItem, null, null, 1);
         Mission.Current.AddCustomMissile(shooter, missileWeapon, msg.Position, msg.Direction, msg.Orientation, msg.BaseSpeed, msg.Speed, addRigidBody: false, weapon);
         return true;
-    }
-
-    internal static Agent FindStandInShooter()
-    {
-        foreach (var agent in Mission.Current.Agents)
-        {
-            if (agent.IsHuman && agent.IsActive() && agent.Controller == AgentControllerType.None) return agent;
-        }
-
-        return null;
     }
 
     // [Simulator] our ram struck the gate — broadcast so everyone else plays the swing (their unmanned ram

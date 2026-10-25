@@ -24,22 +24,5 @@ public class NavalAsyncAgentTickTests
     {
         Assert.False(new NavalAsyncAgentTick().IsRunning);
     }
-
-    // A formation noted twice is checked once; one without a formation AI is left alone, and nothing outlives the battle.
-    [Fact]
-    public void TacticRefresh_NotesEachFormationOnce_AndSkipsOneWithoutAi()
-    {
-        var refresh = new NavalFormationTacticRefresh();
-        var formation = (TaleWorlds.MountAndBlade.Formation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
-            typeof(TaleWorlds.MountAndBlade.Formation));
-
-        refresh.Note(null!);
-        refresh.Note(formation);
-        refresh.Note(formation);
-        Assert.Equal(1, refresh.Noted);
-        refresh.Apply();
-        Assert.Equal(0, refresh.Noted);
-        refresh.Clear();
-    }
 }
 #endif

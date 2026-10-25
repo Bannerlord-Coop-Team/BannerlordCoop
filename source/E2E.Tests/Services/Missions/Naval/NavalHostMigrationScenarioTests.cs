@@ -24,6 +24,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         battle.TickAll(5);
         var lateSampleFromA = a.SentSamples(pirates[0]).Last();
         var copy = b.Hull(pirates[0]);
+        var registeredBeforeSwap = b.RegisteredShipIds();
 
         battle.MigrateHost(a, "B");
         Assert.All(pirates, pirate => Assert.Equal("B", b.Ship(pirate).CurrentAuthority));
@@ -39,6 +40,8 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         Assert.True(copy.IsRemoved);
         Assert.False(fresh.IsCopy);
         Assert.Empty(b.Engine.Boardings);
+        // The replacement raised the spawn event too; it rebinds the ship's id and registers no own hull.
+        Assert.Equal(registeredBeforeSwap, b.RegisteredShipIds());
 
         b.Tick();
         Assert.Contains(b.Engine.Boardings, boarding =>
@@ -56,6 +59,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(42f, c.Hull(pirates[0]).Frame.origin.x, 3);
 
         c.Call(() => c.Instance.SimulateMessage(a.Network.NetPeer, lateSampleFromA));
+        battle.ApplyArrivals();
         Assert.Equal("not_authority", (string)c.Stream(pirates[0])["lastReject"]!);
         Assert.Equal(newHostSample.Sequence, (long)c.Stream(pirates[0])["accepted"]!);
     }
@@ -69,6 +73,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         var parkedCrew = SeatCrewOnCopy(b, pirates[0]);
         b.Engine.ReplaceHullFails = !replaceThrows;
         b.Engine.ReplaceHullThrows = replaceThrows;
+        battle.ExpectLoggedFailure(replaceThrows ? "failed in phase ReplaceHull" : "the hull could not be replaced");
         var copy = b.Hull(pirates[0]);
 
         battle.MigrateHost(a, "B");
@@ -142,7 +147,6 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
     }
 
     private static string CampaignShipIdOf(Guid pirate, Guid[] pirates) => $"Ship_pirate_{Array.IndexOf(pirates, pirate)}";
-
     // vs_pirates for three players; the battle host A simulates two AI hulls, each standing for a pirate campaign ship.
     private NavalBattle StartPirateBattle(out NavalPeer a, out NavalPeer b, out NavalPeer c, out Guid[] pirates)
     {

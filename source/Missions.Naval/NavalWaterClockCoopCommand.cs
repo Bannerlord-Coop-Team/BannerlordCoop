@@ -35,7 +35,7 @@ public sealed class NavalWaterClockCoopCommand : ICoopCommand
     {
         if (args != null && args.Count > 0) return new CoopCommandResult(false, "Usage: coop.debug.naval.water_clock", "command_failed");
 
-        var battle = Mission.Current?.GetMissionBehavior<CoopNavalBattleBehavior>()?.WaterClock;
+        var battle = Mission.Current?.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.WaterClock;
         return new CoopCommandResult(true, Describe(waterClock, battle));
     }
 

@@ -104,15 +104,17 @@ public class NavalScenarioStager : INavalScenarioStager
         {
             TopUpShips(party.Party, config.ShipsPerPlayer, hull);
             TopUpTroops(party, config.TroopTemplatesPerPlayer);
-            TopUpReserve(party, config.ReserveTroops);
         }
-        HealHeroes(players, log);
-        log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
-            (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
         if (config.ArmedShipsPerParty > 0)
             log.Append(" armedPlayers=").Append(string.Join(",", players.Select(party => ArmShips(party.Party, config.ArmedShipsPerParty))));
         if (config.RammedShipsPerParty > 0)
             log.Append(" rammedPlayers=").Append(string.Join(",", players.Select(party => FitRams(party.Party, config.RammedShipsPerParty))));
+        // After arming and rams, which swap hulls, so the reserve is sized on the ships that deploy.
+        if (config.ReserveTroops > 0)
+            log.Append(" reservePlayers=").Append(string.Join(",", players.Select(party => StageReserve(party, config.ReserveTroops))));
+        HealHeroes(players, log);
+        log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
+            (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
 
         MobileParty engagingEnemy = null;
         bool started;
@@ -676,13 +678,10 @@ public class NavalScenarioStager : INavalScenarioStager
 
         int enemyShipsBefore = enemy.Ships.Count;
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
-        TopUpReserve(enemy, config.ReserveTroops);
-        log.Append($" enemy={enemy.StringId}(ships={enemyShipsBefore}->{enemy.Ships.Count},troops={enemy.MemberRoster.TotalManCount})");
-        if (config.ReserveTroops > 0)
-            log.Append($" reserve={config.ReserveTroops}(crewCapacity players={string.Join(",", players.Select(CrewCapacityOf))} " +
-                $"enemy={CrewCapacityOf(enemy)})");
         if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
         if (config.RammedShipsPerParty > 0) log.Append(" rammedEnemy=").Append(FitRams(enemy.Party, config.RammedShipsPerParty));
+        if (config.ReserveTroops > 0) log.Append(" reserveEnemy=").Append(StageReserve(enemy, config.ReserveTroops));
+        log.Append($" enemy={enemy.StringId}(ships={enemyShipsBefore}->{enemy.Ships.Count},troops={enemy.MemberRoster.TotalManCount})");
 
         if (config.SinkingEnemyHull && enemy.Ships.Count > 0)
         {
@@ -894,6 +893,11 @@ public class NavalScenarioStager : INavalScenarioStager
         ship.HasSlot(NavalScenarioPresets.WeaponSlotTag)
         && ship.GetPieceAtSlot(NavalScenarioPresets.WeaponSlotTag)?.StringId == NavalScenarioPresets.WeaponPieceId;
 
+    // Whether the ship carries the bow ram ram=n fits, whoever fitted it.
+    private static bool IsRammed(Ship ship) =>
+        ship.HasSlot(NavalScenarioPresets.RamSlotTag)
+        && ship.GetPieceAtSlot(NavalScenarioPresets.RamSlotTag)?.StringId == NavalScenarioPresets.RamPieceId;
+
     // Tops the party's regulars up to the given number of add_troops templates.
     private void TopUpTroops(MobileParty party, int templates)
     {
@@ -903,27 +907,80 @@ public class NavalScenarioStager : INavalScenarioStager
         if (log.Length > 0) Logger.Warning("[NavalScenario] Troop top-up of {PartyId}: {Log}", party.StringId, log.ToString());
     }
 
-    // reserve=n: tops the healthy troops (heroes too, wounded left out, as deployment counts them) up past every ship's crew
-    // capacity, so at least n wait in reserve whatever ships deploy.
-    private void TopUpReserve(MobileParty party, int reserve)
+    // reserve=n: gives the party's ships room below deck for n troops, then tops its healthy troops up to every deck place
+    // plus that reserve, so n wait in hull reserve to reinforce. Returns the log entry.
+    private string StageReserve(MobileParty party, int reserve)
     {
-        if (reserve <= 0) return;
+        int swapped = MakeReserveRoom(party.Party, reserve);
+        int room = ReserveRoomOf(party.Party);
+        if (room < reserve)
+            Logger.Warning("[NavalScenario] reserve={Reserve} wants that many places below deck, but the ships of {PartyId} " +
+                "have {Room}: a ballista or ram hull has none, so add hulls for the reserve", reserve, party.StringId, room);
 
+        int deck = DeckCapacityOf(party.Party);
+        TopUpHealthy(party, ReserveTroopTarget(deck, room, reserve));
+        return $"{party.StringId}(swapped={swapped},room={room},deck={deck},healthy={party.MemberRoster.TotalHealthyCount})";
+    }
+
+    // Swaps plain ships with no room below deck (no ballista or ram) for the reserve hull until the party's ships have room
+    // for the reserve. Returns how many it swapped.
+    private static int MakeReserveRoom(PartyBase party, int reserve)
+    {
+        var reserveHull = MBObjectManager.Instance.GetObject<ShipHull>(NavalScenarioPresets.ReserveHullId);
+        if (reserveHull == null) return 0;
+
+        var plainShips = party.Ships.Where(ship => !IsArmed(ship) && !IsRammed(ship) && ReserveRoomOf(ship) == 0).ToList();
+        int swaps = ReserveSwapsNeeded(ReserveRoomOf(party), reserve,
+            reserveHull.TotalCrewCapacity - reserveHull.MainDeckCrewCapacity, plainShips.Count);
+        foreach (var ship in plainShips.Take(swaps))
+        {
+            ChangeShipOwnerAction.ApplyByProduction(party, new Ship(reserveHull));
+            DestroyShipAction.Apply(ship);
+        }
+
+        return swaps;
+    }
+
+    // Tops the healthy troops (heroes too, wounded left out, as deployment counts them) up to the target.
+    private void TopUpHealthy(MobileParty party, int target)
+    {
         var log = new StringBuilder();
-        for (int i = ReserveTemplatesMissing(party.MemberRoster.TotalHealthyCount, CrewCapacityOf(party), reserve); i > 0; i--)
+        for (int i = HealthyTemplatesMissing(party.MemberRoster.TotalHealthyCount, target); i > 0; i--)
             PartyCommands.AddTroopTemplate(party.MemberRoster, objectManager, log);
         if (log.Length > 0) Logger.Warning("[NavalScenario] Reserve top-up of {PartyId}: {Log}", party.StringId, log.ToString());
     }
 
-    // Every crew place on a party's ships, the most troops its hulls can take on deck and below.
-    private static int CrewCapacityOf(MobileParty party) => party.Ships.Sum(ship => ship.TotalCrewCapacity);
+    // Every deck crew place on a party's ships; vanilla puts the troops past these below deck as the hull's reserve.
+    private static int DeckCapacityOf(PartyBase party) => party.Ships.Sum(ship => ship.MainDeckCrewCapacity);
+
+    // The party's places below deck, where its hulls' reserve waits.
+    private static int ReserveRoomOf(PartyBase party) => party.Ships.Sum(ReserveRoomOf);
+
+    // One ship's places below deck.
+    private static int ReserveRoomOf(Ship ship) => Math.Max(0, ship.TotalCrewCapacity - ship.MainDeckCrewCapacity);
+
+    /// <summary>
+    /// The healthy troops that fill every deck place and <paramref name="reserve"/> places below deck, as far as the ships have
+    /// room there: vanilla fields at most the ships' total crew, so a troop past that never fights or reinforces.
+    /// </summary>
+    internal static int ReserveTroopTarget(int deckCapacity, int reserveRoom, int reserve) =>
+        deckCapacity + Math.Min(Math.Max(0, reserveRoom), reserve);
+
+    /// <summary>How many roomless plain ships to swap for the reserve hull so the ships have room for <paramref name="reserve"/>.</summary>
+    internal static int ReserveSwapsNeeded(int reserveRoom, int reserve, int roomPerSwap, int swappableShips)
+    {
+        int missing = reserve - reserveRoom;
+        if (missing <= 0 || roomPerSwap <= 0) return 0;
+
+        return Math.Min(swappableShips, (missing + roomPerSwap - 1) / roomPerSwap);
+    }
 
     /// <summary>How many ships bring <paramref name="ships"/> up to <paramref name="wanted"/>.</summary>
     internal static int ShipsMissing(int ships, int wanted) => Math.Max(0, wanted - ships);
 
-    /// <summary>How many add_troops templates bring <paramref name="healthy"/> troops to <paramref name="reserve"/> past <paramref name="crewCapacity"/>.</summary>
-    internal static int ReserveTemplatesMissing(int healthy, int crewCapacity, int reserve) =>
-        Math.Max(0, (crewCapacity + reserve - healthy + TroopsPerTemplate - 1) / TroopsPerTemplate);
+    /// <summary>How many add_troops templates bring <paramref name="healthy"/> troops up to <paramref name="target"/>.</summary>
+    internal static int HealthyTemplatesMissing(int healthy, int target) =>
+        Math.Max(0, (target - healthy + TroopsPerTemplate - 1) / TroopsPerTemplate);
 
     /// <summary>How many add_troops templates bring <paramref name="regulars"/> up to <paramref name="templates"/> templates' worth.</summary>
     internal static int TemplatesMissing(int regulars, int templates) =>

@@ -26,7 +26,7 @@ namespace Missions.Battles;
 /// with its owner (retreat, leave or disconnect) is removed on every client, after its seats and deck are cleared; only the
 /// AI hulls move to the next battle host.
 /// </summary>
-public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
+public interface IBattleShipReplicator : IDisposable
 {
     /// <summary>[Game thread] Announce hulls, stream own samples and expire stale ones for this frame.</summary>
     void Tick(float dt);
@@ -49,20 +49,8 @@ public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
     /// <summary>[Game thread] Rope state per throw station of every registered hull (diagnostics).</summary>
     object InspectRopes();
 
-    /// <summary>
-    /// [Game thread] The fieldable reserve another owner last reported for its hull; none once the hull sank, its owner left
-    /// or its authority moved.
-    /// </summary>
-    int ReportedReserveOf(MissionObject hull);
-
-    /// <summary>
-    /// [Game thread] A hull's fieldable reserve for the end tally: another owner's hull as last reported, any other hull
-    /// read from the engine.
-    /// </summary>
+    /// <summary>[Game thread] <see cref="IBattleShipConditionStream.HullReserve"/>, for the end tally until it reads the stream.</summary>
     int HullReserve(MissionObject hull);
-
-    /// <summary>[Game thread] Whether an AI hull this client took over is still being replaced by a simulated one.</summary>
-    bool IsReplacingHull(Guid shipId);
 
     /// <summary>
     /// [Game thread] Sends the own hulls' rope state once more as the mission ends, while the hulls are still live; samples
@@ -78,18 +66,10 @@ public interface IBattleShipReplicator : IDisposable, IAppliedHostEpoch
     void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding);
 
     /// <summary>
-    /// [Game thread] How many hulls left a side, with their owner or to a capture, for the end check's retreat rule.
-    /// </summary>
-    int DepartedHulls(BattleSideEnum side);
-
-    /// <summary>
     /// [Game thread] Moves a hull to <paramref name="newAuthority"/> at an ordered event every client applies (a host change, a
     /// capture): its sample and condition order restart, and <see cref="INavalHullAuthority.Transfer"/> moves the simulation.
     /// </summary>
     void TransferHull(NetworkShipInfo ship, string newAuthority, bool inPlace = false);
-
-    /// <summary>[Game thread] Counts a hull a capture took off <paramref name="side"/>, as vanilla's retreat rule sees it gone.</summary>
-    void CountCapturedFrom(BattleSideEnum side);
 
     /// <summary>
     /// [Game thread] Every client's half of hulls leaving the battle: seats are released, other owners' agents move to their own
@@ -109,9 +89,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleShipReplicator>();
 
-    internal const float SendIntervalSeconds = 0.05f;
-    // Measured on this client's mission clock from receipt, since peers' wall clocks are not in step.
-    internal const float SampleLifetimeSeconds = 1f;
     // A foreign hull that cannot spawn (no free formation or ships logic yet) is retried this often before it is dropped.
     internal const int ForeignHullSpawnAttempts = 5;
     internal const float ForeignHullRetrySeconds = 1f;
@@ -122,42 +99,29 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly ICoopMissionComponent missionComponent;
     private readonly IMissionContext missionContext;
-    private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalShipEngine engine;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
     private readonly INavalHullAuthority hullAuthority;
+    private readonly INavalAppliedHost appliedHost;
     private readonly IBattleShipConditionStream conditions;
     private readonly IAgentStationUseReplicator stations;
     private readonly IBattlePartyWithdrawal partyWithdrawal;
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly IBattleShipArrivals arrivals;
-
-    private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
-    private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
+    private readonly INavalSideHullLedger ledger;
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
-    private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
+    private readonly IHeldShipBuffer heldShips;
+    private readonly IBattleShipSampleStream samples;
+
     // [Game thread] Players that left and have not entered again; a late record of theirs never spawns a hull here.
     private readonly HashSet<string> departedOwners = new HashSet<string>();
     // [Game thread] Hulls this client removed with a player who left, by ship id, with that player.
     private readonly Dictionary<Guid, string> leftWith = new Dictionary<Guid, string>();
-    // [Game thread] Hulls a captor's record brought back after such a removal, which already counted them gone from their side.
-    private readonly HashSet<Guid> reopenedForCaptor = new HashSet<Guid>();
-    // [Game thread] An AI hull's latest condition from a controller that isn't its authority yet: the successor's first report
-    // can come over the mesh before the server's host change reaches this client, and only goes out again on change.
-    private readonly Dictionary<Guid, NetworkShipCondition> earlyHostConditions = new Dictionary<Guid, NetworkShipCondition>();
     // [Game thread] Departed players whose party withdrawal waits for their hulls to settle, with whether each was the host.
     private readonly Dictionary<string, bool> pendingWithdrawals = new Dictionary<string, bool>();
-    private long recordsHeld;
-    // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
-    private string npcHullHost;
-    // The host epoch whose AI hull move this client applied last, or the one it joined at; a report from a newer one is early.
-    private int appliedHostEpoch;
-    // [Game thread] Host changes whose hull move waits in the arrivals queue; the session already reads their epoch.
-    private int queuedHostChanges;
     private bool spawnRecordsSent;
-    private float sendElapsed;
     private float elapsed;
     private long finalRopesSent, finalRopesAccepted, finalRopesRejected;
     private long removalsSent, removalsAccepted, removalsRejected, agentsMovedOffDepartedHulls;
@@ -177,10 +141,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         IBattleTeamResolver teamResolver,
         IObjectManager objectManager,
         INavalHullAuthority hullAuthority,
+        INavalAppliedHost appliedHost,
         IBattleShipConditionStream conditions,
         IAgentStationUseReplicator stations,
         INavalShipCaptureEngine captureEngine,
-        IBattleShipArrivals arrivals)
+        IBattleShipArrivals arrivals,
+        INavalSideHullLedger ledger,
+        IHeldShipBuffer heldShips,
+        IBattleShipSampleStream samples)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -188,26 +156,26 @@ public class BattleShipReplicator : IBattleShipReplicator
         deployment = context.Deployment;
         missionComponent = context.MissionComponent;
         missionContext = context.MissionContext;
-        hostEpochPolicy = context.HostEpochPolicy;
         resultCommitter = context.ResultCommitter;
         partyWithdrawal = context.PartyWithdrawal;
         this.engine = engine;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
         this.hullAuthority = hullAuthority;
+        this.appliedHost = appliedHost;
         this.conditions = conditions;
         this.stations = stations;
         this.captureEngine = captureEngine;
         this.arrivals = arrivals;
-        NoteJoinEpoch();
+        this.ledger = ledger;
+        this.heldShips = heldShips;
+        this.samples = samples;
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
-        messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
-        messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
     }
@@ -217,11 +185,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         messageBroker.Unsubscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
-        messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
-        messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
         heldShips.Clear();
@@ -263,29 +229,26 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (migrated.MapEventId != session.InstanceId) return;
         if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, session.IsNaval)) return;
 
-        // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers.
-        string newHost = migrated.NewHostControllerId ?? session.OwnControllerId;
-        // The epoch the session reads now is the change's; the move applies later, so it carries it.
-        int epoch = migrated.Epoch > 0 ? migrated.Epoch : session.HostEpoch;
-        GameThread.RunSafe(() =>
+        // The server's assignment always names both, so a guess here would move every AI hull to the wrong client.
+        string newHost = migrated.NewHostControllerId;
+        int epoch = migrated.Epoch;
+        if (newHost == null || epoch <= 0)
         {
-            queuedHostChanges++;
-            arrivals.Enqueue(() => ApplyQueuedHostChange(newHost, epoch), nameof(Handle_BattleHostMigrated));
-        }, context: nameof(Handle_BattleHostMigrated));
-    }
+            Logger.Error("[NavalSync] Host change of {MapEventId} names host {Host} at epoch {Epoch}; the AI hulls stay where they are",
+                migrated.MapEventId, newHost ?? "none", epoch);
+            return;
+        }
 
-    // [Mission tick] The queued hull move of a host change, at the epoch the change carried.
-    private void ApplyQueuedHostChange(string newHost, int epoch)
-    {
-        queuedHostChanges--;
-        TransferHostHulls(newHost, epoch);
+        // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers. The
+        // session reads the change's epoch now and the move applies later, so it carries the epoch.
+        GameThread.RunSafe(() => arrivals.Enqueue(() => TransferHostHulls(newHost, epoch), nameof(Handle_BattleHostMigrated)),
+            context: nameof(Handle_BattleHostMigrated));
     }
 
     /// <summary>[Game thread] Moves every AI hull to <paramref name="newHost"/>, and flips local simulation where ours changed.</summary>
-    internal int TransferHostHulls(string newHost, int epoch = 0)
+    internal int TransferHostHulls(string newHost, int epoch)
     {
-        npcHullHost = newHost;
-        appliedHostEpoch = epoch > 0 ? epoch : session.HostEpoch;
+        appliedHost.Apply(newHost, epoch);
         int transferred = 0;
         foreach (var ship in Registry.Ships)
         {
@@ -306,7 +269,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         bool isOwn = hullAuthority.Transfer(ship, newAuthority, inPlace);
         RestartStreams(ship);
-        AcceptEarlyHostCondition(ship);
         Logger.Information("[NavalSync] {Kind} hull {ShipId} of {Owner} moved to {Authority}{Local}",
             ship.IsNpcParty ? "AI" : "Player", ship.ShipId, ship.OriginalOwner, newAuthority,
             isOwn ? " (this client)" : "");
@@ -315,14 +277,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     // The old owner's samples and conditions no longer describe the hull, whoever simulates it now.
     private void RestartStreams(NetworkShipInfo ship)
     {
-        var stream = GetStream(ship.ShipId);
-        stream.Target = null;
-        stream.Accepted = 0;
-        stream.AcceptedEpoch = 0;
-        conditions.RestartAfterAuthorityMove(ship.ShipId);
+        samples.Restart(ship.ShipId);
+        conditions.OnAuthorityMoved(ship);
     }
-
-    public void CountCapturedFrom(BattleSideEnum side) => departedHulls[side] = DepartedHulls(side) + 1;
 
     public void AnnounceHulls(IReadOnlyList<NetworkShipInfo> ships)
     {
@@ -340,11 +297,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         return hullAuthority.Replace(shipId);
     }
 
-    public bool IsReplacingHull(Guid shipId) => hullAuthority.IsReplacing(shipId);
-
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        samples.Advance(dt);
         WithdrawSettledParties();
         hullAuthority.Tick();
         PruneRemovedHulls();
@@ -357,9 +313,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
 
         if (spawnRecordsSent)
-            SendOwnSamples(dt);
+            samples.SendOwn(dt);
 
-        ExpireStaleSamples();
+        samples.ExpireStale();
     }
 
     // Withdraws a departed party once its hulls settled; run before the hull step, so a removal that finished last tick has its
@@ -392,10 +348,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Prune(Guid shipId)
     {
         if (!Registry.Remove(shipId)) Registry.MarkRemoved(shipId);
-        streams.Remove(shipId);
+        samples.Forget(shipId);
         conditions.Forget(shipId);
         heldShips.Remove(shipId);
-        earlyHostConditions.Remove(shipId);
     }
 
     public void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
@@ -420,16 +375,8 @@ public class BattleShipReplicator : IBattleShipReplicator
             ship.ShipId, reason, missionEnding ? ", mission ending" : "");
     }
 
-    // The epoch whose AI hull move applied last, or the one this client joined at.
-    public int AppliedHostEpoch => appliedHostEpoch;
-
-    public int DepartedHulls(BattleSideEnum side) => departedHulls.TryGetValue(side, out int count) ? count : 0;
-
-    private void CountDeparted(NetworkShipInfo ship)
-    {
-        var side = engine.SideOf(ship.Hull);
-        departedHulls[side] = DepartedHulls(side) + 1;
-    }
+    // Counts a hull leaving the battle as gone from the side it is on now.
+    private void CountDeparted(NetworkShipInfo ship) => ledger.CountDeparted(ship.ShipId, engine.SideOf(ship.Hull));
 
     private void Handle_NetworkShipRemoved(MessagePayload<NetworkShipRemoved> payload)
     {
@@ -448,7 +395,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(removal.ShipId, out var ship))
         {
-            if (heldShips.TryGetValue(removal.ShipId, out var held) && held.Record != null
+            if (heldShips.TryGet(removal.ShipId, out var held) && held.Record != null
                 && held.Record.OwnerControllerId != removal.OwnerControllerId)
             {
                 removalsRejected++;
@@ -533,9 +480,9 @@ public class BattleShipReplicator : IBattleShipReplicator
             leftWith[ship.ShipId] = controllerId;
         RemoveHulls(departing, ShipRemovalReason.Leave, DepartingCrew.All);
 
-        foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.FollowsBattleHost
-            && entry.Value.Record.OwnerControllerId == controllerId).ToArray())
-            Prune(entry.Key);
+        foreach (var held in heldShips.All.Where(held => held.Record != null && !held.Record.FollowsBattleHost
+            && held.Record.OwnerControllerId == controllerId).ToArray())
+            Prune(held.ShipId);
     }
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
@@ -554,99 +501,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Sent {Count} own hull record(s) to {Target}", records.Length, controllerId ?? "all peers");
     }
 
-    // Sends every own hull's sample and changed condition once per send interval.
-    private void SendOwnSamples(float dt)
-    {
-        sendElapsed += dt;
-        if (sendElapsed < SendIntervalSeconds) return;
-        sendElapsed = CarryAfterSend(sendElapsed);
-
-        foreach (var ship in Registry.Ships.Where(IsOwnHull))
-        {
-            var stream = GetStream(ship.ShipId);
-            // The sunk condition already went out after the hull's last sample; peers keep that frame.
-            if (conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) continue;
-
-            stream.Sent++;
-            network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
-                NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
-                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch, engine.ReadMotion(ship.Hull)));
-            conditions.SendIfChanged(ship);
-        }
-    }
-
-    /// <summary>
-    /// The time a send carries into the next interval, so heavy frames keep 20 Hz; at most one interval, so a long frame is
-    /// followed by one catch-up send instead of a burst.
-    /// </summary>
-    internal static float CarryAfterSend(float elapsed) => Math.Min(elapsed - SendIntervalSeconds, SendIntervalSeconds);
-
-    private void Handle_NetworkShipCondition(MessagePayload<NetworkShipCondition> payload)
-    {
-        var condition = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (Mission.Current == null) return;
-            arrivals.Enqueue(() => AcceptCondition(condition), nameof(Handle_NetworkShipCondition));
-        }, context: nameof(Handle_NetworkShipCondition));
-    }
-
-    /// <summary>[Game thread] Sets an owner's condition on its copied hull; one for a hull not spawned here yet waits for it.</summary>
-    internal void AcceptCondition(NetworkShipCondition condition)
-    {
-        if (condition == null) return;
-
-        if (!Registry.TryGet(condition.ShipId, out var ship))
-        {
-            if (Registry.StateOf(condition.ShipId) == ShipLifecycle.Removed) return;
-
-            var held = Held(condition.ShipId);
-            if (held.Condition == null || condition.Stamp.IsNewer(held.Condition.Stamp)) held.Condition = condition;
-            return;
-        }
-
-        var stream = GetStream(condition.ShipId);
-        var rejection = conditions.Accept(ship, condition, fromDepartedHost: false);
-        if (rejection == null) return;
-
-        stream.Reject("condition_" + rejection);
-        if (IsEarlyHostCondition(ship, condition, rejection)) HoldEarlyHostCondition(condition);
-    }
-
-    /// <summary>
-    /// Whether a rejected condition is an AI hull's from a controller of a newer host epoch than this client applied: the
-    /// successor's report that overtook the host change, kept until that change moves the hull to it.
-    /// </summary>
-    internal static bool IsEarlyHostCondition(bool followsHost, string rejection, int conditionEpoch, int localEpoch) =>
-        followsHost && rejection == "not_authority" && conditionEpoch > localEpoch;
-
-    // Reads the hull and the session's epoch for IsEarlyHostCondition.
-    private bool IsEarlyHostCondition(NetworkShipInfo ship, NetworkShipCondition condition, string rejection) =>
-        IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHostEpoch);
-
-    // The epoch this client joined the battle at, taken at the start or with the first hull records once a host is known and no
-    // host change is queued (the session already reads a queued change's epoch), so a stale report isn't read as an early one.
-    private void NoteJoinEpoch()
-    {
-        if (appliedHostEpoch == 0 && queuedHostChanges == 0) appliedHostEpoch = session.HostEpoch;
-    }
-
-    // Keeps the newest early report per hull.
-    private void HoldEarlyHostCondition(NetworkShipCondition condition)
-    {
-        if (earlyHostConditions.TryGetValue(condition.ShipId, out var held) && !condition.Stamp.IsNewer(held.Stamp)) return;
-
-        earlyHostConditions[condition.ShipId] = condition;
-    }
-
-    // A host change moved the hull: the report its new authority sent ahead of it applies now.
-    private void AcceptEarlyHostCondition(NetworkShipInfo ship)
-    {
-        if (!earlyHostConditions.TryGetValue(ship.ShipId, out var held)) return;
-
-        earlyHostConditions.Remove(ship.ShipId);
-        if (held.OwnerControllerId == ship.CurrentAuthority) AcceptCondition(held);
-    }
 
     public void SendFinalRopes()
     {
@@ -681,7 +535,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(final.ShipId, out var ship))
         {
-            if (Registry.StateOf(final.ShipId) == ShipLifecycle.Awaiting) Held(final.ShipId).FinalRopes = final;
+            if (heldShips.IsAwaitingRecord(final.ShipId)) heldShips.Of(final.ShipId).FinalRopes = final;
             else finalRopesRejected++;
             return;
         }
@@ -717,7 +571,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     /// <summary>[Game thread] Queues other owners' hull records and spawns the copies that can spawn now.</summary>
     internal void AcceptSpawnRecords(IEnumerable<BattleShipSpawnData> records)
     {
-        NoteJoinEpoch();
         foreach (var record in records.Where(record => record != null))
         {
             // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host. A returner's
@@ -736,11 +589,12 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place; only a record
             // of a capture the held one predates replaces it.
-            var held = Held(record.ShipId);
+            var held = heldShips.Of(record.ShipId);
             if (held.Record != null && !IsNewerRecord(record, held.Record)) continue;
 
-            held.Record = record;
-            held.RecordOrder = ++recordsHeld;
+            heldShips.HoldRecord(held, record);
+            // A record of a ship whose spawn was given up makes the buffers waiting for its hull hold its traffic again.
+            Registry.RetrySpawn(record.ShipId);
         }
 
         DrainHeldRecords();
@@ -757,49 +611,35 @@ public class BattleShipReplicator : IBattleShipReplicator
         && leftWith.TryGetValue(record.ShipId, out var leaver) && leaver != record.CaptorControllerId
         && Registry.StateOf(record.ShipId) == ShipLifecycle.Removed;
 
-    // Its earlier departure already counted it gone from its side, so its capture does not count again.
+    // Its earlier departure already counted it gone from its side, and the ledger counts a hull once per side, so its capture
+    // doesn't count again.
     private void ReopenForCaptor(BattleShipSpawnData record)
     {
         leftWith.TryGetValue(record.ShipId, out var leaver);
         Registry.TryReopen(record.ShipId);
         leftWith.Remove(record.ShipId);
-        reopenedForCaptor.Add(record.ShipId);
         Logger.Information("[NavalSync] Hull {ShipId} left here with {Leaver}, but {Captor} captured it first; spawning it again",
             record.ShipId, leaver, record.CaptorControllerId);
-    }
-
-    private HeldShip Held(Guid shipId)
-    {
-        if (!heldShips.TryGetValue(shipId, out var held))
-        {
-            held = new HeldShip();
-            heldShips.Add(shipId, held);
-        }
-
-        return held;
     }
 
     // Records spawn first, in arrival order; then a condition held for a hull that registered without a record goes on.
     private void DrainHeldShips()
     {
-        if (heldShips.Count == 0) return;
-
         DrainHeldRecords();
-        foreach (var entry in heldShips.Where(entry => entry.Value.Record == null).ToArray())
+        foreach (var held in heldShips.All.Where(held => held.Record == null).ToArray())
         {
-            if (!Registry.TryGet(entry.Key, out _)) continue;
+            if (!Registry.TryGet(held.ShipId, out _)) continue;
 
-            heldShips.Remove(entry.Key);
-            if (entry.Value.Condition != null) AcceptCondition(entry.Value.Condition);
+            heldShips.Remove(held.ShipId);
+            if (held.Condition != null) conditions.Receive(held.Condition);
         }
     }
 
+    // Spawns the copies whose records can spawn now, in the order the records arrived; the rest keep waiting.
     private void DrainHeldRecords()
     {
-        foreach (var held in heldShips.Values.Where(held => held.Record != null).OrderBy(held => held.RecordOrder).ToArray())
-        {
-            if (!TrySpawnForeignHull(held)) Registry.MarkAwaiting(held.Record.ShipId);
-        }
+        foreach (var held in heldShips.WaitingRecords())
+            TrySpawnForeignHull(held);
     }
 
     // [Game thread] True when the record is settled (spawned or dropped), false to retry next tick.
@@ -883,7 +723,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     // the hull's capture count, so later confirms apply in order. A captured hull counts as gone from the side it was taken from.
     private void ApplyRecordedCapture(NetworkShipInfo ship, BattleShipSpawnData data)
     {
-        bool reopened = reopenedForCaptor.Remove(ship.ShipId);
         if (data.CaptureSequence == 0) return;
 
         // A prize that later lent its formation to another capture is both captured and orphaned.
@@ -891,8 +730,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             var capture = new HullCapture(data.CaptorControllerId, data.CapturedWithShipId, data.CapturedFromSide);
             Registry.TryMarkCaptured(ship.ShipId, capture, ship.Formation, data.CaptureSequence);
-            if (!reopened && IsBattleSide(data.CapturedFromSide) && data.CapturedFromSide != data.Side)
-                CountCapturedFrom(data.CapturedFromSide);
+            if (data.CapturedFromSide != data.Side) ledger.CountDeparted(ship.ShipId, data.CapturedFromSide);
             Logger.Information("[NavalSync] Hull {ShipId} was captured by {Captor} before it spawned here", ship.ShipId,
                 data.CaptorControllerId);
         }
@@ -905,32 +743,27 @@ public class BattleShipReplicator : IBattleShipReplicator
             ship.ShipId, ship.CurrentAuthority);
     }
 
-    // An orphan's side reads as none; only a real side counts for the retreat rule.
-    private static bool IsBattleSide(BattleSideEnum side) => side == BattleSideEnum.Attacker || side == BattleSideEnum.Defender;
-
     // Who simulates a hull whose record waited: an AI hull moves with the host, a player's stays with its owner.
     private string CurrentAuthorityOf(NetworkShipInfo ship) =>
-        ship.FollowsBattleHost ? npcHullHost ?? ship.CurrentAuthority : ship.CurrentAuthority;
+        ship.FollowsBattleHost ? appliedHost.Host ?? ship.CurrentAuthority : ship.CurrentAuthority;
 
     // The departed owner's last held state goes on before the move, so the new authority takes over from its pose and damage.
     // Its epoch may be behind and its sender is out of the mission by now, so only the authority, order and validity checks apply.
     private void ApplyDepartedOwnerState(NetworkShipInfo ship, HeldShip held)
     {
         var departedOwner = ship.CurrentAuthority;
-        var stream = GetStream(ship.ShipId);
         var condition = held.Condition;
         if (condition?.OwnerControllerId == departedOwner)
         {
             held.Condition = null;
-            conditions.Accept(ship, condition, fromDepartedHost: true);
+            conditions.AcceptFromDepartedOwner(ship, condition);
         }
 
         var sample = held.Sample;
         if (sample?.OwnerControllerId == departedOwner)
         {
             held.Sample = null;
-            if (ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch, null) == null)
-                TakeSample(ship, stream, sample);
+            samples.AcceptFromDepartedOwner(ship, sample);
         }
 
         var final = held.FinalRopes;
@@ -944,8 +777,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     // The owner's latest state received while the copy waited, so it does not sit at the record's frame until the next sample.
     private void ApplyHeldState(HeldShip held)
     {
-        if (held.Condition != null) AcceptCondition(held.Condition);
-        if (held.Sample != null) AcceptSample(held.Sample);
+        if (held.Condition != null) conditions.Receive(held.Condition);
+        if (held.Sample != null) samples.Accept(held.Sample);
         if (held.FinalRopes != null) AcceptFinalRopes(held.FinalRopes);
     }
 
@@ -973,75 +806,12 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     internal static bool IsForeignHullSpawnExhausted(int attempts) => attempts >= ForeignHullSpawnAttempts;
 
-    private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
-    {
-        var sample = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (Mission.Current == null) return;
-            AcceptSample(sample);
-        }, context: nameof(Handle_NetworkBattleShipSample));
-    }
-
-    /// <summary>[Game thread] Takes an owner's sample as the copied hull's steering target.</summary>
-    internal void AcceptSample(NetworkBattleShipSample sample)
-    {
-        if (sample == null) return;
-
-        if (!Registry.TryGet(sample.ShipId, out var ship))
-        {
-            if (Registry.StateOf(sample.ShipId) == ShipLifecycle.Awaiting) HoldSample(sample);
-            // Also a sample whose spawn record still waits in the arrivals queue: dropped, as the owner streams at 20 Hz, so the
-            // next one lands about 50 ms later, once the record applied.
-            else GetStream(sample.ShipId).Reject("unknown_ship");
-            return;
-        }
-
-        var stream = GetStream(sample.ShipId);
-
-        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch,
-            missionContext.ControllersInMission);
-        // BR-102: an AI hull follows the host, so a superseded hosting generation is dropped like siege state.
-        if (rejection == null && ship.FollowsBattleHost && hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch))
-            rejection = "stale_epoch";
-        if (rejection != null)
-        {
-            stream.Reject(rejection);
-            return;
-        }
-
-        TakeSample(ship, stream, sample);
-    }
-
-    private void TakeSample(NetworkShipInfo ship, ShipStream stream, NetworkBattleShipSample sample)
-    {
-        if (ship.FollowsBattleHost) stream.AcceptedEpoch = sample.HostEpoch;
-
-        engine.ApplyInput(ship.Hull, sample.Input);
-        engine.ApplyRopes(ship.Hull, sample.Ropes, HullOf, final: false);
-        engine.ApplyForeignSample(ship.Hull, NetworkBattleShipSample.ToFrame(sample.Frame), sample.Motion);
-        stream.Target = sample;
-        stream.TargetReceivedAt = elapsed;
-        stream.Accepted = sample.Sequence;
-    }
-
-    // The owner reports it with the hull's condition, on change, so no frame length expires it: vanilla latches a depleted
-    // side the first frame it reads one. Sinking, the owner leaving or an authority move drop it instead.
-    public int ReportedReserveOf(MissionObject hull)
-    {
-        if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship)) return 0;
-        if (conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) return 0;
-
-        return conditions.ReportedReserveOf(ship.ShipId) ?? 0;
-    }
-
-    // A copy reads 0 from the engine and an own hull 0 from the reports, so a hull mid-swap counts 0 either way.
-    public int HullReserve(MissionObject hull) =>
-        Registry.TryGetByHull(hull, out var ship) && !IsOwnHull(ship) ? ReportedReserveOf(hull) : engine.ReadSpawnableReserve(hull);
 
     // A player who left takes its hulls with it, whether or not its own removal reached this client first.
     // A player who left or disconnected (the server sends a naval disconnect as a leave, D4) takes its hulls; a departed
     // host's AI hulls stay and move to its successor with the host migration.
+    public int HullReserve(MissionObject hull) => conditions.HullReserve(hull);
+
     private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
         var left = payload.What;
@@ -1059,7 +829,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void AcceptPeerLeft(string controllerId, bool wasHost)
     {
         departedOwners.Add(controllerId);
-        ForgetReportedReserveOf(controllerId);
+        conditions.ForgetReserveOf(controllerId);
         if (Mission.Current == null) return;
 
         // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
@@ -1070,49 +840,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>
         !string.IsNullOrEmpty(controllerId) && (instanceId == null || instanceId == session.InstanceId) && !session.IsOwn(controllerId);
 
-    /// <summary>
-    /// [Game thread] Drops the reserve a departed controller reported for the hulls it held; the membership gate drops its late
-    /// reports until it enters again.
-    /// </summary>
-    internal void ForgetReportedReserveOf(string controllerId)
-    {
-        foreach (var ship in Registry.Ships.Where(ship => ship.CurrentAuthority == controllerId))
-            conditions.ForgetReserve(ship.ShipId);
-    }
-
-    private void HoldSample(NetworkBattleShipSample sample)
-    {
-        var held = Held(sample.ShipId);
-        if (held.Sample == null || sample.Stamp.IsNewer(held.Sample.Stamp)) held.Sample = sample;
-    }
-
-    /// <summary>Why a sample must be dropped, or null to accept it.</summary>
-    internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
-        long acceptedSequence, int acceptedEpoch, IReadOnlyCollection<string> controllersInMission)
-    {
-        // A new host numbers an AI hull's samples from its own stream, so a newer epoch restarts the sequence.
-        var rejection = sample.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedSequence), followsHostEpoch: ship.FollowsBattleHost,
-            controllersInMission);
-        if (rejection != null) return rejection;
-        if (!sample.HasValidFrame) return "invalid_frame";
-        if (!sample.Motion.IsValid) return "invalid_motion";
-        if (!sample.Input.IsValid) return "invalid_input";
-        if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
-        return null;
-    }
-
-    // A copy's stream stops counting as live once no sample came for the lifetime; the engine's steering ages it on its own.
-    private void ExpireStaleSamples()
-    {
-        foreach (var stream in streams.Values)
-        {
-            if (stream.Target == null || elapsed - stream.TargetReceivedAt <= SampleLifetimeSeconds) continue;
-
-            stream.Target = null;
-            stream.Reject("expired");
-        }
-    }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
@@ -1144,33 +871,24 @@ public class BattleShipReplicator : IBattleShipReplicator
         return mapEventParty != null && objectManager.TryGetId(mapEventParty, out var id) ? id : null;
     }
 
-    private ShipStream GetStream(Guid shipId)
-    {
-        if (!streams.TryGetValue(shipId, out var stream))
-        {
-            stream = new ShipStream();
-            streams.Add(shipId, stream);
-        }
-
-        return stream;
-    }
-
     public object Inspect() => new
     {
         spawnRecordsSent,
+        appliedHostEpoch = appliedHost.AppliedHostEpoch,
+        appliedHost = appliedHost.Host,
         removalsSent,
         removalsAccepted,
         removalsRejected,
         agentsMovedOffDepartedHulls,
-        departedAttackerHulls = DepartedHulls(BattleSideEnum.Attacker),
-        departedDefenderHulls = DepartedHulls(BattleSideEnum.Defender),
-        pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),
-        heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
-        heldSamples = heldShips.Values.Count(held => held.Sample != null),
+        departedAttackerHulls = ledger.DepartedHulls(BattleSideEnum.Attacker),
+        departedDefenderHulls = ledger.DepartedHulls(BattleSideEnum.Defender),
+        pendingForeignHulls = heldShips.All.Count(held => held.Record != null),
+        heldForDeployment = heldShips.All.Count(held => held.HeldForDeployment),
+        heldSamples = heldShips.All.Count(held => held.Sample != null),
         pendingWithdrawals = pendingWithdrawals.Keys.ToArray(),
         ships = Registry.Ships.Select(ship =>
         {
-            streams.TryGetValue(ship.ShipId, out var stream);
+            var stream = samples.StateOf(ship.ShipId);
             var condition = engine.ReadCondition(ship.Hull);
             return new
             {
@@ -1204,7 +922,8 @@ public class BattleShipReplicator : IBattleShipReplicator
                 sinking = condition?.SinkingState,
                 isSunk = condition?.SinkingState == BattleShipCondition.Sunk,
                 conditionRevision = conditions.RevisionOf(ship.ShipId),
-                reserve = HullReserve(ship.Hull),
+                conditionLastReject = conditions.LastRejectOf(ship.ShipId),
+                reserve = conditions.HullReserve(ship.Hull),
             };
         }).ToArray(),
     };
@@ -1216,48 +935,4 @@ public class BattleShipReplicator : IBattleShipReplicator
         finalRopesRejected,
         stations = engine.InspectRopes(Registry.Ships.Select(ship => ship.Hull).ToArray(), ShipIdOf),
     };
-
-    /// <summary>
-    /// A ship not registered here yet: its waiting spawn record and the owner's latest condition, sample and final ropes,
-    /// applied in that order once the copy spawns.
-    /// </summary>
-    private sealed class HeldShip
-    {
-        public BattleShipSpawnData Record;
-        /// <summary>The record's place in arrival order, so copies spawn in the order their records came.</summary>
-        public long RecordOrder;
-        public NetworkShipCondition Condition;
-        public NetworkBattleShipSample Sample;
-        public NetworkBattleRopeFinal FinalRopes;
-        public int FailedAttempts;
-        public float RetryAt;
-        public bool HeldForDeployment;
-        public bool HeldForMembership;
-
-        public void SettleRecord()
-        {
-            Record = null;
-            FailedAttempts = 0;
-            HeldForDeployment = false;
-            HeldForMembership = false;
-        }
-    }
-
-    private sealed class ShipStream
-    {
-        public NetworkBattleShipSample Target;
-        /// <summary>This client's mission clock when <see cref="Target"/> arrived.</summary>
-        public float TargetReceivedAt;
-        public long Sent;
-        public long Accepted;
-        public int AcceptedEpoch;
-        public long Rejects;
-        public string LastReject;
-
-        public void Reject(string reason)
-        {
-            Rejects++;
-            LastReject = reason;
-        }
-    }
 }

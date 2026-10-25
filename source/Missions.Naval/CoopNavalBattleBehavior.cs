@@ -20,76 +20,78 @@ public class CoopNavalBattleBehavior : MissionLogic
     // Fewer agents than this leaving in one tick is ordinary combat; more is worth a line in the log.
     internal const int AgentDropThreshold = 10;
 
-    private readonly INavalBattleServices services;
     private readonly INavalSteeredCopies steeredCopies;
     private readonly NavalShipsLogic shipsLogic;
-    private readonly Action tickNpcFleet;
     private readonly INavalTickFailureLog fixedTickFailures;
-    private readonly INavalFormationTacticRefresh tacticRefresh;
+    private readonly INavalTickFailureLog missionTickFailures;
+    private readonly INavalLateHullDeployment lateHullDeployment;
     private int lastAgentCount = -1;
     private bool retreated;
 
+    // Takes one failure log per tick kind, so a flood on one of them can't hide the first lines of the other.
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
-        NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalFormationTacticRefresh tacticRefresh)
+        NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
+        INavalLateHullDeployment lateHullDeployment)
     {
-        this.services = services;
+        Services = services;
         this.steeredCopies = steeredCopies;
         NpcFleetSpawner = npcFleetSpawner;
-        tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
         this.fixedTickFailures = fixedTickFailures;
-        this.tacticRefresh = tacticRefresh;
-        NavalFormationTacticRefresh.Active = tacticRefresh;
+        this.missionTickFailures = missionTickFailures;
+        this.lateHullDeployment = lateHullDeployment;
+        shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
-        shipsLogic.MissionEndEvent += services.OnMissionEnding;
+        shipsLogic.MissionEndEvent += OnMissionEnding;
         // Also fires for every hull as NavalShipsLogic.OnEndMission removes them, after the final ropes went out.
         shipsLogic.BeforeShipRemovedEvent += OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent += OnShipRemoved;
         CoopNavalMissionScope.IsActive = true;
     }
 
-    public IBattleShipReplicator ShipReplicator => services.ShipReplicator;
+    /// <summary>The battle's naval services, which the debug commands read.</summary>
+    public INavalBattleServices Services { get; }
 
-    public IBattleShipCaptureReplicator ShipCaptureReplicator => services.ShipCaptureReplicator;
-
-    public IAgentStationUseReplicator StationUseReplicator => services.StationUseReplicator;
-
-    public INavalDeckPoses DeckPoses => services.DeckPoses;
-
+    /// <summary>Fields the AI fleet on the battle host; kept apart from the services because it binds NavalDLC types.</summary>
     public INavalNpcFleetSpawner NpcFleetSpawner { get; }
 
-    public INavalMigrationReserveFielder MigrationReserveFielder => services.MigrationReserveFielder;
-
-    public IBattleShipDamageRouter ShipDamageRouter => services.ShipDamageRouter;
-
-    public IBattleShipWeaponReplicator ShipWeaponReplicator => services.ShipWeaponReplicator;
-
-    public INavalShipEngine Engine => services.Engine;
-
-    public IBattleShipFateReporter FateReporter => services.FateReporter;
-
-    public IBattleWaterClock WaterClock => services.WaterClock;
-
+    // Ticks the naval side of the battle. A throw is logged throttled, so the later behaviours and vanilla's naval logic still
+    // tick this frame instead of the whole mission stalling on one broken step.
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
-        // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
-        steeredCopies.ApplySnaps();
-        services.Tick(dt, tickNpcFleet);
-        // After the services tick, whose arrivals and fleet fielding spawn the hulls this checks.
-        tacticRefresh.Apply();
+        try
+        {
+            TickNaval(dt);
+        }
+        catch (Exception exception)
+        {
+            missionTickFailures.Report(exception, "Ticking the naval services", Mission);
+        }
+
         LogAgentCountDrop();
 #if DEBUG
         NavalImmortalCoopCommand.ApplyArmed();
 #endif
     }
 
+    // Snaps the copies, then ticks the services, the AI fleet and the tactic refresh, in that order.
+    private void TickNaval(float dt)
+    {
+        // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
+        steeredCopies.ApplySnaps();
+        Services.Tick(dt);
+        NpcFleetSpawner.Tick();
+        // After the services and the fleet, whose arrivals and fielding spawn the hulls this checks.
+        lateHullDeployment.Apply(shipsLogic.AllShips);
+    }
+
     // Runs inside FinishMissionLoading, so the battle's water time is in place before the loading screen lifts.
     public override void AfterStart()
     {
         base.AfterStart();
-        services.WaterClock.Start();
+        Services.WaterClock.Start();
     }
 
     // Copies are steered with the physics step, so a velocity change lands on the body before it integrates. The engine calls
@@ -107,10 +109,11 @@ public class CoopNavalBattleBehavior : MissionLogic
         }
     }
 
-    // Runs after DefaultNavalMissionLogic's deployment finish, so this is the hull set the battle starts with.
-    public override void OnDeploymentFinished()
+    // Logs the hull set the battle starts with. Vanilla runs this after every OnDeploymentFinished, so the controllers are the
+    // ones DefaultNavalMissionLogic switched the hulls to when deployment ended.
+    public override void OnAfterDeploymentFinished()
     {
-        base.OnDeploymentFinished();
+        base.OnAfterDeploymentFinished();
         var hulls = shipsLogic.AllShips.Select(ship =>
             $"{ship.Index}:{ship.Team?.TeamSide}/{ship.Formation?.FormationIndex}" +
             $"{(NavalForeignHulls.Contains(ship) ? ":copy" : "")}:{ship.Controller?.ControllerType}" +
@@ -126,11 +129,19 @@ public class CoopNavalBattleBehavior : MissionLogic
         retreated = true;
     }
 
+    // Fires inside SpawnShip, before its caller sets the hull up further. Vanilla's deployment pass only reaches the hulls that
+    // exist when deployment ends, so a later hull (AI fleet, copy, hull swap) is deployed here.
+    private void OnShipSpawned(MissionShip ship)
+    {
+        if (Mission.IsDeploymentFinished) lateHullDeployment.Deploy(ship);
+    }
+
+    // Hands a hull vanilla is about to remove to the services, with the reason its fate is reported under.
     private void OnBeforeShipRemoved(MissionShip ship)
     {
         bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
         var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
-        services.OnBeforeHullRemoved(ship, reason, shipsLogic.IsMissionEnding);
+        Services.OnBeforeHullRemoved(ship, reason, shipsLogic.IsMissionEnding);
     }
 
     // A removed hull is pooled during deployment and its entity removed later, so no copy reference or rope AI preference may
@@ -146,8 +157,10 @@ public class CoopNavalBattleBehavior : MissionLogic
             ship.Index, ship.Team?.TeamSide, ship.Formation?.FormationIndex, wasCopy, shipsLogic.IsDeploymentMode);
     }
 
+    // Whether the agent count fell by more in one tick than ordinary combat explains.
     internal static bool IsAgentCountDrop(int before, int after) => before >= 0 && before - after >= AgentDropThreshold;
 
+    // Logs a large one-tick drop in the mission's agent count.
     private void LogAgentCountDrop()
     {
         int count = Mission.Agents.Count;
@@ -157,13 +170,39 @@ public class CoopNavalBattleBehavior : MissionLogic
         lastAgentCount = count;
     }
 
+    // Vanilla's mission end event, called from its hull removal: a throw is logged so vanilla still removes the hulls.
+    private void OnMissionEnding()
+    {
+        try
+        {
+            Services.OnMissionEnding();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalSync] The naval services threw at the mission end; the last ropes or fates may be missing");
+        }
+    }
+
+    // Disposes the services and resets the naval statics. A throwing service is logged, so the resets, the later behaviours
+    // and vanilla's own mission end still run.
     public override void OnEndMissionInternal()
     {
         CoopNavalMissionScope.IsActive = false;
-        shipsLogic.MissionEndEvent -= services.OnMissionEnding;
+        shipsLogic.MissionEndEvent -= OnMissionEnding;
         shipsLogic.BeforeShipRemovedEvent -= OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
-        services.Dispose();
+        shipsLogic.ShipSpawnedEvent -= OnShipSpawned;
+        try
+        {
+            Services.Dispose();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalSync] Disposing the naval services threw; the naval statics are reset anyway");
+        }
+
+        NpcFleetSpawner.Dispose();
+
         NavalRopes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();
@@ -172,8 +211,6 @@ public class CoopNavalBattleBehavior : MissionLogic
 #endif
         // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
         NavalForeignHulls.Clear();
-        tacticRefresh.Clear();
-        if (NavalFormationTacticRefresh.Active == tacticRefresh) NavalFormationTacticRefresh.Active = null;
         NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();

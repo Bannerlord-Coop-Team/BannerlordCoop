@@ -9,8 +9,8 @@ namespace Missions.Battles;
 public interface IBattleAgentFader
 {
     /// <summary>
-    /// [Game thread] Release the agent's station, then fade it out; an inactive agent is left alone. A puppet deregistered
-    /// first keeps the naval release patch from reporting the release as a desync.
+    /// [Game thread] Release the agent's station, then fade it out; an inactive agent is left alone. A caller that deregisters
+    /// a puppet first keeps the naval release patch from reporting the release as a desync.
     /// </summary>
     void FadeOut(Agent agent, bool hideInstantly, bool hideMount);
 }
@@ -18,12 +18,13 @@ public interface IBattleAgentFader
 /// <inheritdoc cref="IBattleAgentFader"/>
 public class BattleAgentFader : IBattleAgentFader
 {
+    // Takes the agent's station lock like vanilla Agent.OnRemove, since the game-thread queue drains while agent ticks run.
     public void FadeOut(Agent agent, bool hideInstantly, bool hideMount)
     {
         if (agent == null || !agent.IsActive()) return;
 
         if (agent.CurrentlyUsedGameObject != null)
-            agent.StopUsingGameObject(isSuccessful: false, Agent.StopUsingGameObjectFlags.None);
+            agent.StopUsingGameObjectMT(isSuccessful: false, Agent.StopUsingGameObjectFlags.None);
         agent.FadeOut(hideInstantly, hideMount);
     }
 }
