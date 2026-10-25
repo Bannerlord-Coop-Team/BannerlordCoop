@@ -141,6 +141,24 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(0, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
     }
 
+    // S12 R1: a departed host's last use for an agent this client adopted settles as stale at once, not with the expiry Warning.
+    [Fact]
+    public void Tick_DropsADepartedHostsInFlightUseForAnAdoptedAgentWithoutWaiting()
+    {
+        var crew = new RemoteCrew();
+        crew.Registry.Setup(r => r.IsLocallyControlled(crew.Agent)).Returns(true);
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, members: Members("someone_else"));
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 7, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (int)inspected["pending"]!);
+        Assert.Equal(1, (long)inspected["staleUses"]!);
+        Assert.Equal(0, (long)inspected["dropped"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+    }
+
     // S12 A3: a joiner's seats go out from the tick, after the arrivals sent it the hull records they refer to.
     [Fact]
     public void PeerEntered_SendsTheJoinerTheOwnSeatsFromTheNextTick()

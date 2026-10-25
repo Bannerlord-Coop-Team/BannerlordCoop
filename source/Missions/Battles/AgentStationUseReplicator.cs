@@ -379,15 +379,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         bool registered = agents.TryGetAgentInfo(use.AgentId, out var info) && info.Agent != null;
         if (!registered && !use.InUse) return SettleObsoleteRelease(use, "its puppet is not registered");
 
-        // A relayed seat catch-up can beat the sender's announced entry; a departed sender's uses expire or go with its hulls.
-        if (AuthorityStamp.ValidateMember(use.SenderControllerId, missionContext.ControllersInMission) != null) return false;
-        if (!registered || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship)) return false;
-
-        if (agents.IsLocallyControlled(info.Agent))
+        // An agent this client adopted takes no more uses, also not a departed host's last ones still in flight.
+        if (registered && agents.IsLocallyControlled(info.Agent))
         {
             staleUses++;
             return true;
         }
+
+        // A relayed seat catch-up can beat the sender's announced entry; a departed sender's uses expire or go with its hulls.
+        if (AuthorityStamp.ValidateMember(use.SenderControllerId, missionContext.ControllersInMission) != null) return false;
+        if (!registered || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship)) return false;
 
         if (info.CurrentAuthority != use.SenderControllerId) return false;
 
