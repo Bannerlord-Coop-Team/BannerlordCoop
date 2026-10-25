@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -7,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
@@ -32,6 +34,8 @@ public class HeadmanHerdAlternativeProgressTests
         lock (GameInstance.@lock)
         {
             using var herd = new HeadmanNeedsToDeliverAHerdTests(output);
+            // This in-process environment has no host party for the unrelated player-progression calculation.
+            using var progression = new MethodCallRecorder(AccessTools.Method(typeof(DefaultPlayerProgressionModel), nameof(DefaultPlayerProgressionModel.GetPlayerProgress)));
             var now = AccessTools.PropertyGetter(typeof(CampaignTime), nameof(CampaignTime.Now));
             var patches = Harmony.GetPatchInfo(now).Prefixes.ToArray();
             var order = PatchProcessor.GetSortedPatchMethods(now, patches);
@@ -42,6 +46,12 @@ public class HeadmanHerdAlternativeProgressTests
             {
                 harmony.Unpatch(now, bootstrap.PatchMethod);
                 AssertProgress(herd, periodicDay);
+                if (periodicDay)
+                {
+                    Assert.Equal(1, progression.CountFor(herd.scenario.Server));
+                    Assert.Equal(1, progression.CountFor(herd.scenario.ClientA));
+                    Assert.Equal(1, progression.CountFor(herd.scenario.ClientB));
+                }
             }
             finally
             {
