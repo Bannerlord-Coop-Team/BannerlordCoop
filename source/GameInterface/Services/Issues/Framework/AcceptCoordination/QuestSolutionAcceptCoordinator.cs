@@ -235,6 +235,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)

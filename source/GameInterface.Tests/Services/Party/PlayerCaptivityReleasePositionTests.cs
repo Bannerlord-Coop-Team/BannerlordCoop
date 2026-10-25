@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.Issues.Framework.Interface;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
@@ -53,6 +54,8 @@ public class PlayerCaptivityReleasePositionTests
             network.Object,
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
+            new Mock<IAlternativeSolutionPicker>().Object,
+            new Mock<IAlternativeSolutionCommitments>().Object,
             recruitmentSideEffects.Object,
             playerManager.Object);
     }
