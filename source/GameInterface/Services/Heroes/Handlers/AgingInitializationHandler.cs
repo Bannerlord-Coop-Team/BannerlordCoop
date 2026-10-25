@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
 using Serilog;
@@ -20,6 +21,7 @@ internal class AgingInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IAgingCampaignBehaviorInterface agingCampaignBehaviorInterface;
+    private readonly IMarriageOfferCampaignBehaviorInterface marriageOfferCampaignBehaviorInterface;
 
     private AgingPlayerData agingPlayerData;
 
@@ -27,12 +29,14 @@ internal class AgingInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IAgingCampaignBehaviorInterface agingCampaignBehaviorInterface)
+        IAgingCampaignBehaviorInterface agingCampaignBehaviorInterface,
+        IMarriageOfferCampaignBehaviorInterface marriageOfferCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.agingCampaignBehaviorInterface = agingCampaignBehaviorInterface;
+        this.marriageOfferCampaignBehaviorInterface = marriageOfferCampaignBehaviorInterface;
 
         messageBroker.Subscribe<InitializeClientAgingData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -70,6 +74,7 @@ internal class AgingInitializationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             agingCampaignBehaviorInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            marriageOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId, obj.Who as NetPeer);
         });
     }
 
