@@ -214,12 +214,19 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [InlineData(3, 4, 2)]
     public void DeliveryDialogue_TransfersEveryEquipmentStackOnce_WithoutChangingTheOtherPlayer(int plain, int modified, int otherModified)
     {
-        var modifierIds = new[] { "herd_delivery_modifier", "herd_delivery_other_modifier" };
+        var modifierIds = new string[2];
+        Server.Call(() =>
+        {
+            for (var index = 0; index < modifierIds.Length; index++)
+            {
+                var modifier = new ItemModifier();
+                Assert.True(Server.ObjectManager.TryGetId(modifier, out modifierIds[index]));
+            }
+        });
         foreach (var instance in Instances)
             instance.Call(() =>
             {
-                foreach (var id in modifierIds)
-                    Assert.True(instance.ObjectManager.AddExisting(id, new ItemModifier { StringId = id }));
+                foreach (var id in modifierIds) Object<ItemModifier>(instance, id);
                 Object<ItemObject>(instance, livestockId).Value = 1000;
             });
         Accept(ClientA);
