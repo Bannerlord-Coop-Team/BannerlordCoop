@@ -182,6 +182,31 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
     }
 
     [Theory]
+    [InlineData(nameof(ISiegeBreakOut.CanJoinDefenders))]
+    [InlineData(nameof(ISettlementEncounterDistanceValidator.TryValidate))]
+    [InlineData(nameof(ISiegeBreakOut.GetBreakInCasualties))]
+    public void CheckThatThrows_StillRepliesRejected_SoTheClientRejectLockClears(string failingCheck)
+    {
+        var failure = new InvalidOperationException("check failed");
+        if (failingCheck == nameof(ISiegeBreakOut.CanJoinDefenders))
+            action.Setup(service => service.CanJoinDefenders(party, settlement, false)).Throws(failure);
+        else if (failingCheck == nameof(ISiegeBreakOut.GetBreakInCasualties))
+            action.Setup(service => service.GetBreakInCasualties(party, siege)).Throws(failure);
+        else
+        {
+            string reason = null;
+            distance.Setup(validator => validator.TryValidate(party, settlement, out reason)).Throws(failure);
+        }
+
+        Send("throws");
+
+        var result = Assert.Single(Results());
+        Assert.Equal("throws", result.RequestId);
+        Assert.False(result.Approved);
+        VerifyCharged(Times.Never());
+    }
+
+    [Theory]
     [InlineData(nameof(PartyEnterSettlementAttempted))]
     [InlineData(nameof(SettlementEncounterLeaveApplied))]
     [InlineData(nameof(PlayerDisconnected))]

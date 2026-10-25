@@ -441,7 +441,6 @@ public class CoopTournamentController : CoopMissionController
         agentSpawner.ApplyManifest(manifest, snapshot, session);
         CaptureManifestAgents(manifest);
         RefreshNativeFightState();
-        // Remote matches skip native StartMatch, which sets Battle mode.
         Mission.Current.SetMissionMode(MissionMode.Battle, true);
         if (latestRuntimeState?.MatchId == manifest.MatchId)
             ApplyRuntimeState(latestRuntimeState);
