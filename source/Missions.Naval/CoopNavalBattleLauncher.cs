@@ -142,8 +142,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         SplitPlayerSideParties(sideParties, PartyBase.MainParty,
             out var ownMapEventParty, out var ownTeamParties, out var allyTeamParties);
+        var playerParties = GetPlayerParties();
         NavalPlayerDeploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
-            sideParties.Select(party => party.Party), PartyBase.MainParty, GetPlayerParties().Contains);
+            sideParties.Select(party => party.Party), PartyBase.MainParty, playerParties.Contains);
+        NavalPlayerDeploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
+            sideParties.Select(party => party.Party), playerParties.Contains);
         deploymentModel.GetShipDeploymentLimitsOfPlayerTeams(ownTeamParties, allyTeamParties,
             out var ownTeamLimit, out var allyTeamLimit);
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
@@ -162,9 +165,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             0,
         };
 
-        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank} ownShips={ShipCount} " +
+        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank}/{PlayerCount} ownShips={ShipCount} " +
             "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
-            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
+            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, NavalPlayerDeploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
             string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
