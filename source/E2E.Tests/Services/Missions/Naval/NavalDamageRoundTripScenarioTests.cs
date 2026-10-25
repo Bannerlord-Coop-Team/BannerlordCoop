@@ -8,9 +8,9 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions.Naval;
 
 /// <summary>
-/// Hull damage round trip: a non-owner's hit goes to the hull's owner, which applies it and sends the resulting condition
-/// back to every client. Hits from a superseded host epoch are dropped, and a sunk hull stops streaming and lets its
-/// seated puppets go.
+/// Hull damage round trip: a non-owner's hit goes only to the hull's owner, which applies it and sends the resulting
+/// condition back to every client. A hit that reaches a peer no longer holding the hull is dropped, and a sunk hull stops
+/// streaming and lets its seated puppets go.
 /// </summary>
 public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
 {
@@ -30,21 +30,23 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
         Assert.Empty(c.Hull(pirate).AppliedDamage);
         Assert.All(battle.Peers, peer => Assert.Equal(70f, peer.Hull(pirate).HitPoints, 3));
         Assert.Equal(1, (long)DamageStats(b)["sent"]!);
-        Assert.Equal("not_authority", (string)DamageStats(c)["lastDrop"]!);
+        Assert.Empty((JObject)DamageStats(c)["drops"]!);
     }
 
+    // A sender's view of the hull's authority can be one hand-over behind; the peer it reached no longer holds it and drops it.
     [Fact]
-    public void HitFromASupersededHostEpoch_IsDropped()
+    public void HitSentToAPeerThatNoLongerHoldsTheHull_IsDropped()
     {
-        using var battle = StartPirateBattle(out var a, out var b, out _, out var pirate);
+        using var battle = StartPirateBattle(out var a, out var b, out var c, out var pirate);
 
-        b.Call(() => b.Network.SendAll(new NetworkApplyShipDamage(pirate, "B", BattleShipDamageKind.Hull, 30f, 0f, Vec3.Zero,
-            Guid.Empty, Guid.Empty, false, -1, battle.HostEpoch - 1)));
+        b.Call(() => b.Network.Send("C", new NetworkApplyShipDamage(pirate, "B", BattleShipDamageKind.Hull, 30f, 0f, Vec3.Zero,
+            Guid.Empty, Guid.Empty, false, -1)));
         battle.ApplyArrivals();
 
         Assert.Empty(a.Hull(pirate).AppliedDamage);
-        Assert.Equal(FakeNavalShipEngine.FullHitPoints, a.Hull(pirate).HitPoints, 3);
-        Assert.Equal("stale_epoch", (string)DamageStats(a)["lastDrop"]!);
+        Assert.Empty(c.Hull(pirate).AppliedDamage);
+        Assert.All(battle.Peers, peer => Assert.Equal(FakeNavalShipEngine.FullHitPoints, peer.Hull(pirate).HitPoints, 3));
+        Assert.Equal(1, (long)DamageStats(c)["drops"]!["not_authority"]!);
     }
 
     [Fact]
@@ -87,7 +89,7 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
         Assert.Empty(b.Hull(pirate).AppliedDamage);
         Assert.Empty(c.Hull(pirate).AppliedDamage);
         Assert.All(battle.Peers, peer => Assert.Equal(70f, peer.Hull(pirate).HitPoints, 3));
-        Assert.Equal("not_authority", (string)DamageStats(c)["lastDrop"]!);
+        Assert.Empty((JObject)DamageStats(c)["drops"]!);
     }
 
     // M10a: a copy is steered from the owner's body velocity and yaw rate, which ride every sample.
