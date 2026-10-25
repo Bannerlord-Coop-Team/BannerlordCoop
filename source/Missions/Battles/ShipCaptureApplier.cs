@@ -57,6 +57,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
     private readonly IBattleShipReplicator ships;
     private readonly INavalHullAuthority hullAuthority;
     private readonly IBattleShipArrivals arrivals;
+    private readonly INavalSideHullLedger ledger;
 
     // [Game thread] Confirms waiting for a hull this client hasn't registered yet, for a swap, or for an earlier capture.
     private readonly List<NetworkShipCaptured> heldConfirms = new List<NetworkShipCaptured>();
@@ -76,7 +77,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
     public ShipCaptureApplier(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker, BattleContext context,
         INavalShipEngine engine, INavalShipCaptureEngine captureEngine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority,
-        IBattleShipArrivals arrivals)
+        IBattleShipArrivals arrivals, INavalSideHullLedger ledger)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -89,6 +90,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         this.ships = ships;
         this.hullAuthority = hullAuthority;
         this.arrivals = arrivals;
+        this.ledger = ledger;
 
         messageBroker.Subscribe<NetworkShipCaptured>(Handle_NetworkShipCaptured);
         // Subscribed after the ship replicator's, so a record that spawns a hull is spawned before it is read here.
@@ -316,9 +318,9 @@ public class ShipCaptureApplier : IShipCaptureApplier
         var applied = new AppliedCapture(prize.ShipId, captorShip.ShipId, captor);
         appliedAt[(prize.ShipId, prizeSequence)] = applied;
         appliedAt[(captorShip.ShipId, captorSequence)] = applied;
-        if (IsBattleSide(prizeSide) && prizeSide != captorSide) ships.CountCapturedFrom(prizeSide);
+        if (prizeSide != captorSide) ledger.CountDeparted(prize.ShipId, prizeSide);
         Logger.Debug("[NavalSync] Capture of hull {ShipId}: swap and registry done; hulls gone from {PrizeSide}: {Departed}",
-            prize.ShipId, prizeSide, ships.DepartedHulls(prizeSide));
+            prize.ShipId, prizeSide, ledger.DepartedHulls(prizeSide));
 
         capturesApplied++;
         Logger.Information("[NavalSync] Hull {ShipId} of {Previous} captured by {Captor} into hull {CaptorShipId}'s formation; that hull is orphaned",
@@ -464,9 +466,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
             confirm.ShipId, confirm.CaptorControllerId, confirm.PreviousAuthority, reason);
         return ConfirmOutcome.Done;
     }
-
-    // An orphan's side reads as none; only a real side counts for the retreat rule.
-    private static bool IsBattleSide(BattleSideEnum side) => side == BattleSideEnum.Attacker || side == BattleSideEnum.Defender;
 
     // Applied, from records, dropped, repeated and conflicting captures, and the confirms still waiting.
     public object Inspect() => new

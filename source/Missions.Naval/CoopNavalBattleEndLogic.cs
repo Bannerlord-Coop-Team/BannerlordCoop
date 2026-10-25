@@ -29,7 +29,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalNpcFleetSpawner npcFleet;
-    private readonly IBattleShipReplicator shipReplicator;
+    private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
 
@@ -39,14 +39,14 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     // Takes the battle's session, deployment, committer and AI fleet, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalSideTallyReader tallyReader,
+        INavalNpcFleetSpawner npcFleet, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
         INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
         this.npcFleet = npcFleet;
-        this.shipReplicator = shipReplicator;
+        this.hullLedger = hullLedger;
         this.tallyReader = tallyReader;
         this.heroGrace = heroGrace;
     }
@@ -225,7 +225,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return false;
 
         int hullsLeft = _navalShipsLogic.AllShips.Count(ship => ship.Team != null && ship.Team.Side == side);
-        return KeepsRetreat(shipReplicator.DepartedHulls(side), hullsLeft);
+        return KeepsRetreat(hullLedger.DepartedHulls(side), hullsLeft);
     }
 
     /// <summary>

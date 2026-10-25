@@ -108,7 +108,7 @@ internal static class NavalInspectSummary
             driftMean = copy.Diagnostics.Distance.Mean;
             driftMax = copy.Diagnostics.Distance.Max;
         }
-        if (naval != null) fatesSent = naval.FateReporter.FatesSentOf(info.ShipId);
+        if (naval != null) fatesSent = naval.Services.FateReporter.FatesSentOf(info.ShipId);
 #endif
         return new HullSummary(
             ShortId(info.ShipId), hull.ShipOrigin.Hull?.StringId, info.OriginalOwner, info.CurrentAuthority, info.IsNpcParty,

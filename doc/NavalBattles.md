@@ -134,8 +134,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   (`IBattleShipArrivals`) at the start of the next naval services tick, in arrival order: spawn records, removals, departures,
   entries, host changes, conditions, final ropes, routed damage and capture requests, confirms and records. The game-thread
   queue drains while the engine's async agent and team tick runs, which reads the hull state these change (R48 L6).
-- Streams that resend continuously (samples, weapon state) still apply on receipt; a sample for a hull whose record still
-  waits is dropped and the next one lands about 50 ms later. Station use is kept pending and applied by its replicator's tick.
+- Samples go through the same queue, merged to one queued arrival per hull that applies the newest sample; a sample for a
+  hull whose record still waits is held with the record. Weapon state still applies on receipt. Station use is kept pending
+  and applied by its replicator's tick.
 - Routed damage to AI hulls is stamped and checked with the host epoch whose hull move this client applied
   (`IAppliedHostEpoch`), which trails the session's epoch by the queued move of a host change.
 
@@ -189,7 +190,7 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    hull spawn records, removals, departures, entries, host changes and hull conditions, applied first in that tick in
    arrival order. An AI hull's condition from its successor that overtook the host change is kept until the change moves
    the hull to it. A result report or the mission end applies what waits first, unless the async agent tick runs (then it
-   stays for the next tick). A sample for a hull whose record still waits is dropped; the owner streams at 20 Hz.
+   stays for the next tick). A sample for a hull whose record still waits is held with the record.
    The authority moves in place
    (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
    with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or

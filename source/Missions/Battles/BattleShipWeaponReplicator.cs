@@ -42,7 +42,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private readonly IBattleSession session;
     private readonly ICoopMissionComponent missionComponent;
     private readonly INavalShipEngine engine;
-    private readonly IBattleShipReplicator ships;
+    private readonly INavalHullAuthority hullAuthority;
     private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IMissionContext missionContext;
 
@@ -57,7 +57,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private string lastDrop;
 
     public BattleShipWeaponReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
-        ICoopMissionComponent missionComponent, INavalShipEngine engine, IBattleShipReplicator ships, IHostEpochPolicy hostEpochPolicy,
+        ICoopMissionComponent missionComponent, INavalShipEngine engine, INavalHullAuthority hullAuthority, IHostEpochPolicy hostEpochPolicy,
         IMissionContext missionContext)
     {
         this.missionContext = missionContext;
@@ -66,7 +66,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         this.session = session;
         this.missionComponent = missionComponent;
         this.engine = engine;
-        this.ships = ships;
+        this.hullAuthority = hullAuthority;
         this.hostEpochPolicy = hostEpochPolicy;
 
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_SiegeWeaponFired);
@@ -131,7 +131,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     }
 
     private bool IsSimulatedHere(NetworkShipInfo ship) =>
-        ship.CurrentAuthority == session.OwnControllerId && !ships.IsReplacingHull(ship.ShipId);
+        ship.CurrentAuthority == session.OwnControllerId && !hullAuthority.IsReplacing(ship.ShipId);
 
     private void UpdateSimulatedWeapons()
     {
