@@ -11,6 +11,7 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class LateDeploymentPlanNotificationPatch
 {
+    // Skips the plan notification only while the late plan is being made.
     [HarmonyPrefix]
     private static bool Prefix() => !NavalLateDeploymentPlan.IsMaking;
 }
