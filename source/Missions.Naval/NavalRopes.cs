@@ -1,6 +1,8 @@
-﻿using Missions.Messages;
+﻿using Common.Logging;
+using Missions.Messages;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -38,7 +40,9 @@ internal static class NavalRopes
     }
 
     private static readonly Dictionary<ShipAttachmentMachine, RopeRecord> records = new Dictionary<ShipAttachmentMachine, RopeRecord>();
-    private static long replicaRejects, finalsApplied;
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalRopes));
+
+    private static long replicaRejects, replicaFaults, finalsApplied;
     private static string lastReplicaReject;
 
     /// <summary>Set while a replica rope may change: an owner state applies, or a local break of a rope whose hull left runs.</summary>
@@ -50,7 +54,7 @@ internal static class NavalRopes
         records.Clear();
         RopeForcePatch.ClearCounters();
         NavalRopeRemoval.Clear();
-        replicaRejects = finalsApplied = 0;
+        replicaRejects = replicaFaults = finalsApplied = 0;
         lastReplicaReject = null;
         BypassReplicaGates = false;
     }
@@ -218,18 +222,7 @@ internal static class NavalRopes
         BypassReplicaGates = true;
         try
         {
-            foreach (var value in values)
-            {
-                try
-                {
-                    ApplyOne(copy, value, hullOf);
-                }
-                catch (Exception exception)
-                {
-                    replicaRejects++;
-                    lastReplicaReject = value.SourceKey + ":" + exception.Message;
-                }
-            }
+            foreach (var value in values) ApplyCounted(copy, value, hullOf);
         }
         finally
         {
@@ -242,15 +235,38 @@ internal static class NavalRopes
         finalsApplied++;
     }
 
-    // Applies one owner state to its station's replica, throwing the reason it was rejected.
-    private static void ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf)
+    // Applies one state, so one bad rope doesn't stop the others; counts a reject, and logs the mission's first fault.
+    private static void ApplyCounted(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf)
+    {
+        string reject;
+        try
+        {
+            reject = ApplyOne(copy, value, hullOf);
+        }
+        catch (Exception exception)
+        {
+            lastReplicaReject = value.SourceKey + ":fault:" + exception.GetType().Name;
+            if (++replicaFaults == 1)
+                Logger.Warning(exception, "[NavalSync] Applying the owner's rope at {Source} on a copy threw; later faults are only counted",
+                    value.SourceKey);
+            return;
+        }
+
+        if (reject == null) return;
+
+        replicaRejects++;
+        lastReplicaReject = value.SourceKey + ":" + reject;
+    }
+
+    // Applies one owner state to its station's replica; returns why it was rejected, or null.
+    private static string ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf)
     {
         var source = Resolve<ShipAttachmentMachine>(copy, value.SourceKey);
-        if (source == null) throw new InvalidOperationException("source_station_missing");
+        if (source == null) return "source_station_missing";
 
         if (!records.TryGetValue(source, out var record)) records[source] = record = new RopeRecord();
         var step = Decide(record.Generation, source.CurrentAttachment != null, value);
-        if (step == ReplicaStep.Ignore) return;
+        if (step == ReplicaStep.Ignore) return null;
 
         record.Last = value;
         record.DecorationPlanks = value.DecorationPlanks;
@@ -258,7 +274,7 @@ internal static class NavalRopes
         {
             // The copy's machine tick destroys it next frame, as vanilla does on the owner.
             source.CurrentAttachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
-            return;
+            return null;
         }
 
         if (step == ReplicaStep.Recreate)
@@ -273,29 +289,50 @@ internal static class NavalRopes
         var target = value.HasTarget && hullOf(value.TargetShipId) is MissionShip targetHull
             ? Resolve<ShipAttachmentPointMachine>(targetHull, value.TargetKey)
             : null;
-        if (value.HasTarget && target == null) throw new InvalidOperationException("target_station_missing");
-        if (target == null && (value.State == BattleRopeState.RopesPulling || value.IsPlank))
-            throw new InvalidOperationException("target_required");
+        string reject = TargetReject(value, target != null) ?? Connect(source, target, record) ?? HookLanded(source.CurrentAttachment, target);
+        if (reject != null) return reject;
 
-        if (source.CurrentAttachment == null)
-        {
-            if (IsBusy(target)) throw new InvalidOperationException("target_busy");
-            source.ConnectWithAttachmentPointMachine(target, forceBridge: false);
-            if (source.CurrentAttachment == null) throw new InvalidOperationException("replica_creation_refused");
-            record.Attachment = source.CurrentAttachment;
-        }
+        Present(source, target, value);
+        return null;
+    }
 
+    /// <summary>Why a state can't apply with or without its resolved target point, or null.</summary>
+    internal static string TargetReject(BattleRopeState value, bool targetResolved)
+    {
+        if (value.HasTarget && !targetResolved) return "target_station_missing";
+        if (!targetResolved && (value.State == BattleRopeState.RopesPulling || value.IsPlank)) return "target_required";
+        return null;
+    }
+
+    // Creates the station's replica rope through vanilla's connect path when it has none; returns why it couldn't, or null.
+    private static string Connect(ShipAttachmentMachine source, ShipAttachmentPointMachine target, RopeRecord record)
+    {
+        if (source.CurrentAttachment != null) return null;
+        if (IsBusy(target)) return "target_busy";
+
+        source.ConnectWithAttachmentPointMachine(target, forceBridge: false);
+        if (source.CurrentAttachment == null) return "replica_creation_refused";
+
+        record.Attachment = source.CurrentAttachment;
+        return null;
+    }
+
+    // Hooks a replica created in flight to the point the owner's hook landed on; returns why it couldn't, or null.
+    private static string HookLanded(Attachment attachment, ShipAttachmentPointMachine target)
+    {
+        if (attachment.AttachmentTarget != null && attachment.AttachmentTarget != target) return "target_changed_within_generation";
+        if (target == null || attachment.AttachmentTarget != null) return null;
+        if (IsBusy(target)) return "late_target_busy";
+
+        attachment.AttachmentTarget = target;
+        target.AssignConnection(attachment);
+        return null;
+    }
+
+    // Sets the replica to the owner's state: its joint while pulling or planked, the plank, state, length and hook frame.
+    private static void Present(ShipAttachmentMachine source, ShipAttachmentPointMachine target, BattleRopeState value)
+    {
         var attachment = source.CurrentAttachment;
-        if (attachment.AttachmentTarget != null && attachment.AttachmentTarget != target)
-            throw new InvalidOperationException("target_changed_within_generation");
-        if (target != null && attachment.AttachmentTarget == null)
-        {
-            // The owner's hook landed after the replica was created in flight.
-            if (IsBusy(target)) throw new InvalidOperationException("late_target_busy");
-            attachment.AttachmentTarget = target;
-            target.AssignConnection(attachment);
-        }
-
         if ((value.State == BattleRopeState.RopesPulling || value.IsPlank) && attachment.ShipAttachmentJoint == null)
         {
             var position = source.RopeVisual.GameEntity.GlobalPosition;
@@ -461,6 +498,7 @@ internal static class NavalRopes
         ownForceWrites = RopeForcePatch.OwnForceWrites(),
         foreignFiltered = RopeForcePatch.ForeignForcesFiltered(),
         replicaRejects,
+        replicaFaults,
         lastReplicaReject,
         jointStepsSkipped = NavalRopeRemoval.JointStepsSkipped,
         finalsApplied,
