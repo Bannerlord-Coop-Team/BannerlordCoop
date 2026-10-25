@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
@@ -38,10 +39,13 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     bool TrySetForcedBulkHz(int? hz, out string error);
 
     /// <summary>
-    /// Owned agents the seam places on a hull send hull-local poses, received ones rebase on the resolved local hull, and owned
-    /// agents seated at a ship station send no world movement; null turns it off.
+    /// Owned agents the seam places on a hull send hull-local poses and received ones rebase on the resolved local hull; null
+    /// turns it off.
     /// </summary>
     void ConfigureShipDeck(IShipDeckSeam seam);
+
+    /// <summary>Owned agents seated at a ship station send no world movement; null turns it off.</summary>
+    void ConfigureStationSeats(IShipStationSeats seats);
 
     /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
     void ForgetMovementTarget(Agent agent);
@@ -520,6 +524,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         receivedMovementSequences.Clear();
         recipientMovementStates.Clear();
         ConfigureShipDeck(null);
+        ConfigureStationSeats(null);
 
         movementBatchSender.Clear();
         movementRateController.Dispose();

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -10,6 +11,7 @@ namespace Missions.Agents.Handlers;
 public partial class AgentMovementHandler
 {
     private IShipDeckSeam shipDeck;
+    private IShipStationSeats stationSeats;
     private long deckStamped, deckAccepted, deckRejected, seatedWithheld;
 
     public void ConfigureShipDeck(IShipDeckSeam seam)
@@ -19,13 +21,15 @@ public partial class AgentMovementHandler
         _interpolator.ConfigureNavalDeck(seam == null ? null : seam.TryResolveDeckFrame);
     }
 
+    public void ConfigureStationSeats(IShipStationSeats seats) => stationSeats = seats;
+
     public void ForgetMovementTarget(Agent agent) => _interpolator.Forget(agent);
 
     // [Game thread] Captures an owned on-foot agent's hull-local pose once per sample, so the send decision compares it.
     private void CaptureDeck(CoopAgentInfo info, ref AgentData data)
     {
         if (shipDeck == null || data.MountData != null) return;
-        if (!shipDeck.TryCaptureDeck(info, data.Position, out Guid ship, out Vec3 local, out float speed)) return;
+        if (!shipDeck.TryCaptureDeck(info, data.Position, totalSimulationTime, out Guid ship, out Vec3 local, out float speed)) return;
 
         data.CaptureDeck(ship, local, speed);
         deckStamped++;
@@ -80,7 +84,7 @@ public partial class AgentMovementHandler
     // A seated agent's pose belongs to its station, which peers replay through the station-use stream.
     private bool WithholdSeatedMovement(RecipientMovementState recipient, CapturedMovement captured)
     {
-        if (shipDeck == null || captured.IsMount || !shipDeck.IsSeatedAtStation(captured.AgentInfo)) return false;
+        if (stationSeats == null || captured.IsMount || !stationSeats.IsOwnSeat(captured.AgentInfo.AgentId)) return false;
 
         // Nothing is sent or deferred, so leaving the station compares against no baseline.
         recipient.LastSentMovement.Remove(captured.AgentInfo.AgentId);

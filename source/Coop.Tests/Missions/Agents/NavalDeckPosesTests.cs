@@ -44,7 +44,7 @@ public class NavalDeckPosesTests
         var deck = new Deck();
         using var poses = deck.Create();
 
-        bool captured = poses.TryCaptureDeck(deck.Info, new Vec3(12f, 23f, 1f), out Guid ship, out Vec3 local, out float speed);
+        bool captured = poses.TryCaptureDeck(deck.Info, new Vec3(12f, 23f, 1f), 0f, out Guid ship, out Vec3 local, out float speed);
 
         Assert.True(captured);
         Assert.Equal(deck.ShipId, ship);
@@ -58,12 +58,12 @@ public class NavalDeckPosesTests
         var deck = new Deck();
         using var poses = deck.Create();
         deck.Engine.Setup(e => e.GetSupportHull(It.IsAny<Agent>())).Returns(ShipTestHulls.Create());
-        bool unregistered = poses.TryCaptureDeck(deck.Info, new Vec3(12f, 23f, 1f), out _, out _, out _);
+        bool unregistered = poses.TryCaptureDeck(deck.Info, new Vec3(12f, 23f, 1f), 0f, out _, out _, out _);
 
         deck.Engine.Setup(e => e.GetSupportHull(It.IsAny<Agent>())).Returns(deck.Hull);
         Vec2 min = Min, max = Max;
         deck.Engine.Setup(e => e.TryGetFootprint(deck.Hull, out min, out max)).Returns(true);
-        bool offFootprint = poses.TryCaptureDeck(deck.Info, new Vec3(400f, 20f, 0f), out _, out Vec3 local, out _);
+        bool offFootprint = poses.TryCaptureDeck(deck.Info, new Vec3(400f, 20f, 0f), 0f, out _, out Vec3 local, out _);
 
         Assert.False(unregistered);
         Assert.False(offFootprint);
@@ -77,12 +77,10 @@ public class NavalDeckPosesTests
         var deck = new Deck();
         using var poses = deck.Create();
 
-        float first = Speed(poses, deck, 12f);
-        poses.Tick(0.1f);
-        float walking = Speed(poses, deck, 12.5f);
-        float repeated = Speed(poses, deck, 13f);
-        poses.Tick(0.6f);
-        float afterGap = Speed(poses, deck, 14f);
+        float first = Speed(poses, deck, 12f, 0f);
+        float walking = Speed(poses, deck, 12.5f, 0.1f);
+        float repeated = Speed(poses, deck, 13f, 0.1f);
+        float afterGap = Speed(poses, deck, 14f, 0.7f);
 
         Assert.Equal(0f, first);
         Assert.Equal(5f, walking, 3);
@@ -104,9 +102,9 @@ public class NavalDeckPosesTests
         Assert.False(unknown);
     }
 
-    private static float Speed(NavalDeckPoses poses, Deck deck, float worldX)
+    private static float Speed(NavalDeckPoses poses, Deck deck, float worldX, float time)
     {
-        Assert.True(poses.TryCaptureDeck(deck.Info, new Vec3(worldX, 20f, 0f), out _, out _, out float speed));
+        Assert.True(poses.TryCaptureDeck(deck.Info, new Vec3(worldX, 20f, 0f), time, out _, out _, out float speed));
         return speed;
     }
 
@@ -132,9 +130,8 @@ public class NavalDeckPosesTests
         {
             var component = new Mock<ICoopMissionComponent>();
             component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
-            component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
             component.SetupGet(c => c.ShipRegistry).Returns(Ships);
-            return new NavalDeckPoses(component.Object, Engine.Object, Mock.Of<IAgentStationUseReplicator>());
+            return new NavalDeckPoses(component.Object, Engine.Object);
         }
     }
 }
