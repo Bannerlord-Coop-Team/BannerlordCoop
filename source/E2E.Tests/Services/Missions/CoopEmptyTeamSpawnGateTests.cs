@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using GameInterface.Services.MapEvents;
@@ -21,12 +22,21 @@ public class CoopEmptyTeamSpawnGateTests
 
     private static readonly List<(bool IsPlayerSide, int Number)> spawnCalls = new();
 
+    private static readonly MethodInfo CheckDeploymentMethod =
+        AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment");
+    private static readonly MethodInfo IsPlanMadeMethod = AccessTools.Method(typeof(DefaultMissionDeploymentPlan),
+        nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) });
+
     // A battle earlier in the process (e.g. single-player before joining) compiles the gate before coop patches
     // exist; the player's side must still deploy once the coop patch is installed.
     [Fact]
     public void PlayerSideSpawns_WhenSpawnGateCompiledBeforeCoopPatch()
     {
         using var scope = new GateScope();
+        // Patching IsPlanMade stops the JIT inlining it for the rest of the process, which would hide the stale compile.
+        Assert.True(Harmony.GetPatchInfo(IsPlanMadeMethod) == null,
+            "IsPlanMade was patched earlier in this process, so CheckDeployment can no longer compile with it inlined");
+        Assert.Equal(new[] { scope.EngineOwner }, Harmony.GetPatchInfo(CheckDeploymentMethod).Owners);
         var battle = new GateBattle();
 
         battle.CheckDeployment();
@@ -50,11 +60,14 @@ public class CoopEmptyTeamSpawnGateTests
         private readonly Mission previousMission = Mission._current;
         private readonly bool previousEnabled = BattleSpawnConfig.Enabled;
         private readonly ActiveCoopBattleScope battleScope = new(null);
+        private readonly DeploymentPatchStaticsScope patchStatics = new();
+        private readonly List<(HarmonyPatchType Type, Patch Patch)> liftedPatches = new();
 
         public GateScope()
         {
             BattleSpawnConfig.Enabled = true;
             spawnCalls.Clear();
+            LiftExistingGatePatches();
 
             Prefix(AccessTools.PropertyGetter(typeof(Mission), nameof(Mission.HasSpawnPath)), nameof(HasSpawnPath));
             Prefix(AccessTools.Method(typeof(Mission), nameof(Mission.GetInitialSpawnPathData)), nameof(InitialSpawnPath));
@@ -66,28 +79,55 @@ public class CoopEmptyTeamSpawnGateTests
                 nameof(RecordSpawn));
             // Rebuilds the gate after the shims so an earlier compile can't keep inlined engine getters; IsPlanMade
             // stays unpatched here, as it is in a battle that runs before coop installs its patches.
-            Prefix(AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment"), nameof(RebuildGate));
+            Prefix(CheckDeploymentMethod, nameof(RebuildGate));
         }
+
+        /// <summary>The owner of the engine shims, the only patches the gate carries before the coop patch installs.</summary>
+        public string EngineOwner => engine.Id;
 
         /// <summary>The client container's battle registry the coop patch resolves; no battle is open until a test begins one.</summary>
         public ICoopBattleMissionRegistry BattleRegistry => battleScope.Registry;
 
         // Installs the production patch class exactly as the game's PatchAll does.
-        public void InstallCoopPatch()
-        {
-            var patchType = typeof(CoopBattleMissionRegistry).Assembly.GetType(
-                "GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch", throwOnError: true)!;
-            coop.CreateClassProcessor(patchType).Patch();
-        }
+        public void InstallCoopPatch() => coop.CreateClassProcessor(DeploymentPatchStaticsScope.PatchType).Patch();
 
         public void Dispose()
         {
             coop.UnpatchAll(coop.Id);
             engine.UnpatchAll(engine.Id);
+            foreach (var lifted in liftedPatches)
+                Reapply(lifted.Type, lifted.Patch);
             Mission._current = previousMission;
             BattleSpawnConfig.Enabled = previousEnabled;
+            patchStatics.Dispose();
             battleScope.Dispose();
             spawnCalls.Clear();
+        }
+
+        // Earlier E2E environments leave production patches installed for the process, so the gate is taken back to
+        // its pre-coop state here and those patches are put back on dispose.
+        private void LiftExistingGatePatches()
+        {
+            var patches = Harmony.GetPatchInfo(CheckDeploymentMethod);
+            if (patches == null) return;
+
+            liftedPatches.AddRange(patches.Prefixes.Select(patch => (HarmonyPatchType.Prefix, patch)));
+            liftedPatches.AddRange(patches.Postfixes.Select(patch => (HarmonyPatchType.Postfix, patch)));
+            liftedPatches.AddRange(patches.Transpilers.Select(patch => (HarmonyPatchType.Transpiler, patch)));
+            liftedPatches.AddRange(patches.Finalizers.Select(patch => (HarmonyPatchType.Finalizer, patch)));
+            foreach (var owner in patches.Owners)
+                new Harmony(owner).Unpatch(CheckDeploymentMethod, HarmonyPatchType.All, owner);
+        }
+
+        // Puts one lifted patch back on the gate under its original owner and ordering.
+        private static void Reapply(HarmonyPatchType type, Patch patch)
+        {
+            var method = new HarmonyMethod(patch.PatchMethod, patch.priority, patch.before, patch.after, patch.debug);
+            new Harmony(patch.owner).Patch(CheckDeploymentMethod,
+                prefix: type == HarmonyPatchType.Prefix ? method : null,
+                postfix: type == HarmonyPatchType.Postfix ? method : null,
+                transpiler: type == HarmonyPatchType.Transpiler ? method : null,
+                finalizer: type == HarmonyPatchType.Finalizer ? method : null);
         }
 
         private void Prefix(MethodBase target, string shim) =>
@@ -177,8 +217,7 @@ public class CoopEmptyTeamSpawnGateTests
         // Mirrors BattleDeploymentMissionController.OnSetupTeamsOfSide arming the player's side.
         public void EnablePlayerSideSpawn() => playerSide.SetSpawnTroops(true);
 
-        public void CheckDeployment() =>
-            AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment").Invoke(spawnLogic, null);
+        public void CheckDeployment() => CheckDeploymentMethod.Invoke(spawnLogic, null);
 
         private static Team AddTeam(Mission mission, BattleSideEnum side)
         {

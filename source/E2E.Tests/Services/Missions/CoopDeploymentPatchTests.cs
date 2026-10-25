@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Linq;
+﻿using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Common;
@@ -342,8 +341,7 @@ public class CoopDeploymentPatchTests
     private static bool ApplySpawnGateOverride(Team? team, bool original = false) =>
         (bool)GetPatchMethod("ApplySpawnGateOverride").Invoke(null, new object?[] { team, original })!;
 
-    private static Type GetPatchType() => typeof(CoopBattleMissionRegistry).Assembly
-        .GetType("GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch", throwOnError: true)!;
+    private static Type GetPatchType() => DeploymentPatchStaticsScope.PatchType;
 
     private static MethodInfo GetPatchMethod(string name) =>
         GetPatchType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -378,27 +376,11 @@ public class CoopDeploymentPatchTests
         private readonly bool previousEnabled = BattleSpawnConfig.Enabled;
         private readonly bool previousServer = ModInformation.IsServer;
         private readonly ActiveCoopBattleScope battleScope = new(null);
-        private readonly List<(FieldInfo Field, object? Value)> previousFields = new();
+        private readonly DeploymentPatchStaticsScope patchStatics = new();
 
         public PatchState()
         {
             battleRegistry = battleScope.Registry;
-            // Readonly scalars such as the logger cannot be reset; readonly observation lists are cleared in place.
-            foreach (var field in GetPatchType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-                         .Where(field => !field.IsInitOnly || typeof(IList).IsAssignableFrom(field.FieldType)))
-            {
-                var value = field.GetValue(null);
-                if (value is IList list)
-                {
-                    previousFields.Add((field, list.Cast<object>().ToArray()));
-                    list.Clear();
-                }
-                else
-                {
-                    previousFields.Add((field, value));
-                    field.SetValue(null, field.FieldType.IsValueType ? Activator.CreateInstance(field.FieldType) : null);
-                }
-            }
             Mission._current = null;
             BattleSpawnConfig.Enabled = true;
             SetBattleActive(false);
@@ -411,18 +393,7 @@ public class CoopDeploymentPatchTests
             ModInformation.IsServer = previousServer;
             battleScope.Dispose();
             battleRegistry = null!;
-            foreach (var entry in previousFields)
-            {
-                if (entry.Field.GetValue(null) is IList list)
-                {
-                    list.Clear();
-                    foreach (var value in (object[])entry.Value!) list.Add(value);
-                }
-                else
-                {
-                    entry.Field.SetValue(null, entry.Value);
-                }
-            }
+            patchStatics.Dispose();
         }
     }
 }

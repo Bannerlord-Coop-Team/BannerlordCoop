@@ -39,8 +39,8 @@ internal class CoopEmptyTeamDeploymentPatch
     private static int lastOverrideActiveAgents;
 #endif
 
-    // Routes CheckDeployment's IsPlanMade(team) reads through the spawn-gate override. MakeTeamPlans keeps the native
-    // answer, because its own IsPlanMade guard must still make real plans for the teams this client fields.
+    // Routes CheckDeployment's IsPlanMade(team) reads through the spawn-gate override. The other callers keep the native
+    // answer: MakeTeamPlans must still plan the teams this client fields, and PhaseTick must only clear real plans.
     [HarmonyTranspiler]
     internal static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
     {
