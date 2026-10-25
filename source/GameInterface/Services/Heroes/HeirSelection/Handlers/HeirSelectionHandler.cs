@@ -11,6 +11,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -46,6 +47,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
+    private readonly IIssueCancellationCoordinator issueCancellationCoordinator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
     private readonly ISendCoalescer sendCoalescer;
@@ -66,6 +68,7 @@ internal class HeirSelectionHandler : IHandler
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
         ICoopSessionMigrator coopSessionMigrator,
         ITraitLevelingHelperInterface traitLevelingHelperInterface,
+        IIssueCancellationCoordinator issueCancellationCoordinator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
         ISendCoalescer sendCoalescer = null)
@@ -79,6 +82,7 @@ internal class HeirSelectionHandler : IHandler
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
         this.traitLevelingHelperInterface = traitLevelingHelperInterface;
+        this.issueCancellationCoordinator = issueCancellationCoordinator;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
         this.sendCoalescer = sendCoalescer;
@@ -438,6 +442,8 @@ internal class HeirSelectionHandler : IHandler
 
         sentSelections.Remove(originalHeroId);
 
+        // Finish personal quests before their inventory consequences are copied into the inheritance cache.
+        issueCancellationCoordinator.CancelForPlayerDeath(registeredPlayer.ControllerId, data.OriginalHero, originalParty);
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
@@ -33,6 +34,23 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         owner = null;
         return victim.Issue == null || PrepareCancellation(victim.Issue, out owner);
+    }
+
+    public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
+    {
+        if (ModInformation.IsClient || !oldHero.IsDead || originalParty == null) return;
+
+        using (new MainHeroSubstitutionScope(oldHero, originalParty))
+        {
+            foreach (var issue in Campaign.Current.IssueManager.Issues.Values.ToList())
+            {
+                var quest = issue.IssueQuest;
+                if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
+                    !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
+
+                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+            }
+        }
     }
 
     public bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner)
