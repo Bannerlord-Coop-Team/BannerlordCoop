@@ -18,7 +18,8 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleShipWeaponReplicator : IDisposable
 {
-    /// <summary>[Game thread] Hands each weapon to its hull's owner and sends the own weapons' changed state.</summary>
+    /// <summary>[Game thread] Hands each weapon to its hull's owner, carrying a copy's reload into one taken over in place, and
+    /// sends the own weapons' state on change and again each second.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] Weapon per hull and the shot and state counters (diagnostics).</summary>
@@ -137,8 +138,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     }
 
     /// <summary>
-    /// The state a weapon taken over mid-reload starts from: loaded, with one bolt fewer, since vanilla spends the reload's
-    /// bolt only once it ends. Null for a loaded weapon or none, which keeps its state.
+    /// The state a weapon taken over mid-reload starts from: loaded, with one bolt fewer (never below 0), since vanilla spends
+    /// the reload's bolt only once it ends. Null for a loaded weapon or none, which keeps its state.
     /// </summary>
     internal static BattleShipWeaponState CarriedState(BattleShipWeaponState applied)
     {

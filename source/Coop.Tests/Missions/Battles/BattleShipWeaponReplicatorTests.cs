@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Surrogates;
 using Missions;
@@ -19,6 +20,7 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+[Collection("Mission.Current")]
 public class BattleShipWeaponReplicatorTests
 {
     private const string Own = "local";
@@ -88,6 +90,32 @@ public class BattleShipWeaponReplicatorTests
         harness.Engine.Verify(e => e.ReadWeaponState(It.Is<MissionObject>(weapon => weapon != own.Weapon)), Times.Never);
     }
 
+    // S18 A2: a received shot and the reload state it caused wait for the naval tick, then apply in that order, so the state's
+    // reload animation never plays before the shot's fire animation.
+    [Fact]
+    public void ReceivedShotAndState_WaitForTheTick_ThenApplyInArrivalOrder()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false);
+        var applied = new List<string>();
+        harness.Engine.Setup(e => e.ReplayWeaponShot(copy.Weapon, It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(), It.IsAny<bool>()))
+            .Callback(() => applied.Add("shot"))
+            .Returns(true);
+        harness.Engine.Setup(e => e.ApplyWeaponState(copy.Weapon, It.IsAny<BattleShipWeaponState>(), It.IsAny<BattleShipWeaponState>()))
+            .Callback<MissionObject, BattleShipWeaponState, BattleShipWeaponState>((_, state, _) => applied.Add($"state {state.WeaponState}"));
+        harness.Replicator.Tick(0.01f);
+
+        harness.Broker.Publish(this, Shot(copy.Ship.ShipId, Peer));
+        harness.Broker.Publish(this, new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, (int)RangedSiegeWeapon.WeaponState.Reloading, 3)));
+        GameThread.Run(() => { }, blocking: true);
+        Assert.Empty(applied);
+        harness.Arrivals.ApplyAll();
+
+        Assert.Equal(new[] { "shot", "state 7" }, applied);
+    }
+
     // S18 A3: an unchanged state goes out again each keyframe, so a peer that dropped one around a host change catches up.
     [Fact]
     public void Tick_ResendsAnUnchangedOwnState_EachKeyframe()
@@ -128,6 +156,7 @@ public class BattleShipWeaponReplicatorTests
     [Theory]
     [InlineData((int)RangedSiegeWeapon.WeaponState.Reloading, 3, 2)]
     [InlineData((int)RangedSiegeWeapon.WeaponState.WaitingAfterShooting, 1, 0)]
+    // No bolt left to spend: the count stays at 0 rather than going negative.
     [InlineData((int)RangedSiegeWeapon.WeaponState.Reloading, 0, 0)]
     public void CarriedState_IsLoadedWithTheReloadsBoltSpent(int weaponState, int ammo, int expectedAmmo)
     {
@@ -404,6 +433,7 @@ public class BattleShipWeaponReplicatorTests
         public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
         public Mock<INetworkAgentRegistry> Agents { get; } = new Mock<INetworkAgentRegistry>();
         public Mock<INavalHullAuthority> HullAuthority { get; } = new Mock<INavalHullAuthority>();
+        public BattleShipArrivals Arrivals { get; } = new BattleShipArrivals();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         /// <summary>The server-announced mission members the membership gate reads.</summary>
@@ -426,7 +456,7 @@ public class BattleShipWeaponReplicatorTests
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
 
             Replicator = new BattleShipWeaponReplicator(Network.Object, Broker, session.Object, component.Object, Engine.Object,
-                HullAuthority.Object, new HostEpochPolicy(), members.Object, new BattleShipArrivals());
+                HullAuthority.Object, new HostEpochPolicy(), members.Object, Arrivals);
         }
 
         /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>.</summary>
