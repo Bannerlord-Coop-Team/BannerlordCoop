@@ -102,7 +102,12 @@ internal class ChangeGovernorHandler : IHandler
 
     private bool CanSenderManageClan(object sender, Clan clan)
     {
-        if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
+        if (!playerManager.TryGetSenderHero(sender, out var hero))
+        {
+            Logger.Warning("Ignoring a governor change for clan {ClanId} from a peer whose hero could not be found", clan?.StringId);
+            return false;
+        }
+        if (permissions.CanManageClan(hero, clan)) return true;
 
         Logger.Warning("Ignoring a governor change for clan {ClanId} from a peer that does not lead it", clan?.StringId);
         return false;

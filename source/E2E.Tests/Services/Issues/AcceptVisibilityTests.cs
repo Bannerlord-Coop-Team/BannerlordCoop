@@ -362,8 +362,7 @@ public class AcceptVisibilityTests : IDisposable
         });
 
         Assert.Empty(otherQuestCompletions);
-        var update = Assert.Single(otherUpdates);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
     }
 
     [Fact]
@@ -453,6 +452,9 @@ public class AcceptVisibilityTests : IDisposable
         StartLordSolutionOnTheOwner(ownerIssue, notableId);
         Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
 
+        Owner.Call(() => Owner.SimulateMessage(this, new NetworkIssueJournal(notableId, IssueId, false,
+            new[] { outcome == IssueOutcome.LordAcceptedCounterOffer
+                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog })));
         Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 

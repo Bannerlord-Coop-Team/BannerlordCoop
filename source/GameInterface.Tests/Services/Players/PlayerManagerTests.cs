@@ -205,6 +205,44 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void TryGetCurrentController_CurrentPeer_ReturnsController()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.True(playerManager.TryGetCurrentController(peer, out var controllerId));
+        Assert.Equal(ControllerId, controllerId);
+    }
+
+    [Fact]
+    public void TryGetCurrentController_StalePeerAfterReconnect_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var network = new TestNetwork();
+        var stalePeer = network.CreatePeer();
+        var currentPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, stalePeer);
+        playerManager.SetPeer(ControllerId, currentPeer);
+
+        Assert.False(playerManager.TryGetCurrentController(stalePeer, out var controllerId));
+        Assert.Null(controllerId);
+    }
+
+    [Fact]
+    public void TryGetCurrentController_UnregisteredPeer_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.TryGetCurrentController(new TestNetwork().CreatePeer(), out var controllerId));
+        Assert.Null(controllerId);
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);
