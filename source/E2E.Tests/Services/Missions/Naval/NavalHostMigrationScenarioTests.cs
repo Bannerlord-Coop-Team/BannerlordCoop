@@ -59,6 +59,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(42f, c.Hull(pirates[0]).Frame.origin.x, 3);
 
         c.Call(() => c.Instance.SimulateMessage(a.Network.NetPeer, lateSampleFromA));
+        battle.ApplyArrivals();
         Assert.Equal("not_authority", (string)c.Stream(pirates[0])["lastReject"]!);
         Assert.Equal(newHostSample.Sequence, (long)c.Stream(pirates[0])["accepted"]!);
     }

@@ -37,7 +37,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             Assert.Equal(BattleSideEnum.Attacker, peer.Hull(prize).Side);
             Assert.Equal(BattleSideEnum.None, peer.Hull(captorHull).Side);
             Assert.Equal(1L, (long)CaptureStats(peer)["applied"]!["capturesApplied"]!);
-            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+            Assert.Equal(1, peer.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
         }
 
         Assert.False(c.Hull(prize).IsCopy);
@@ -53,6 +53,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(12f, h.Hull(prize).Frame.origin.x, 3);
         Assert.Equal(12f, o.Hull(prize).Frame.origin.x, 3);
         o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, lateSampleFromH));
+        battle.ApplyArrivals();
         Assert.Equal("not_authority", (string)o.Stream(prize)["lastReject"]!);
 
         // A hit on the prize goes to the captor, and every client ends at its HP.
@@ -121,7 +122,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             Assert.Equal("A", peer.Ship(hullB).CaptorControllerId);
             Assert.Equal(BattleSideEnum.Attacker, peer.Hull(hullB).Side);
             Assert.True(peer.Ship(hullA).IsOrphaned);
-            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+            Assert.Equal(1, peer.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
         }
         Assert.True(b.Hull(hullB).IsCopy);
         Assert.False(a.Hull(hullB).IsCopy);
@@ -512,7 +513,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var enemy = EndTally(h, BattleSideEnum.Defender, liveHumans: 0);
         var players = EndTally(h, BattleSideEnum.Attacker, liveHumans: 3);
         Assert.Equal(0, enemy.Hulls);
-        Assert.Equal(2, h.Ships.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(2, h.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
         Assert.Equal(3, players.Hulls);
     }
 
@@ -607,7 +608,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(1, o.Ship(hullB).CaptureSequence);
         Assert.Equal(BattleSideEnum.Attacker, o.Hull(hullB).Side);
         Assert.True(o.Ship(hullA).IsOrphaned);
-        Assert.Equal(1, o.Ships.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(1, o.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
         Assert.True(a.Has(hullB));
     }
 
@@ -631,7 +632,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         battle.TickAll(3);
 
         Assert.Equal(0, EndTally(joiner, BattleSideEnum.Defender, liveHumans: 0).Hulls);
-        Assert.Equal(2, joiner.Ships.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(2, joiner.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
         Assert.Equal("C", joiner.Ship(pirates[1]).CaptorControllerId);
         Assert.True(joiner.Ship(pirates[0]).IsOrphaned);
     }
@@ -668,7 +669,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             Assert.Equal(1L, (long)applied["capturesApplied"]!);
             Assert.Empty(applied["heldConfirms"]!);
             Assert.Empty(applied["heldRecords"]!);
-            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+            Assert.Equal(1, peer.Services.HullLedger.DepartedHulls(BattleSideEnum.Defender));
             Assert.Equal(BattleShipCondition.Sunk, peer.Hull(pirates[0]).SinkingState);
         }
         Assert.True(h.Hull(pirates[1]).IsCopy);
