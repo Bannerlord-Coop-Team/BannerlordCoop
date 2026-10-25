@@ -309,6 +309,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             }
         });
         environment.FlushCoalescer();
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         Assert.Equal(IssueOutcome.AlternativeSolution,
             Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
