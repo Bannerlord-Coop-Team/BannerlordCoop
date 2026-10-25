@@ -39,6 +39,92 @@ public class IssueCancellationTests : IDisposable
         AssertFinalizedEverywhere();
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void PlayerDeathCancelsOnlyItsPersonalMirrorBeforeInheritance(bool dead, bool special)
+    {
+        scenario.Accept(scenario.ClientA);
+        var otherGiverId = environment.CreateRegisteredObject<Hero>();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(otherGiverId, out var otherGiver));
+            using (new AllowedThread())
+            {
+                owner._heroState = dead ? Hero.CharacterStates.Dead : Hero.CharacterStates.Active;
+                owner._partyBelongedTo = null;
+                var otherIssue = new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(otherGiver, null);
+                otherIssue.StringId = "bystander_issue";
+                otherIssue._issueState = IssueBase.IssueState.Ongoing;
+                Campaign.Current.IssueManager._issues.Add(otherGiver, otherIssue);
+                otherGiver.OnIssueCreatedForHero(otherIssue);
+                otherGiver.Issue.IssueQuest = new UnstartedQuest("bystander_mirror", otherGiver);
+                if (special) Giver().Issue.IssueQuest = new SpecialQuest("special_mirror", Giver());
+            }
+            Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(otherGiverId,
+                otherGiver.Issue.StringId, QuestScenario.ControllerB));
+            var quest = Giver().Issue.IssueQuest;
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            var calls = new List<(QuestBase, Hero, MobileParty, bool)>();
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(this, (completed, detail) =>
+                calls.Add((completed, Hero.MainHero, MobileParty.MainParty, AllowedThread.IsThisThreadAllowed())));
+            var previousHero = Hero.MainHero;
+            var previousParty = MobileParty.MainParty;
+            var cancellations = scenario.Server.Resolve<IIssueCancellationCoordinator>();
+            cancellations.CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
+            cancellations.CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
+            if (dead && !special)
+            {
+                var call = Assert.Single(calls);
+                Assert.Same(quest, call.Item1);
+                Assert.Same(owner, call.Item2);
+                Assert.Same(originalParty, call.Item3);
+                Assert.False(call.Item4);
+                Assert.True(quest.IsFinalized);
+                Assert.Null(Giver().Issue);
+            }
+            else
+            {
+                Assert.Empty(calls);
+                Assert.True(quest.IsOngoing);
+            }
+            Assert.True(otherGiver.Issue.IssueQuest.IsOngoing);
+            Assert.Same(previousHero, Hero.MainHero);
+            Assert.Same(previousParty, MobileParty.MainParty);
+        });
+        if (dead && !special) AssertFinalizedEverywhere();
+        else Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void PlayerDeathDoesNotReturnOrCancelPendingAlternativeTroops()
+    {
+        StageAlternative(environment.CreateRegisteredObject<Hero>(), environment.CreateRegisteredObject<CharacterObject>());
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            owner.ChangeState(Hero.CharacterStates.Dead);
+            owner._partyBelongedTo = null;
+            var issue = Giver().Issue;
+            scenario.Server.Resolve<IIssueCancellationCoordinator>()
+                .CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
+            Assert.Same(issue, Giver().Issue);
+            Assert.Equal(4, issue.AlternativeSolutionSentTroops.TotalManCount);
+            Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster());
+        });
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    private sealed class SpecialQuest : UnstartedQuest
+    {
+        public SpecialQuest(string questId, Hero giver) : base(questId, giver) { }
+        public override string SpecialQuestType => "succession-test";
+    }
+
     [Fact]
     public void CancelRunningIssueAnnouncesOnceAcrossNestedQuestCompletion()
     {
