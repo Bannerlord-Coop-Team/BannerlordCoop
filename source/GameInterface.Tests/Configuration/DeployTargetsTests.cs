@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using Xunit;
 
@@ -18,7 +17,7 @@ public class DeployTargetsTests : IDisposable
     {
         Directory.CreateDirectory(Path.Combine(root, "deploy"));
         Directory.CreateDirectory(Path.Combine(root, "game", "Modules"));
-        File.Copy(Path.Combine(FindRepoRoot(), "Deploy.targets"), Path.Combine(root, "Deploy.targets"));
+        File.Copy(Path.Combine(StubMsBuild.FindRepoRoot(), "Deploy.targets"), Path.Combine(root, "Deploy.targets"));
         File.WriteAllText(Path.Combine(root, "deploy", "SubModule.xml"), "<Module/>");
         File.WriteAllText(Path.Combine(root, "stub.proj"),
             "<Project><PropertyGroup><ModName>Coop</ModName>" +
@@ -63,31 +62,11 @@ public class DeployTargetsTests : IDisposable
         Assert.True(File.Exists(Path.Combine(module, "SubModule.xml")));
     }
 
-    /// <summary>Builds the stub project with dotnet msbuild and returns its output, failing the test on a build error.</summary>
+    /// <summary>Builds the stub project and returns its output, failing the test on a build error.</summary>
     private string Build(string extraArgument = "")
     {
-        var info = new ProcessStartInfo("dotnet", $"msbuild stub.proj -t:Build -nologo -nr:false {extraArgument}")
-        {
-            WorkingDirectory = root, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true,
-        };
-        foreach (string variable in new[] { "MSBuildExtensionsPath", "MSBUILD_EXE_PATH", "MSBuildSDKsPath" })
-            info.Environment.Remove(variable);
-
-        using var process = Process.Start(info)!;
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        Assert.True(process.WaitForExit(120000), "dotnet msbuild did not finish within two minutes");
-        string output = stdout.Result + stderr.Result;
-        Assert.True(process.ExitCode == 0, output);
+        var (exitCode, output) = StubMsBuild.Build(root, extraArgument);
+        Assert.True(exitCode == 0, output);
         return output;
-    }
-
-    /// <summary>Walks up from the test output folder to the checkout that holds Deploy.targets.</summary>
-    private static string FindRepoRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "Deploy.targets"))) directory = directory.Parent;
-        Assert.NotNull(directory);
-        return directory!.FullName;
     }
 }
