@@ -950,7 +950,7 @@ public class NavalShipEngine : INavalShipEngine
         if (previous != null && previous.WeaponState == state.WeaponState) return;
 
         var weaponState = (RangedSiegeWeapon.WeaponState)state.WeaponState;
-        SiegeMachineStateReplicator.PlayWeaponStateAnimation(siegeWeapon, weaponState);
+        RangedSiegeWeaponPresentation.PlayWeaponStateAnimation(siegeWeapon, weaponState);
         ShowLoadedProjectile(siegeWeapon,
             weaponState == RangedSiegeWeapon.WeaponState.Idle || weaponState == RangedSiegeWeapon.WeaponState.WaitingBeforeIdle);
     }
@@ -961,7 +961,7 @@ public class NavalShipEngine : INavalShipEngine
         var mission = Mission.Current;
         if (mission == null || !siegeWeapon.GameEntity.IsValid) return false;
 
-        shooter = shooter ?? SiegeWeaponFireReplicator.FindStandInShooter();
+        shooter = shooter ?? RangedSiegeWeaponPresentation.FindStandInShooter();
         var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
         if (shooter == null || missileItem == null) return false;
 
@@ -971,7 +971,7 @@ public class NavalShipEngine : INavalShipEngine
             shot.Orientation, shot.BaseSpeed, shot.Speed, addRigidBody: false, ignored);
         if (!playLaunchEffects) return true;
 
-        SiegeWeaponFireReplicator.PlayFireAnimation(siegeWeapon);
+        RangedSiegeWeaponPresentation.PlayFireAnimation(siegeWeapon);
         ShowLoadedProjectile(siegeWeapon, false);
         if (siegeWeapon.FireSoundIndex >= 0)
             SoundManager.StartOneShotEventWithIndex(siegeWeapon.FireSoundIndex, siegeWeapon.GameEntity.GetGlobalFrame().origin);
