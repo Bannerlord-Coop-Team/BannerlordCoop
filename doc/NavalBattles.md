@@ -139,8 +139,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   these change (R48 L6).
 - Samples go through the same queue, merged to one queued arrival per hull that applies the newest sample; a sample for a
   hull whose record still waits is held with the record. Station use is kept pending and applied by its replicator's tick.
-- Routed damage to AI hulls is stamped and checked with the host epoch whose hull move this client applied
-  (`IAppliedHostEpoch`), which trails the session's epoch by the queued move of a host change.
+- A local hit on an AI hull waits once behind a queued host change (the session's epoch is ahead of `IAppliedHostEpoch`)
+  and then goes to the hull's authority, so it reaches the successor. Hull conditions are stamped with the applied epoch.
 
 ### Deployment hold
 
