@@ -51,6 +51,71 @@ public class AlternativeEndingJournalReplayTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    [Fact]
+    public void AlternativeAcceptance_ReconcilesTheNativeHistoryWithoutRepeatingIssueUpdates()
+    {
+        var updates = new List<IssueBase.IssueUpdateDetails>();
+        scenario.ClientA.Call(() =>
+        {
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this,
+                (IssueBase issue, IssueBase.IssueUpdateDetails detail, Hero solver) => updates.Add(detail));
+            issues[scenario.ClientA]._journalEntries.Add(new JournalLog(new CampaignTime(999), new TextObject("Local acceptance")));
+            archives[scenario.ClientA].Update(issues[scenario.ClientA].JournalEntries,
+                IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest);
+        });
+        var text = new TextObject("{=acceptance_test}Troops for {PERSON}: {COUNT}", new Dictionary<string, object>
+        {
+            ["PERSON"] = new TextObject("Companion {NAME}", new Dictionary<string, object> { ["NAME"] = "Suvys" }),
+            ["COUNT"] = 3,
+            ["FRACTION"] = 1.5f,
+            ["OPTIONAL"] = null!,
+        });
+        var task = new TextObject("Return {DAYS}", new Dictionary<string, object> { ["DAYS"] = 4 });
+        var expected = new[]
+        {
+            new JournalLog(new CampaignTime(123), text, task, 2, 4),
+            new JournalLog(new CampaignTime(124), null!, null!, 3, 5),
+        };
+        var message = new NetworkAlternativeSolutionJournal(scenario.NotableId, QuestScenario.IssueId,
+            IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest,
+            expected.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray());
+        for (var delivery = 0; delivery < 2; delivery++)
+        {
+            scenario.ClientA.SimulateMessage(scenario.Server, message);
+            scenario.ClientB.SimulateMessage(scenario.Server, message);
+        }
+        Assert.Empty(updates);
+        AssertObserverHasNoArchive();
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issues[scenario.ClientA])));
+            Assert.Same(archives[scenario.ClientA], archive);
+            Assert.False(archive.IsEnded());
+            Assert.Equal(IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, archive._lastIssueStatus);
+            foreach (var entries in new[] { archive.GetEntries().ToArray(), issues[scenario.ClientA].JournalEntries.ToArray() })
+            {
+                Assert.Equal(expected.Length, entries.Length);
+                for (var index = 0; index < expected.Length; index++)
+                {
+                    Assert.Equal(expected[index].LogTime, entries[index].LogTime);
+                    Assert.Equal(expected[index].CurrentProgress, entries[index].CurrentProgress);
+                    Assert.Equal(expected[index].Range, entries[index].Range);
+                    Assert.Equal(expected[index].Type, entries[index].Type);
+                    Assert.Equal(expected[index].LogText?.Value, entries[index].LogText?.Value);
+                    Assert.Equal(expected[index].TaskName?.Value, entries[index].TaskName?.Value);
+                }
+                Assert.Equal(text.ToString(), entries[0].LogText.ToString());
+                var person = Assert.IsType<TextObject>(entries[0].LogText.Attributes["PERSON"]);
+                Assert.Equal("Suvys", person.Attributes["NAME"]);
+                Assert.Equal(3, entries[0].LogText.Attributes["COUNT"]);
+                Assert.Equal(1.5f, entries[0].LogText.Attributes["FRACTION"]);
+                Assert.Null(entries[0].LogText.Attributes["OPTIONAL"]);
+                Assert.Equal(4, entries[0].TaskName.Attributes["DAYS"]);
+            }
+        });
+    }
+
     [Theory]
     [InlineData(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest)]
     [InlineData(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest)]
