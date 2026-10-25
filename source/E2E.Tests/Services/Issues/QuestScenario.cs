@@ -21,6 +21,7 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
+    private readonly Func<EnvironmentInstance, Hero, IssueBase>? issueFactory;
 
     public string NotableId { get; }
     public Player PlayerA { get; }
@@ -38,6 +39,7 @@ internal sealed class QuestScenario
         Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null)
     {
         this.testEnvironment = testEnvironment;
+        issueFactory = createIssue;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
