@@ -40,7 +40,11 @@ internal class MerchantOutlawsAlternativeJournalPatches
     [HarmonyFinalizer]
     private static void DailyFinalizer(List<IssueBase> __state)
     {
-        if (__state != null) QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
+        if (__state == null) return;
+        foreach (var issue in __state.Where(issue =>
+                     (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays <= (int)CampaignTime.Now.ToDays))
+            issue._areIssueEffectsResolved = true;
+        QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
