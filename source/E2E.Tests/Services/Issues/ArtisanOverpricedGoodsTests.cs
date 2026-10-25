@@ -302,7 +302,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
                 issue.CompleteIssueWithCancel(text);
-                Server.Resolve<IOutcomeDispatcher>().After(issue, IssueOutcome.QuestCancel);
             }
             Assert.Equal(2, issue.JournalEntries.Count);
             Assert.Single(issue.JournalEntries, log => log.LogText.ToString() == expected);
