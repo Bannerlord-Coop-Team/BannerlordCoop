@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Missions.Battles;
 using Missions.Naval;
+using Moq;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -20,6 +21,34 @@ public class CoopNavalBattleEndLogicTests
     public void OutcomeOf_MapsTheSharedResultOntoTheLocalPlayersSide(BattleState state, BattleSideEnum playerSide, NavalBattleOutcome expected)
     {
         Assert.Equal(expected, CoopNavalBattleEndLogic.OutcomeOf(state, playerSide));
+    }
+
+    // R49 bug 4: the hero was the side's last living human, so its death depleted the side and ended the battle that second.
+    [Fact]
+    public void DefeatsSide_DepletedSideWhoseHeroGraceRuns_IsHeld()
+    {
+        var grace = new Mock<INavalPlayerHeroGrace>();
+        grace.Setup(g => g.HasExpired(BattleSideEnum.Attacker, 12f)).Returns(false);
+
+        Assert.False(CoopNavalBattleEndLogic.DefeatsSide(depleted: true, grace.Object, BattleSideEnum.Attacker, now: 12f));
+    }
+
+    [Fact]
+    public void DefeatsSide_DepletedSideOnceTheGraceIsOver_Loses()
+    {
+        var grace = new Mock<INavalPlayerHeroGrace>();
+        grace.Setup(g => g.HasExpired(BattleSideEnum.Attacker, 31f)).Returns(true);
+
+        Assert.True(CoopNavalBattleEndLogic.DefeatsSide(depleted: true, grace.Object, BattleSideEnum.Attacker, now: 31f));
+    }
+
+    [Fact]
+    public void DefeatsSide_SideWithTroopsLeft_NeverLoses()
+    {
+        var grace = new Mock<INavalPlayerHeroGrace>();
+        grace.Setup(g => g.HasExpired(It.IsAny<BattleSideEnum>(), It.IsAny<float>())).Returns(true);
+
+        Assert.False(CoopNavalBattleEndLogic.DefeatsSide(depleted: false, grace.Object, BattleSideEnum.Defender, now: 31f));
     }
 
     // M8a: vanilla reads a side with no hull as retreated; in coop that stands only once that side's hulls left with their

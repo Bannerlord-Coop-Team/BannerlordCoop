@@ -71,6 +71,8 @@ public class NavalVsPiratesScenarioTests : NavalBattleTestEnvironment
         long latest = a.SentSamples(hullA).Last().Sequence;
 
         a.Call(() => a.Network.SendAll(firstSample));
+        // A received sample applies with the arrivals of the receiver's next tick.
+        battle.ApplyArrivals();
 
         Assert.Equal("stale", (string)b.Stream(hullA)["lastReject"]!);
         Assert.Equal(10f, b.Hull(hullA).Frame.origin.x, 3);

@@ -47,6 +47,7 @@ public class NavalCrewBeforeHullScenarioTests : NavalBattleTestEnvironment
         var a = battle["A"];
         var b = battle["B"];
         b.Engine.FailingForeignSpawns = int.MaxValue;
+        battle.ExpectLoggedFailure("Could not spawn hull");
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
         var crewId = Guid.NewGuid();
         SendCrew(battle, a, pirate, crewId);

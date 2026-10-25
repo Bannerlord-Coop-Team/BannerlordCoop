@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using Common.Commands;
+using Missions.Agents;
 using Missions.Battles;
 using NavalDLC.Missions.Objects;
 using System;
@@ -23,6 +24,7 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
 
     private readonly INavalShipEngine engine;
 
+    // The engine finds the hull the main agent stands on.
     public NavalBoardCopyCoopCommand(INavalShipEngine engine)
     {
         this.engine = engine;
@@ -107,7 +109,9 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
         return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
             "NAVAL_BOARD ship={0} owner={1} spot={2} deckError={3:0.00} m heightAboveSpot={4:0.00} m; the stepped hull resolves " +
             "on the next tick (board_copy status), and coop.debug.naval.inspect on {1} reports the puppet's maxDeckError",
-            ship.ShipId, ship.CurrentAuthority, spotName, DeckError(hullFrame, spot.origin, position), position.z - spot.origin.z));
+            ship.ShipId, ship.CurrentAuthority, spotName,
+            NavalDeckTarget.HorizontalError(hullFrame, hullFrame.TransformToLocalNonOrthogonal(spot.origin), position),
+            position.z - spot.origin.z));
     }
 
     // Vanilla's deck spots: the player standing point NavalShipAgents teleports Agent.Main to, else the middle inner deck
@@ -136,13 +140,6 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
             "NAVAL_BOARD_STATUS supportShip={0} owner={1} copy={2} local=({3:0.00}, {4:0.00}, {5:0.00})",
             ship.ShipId, ship.CurrentAuthority, NavalForeignHulls.Contains(support), local.x, local.y, local.z));
     }
-
-    /// <summary>
-    /// The horizontal distance in metres between the deck spot and the agent, measured in the hull's frame as the deck
-    /// interpolator's <c>NavalDeckTarget.HorizontalError</c> does.
-    /// </summary>
-    internal static float DeckError(in MatrixFrame hull, Vec3 spot, Vec3 position) =>
-        (hull.TransformToLocalNonOrthogonal(position) - hull.TransformToLocalNonOrthogonal(spot)).AsVec2.Length;
 
     // A failed command result with output.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");

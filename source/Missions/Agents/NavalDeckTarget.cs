@@ -13,6 +13,7 @@ public delegate bool NavalDeckFrameResolver(Agent agent, Guid deckShip, out Matr
 /// </summary>
 internal readonly struct NavalDeckTarget
 {
+    // Keeps the pose and the owner's world directions relative to the hull frame they were received against.
     public NavalDeckTarget(Guid ship, Vec3 local, in MatrixFrame receiveHull, Vec2 worldMovementDirection,
         Vec3 worldLookDirection)
     {
@@ -29,8 +30,10 @@ internal readonly struct NavalDeckTarget
     public Vec3 LocalMovementDirection { get; }
     public Vec3 LocalLookDirection { get; }
 
+    // The pose's world position on the hull's current frame.
     public Vec3 ResolvePosition(in MatrixFrame hull) => hull.TransformToParent(Local);
 
+    // The owner's movement direction on the hull's current frame, or zero when it has none.
     public Vec2 ResolveMovementDirection(in MatrixFrame hull)
     {
         Vec2 direction = hull.rotation.TransformToParent(LocalMovementDirection).AsVec2;
@@ -39,12 +42,18 @@ internal readonly struct NavalDeckTarget
         return direction;
     }
 
+    // The owner's look direction on the hull's current frame.
     public Vec3 ResolveLookDirection(in MatrixFrame hull)
     {
         Vec3 look = hull.rotation.TransformToParent(LocalLookDirection);
         return look.LengthSquared <= 0.0001f ? look : look.NormalizedCopy();
     }
 
-    public float HorizontalError(in MatrixFrame hull, Vec3 position) =>
-        (hull.TransformToLocalNonOrthogonal(position) - Local).AsVec2.Length;
+    // How far a puppet at the world position stands from this pose, measured on the hull's deck plane.
+    public float HorizontalError(in MatrixFrame hull, Vec3 position) => HorizontalError(hull, Local, position);
+
+    /// <summary>The horizontal distance between a hull-local spot and a world position, measured in the hull's frame so height
+    /// above the deck doesn't count.</summary>
+    internal static float HorizontalError(in MatrixFrame hull, Vec3 local, Vec3 position) =>
+        (hull.TransformToLocalNonOrthogonal(position) - local).AsVec2.Length;
 }

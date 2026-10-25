@@ -203,18 +203,22 @@ namespace Missions.Agents.Packets
         [ProtoIgnore]
         public System.Guid DeckShip { get; private set; }
 
+        // Whether a received deck pose names a hull in its packet's table and carries a finite pose.
         internal bool HasValidDeck => DeckShipIndex >= 1 && DeckShip != System.Guid.Empty && DeckLocal.IsValid
             && Position.IsValid && LookDirection.IsValid && MovementDirection.IsValid
             && !float.IsNaN(Speed) && !float.IsInfinity(Speed) && Speed >= 0f;
 
-        // Speed becomes deck-relative so the puppet throttle excludes hull motion.
-        internal void StampDeck(System.Guid deckShip, int deckShipIndex, Vec3 deckLocal, float deckSpeed)
+        // Captured once per sample, so the send decision compares it; speed becomes deck-relative so the puppet throttle
+        // excludes hull motion.
+        internal void CaptureDeck(System.Guid deckShip, Vec3 deckLocal, float deckSpeed)
         {
             DeckShip = deckShip;
-            DeckShipIndex = deckShipIndex;
             DeckLocal = deckLocal;
             Speed = deckSpeed;
         }
+
+        // The deck pose's 1-based index into the hull table of the packet that carries it.
+        internal void IndexDeck(int deckShipIndex) => DeckShipIndex = deckShipIndex;
 
         // An index outside the table leaves DeckShip empty, so the pose is rejected rather than read as world.
         internal void ResolveDeckShip(System.Guid[] deckShips)

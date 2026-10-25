@@ -42,27 +42,29 @@ public interface INetworkShipRegistry
     /// <summary>Records a ship id that left the mission before its hull registered here, so it never spawns or buffers again.</summary>
     void MarkRemoved(Guid shipId);
 
-    /// <summary>Records another owner's hull whose spawn record waits here; registering it, or giving up on it, ends the wait.</summary>
-    void MarkAwaiting(Guid shipId);
+    /// <summary>
+    /// A fresh spawn record waits for a ship whose spawn was given up, so the buffers waiting for its hull hold its traffic
+    /// again; any other state stays.
+    /// </summary>
+    void RetrySpawn(Guid shipId);
 
     /// <summary>Records a foreign hull this client gave up spawning, so its buffered crew is dropped; registering it clears this.</summary>
     void MarkSpawnFailed(Guid shipId);
 
-    /// <summary>[Game thread] Where a ship id is in its local lifecycle, polled by every buffer that waits for a hull.</summary>
+    /// <summary>[Game thread] Where a ship id is in its local lifecycle.</summary>
     ShipLifecycle StateOf(Guid shipId);
 
     /// <summary>
     /// [Game thread] Whether traffic for a ship id that is not registered can be dropped: its spawn was given up or it left the
-    /// mission. The one check every buffer that waits for a hull uses.
+    /// mission. The crew, station, weapon and capture buffers wait for a hull on this check.
     /// </summary>
     bool IsGone(Guid shipId);
 }
 
-/// <summary>A ship id's local lifecycle: its spawn record waits, it is registered, its spawn was given up, or it left the mission.</summary>
+/// <summary>A ship id's local lifecycle: not seen as a hull yet, registered, its spawn was given up, or it left the mission.</summary>
 public enum ShipLifecycle
 {
     Unknown,
-    Awaiting,
     Registered,
     SpawnFailed,
     Removed,
@@ -221,7 +223,10 @@ public class NetworkShipRegistry : INetworkShipRegistry
         return true;
     }
 
-    public void MarkAwaiting(Guid shipId) => MarkUnregistered(shipId, ShipLifecycle.Awaiting);
+    public void RetrySpawn(Guid shipId)
+    {
+        if (unregistered.TryGetValue(shipId, out var state) && state == ShipLifecycle.SpawnFailed) unregistered.Remove(shipId);
+    }
 
     public void MarkSpawnFailed(Guid shipId) => MarkUnregistered(shipId, ShipLifecycle.SpawnFailed);
 

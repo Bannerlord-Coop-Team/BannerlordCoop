@@ -49,20 +49,20 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             isHost = controller.Session.IsLocalHost,
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalSetupGuard>()?.ReservePresent,
-            shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
-            shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipCaptureReplicator.Inspect(),
-            shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipDamageRouter.Inspect(),
+            shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipReplicator.Inspect(),
+            shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipCaptureReplicator.Inspect(),
+            shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipDamageRouter.Inspect(),
             shipDamageGate = NavalShipDamageGate.Inspect(),
 #if DEBUG
             // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
             copyProbe = mission.GetMissionBehavior<NavalCopyProbeLogic>()?.Inspect(),
 #endif
-            shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipWeaponReplicator.Inspect(),
+            shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipWeaponReplicator.Inspect(),
             shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
             hostEpoch = controller.Session.HostEpoch,
             npcFleet = InspectNpcFleet(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
             end = mission.GetMissionBehavior<CoopNavalBattleEndLogic>()?.Inspect(),
-            stationUse = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.StationUseReplicator.Inspect(),
+            stationUse = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.StationUseReplicator.Inspect(),
             agents = InspectAgents(mission, controller.MissionComponent, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
             mainAgent = Agent.Main?.Character?.StringId,
             mainAgentUsing = Agent.Main?.CurrentlyUsedGameObject is UsableMissionObject used ? used.GameEntity.Name : null,
@@ -99,7 +99,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
     {
         if (naval == null || !controller.MissionComponent.ShipRegistry.TryGetByHull(ship, out var info)) return null;
 
-        return naval.FateReporter.FatesSentOf(info.ShipId);
+        return naval.Services.FateReporter.FatesSentOf(info.ShipId);
     }
 #endif
 
@@ -112,7 +112,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
         return new
         {
             spawner = naval?.NpcFleetSpawner.Inspect(),
-            migrationReserve = naval?.MigrationReserveFielder.Inspect(),
+            migrationReserve = naval?.Services.MigrationReserveFielder.Inspect(),
             isLocalHost = controller.Session.IsLocalHost,
             hulls = hulls.Length,
             sinkingOrSunk = hulls.Length - afloat.Length,
@@ -133,7 +133,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             if ((ship?.Hull as MissionShip)?.IsSunk == true) ship = null;
             Guid deckShip = Guid.Empty;
             Vec3 deckLocal = Vec3.Zero;
-            bool onDeck = naval != null && naval.DeckPoses.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
+            bool onDeck = naval != null && naval.Services.DeckPoses.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
             return (object)new
             {
                 name = agent.Name,
@@ -145,9 +145,9 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 shipOwner = ship?.CurrentAuthority,
                 deckShip = onDeck ? (Guid?)deckShip : null,
                 deckLocal = onDeck ? deckLocal.ToString() : null,
-                station = naval?.StationUseReplicator.DescribeStation(agent),
+                station = naval?.Services.StationUseReplicator.DescribeStation(agent),
                 seatLock = agent.MovementLockedState.ToString(),
-                ownSeat = info != null && naval != null && naval.StationUseReplicator.IsOwnSeat(info.AgentId),
+                ownSeat = info != null && naval != null && naval.Services.StationUseReplicator.IsOwnSeat(info.AgentId),
             };
         })
         .ToArray();

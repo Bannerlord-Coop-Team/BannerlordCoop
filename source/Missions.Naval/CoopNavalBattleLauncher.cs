@@ -42,6 +42,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleLauncher>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly IBattleNetwork network;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
@@ -54,7 +55,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     // A fresh failure log per behaviour, so each counts its own throws.
     private readonly Func<INavalTickFailureLog> tickFailureLogs;
     private readonly IAsyncAgentTick asyncAgentTick;
-    private readonly INavalFormationTacticRefresh tacticRefresh;
+    private readonly INavalLateHullDeployment lateHullDeployment;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -63,6 +64,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
+        IBattleNetwork network,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
@@ -75,7 +77,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IPlayerManager playerManager,
         Func<INavalTickFailureLog> tickFailureLogs,
         IAsyncAgentTick asyncAgentTick,
-        INavalFormationTacticRefresh tacticRefresh
+        INavalLateHullDeployment lateHullDeployment
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -91,13 +93,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.playerManager = playerManager;
         this.tickFailureLogs = tickFailureLogs;
         this.asyncAgentTick = asyncAgentTick;
-        this.tacticRefresh = tacticRefresh;
+        this.lateHullDeployment = lateHullDeployment;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
@@ -139,8 +142,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
         SplitPlayerSideParties(sideParties, PartyBase.MainParty,
             out var ownMapEventParty, out var ownTeamParties, out var allyTeamParties);
+        var playerParties = GetPlayerParties();
         NavalPlayerDeploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
-            sideParties.Select(party => party.Party), PartyBase.MainParty, GetPlayerParties().Contains);
+            sideParties.Select(party => party.Party), PartyBase.MainParty, playerParties.Contains);
+        NavalPlayerDeploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
+            sideParties.Select(party => party.Party), playerParties.Contains);
         deploymentModel.GetShipDeploymentLimitsOfPlayerTeams(ownTeamParties, allyTeamParties,
             out var ownTeamLimit, out var allyTeamLimit);
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
@@ -159,9 +165,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             0,
         };
 
-        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank} ownShips={ShipCount} " +
+        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank}/{PlayerCount} ownShips={ShipCount} " +
             "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
-            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
+            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, NavalPlayerDeploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
             string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
@@ -246,13 +252,13 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
-        var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
+        var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
-            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tacticRefresh));
+            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ShipReplicator, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
-            npcFleetSpawner, services.ShipReplicator, tallyReader,
+            npcFleetSpawner, services.HullLedger, tallyReader,
             new NavalPlayerHeroGrace(context.Session, context.MissionContext, playerManager, objectManager)));
     }
 

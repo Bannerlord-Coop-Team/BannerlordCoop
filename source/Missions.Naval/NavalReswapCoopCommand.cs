@@ -37,7 +37,7 @@ public sealed class NavalReswapCoopCommand : ICoopCommand
         if (args == null || args.Count != 1) return Failed("Usage: coop.debug.naval.reswap <shipId-prefix>");
 
         var error = TryResolveShipId(controller.MissionComponent.ShipRegistry.Ships.Select(ship => ship.ShipId), args[0], out var shipId)
-            ?? naval.ShipReplicator.ReplaceNpcHull(shipId);
+            ?? naval.Services.ShipReplicator.ReplaceNpcHull(shipId);
         if (error != null) return Failed(error);
 
         return new CoopCommandResult(true, "NAVAL_RESWAP ship=" + shipId + " queued: phases ParkAgents, ReplaceHull, BoardAgents " +

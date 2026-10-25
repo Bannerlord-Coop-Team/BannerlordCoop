@@ -665,7 +665,7 @@ public class BattleShipCaptureReplicatorTests
         var applied = harness.Inspect()["applied"]!;
         Assert.Equal(1L, (long)applied["duplicateConfirms"]!);
         Assert.Equal(1L, (long)applied["captureConflicts"]!);
-        Assert.Equal(1, harness.Ships.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
     }
 
     // C3: a confirm for a hull whose record still waits here (a joiner deploying for longer than any timer) applies once the
@@ -676,7 +676,6 @@ public class BattleShipCaptureReplicatorTests
         var harness = new Harness();
         var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
         var prizeId = Guid.NewGuid();
-        harness.Registry.MarkAwaiting(prizeId);
 
         harness.Applier.AcceptConfirm(new NetworkShipCaptured(prizeId, Captor, captorShip.ShipId, Host, 1, 0, 0));
         for (int second = 0; second < 120; second++)
@@ -779,10 +778,10 @@ public class BattleShipCaptureReplicatorTests
 
         harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Host));
 
-        Assert.Equal(1, harness.Ships.DepartedHulls(BattleSideEnum.Defender));
-        Assert.Equal(0, harness.Ships.DepartedHulls(BattleSideEnum.Attacker));
+        Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Attacker));
 #if COOP_NAVAL
-        Assert.True(global::Missions.Naval.CoopNavalBattleEndLogic.KeepsRetreat(harness.Ships.DepartedHulls(BattleSideEnum.Defender),
+        Assert.True(global::Missions.Naval.CoopNavalBattleEndLogic.KeepsRetreat(harness.Ledger.DepartedHulls(BattleSideEnum.Defender),
             hullsLeft: 0));
 #endif
     }
@@ -837,6 +836,7 @@ public class BattleShipCaptureReplicatorTests
         public BattleShipArrivals Arrivals { get; } = new BattleShipArrivals();
         public BattleShipReplicator Ships { get; }
         public ShipCaptureApplier Applier { get; }
+        public NavalSideHullLedger Ledger { get; }
         public BattleShipCaptureReplicator Exchange { get; }
         private readonly Dictionary<MissionObject, BattleSideEnum> sides = new Dictionary<MissionObject, BattleSideEnum>();
         private int hostEpoch = 1;
@@ -874,17 +874,14 @@ public class BattleShipCaptureReplicatorTests
 
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
-            var epochs = new HostEpochPolicy();
-            var context = new BattleContext(Session.Object, Mock.Of<IBattleDeploymentCoordinator>(), component.Object, epochs,
-                Mock.Of<IBattleResultCommitter>(), Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(),
-                Mock.Of<IBattlePartyWithdrawal>());
-            HullAuthority = new NavalHullAuthority(Session.Object, component.Object, Engine.Object, context.TroopWithdrawal);
-            Ships = new BattleShipReplicator(Network.Object, Broker, context, Engine.Object, Mock.Of<IBattleTeamResolver>(),
-                Mock.Of<IObjectManager>(), HullAuthority,
-                new BattleShipConditionStream(Network.Object, Session.Object, Engine.Object, epochs, members.Object),
-                Mock.Of<IAgentStationUseReplicator>(), CaptureEngine.Object, Arrivals);
+            var context = ShipReplicatorFixture.Context(Session.Object, component.Object, members.Object);
+            var core = new ShipReplicatorFixture(context, Broker, Engine.Object, Network.Object, captureEngine: CaptureEngine.Object,
+                arrivals: Arrivals);
+            HullAuthority = core.HullAuthority;
+            Ships = core.Replicator;
+            Ledger = core.Ledger;
             Applier = new ShipCaptureApplier(Network.Object, Relay.Object, Broker, context, Engine.Object, CaptureEngine.Object, Ships,
-                HullAuthority, Arrivals);
+                HullAuthority, Arrivals, Ledger);
             Exchange = new BattleShipCaptureReplicator(Network.Object, Broker, context, Engine.Object, CaptureEngine.Object,
                 HullAuthority, Applier, Arrivals);
             Broker.Subscribe<SendInformationMessage>(Handle_Told);
@@ -917,7 +914,7 @@ public class BattleShipCaptureReplicatorTests
         {
             hostEpoch = epoch;
             host = newHost;
-            Ships.TransferHostHulls(newHost);
+            Ships.TransferHostHulls(newHost, epoch);
         }
 
         public JObject Inspect() => JObject.FromObject(Exchange.Inspect());
