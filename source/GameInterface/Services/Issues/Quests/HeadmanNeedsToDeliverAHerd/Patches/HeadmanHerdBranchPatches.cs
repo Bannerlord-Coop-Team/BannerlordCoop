@@ -1,6 +1,11 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem.Roster;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd.Patches;
@@ -31,6 +36,29 @@ internal class HeadmanHerdBranchPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCompleteWithSuccess))]
     [HarmonyPrefix]
     private static bool SuccessPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnCompleteWithSuccess))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> SuccessTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var enumerator = AccessTools.Method(typeof(ItemRoster), nameof(ItemRoster.GetEnumerator));
+        var snapshot = AccessTools.Method(typeof(Enumerable), nameof(Enumerable.ToArray)).MakeGenericMethod(typeof(ItemRosterElement));
+        var snapshotEnumerator = AccessTools.Method(typeof(IEnumerable<ItemRosterElement>), nameof(IEnumerable<ItemRosterElement>.GetEnumerator));
+        var replaced = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(enumerator))
+            {
+                // Depleting a stack swaps the last element into its slot, which live enumeration skips.
+                yield return new CodeInstruction(OpCodes.Call, snapshot).MoveLabelsFrom(instruction).MoveBlocksFrom(instruction);
+                instruction.opcode = OpCodes.Callvirt;
+                instruction.operand = snapshotEnumerator;
+                replaced++;
+            }
+            yield return instruction;
+        }
+        if (replaced != 1) throw new InvalidOperationException("The herd success no longer enumerates the item roster once");
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFailed))]
     [HarmonyPrefix]
