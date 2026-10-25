@@ -95,7 +95,7 @@ public class HeadmanHerdAlternativeProgressTests
                 var roster = Get<MobileParty>(scenario.Server, pair.Item1.MobilePartyId).MemberRoster;
                 roster.AddToCounts(Get<Hero>(scenario.Server, pair.Item2).CharacterObject, 1);
                 roster.AddToCounts(Get<CharacterObject>(scenario.Server, troop), 8);
-                roster.AddXpToTroop(1250, Get<CharacterObject>(scenario.Server, troop));
+                roster.AddXpToTroop(Get<CharacterObject>(scenario.Server, troop), 1250);
             }
         });
         herd.environment.FlushCoalescer();
