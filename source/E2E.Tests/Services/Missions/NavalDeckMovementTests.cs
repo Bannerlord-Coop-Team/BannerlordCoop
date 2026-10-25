@@ -285,7 +285,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
     }
 
     // S13 D3 (R43: one puppet teleported 2034 times): a deck puppet out of reach teleports once per owner update, then walks.
-    // Each 7 m hull move is past the 6 m snap and under the DEBUG large-error log, which reads native state.
+    // The puppet stays 7 m off its target, past the 6 m snap and under the DEBUG large-error log, which reads native state.
     [Fact]
     public void DeckPuppet_TeleportsAtMostOncePerOwnerUpdate()
     {
@@ -293,15 +293,14 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         WithReceiver(fixture, receiver =>
         {
             receiver.Receive(receiver.Data(true, Vec3.Zero));
-            for (int i = 0; i < 3; i++)
-            {
-                receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
-                receiver.Tick();
-            }
+            receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
+            receiver.Tick();
+            receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
+            receiver.Tick();
+            receiver.Tick();
             int afterOneUpdate = receiver.Mirror.TeleportToPositionCalls;
 
             receiver.Receive(receiver.Data(true, Vec3.Zero));
-            receiver.MoveHull(0f, new Vec3(7f, 0f, 0f));
             receiver.Tick();
 
             Assert.Equal(1, afterOneUpdate);
