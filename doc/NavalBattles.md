@@ -680,12 +680,11 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   record until the owner is a member (log `Holding hull ... until it is a mission member`) and drops one from a departed
   owner (`Dropped hull record ... of departed ...`). A station use from a sender that isn't a member yet waits under its
   10 s pending lifetime; weapon catch-up may hit the same ordering gap. The relay ordering itself is unchanged. The hold is not hit live yet: in R41a-3 the race didn't occur.
-- **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (partly done, capture P0).** Hulls fielded after
-  deployment (AI fleet, copies, swap replacements) now get the weapon AI, the helm's `OnDeploymentFinished` (standing
-  point components, enemy helm AI-only, the logics its vacancy check reads) and `CrewSizeOnMainDeck`
-  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap carries the old hull's ammo over, one bolt fewer when caught mid-reload since the fresh weapon spawns loaded), the anchor, wake and flotsam, the
-  rope, oar, climbing and ammo barrel machines' standing point setup, and `IsDeployed`. The capture side is done: a fresh
-  enemy copy's helm opens to the player (section 2, "Capture"), and capture replicates.
+- **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (done, not live-checked).** Hulls fielded after
+  deployment (AI fleet, copies, swap replacements) get vanilla's whole `MissionShip.OnDeploymentFinished` once, from
+  `NavalShipsLogic.ShipSpawnedEvent` (`NavalLateHullDeployment`). A swap sets the carried ammo after the spawn, and a copy
+  takes the replicated ammo. Live check: a climb interrupted on an AI-fleet hull, an AI rope throw, an oar seat on a copy.
+  The capture side is done: a fresh enemy copy's helm opens to the player (section 2, "Capture"), and capture replicates.
 - **Capture limits (not live yet, R46).**
   - The captor's prompt reads vacancy on its copy, where puppets swim on local water and the reserve reads 0, so it may
     show a hull vacant that its authority then refuses (`NotVacant`); the authority's verdict is the one that counts.
@@ -705,8 +704,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - A PvP victim's formation keeps vanilla's record pointing at the captor's orphan, so a later reinforcement of the victim
     would target a copy; its client logs a warning when its hull is captured.
 - **Weapon target lists are snapshots (follow-up B, fixed R46).** A ballista lists its ship targets once, at its own
-  deployment (`ThreatSeeker.InitializeTargetableObjects`); `LateHullDeploymentPatch` now refreshes every fielded hull's list
-  when a later hull spawns, so co-op hulls arriving after deployment are targets as in vanilla.
+  deployment (`ThreatSeeker.InitializeTargetableObjects`); `NavalLateHullDeployment` refreshes every fielded hull's list
+  on the mission tick after a later hull spawns, so co-op hulls arriving after deployment are targets as in vanilla.
 - **A captured prize's ballista may stay idle (vanilla).** `GetAllThreats` drops a target on the weapon's own side for good,
   so before the capture the prize's ballista already dropped its old side's hulls; after it (`RangedSiegeWeapon.OnShipCaptured`
   only sets `DefaultSide`) it can't target its new enemies' hulls and skips formations in melee, as in singleplayer. Unlike

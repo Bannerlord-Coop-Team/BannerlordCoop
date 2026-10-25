@@ -118,7 +118,7 @@ public class NavalShipEngine : INavalShipEngine
         return ship;
     }
 
-    // The late hull patch made an enemy copy's helm AI-only, and vanilla only opens it to the player when a unit leaves its
+    // The late hull deployment made an enemy copy's helm AI-only, and vanilla only opens it to the player when a unit leaves its
     // formation; a copy's formation may never get one here (a late joiner's emptied AI hull), and puppets never pick a station.
     private static void OpenEmptyEnemyHelm(MissionShip ship, Team playerTeam)
     {

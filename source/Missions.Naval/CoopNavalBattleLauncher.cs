@@ -42,6 +42,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleLauncher>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly IBattleNetwork network;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
@@ -54,7 +55,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     // A fresh failure log per behaviour, so each counts its own throws.
     private readonly Func<INavalTickFailureLog> tickFailureLogs;
     private readonly IAsyncAgentTick asyncAgentTick;
-    private readonly INavalFormationTacticRefresh tacticRefresh;
+    private readonly INavalLateHullDeployment lateHullDeployment;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -63,6 +64,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
+        IBattleNetwork network,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
@@ -75,7 +77,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IPlayerManager playerManager,
         Func<INavalTickFailureLog> tickFailureLogs,
         IAsyncAgentTick asyncAgentTick,
-        INavalFormationTacticRefresh tacticRefresh
+        INavalLateHullDeployment lateHullDeployment
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -91,13 +93,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.playerManager = playerManager;
         this.tickFailureLogs = tickFailureLogs;
         this.asyncAgentTick = asyncAgentTick;
-        this.tacticRefresh = tacticRefresh;
+        this.lateHullDeployment = lateHullDeployment;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
@@ -249,10 +252,10 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
-        var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
+        var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
-            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), tacticRefresh));
+            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ShipReplicator, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.HullLedger, tallyReader,
