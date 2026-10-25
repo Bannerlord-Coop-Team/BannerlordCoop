@@ -85,8 +85,6 @@ public class GameInterfaceModule : Module
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 
-    private static readonly ILogger Logger = LogManager.GetLogger<GameInterfaceModule>();
-
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
@@ -248,21 +246,12 @@ public class GameInterfaceModule : Module
         base.Load(builder);
     }
 
-    // Test hosts don't ship Coop.Naval.dll, so skip it instead of failing the whole container build
+    // Loads Coop.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)
     {
-        var directory = Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location);
-        var path = Path.Combine(directory, CoopNavalAssemblyName + ".dll");
-
-        if (!File.Exists(path))
-        {
-            Logger.Error("NavalDLC is active but {Path} was not found, naval campaign services are disabled", path);
-            assembly = null;
-            return false;
-        }
-
-        assembly = Assembly.LoadFrom(path);
-        return true;
+        var path = Path.Combine(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location), ModInformation.CoopNavalAssemblyFile);
+        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        return assembly != null;
     }
 
     // Log injector
