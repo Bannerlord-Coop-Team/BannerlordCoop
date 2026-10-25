@@ -97,6 +97,11 @@ internal class PartyScreenLogicPatches
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ResetPrisonerDonationRequest();
+        var partyScreenMode = __instance._partyScreenMode;
+        if (Game.Current.GameStateManager.ActiveState is PartyState activePartyState)
+        {
+            partyScreenMode = activePartyState.PartyScreenMode;
+        }
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
@@ -109,12 +114,6 @@ internal class PartyScreenLogicPatches
             foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
             {
                 recruitedPrisonersRoster.Add(tuple.Item1, tuple.Item2, 0);
-            }
-
-            var partyScreenMode = __instance._partyScreenMode;
-            if (Game.Current.GameStateManager.ActiveState is PartyState partyState)
-            {
-                partyScreenMode = partyState.PartyScreenMode;
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
