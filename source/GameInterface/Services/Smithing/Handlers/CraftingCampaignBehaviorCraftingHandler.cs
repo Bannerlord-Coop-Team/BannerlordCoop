@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
@@ -32,6 +33,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
     private readonly ISendCoalescer sendCoalescer;
 
     public CraftingCampaignBehaviorCraftingHandler(
@@ -40,6 +42,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -47,6 +50,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         this.network = network;
         this.playerManager = playerManager;
         this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
+        this.statisticsInterface = statisticsInterface;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<DoSmelting>(Handle_DoSmelting);
@@ -316,6 +320,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<ItemObject>(craftedItemId, out var craftedItem)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
+
+        statisticsInterface.OnNewItemCrafted(playerHero, craftedItem, !data.IsFreeMode);
 
         float gainedXp;
         if (data.IsFreeMode)

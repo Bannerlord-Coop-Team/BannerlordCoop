@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Caravans;
+﻿using GameInterface.Services.CampaignService.Statistics;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -39,6 +40,8 @@ internal static class CoopSessionMigrationRules
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
+
+        PreserveWithMigration.Add(AccessTools.Property(typeof(StatisticsPlayerData), nameof(StatisticsPlayerData.PlayerStatistics)));
 
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));

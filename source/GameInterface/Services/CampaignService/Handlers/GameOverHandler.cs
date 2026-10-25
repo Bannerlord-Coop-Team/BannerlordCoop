@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.CampaignService.Messages;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.HeirSelection.Handlers;
 using GameInterface.Services.ObjectManager;
@@ -31,17 +32,20 @@ internal class GameOverHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly HeirSelectionHandler heirSelectionHandler;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
 
     public GameOverHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         PlayerDeathCutsceneHandler cutscenesHandler,
-        HeirSelectionHandler heirSelectionHandler)
+        HeirSelectionHandler heirSelectionHandler,
+        IStatisticsCampaignBehaviorInterface statisticsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.cutscenesHandler = cutscenesHandler;
         this.heirSelectionHandler = heirSelectionHandler;
+        this.statisticsInterface = statisticsInterface;
 
         messageBroker.Subscribe<NetworkClientGameOver>(Handle_NetworkClientGameOver);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -67,6 +71,8 @@ internal class GameOverHandler : IHandler
 
             GameOverState.IsGameOver = true;
             heirSelectionHandler.EndSelection();
+
+            statisticsInterface.LoadStatistics(data.Statistics);
             messageBroker.Publish(this, new PlayerDeleteRequested(keepConnected: true));
 
             cutscenesHandler.EnqueueDeathPresentation(() =>
@@ -95,7 +101,7 @@ internal class GameOverHandler : IHandler
                 }
                 else
                 {
-                    heirSelectionBehavior.ShowGameStatistics(); // TODO: Track statistics
+                    heirSelectionBehavior.ShowGameStatistics();
                 }
 
                 if (Campaign.Current.CurrentMenuContext != null)

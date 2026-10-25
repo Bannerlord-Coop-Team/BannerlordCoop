@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
@@ -54,7 +55,8 @@ public class PlayerCaptivityReleasePositionTests
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
             recruitmentSideEffects.Object,
-            playerManager.Object);
+            playerManager.Object,
+            new Mock<IStatisticsCampaignBehaviorInterface>().Object);
     }
 
     [Fact]

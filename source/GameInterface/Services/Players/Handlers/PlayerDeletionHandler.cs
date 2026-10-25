@@ -180,6 +180,7 @@ internal class PlayerDeletionHandler : IHandler
             Logger.Warning("Could not remove player registration for {ControllerId} during retirement", player.ControllerId);
             return;
         }
+        sessionProvider.CoopSession.StatisticsPlayerData.PlayerStatistics.Remove(player.HeroId);
 
         network.SendAll(new NetworkPlayerRetired(player.ControllerId, player.HeroId));
 
@@ -255,6 +256,7 @@ internal class PlayerDeletionHandler : IHandler
 
         playerManager.RemovePlayer(player);
         sessionProvider.CoopSession.AgingPlayerData.PlayerSuccessions.Remove(player.HeroId);
+        sessionProvider.CoopSession.StatisticsPlayerData.PlayerStatistics.Remove(player.HeroId);
 
         var removed = new NetworkPlayerRemoved(player.ControllerId, player.HeroId);
         if (peer == null) network.SendAll(removed);
