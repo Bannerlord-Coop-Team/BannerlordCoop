@@ -601,9 +601,11 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     gain 0.99-1.01. Roll is pass/fail per free copy over windows of at least 60 s without sinking, snap, ram contact or
     a rope, on the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees, and a gain of 0.9 to 1.1
     (slope of the copy's roll on the owner's, both de-meaned). Roped hulls are excluded, see the next item.
-  - **Roped hulls still roll off.** R46 measured roll sd 1.7-4.4 degrees and a gain up to 1.56 on copies tied by ropes,
-    even with an empty deck, so it is the rope and contact force on copies, not the crew load. Roll stays report-only for
-    a roped copy until that follow-up lands.
+  - **Roped hulls rolled off (fix pending a live check).** R46 measured roll sd 1.7-4.4 degrees and a gain up to 1.56 on
+    copies tied by ropes, even with an empty deck. Copy-copy contacts are refused, so contact force doesn't explain it: the
+    rope joint's `StabilizeShipUps` roll spring was filtered on copies with the joint's other forces. `RopeForcePatch` now
+    lets that torque through (it acts only about each hull's own forward axis) and keeps filtering the yaw and planar
+    forces. Roll stays report-only for a roped copy until a live run measures it against the free-hull criteria.
   - `coop.debug.naval.water_clock` reports the patch status, the written and vanilla water time, their offset and the
     battle's offset estimate.
   - **Each game-version port must re-check the signature** and update it if it no longer matches: the scene field

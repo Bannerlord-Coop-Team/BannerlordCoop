@@ -206,11 +206,11 @@ internal class RopeForcePatch
         return !copy;
     }
 
-    // The joint force steps and the attachment's own force step.
+    // The joint force steps and the attachment's own force step. StabilizeShipUps stays unfiltered: its torque is a roll
+    // spring about each hull's own forward axis, from that hull's own orientation, so a roped copy rolls like its owner.
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[]
-            { nameof(Joint.StabilizeShipUps), nameof(Joint.AlignShips), nameof(Joint.ApplyConstraintImpulse), nameof(Joint.ReduceRelativeDrift) })
+        foreach (var name in new[] { nameof(Joint.AlignShips), nameof(Joint.ApplyConstraintImpulse), nameof(Joint.ReduceRelativeDrift) })
             yield return AccessTools.DeclaredMethod(typeof(Joint), name);
         yield return AccessTools.DeclaredMethod(typeof(Attachment), nameof(Attachment.OnFixedTick));
     }

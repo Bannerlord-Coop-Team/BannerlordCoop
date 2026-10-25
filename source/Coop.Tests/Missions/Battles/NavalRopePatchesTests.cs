@@ -10,6 +10,7 @@ using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using Joint = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachmentJoint;
 using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment.ShipAttachmentState;
 
 namespace Coop.Tests.Missions.Battles;
@@ -135,6 +136,18 @@ public class NavalRopePatchesTests
             CoopNavalMissionScope.IsActive = wasActive;
             NavalRopes.Clear();
         }
+    }
+
+    // S17 A3: R46 roped copies rolled off (roll sd 1.7-4.4 degrees, gain up to 1.56) because the joint's roll spring was
+    // filtered on them; it is a torque about each hull's own forward axis, so it applies to a copy as on its owner.
+    [Fact]
+    public void ForceGate_LetsTheJointRollStabilizerReachCopies()
+    {
+        var stabilizer = AccessTools.DeclaredMethod(typeof(Joint), nameof(Joint.StabilizeShipUps));
+
+        Assert.DoesNotContain(stabilizer, RopeForcePatch.TargetMethods());
+        Assert.Contains(PatchProcessor.GetOriginalInstructions(stabilizer), code => code.operand is MethodInfo called
+            && called.DeclaringType == typeof(NavalPhysics) && called.Name == nameof(NavalPhysics.ApplyTorque));
     }
 
     [Fact]
