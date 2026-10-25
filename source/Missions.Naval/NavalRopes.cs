@@ -41,8 +41,8 @@ internal static class NavalRopes
     }
 
     /// <summary>
-    /// How many samples repeat a station's removal: 5 s at the 20 Hz sample rate, well past a rejected sample or a target
-    /// still waiting in the arrivals queue. A peer that never had the replica ignores a removal anyway.
+    /// How many samples repeat a station's removal: 5 s at the 20 Hz sample rate. A peer that misses them all still removes
+    /// its replica, from the first accepted sample that omits the station.
     /// </summary>
     internal const int RemovedRepeatSamples = 100;
 
@@ -227,12 +227,14 @@ internal static class NavalRopes
     /// <summary>Applies an owner's rope set to its copy here; a final set also lays the replicas out once.</summary>
     internal static void Apply(MissionShip copy, BattleRopeState[] values, Func<Guid, MissionObject> hullOf, bool final)
     {
-        if (values == null) return;
+        if (final && values == null) return;
 
         BypassReplicaGates = true;
         try
         {
-            foreach (var value in values) ApplyCounted(copy, value, hullOf);
+            foreach (var value in values ?? Array.Empty<BattleRopeState>())
+                ApplyCounted(value.SourceKey, () => ApplyOne(copy, value, hullOf));
+            if (!final) RemoveOmitted(copy, values);
         }
         finally
         {
@@ -245,27 +247,48 @@ internal static class NavalRopes
         finalsApplied++;
     }
 
-    // Applies one state, so one bad rope doesn't stop the others; counts a reject, and logs the mission's first fault.
-    private static void ApplyCounted(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf)
+    // An owner's sample carries every live rope, so a replica it omits lost its rope while this client missed the removal.
+    private static void RemoveOmitted(MissionShip copy, BattleRopeState[] values)
+    {
+        foreach (var source in copy.AttachmentMachines)
+        {
+            var attachment = source.CurrentAttachment;
+            if (attachment == null || attachment.State == RopeState.BrokenAndWaitingForRemoval) continue;
+            if (!records.TryGetValue(source, out var record) || record.Last == null || record.Last.State == BattleRopeState.Removed) continue;
+
+            string key = record.Last.SourceKey;
+            if (values != null && values.Any(value => value.SourceKey == key)) continue;
+
+            record.Last = Removed(record.Last);
+            ApplyCounted(key, () =>
+            {
+                attachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
+                return null;
+            });
+        }
+    }
+
+    // Runs one rope's apply, so one bad rope doesn't stop the others; counts a reject, and logs the mission's first fault.
+    private static void ApplyCounted(string sourceKey, Func<string> apply)
     {
         string reject;
         try
         {
-            reject = ApplyOne(copy, value, hullOf);
+            reject = apply();
         }
         catch (Exception exception)
         {
-            lastReplicaReject = value.SourceKey + ":fault:" + exception.GetType().Name;
+            lastReplicaReject = sourceKey + ":fault:" + exception.GetType().Name;
             if (++replicaFaults == 1)
                 Logger.Warning(exception, "[NavalSync] Applying the owner's rope at {Source} on a copy threw; later faults are only counted",
-                    value.SourceKey);
+                    sourceKey);
             return;
         }
 
         if (reject == null) return;
 
         replicaRejects++;
-        lastReplicaReject = value.SourceKey + ":" + reject;
+        lastReplicaReject = sourceKey + ":" + reject;
     }
 
     // Applies one owner state to its station's replica; returns why it was rejected, or null.

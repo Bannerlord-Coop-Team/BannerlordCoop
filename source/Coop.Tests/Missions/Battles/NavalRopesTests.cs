@@ -6,6 +6,9 @@ using NavalDLC.Missions.Objects;
 using System;
 using TaleWorlds.Engine;
 using Xunit;
+using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
+using RopeAttachmentState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment.ShipAttachmentState;
+using ShipAttachmentMachine = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine;
 using static Missions.Naval.NavalRopes;
 
 namespace Coop.Tests.Missions.Battles;
@@ -76,6 +79,64 @@ public class NavalRopesTests
         }
     }
 
+    // S17 re-review R1: a peer that missed the whole removal window still drops the replica once a sample omits its station.
+    [Fact]
+    public void Apply_RemovesAReplicaTheOwnersSampleOmits()
+    {
+        var (copy, station, rope) = ReplicaOnCopy();
+        Clear();
+        try
+        {
+            records[station] = new RopeRecord { Generation = 3, Last = BattleRopeStateTests.Rope(3, BattleRopeState.RopesPulling) };
+
+            Apply(copy, null, _ => null, final: false);
+
+            Assert.Equal(BattleRopeState.Removed, records[station].Last.State);
+            Assert.Equal(3L, records[station].Last.Generation);
+            // Vanilla's SetAttachmentState sets the state before it reaches the engine, which these tests lack.
+            Assert.Equal(RopeAttachmentState.BrokenAndWaitingForRemoval, rope.State);
+        }
+        finally
+        {
+            Clear();
+        }
+    }
+
+    [Fact]
+    public void Apply_KeepsAReplicaTheOwnersSampleCarries()
+    {
+        var (copy, station, rope) = ReplicaOnCopy();
+        Clear();
+        try
+        {
+            records[station] = new RopeRecord { Generation = 3, Last = BattleRopeStateTests.Rope(3, BattleRopeState.RopesPulling) };
+
+            Apply(copy, new[] { BattleRopeStateTests.Rope(3, BattleRopeState.RopesPulling) }, _ => null, final: false);
+            Apply(copy, null, _ => null, final: true);
+
+            Assert.Equal(BattleRopeState.RopesPulling, records[station].Last.State);
+            Assert.Equal(RopeAttachmentState.RopesPulling, rope.State);
+        }
+        finally
+        {
+            Clear();
+        }
+    }
+
+    // A constructor-skipped copy hull whose one station holds a pulling replica rope.
+    private static (MissionShip copy, ShipAttachmentMachine station, Attachment rope) ReplicaOnCopy()
+    {
+        var copy = ShipTestHulls.Uninitialized<MissionShip>();
+        var station = ShipTestHulls.Uninitialized<ShipAttachmentMachine>();
+        station.OwnerShip = copy;
+        copy._attachmentMachines = new TaleWorlds.Library.MBList<ShipAttachmentMachine> { station };
+        var rope = (Attachment)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Attachment));
+        rope._state = RopeAttachmentState.RopesPulling;
+        rope.AttachmentSource = station;
+        station.CurrentAttachment = rope;
+        return (copy, station, rope);
+    }
+
     // S17 D1: an expected reject is counted, not thrown.
     [Fact]
     public void Apply_CountsARejectWithItsReason()
@@ -83,7 +144,10 @@ public class NavalRopesTests
         Clear();
         try
         {
-            Apply(ShipTestHulls.Uninitialized<MissionShip>(), new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopeThrown) }, _ => null, final: false);
+            var copy = ShipTestHulls.Uninitialized<MissionShip>();
+            copy._attachmentMachines = new TaleWorlds.Library.MBList<ShipAttachmentMachine>();
+
+            Apply(copy, new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopeThrown) }, _ => null, final: false);
 
             Assert.Equal(1L, replicaRejects);
             Assert.Equal(0L, replicaFaults);
@@ -101,6 +165,7 @@ public class NavalRopesTests
     public void Apply_CountsAFaultApartFromRejects_AndAppliesTheRest()
     {
         var hull = ShipTestHulls.Uninitialized<MissionShip>();
+        hull._attachmentMachines = new TaleWorlds.Library.MBList<ShipAttachmentMachine>();
         AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(hull, NavalShipEngineTests.ValidEntity());
         var ropes = new[]
         {
