@@ -170,7 +170,7 @@ public class CoopBattleController : CoopMissionController
         var partyWithdrawal = new BattlePartyWithdrawal(coopMissionComponent, session, troopWithdrawal, agentFader, playerParties,
             authorityChanged);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, deployment, formationAssigner, missionContext, reinforcementFielder,
-            resultCommitter, partyWithdrawal, playerParties, authorityChanged);
+            partyWithdrawal, playerParties, authorityChanged);
         ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,

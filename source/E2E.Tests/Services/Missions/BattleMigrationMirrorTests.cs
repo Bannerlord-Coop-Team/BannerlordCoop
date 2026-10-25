@@ -115,7 +115,7 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
             using var migrator = new BattleAuthorityMigrator(Mock.Of<INetwork>(), newHost.Resolve<IMessageBroker>(),
                 Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(), missionComponent.Object, session.Object,
                 Mock.Of<IBattleDeploymentCoordinator>(), Mock.Of<IAgentFormationAssigner>(), Mock.Of<IMissionContext>(),
-                Mock.Of<IReinforcementFielder>(), Mock.Of<IBattleResultCommitter>(), Mock.Of<IBattlePartyWithdrawal>(),
+                Mock.Of<IReinforcementFielder>(), Mock.Of<IBattlePartyWithdrawal>(),
                 Mock.Of<IBattlePlayerPartyResolver>());
 
             migrator.ApplyLateSpawnedPuppet(npc, npcId, null!, Guid.Empty);

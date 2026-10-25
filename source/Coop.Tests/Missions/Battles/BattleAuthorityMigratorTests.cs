@@ -9,7 +9,6 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
 using System;
-using TaleWorlds.Core;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -66,12 +65,11 @@ public class BattleAuthorityMigratorTests
         partyWithdrawal.Verify(value => value.WithdrawParty(It.IsAny<string>(), It.IsAny<bool>()), isNaval ? Times.Never() : Times.Once());
     }
 
+    // Q4: a promotion this client receives adopts the AI on land and at sea; the server alone keeps a naval host that reported.
     [Theory]
-    [InlineData(true, false, 1)]
-    [InlineData(true, true, 0)]
-    [InlineData(false, false, 1)]
-    [InlineData(false, true, 1)]
-    public void PromotionToThisClient_AdoptsUnlessANavalResultIsHeld(bool isNaval, bool resultHeld, int expectedPromotions)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PromotionToThisClient_Adopts(bool isNaval)
     {
         using var broker = new MessageBroker();
         var session = new Mock<IBattleSession>();
@@ -83,15 +81,12 @@ public class BattleAuthorityMigratorTests
         var registry = new Mock<INetworkAgentRegistry>();
         registry.Setup(value => value.GetAgents(It.IsAny<string>())).Returns(Array.Empty<CoopAgentInfo>());
         registry.Setup(value => value.GetControllerIds()).Returns(Array.Empty<string>());
-        var resultCommitter = new Mock<IBattleResultCommitter>();
-        var resolvedState = BattleState.DefenderVictory;
-        resultCommitter.Setup(value => value.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
         var deployment = new Mock<IBattleDeploymentCoordinator>();
-        using var migrator = CreateMigrator(broker, session, registry, deployment.Object, resultCommitter: resultCommitter.Object);
+        using var migrator = CreateMigrator(broker, session, registry, deployment.Object);
 
         broker.Publish(this, new BattleHostMigrated(MapEventId, "host", "peer"));
 
-        deployment.Verify(value => value.OnPromotedToHost(), Times.Exactly(expectedPromotions));
+        deployment.Verify(value => value.OnPromotedToHost(), Times.Once);
     }
 
     // A migrator over the given session and agent registry, with no controller in the mission.
@@ -101,7 +96,6 @@ public class BattleAuthorityMigratorTests
         Mock<INetworkAgentRegistry> registry,
         IBattleDeploymentCoordinator deployment = null,
         IReinforcementFielder reinforcementFielder = null,
-        IBattleResultCommitter resultCommitter = null,
         IBattlePartyWithdrawal partyWithdrawal = null)
     {
         var mission = new Mock<ICoopMissionComponent>();
@@ -120,7 +114,6 @@ public class BattleAuthorityMigratorTests
             Mock.Of<IAgentFormationAssigner>(),
             missionContext.Object,
             reinforcementFielder ?? Mock.Of<IReinforcementFielder>(),
-            resultCommitter ?? Mock.Of<IBattleResultCommitter>(),
             partyWithdrawal ?? Mock.Of<IBattlePartyWithdrawal>(),
             Mock.Of<IBattlePlayerPartyResolver>());
     }

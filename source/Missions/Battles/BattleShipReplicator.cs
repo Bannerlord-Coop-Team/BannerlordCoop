@@ -99,7 +99,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly ICoopMissionComponent missionComponent;
     private readonly IMissionContext missionContext;
-    private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalShipEngine engine;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
@@ -156,7 +155,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         deployment = context.Deployment;
         missionComponent = context.MissionComponent;
         missionContext = context.MissionContext;
-        resultCommitter = context.ResultCommitter;
         partyWithdrawal = context.PartyWithdrawal;
         this.engine = engine;
         this.teamResolver = teamResolver;
@@ -227,7 +225,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         var migrated = payload.What;
         if (migrated.MapEventId != session.InstanceId) return;
-        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, session.IsNaval)) return;
 
         // The server's assignment always names both, so a guess here would move every AI hull to the wrong client.
         string newHost = migrated.NewHostControllerId;

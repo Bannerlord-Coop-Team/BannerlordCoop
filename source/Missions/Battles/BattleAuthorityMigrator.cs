@@ -56,7 +56,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IMissionContext missionContext;
     private readonly IReinforcementFielder reinforcementFielder;
-    private readonly IBattleResultCommitter resultCommitter;
     private readonly IBattlePartyWithdrawal partyWithdrawal;
     private readonly IBattlePlayerPartyResolver playerParties;
     private readonly Action<IReadOnlyCollection<Guid>> authorityChanged;
@@ -80,7 +79,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IReinforcementFielder reinforcementFielder,
-        IBattleResultCommitter resultCommitter,
         IBattlePartyWithdrawal partyWithdrawal,
         IBattlePlayerPartyResolver playerParties,
         Action<IReadOnlyCollection<Guid>> authorityChanged = null)
@@ -95,7 +93,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.formationAssigner = formationAssigner;
         this.missionContext = missionContext;
         this.reinforcementFielder = reinforcementFielder;
-        this.resultCommitter = resultCommitter;
         this.partyWithdrawal = partyWithdrawal;
         this.playerParties = playerParties;
         this.authorityChanged = authorityChanged;
@@ -375,13 +372,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (string.IsNullOrEmpty(newHost))
             newHost = session.OwnControllerId;
 
-        if (!AppliesHostMigration(resultCommitter, session.IsNaval))
-        {
-            withdrawnHosts.Remove(previousHost);
-            Logger.Information("[BattleSync] Keeping the agents of {Old} as they are after the host change to {New}: this client already holds the battle's result",
-                previousHost, newHost);
-            return;
-        }
 
         if (!session.IsOwn(newHost))
         {
@@ -628,14 +618,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         // no agents to adopt and continues them from those pointers. Runs even when nothing was adopted.
         RequestReserves();
     }
-
-    /// <summary>
-    /// Whether a host change moves agents and hulls on this client. Once a naval client holds the battle's result its
-    /// mission has ended or ends with that result, so nothing is adopted, revived or re-crewed on it; a land battle's AI
-    /// keeps running for the players still in it.
-    /// </summary>
-    internal static bool AppliesHostMigration(IBattleResultCommitter resultCommitter, bool isNavalMission) =>
-        !isNavalMission || !resultCommitter.TryGetResolvedState(out _);
 
     // A hull's crew gets no adoption Charge: its ship order drives it, a charge would send it off the deck, and the ship
     // replicator re-crews the hull it takes over instead.

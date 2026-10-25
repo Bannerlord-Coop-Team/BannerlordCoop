@@ -1144,12 +1144,12 @@ public class BattleShipReplicatorTests
         return ship;
     }
 
-    [Theory]
-    [InlineData(false, Own)]
-    [InlineData(true, Peer)]
-    public void HostMigrated_ToThisClient_MovesTheAiHullsOnlyWhileTheResultIsOpen(bool resultHeld, string expectedAuthority)
+    // Q4: the server alone decides whether a naval host changes (it keeps a host that reported), so a client applies every
+    // host change it receives.
+    [Fact]
+    public void HostMigrated_ToThisClient_MovesTheAiHulls()
     {
-        var harness = new Harness(committed: true, resultHeld: resultHeld);
+        var harness = new Harness(committed: true);
         var aiHull = CreateHull();
         var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, aiHull, null);
         harness.Registry.TryRegister(ai);
@@ -1157,7 +1157,7 @@ public class BattleShipReplicatorTests
 
         harness.PublishAndDrain(new BattleHostMigrated(Instance, Peer, Own, harness.SessionEpoch));
 
-        Assert.Equal(expectedAuthority, ai.CurrentAuthority);
+        Assert.Equal(Own, ai.CurrentAuthority);
     }
 
     [Fact]
@@ -1877,7 +1877,7 @@ public class BattleShipReplicatorTests
         /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
         public int SessionEpoch { get; set; } = HostEpoch;
 
-        public Harness(bool committed, bool resultHeld = false, int startEpoch = HostEpoch, bool queuedArrivals = false)
+        public Harness(bool committed, int startEpoch = HostEpoch, bool queuedArrivals = false)
         {
             SessionEpoch = startEpoch;
             Arrivals = queuedArrivals ? new BattleShipArrivals() : new ImmediateShipArrivals();
@@ -1910,8 +1910,6 @@ public class BattleShipReplicatorTests
                     100f, 50f, 1, ""));
 
             var resultCommitter = new Mock<IBattleResultCommitter>();
-            var resolvedState = BattleState.DefenderVictory;
-            resultCommitter.Setup(c => c.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
 
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
