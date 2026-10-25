@@ -91,13 +91,6 @@ internal static class NavalRopes
     internal static RopeRecord RecordOf(ShipAttachmentMachine machine) =>
         machine != null && records.TryGetValue(machine, out var record) ? record : null;
 
-    /// <summary>Kept for the call sites in NavalShipEngine and CoopNavalBattleBehavior until they move after lane A.</summary>
-    internal static void BreakConnections(MissionShip hull) => NavalRopeRemoval.BreakConnections(hull);
-
-    /// <summary>Kept for the call site in CoopNavalBattleBehavior until it moves after lane A.</summary>
-    internal static void ForgetTarget(IEnumerable<MissionShip> ships, MissionShip removed) =>
-        NavalRopeRemoval.ForgetRemovedHull(ships, removed);
-
     /// <summary>Whether the station sits on another owner's copy here.</summary>
     internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
 
