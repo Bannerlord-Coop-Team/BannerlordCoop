@@ -27,21 +27,19 @@ internal static class NavalRopeRemoval
     internal static void Clear() => Interlocked.Exchange(ref jointStepsSkipped, 0);
 
     /// <summary>
-    /// Breaks every rope and plank that starts or ends on a hull leaving the mission, replicas included, and forgets its
-    /// stations; the owners of the other ends see their rope gone and send its removal.
+    /// Breaks every rope and plank that starts or ends on a hull about to leave, replicas included, before vanilla's removal;
+    /// the owners of the other ends see their rope gone and send its removal.
     /// </summary>
-    internal static void BreakConnections(MissionShip hull)
-    {
-        NavalRopes.PastReplicaGates(hull.BreakAllExistingConnections);
-        NavalRopes.Forget(hull);
-    }
+    internal static void BreakConnections(MissionShip hull) => NavalRopes.PastReplicaGates(hull.BreakAllExistingConnections);
 
     /// <summary>
-    /// Drops every station's AI preference for a hull that left the mission. Vanilla's removal clears the boarding order but
-    /// not these, and its pilot AI throws at the preferred hull's points (GetBestEnemyAttachment) without a removal check.
+    /// Forgets a hull that left on every removal path: its stations' records, and every station's AI preference for it, which
+    /// vanilla's removal keeps and its pilot AI throws at (GetBestEnemyAttachment) without a removal check.
     /// </summary>
-    internal static void ForgetTarget(IEnumerable<MissionShip> ships, MissionShip removed)
+    internal static void ForgetRemovedHull(IEnumerable<MissionShip> ships, MissionShip removed)
     {
+        NavalRopes.Forget(removed);
+
         foreach (var ship in ships)
         {
             if (ship == removed) continue;

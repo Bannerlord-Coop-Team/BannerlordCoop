@@ -348,9 +348,9 @@ boarding order, but not the rope stations' AI preference (`ShipAttachmentMachine
 throws at the preferred hull's points without a removal check (`GetBestEnemyAttachment`). A hook that landed on a removed
 hull built a joint with no target hull (`ShipAttachmentJoint._shipTargetScript` null, its root entity no longer carries a
 `MissionShip`), whose first fixed-tick force step threw on the native physics thread, and the TaleWorlds Watchdog froze the
-process. Every removal path now keeps it: `NavalRopes.BreakConnections` before `RemoveShip` (departure, capture, migration
-replace), `ForgetTarget` on vanilla's `ShipRemovedEvent` (vanilla's own retreat too), `RopeConnectPatch` refuses a rope to a
-removed hull, `TickRope` breaks one whose end left or whose joint lacks a hull (`NavalRopes.EndIsGone`), and
+process. Every removal path now keeps it: `NavalRopeRemoval.BreakConnections` before `RemoveShip` (departure, capture, migration
+replace), `ForgetRemovedHull` on vanilla's `ShipRemovedEvent` (vanilla's own retreat too; it also forgets the hull's rope
+records), `RopeConnectPatch` refuses a rope to a removed hull, `TickRope` breaks one whose end left or whose joint lacks a hull (`NavalRopeRemoval.EndIsGone`), and
 `RopeJointHullGuardPatch` skips such a joint's force step until then (the first skip is logged, `jointStepsSkipped`). A sinking
 hull is not removed (vanilla keeps it in `AllShips`).
 

@@ -96,7 +96,7 @@ internal static class NavalRopes
 
     /// <summary>Kept for the call site in CoopNavalBattleBehavior until it moves after lane A.</summary>
     internal static void ForgetTarget(IEnumerable<MissionShip> ships, MissionShip removed) =>
-        NavalRopeRemoval.ForgetTarget(ships, removed);
+        NavalRopeRemoval.ForgetRemovedHull(ships, removed);
 
     /// <summary>Whether the station sits on another owner's copy here.</summary>
     internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
@@ -429,15 +429,10 @@ internal static class NavalRopes
         record.CurveAngle = angle;
     }
 
-    // A replica connects only as its owner's state applies, and no rope hooks a hull that left (its stale AI preference goes).
-    internal static bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target)
-    {
-        if (!AllowsChange(IsReplicaMachine(source), BypassReplicaGates)) return false;
-        if (target == null || !NavalRopeRemoval.IsMissingOrRemoved(target.OwnerShip)) return true;
-
-        if (source != null && source.GetPreferredTargetShip() == target.OwnerShip) source.SetPreferredTargetShip(null);
-        return false;
-    }
+    // A replica connects only as its owner's state applies, and no rope hooks a hull that left.
+    internal static bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
+        AllowsChange(IsReplicaMachine(source), BypassReplicaGates)
+        && (target == null || !NavalRopeRemoval.IsMissingOrRemoved(target.OwnerShip));
 
     // A replica's state changes only as its owner's state applies.
     internal static bool AllowState(Attachment attachment) => AllowsChange(IsReplica(attachment), BypassReplicaGates);

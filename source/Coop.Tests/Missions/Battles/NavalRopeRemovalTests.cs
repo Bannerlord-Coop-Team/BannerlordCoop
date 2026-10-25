@@ -20,7 +20,7 @@ namespace Coop.Tests.Missions.Battles;
 public class NavalRopeRemovalTests
 {
     [Fact]
-    public void ForgetTarget_ClearsOnlyThePreferencesForTheRemovedHull()
+    public void ForgetRemovedHull_ClearsOnlyThePreferencesForTheRemovedHull_AndItsRecords()
     {
         var removed = Hull();
         var other = Hull();
@@ -28,21 +28,29 @@ public class NavalRopeRemovalTests
         var preferringOther = Machine(owner: Hull(), preferred: other);
         var remaining = Hull(preferringRemoved, preferringOther);
 
-        NavalRopeRemoval.ForgetTarget(new[] { remaining, other }, removed);
+        var removedStation = Machine(owner: removed, preferred: null);
+        removed._attachmentMachines.Add(removedStation);
+        NavalRopes.Clear();
+        NavalRopes.records[removedStation] = new NavalRopes.RopeRecord { Generation = 2 };
+        NavalRopes.records[preferringOther] = new NavalRopes.RopeRecord { Generation = 1 };
+
+        NavalRopeRemoval.ForgetRemovedHull(new[] { remaining, other }, removed);
 
         Assert.Null(preferringRemoved.GetPreferredTargetShip());
         Assert.Same(other, preferringOther.GetPreferredTargetShip());
+        Assert.Null(NavalRopes.RecordOf(removedStation));
+        Assert.NotNull(NavalRopes.RecordOf(preferringOther));
+        NavalRopes.Clear();
     }
 
     [Fact]
-    public void AllowConnection_RefusesAPointOnARemovedHull_AndDropsTheStalePreference()
+    public void AllowConnection_RefusesAPointOnARemovedHull()
     {
         var removed = Hull();
         removed._isRemoved = true;
         var source = Machine(owner: Hull(), preferred: removed);
 
         Assert.False(NavalRopes.AllowConnection(source, Point(removed)));
-        Assert.Null(source.GetPreferredTargetShip());
     }
 
     [Fact]
