@@ -355,18 +355,22 @@ public class VillageNeedsToolsTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            owner.PartyBelongedTo.MemberRoster.AddToCounts(troop, 6);
             using (new AllowedThread()) owner.Gold = 0;
         });
+        TestEnvironment.FlushCoalescer();
         ClientA.Call(() =>
         {
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var giver));
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
             using (new AllowedThread())
             {
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
             }
+            AlternativeSolutionPickerDriver.Commit(ClientA, giver.Issue, owner, owner.PartyBelongedTo, troop, 6);
             giver.Issue.AlternativeSolutionStartConsequence();
             giver.Issue.StartIssueWithAlternativeSolution();
         }, AlternativeSolutionLogTexts);
@@ -611,9 +615,7 @@ public class VillageNeedsToolsTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
-            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
-            party.MemberRoster.AddToCounts(troop, -6);
         });
         TestEnvironment.FlushCoalescer();
 
@@ -629,14 +631,15 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
                 Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
                 Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
                 var issue = notable.Issue;
 
                 using (new AllowedThread())
                 {
                     Campaign.Current.MainParty = ownerParty;
                     issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
                 }
+                AlternativeSolutionPickerDriver.Commit(ClientA, issue, owner, ownerParty, troop, 6);
 
                 issue.AlternativeSolutionStartConsequence();
                 issue.StartIssueWithAlternativeSolution();
