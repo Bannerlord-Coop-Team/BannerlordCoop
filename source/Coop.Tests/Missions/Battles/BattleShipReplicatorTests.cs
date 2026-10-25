@@ -1750,6 +1750,41 @@ public class BattleShipReplicatorTests
         Assert.Equal(1, (long)Inspected(harness, record.ShipId)["accepted"]!);
     }
 
+    // S7 R2-A1: arrivals apply before the prune, so a hull vanilla removed this frame is still registered; it takes no sample.
+    [Fact]
+    public void AcceptSample_ForAHullVanillaRemoved_IsDroppedBeforeThePrune()
+    {
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+        harness.Engine.Setup(e => e.IsHullRemoved(copy)).Returns(true);
+
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
+
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Never);
+        Assert.Equal("hull_removed", (string)Inspected(harness, ship.ShipId)["lastReject"]!);
+    }
+
+    // S7 R2-A1: a rope end naming a hull vanilla removed this frame resolves to no hull, so no rope connects onto it.
+    [Fact]
+    public void AcceptSample_RopeEndOnAHullVanillaRemoved_ResolvesToNoHull()
+    {
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+        var (removed, removedShip) = RegisterPeerCopy(harness, isNpcParty: false);
+        harness.Engine.Setup(e => e.IsHullRemoved(removed)).Returns(true);
+        var resolved = new List<MissionObject>();
+        harness.Engine.Setup(e => e.ApplyRopes(copy, It.IsAny<BattleRopeState[]>(), It.IsAny<Func<Guid, MissionObject>>(), false))
+            .Callback((MissionObject _, BattleRopeState[] _, Func<Guid, MissionObject> hullOf, bool _) =>
+            {
+                resolved.Add(hullOf(removedShip.ShipId));
+                resolved.Add(hullOf(ship.ShipId));
+            });
+
+        harness.Samples.Accept(new NetworkBattleShipSample(ship.ShipId, Peer, 1, MovedFrame()));
+
+        Assert.Equal(new[] { null, copy }, resolved);
+    }
+
     [Fact]
     public void AcceptSample_ForAShipWithNoWaitingRecord_RejectsItAsUnknown()
     {

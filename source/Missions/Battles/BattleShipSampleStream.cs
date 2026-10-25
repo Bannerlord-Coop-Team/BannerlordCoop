@@ -99,7 +99,7 @@ public class BattleShipSampleStream : IBattleShipSampleStream
     }
 
     // Applied from the arrivals: a sample connects and breaks ropes, which the async agent and team tick reads, so it must not
-    // apply from the game-thread drain (R48 L6), and a spawn record that arrived ahead of it applies first.
+    // apply from the game-thread drain (R48 L6). A run of samples keeps the first one's place in the queue and applies the newest.
     private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
     {
         var sample = payload.What;
@@ -168,6 +168,13 @@ public class BattleShipSampleStream : IBattleShipSampleStream
         {
             if (heldShips.IsAwaitingRecord(sample.ShipId)) heldShips.Of(sample.ShipId).HoldSample(sample);
             else StreamOf(sample.ShipId).Reject("unknown_ship");
+            return;
+        }
+
+        // Vanilla removed the hull this frame; the prune drops it in the replicator's tick, after the arrivals.
+        if (engine.IsHullRemoved(ship.Hull))
+        {
+            StreamOf(sample.ShipId).Reject("hull_removed");
             return;
         }
 
@@ -247,7 +254,8 @@ public class BattleShipSampleStream : IBattleShipSampleStream
     private Guid ShipIdOf(MissionObject hull) => Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : Guid.Empty;
 
     // The local hull a rope end's ship id names, or null.
-    private MissionObject HullOf(Guid shipId) => Registry.TryGet(shipId, out var ship) ? ship.Hull : null;
+    private MissionObject HullOf(Guid shipId) =>
+        Registry.TryGet(shipId, out var ship) && !engine.IsHullRemoved(ship.Hull) ? ship.Hull : null;
 
     // The hull's stream state, created on first use.
     private ShipSampleStream StreamOf(Guid shipId)

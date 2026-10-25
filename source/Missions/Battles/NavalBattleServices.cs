@@ -226,18 +226,31 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.CaptureApplied -= OnCaptureApplied;
 #endif
         messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
-        ShipWeaponReplicator.Dispose();
-        ShipDamageRouter.Dispose();
-        DeckPoses.Dispose();
-        StationUseReplicator.Dispose();
-        ShipCaptureReplicator.Dispose();
-        captureApplier.Dispose();
-        ShipReplicator.Dispose();
-        samples.Dispose();
-        conditions.Dispose();
-        hullAuthority.Dispose();
-        appliedHost.Dispose();
+        DisposeLogged(ShipWeaponReplicator);
+        DisposeLogged(ShipDamageRouter);
+        DisposeLogged(DeckPoses);
+        DisposeLogged(StationUseReplicator);
+        DisposeLogged(ShipCaptureReplicator);
+        DisposeLogged(captureApplier);
+        DisposeLogged(ShipReplicator);
+        DisposeLogged(samples);
+        DisposeLogged(conditions);
+        DisposeLogged(hullAuthority);
+        DisposeLogged(appliedHost);
         Arrivals.Clear();
+    }
+
+    // Disposes one service; a throw is logged, so the services after it still drop their subscriptions.
+    private static void DisposeLogged(IDisposable service)
+    {
+        try
+        {
+            service.Dispose();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalSync] Disposing {Service} threw", service.GetType().Name);
+        }
     }
 }
 

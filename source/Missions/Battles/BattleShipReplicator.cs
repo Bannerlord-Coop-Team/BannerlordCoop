@@ -99,7 +99,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly ICoopMissionComponent missionComponent;
     private readonly IMissionContext missionContext;
-    private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalShipEngine engine;
     private readonly IBattleTeamResolver teamResolver;
@@ -157,7 +156,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         deployment = context.Deployment;
         missionComponent = context.MissionComponent;
         missionContext = context.MissionContext;
-        hostEpochPolicy = context.HostEpochPolicy;
         resultCommitter = context.ResultCommitter;
         partyWithdrawal = context.PartyWithdrawal;
         this.engine = engine;
