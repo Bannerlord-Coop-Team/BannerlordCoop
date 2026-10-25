@@ -216,6 +216,7 @@ public class ServerMissionMembershipHandler : IHandler
             departure.ControllerId,
             departure.InstanceId,
             wasRetreat,
-            departure.IsInstanceEmpty));
+            departure.IsInstanceEmpty,
+            withdraws: leaves));
     }
 }

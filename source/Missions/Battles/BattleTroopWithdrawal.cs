@@ -3,9 +3,8 @@
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] Takes an agent off a battle's books as a withdrawal, not a casualty, the way a departed player's party
-/// withdraws: the health its holder keeps is recorded, it leaves the agent registry and its casualty attribution is
-/// forgotten. The caller fades it out afterwards.
+/// [Game thread] Takes an agent off a battle's books as a withdrawal, not a casualty: its health is recorded, it leaves the
+/// agent registry and its casualty attribution is forgotten. The caller fades it out afterwards.
 /// </summary>
 public interface IBattleTroopWithdrawal
 {
