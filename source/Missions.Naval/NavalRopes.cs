@@ -37,7 +37,14 @@ internal static class NavalRopes
         internal float[] CurveTarget;
         internal float CurveAngle;
         internal int DecorationPlanks;
+        internal int RemovedRepeats;
     }
+
+    /// <summary>
+    /// How many samples repeat a station's removal: 5 s at the 20 Hz sample rate, well past a rejected sample or a target
+    /// still waiting in the arrivals queue. A peer that never had the replica ignores a removal anyway.
+    /// </summary>
+    internal const int RemovedRepeatSamples = 100;
 
     private static readonly Dictionary<ShipAttachmentMachine, RopeRecord> records = new Dictionary<ShipAttachmentMachine, RopeRecord>();
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalRopes));
@@ -136,13 +143,13 @@ internal static class NavalRopes
             var attachment = source.CurrentAttachment;
             if (attachment == null || !ReferenceEquals(attachment, record.Attachment))
             {
-                // The station's rope is gone: repeat its removal until the next throw, so every replica converges.
-                if (record.Last == null) continue;
-                if (record.Last.State != BattleRopeState.Removed) record.Last = Removed(record.Last);
+                // The station's rope is gone: repeat its removal for a while, so every replica converges.
+                if (record.Last == null || !RepeatRemoval(record)) continue;
             }
             else
             {
                 record.Last = CaptureAttachment(hull, source, attachment, record, shipIdOf);
+                record.RemovedRepeats = 0;
             }
 
             if (record.Last != null) result.Add(record.Last);
@@ -150,6 +157,16 @@ internal static class NavalRopes
         }
 
         return result.Count == 0 ? null : result.ToArray();
+    }
+
+    // Turns the station's last state into its removal; false once the removal has gone out for the whole repeat window.
+    private static bool RepeatRemoval(RopeRecord record)
+    {
+        if (record.Last.State != BattleRopeState.Removed) record.Last = Removed(record.Last);
+        if (record.RemovedRepeats == RemovedRepeatSamples) return false;
+
+        record.RemovedRepeats++;
+        return true;
     }
 
     /// <summary>The removal of a station's last published rope, at that rope's generation.</summary>

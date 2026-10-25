@@ -48,6 +48,34 @@ public class NavalRopesTests
         Assert.Equal(expected, TargetReject(value, targetResolved));
     }
 
+    // S17 F1: a removal repeats for the window, not for the rest of the battle.
+    [Fact]
+    public void Capture_RepeatsAStationsRemovalOnlyForTheRepeatWindow()
+    {
+        var hull = ShipTestHulls.Uninitialized<MissionShip>();
+        var station = ShipTestHulls.Uninitialized<NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine>();
+        station.OwnerShip = hull;
+        hull._attachmentMachines = new TaleWorlds.Library.MBList<NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine> { station };
+        Clear();
+        try
+        {
+            records[station] = new RopeRecord { Generation = 3, Last = BattleRopeStateTests.Rope(3, BattleRopeState.RopesPulling) };
+
+            for (int sample = 0; sample < RemovedRepeatSamples; sample++)
+            {
+                var removal = Assert.Single(Capture(hull, _ => Guid.Empty));
+                Assert.Equal(BattleRopeState.Removed, removal.State);
+                Assert.Equal(3L, removal.Generation);
+            }
+
+            Assert.Null(Capture(hull, _ => Guid.Empty));
+        }
+        finally
+        {
+            Clear();
+        }
+    }
+
     // S17 D1: an expected reject is counted, not thrown.
     [Fact]
     public void Apply_CountsARejectWithItsReason()

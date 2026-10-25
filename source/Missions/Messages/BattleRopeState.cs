@@ -6,8 +6,8 @@ namespace Missions.Messages;
 
 /// <summary>
 /// The owner's rope at one throw station of its hull, keyed by the station's content path. Every hull sample
-/// carries the whole set; a station's generation only grows and its removal is repeated until the next throw,
-/// so a dropped or rejected sample is repaired by the next one.
+/// carries the set; a station's generation only grows and its removal repeats for a few seconds, so a rejected
+/// sample, or a target the peer can't resolve yet, is repaired by the next one.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class BattleRopeState
@@ -61,6 +61,7 @@ public sealed class BattleRopeState
         || (ropes.Length <= MaxRopesPerHull && ropes.All(rope => rope?.IsValid == true)
             && ropes.Select(rope => rope.SourceKey).Distinct().Count() == ropes.Length);
 
+    // A finite value within the range.
     private static bool Bounded(float value, float min, float max) =>
         !float.IsNaN(value) && !float.IsInfinity(value) && value >= min && value <= max;
 }
