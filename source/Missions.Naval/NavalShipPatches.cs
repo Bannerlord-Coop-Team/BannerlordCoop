@@ -37,53 +37,6 @@ internal class NavalShipSpawnPatch
     }
 }
 
-// MissionShip.OnDeploymentFinished only runs on hulls spawned before deployment ends, so a later hull (AI fleet, foreign copy,
-// hull swap) gets the weapon, helm and crew steps here. Ammo and anchor stay as spawned, so a swap doesn't refill ammo.
-[HarmonyPatch(typeof(NavalShipsLogic), nameof(NavalShipsLogic.SpawnShip),
-    new[] { typeof(Formation), typeof(MatrixFrame), typeof(bool), typeof(bool) },
-    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class LateHullDeploymentPatch
-{
-    // Runs the deployment steps a late hull needs; each one is safe to repeat on a pooled hull that vanilla deployed before.
-    [HarmonyPostfix]
-    private static void Postfix(NavalShipsLogic __instance, MissionShip __result)
-    {
-        if (__result == null) return;
-        if (!FinishesDeployment(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
-
-        // A ballista lists its ship targets once, at its own deployment (ThreatSeeker.InitializeTargetableObjects), so in vanilla
-        // every hull is in every list; here hulls arrive after deployment, so the hulls already fielded learn of this one.
-        RefreshShipWeaponTargets(__instance.AllShips, __result);
-
-        // Readies the ballista AI's threat seeker, otherwise ThreatSeeker.GetAllThreats throws on its first tick.
-        __result.ShipSiegeWeapon?.OnDeploymentFinished();
-        // Adds the helm's standing point components, makes an enemy helm AI-only and sets the logic its vacancy check reads.
-        __result.ShipControllerMachine.OnDeploymentFinished();
-        // The first unit's party feeds a crew perk; a fresh AI fleet or copy formation has no unit yet, so that perk is left out.
-        __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
-            .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
-        // Checked from the mission tick, not here: the async team tick may be reordering this formation's behaviours.
-        NavalFormationTacticRefresh.Active?.Note(__result.Formation);
-    }
-
-    /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>
-    internal static void RefreshShipWeaponTargets(IEnumerable<MissionShip> ships, MissionShip spawned)
-    {
-        foreach (var ai in WeaponAisToRefresh(ships, spawned))
-            ai.InitializeThreatSeeker();
-    }
-
-    /// <summary>The ranged weapon AIs of the hulls still in the mission, the newly spawned one excepted.</summary>
-    internal static IEnumerable<RangedSiegeWeaponAi> WeaponAisToRefresh(IEnumerable<MissionShip> ships, MissionShip spawned) =>
-        ships.Where(ship => ship != null && ship != spawned && !ship.IsRemoved)
-            .Select(ship => ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)
-            .Where(ai => ai != null);
-
-    // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
-    internal static bool FinishesDeployment(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
-}
-
 // Only the owner runs a hull's ship order; a foreign copy follows the owner's frames.
 [HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.Tick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
