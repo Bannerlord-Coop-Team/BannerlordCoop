@@ -72,6 +72,11 @@ public interface IPlayerManager
     bool TryGetPlayer(NetPeer peer, out Player player);
 
     /// <summary>
+    /// Resolves the controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
+    /// </summary>
+    bool TryGetCurrentController(NetPeer peer, out string controllerId);
+
+    /// <summary>
     /// Resolves the Player controlling the given hero.
     /// </summary>
     bool TryGetPlayer(Hero hero, out Player player);
@@ -388,6 +393,21 @@ public class PlayerManager : IPlayerManager
     public bool TryGetPlayer(NetPeer peer, out Player player)
     {
         return peerToPlayer.TryGetValue(peer, out player);
+    }
+
+    public bool TryGetCurrentController(NetPeer peer, out string controllerId)
+    {
+        controllerId = null;
+        lock (registrySync)
+        {
+            if (!peerToPlayer.TryGetValue(peer, out var player) ||
+                !controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer))
+                return false;
+
+            controllerId = player.ControllerId;
+            return true;
+        }
     }
 
     public bool TryGetPlayer(Hero hero, out Player player)
