@@ -888,7 +888,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         return issue;
     }
 
-    private void Accept(EnvironmentInstance client)
+    internal void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
         {
