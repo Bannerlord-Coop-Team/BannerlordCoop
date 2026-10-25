@@ -136,6 +136,54 @@ public class MerchantOutlawsTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompanionReturnProgressIsAuthoritativeInEitherSnapshotAndDailyTickOrder(bool snapshotFirst)
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var issue = Get<Hero>(instance, scenario.NotableId).Issue;
+                using (new AllowedThread())
+                {
+                    issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(10);
+                    issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(5);
+                    issue._journalEntries.Clear();
+                    issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TaleWorlds.Localization.TextObject("returning"),
+                        currentProgress: instance == Server ? 3 : 2, range: 10));
+                }
+                instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA);
+            });
+        }
+        void Snapshot() => Server.Call(() => Server.Resolve<IMerchantOutlawsProgress>().Send(Get<Hero>(Server, scenario.NotableId).Issue));
+        void Tick() => ClientA.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
+
+        if (snapshotFirst)
+        {
+            Snapshot();
+            Tick();
+        }
+        else
+        {
+            Tick();
+            ClientA.Call(() => Assert.Equal(2, Get<Hero>(ClientA, scenario.NotableId).Issue.JournalEntries[0].CurrentProgress));
+            Snapshot();
+        }
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Equal(3, Assert.Single(issue.JournalEntries).CurrentProgress);
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+    }
+
     [Fact]
     public void HideoutBanditsStayUntrackedWhenAcceptedAndProgressIsReplayed()
     {

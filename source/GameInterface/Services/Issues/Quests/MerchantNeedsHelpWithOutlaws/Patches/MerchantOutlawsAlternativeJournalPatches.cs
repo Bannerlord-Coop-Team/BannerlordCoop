@@ -1,6 +1,8 @@
 ﻿using Common;
 using HarmonyLib;
 using System.Linq;
+using System.Collections.Generic;
+using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
@@ -21,6 +23,24 @@ internal class MerchantOutlawsAlternativeJournalPatches
         // The server sends this log, so a client tick must not append it again.
         __instance._areIssueEffectsResolved = true;
         return false;
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
+    [HarmonyPrefix, HarmonyPriority(Priority.First)]
+    private static void DailyPrefix(IssueManager __instance, out List<IssueBase> __state)
+    {
+        __state = null;
+        if (ModInformation.IsServer) return;
+        // Owner progress comes from the server snapshot, regardless of which side ticks first.
+        __state = __instance.Issues.Values.Where(issue => issue is Issue && issue.IsSolvingWithAlternative).ToList();
+        QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithQuestSolution);
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
+    [HarmonyFinalizer]
+    private static void DailyFinalizer(List<IssueBase> __state)
+    {
+        if (__state != null) QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
