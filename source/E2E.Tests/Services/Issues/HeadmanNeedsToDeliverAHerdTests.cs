@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -202,6 +203,98 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             });
         }
         ClientA.Call(() => Assert.NotEmpty(accepted[ClientA].JournalEntries));
+    }
+
+    [Theory]
+    [InlineData(3, 10, 0)]
+    [InlineData(0, 13, 0)]
+    [InlineData(2, 4, 7)]
+    [InlineData(3, 4, 3)]
+    [InlineData(13, 0, 0)]
+    [InlineData(3, 4, 2)]
+    public void DeliveryDialogue_TransfersEveryEquipmentStackOnce_WithoutChangingTheOtherPlayer(int plain, int modified, int otherModified)
+    {
+        var modifierIds = new[] { "herd_delivery_modifier", "herd_delivery_other_modifier" };
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                foreach (var id in modifierIds)
+                    Assert.True(instance.ObjectManager.AddExisting(id, new ItemModifier { StringId = id }));
+                Object<ItemObject>(instance, livestockId).Value = 1000;
+            });
+        Accept(ClientA);
+        MoveToDestination();
+        Server.Call(() =>
+        {
+            var owner = Party(Server, QuestScenario.ControllerA).ItemRoster;
+            owner.Clear();
+            owner.AddToCounts(DefaultItems.Grain, 5);
+            var item = Object<ItemObject>(Server, livestockId);
+            owner.AddToCounts(item, plain);
+            owner.AddToCounts(new EquipmentElement(item, Object<ItemModifier>(Server, modifierIds[0])), modified);
+            owner.AddToCounts(new EquipmentElement(item, Object<ItemModifier>(Server, modifierIds[1])), otherModified);
+            var market = Object<Settlement>(Server, townId).ItemRoster;
+            market.Clear();
+            market.AddToCounts(item, 3);
+            market.AddToCounts(new EquipmentElement(item, Object<ItemModifier>(Server, modifierIds[0])), 2);
+            var other = Party(Server, QuestScenario.ControllerB).ItemRoster;
+            other.AddToCounts(DefaultItems.Grain, 11);
+            other.AddToCounts(new EquipmentElement(item, Object<ItemModifier>(Server, modifierIds[1])), 7);
+        });
+        environment.FlushCoalescer();
+        var gold = new Dictionary<EnvironmentInstance, (int Owner, int Other)>();
+        var otherInventory = new Dictionary<EnvironmentInstance, ItemRosterElement[]>();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                Assert.Equal(10, accepted[Server]._animalCountToDeliver);
+                gold[instance] = (PlayerHero(instance, QuestScenario.ControllerA).Gold, PlayerHero(instance, QuestScenario.ControllerB).Gold);
+                otherInventory[instance] = Party(instance, QuestScenario.ControllerB).ItemRoster.ToArray();
+            });
+
+        ClientA.Call(() =>
+        {
+            using (OwnerScope(ClientA, QuestScenario.ControllerA)) accepted[ClientA].DeliverHerdOnConsequence();
+        });
+        environment.FlushCoalescer();
+        var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        var enough = plain + modified + otherModified >= 10;
+        // Re-deliver the real proof twice after completion, or after an insufficient-inventory refusal.
+        for (var retry = 0; retry < 2; retry++)
+        {
+            ClientA.Call(() => ClientA.SendMessageToServer(request));
+            environment.FlushCoalescer();
+        }
+
+        if (enough)
+            Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        else
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var deliveredPlain = enough ? Math.Min(plain, 10) : 0;
+        var deliveredModified = enough ? Math.Min(modified, 10 - deliveredPlain) : 0;
+        var deliveredOther = enough ? 10 - deliveredPlain - deliveredModified : 0;
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var item = Object<ItemObject>(instance, livestockId);
+                var owner = Party(instance, QuestScenario.ControllerA).ItemRoster;
+                var market = Object<Settlement>(instance, townId).ItemRoster;
+                var elements = new[] { new EquipmentElement(item),
+                    new EquipmentElement(item, Object<ItemModifier>(instance, modifierIds[0])),
+                    new EquipmentElement(item, Object<ItemModifier>(instance, modifierIds[1])) };
+                Assert.Equal(plain + modified + otherModified - (enough ? 10 : 0), owner.Where(e => e.EquipmentElement.Item == item).Sum(e => e.Amount));
+                Assert.Equal(5 + (enough ? 10 : 0), market.Sum(e => e.Amount));
+                Assert.Equal(new[] { plain - deliveredPlain, modified - deliveredModified, otherModified - deliveredOther },
+                    elements.Select(e => owner.Where(stack => stack.EquipmentElement.IsEqualTo(e)).Sum(stack => stack.Amount)));
+                Assert.Equal(new[] { 3 + deliveredPlain, 2 + deliveredModified, deliveredOther },
+                    elements.Select(e => market.Where(stack => stack.EquipmentElement.IsEqualTo(e)).Sum(stack => stack.Amount)));
+                Assert.Equal(5, owner.GetItemNumber(DefaultItems.Grain));
+                Assert.Equal(gold[instance].Owner + (enough ? accepted[Server]._rewardGold : 0), PlayerHero(instance, QuestScenario.ControllerA).Gold);
+                Assert.Equal(gold[instance].Other, PlayerHero(instance, QuestScenario.ControllerB).Gold);
+                Assert.Equal(otherInventory[instance].Select(e => (e.EquipmentElement, e.Amount)),
+                    Party(instance, QuestScenario.ControllerB).ItemRoster.Select(e => (e.EquipmentElement, e.Amount)));
+                Assert.Equal(!enough, accepted[Server].IsOngoing);
+            });
     }
 
     [Theory]
