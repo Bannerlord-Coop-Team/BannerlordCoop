@@ -8,7 +8,7 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Observes UI progress that the unstarted authoritative quest does not calculate.</summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch(typeof(JournalLog), nameof(JournalLog.UpdateCurrentProgress))]
+[HarmonyPatch(typeof(JournalLog), nameof(JournalLog.CurrentProgress), MethodType.Setter)]
 internal class QuestJournalProgressPatch
 {
     [HarmonyPrefix]
