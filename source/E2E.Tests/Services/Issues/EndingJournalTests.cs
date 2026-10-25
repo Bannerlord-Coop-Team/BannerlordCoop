@@ -417,8 +417,10 @@ public class EndingJournalTests : IDisposable
             entry => entry.IsRelatedTo(ownerQuest))));
     }
 
-    [Fact]
-    public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding(int updatedProgress)
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
@@ -426,12 +428,12 @@ public class EndingJournalTests : IDisposable
         scenario.Server.Call(() =>
         {
             using var owner = OwnerScope();
-            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 2, 5);
         });
         scenario.ClientA.Call(() =>
         {
-            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
-            progress.UpdateCurrentProgress(4);
+            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 2, 5);
+            progress.UpdateCurrentProgress(updatedProgress);
         });
         environment.FlushCoalescer();
         scenario.Server.Call(() =>
@@ -440,8 +442,8 @@ public class EndingJournalTests : IDisposable
             serverQuest.CompleteQuestWithCancel(Ending());
         });
         environment.FlushCoalescer();
-        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
-        scenario.ClientA.Call(() => Assert.Equal(4, ownerQuest.JournalEntries.First().CurrentProgress));
+        scenario.Server.Call(() => Assert.Equal(updatedProgress, serverProgress.CurrentProgress));
+        scenario.ClientA.Call(() => Assert.Equal(updatedProgress, ownerQuest.JournalEntries.First().CurrentProgress));
     }
 
     [Fact]
