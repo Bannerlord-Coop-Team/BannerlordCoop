@@ -6,23 +6,6 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
 
-/// <summary>
-/// A naval battle's view of agents on hulls, which the movement and action handlers ask while it is configured: owned
-/// agents on a hull send hull-local poses, received ones rebase on the local hull, and seated ones leave their pose and
-/// actions to the station.
-/// </summary>
-public interface IShipDeckSeam
-{
-    /// <summary>[Game thread] An owned on-foot agent's hull-local pose and deck-relative speed; false when it is on no registered hull.</summary>
-    bool TryCaptureDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed);
-
-    /// <summary>[Game thread] The local hull, owned or copied, that a received deck pose is relative to.</summary>
-    bool TryResolveDeckFrame(Agent agent, Guid deckShip, out MatrixFrame hullFrame);
-
-    /// <summary>Whether this client seated the agent at a ship station, so it sends no world movement or actions for it.</summary>
-    bool IsSeatedAtStation(CoopAgentInfo info);
-}
-
 /// <summary>Naval movement: deck-relative poses for agents on a hull, and no world movement for agents seated at a ship station.</summary>
 public partial class AgentMovementHandler
 {
@@ -38,37 +21,50 @@ public partial class AgentMovementHandler
 
     public void ForgetMovementTarget(Agent agent) => _interpolator.Forget(agent);
 
-    // [Game thread] Stamped at packet construction; returns the packet's hull table, null when no pose is deck-relative.
-    private Guid[] StampDecks(string scope, ushort[] compactIds, Guid[] canonicalIds, AgentData[] data)
+    // [Game thread] Captures an owned on-foot agent's hull-local pose once per sample, so the send decision compares it.
+    private void CaptureDeck(CoopAgentInfo info, ref AgentData data)
     {
-        if (shipDeck == null) return null;
+        if (shipDeck == null || data.MountData != null) return;
+        if (!shipDeck.TryCaptureDeck(info, data.Position, out Guid ship, out Vec3 local, out float speed)) return;
 
+        data.CaptureDeck(ship, local, speed);
+        deckStamped++;
+    }
+
+    // The packet's hull table, indexing each captured deck pose into it; null when no pose is deck-relative.
+    private static Guid[] IndexDecks(AgentData[] data)
+    {
         List<Guid> ships = null;
         for (int i = 0; i < data.Length; i++)
         {
-            if (data[i].MountData != null) continue;
-
-            CoopAgentInfo info;
-            bool found = scope == null ? agentRegistry.TryGetAgentInfo(canonicalIds[i], out info)
-                : agentRegistry.TryGetAgentInfo(scope, compactIds[i], out info);
-            if (!found || !shipDeck.TryCaptureDeck(info, data[i].Position, out Guid ship, out Vec3 local, out float speed)) continue;
+            if (data[i].DeckShip == Guid.Empty) continue;
 
             ships ??= new List<Guid>();
-            int index = ships.IndexOf(ship);
+            int index = ships.IndexOf(data[i].DeckShip);
             if (index < 0)
             {
-                ships.Add(ship);
+                ships.Add(data[i].DeckShip);
                 index = ships.Count - 1;
             }
 
-            data[i].StampDeck(ship, index + 1, local, speed);
-            deckStamped++;
+            data[i].IndexDeck(index + 1);
         }
 
         return ships?.ToArray();
     }
 
-    // [Game thread] A deck pose never falls back to world; one that cannot resolve clears the buffered target.
+    // A deck pose that moved compares hull-local, since hull bob alone moves the world pose past the threshold every sample.
+    private static bool HasPoseMoved(AgentData previous, AgentData current)
+    {
+        if (previous.DeckShip != current.DeckShip) return true;
+
+        return current.DeckShip == Guid.Empty
+            ? (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq
+            : (current.DeckLocal - previous.DeckLocal).LengthSquared > PositionDeltaThresholdSq;
+    }
+
+    // [Game thread] A deck pose never falls back to world; one that cannot resolve clears the buffered target and halts the
+    // puppet, as an evicted deck target does.
     private void ApplyDeckMovement(Agent agent, AgentData data)
     {
         if (data.HasValidDeck && data.MountData == null && !agent.HasMount && _interpolator.TrySetRiderDeckTarget(agent, data))
@@ -77,7 +73,7 @@ public partial class AgentMovementHandler
             return;
         }
 
-        _interpolator.Forget(agent);
+        _interpolator.ForgetAndHalt(agent);
         deckRejected++;
     }
 
@@ -93,6 +89,7 @@ public partial class AgentMovementHandler
         return true;
     }
 
+    // The deck capture, receive and seat counters with the interpolator's deck diagnostics.
     public object InspectShipDecks() => new
     {
         stamped = deckStamped,

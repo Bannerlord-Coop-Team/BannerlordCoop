@@ -46,6 +46,7 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
     void ForgetMovementTarget(Agent agent);
 
+    /// <summary>[Game thread] The naval deck counters (diagnostics).</summary>
     object InspectShipDecks();
 
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
@@ -804,6 +805,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
                     mountAction0IsSyntheticTurn: syntheticTurn,
                     mountAuthorityRevision: mountAuthorityRevision);
+                CaptureDeck(agentInfo, ref agentData);
 
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
@@ -1220,7 +1222,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 
     private static bool HasMovementChanged(AgentData previous, AgentData current)
     {
-        return (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq ||
+        return HasPoseMoved(previous, current) ||
                (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
                (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
                (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
@@ -1634,7 +1636,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         Guid[] canonicalIds,
         AgentData[] data)
     {
-        Guid[] deckShips = StampDecks(identityScopeId, compactIds, canonicalIds, data);
+        Guid[] deckShips = IndexDecks(data);
         return identityScopeId == null
             ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips)
             : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips);
