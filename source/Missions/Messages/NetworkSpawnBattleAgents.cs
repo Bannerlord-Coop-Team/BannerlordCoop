@@ -90,7 +90,7 @@ public class BattleAgentSpawnData
     [ProtoMember(2)]
     public readonly string CharacterId;
     [ProtoMember(4)]
-    public readonly Vec3 Position;
+    public Vec3 Position { get; private set; }
     [ProtoMember(5)]
     public readonly BattleSideEnum Side;
     [ProtoMember(6)]
@@ -213,10 +213,10 @@ public class BattleAgentSpawnData
     }
 
     /// <summary>This record with another spawn position and every other field kept.</summary>
-    public BattleAgentSpawnData WithPosition(Vec3 position) => new BattleAgentSpawnData(
-        AgentId, CharacterId, position, Side, Health, OwnerControllerId, MapEventPartyId, TroopSeed, SpawnEquipment,
-        BodyProperties, MissionEquipmentData, MountAgentId, FormationIndex, MovementId, MountMovementId,
-        OriginalOwnerControllerId, HasCurrentEquipment ? CurrentEquipment : (AgentEquipmentData?)null, MovementScopeId,
-        MountOriginalOwnerControllerId, MountMovementScopeId, IsRunningAway, AuthorityRevision, MountAuthorityRevision,
-        MountOwnerControllerId, SiegeEquipmentGrant, SiegeEquipmentGrantRevision, ShipId);
+    public BattleAgentSpawnData WithPosition(Vec3 position)
+    {
+        var moved = (BattleAgentSpawnData)MemberwiseClone();
+        moved.Position = position;
+        return moved;
+    }
 }
