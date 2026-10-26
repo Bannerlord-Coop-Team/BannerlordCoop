@@ -115,6 +115,30 @@ namespace Coop.CrashReporter.Tests
             Assert.False(collector.IsCleanExit(-1073741819));
         }
 
+        [Fact]
+        public void IsCleanExit_ReadsAnEngineLogShorterThanTheTail()
+        {
+            int processId = Process.GetCurrentProcess().Id;
+            CrashReporterOptions options = CreateOptions(processId);
+            string logsRoot = Path.Combine(options.BannerlordDataRoot, "logs");
+            Directory.CreateDirectory(logsRoot);
+            File.WriteAllText(
+                Path.Combine(logsRoot, "rgl_log_" + processId + ".txt"),
+                "[23:40:13.551] Managed Interface deleted.\r\n");
+            var collector = new CrashReportCollector(options);
+
+            Assert.True(collector.IsCleanExit(-1));
+        }
+
+        [Fact]
+        public void IsCleanExit_ReportsMinusOneWithoutAnEngineLog()
+        {
+            CrashReporterOptions options = CreateOptions(Process.GetCurrentProcess().Id);
+            var collector = new CrashReportCollector(options);
+
+            Assert.False(collector.IsCleanExit(-1));
+        }
+
         public void Dispose()
         {
             try
