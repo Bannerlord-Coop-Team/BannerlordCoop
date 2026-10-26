@@ -221,12 +221,13 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
-                // Naval village raids are single player for now so only the server claims the battle and nobody else is sent into it
+                // Naval village raids are single player until #4117, so only the first claim opens the battle and nobody else is sent into it
                 operation = "claim naval raid mission";
                 if (MapEventHelper.IsNavalRaid(mapEvent))
                 {
                     if (!isNewMissionClaim)
                     {
+                        Logger.Warning("Rejecting attack mission start for naval raid {MapEventId}: it is already claimed and naval village raids are single player", payload.What.MapEventId);
                         network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                         return;
                     }

@@ -722,6 +722,9 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             {
                 plunderedGold += (int)Campaign.Current.Models.ShipCostModel.GetShipTradeValue(distributedShip.Key, winnerLeaderParty, null);
             }
+            objectManager.TryGetId(distributedShip.Key, out var shipId);
+            Logger.Information("[NavalSync] Loot ship {ShipId} of {Loser} went to no winner; destroying it",
+                shipId, distributedShip.Key.Owner?.Id);
             DestroyShipAction.Apply(distributedShip.Key);
         }
 
