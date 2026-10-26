@@ -8,6 +8,6 @@ public sealed class DiscordPresenceModule : Module
     {
         // The presence adapter owns connection disposal on its serialized worker queue.
         builder.RegisterType<DiscordRpcConnection>().As<IDiscordRpcConnection>().InstancePerDependency().ExternallyOwned();
-        builder.RegisterType<DiscordPresenceClient>().As<IDiscordPresenceClient>().InstancePerLifetimeScope();
+        builder.RegisterType<DiscordPresenceClient>().As<IDiscordPresenceClient>().SingleInstance();
     }
 }

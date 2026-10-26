@@ -6,6 +6,8 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Handlers;
@@ -92,6 +94,11 @@ public class CoopBattleController : CoopMissionController
 
     // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
     private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
+#if DEBUG
+    internal SiegeInteractionDebugBehavior SiegeInteractionDebugBehavior { get; }
+#endif
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -113,7 +120,12 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        ISiegeGateHitApplier siegeGateHitApplier)
+        ISiegeGateHitApplier siegeGateHitApplier,
+        MissionMapTimeView mapTimeView,
+#if DEBUG
+        SiegeInteractionDebugBehavior siegeInteractionDebugBehavior,
+#endif
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -121,13 +133,21 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+#if DEBUG
+        SiegeInteractionDebugBehavior = siegeInteractionDebugBehavior;
+#endif
+
         var session = new BattleSession(controllerIdProvider, hostRegistry);
+        Session = session;
         debugMissionContext = missionContext;
         coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
             () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
+        Deployment = deployment;
 
         lifecycle = new BattleInstanceLifecycle(
             network,
@@ -195,8 +215,6 @@ public class CoopBattleController : CoopMissionController
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
-        Session = session;
-        Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
@@ -209,38 +227,39 @@ public class CoopBattleController : CoopMissionController
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId));
-        lifecycle.Dispose();
-        replicator.Dispose();
-        deathReporter.Dispose();
-        routReporter.Dispose();
-        puppetSpawner.Dispose();
-        puppetDeathApplier.Dispose();
-        puppetRoutApplier.Dispose();
-        damageRouter.Dispose();
-        authorityMigrator.Dispose();
-        reinforcementFielder.Dispose();
-        siegeEngineDeployment.Dispose();
-        coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null);
-        siegeMachineState.Dispose();
-        siegeWeaponFire.Dispose();
-        Deployment.Dispose();
-        messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
-        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
-
-        if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
-            BattleSpawnGate.HeroAgentAuthorityProbe = null;
-
-        // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
-        // never bleeds into the next siege before the first tick refreshes it.
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.IsAuthorityKnown = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
-        BattleConclusionGate.IsInCoopBattleMission = false;
-
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)),
+            lifecycle.Dispose,
+            replicator.Dispose,
+            deathReporter.Dispose,
+            routReporter.Dispose,
+            puppetSpawner.Dispose,
+            puppetDeathApplier.Dispose,
+            puppetRoutApplier.Dispose,
+            damageRouter.Dispose,
+            authorityMigrator.Dispose,
+            reinforcementFielder.Dispose,
+            siegeEngineDeployment.Dispose,
+            () => coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null),
+            siegeMachineState.Dispose,
+            siegeWeaponFire.Dispose,
+            Deployment.Dispose,
+            () => messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot),
+            () => messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned),
+            () =>
+            {
+                if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
+                    BattleSpawnGate.HeroAgentAuthorityProbe = null;
+                // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
+                // never bleeds into the next siege before the first tick refreshes it.
+                SiegeMissionAuthorityGate.IsLocalAuthority = false;
+                SiegeMissionAuthorityGate.IsAuthorityKnown = false;
+                SiegeMissionAuthorityGate.ResetClaimedMachines();
+                BattleConclusionGate.IsInCoopBattleMission = false;
+            },
+            base.DisposeMission);
     }
 
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to

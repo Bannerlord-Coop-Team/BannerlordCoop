@@ -5,6 +5,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -25,17 +26,14 @@ public class AlleyDebugCommand
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
 
-    private static bool TryGetAlley(string settlementId, string indexArg, out Alley alley, out Settlement settlement, out string error)
+    // Resolves a settlement by name or id plus a numeric alley index to an alley, with a ready-to-show error on failure.
+    private static bool TryGetAlley(ICommandObjectResolver resolver, string settlementId, string indexArg, out Alley alley, out Settlement settlement, out string error)
     {
         alley = null;
-        settlement = Settlement.Find(settlementId);
-        error = null;
 
-        if (settlement == null)
-        {
-            error = $"Settlement with id '{settlementId}' not found";
+        if (!resolver.TryResolveSettlement(settlementId, out settlement, out error))
             return false;
-        }
+
         if (settlement.Alleys == null || settlement.Alleys.Count == 0)
         {
             error = $"Settlement '{settlementId}' has no alleys";
@@ -53,6 +51,13 @@ public class AlleyDebugCommand
 
     public sealed class AlleyListCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyListCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "list";
@@ -63,13 +68,12 @@ public class AlleyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            Settlement settlement = Settlement.Find(args[0]);
-            if (settlement == null) return Failed($"Settlement with id '{args[0]}' not found");
+            if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
             if (settlement.Alleys == null || settlement.Alleys.Count == 0) return Failed($"'{settlement.Name}' has no alleys");
 
             var sb = new StringBuilder();
@@ -108,6 +112,13 @@ public class AlleyDebugCommand
 
     public sealed class AlleySetOwnerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleySetOwnerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "set_owner";
@@ -118,25 +129,22 @@ public class AlleyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
-            new ExpectedArgs("hero_registry_id", "The registered owner hero id."),
+            new ExpectedArgs("hero_registry_id", "Owner hero name or id (the registry id from my_hero_id works); quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run coop.debug.alley.set_owner on the server (host) only");
 
-            if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out _, out var error)) return Failed(error);
 
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return Failed("Unable to resolve IObjectManager");
 
-            // Resolve by the registry id (coop.debug.alley.my_hero_id on the owning client), which is the
-            // same on every machine. Player-hero StringIds are generated per-machine, so a client's StringId
-            // or name won't match the host's copy; fall back to those only for non-player heroes.
-            if (!objectManager.TryGetObject<Hero>(args[2], out var hero))
-                hero = Hero.FindFirst(h => h.StringId == args[2] || h.Name?.ToString() == args[2]);
-            if (hero == null) return Failed($"Hero '{args[2]}' not found (use the registry id from coop.debug.alley.my_hero_id on the owning client)");
+            // The resolver tries the registry id first (coop.debug.alley.my_hero_id on the owning client), which is the
+            // same on every machine. Player-hero StringIds are generated per-machine, so use the registry id for those.
+            if (!resolver.TryResolveHero(args[2], out var hero, out var heroError)) return Failed(heroError);
 
             if (!objectManager.TryGetId(alley, out var alleyId)) return Failed("Alley is not registered");
             if (!objectManager.TryGetId(hero, out var heroId)) return Failed("Hero is not registered");
@@ -155,6 +163,13 @@ public class AlleyDebugCommand
 
     public sealed class AlleyAbandonCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyAbandonCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "abandon";
@@ -165,7 +180,7 @@ public class AlleyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
         };
 
@@ -173,7 +188,7 @@ public class AlleyDebugCommand
         {
             if (ModInformation.IsClient) return Failed("Run coop.debug.alley.abandon on the server (host) only");
 
-            if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out _, out var error)) return Failed(error);
             if (alley.Owner == null) return Failed("Alley is not owned");
 
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return Failed("Unable to resolve IObjectManager");
@@ -211,6 +226,13 @@ public class AlleyDebugCommand
 
     public sealed class AlleyAttackCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyAttackCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "attack";
@@ -221,7 +243,7 @@ public class AlleyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
         };
 
@@ -229,7 +251,7 @@ public class AlleyDebugCommand
         {
             if (ModInformation.IsClient) return Failed("Run coop.debug.alley.attack on the server (host) only");
 
-            if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out _, out var error)) return Failed(error);
             if (alley.Owner == null || alley.Owner.IsGangLeader) return Failed("Alley is not player-owned; only a player alley can be attacked");
 
             // Force an AI attack now (bypasses the daily roll). Needs a gang-occupied rival alley in the same
@@ -241,6 +263,13 @@ public class AlleyDebugCommand
 
     public sealed class AlleyInfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyInfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "info";
@@ -251,13 +280,13 @@ public class AlleyDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetAlley(args[0], args[1], out var alley, out _, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out _, out var error)) return Failed(error);
 
             var sb = new StringBuilder();
             sb.AppendLine($"Alley [{args[1]}] in {alley.Settlement.Name}");
