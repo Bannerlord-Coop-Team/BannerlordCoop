@@ -69,11 +69,11 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // While this client deploys, copies are held back, so their crew's uses wait without aging.
     private float deploymentHeldAt;
     private bool seatsAnnounced;
-    private bool applyingRemote;
     // A game-thread closure queued before Dispose still runs; it must not send or seat for a torn-down battle.
     private bool disposed;
-    // dropped counts uses that were lost; staleUses (superseded) and obsoleteReleases (nothing left to release) are expected.
-    private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, localPuppetReleases, pinned, ownerReleases,
+    // dropped counts uses that were lost and unownedPuppetReleases seats vanilla took from a puppet its owner keeps seated;
+    // staleUses (superseded) and obsoleteReleases (nothing left to release) are expected.
+    private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, pinned, ownerReleases,
         sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
         adoptedSeats;
 
@@ -122,25 +122,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         GameThread.RunSafe(() => AnnounceStationUse(change), context: nameof(Handle_AgentStationUseChanged));
     }
 
-    // [Game thread] Sends a station use or release of an agent this client drives; a puppet's local release is only logged.
+    // [Game thread] Sends a station use or release of an agent this client drives.
     private void AnnounceStationUse(AgentStationUseChanged change)
     {
         if (disposed) return;
 
+        // A puppet's seat is its owner's to announce. Vanilla also releases puppets here for the reasons it releases the owner's
+        // agent (a ramp over an oar, a death, a sinking), so a local release is judged by the refresh, after the owner's arrived.
         var agents = missionComponent.AgentRegistry;
-        if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
-
-        if (!agents.IsLocallyControlled(change.Agent))
-        {
-            // Only the owner's stream may move a puppet off a station; anything else is a local desync worth seeing. A dying
-            // puppet's own removal releases it (vanilla Agent.OnRemove), and by then its state is no longer active.
-            if (!applyingRemote && !change.InUse && engine.IsAlive(change.Agent))
-            {
-                unownedPuppetReleases++;
-                Logger.Warning("[NavalSync] Puppet {AgentId} left a station locally, not by its owner", info.AgentId);
-            }
+        if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info) || !agents.IsLocallyControlled(change.Agent))
             return;
-        }
 
         // A use deferred from a tick worker can come after a later release went out inline; the agent's state decides.
         if (change.InUse != engine.IsSeated(change.Agent, change.Point)) return;
@@ -218,8 +209,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     internal static bool KeepsAppliedSeat(bool alive, bool registered, bool ownedHere, bool hullSinking, bool hullRemoved) =>
         alive && registered && !ownedHere && !hullSinking && !hullRemoved;
 
-    // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
-    // user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
+    // [Game thread] Runs after this frame's hull frame writes and the owners' uses. A puppet the owner keeps seated is re-pinned
+    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;
@@ -255,9 +246,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 }
 
                 seat.Reseated = true;
-                localPuppetReleases++;
-                Logger.Warning("[NavalSync] Puppet {AgentId} was released from its station {Station} locally; re-seating it once",
-                    entry.Key, DescribeStation(seat.Point));
+                unownedPuppetReleases++;
+                Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
+                    "re-seating it once", entry.Key, DescribeStation(seat.Point));
                 Apply(seat.Agent, seat.Point, inUse: true);
                 if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
             }
@@ -420,6 +411,13 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             return true;
         }
 
+        // Vanilla here can release a puppet a moment before its owner's release arrives, for the same cause (a ramp over an oar).
+        if (!use.InUse && !engine.IsSeated(info.Agent, point))
+        {
+            appliedSeats.Remove(use.AgentId);
+            return SettleObsoleteRelease(use, "its puppet already left the station here");
+        }
+
         // A sinking hull seats nobody; a late use from its owner only lets the puppet go.
         bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
         if (!use.InUse) ownerReleases++;
@@ -441,16 +439,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     internal void Apply(Agent agent, UsableMissionObject point, bool inUse)
     {
         missionComponent.AgentMovementHandler.ForgetMovementTarget(agent);
-        applyingRemote = true;
-        try
-        {
-            engine.ApplyStationUse(agent, point, inUse);
-        }
-        finally
-        {
-            applyingRemote = false;
-        }
-
+        engine.ApplyStationUse(agent, point, inUse);
         applied++;
     }
 
@@ -506,7 +495,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         staleUses,
         obsoleteReleases,
         unownedPuppetReleases,
-        localPuppetReleases,
         pinned,
         ownerReleases,
         sinkingUseReleases,
