@@ -28,15 +28,15 @@ public class NavalSideTallyReader : INavalSideTallyReader
     public static readonly IReadOnlyDictionary<MissionObject, int> NoCrew = new Dictionary<MissionObject, int>();
 
     private readonly INavalShipEngine engine;
-    private readonly IBattleShipReplicator shipReplicator;
+    private readonly IBattleShipConditionStream conditions;
     private readonly INavalMigrationReserveFielder migrationReserve;
 
-    // Takes the engine that reads the hulls, the replicator holding each hull's reported reserve and the migration reserve.
-    public NavalSideTallyReader(INavalShipEngine engine, IBattleShipReplicator shipReplicator,
+    // Takes the engine that reads the hulls, the condition stream holding each hull's reported reserve and the migration reserve.
+    public NavalSideTallyReader(INavalShipEngine engine, IBattleShipConditionStream conditions,
         INavalMigrationReserveFielder migrationReserve)
     {
         this.engine = engine;
-        this.shipReplicator = shipReplicator;
+        this.conditions = conditions;
         this.migrationReserve = migrationReserve;
     }
 
@@ -48,7 +48,7 @@ public class NavalSideTallyReader : INavalSideTallyReader
         {
             int crew = crewByHull.TryGetValue(hull, out int count) ? count : 0;
             bool isSunk = engine.ReadCondition(hull).SinkingState == BattleShipCondition.Sunk;
-            hulls.Add(new NavalHullCount(engine.SideOf(hull), isSunk, crew, shipReplicator.HullReserve(hull)));
+            hulls.Add(new NavalHullCount(engine.SideOf(hull), isSunk, crew, conditions.HullReserve(hull)));
         }
 
         // Reserve a promoted host recovered still waits for a hull, yet keeps the side alive.

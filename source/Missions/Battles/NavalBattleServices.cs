@@ -26,11 +26,8 @@ public interface INavalBattleServices : IDisposable
     /// <summary>Replicates in-mission ship captures, confirmed by each captured hull's authority.</summary>
     IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
-    /// <summary>Applies the captures the hulls' authorities confirm, on this client's tick.</summary>
-    IShipCaptureApplier CaptureApplier { get; }
-
-    /// <summary>The hull and capture traffic that arrived since the last tick, applied first in the next one.</summary>
-    IBattleShipArrivals Arrivals { get; }
+    /// <summary>Each hull's damage state and fieldable reserve, as its simulating client reports them.</summary>
+    IBattleShipConditionStream ConditionStream { get; }
 
     /// <summary>Replicates which agent uses which ship station.</summary>
     IAgentStationUseReplicator StationUseReplicator { get; }
@@ -138,9 +135,10 @@ public class NavalBattleServices : INavalBattleServices
 
     public IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
-    public IShipCaptureApplier CaptureApplier => captureApplier;
+    public IBattleShipConditionStream ConditionStream => conditions;
 
-    public IBattleShipArrivals Arrivals { get; }
+    /// <summary>[E2E harness] The hull and capture traffic that arrived since the last tick, applied first in the next one.</summary>
+    internal IBattleShipArrivals Arrivals { get; }
 
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
@@ -170,6 +168,18 @@ public class NavalBattleServices : INavalBattleServices
         StationUseReplicator.Tick(dt);
         ShipWeaponReplicator.Tick(dt);
         MigrationReserveFielder.Tick();
+    }
+
+    /// <summary>
+    /// [E2E harness] The traffic steps of <see cref="Tick"/> alone, in its order and without advancing time: the arrivals, the
+    /// capture applier and replicator, then station use, so a capture's request, decision and confirm settle between ticks.
+    /// </summary>
+    internal void ApplyTraffic()
+    {
+        Arrivals.ApplyAll();
+        captureApplier.Tick(0f);
+        ShipCaptureReplicator.Tick(0f);
+        StationUseReplicator.Tick(0f);
     }
 
     public void OnBeforeHullRemoved(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
