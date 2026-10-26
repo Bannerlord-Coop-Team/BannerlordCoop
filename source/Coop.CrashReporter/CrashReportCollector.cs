@@ -116,7 +116,9 @@ namespace Coop.CrashReporter
         }
 
         // Bannerlord's own Exit Game ends the process with -1 after the engine finishes shutting down,
-        // so -1 is only a crash when the engine log stops before that shutdown line.
+        // so -1 is only a crash when the engine log stops before that shutdown line. The line is the
+        // engine's own rgl log text (seen on 1.4.8); if a game update changes it, a clean exit is
+        // reported as a crash again rather than a crash being missed.
         internal bool IsCleanExit(int exitCode)
         {
             if (exitCode == 0)
