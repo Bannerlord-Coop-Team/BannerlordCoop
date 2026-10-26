@@ -110,7 +110,7 @@ namespace Coop.Tests.Autofac
 
             // The restart command is an operator command, so Release servers have it too.
             Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
-            Assert.Same(container.Resolve<IServerAdmissionGate>(), container.Resolve<IServerAdmissionGate>());
+            Assert.Same(container.Resolve<IServerJoinAdmission>(), container.Resolve<IServerJoinAdmission>());
             Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
 
 #if DEBUG

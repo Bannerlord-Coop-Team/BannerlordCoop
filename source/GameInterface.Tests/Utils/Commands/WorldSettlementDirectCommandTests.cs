@@ -2,12 +2,7 @@
 using Common;
 using Common.Commands;
 using Common.Util;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
-#if DEBUG
-using GameInterface.Services.Villages.Commands;
-using Moq;
-#endif
 using Serilog;
 using System;
 using System.Collections;
@@ -140,7 +135,7 @@ public class WorldSettlementDirectCommandTests
     }
 
     [Fact]
-    public void GetTownName_RegisteredNonSettlement_IsExplicitFailure()
+    public void GetTownName_IdRegisteredAsAnotherType_IsReportedAsNotFound()
     {
         var objectManager = new ObjectManager(Serilog.Core.Logger.None);
         Assert.True(objectManager.AddExisting("registered-object", new object()));
@@ -151,7 +146,8 @@ public class WorldSettlementDirectCommandTests
 
         Assert.False(result.Succeeded);
         Assert.Equal("command_failed", result.ErrorCode);
-        Assert.Contains("was not of type Settlement", result.Output);
+        Assert.Contains("No Settlement found with id", result.Output);
+        Assert.Contains("'registered-object'", result.Output);
     }
 
     [Fact]
@@ -217,13 +213,13 @@ public class WorldSettlementDirectCommandTests
     [Theory]
     [InlineData("coop.debug.workshop.set_workshop_custom_name")]
     [InlineData("coop.debug.workshop.set_workshop_owner")]
-    public void WorkshopCommands_RequireSettlementStringId(string fullName)
+    public void WorkshopCommands_AcceptSettlementNameOrId(string fullName)
     {
         ICoopCommand command = CreateCommand(fullName);
         IExpectedArgs settlementArgument = command.ExpectedArgs[0];
 
         Assert.Equal("settlementId", settlementArgument.Name);
-        Assert.Equal("The settlement id.", settlementArgument.Description);
+        Assert.Equal("Settlement name or id; quote names with spaces.", settlementArgument.Description);
     }
 
     private static CoopCommandResult RunWithObjectManager(
@@ -261,22 +257,8 @@ public class WorldSettlementDirectCommandTests
     private static ICoopCommand[] CreateCommands()
     {
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type, CreateConstructorArgs(type)))
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
-    }
-
-    // Supplies the single dependency a migrated command's constructor takes, or none.
-    private static object[] CreateConstructorArgs(Type type)
-    {
-        if (type.GetConstructor(new[] { typeof(IObjectManager) }) != null)
-            return new object[] { new ObjectManager(Serilog.Core.Logger.None) };
-        if (type.GetConstructor(new[] { typeof(ISiegeMachineAuthorityRegistry) }) != null)
-            return new object[] { new SiegeMachineAuthorityRegistry() };
-#if DEBUG
-        if (type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null)
-            return new object[] { new Mock<IRaidLootWarningFixture>().Object };
-#endif
-        return Array.Empty<object>();
     }
 
     private static Type[] GetCommandTypes()

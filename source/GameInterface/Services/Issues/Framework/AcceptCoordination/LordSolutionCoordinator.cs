@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -33,11 +34,12 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private readonly IPlayerManager players;
     private readonly IIssueAcceptPreconditions preconditions;
     private readonly IControllerIdProvider controller;
+    private readonly IQuestJournalOwnerResolver journal;
     private readonly HashSet<IssueBase> pendingDecisions = new HashSet<IssueBase>();
 
     public LordSolutionCoordinator(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnershipRegistry ownership, IPlayerManager players,
-        IIssueAcceptPreconditions preconditions, IControllerIdProvider controller)
+        IIssueAcceptPreconditions preconditions, IControllerIdProvider controller, IQuestJournalOwnerResolver journal)
     {
         this.broker = broker;
         this.network = network;
@@ -47,6 +49,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         this.players = players;
         this.preconditions = preconditions;
         this.controller = controller;
+        this.journal = journal;
         broker.Subscribe<RequestLordSolution>(HandleRequest);
         broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
         broker.Subscribe<NetworkLordSolutionRejected>(HandleRejected);
@@ -65,12 +68,16 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
 
     public bool Before(IssueBase issue, LordSolutionOperation operation)
     {
-        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+        if (operation == LordSolutionOperation.Start && CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // A menu replay may reach a no-counteroffer ending, but it must still ask the server to pay it.
+        if (operation != LordSolutionOperation.Start && pendingDecisions.Contains(issue)) return false;
         if (objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
         {
             // Vanilla decides when the merchant conversation ends, then reopens the menu before the server replies.
             if (operation != LordSolutionOperation.Start) pendingDecisions.Add(issue);
-            network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation));
+            network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation,
+                operation == LordSolutionOperation.Start ? Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier() : 0f));
         }
         return false;
     }
@@ -102,10 +109,12 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             }
 
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            using (new IssueDifficultyOverride(data.Operation == LordSolutionOperation.Start ? data.Difficulty : issue._issueDifficultyMultiplier))
             {
                 if (data.Operation == LordSolutionOperation.Start)
                 {
                     if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement ||
+                        issue.IssueOwner.CurrentSettlement?.OwnerClan != hero.Clan || hero.Clan == null ||
                         !issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
                         !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
                         !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
@@ -137,7 +146,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                             outcome = IssueOutcome.LordAcceptedCounterOffer;
                             break;
                         case LordSolutionOperation.RefuseCounterOffer:
-                            if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                            if (issue.CounterOfferHero != null && Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
                             {
                                 Reject(peer, data);
                                 return;
@@ -163,8 +172,8 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private void Reject(NetPeer peer, RequestLordSolution data)
     {
         var message = data.Operation == LordSolutionOperation.Start
-            ? "The decree could not be accepted. Check your influence and speak to the artisan again."
-            : "The decree decision could not be applied. Check your influence and speak to the merchant again.";
+            ? "The lord solution could not be accepted. Check your influence and speak to the issue giver again."
+            : "The lord solution decision could not be applied. Check your influence and try again.";
         network.Send(peer, new SendInformationMessage(message));
         if (data.Operation != LordSolutionOperation.Start)
             network.Send(peer, new NetworkLordSolutionRejected(data.IssueOwnerId, data.IssueId));
@@ -193,9 +202,16 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         {
             if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
             ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
+            var strayQuest = issue.IssueQuest;
+            issue.IssueQuest = null;
             using (new AllowedThread())
             using (new IssueDifficultyOverride(data.Difficulty))
             {
+                if (strayQuest != null)
+                {
+                    if (strayQuest.IsOngoing) strayQuest.CompleteQuestWithCancel();
+                    journal.DiscardArchive(issue);
+                }
                 if (data.ControllerId == controller.ControllerId) issue.StartIssueWithLordSolution();
                 else issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
             }

@@ -1,21 +1,28 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Coop.Core.Server.Connections.Messages;
+using Common;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Registries;
+using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -114,6 +121,279 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     public void Dispose() => environment.Dispose();
 
     [Fact]
+    public void LordStart_UsesTheRequestingPlayersDifficulty()
+    {
+        ClientA.Call(() =>
+        {
+            using (new IssueDifficultyOverride(2f))
+                Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution();
+        });
+
+        Assert.Equal(2f, Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>()).Difficulty);
+        Assert.Equal(2f, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()).Difficulty);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(2f, Get<Hero>(instance, scenario.NotableId).Issue._issueDifficultyMultiplier));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NoCounterOffer_MenuReplayRequestsTheServerAndDoesNotCompleteLocally(bool influenceDropped)
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        // Exercise IssueBase's no-counteroffer menu branch on the owner; retain the real artisan's
+        // merchant on the server because its reward consequence changes that merchant's power.
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CounterOfferHero = null);
+        if (influenceDropped)
+            Server.Call(() =>
+            {
+                Get<Hero>(Server, scenario.NotableId).Issue.CounterOfferHero = null;
+                Get<Clan>(Server, clanId).Influence = 0;
+            });
+        environment.FlushCoalescer();
+        // The framework sees a no-counteroffer issue; the actual artisan reward still needs its merchant.
+        var harmony = new Harmony($"no-counteroffer-rewards.{Guid.NewGuid():N}");
+        harmony.Patch(AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)),
+            prefix: new HarmonyMethod(typeof(ArtisanOverpricedGoodsTests), nameof(RestoreRewardMerchant)));
+        try
+        {
+            OnMapAfterConversation(ClientA, () =>
+            {
+                using (new AllowedThread())
+                    CampaignEventDispatcher.Instance.BeforeGameMenuOpened(null);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+        environment.FlushCoalescer();
+
+        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+            request => request.Operation == LordSolutionOperation.RefuseCounterOffer);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertFinished(2530, 10900);
+        AssertEffects(210, 90, 5, -10);
+    }
+
+    private static void RestoreRewardMerchant(Issue __instance)
+    {
+        if (ModInformation.IsServer)
+            __instance.CounterOfferHero = __instance.IssueSettlement.Notables.First(hero => hero.IsMerchant);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LordCompletion_ArchivesOnlyTheOwnerIncludingTheDownloadedSave(bool counterOffer)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var ownerIssue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+        ClientA.Call(() =>
+        {
+            if (counterOffer) ownerIssue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
+            else ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+        });
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                log => log.IsRelatedTo(ownerIssue)));
+            Assert.True(entry.IsEnded());
+            Assert.Equal(counterOffer, entry.IsEndedUnsuccessfully());
+        });
+        LogEntry[] history = null!;
+        Server.Call(() =>
+        {
+            history = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray();
+            var entry = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(history.OfType<JournalLogEntry>()));
+            Assert.Equal(QuestScenario.ControllerA, entry.OwnerControllerId);
+            Assert.True(entry.IsEnded());
+        });
+        ClientB.Call(() =>
+        {
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(history);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+        });
+    }
+
+    [Fact]
+    public void LordOwnershipSnapshot_NormalizesTheLoadedSolverFlag()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        ClientB.Call(() => Get<Hero>(ClientB, scenario.NotableId).Issue.IsTriedToSolveBefore = true);
+        ClientB.SimulateMessage(Server.NetPeer, new NetworkIssueOwnershipSnapshot(new[]
+        {
+            new IssueOwnershipData(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA),
+        }));
+        ClientB.Call(() => Assert.False(Get<Hero>(ClientB, scenario.NotableId).Issue.IsTriedToSolveBefore));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LordCompletion_NormalizesTheLoadedNonOwnerBeforeOrAfterItsSnapshot(bool completesBeforeSnapshot)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var ownerIssue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+        var observerIssue = Get<Hero>(ClientB, scenario.NotableId).Issue;
+        IssueBase.IssueState savedState = default;
+        var savedTried = false;
+        var savedLog = "";
+        Server.Call(() =>
+        {
+            var savedIssue = Get<Hero>(Server, scenario.NotableId).Issue;
+            savedState = savedIssue._issueState;
+            savedTried = savedIssue.IsTriedToSolveBefore;
+            savedLog = Assert.Single(savedIssue.JournalEntries).LogText.ToString();
+        });
+        Assert.True(savedTried);
+        ClientB.Call(() =>
+        {
+            // A joining client loads the server's pending issue before its ownership snapshot arrives.
+            ClientB.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            observerIssue._issueState = savedState;
+            observerIssue.IsTriedToSolveBefore = savedTried;
+            using (new AllowedThread())
+                observerIssue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(savedLog)));
+        });
+        if (!completesBeforeSnapshot)
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignEntered(ClientB.NetPeer)));
+
+        ClientA.Call(() => ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        if (completesBeforeSnapshot)
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerCampaignEntered(ClientB.NetPeer)));
+        environment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        ClientA.Call(() =>
+        {
+            Assert.True(ownerIssue.IsTriedToSolveBefore);
+            Assert.Equal(2, ownerIssue.JournalEntries.Count);
+            Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerIssue) && entry.IsEnded()));
+        });
+        ClientB.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+            Assert.False(observerIssue.IsTriedToSolveBefore);
+            Assert.Null(Get<Hero>(ClientB, scenario.NotableId).Issue);
+        });
+    }
+
+    [Fact]
+    public void PendingLordCancellation_TransportsTheLocalizedEndingOnlyToItsOwner()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var ownerIssue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+        var observerIssue = Get<Hero>(ClientB, scenario.NotableId).Issue;
+        var expected = "";
+        Server.Call(() =>
+        {
+            var issue = Get<Hero>(Server, scenario.NotableId).Issue;
+            var owner = Get<Hero>(Server, scenario.OwnerHeroId);
+            var text = new TextObject("{=rTvWdMXF}{DIED_HERO.LINK} died and your agreement with {?DIED_HERO.GENDER}her{?}him{\\?} canceled.");
+            StringHelpers.SetCharacterProperties("DIED_HERO", issue.IssueOwner.CharacterObject, text);
+            expected = text.ToString();
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                issue.CompleteIssueWithCancel(text);
+                Server.Resolve<IOutcomeDispatcher>().After(issue, IssueOutcome.QuestCancel);
+            }
+            Assert.Equal(2, issue.JournalEntries.Count);
+            Assert.Single(issue.JournalEntries, log => log.LogText.ToString() == expected);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        AssertFinished(2500, 10000);
+        AssertEffects(200, 100, 0, 0);
+        Server.Call(() => Assert.Equal(100, Get<Clan>(Server, clanId).Influence));
+        ClientA.Call(() =>
+        {
+            Assert.Equal(2, ownerIssue.JournalEntries.Count);
+            Assert.Single(ownerIssue.JournalEntries, log => log.LogText.ToString() == expected);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerIssue)));
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientB.Call(() =>
+        {
+            Assert.Empty(observerIssue.JournalEntries);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+        });
+    }
+
+    [Fact]
+    public void StaleDirectAccept_DoesNotReplaceAnAcceptedLordSolution()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        using var notifications = new MethodCallRecorder(
+            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithQuest()));
+
+        Assert.Equal(1, notifications.CountFor(ClientA));
+        Assert.Equal(0, notifications.CountFor(ClientB));
+        Assert.Equal(0, notifications.CountFor(Server));
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.Null(issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void RefusedDirectAccept_RestoresTheServersOriginalOfferDeadline()
+    {
+        CampaignTime due = default;
+        Server.Call(() => due = CampaignTime.DaysFromNow(7));
+        foreach (var instance in Instances)
+            instance.Call(() => Get<Hero>(instance, scenario.NotableId).Issue.IssueDueTime = due);
+        Server.Call(() => ((ArtisanPriceModel)Campaign.Current.Models.TradeItemPriceFactorModel).PriceIndex = 1f);
+        Accept();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        ClientA.Call(() => Assert.Equal(due, Get<Hero>(ClientA, scenario.NotableId).Issue.IssueDueTime));
+    }
+
+    [Fact]
+    public void LordAcceptance_RemovesALosingOptimisticQuestBeforeItsRejectionArrives()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        foreach (var instance in Instances)
+            instance.Call(() => SetupPlayer(instance, scenario.OtherHeroId, scenario.OtherPartyId, clanId));
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(ClientA.NetPeer, Server.NetPeer);
+        Accept();
+        var strayQuest = scenario.QuestOf(ClientA);
+        ClientB.Call(() => Get<Hero>(ClientB, scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.Null(issue.IssueQuest);
+            Assert.True(strayQuest.IsFinalized);
+            Assert.DoesNotContain(strayQuest, Campaign.Current.QuestManager.Quests);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(log => log.IsRelatedTo(issue)));
+        });
+        router.ResumeLink(ClientA.NetPeer, Server.NetPeer);
+        environment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+    }
+
+    [Fact]
     public void Acceptance_StartsOnlyTheOwnersQuestAndRetainsAnUnstartedServerCopy()
     {
         Accept();
@@ -166,6 +446,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Accept();
         Stock(2);
         ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkArtisanDeliveryProgress>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkArtisanDeliveryProgress>());
         foreach (var instance in new[] { Server, ClientA })
             instance.Call(() => Assert.Equal(2, QuestHere(instance)._givenTradeGoods));
         ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
@@ -181,6 +463,68 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         AssertFinished(2530, 10900);
         AssertEffects(210, 90, 5, -10);
         Server.Call(() => Assert.Equal(0, Get<MobileParty>(Server, scenario.OwnerPartyId).ItemRoster.GetItemNumber(Get<ItemObject>(Server, itemId))));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+
+        Accept();
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
+        if (success)
+        {
+            Stock(Amount);
+            ClientA.Call(() => ownerQuest.DeliverItemsFullyOnConsequence());
+            ClientA.Call(() => ownerQuest.CompleteQuestWithSuccess());
+        }
+        else
+        {
+            ClientA.Call(() => ownerQuest.CompleteQuestWithFail());
+        }
+
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, QuestScenario.IssueId, ownerQuest,
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
+    }
+
+    [Fact]
+    public void FailedAcceptDoesNotLeaveTheNextPlayersArchiveOwnedByTheRejectedPlayer()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(new[] { Server, ClientB });
+        var harmony = new Harmony($"{nameof(FailedAcceptDoesNotLeaveTheNextPlayersArchiveOwnedByTheRejectedPlayer)}.{Guid.NewGuid():N}");
+        var target = AccessTools.Method(typeof(ArtisanOverpricedGoodsQuestSolutionAcceptStrategy),
+            nameof(ArtisanOverpricedGoodsQuestSolutionAcceptStrategy.Apply));
+        harmony.Patch(target, prefix: new HarmonyMethod(typeof(ArtisanOverpricedGoodsTests), nameof(ThrowOnServerAccept)));
+        try
+        {
+            Accept();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Server.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => true)));
+
+        ClientB.Call(() => StartQuest(ClientB, scenario.NotableId));
+        Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+        var ownerQuest = (Quest)scenario.QuestOf(ClientB);
+        Server.Call(() => Get<MobileParty>(Server, scenario.OtherPartyId).ItemRoster.AddToCounts(Get<ItemObject>(Server, itemId), Amount));
+        environment.FlushCoalescer();
+        ClientB.Call(() => ownerQuest.DeliverItemsFullyOnConsequence());
+        ClientB.Call(() => ownerQuest.CompleteQuestWithSuccess());
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientB, ClientA, QuestScenario.IssueId, ownerQuest, IssueOutcome.QuestSuccess);
+    }
+
+    private static void ThrowOnServerAccept()
+    {
+        if (ModInformation.IsServer)
+            throw new InvalidOperationException("Stubbed accept failure");
     }
 
     [Theory]
@@ -266,6 +610,10 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             else issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
         });
         environment.FlushCoalescer();
+        var decision = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+            request => request.Operation != LordSolutionOperation.Start);
+        Assert.Equal(acceptMerchant ? LordSolutionOperation.AcceptCounterOffer : LordSolutionOperation.RefuseCounterOffer, decision.Operation);
+        Assert.Equal(0f, decision.Difficulty);
         var outcome = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome;
         Assert.Equal(acceptMerchant ? IssueOutcome.LordAcceptedCounterOffer : IssueOutcome.LordRefusedCounterOffer, outcome);
         AssertFinished(acceptMerchant ? 2470 : 2530, acceptMerchant ? 10000 : 10900);
@@ -418,6 +766,53 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerEnding_ArchivesTheVanillaTextOnceWithoutClientRewards(bool timeout)
+    {
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+        Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
+        var serverQuest = (Quest)scenario.QuestOf(Server);
+        using var gold = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GiveGoldAction), "ApplyInternal"));
+        using var traits = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.CharacterDevelopment.TraitLevelingHelper), "OnIssueSolvedThroughQuest", new[] { typeof(Hero), typeof(Tuple<TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject, int>[]) }));
+        var expected = "";
+        Server.Call(() =>
+        {
+            expected = (timeout ? serverQuest.TimeoutQuestLogText : serverQuest.SuccessQuestLogText).ToString();
+            if (timeout) serverQuest.CompleteQuestWithTimeOut();
+            else
+            {
+                serverQuest._givenTradeGoods = Amount;
+                serverQuest.CompleteQuestWithSuccess();
+            }
+        });
+        environment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        ClientA.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+        ClientB.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+            (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.RelatedHero == Get<Hero>(ClientB, scenario.NotableId))));
+        Assert.Equal(timeout ? 0 : 1, gold.CountFor(Server));
+        Assert.Equal(timeout ? 0 : 1, traits.CountFor(Server));
+        foreach (var client in environment.Clients)
+        {
+            Assert.Equal(0, gold.CountFor(client));
+            Assert.Equal(0, traits.CountFor(client));
+        }
+    }
+
     private static void OnMapAfterConversation(EnvironmentInstance client, Action act)
     {
         client.Call(() =>
@@ -454,12 +849,15 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, 150)]
-    [InlineData(true, 150)]
-    [InlineData(false, 100)]
-    public void CompanionSolution_ChargesOnceAndReturnsTroopsOnlyToItsOwner(bool failure, int companionSkill)
+    [InlineData(false, 150, false)]
+    [InlineData(true, 150, false)]
+    [InlineData(false, 100, false)]
+    [InlineData(false, 150, true)]
+    public void CompanionSolution_ChargesOnceAndReturnsTroopsOnlyToItsOwner(bool failure, int companionSkill, bool rejectAfterStart)
     {
         using var nativeState = new NativeHeroStateScope();
+        if (rejectAfterStart)
+            QuestJournalHistoryAssertions.RegisterJournalBehavior(new[] { Server });
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         var needed = 0;
@@ -491,26 +889,44 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         });
         environment.FlushCoalescer();
 
-        // PartyScreenLogic's separate commit has already removed the selected troops on the server.
-        Server.Call(() =>
+        var harmony = new Harmony($"alternative-archive-failure.{Guid.NewGuid():N}");
+        if (rejectAfterStart)
+            harmony.Patch(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution)),
+                postfix: new HarmonyMethod(typeof(ArtisanOverpricedGoodsTests), nameof(ThrowOnServerAccept)));
+        try
         {
-            var party = Get<MobileParty>(Server, scenario.OwnerPartyId);
-            party.MemberRoster.AddToCounts(Get<Hero>(Server, companionId).CharacterObject, -1);
-            party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), -needed);
-        });
-        environment.FlushCoalescer();
-
-        ClientA.Call(() =>
+            ClientA.Call(() =>
+            {
+                var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+                var companion = Get<Hero>(ClientA, companionId);
+                var troop = Get<CharacterObject>(ClientA, troopId);
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                AlternativeSolutionPickerDriver.Commit(ClientA, issue, Get<Hero>(ClientA, scenario.OwnerHeroId),
+                    Get<MobileParty>(ClientA, scenario.OwnerPartyId), troop, needed);
+                issue.AlternativeSolutionStartConsequence();
+                issue.StartIssueWithAlternativeSolution();
+            });
+        }
+        finally
         {
-            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
-            var companion = Get<Hero>(ClientA, companionId);
-            var troop = Get<CharacterObject>(ClientA, troopId);
-            issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-            issue.AlternativeSolutionSentTroops.AddToCounts(troop, needed);
-            issue.AlternativeSolutionStartConsequence();
-            issue.StartIssueWithAlternativeSolution();
-        });
+            harmony.UnpatchAll(harmony.Id);
+        }
         environment.FlushCoalescer();
+        if (rejectAfterStart)
+        {
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+            Server.Call(() =>
+            {
+                var issue = Get<Hero>(Server, scenario.NotableId).Issue;
+                Assert.True(issue.IsSolvingWithAlternative);
+                Assert.NotEmpty(issue.JournalEntries);
+                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+                Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry.IsRelatedTo(issue)));
+            });
+            return;
+        }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         foreach (var instance in new[] { Server, ClientA })
             instance.Call(() => Assert.Same(Get<Hero>(instance, companionId),

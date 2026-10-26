@@ -15,6 +15,7 @@ using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Concurrent;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Xunit;
@@ -33,7 +34,7 @@ public class CoopServerStartTests
         var holder = new NetManager(new EventBasedNetListener());
         try
         {
-            Assert.True(holder.StartInManualMode(0));
+            Assert.True(holder.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             int port = holder.LocalPort;
             using var broker = new TestMessageBroker();
 
@@ -113,10 +114,14 @@ public class CoopServerStartTests
         return logs.ToArray();
     }
 
+    /// <summary>Builds a server on <paramref name="port"/> that binds loopback only.</summary>
     private static CoopServer CreateServer(int port, TestMessageBroker broker, CancellationTokenSource cancellation)
     {
         var config = new Mock<INetworkConfig>();
         config.SetupGet(value => value.Port).Returns(port);
+        // Loopback only, so the test host never opens a port the firewall prompts for.
+        config.SetupGet(value => value.BindAddressIPv4).Returns(IPAddress.Loopback);
+        config.SetupGet(value => value.BindAddressIPv6).Returns(IPAddress.IPv6Loopback);
         config.SetupGet(value => value.DisconnectTimeout).Returns(TimeSpan.FromSeconds(5));
         config.SetupGet(value => value.UpdateTime).Returns(TimeSpan.FromMilliseconds(15));
         config.SetupGet(value => value.NetworkPollInterval).Returns(TimeSpan.FromMilliseconds(25));
@@ -127,7 +132,7 @@ public class CoopServerStartTests
             Mock.Of<IPacketManager>(),
             Mock.Of<IMessagePacketHandler>(),
             Mock.Of<IConnectionMessageQueue>(),
-            Mock.Of<IServerAdmissionGate>(),
+            Mock.Of<IServerJoinAdmission>(),
             Mock.Of<IJoinPeerTerminator>(),
             Mock.Of<IControllerIdProvider>(),
             Mock.Of<IMissionManager>(),

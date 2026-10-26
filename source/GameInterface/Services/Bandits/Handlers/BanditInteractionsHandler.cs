@@ -3,9 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Bandits.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
@@ -27,17 +29,20 @@ internal class BanditInteractionsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public BanditInteractionsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<SetPlayerBanditInteraction>(Handle_SetPlayerBanditInteraction);
         messageBroker.Subscribe<NetworkSetPlayerBanditInteraction>(Handle_NetworkSetPlayerBanditInteraction);
@@ -103,6 +108,8 @@ internal class BanditInteractionsHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+
             // Guard against saving ids that can't be resolved on the server
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.ConversationPartyId, out var _)) return;
@@ -281,7 +288,11 @@ internal class BanditInteractionsHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
-                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
+                // Recruitment listeners need the player from this encounter on the dedicated server.
+                using (new MainHeroSubstitutionScope(mainParty.LeaderHero, mainParty))
+                {
+                    CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
+                }
                 DestroyPartyAction.Apply(mainParty.Party, mobileParty);
             }
         });
