@@ -211,4 +211,12 @@ public class BattleAgentSpawnData
         SiegeEquipmentGrantRevision = siegeEquipmentGrantRevision;
         ShipId = shipId;
     }
+
+    /// <summary>This record with another spawn position and every other field kept.</summary>
+    public BattleAgentSpawnData WithPosition(Vec3 position) => new BattleAgentSpawnData(
+        AgentId, CharacterId, position, Side, Health, OwnerControllerId, MapEventPartyId, TroopSeed, SpawnEquipment,
+        BodyProperties, MissionEquipmentData, MountAgentId, FormationIndex, MovementId, MountMovementId,
+        OriginalOwnerControllerId, HasCurrentEquipment ? CurrentEquipment : (AgentEquipmentData?)null, MovementScopeId,
+        MountOriginalOwnerControllerId, MountMovementScopeId, IsRunningAway, AuthorityRevision, MountAuthorityRevision,
+        MountOwnerControllerId, SiegeEquipmentGrant, SiegeEquipmentGrantRevision, ShipId);
 }

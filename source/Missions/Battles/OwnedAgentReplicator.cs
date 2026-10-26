@@ -38,7 +38,8 @@ public interface IOwnedAgentReplicator : IDisposable
     void ReplicateCurrentAgentsTo(string controllerId);
     void RecoverRetainedPlayerHandoffs(float dt);
 
-    /// <summary>[Owner, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
+    /// <summary>[Owner, game thread] Send newly captured agents, at their current positions, as bounded batches once per
+    /// mission tick.</summary>
     void FlushPendingSpawns();
     void FlushPendingFormations();
 
@@ -70,7 +71,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private float retainedHeroRecoverySeconds;
-    private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
+    // Captured spawns waiting for the next tick's batch, each with the agent it was captured from.
+    private readonly List<(Agent Agent, BattleAgentSpawnData Record)> pendingSpawns =
+        new List<(Agent Agent, BattleAgentSpawnData Record)>();
     private readonly HashSet<Agent> pendingFormations = new HashSet<Agent>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
@@ -186,20 +189,24 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             authorityMigrator.TrySurrenderPlayerHero(data);
     }
 
+    /// <inheritdoc/>
     public void FlushPendingSpawns()
     {
         if (pendingSpawns.Count == 0) return;
 
-        IReadOnlyList<NetworkSpawnBattleAgents> batches =
-            spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
-        int recordCount = pendingSpawns.Count;
+        var records = pendingSpawns.ConvertAll(pending => AtCurrentPosition(pending.Agent, pending.Record));
         pendingSpawns.Clear();
-
+        IReadOnlyList<NetworkSpawnBattleAgents> batches = spawnBatchCodec.Encode(records, SpawnBatchPurpose.Initial);
         foreach (NetworkSpawnBattleAgents batch in batches)
             network.SendAll(batch);
 
-        LogBatchSend("Broadcast", recordCount, batches, null);
+        LogBatchSend("Broadcast", records.Count, batches, null);
     }
+
+    // The record at its agent's current spot, since native can move a spawn before the batch goes out (an AI crew is
+    // teleported to its oars in its spawn frame); a gone agent keeps its captured spot.
+    private static BattleAgentSpawnData AtCurrentPosition(Agent agent, BattleAgentSpawnData record) =>
+        agent.IsActive() ? record.WithPosition(agent.Position) : record;
 
     public void BroadcastOwnDeployedTroops()
     {
@@ -468,7 +475,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
         // Coalesce captures from native's spawn loop. The next mission tick emits bounded compressed batches
         // instead of hundreds of singleton reliable messages.
-        pendingSpawns.Add(data);
+        pendingSpawns.Add((agent, data));
         Logger.Debug("[BattleSync] Captured own spawn {Char} (agent {AgentId}); queued for batched replication", characterId, agentId);
     }
 
