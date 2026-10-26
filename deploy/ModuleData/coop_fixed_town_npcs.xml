@@ -567,7 +567,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="If you’ve come for trouble, you’ll find it. If not, you’re welcome here."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
@@ -845,6 +845,36 @@
         <equipment slot="Body" id="Item.sturgia_cavalry_armor" />
         <equipment slot="Gloves" id="Item.decorated_imperial_gauntlets" />
         <equipment slot="Leg" id="Item.strapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_8de19a17"
+    name="{=!}Viktorovich"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Die Heizungsanlagen laufen – wird es nicht Zeit, dass auch wir uns an die Arbeit machen?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.battanian_plated_noble_helmet" />
+        <equipment slot="Cape" id="Item.varangian_bra_scale" />
+        <equipment slot="Body" id="Item.desert_scale_armor" />
+        <equipment slot="Gloves" id="Item.mail_mitten_h" />
+        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>

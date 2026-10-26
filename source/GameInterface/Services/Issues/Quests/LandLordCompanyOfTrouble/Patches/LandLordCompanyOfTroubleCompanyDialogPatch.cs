@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBeha
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class LandLordCompanyOfTroubleCompanyDialogPatch
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.CompanyDialogFromCondition))]

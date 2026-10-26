@@ -4,14 +4,18 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -29,6 +33,8 @@ internal class FinalizationCoordinator : IHandler
     private readonly IIssueResolver issueResolver;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
+    private readonly IControllerIdProvider controller;
+    private readonly IAlternativeSolutionCommitments commitments;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -36,7 +42,9 @@ internal class FinalizationCoordinator : IHandler
         IObjectManager objectManager,
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IControllerIdProvider controller,
+        IAlternativeSolutionCommitments commitments)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -44,12 +52,16 @@ internal class FinalizationCoordinator : IHandler
         this.issueResolver = issueResolver;
         this.ownership = ownership;
         this.playerManager = playerManager;
+        this.controller = controller;
+        this.commitments = commitments;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
+        messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
+        messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
         messageBroker.Subscribe<NetworkIssueFinalized>(Handle_NetworkIssueFinalized);
     }
 
@@ -60,6 +72,8 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
+        messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
+        messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
         messageBroker.Unsubscribe<NetworkIssueFinalized>(Handle_NetworkIssueFinalized);
     }
 
@@ -77,7 +91,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome));
+        network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
     }
 
     // Client only.
@@ -114,14 +128,14 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out _, out var playerHero))
+            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
                 return;
             }
 
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
-                CompleteOnServer(issue, data.Outcome);
+                CompleteOnServer(issue, descriptor, data.Outcome, data.Log);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -167,6 +181,53 @@ internal class FinalizationCoordinator : IHandler
         }, context: nameof(FinalizationCoordinator));
     }
 
+    private void Handle_IssueJournalObserved(MessagePayload<IssueJournalObserved> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var issue = payload.What.Issue;
+        if (issue.IsSolvingWithAlternative ||
+            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
+            !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
+            !playerManager.TryGetPeer(owner, out var peer)) return;
+
+        var quest = issue.IssueQuest;
+        var entries = quest?.JournalEntries ?? issue.JournalEntries;
+        network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
+            entries.Select(log => log.LogText).Where(text => text != null).ToArray()));
+    }
+
+    private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
+                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
+
+            var quest = issue.IssueQuest;
+            if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
+                !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
+            if (!data.IsQuestJournal && quest != null) return;
+
+            var entries = quest?.JournalEntries ?? issue.JournalEntries;
+            var existing = entries.Where(log => log.LogText != null).GroupBy(log => log.LogText.ToString())
+                .ToDictionary(group => group.Key, group => group.Count());
+            foreach (var text in data.Logs ?? Array.Empty<TextObject>())
+            {
+                if (text == null) continue;
+                var key = text.ToString();
+                if (existing.TryGetValue(key, out var count) && count > 0)
+                {
+                    existing[key] = count - 1;
+                    continue;
+                }
+                if (quest != null) quest.AddLog(text);
+                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
+            }
+        }, context: nameof(FinalizationCoordinator));
+    }
+
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
     {
@@ -182,6 +243,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
@@ -199,7 +261,9 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            ownership.Remove(data.IssueOwnerId);
+            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
+            var isOwner = hasOwner && owner == controller.ControllerId;
+            if (hasOwner) ownership.Remove(data.IssueOwnerId);
 
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
             {
@@ -209,7 +273,7 @@ internal class FinalizationCoordinator : IHandler
             using (new AllowedThread())
             using (new QuestEndingReplay())
             {
-                Replay(issue, data.Outcome);
+                Replay(issue, data.Outcome, isOwner);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -252,7 +316,7 @@ internal class FinalizationCoordinator : IHandler
         return objectManager.TryGetObjectWithLogging(player.HeroId, out playerHero);
     }
 
-    private void CompleteOnServer(IssueBase issue, IssueOutcome outcome)
+    private void CompleteOnServer(IssueBase issue, IQuestTypeDescriptor descriptor, IssueOutcome outcome, TextObject log)
     {
         if (!IsQuestOutcome(outcome))
         {
@@ -268,18 +332,42 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        TryCompleteQuest(quest, outcome);
+        if (outcome == IssueOutcome.QuestSuccess && descriptor.FinalizationProofStrategy != null)
+        {
+            Logger.Warning("Ignoring generic success for {issue}; its quest requires a finalization proof", issue.StringId);
+            return;
+        }
+
+        TryCompleteQuest(quest, outcome, log);
     }
 
-    private static void Replay(IssueBase issue, IssueOutcome outcome)
+    private static void Replay(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         var quest = issue.IssueQuest;
 
-        if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
+        if (quest != null && (!isOwner || !Campaign.Current.QuestManager.Quests.Contains(quest)))
         {
+            // Discard mirror bookkeeping without running task cancellation or quest gameplay hooks.
+            quest.ClearRelatedFields();
+            quest._questState = QuestBase.QuestStates.Finalized;
+            quest.OfferDialogFlow = null;
+            quest.DiscussDialogFlow = null;
+            quest.QuestCharacterDialogFlow = null;
+            quest.RemoveAllTrackedObjects();
+            if (!string.IsNullOrEmpty(quest.StringId) &&
+                !Campaign.Current.QuestManager.Quests.Any(other => other != quest && other.StringId == quest.StringId))
+                quest.RemoveAllMapMarkers();
+            Campaign.Current.QuestManager.OnQuestFinalized(quest);
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;
             quest = null;
+        }
+
+        if (!isOwner && quest == null)
+        {
+            issue.IsTriedToSolveBefore = false;
+            issue.IssueFinalized();
+            return;
         }
 
         if (quest != null && quest.IsOngoing && TryCompleteQuest(quest, outcome))
@@ -287,7 +375,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        TryCompleteIssue(issue, outcome);
+        TryCompleteIssue(issue, outcome, isOwner);
 
         if (quest != null && quest.IsOngoing)
         {
@@ -300,7 +388,7 @@ internal class FinalizationCoordinator : IHandler
         return outcome >= IssueOutcome.QuestSuccess && outcome <= IssueOutcome.QuestTimeOut;
     }
 
-    private static bool TryCompleteQuest(QuestBase quest, IssueOutcome outcome)
+    private static bool TryCompleteQuest(QuestBase quest, IssueOutcome outcome, TextObject log = null)
     {
         switch (outcome)
         {
@@ -308,23 +396,23 @@ internal class FinalizationCoordinator : IHandler
                 quest.CompleteQuestWithSuccess();
                 return true;
             case IssueOutcome.QuestFail:
-                quest.CompleteQuestWithFail();
+                quest.CompleteQuestWithFail(log);
                 return true;
             case IssueOutcome.QuestBetrayal:
-                quest.CompleteQuestWithBetrayal();
+                quest.CompleteQuestWithBetrayal(log);
                 return true;
             case IssueOutcome.QuestCancel:
-                quest.CompleteQuestWithCancel();
+                quest.CompleteQuestWithCancel(log);
                 return true;
             case IssueOutcome.QuestTimeOut:
-                quest.CompleteQuestWithTimeOut();
+                quest.CompleteQuestWithTimeOut(log);
                 return true;
             default:
                 return false;
         }
     }
 
-    private static bool TryCompleteIssue(IssueBase issue, IssueOutcome outcome)
+    private static bool TryCompleteIssue(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         switch (outcome)
         {
@@ -348,7 +436,16 @@ internal class FinalizationCoordinator : IHandler
                 issue.CompleteIssueWithStayAliveConditionsFailed();
                 return true;
             case IssueOutcome.AlternativeSolution:
+            case IssueOutcome.IssueFinishedByAiLord:
                 issue.IssueFinalized();
+                return true;
+            case IssueOutcome.LordAcceptedCounterOffer:
+                issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithBetrayal, Hero.MainHero);
+                return true;
+            case IssueOutcome.LordRefusedCounterOffer:
+                issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, Hero.MainHero);
                 return true;
             default:
                 return false;

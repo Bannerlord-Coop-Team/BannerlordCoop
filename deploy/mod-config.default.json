@@ -171,10 +171,10 @@
     "smithingStaminaRecoveryOutsideSettlements": true,
 
     // Set a multiplier for increasing/decreasing smithing stamina recovery speed.
-    // The vanilla rate is 1. The default for this mod is 0.1 as stamina regenerates in the smithing screen.
-    // Setting any lower than this won't decrease speed more.
+    // The vanilla rate is 1. The default for this mod is 0.6 as stamina regenerates in the smithing screen.
+    // Setting it lower than 0.1 won't decrease speed more.
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
-    "smithingStaminaRecoveryMultiplier": 0.1,
+    "smithingStaminaRecoveryMultiplier": 0.6,
 
     // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
@@ -221,6 +221,10 @@
 
     // Toggle players being allowed to join battles when wounded
     // Default is true
-    "playerWoundedBattleEntry": true
+    "playerWoundedBattleEntry": true,
+
+    // Set the time in seconds players have to vote on kingdom decisions.
+    // Default is 60. Values of 0 or lower will default back to 60.
+    "kingdomDecisionVoteTimeoutSeconds": 60
   }
 }

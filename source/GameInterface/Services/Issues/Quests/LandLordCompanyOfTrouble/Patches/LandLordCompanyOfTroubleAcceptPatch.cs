@@ -7,6 +7,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBeha
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class LandLordCompanyOfTroubleAcceptPatch
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]

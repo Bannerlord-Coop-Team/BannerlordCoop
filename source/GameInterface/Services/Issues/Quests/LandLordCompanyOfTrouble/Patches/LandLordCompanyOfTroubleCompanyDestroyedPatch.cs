@@ -5,6 +5,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class LandLordCompanyOfTroubleCompanyDestroyedPatch
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMobilePartyDestroyed))]
