@@ -369,7 +369,7 @@
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
                              Command.Click="ActionRentServer" Parameter.Text="@RentServerButtonText" PositionXOffset="-20"
-                             Brush.GlobalColor="#FF4040FF"/>
+                             Brush="Coop.Button.Red"/>
           </Children>
         </ListPanel>
 
@@ -379,7 +379,7 @@
           <Children>
             <Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
                              Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"
-                             Brush.GlobalColor="#FF4040FF"/>
+                             Brush="Coop.Button.Red"/>
           </Children>
         </ListPanel>
 
