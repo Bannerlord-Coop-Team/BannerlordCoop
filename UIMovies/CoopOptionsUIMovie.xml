@@ -433,7 +433,8 @@
 					StackLayout.LayoutMethod="HorizontalLeftToRight">
 			<Children>
 				<Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-								Command.Click="ActionPatreon" Parameter.Text="@PatreonButtonText" PositionXOffset="-20"/>
+								Command.Click="ActionRentServer" Parameter.Text="@RentServerButtonText" PositionXOffset="-20"
+								Brush.GlobalColor="#FF4040FF"/>
 			</Children>
 		</ListPanel>
 
@@ -442,7 +443,8 @@
 					StackLayout.LayoutMethod="HorizontalLeftToRight">
 			<Children>
 				<Standard.Button HorizontalAlignment="Left" VerticalAlignment="Bottom"
-								Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"/>
+								Command.Click="ActionDonate" Parameter.Text="@DonateButtonText" PositionXOffset="-20"
+								Brush.GlobalColor="#FF4040FF"/>
 			</Children>
 		</ListPanel>
 
