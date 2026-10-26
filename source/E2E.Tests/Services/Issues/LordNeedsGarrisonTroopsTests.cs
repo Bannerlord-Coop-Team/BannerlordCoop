@@ -4,18 +4,24 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Issues.Framework.Finalization;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using System.IO;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssueQuest;
@@ -28,12 +34,68 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
     private readonly E2ETestEnvironment testEnvironment;
     private readonly string settlementId;
     private readonly string troopId;
+    private readonly string townId;
+    private readonly string giverClanId;
+    private readonly QuestScenario scenario;
 
     public LordNeedsGarrisonTroopsTests(ITestOutputHelper output)
     {
         testEnvironment = new E2ETestEnvironment(output);
         settlementId = testEnvironment.CreateRegisteredObject<Settlement>();
         troopId = testEnvironment.CreateRegisteredObject<CharacterObject>();
+        townId = testEnvironment.CreateRegisteredObject<Town>();
+        giverClanId = testEnvironment.CreateRegisteredObject<Clan>();
+        scenario = new QuestScenario(testEnvironment, (instance, giver) =>
+        {
+            var troop = Get<CharacterObject>(instance, troopId);
+            troop.UpgradeTargets = Array.Empty<CharacterObject>();
+            troop._basicName = new TextObject("Test troop");
+            troop.Level = 20;
+            var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            culture.BasicTroop = troop;
+            giver.CharacterObject.Culture = culture;
+            var giverClan = Get<Clan>(instance, giverClanId);
+            giverClan.Culture = culture;
+            giver.Clan = giverClan;
+            giver.CharacterObject._basicName = new TextObject("Garrison giver");
+            giver.Culture.BasicTroop = troop;
+            Assert.NotNull(troop.UpgradeTargets);
+            return new Issue(giver, Get<Settlement>(instance, settlementId));
+        });
+
+        foreach (var instance in testEnvironment.Clients.Prepend(testEnvironment.Server))
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                    var settlement = Get<Settlement>(instance, settlementId);
+                    var town = Get<Town>(instance, townId);
+                    var giver = Get<Hero>(instance, scenario.NotableId);
+                    var giverClan = Get<Clan>(instance, giverClanId);
+                    var owner = Get<Hero>(instance, scenario.OwnerHeroId);
+                    var ownerParty = Get<MobileParty>(instance, scenario.OwnerPartyId);
+
+                    settlement.SetSettlementComponent(town);
+                    town._ownerClan = giverClan;
+                    giver.Clan = giverClan;
+                    giverClan._leader = giver;
+                    GarrisonPartyComponent.CreateGarrisonParty("garrison-test", settlement);
+                    owner._partyBelongedTo = ownerParty;
+                    ownerParty.CurrentSettlement = settlement;
+                    owner.Gold = 10000;
+
+                    if (instance == testEnvironment.Clients.First())
+                    {
+                        Game.Current.PlayerTroop = owner.CharacterObject;
+                        Campaign.Current.MainParty = ownerParty;
+                        Campaign.Current.PlayerDefaultFaction = owner.Clan;
+                    }
+                }
+            });
+        }
     }
 
     public void Dispose() => testEnvironment.Dispose();
@@ -136,14 +198,89 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         {
             var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess));
             var patches = Harmony.GetPatchInfo(target);
-
-            if (patches?.Prefixes != null)
-            {
-                Assert.DoesNotContain(patches.Prefixes, prefix =>
-                    prefix.PatchMethod.DeclaringType?.FullName ==
-                    "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
-            }
+            Assert.NotNull(patches);
+            Assert.NotNull(patches!.Prefixes);
+            Assert.DoesNotContain(patches.Prefixes, prefix =>
+                prefix.PatchMethod.DeclaringType?.FullName ==
+                "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
         });
+    }
+
+    [Fact]
+    public void DirectHandInSuccessMirrorsOneVanillaSuccessEntryToOwnerAndArchive()
+    {
+        foreach (var instance in testEnvironment.Clients.Prepend(testEnvironment.Server))
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+
+        var rewardPatch = new Harmony($"garrison-direct-success.{Guid.NewGuid():N}");
+        rewardPatch.Patch(
+            AccessTools.PropertyGetter(typeof(Issue), "RewardGold"),
+            prefix: new HarmonyMethod(typeof(LordNeedsGarrisonTroopsTests), nameof(ReturnTestReward)));
+        try
+        {
+            scenario.Accept(scenario.ClientA);
+            var serverQuest = (Quest)scenario.QuestOf(scenario.Server);
+            var ownerQuest = (Quest)scenario.QuestOf(scenario.ClientA);
+
+            scenario.ClientA.Call(() =>
+            {
+                using var allowed = new AllowedThread();
+                var accepted = AccessTools.Method(typeof(Quest), "QuestAcceptedConsequences");
+                Assert.NotNull(accepted);
+                accepted!.Invoke(ownerQuest, null);
+            });
+
+            string expected = null!;
+            scenario.Server.Call(() =>
+            {
+                expected = Assert.IsType<TextObject>(AccessTools.PropertyGetter(typeof(Quest), "SuccessQuestLogText")!.Invoke(serverQuest, null)).ToString();
+                serverQuest._questState = QuestBase.QuestStates.Ongoing;
+                serverQuest._settlement.Town!.GarrisonParty!.MemberRoster.AddToCounts(
+                    Get<CharacterObject>(scenario.Server, troopId), 5);
+                var party = Get<MobileParty>(scenario.Server, scenario.OwnerPartyId);
+                party.MemberRoster.AddToCounts(Get<CharacterObject>(scenario.Server, troopId), 5);
+                Campaign.Current.MainParty = party;
+
+                var owner = Get<Hero>(scenario.Server, scenario.OwnerHeroId);
+                using (new MainHeroSubstitutionScope(owner, party))
+                {
+                    Assert.True(Descriptor(scenario.Server).FinalizationProofStrategy!.TryRunBranch(
+                        serverQuest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
+                }
+            });
+            testEnvironment.FlushCoalescer();
+
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            scenario.Server.Call(() =>
+            {
+                Assert.Single(serverQuest.JournalEntries, log => log.LogText.ToString() == expected);
+                var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry.IsRelatedTo(serverQuest)));
+                Assert.True(archive.IsEnded());
+                Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+            });
+            scenario.ClientA.Call(() =>
+            {
+                Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+                var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry.IsRelatedTo(ownerQuest)));
+                Assert.True(archive.IsEnded());
+                Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+            });
+            scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId))));
+        }
+        finally
+        {
+            rewardPatch.UnpatchAll(rewardPatch.Id);
+        }
+    }
+
+    private static bool ReturnTestReward(ref int __result)
+    {
+        __result = 100;
+        return false;
     }
 
     [Theory]
@@ -200,4 +337,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 
     private static T Uninitialized<T>() where T : class =>
         (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
+
+    private static T Get<T>(EnvironmentInstance instance, string id) where T : class =>
+        instance.GetRegisteredObject<T>(id);
 }
