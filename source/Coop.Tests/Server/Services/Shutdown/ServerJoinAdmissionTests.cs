@@ -36,6 +36,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -118,6 +119,56 @@ public class ServerJoinAdmissionTests
         }, Password, () => broker.GetMessagesFromType<SendPopupMessage>().Any());
 
         Assert.Equal("The server rejected the connection.", Assert.Single(broker.GetMessagesFromType<SendPopupMessage>()).Text);
+    }
+
+    // A connection check that sends no usable join data, like the tools' Check server button (FF FF).
+    [Theory]
+    [InlineData(new byte[0])]
+    [InlineData(new byte[] { 0x01 })]
+    [InlineData(new byte[] { 0x05, 0x00 })]
+    [InlineData(new byte[] { 0xFF, 0xFF })]
+    public void ShortJoinData_IsRejectedForThePasswordWithoutThrowing(byte[] connectData)
+    {
+        int testThread = Environment.CurrentManagedThreadId;
+        var thrown = new ConcurrentQueue<Exception>();
+        EventHandler<FirstChanceExceptionEventArgs> record = (_, args) =>
+        {
+            if (Environment.CurrentManagedThreadId == testThread) thrown.Enqueue(args.Exception);
+        };
+
+        using var cancellation = new CancellationTokenSource();
+        using var server = CreateServer(new TestMessageBroker(), new ServerJoinAdmission(), cancellation);
+        var serverListener = new EventBasedNetListener();
+        serverListener.ConnectionRequestEvent += server.OnConnectionRequest;
+        var clientListener = new EventBasedNetListener();
+        byte? rejectCode = null;
+        clientListener.PeerDisconnectedEvent += (_, info) =>
+        {
+            if (info.Reason == DisconnectReason.ConnectionRejected) rejectCode = info.AdditionalData.GetByte();
+        };
+        var serverTransport = new NetManager(serverListener);
+        var clientTransport = new NetManager(clientListener);
+
+        AppDomain.CurrentDomain.FirstChanceException += record;
+        try
+        {
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            var data = new NetDataWriter();
+            data.Put(connectData);
+            clientTransport.Connect(new IPEndPoint(IPAddress.Loopback, serverTransport.LocalPort), data);
+
+            PumpUntil(serverTransport, clientTransport, cancellation.Token, () => rejectCode != null);
+        }
+        finally
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= record;
+            clientTransport.Stop();
+            serverTransport.Stop();
+        }
+
+        Assert.Equal((byte)ConnectionRejectCode.IncorrectPassword, rejectCode);
+        Assert.Empty(thrown);
     }
 
     [Fact]
