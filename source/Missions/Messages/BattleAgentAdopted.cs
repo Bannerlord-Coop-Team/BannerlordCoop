@@ -8,6 +8,7 @@ public readonly struct BattleAgentAdopted : IEvent
 {
     public readonly Agent Agent;
 
+    // Carries the agent the migrator just turned into this client's AI.
     public BattleAgentAdopted(Agent agent)
     {
         Agent = agent;

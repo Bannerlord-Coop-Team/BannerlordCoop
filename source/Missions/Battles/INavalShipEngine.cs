@@ -118,9 +118,8 @@ public interface INavalShipEngine
     MissionObject CrewHullOf(Agent agent);
 
     /// <summary>
-    /// [Game thread] Makes the agent vanilla's crew of <paramref name="hull"/>, its <see cref="CrewHullOf"/>: tracked on the hull
-    /// unless already tracked on one, and its own record of its formation's hull pointing at it. Vanilla's off-ship check moves
-    /// AI crew between hulls and assumes both.
+    /// [Game thread] Tracks the agent on <paramref name="hull"/> (unless already tracked) and points its FormationShip at it,
+    /// which vanilla's off-ship check assumes.
     /// </summary>
     void EnlistCrew(Agent agent, MissionObject hull);
 

@@ -12,9 +12,8 @@ namespace Missions.Battles;
 /// [Game thread] Moves a registered hull to a new authority. A hull this client takes over is replaced by a freshly
 /// simulated hull of the same ship, one step per mission tick (park its agents, replace the hull, board them again), keeping
 /// its ship id; a hull it hands away goes back to following samples. A departing hull is parked clear one tick and removed
-/// the next, after its departing crew withdrew. Agents this client takes over become vanilla's crew of their hull once it
-/// stays. Every path that spawns a hull itself opens <see cref="SuppressSpawnRegistration"/>, so the spawn event registers
-/// no own hull.
+/// the next, after its departing crew withdrew. An adopted agent is made vanilla's crew of its hull. Every path that
+/// spawns a hull itself opens <see cref="SuppressSpawnRegistration"/>, so the spawn event registers no own hull.
 /// </summary>
 public interface INavalHullAuthority : IDisposable
 {
@@ -42,8 +41,8 @@ public interface INavalHullAuthority : IDisposable
     void Remove(IReadOnlyList<NetworkShipInfo> ships, DepartingCrew crew);
 
     /// <summary>
-    /// Makes an agent this client's AI took over vanilla's crew of its hull, which vanilla's spawn did for the agents it
-    /// fielded: now, or once deployment ended and its hull is not being replaced or removed, which would take the crew with it.
+    /// Makes an adopted agent vanilla's crew of its formation's hull. Waits while deployment runs or that hull is being
+    /// replaced or removed, since vanilla fades a removed hull's crew.
     /// </summary>
     void EnlistCrew(Agent agent);
 
@@ -96,7 +95,7 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     private readonly List<HullRemoval> hullRemovals = new List<HullRemoval>();
-    private readonly List<Agent> unenlistedCrew = new List<Agent>();
+    private readonly List<Agent> waitingCrew = new List<Agent>();
     private int spawnScopes;
 
     public NavalHullAuthority(IBattleSession session, ICoopMissionComponent missionComponent, INavalShipEngine engine,
@@ -161,24 +160,31 @@ public class NavalHullAuthority : INavalHullAuthority
     // Enlists at once when it can, as vanilla's off-ship check may run for the agent in this very tick.
     public void EnlistCrew(Agent agent)
     {
-        unenlistedCrew.Add(agent);
-        EnlistSettledCrew();
+        if (!TryEnlist(agent)) waitingCrew.Add(agent);
     }
 
-    // An agent that died or has no crew hull left needs no enlisting; one whose hull is going waits for the hull it crews next.
-    private void EnlistSettledCrew()
+    // Offers each waiting agent again, taken off the queue first so a throwing enlist is not retried; one that still waits
+    // queues anew.
+    private void EnlistWaitingCrew()
     {
-        if (unenlistedCrew.Count == 0 || engine.IsDeploymentMode) return;
-
-        var goingHulls = HullsBeingRemoved.Concat(HullsBeingReplaced).ToList();
-        foreach (var agent in unenlistedCrew.ToArray())
+        foreach (var agent in waitingCrew.ToArray())
         {
-            var hull = engine.IsAlive(agent) ? engine.CrewHullOf(agent) : null;
-            if (hull != null && goingHulls.Contains(hull)) continue;
-
-            unenlistedCrew.Remove(agent);
-            if (hull != null) engine.EnlistCrew(agent, hull);
+            waitingCrew.Remove(agent);
+            EnlistCrew(agent);
         }
+    }
+
+    // False while deployment runs or the agent's crew hull is going; a dead agent or one without a crew hull needs nothing.
+    private bool TryEnlist(Agent agent)
+    {
+        if (engine.IsDeploymentMode) return false;
+
+        var hull = engine.IsAlive(agent) ? engine.CrewHullOf(agent) : null;
+        if (hull == null) return true;
+        if (HullsBeingRemoved.Contains(hull) || HullsBeingReplaced.Contains(hull)) return false;
+
+        engine.EnlistCrew(agent, hull);
+        return true;
     }
 
     public bool IsSettledFor(string owner) =>
@@ -220,7 +226,7 @@ public class NavalHullAuthority : INavalHullAuthority
         foreach (var swap in hullSwaps.ToArray())
             TickHullSwap(swap);
 
-        EnlistSettledCrew();
+        EnlistWaitingCrew();
     }
 
     // Advances one swap, which ends it when its ship went away or a step threw.
@@ -362,7 +368,7 @@ public class NavalHullAuthority : INavalHullAuthority
     {
         hullSwaps.Clear();
         hullRemovals.Clear();
-        unenlistedCrew.Clear();
+        waitingCrew.Clear();
     }
 
     private enum HullSwapPhase

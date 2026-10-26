@@ -417,6 +417,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     /// <summary>Every agent made vanilla's crew of a hull, in order; vanilla's tracking itself is not modelled here.</summary>
     public List<(Agent Agent, MissionObject Hull)> Enlistments { get; } = new();
 
+    // Records the enlistment; vanilla's tracking is not modelled.
     public void EnlistCrew(Agent agent, MissionObject hull) => Enlistments.Add((agent, hull));
 
     public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
