@@ -261,15 +261,10 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        // An ending callback can run again while succession replays the native character-change event.
-        // Ownership is removed with the first announcement, so do not broadcast the same issue twice.
-        if (!ownership.TryGetOwner(issueOwnerId, issue.StringId, out _))
-        {
-            return;
-        }
-
         if (!announcedIssues.Add(issue))
         {
+            // An ending callback can run again while succession replays the native character-change event.
+            // Keep the first callback's cleanup and announcement, then ignore the replay.
             return;
         }
 
