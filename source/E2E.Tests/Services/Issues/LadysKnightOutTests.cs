@@ -131,7 +131,10 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() =>
         {
             var serverQuest = (Quest)scenario.QuestOf(scenario.Server);
-            Assert.Empty(serverQuest.JournalEntries);
+            Assert.Equal(quest.JournalEntries.Count, serverQuest.JournalEntries.Count);
+            Assert.Equal(
+                quest.JournalEntries.Select(entry => entry.LogText.ToString()),
+                serverQuest.JournalEntries.Select(entry => entry.LogText.ToString()));
             Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
         });
     }
