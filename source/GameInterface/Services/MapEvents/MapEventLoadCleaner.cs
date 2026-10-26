@@ -24,7 +24,7 @@ public interface IMapEventLoadCleaner
     void CleanUpLoadedMapEvents();
 
     // Releases every party still linked to a battle that already ended, calling onReleased for each one
-    // as it is released. Also run live by coop.unstuck.
+    // as it is released. A throw from onReleased is logged and the rest are still released. Also run live by coop.unstuck.
     PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
 
     // Releases the parties of a battle whose finalize threw after it already ended, and publishes its end for the clients.

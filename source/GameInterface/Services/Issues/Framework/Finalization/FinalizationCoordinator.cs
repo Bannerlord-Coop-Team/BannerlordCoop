@@ -34,6 +34,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
+    private readonly IAlternativeSolutionCommitments commitments;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -42,7 +43,8 @@ internal class FinalizationCoordinator : IHandler
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IControllerIdProvider controller)
+        IControllerIdProvider controller,
+        IAlternativeSolutionCommitments commitments)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -51,6 +53,7 @@ internal class FinalizationCoordinator : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.controller = controller;
+        this.commitments = commitments;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -248,6 +251,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
@@ -350,20 +354,29 @@ internal class FinalizationCoordinator : IHandler
     {
         var quest = issue.IssueQuest;
 
-        // A non-owner's mirror has no quest. Only finalize it, otherwise vanilla's ending adds journal entries and
-        // issue updates for an issue this player never took. A lord solution has no quest on the owner either.
+        if (quest != null && (!isOwner || !Campaign.Current.QuestManager.Quests.Contains(quest)))
+        {
+            // Discard mirror bookkeeping without running task cancellation or quest gameplay hooks.
+            quest.ClearRelatedFields();
+            quest._questState = QuestBase.QuestStates.Finalized;
+            quest.OfferDialogFlow = null;
+            quest.DiscussDialogFlow = null;
+            quest.QuestCharacterDialogFlow = null;
+            quest.RemoveAllTrackedObjects();
+            if (!string.IsNullOrEmpty(quest.StringId) &&
+                !Campaign.Current.QuestManager.Quests.Any(other => other != quest && other.StringId == quest.StringId))
+                quest.RemoveAllMapMarkers();
+            Campaign.Current.QuestManager.OnQuestFinalized(quest);
+            issue.IssueQuest = null;
+            issue.IsTriedToSolveBefore = false;
+            quest = null;
+        }
+
         if (!isOwner && quest == null)
         {
             issue.IsTriedToSolveBefore = false;
             issue.IssueFinalized();
             return;
-        }
-
-        if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
-        {
-            issue.IssueQuest = null;
-            issue.IsTriedToSolveBefore = false;
-            quest = null;
         }
 
         if (quest != null && quest.IsOngoing && TryCompleteQuest(quest, outcome))

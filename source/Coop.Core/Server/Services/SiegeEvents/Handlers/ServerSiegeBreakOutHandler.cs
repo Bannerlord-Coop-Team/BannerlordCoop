@@ -56,48 +56,75 @@ internal class ServerSiegeBreakOutHandler : IHandler
     {
         if (!(payload.Who is NetPeer peer)) return;
         var request = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => network.Send(peer, Answer(peer, request)), context: nameof(NetworkRequestBreakOut));
+    }
+
+    // Every failure still answers, so the client never waits on a reply that is not coming.
+    private NetworkBreakOutResult Answer(NetPeer peer, NetworkRequestBreakOut request)
+    {
+        var rejected = new NetworkBreakOutResult(request.RequestId, false, Array.Empty<uint>(), Array.Empty<int>(), -1);
+        try
         {
-            var result = new NetworkBreakOutResult(request.RequestId, false, Array.Empty<uint>(), Array.Empty<int>(), -1);
-            if (playerManager.TryGetPlayer(peer, out var player) &&
-                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var controlled) &&
-                objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) &&
-                ReferenceEquals(controlled, party) &&
-                objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) &&
-                objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) &&
-                party.IsActive && party.CurrentSettlement == settlement && settlement.SiegeEvent == siege &&
-                party.BesiegerCamp == null && party.MapEvent == null && settlement.Party?.MapEvent == null &&
-                // The client flag alone never opens the port; vanilla needs a port, ships and the fleet anchored there.
-                (!request.IsFromPort || breakOut.CanBreakOutFromPort(party, settlement)))
-            {
-                if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
-                {
-                    // A paid gate break out is not reused for the port or the other way round, so this request is turned down.
-                    if (receipt.IsFromPort == request.IsFromPort)
-                        result = new NetworkBreakOutResult(request.RequestId, receipt.Result.Approved,
-                            receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
-                }
-                else
-                {
-                    try
-                    {
-                        int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
-                        var paidReceipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = result };
-                        var paid = sacrifice.TryApply(party, losses, () => receipts[party] = paidReceipt);
-                        if (paid != null)
-                        {
-                            result = new NetworkBreakOutResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
-                            paidReceipt.Result = result;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Failed to apply breakout request {RequestId}", request.RequestId);
-                    }
-                }
-            }
-            network.Send(peer, result);
-        }, context: nameof(NetworkRequestBreakOut));
+            return Apply(peer, request, rejected);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to apply breakout request {RequestId}", request.RequestId);
+            return rejected;
+        }
+    }
+
+    private NetworkBreakOutResult Apply(NetPeer peer, NetworkRequestBreakOut request, NetworkBreakOutResult rejected)
+    {
+        if (!playerManager.TryGetPlayer(peer, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var controlled) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) ||
+            !ReferenceEquals(controlled, party))
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} from a peer that does not control party {PartyId}",
+                request.RequestId, request.PartyId);
+            return rejected;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) ||
+            !objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) ||
+            settlement.SiegeEvent != siege)
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} for party {PartyId} and settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        if (!party.IsActive || party.CurrentSettlement != settlement || party.BesiegerCamp != null ||
+            party.MapEvent != null || settlement.Party?.MapEvent != null)
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} for party {PartyId} that cannot leave settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        // The client flag alone never opens the port; vanilla needs a port, ships and the fleet anchored there.
+        if (request.IsFromPort && !breakOut.CanBreakOutFromPort(party, settlement))
+        {
+            Logger.Warning("Rejecting port breakout request {RequestId} for party {PartyId} that cannot use the port of {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
+        {
+            // A paid gate break out is not reused for the port or the other way round, so this request is turned down.
+            if (receipt.IsFromPort != request.IsFromPort) return rejected;
+            return new NetworkBreakOutResult(request.RequestId, receipt.Result.Approved,
+                receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
+        }
+
+        int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
+        var paidReceipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = rejected };
+        var paid = sacrifice.TryApply(party, losses, () => receipts[party] = paidReceipt);
+        if (paid == null) return rejected;
+        paidReceipt.Result = new NetworkBreakOutResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
+        return paidReceipt.Result;
     }
 
     private void HandleEnter(MessagePayload<PartyEnterSettlementAttempted> payload)
