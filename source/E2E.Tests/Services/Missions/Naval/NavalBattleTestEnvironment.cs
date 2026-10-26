@@ -477,8 +477,11 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             });
             Services = instance.Resolve<INavalBattleServicesFactory>().Create(
                 controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine,
-                engine, Mock.Of<IAsyncAgentTick>());
+                engine, AsyncAgentTick);
         }
+
+        /// <summary>The async agent tick the ship services read; idle unless a scenario sets it running.</summary>
+        public FakeAsyncAgentTick AsyncAgentTick { get; } = new();
 
         /// <summary>The membership the ship services' gate reads.</summary>
         public NavalMissionMembers Members { get; }
