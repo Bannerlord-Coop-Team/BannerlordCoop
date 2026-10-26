@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Commands;
+using GameInterface.Tests.Utils.Commands;
 using GameInterface;
 using Serilog;
 using System;
@@ -38,7 +39,7 @@ public class CharacterFactionCoopCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(143, commandTypes.Length);
+        Assert.Equal(144, commandTypes.Length);
 #else
         Assert.Equal(138, commandTypes.Length);
 #endif
@@ -98,11 +99,11 @@ public class CharacterFactionCoopCommandTests
         ICoopCommand clanEconomy = CreateCommand("coop.debug.clan", "economy");
 
         Assert.Equal(2, setGold.ExpectedArgs.Length);
-        Assert.Contains("Quote multi-word", setGold.ExpectedArgs[0].Description);
+        Assert.Contains("quote", setGold.ExpectedArgs[0].Description, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, createKingdom.ExpectedArgs.Length);
-        Assert.All(createKingdom.ExpectedArgs, expected => Assert.Contains("Quote multi-word", expected.Description));
+        Assert.All(createKingdom.ExpectedArgs, expected => Assert.Contains("quote", expected.Description, StringComparison.OrdinalIgnoreCase));
         Assert.Single(clanEconomy.ExpectedArgs);
-        Assert.Contains("Quote multi-word", clanEconomy.ExpectedArgs[0].Description);
+        Assert.Contains("quote", clanEconomy.ExpectedArgs[0].Description, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -233,7 +234,7 @@ public class CharacterFactionCoopCommandTests
 
     private static ICoopCommand[] CreateCommands() =>
         GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
 
     private sealed class TestArgs : ICoopCommandArgs

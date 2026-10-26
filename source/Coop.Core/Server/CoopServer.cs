@@ -212,11 +212,12 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         FlushPendingMessages();
     }
 
+    /// <summary>Binds the configured address and port and starts polling, or logs why the bind failed.</summary>
     public override void Start()
     {
         Logger.Information("Server starting on port {Port}", Config.Port);
 
-        if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
+        if (netManager.Start(Config.BindAddressIPv4, Config.BindAddressIPv6, Config.Port))
         {
             Logger.Information("Server listening on UDP port {Port}", netManager.LocalPort);
             StartNetworkPoller();
@@ -231,7 +232,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
             return;
         }
 
-        UdpBindFailure failure = bindDiagnostics.Describe(Config.Port);
+        UdpBindFailure failure = bindDiagnostics.Describe(Config.BindAddressIPv4, Config.Port);
         Logger.Error("Server failed to bind UDP port {Port} ({SocketError:l}): {Detail:l}", Config.Port, failure.Error, failure.Detail);
     }
 
