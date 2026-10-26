@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -109,6 +110,7 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
+            if (data.Text != null && quest.JournalEntries.Any(log => log.LogText?.ToString() == data.Text.ToString())) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())
                 quest.AddLog(data.Text);
