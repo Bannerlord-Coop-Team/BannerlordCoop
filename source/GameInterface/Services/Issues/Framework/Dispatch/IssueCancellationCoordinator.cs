@@ -37,7 +37,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (victim.Issue == null) return true;
         if (!PrepareCancellation(victim.Issue, out owner)) return false;
 
-        if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing)
+        if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing && registry.IsRegistered(victim.Issue.GetType()))
         {
             CancelQuestAndIssue(victim.Issue, BuildGiverDeathLog(victim.Issue));
             return false;
