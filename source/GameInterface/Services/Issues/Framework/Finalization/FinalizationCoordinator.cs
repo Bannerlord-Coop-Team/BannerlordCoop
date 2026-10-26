@@ -195,6 +195,8 @@ internal class FinalizationCoordinator : IHandler
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
+        Logger.Information("sending issue journal {issue}, entries={entries}, latest={latest}", issue.StringId, entries.Count,
+            entries.Where(log => log.LogText != null).Select(log => log.LogTime.NumTicks).DefaultIfEmpty(long.MinValue).Max());
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
             entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
     }
@@ -209,6 +211,9 @@ internal class FinalizationCoordinator : IHandler
                 !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
 
             var quest = issue.IssueQuest;
+            Logger.Information("received issue journal {issue}, quest={quest}, ongoing={ongoing}, entries={entries}, latest={latest}",
+                data.IssueId, quest != null, quest?.IsOngoing, data.Logs?.Length ?? 0,
+                (data.Logs ?? Array.Empty<IssueJournalEntry>()).Where(log => log.Text != null).Select(log => log.Time.NumTicks).DefaultIfEmpty(long.MinValue).Max());
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
             if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
@@ -276,6 +281,7 @@ internal class FinalizationCoordinator : IHandler
         {
             var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
             var isOwner = hasOwner && owner == controller.ControllerId;
+            Logger.Information("received issue finalized {issue}, owner={owner}, isOwner={isOwner}", data.IssueId, hasOwner, isOwner);
             if (hasOwner) ownership.Remove(data.IssueOwnerId);
 
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
