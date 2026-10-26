@@ -130,7 +130,11 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
 
-    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload) => FlushAcceptanceJournals();
+    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload)
+    {
+        FlushAcceptanceJournals();
+        acceptingQuests.Clear();
+    }
 
     private void FlushAcceptanceJournals()
     {
