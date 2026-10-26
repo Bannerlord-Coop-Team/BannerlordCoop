@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -12,10 +13,12 @@ public readonly struct SiegeAftermathChoicePrompted : IEvent
 {
     public readonly MobileParty LeaderParty;
     public readonly Settlement Settlement;
+    public readonly Clan PreviousOwnerClan;
 
-    public SiegeAftermathChoicePrompted(MobileParty leaderParty, Settlement settlement)
+    public SiegeAftermathChoicePrompted(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan)
     {
         LeaderParty = leaderParty;
         Settlement = settlement;
+        PreviousOwnerClan = previousOwnerClan;
     }
 }

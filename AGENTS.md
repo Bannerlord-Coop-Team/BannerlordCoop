@@ -39,17 +39,23 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
+### Area-Specific Instructions
+
+Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you work in one of these folders, read its `AGENTS.md` in full.
+
+- Issues and quests: [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md)
+
 ### Build & Test Commands
 
-Run from the repo root on Windows; the repo expects `mb2` to be a junction to the local Bannerlord install. Prefer the Windows MSBuild/PowerShell for builds, and don't deploy into the live `mb2\Modules` folder unless explicitly asked.
+Run from the repo root on Windows. The build finds the local Bannerlord install through the `BANNERLORD_DIR` user environment variable (the folder holding `bin\` and `Modules\`), which `runmefirst.cmd` sets; MSBuild reads it as `$(BannerlordDir)`, a game-dependent project fails with a clear error if it's unset, and `-p:BannerlordDir=...` overrides it for one build. After the variable changes, restart Visual Studio, terminals and MSBuild nodes so they see it. Don't create an `mb2` junction or symlink in a checkout, because worktree cleanup deletes through it into the game install. Prefer the Windows MSBuild/PowerShell for builds, and don't deploy into the live `$BANNERLORD_DIR\Modules` folder unless explicitly asked.
 
 - `nuget restore source\Coop.sln` — restores legacy `packages.config` dependencies.
 - `dotnet build source\Coop.Core\Coop.Core.csproj -c Release` — the SDK-style core projects.
 - `dotnet build source\ServerConsole\ServerConsole.csproj -c Debug` — the old IntroServer test launcher, not the co-op server.
 - `dotnet test source\Coop.sln -c Release` — xUnit tests where game runtime deps permit.
-- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds the mod and deploys it into `mb2\Modules\Coop` through `Deploy.targets`.
+- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds the mod and deploys it into `$BANNERLORD_DIR\Modules\Coop` through `Deploy.targets`.
 
-`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
+`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees skip it with a message unless built with `-p:DeployFromWorktree=true`. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 
@@ -94,7 +100,7 @@ When working inside an authorized repository for legitimate development, debuggi
 
 ### Working From WSL
 
-If the agent runs in WSL, read `doc/WorkingFromWSL.md` first: the Windows toolchain isn't on the WSL PATH, worktrees need a real Windows `mb2` junction, and long git/build commands need a longer timeout.
+If the agent runs in WSL, read `doc/WorkingFromWSL.md` first: the Windows toolchain isn't on the WSL PATH, `BANNERLORD_DIR` reaches WSL through `WSLENV`, and long git/build commands need a longer timeout.
 
 ### Local MCP Tools (Pi and Codex)
 
@@ -104,11 +110,11 @@ Use the `bannerlord-coop` MCP tools directly for authorized live tests, not shel
 
 ### Runtime Logs (check these first when debugging)
 
-The live mod writes Serilog output next to the game executable, under the `mb2` junction's `bin\Win64_Shipping_Client` folder. **When debugging a crash, desync, or `Failed to get id` error, read the relevant log before theorizing** — it captures the actual run and is reachable from WSL through the junction:
+The live mod writes Serilog output next to the game executable, in `$BANNERLORD_DIR\bin\Win64_Shipping_Client`. **When debugging a crash, desync, or `Failed to get id` error, read the relevant log before theorizing** — it captures the actual run and is reachable from WSL too, where `WSLENV` forwards `BANNERLORD_DIR` as a `/mnt/c/...` path:
 
-- `mb2/bin/Win64_Shipping_Client/Coop_client.log` — a client run (launched with `/client`).
-- `mb2/bin/Win64_Shipping_Client/Coop_server.log` — an in-game server/host run (launched with `/server`).
-- `mb2/bin/Win64_Shipping_Client/BootPatches.log` — early-boot fallback, written before Serilog is configured.
+- `$BANNERLORD_DIR/bin/Win64_Shipping_Client/Coop_client.log` — a client run (launched with `/client`).
+- `$BANNERLORD_DIR/bin/Win64_Shipping_Client/Coop_server.log` — an in-game server/host run (launched with `/server`).
+- `$BANNERLORD_DIR/bin/Win64_Shipping_Client/BootPatches.log` — early-boot fallback, written before Serilog is configured.
 
 Each log is **deleted and recreated on every startup** (`CoopMod.SetupLogging`), so it only ever holds the most recent run — copy it aside before relaunching if you need to compare. Client and server run as two separate processes; open the file for the side you're debugging. The standalone `ServerConsole` logs to the console only (no file), so file logs come from the in-game `/server` mode. DEBUG builds log at Debug level, Release at Information.
 
@@ -130,7 +136,7 @@ Tests use xUnit. Add unit tests for logic that does not require Bannerlord to ru
 
 A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
 
-An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line.
+An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line. Count sends and events with `Assert.Single`, not `Assert.Contains`, so a duplicate fails the test.
 
 When a change needs runtime verification, **prefer adding a debug cheat over hand-staging the scenario.** Co-op state is usually impractical to set up by hand (winning a specific battle to take a prisoner, an AI governor change), so add or extend a `coop.debug.*` console command that triggers the exact authoritative action — e.g. `coop.debug.town.set_governor` driving `ChangeGovernorAction`, or `coop.debug.town.imprison_hero` driving `TakePrisonerAction` — and drive the test from the console instead of describing fiddly in-game steps. **Run state-changing cheats on the server only:** the host is authoritative and replicates to clients, so a cheat must originate there (it also lets server-side events fire on the host); use a client purely for read-only inspection (e.g. `coop.debug.location.list_characters`) to confirm what it received.
 
@@ -140,11 +146,11 @@ Write manual-test steps with **real, concrete in-game names and ids — never `<
 
 ### Reviewing Changes (Scope to the Right Tree)
 
-The main working directory is a rotating test bench (see Worktree & Working-Directory Workflow): it normally holds unrelated uncommitted changes, and the shell cwd resets to it between bash calls. So `/code-review` and `/codex-review`, which default to "the current diff," will quietly review the wrong thing unless you scope them — `cd` into the worktree first, or point the review at the PR. When the task is a PR review, review the PR head and cite each finding as a real `source/.../File.cs:NNN` resolved on that branch (not a diff-offset estimate), so it can be acted on without an "ok but what file and line?" round-trip. Co-op assumes cooperative, trusted clients, so don't raise or rank findings as anti-cheat, malicious-client, or forged-packet exploits; frame the same code on its honest failure path (double-click, race, stale local state) instead.
+The main working directory is a rotating test bench (see Worktree & Working-Directory Workflow): it normally holds unrelated uncommitted changes, and the shell cwd resets to it between bash calls. So `/code-review` and `/codex-review`, which default to "the current diff," will quietly review the wrong thing unless you scope them — `cd` into the worktree first, or point the review at the PR. When the task is a PR review, follow the review skill (`.agents/skills/review/SKILL.md`), review the PR head, and cite each finding as a real `source/.../File.cs:NNN` resolved on that branch (not a diff-offset estimate), so it can be acted on without an "ok but what file and line?" round-trip. Co-op assumes cooperative, trusted clients, so don't raise or rank findings as anti-cheat, malicious-client, or forged-packet exploits; frame the same code on its honest failure path (double-click, race, stale local state) instead. When a reported bug can't be made to fail in a test, reply with the evidence and add the test as a regression check instead of changing code.
 
 ### Commits & Pull Requests
 
-Recent history uses short imperative summaries, for example `fixed deployment` and `Register client player hero and party as controlled on join`. Keep commits focused and reference issues when relevant. Never commit secrets, local tokens, generated build outputs, or local machine paths beyond documented setup notes. PRs should target `development`, describe the behavior change, link related issues, list tests/manual validation, and include screenshots or logs for UI, crash, or gameplay fixes.
+Recent history uses short imperative summaries, for example `fixed deployment` and `Register client player hero and party as controlled on join`. Keep commits focused and reference issues when relevant. Never commit secrets, local tokens, generated build outputs, or local machine paths beyond documented setup notes. PRs should target `development`, describe the behavior change, link related issues, list tests/manual validation, and include screenshots or logs for UI, crash, or gameplay fixes. List a flow the live-test tooling can't drive as not run and file a tooling issue for it. After merging `development` into a PR, re-read the shared files the PR touched, because a conflict resolution can quietly bring back the old version of a method.
 
 Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) and edit from that, because PR titles and descriptions may have been manually edited and a cached draft may be stale. Default to not touching the description unless asked, and change only the specific thing requested. Never hand-add any Claude/Anthropic attribution (a `Claude-Session:` trailer, a session URL, `Co-Authored-By`) to a commit or PR.
 
@@ -165,6 +171,7 @@ Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails up
   - Review/Fix Loop (suggested)
   - Review and report
   - Skip
+- **Offer to update the quest learnings before a quest PR leaves draft.** When the PR touches `source/GameInterface/Services/Issues/`, also ask whether to add what its review and fix commits taught to [`QuestLearnings.md`](source/GameInterface/Services/Issues/QuestLearnings.md), following its update steps.
 - **Don't take maintainer actions unasked.** No merging, approving, closing or reopening PRs/issues, requesting reviewers, or force-pushing a branch someone else is reviewing, unless explicitly told to.
 
 ### Unowned AI Contributions Are Not Accepted
@@ -207,7 +214,7 @@ Keep a drafted comment to its one load-bearing point. Don't fold in secondary me
 
 ## Worktree & Working-Directory Workflow
 
-Running the server + client end-to-end needs the changes in the main working directory — the checkout wired to the `mb2` junction and `Deploy.targets`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
+Running the server + client end-to-end needs the changes in the main working directory — the only checkout `Deploy.targets` deploys from into `$BANNERLORD_DIR\Modules`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
 
 When asked to move worktree changes into the working directory, **don't blindly layer them on top of what's already there.** Check the working directory first, and **stop and ask for direction before moving if either is true** so the next step can be chosen (stash, commit, discard, switch branch, merge, …):
 

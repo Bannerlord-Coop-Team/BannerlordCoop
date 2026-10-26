@@ -101,13 +101,12 @@ public class BattleResultReadyTests : MissionTestEnvironment
                 Assert.Throws<InvalidOperationException>(() => controller.Dispose());
 
                 Assert.False(missionRegistry.IsMissionActive);
-                // The throw skipped the agent registry teardown, so only the detach can silence the answer.
                 Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+                broker.Verify(b => b.Unsubscribe<NetworkMissionJoinInfo>(
+                    It.IsAny<Action<MessagePayload<NetworkMissionJoinInfo>>>()), Times.Once);
             }
             finally
             {
-                // Finish the skipped teardown, otherwise its statics leak and the container's dispose rethrows.
-                broker.Reset();
                 controller.Dispose();
             }
         });

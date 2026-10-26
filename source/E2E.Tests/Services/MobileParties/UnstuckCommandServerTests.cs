@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -249,6 +250,79 @@ public class UnstuckCommandServerTests : MapEventTestBase
         Assert.Contains("Removed the party from its map event.", result.Output);
         Server.Call(() => Assert.Null(Server.GetRegisteredObject<MobileParty>(target.PartyId).MapEvent));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+    }
+
+    [Fact]
+    public void LordsLinkedToAnEndedBattle_AreReleasedOnServerAndClients()
+    {
+        // #4052: a siege ended but its lords kept their links, and the battle was no longer registered
+        // anywhere, so nothing could end it again and the lords sat in an empty battle at the town.
+        var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");
+        var ended = CreateServerMapEvent();
+        var live = CreateServerMapEvent();
+        var townId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        Server.Call(() =>
+        {
+            // The town itself defended the siege, so its own party is linked too.
+            var town = Server.GetRegisteredObject<Settlement>(townId);
+            Campaign.Current.CampaignObjectManager.Settlements =
+                new MBList<Settlement>(Campaign.Current.CampaignObjectManager.Settlements) { town };
+            town.Party.MapEventSide = Server.GetRegisteredObject<MapEvent>(ended.MapEventId).DefenderSide;
+        }, MapEventDisabledMethods);
+        EndWithoutClearingSides(ended.MapEventId);
+
+        var result = Execute("unstuck-target");
+
+        Assert.True(result.Succeeded, result.Output);
+        Assert.Contains("Released 3 parties still linked to a battle that already ended.", result.Output);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(instance.GetRegisteredObject<MobileParty>(ended.AttackerPartyId).Party.MapEventSide);
+                Assert.Null(instance.GetRegisteredObject<MobileParty>(ended.DefenderPartyId).Party.MapEventSide);
+                Assert.Null(instance.GetRegisteredObject<Settlement>(townId).Party.MapEventSide);
+
+                // A battle still in progress keeps its parties.
+                var liveEvent = instance.GetRegisteredObject<MapEvent>(live.MapEventId);
+                Assert.Same(liveEvent, instance.GetRegisteredObject<MobileParty>(live.AttackerPartyId).MapEvent);
+                Assert.Same(liveEvent, instance.GetRegisteredObject<MobileParty>(live.DefenderPartyId).MapEvent);
+                Assert.False(liveEvent.IsFinalized);
+            });
+        }
+        Server.Call(() =>
+        {
+            var attacker = Server.GetRegisteredObject<MobileParty>(ended.AttackerPartyId);
+            Assert.Equal(MoveModeType.Hold, attacker.PartyMoveMode);
+            Assert.Null(Server.GetRegisteredObject<MobileParty>(target.PartyId).MapEvent);
+        });
+        Assert.Equal(3, Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Count());
+
+        var repeat = Execute("unstuck-target");
+        Assert.True(repeat.Succeeded, repeat.Output);
+        Assert.DoesNotContain("Released", repeat.Output);
+    }
+
+    /// <summary>
+    /// Leaves the battle the way the #4052 save had it on every instance: finalized, out of the map event
+    /// manager and the object manager, while both parties still point at its sides.
+    /// </summary>
+    private void EndWithoutClearingSides(string mapEventId)
+    {
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var mapEvent = instance.GetRegisteredObject<MapEvent>(mapEventId);
+                using (new AllowedThread())
+                {
+                    mapEvent._state = MapEventState.WaitingRemoval;
+                    Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
+                }
+                Assert.True(instance.ObjectManager.Remove(mapEvent));
+                Assert.All(mapEvent.InvolvedParties, party => Assert.Same(mapEvent, party.MapEvent));
+            });
+        }
     }
 
     private record PlayerIds(string HeroId, string PartyId);

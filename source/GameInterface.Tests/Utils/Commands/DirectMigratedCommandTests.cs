@@ -1,8 +1,6 @@
 ﻿using Common;
-using Autofac;
 using Common.Commands;
 using GameInterface;
-using GameInterface.Services.MapEvents;
 using Serilog;
 using System;
 using System.Collections;
@@ -85,9 +83,9 @@ public class DirectMigratedCommandTests
     [Fact]
     public void ProcessCommand_ReadsCountOnlyForOptionalArguments()
     {
-        string[] countReaders = CreateCommands()
-            .Where(command => CallsArgumentCount(command.GetType().GetMethod(nameof(ICoopCommand.ProcessCommand))))
-            .Select(command => command.Name)
+        string[] countReaders = GetCommandTypes()
+            .Where(type => CallsArgumentCount(type.GetMethod(nameof(ICoopCommand.ProcessCommand))))
+            .Select(type => CommandTestFactory.Create<ICoopCommand>(type).Name)
             .OrderBy(name => name)
             .ToArray();
 
@@ -272,19 +270,10 @@ public class DirectMigratedCommandTests
             .ToArray();
     }
 
-    // Builds every migrated command through a container, as the module does, so injected dependencies resolve.
     private static ICoopCommand[] CreateCommands()
     {
-        var commandTypes = GetCommandTypes();
-        var builder = new ContainerBuilder();
-        builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>();
-        builder.RegisterType<RoutedPlayerHitNotificationTracker>().As<IRoutedPlayerHitNotificationTracker>();
-        foreach (var type in commandTypes)
-            builder.RegisterType(type);
-
-        using var container = builder.Build();
-        return commandTypes
-            .Select(type => (ICoopCommand)container.Resolve(type))
+        return GetCommandTypes()
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
     }
 

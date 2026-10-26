@@ -12,7 +12,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Regression coverage for replicated death kill-feed context.</summary>
-[Collection(ActiveCoopBattleCollection.Name)]
+[Collection(nameof(MissionCurrentCollection))]
 public class ReplicatedDeathKillFeedPatchTests
 {
     [Fact]

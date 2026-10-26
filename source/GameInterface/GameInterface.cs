@@ -23,6 +23,9 @@ public class GameInterface : IGameInterface
 
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
 
+    // Quest framework and per-quest patches, applied only while the quest feature flag is on
+    public const string HARMONY_QUESTS_CATEGORY = "QuestPatches";
+
     private const string PatchingFailedEarlierMessage =
         "Patching failed earlier in this session. Restart Bannerlord before joining or hosting again.";
 
