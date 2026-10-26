@@ -75,7 +75,7 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void IsCleanExit_TreatsMinusOneAfterEngineShutdownAsClean()
         {
-            int processId = Process.GetCurrentProcess().Id;
+            int processId = Environment.ProcessId;
             CrashReporterOptions options = CreateOptions(processId);
             WriteEngineLog(
                 options,
@@ -90,7 +90,7 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void IsCleanExit_ReportsMinusOneWithoutEngineShutdown()
         {
-            int processId = Process.GetCurrentProcess().Id;
+            int processId = Environment.ProcessId;
             CrashReporterOptions options = CreateOptions(processId);
             WriteEngineLog(
                 options,
@@ -104,7 +104,7 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void IsCleanExit_ReportsCrashAfterEngineShutdown()
         {
-            int processId = Process.GetCurrentProcess().Id;
+            int processId = Environment.ProcessId;
             CrashReporterOptions options = CreateOptions(processId);
             WriteEngineLog(
                 options,
@@ -118,7 +118,7 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void IsCleanExit_ReadsAnEngineLogShorterThanTheTail()
         {
-            int processId = Process.GetCurrentProcess().Id;
+            int processId = Environment.ProcessId;
             CrashReporterOptions options = CreateOptions(processId);
             string logsRoot = Path.Combine(options.BannerlordDataRoot, "logs");
             Directory.CreateDirectory(logsRoot);
@@ -133,7 +133,7 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void IsCleanExit_ReportsMinusOneWithoutAnEngineLog()
         {
-            CrashReporterOptions options = CreateOptions(Process.GetCurrentProcess().Id);
+            CrashReporterOptions options = CreateOptions(Environment.ProcessId);
             var collector = new CrashReportCollector(options);
 
             Assert.False(collector.IsCleanExit(-1));
