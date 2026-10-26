@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using System;
 
@@ -30,6 +31,9 @@ internal class IssuesModule : Module
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LandLordCompanyOfTroubleService>()
+            .As<ILandLordCompanyOfTroubleService>()
+            .InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)

@@ -1,10 +1,7 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
@@ -16,12 +13,12 @@ internal class LandLordCompanyOfTroubleMapEventEndedPatch
     [HarmonyPostfix]
     private static void OnMapEventEndedPostfix(MapEvent mapEvent)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!ContainerProvider.TryResolve<ILandLordCompanyOfTroubleService>(out var service))
         {
             return;
         }
 
-        dispatcher.RunAsOwners<Quest>(quest => OnMapEventEnded(quest, mapEvent));
+        service.OnMapEventEnded(mapEvent);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
@@ -29,35 +26,5 @@ internal class LandLordCompanyOfTroubleMapEventEndedPatch
     private static bool OnMapEventEndedPrefix()
     {
         return ModInformation.IsServer;
-    }
-
-    private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
-    {
-        var involvedParties = mapEvent.InvolvedParties.ToList();
-        if (!involvedParties.Contains(PartyBase.MainParty))
-        {
-            return;
-        }
-
-        var company = quest._companyOfTroubleParty;
-        if (company == null)
-        {
-            quest.OnMapEventEnded(mapEvent);
-            return;
-        }
-
-        if (!involvedParties.Contains(company.Party))
-        {
-            return;
-        }
-
-        if (mapEvent.WinningSide == PartyBase.MainParty.Side)
-        {
-            quest.QuestSuccessWithPlayerDefeatedCompany();
-        }
-        else
-        {
-            quest.QuestFailWithPlayerDefeatedAgainstCompany();
-        }
     }
 }
