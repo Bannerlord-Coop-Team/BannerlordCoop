@@ -1,5 +1,5 @@
-﻿using GameInterface;
-using HarmonyLib;
+﻿using HarmonyLib;
+using Missions.Agents.Extensions;
 using NavalDLC.Missions;
 
 namespace Missions.Naval;
@@ -14,15 +14,5 @@ internal class NavalPuppetDrowningPatch
 {
     // Skips vanilla's drowning blow on an agent another client owns.
     [HarmonyPrefix]
-    private static bool Prefix(AgentNavalComponent __instance)
-    {
-        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)) return true;
-
-        var agent = __instance.Agent;
-        bool isRegistered = registry.TryGetAgentInfo(agent, out _);
-        return DrownsAgent(isRegistered, isRegistered && registry.IsLocallyControlled(agent));
-    }
-
-    /// <summary>Whether this client drowns the agent: one it controls or doesn't network, never a puppet.</summary>
-    internal static bool DrownsAgent(bool isRegistered, bool isLocallyControlled) => !isRegistered || isLocallyControlled;
+    private static bool Prefix(AgentNavalComponent __instance) => !__instance.Agent.IsPuppet();
 }

@@ -7,6 +7,7 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using ProtoBuf;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -19,62 +20,23 @@ public class BattleShipDamageRouterTests
 {
     private const string Own = "local";
     private const string Peer = "peer";
+    private const string Successor = "successor";
     private const int HostEpoch = 3;
 
-    [Theory]
-    [InlineData(true, false, BattleShipHitOrigin.LocalHit, BattleShipDamageRoute.Vanilla)]
-    [InlineData(true, false, BattleShipHitOrigin.SelfTick, BattleShipDamageRoute.Vanilla)]
-    [InlineData(true, false, BattleShipHitOrigin.ReplayedHit, BattleShipDamageRoute.Drop)]
-    [InlineData(false, false, BattleShipHitOrigin.LocalHit, BattleShipDamageRoute.Send)]
-    [InlineData(false, false, BattleShipHitOrigin.SelfTick, BattleShipDamageRoute.Drop)]
-    [InlineData(false, false, BattleShipHitOrigin.ReplayedHit, BattleShipDamageRoute.Drop)]
-    [InlineData(true, true, BattleShipHitOrigin.ReplayedHit, BattleShipDamageRoute.Vanilla)]
-    [InlineData(false, true, BattleShipHitOrigin.SelfTick, BattleShipDamageRoute.Vanilla)]
-    public void Route_RunsVanillaOnOwnHullsAndRoutedAppliesAndSendsOnlyLocalHitsOnForeignHulls(
-        bool isOwnHull, bool isRoutedApply, BattleShipHitOrigin origin, BattleShipDamageRoute expected)
-    {
-        Assert.Equal(expected, BattleShipDamageRouter.Route(isOwnHull, isRoutedApply, origin));
-    }
-
-    [Theory]
-    [InlineData(false, false, BattleShipHitOrigin.LocalHit)]
-    [InlineData(true, false, BattleShipHitOrigin.LocalHit)]
-    [InlineData(true, true, BattleShipHitOrigin.ReplayedHit)]
-    public void AttackOrigin_TreatsOnlyAPuppetsAttackAsAReplay(bool hasAttacker, bool attackerIsPuppet, BattleShipHitOrigin expected)
-    {
-        Assert.Equal(expected, BattleShipDamageRouter.AttackOrigin(hasAttacker, attackerIsPuppet));
-    }
-
-    [Theory]
-    [InlineData(true, false, BattleShipHitOrigin.LocalHit)]
-    [InlineData(false, true, BattleShipHitOrigin.LocalHit)]
-    [InlineData(false, false, BattleShipHitOrigin.ReplayedHit)]
-    public void CollisionOrigin_BelongsToTheRammersOwner(bool isQueuedContact, bool hitterIsOwn, BattleShipHitOrigin expected)
-    {
-        Assert.Equal(expected, BattleShipDamageRouter.CollisionOrigin(isQueuedContact, hitterIsOwn));
-    }
-
     [Fact]
-    public void KeepsContactCollision_OnlyForAnOwnRammer()
-    {
-        Assert.True(BattleShipDamageRouter.KeepsContactCollision(rammerIsOwn: true));
-        Assert.False(BattleShipDamageRouter.KeepsContactCollision(rammerIsOwn: false));
-    }
-
-    [Fact]
-    public void ForeignHullHit_IsSentToEveryPeerWithTheHullsId()
+    public void ForeignHullHit_IsSentOnlyToTheHullsAuthority()
     {
         var harness = new Harness();
         var hull = harness.Register(Peer, isNpcParty: false);
 
         harness.Broker.Publish(this, Hit(hull.Hull, BattleShipDamageKind.Fire, 30f));
 
-        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkApplyShipDamage
+        harness.Network.Verify(n => n.Send(Peer, It.Is<IMessage>(m => m is NetworkApplyShipDamage
             && ((NetworkApplyShipDamage)m).ShipId == hull.ShipId
             && ((NetworkApplyShipDamage)m).Kind == BattleShipDamageKind.Fire
             && ((NetworkApplyShipDamage)m).Damage == 30f
-            && ((NetworkApplyShipDamage)m).SenderControllerId == Own
-            && ((NetworkApplyShipDamage)m).HostEpoch == HostEpoch)), Times.Once);
+            && ((NetworkApplyShipDamage)m).SenderControllerId == Own)), Times.Once);
+        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
         harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
             It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
         Assert.Equal(1, (long)harness.Inspect()["sent"]!);
@@ -90,7 +52,7 @@ public class BattleShipDamageRouterTests
 
         harness.Engine.Verify(e => e.ApplyShipDamage(hull.Hull, It.Is<NetworkApplyShipDamage>(d => d.Damage == 50f), null, null),
             Times.Once);
-        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        harness.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
     }
 
     [Fact]
@@ -100,8 +62,8 @@ public class BattleShipDamageRouterTests
 
         harness.Broker.Publish(this, Hit(ShipTestHulls.Create(), BattleShipDamageKind.Hull, 50f));
 
-        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
-        Assert.Equal("unregistered_hull", (string)harness.Inspect()["lastDrop"]!);
+        harness.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
+        Assert.Equal(1, harness.Drops("unregistered_hull"));
     }
 
     [Fact]
@@ -128,8 +90,7 @@ public class BattleShipDamageRouterTests
 
         harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
             It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
-        Assert.Equal(1, (long)harness.Inspect()["dropped"]!);
-        Assert.Equal("not_authority", (string)harness.Inspect()["lastDrop"]!);
+        Assert.Equal(1, harness.Drops("not_authority"));
     }
 
     [Fact]
@@ -139,26 +100,21 @@ public class BattleShipDamageRouterTests
 
         harness.Router.ApplyNetworkDamage(Damage(Guid.NewGuid(), BattleShipDamageKind.Hull, 10f));
 
-        Assert.Equal("unknown_ship", (string)harness.Inspect()["lastDrop"]!);
+        Assert.Equal(1, harness.Drops("unknown_ship"));
     }
 
     [Theory]
-    [InlineData(Own, true, HostEpoch, HostEpoch, 10f, null)]
-    [InlineData(Own, true, 2, HostEpoch, 10f, "stale_epoch")]
-    [InlineData(Own, true, 4, HostEpoch, 10f, "stale_epoch")]
-    [InlineData(Own, true, 0, HostEpoch, 10f, null)]
-    [InlineData(Own, true, 2, 0, 10f, null)]
-    [InlineData(Own, false, 2, HostEpoch, 10f, null)]
-    [InlineData(Peer, true, HostEpoch, HostEpoch, 10f, "not_authority")]
-    [InlineData(Own, false, HostEpoch, HostEpoch, float.NaN, "invalid_damage")]
-    [InlineData(Own, false, HostEpoch, HostEpoch, -1f, "invalid_damage")]
-    public void ValidateDamage_AppliesOnlyAtTheAuthorityOfTheSendersHostEpoch(
-        string authority, bool isNpcParty, int damageEpoch, int localEpoch, float amount, string expected)
+    [InlineData(Own, true, 10f, null)]
+    [InlineData(Own, false, 10f, null)]
+    [InlineData(Peer, true, 10f, "not_authority")]
+    [InlineData(Peer, false, 10f, "not_authority")]
+    [InlineData(Own, false, float.NaN, "invalid_damage")]
+    [InlineData(Own, false, -1f, "invalid_damage")]
+    public void ValidateDamage_AppliesOnlyAtTheHullsCurrentAuthority(string authority, bool isNpcParty, float amount, string expected)
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, "MapEventParty_9", isNpcParty, ShipTestHulls.Create(), null);
-        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, amount, hostEpoch: damageEpoch);
 
-        Assert.Equal(expected, BattleShipDamageRouter.ValidateDamage(ship, Own, damage, localEpoch));
+        Assert.Equal(expected, BattleShipDamageRouter.ValidateDamage(ship, Own, Damage(ship.ShipId, BattleShipDamageKind.Hull, amount)));
     }
 
     [Fact]
@@ -170,14 +126,14 @@ public class BattleShipDamageRouterTests
         harness.Router.Dispose();
         harness.Broker.Publish(this, Hit(hull.Hull, BattleShipDamageKind.Hull, 5f));
 
-        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        harness.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
     }
 
     [Fact]
     public void NetworkApplyShipDamage_RoundTripsEveryField()
     {
         var damage = new NetworkApplyShipDamage(Guid.NewGuid(), Peer, BattleShipDamageKind.Collision, 120.5f, 7.25f,
-            new Vec3(1f, -2f, 3.5f), Guid.NewGuid(), Guid.NewGuid(), isRamDamage: true, sailIndex: 2, hostEpoch: 4);
+            new Vec3(1f, -2f, 3.5f), Guid.NewGuid(), Guid.NewGuid(), isRamDamage: true, sailIndex: 2);
 
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, damage);
@@ -196,24 +152,18 @@ public class BattleShipDamageRouterTests
         Assert.Equal(damage.HitterShipId, copy.HitterShipId);
         Assert.True(copy.IsRamDamage);
         Assert.Equal(2, copy.SailIndex);
-        Assert.Equal(4, copy.HostEpoch);
     }
 
-    // Architecture review: a hit routed to the new AI host can arrive after the host change reached this client but before the
-    // change's queued hull move applied; it waits in the arrivals queue behind that move and applies once the hull is this
-    // client's, instead of being dropped as not_authority.
+    // A hit routed to the new AI host can arrive after the host change reached this client but before the change's queued
+    // hull move applied; it waits in the arrivals queue behind that move and applies once the hull is this client's.
     [Fact]
     public void RoutedHit_ArrivingBeforeTheQueuedHostChange_AppliesOnceTheHullMoves()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(sessionEpoch: HostEpoch + 1);
         var ship = harness.Register(Peer, isNpcParty: true);
-        harness.Arrivals.Enqueue(() =>
-        {
-            ship.CurrentAuthority = Own;
-            harness.AppliedEpoch = HostEpoch + 1;
-        }, "host change");
-        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, 10f, hostEpoch: HostEpoch + 1);
+        harness.QueueHostChange(ship, Own);
+        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, 10f);
 
         harness.Broker.Publish(this, damage);
         GameThread.Run(() => { }, blocking: true);
@@ -224,38 +174,104 @@ public class BattleShipDamageRouterTests
         harness.Engine.Verify(e => e.ApplyShipDamage(ship.Hull, damage, null, null), Times.Once);
     }
 
-    // Hits are checked against the epoch whose hull move this client applied, not the session's, which runs a queued move ahead.
+    // Q2: the hit goes only to the authority in the sender's view, so a capture that moves the hull between the old
+    // authority's apply and the captor's can't apply it a second time (a broadcast reaches both).
     [Fact]
-    public void RoutedHit_IsCheckedAgainstTheAppliedHostEpoch_NotTheSessions()
+    public void HitAcrossACapture_IsAppliedAtMostOnce()
     {
-        var harness = new Harness(sessionEpoch: HostEpoch + 1);
-        var ship = harness.Register(Own, isNpcParty: true);
-        var damage = Damage(ship.ShipId, BattleShipDamageKind.Hull, 10f, hostEpoch: HostEpoch);
+        const string oldAuthority = "old-authority", captor = "captor";
+        var sender = new Harness();
+        var peers = new Dictionary<string, Harness>
+        {
+            [oldAuthority] = new Harness(own: oldAuthority),
+            [captor] = new Harness(own: captor),
+        };
+        var shipId = Guid.NewGuid();
+        var onSender = sender.Register(oldAuthority, isNpcParty: false, shipId);
+        peers[oldAuthority].Register(oldAuthority, isNpcParty: false, shipId);
+        // The captor already applied its capture; the old authority applies the hit before its own.
+        peers[captor].Register(captor, isNpcParty: false, shipId);
+        var delivered = new List<(string To, NetworkApplyShipDamage Damage)>();
+        sender.Network.Setup(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()))
+            .Callback<string, IMessage>((to, message) => delivered.Add((to, (NetworkApplyShipDamage)message)));
+        sender.Network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
+            .Callback<IMessage>(message =>
+            {
+                foreach (var peer in peers.Keys) delivered.Add((peer, (NetworkApplyShipDamage)message));
+            });
 
-        harness.Router.ApplyNetworkDamage(damage);
+        sender.Broker.Publish(this, Hit(onSender.Hull, BattleShipDamageKind.Hull, 30f));
+        foreach (var (to, damage) in delivered) peers[to].Router.ApplyNetworkDamage(damage);
 
-        harness.Engine.Verify(e => e.ApplyShipDamage(ship.Hull, damage, null, null), Times.Once);
+        Assert.Equal(1, (long)peers[oldAuthority].Inspect()["applied"]! + (long)peers[captor].Inspect()["applied"]!);
     }
 
-    // A local hit on another client's hull is stamped with the applied host epoch, which the authority checks it against.
+    // S14 A4: the sender's hit on an AI hull waits behind a host change the session already read, then goes to the successor.
     [Fact]
-    public void LocalHit_OnAnotherClientsHull_IsStampedWithTheAppliedHostEpoch()
+    public void LocalHit_OnAnAiHullWithAQueuedHostChange_IsSentToTheSuccessorOnceTheMoveApplies()
+    {
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Peer, isNpcParty: true);
+        harness.QueueHostChange(ship, Successor);
+
+        harness.Broker.Publish(this, Hit(ship.Hull, BattleShipDamageKind.Hull, 10f));
+        harness.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
+        harness.Arrivals.ApplyAll();
+
+        harness.Network.Verify(n => n.Send(Successor, It.Is<IMessage>(m => ((NetworkApplyShipDamage)m).ShipId == ship.ShipId)),
+            Times.Once);
+        harness.Network.Verify(n => n.Send(Peer, It.IsAny<IMessage>()), Times.Never);
+        Assert.Equal(1, (long)harness.Inspect()["deferred"]!);
+    }
+
+    // S14 A4: when this client is the successor, the held hit lands here once the queued move made the hull its own.
+    [Fact]
+    public void LocalHit_OnAnAiHullThisClientIsTakingOver_IsAppliedHereOnceTheMoveApplies()
+    {
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Peer, isNpcParty: true);
+        harness.QueueHostChange(ship, Own);
+
+        harness.Broker.Publish(this, Hit(ship.Hull, BattleShipDamageKind.Hull, 10f));
+        harness.Arrivals.ApplyAll();
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(ship.Hull, It.Is<NetworkApplyShipDamage>(d => d.Damage == 10f), null, null),
+            Times.Once);
+        harness.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<IMessage>()), Times.Never);
+    }
+
+    // S14 A4: the hold is taken once, so a hit is still sent when the applied epoch keeps lagging the session's.
+    [Fact]
+    public void DeferredHit_IsSentAtTheNextTick_EvenWhenTheAppliedEpochStillLags()
     {
         var harness = new Harness(sessionEpoch: HostEpoch + 1);
         var ship = harness.Register(Peer, isNpcParty: true);
 
         harness.Broker.Publish(this, Hit(ship.Hull, BattleShipDamageKind.Hull, 10f));
+        harness.Arrivals.ApplyAll();
 
-        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkApplyShipDamage
-            && ((NetworkApplyShipDamage)m).HostEpoch == HostEpoch)), Times.Once);
+        harness.Network.Verify(n => n.Send(Peer, It.IsAny<IMessage>()), Times.Once);
+        Assert.Equal(0, harness.Arrivals.Count);
+    }
+
+    // A player hull doesn't follow the battle host, so a queued host change doesn't hold its hits.
+    [Fact]
+    public void LocalHit_OnAPlayerHull_IsSentAtOnceWhileAHostChangeIsQueued()
+    {
+        var harness = new Harness(sessionEpoch: HostEpoch + 1);
+        var ship = harness.Register(Peer, isNpcParty: false);
+
+        harness.Broker.Publish(this, Hit(ship.Hull, BattleShipDamageKind.Hull, 10f));
+
+        harness.Network.Verify(n => n.Send(Peer, It.IsAny<IMessage>()), Times.Once);
+        Assert.Equal(0, (long)harness.Inspect()["deferred"]!);
     }
 
     private static BattleShipHit Hit(MissionObject hull, BattleShipDamageKind kind, float damage) =>
         new BattleShipHit(hull, kind, damage, 0f, Vec3.Zero, null, null, false, -1);
 
-    private static NetworkApplyShipDamage Damage(Guid shipId, BattleShipDamageKind kind, float damage, Guid hitterShipId = default,
-        int hostEpoch = HostEpoch) =>
-        new NetworkApplyShipDamage(shipId, Peer, kind, damage, 0f, Vec3.Zero, Guid.Empty, hitterShipId, false, -1, hostEpoch);
+    private static NetworkApplyShipDamage Damage(Guid shipId, BattleShipDamageKind kind, float damage, Guid hitterShipId = default) =>
+        new NetworkApplyShipDamage(shipId, Peer, kind, damage, 0f, Vec3.Zero, Guid.Empty, hitterShipId, false, -1);
 
     private sealed class Harness
     {
@@ -268,14 +284,14 @@ public class BattleShipDamageRouterTests
         /// <summary>The host epoch whose hull move this client applied; a test moves it as a queued host change applies.</summary>
         public int AppliedEpoch { get; set; } = HostEpoch;
 
-        public Harness(int sessionEpoch = HostEpoch)
+        public Harness(int sessionEpoch = HostEpoch, string own = Own)
         {
             var component = new Mock<ICoopMissionComponent>();
             component.SetupGet(c => c.ShipRegistry).Returns(Registry);
             component.SetupGet(c => c.AgentRegistry).Returns(Mock.Of<INetworkAgentRegistry>());
 
             var session = new Mock<IBattleSession>();
-            session.SetupGet(s => s.OwnControllerId).Returns(Own);
+            session.SetupGet(s => s.OwnControllerId).Returns(own);
             session.SetupGet(s => s.HostEpoch).Returns(sessionEpoch);
             var appliedEpoch = new Mock<IAppliedHostEpoch>();
             appliedEpoch.SetupGet(e => e.AppliedHostEpoch).Returns(() => AppliedEpoch);
@@ -284,13 +300,24 @@ public class BattleShipDamageRouterTests
                 appliedEpoch.Object, Arrivals);
         }
 
-        public NetworkShipInfo Register(string authority, bool isNpcParty)
+        public NetworkShipInfo Register(string authority, bool isNpcParty, Guid shipId = default)
         {
-            var ship = new NetworkShipInfo(Guid.NewGuid(), authority, "MapEventParty_9", isNpcParty, ShipTestHulls.Create(), null);
+            var ship = new NetworkShipInfo(shipId == Guid.Empty ? Guid.NewGuid() : shipId, authority, "MapEventParty_9", isNpcParty,
+                ShipTestHulls.Create(), null);
             Registry.TryRegister(ship);
             return ship;
         }
 
+        // The hull move of a host change the session already reads, waiting in the arrivals queue as the replicator queues it.
+        public void QueueHostChange(NetworkShipInfo ship, string newHost) => Arrivals.Enqueue(() =>
+        {
+            ship.CurrentAuthority = newHost;
+            AppliedEpoch = HostEpoch + 1;
+        }, "host change");
+
         public JObject Inspect() => JObject.FromObject(Router.Inspect());
+
+        // How many hits were dropped for the reason.
+        public long Drops(string reason) => Inspect()["drops"]![reason]?.Value<long>() ?? 0;
     }
 }

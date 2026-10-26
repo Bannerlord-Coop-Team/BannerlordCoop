@@ -36,8 +36,10 @@ internal static class SiegeWeaponFireContext
 [HarmonyPatch(typeof(RangedSiegeWeapon), "ShootProjectileAux")]
 internal static class RangedSiegeWeaponShootPatch
 {
+    // Opens the shot's capture context for this weapon.
     private static void Prefix(RangedSiegeWeapon __instance) => SiegeWeaponFireContext.Begin(__instance);
 
+    // Closes the capture context, also when the shot throws.
     private static void Finalizer() => SiegeWeaponFireContext.End();
 }
 

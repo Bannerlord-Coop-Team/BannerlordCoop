@@ -47,5 +47,6 @@ public sealed class NetworkShipWeaponShot : IEvent
     public bool IsValid => Position.IsValid && Direction.IsValid && IsFinite(BaseSpeed) && IsFinite(Speed)
         && !string.IsNullOrEmpty(MissileItemId) && !string.IsNullOrEmpty(WeaponKey);
 
+    // Whether a float off the wire is a real number.
     private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 }

@@ -76,7 +76,7 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
         var (mapEventId, partyIds) = SetupCoopBattle(EnemyController, RemainingController, RetreaterController);
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
-            new MissionMemberDeparted(RetreaterController, mapEventId, wasRetreat: true, isInstanceEmpty: false)));
+            new MissionMemberDeparted(RetreaterController, mapEventId, wasRetreat: true, isInstanceEmpty: false, withdraws: true)));
 
         AssertRetreated(mapEventId, partyIds[2], expected: false);
     }

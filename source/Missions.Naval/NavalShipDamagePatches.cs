@@ -3,6 +3,10 @@ using Missions.Messages;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.ShipActuators;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -15,10 +19,12 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipHitScopePatch
 {
+    // Opens the attack scope of the hit.
     [HarmonyPrefix]
     private static void Prefix(Agent attackerAgent, Vec3 impactPosition, out NavalShipDamageGate.HitScope __state) =>
         __state = NavalShipDamageGate.EnterHit(attackerAgent, impactPosition);
 
+    // Closes the attack scope, also when vanilla throws.
     [HarmonyFinalizer]
     private static void Finalizer(NavalShipDamageGate.HitScope __state) => NavalShipDamageGate.ExitHit(__state);
 }
@@ -28,10 +34,12 @@ internal class ShipHitScopePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipSailHitScopePatch
 {
+    // Opens the attack scope of the sail hit.
     [HarmonyPrefix]
     private static void Prefix(Agent attackerAgent, out NavalShipDamageGate.HitScope __state) =>
         __state = NavalShipDamageGate.EnterHit(attackerAgent, Vec3.Invalid);
 
+    // Closes the attack scope, also when vanilla throws.
     [HarmonyFinalizer]
     private static void Finalizer(NavalShipDamageGate.HitScope __state) => NavalShipDamageGate.ExitHit(__state);
 }
@@ -41,6 +49,7 @@ internal class ShipSailHitScopePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipHullDamagePatch
 {
+    // Runs vanilla when the gate allows the hit, otherwise reports no damage.
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, float rawDamage, ref float __result, ref int inflictedDamage,
         ref int modifiedDamage, ref DamageTypes damageType, ref bool isFatalDamage)
@@ -61,15 +70,36 @@ internal class ShipHullDamagePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipCollisionDamagePatch
 {
+    // Opens the collision scope and runs vanilla only when the gate allows the impact.
     [HarmonyPrefix]
-    private static bool Prefix(MissionShip __instance, MissionShip hitterShip, bool isRamDamage, Vec3 point, float damage) =>
-        NavalShipDamageGate.AllowsCollision(__instance, hitterShip, isRamDamage, point, damage);
+    private static bool Prefix(MissionShip __instance, MissionShip hitterShip, bool isRamDamage, Vec3 point, float damage, out bool __state)
+    {
+        __state = NavalShipDamageGate.EnterCollision(isRamDamage);
+        return NavalShipDamageGate.AllowsCollision(__instance, hitterShip, isRamDamage, point, damage);
+    }
+
+    // Closes the collision scope, also when vanilla throws.
+    [HarmonyFinalizer]
+    private static void Finalizer(bool __state) => NavalShipDamageGate.ExitCollision(__state);
 }
 
+// Vanilla's ram morale reaches only the rammer team's AI-controlled agents, so each client gives its own agents theirs from
+// its own view of the ram (NavalShipDamageGate.AllowsCollision) and the hull owner's routed apply of the hit skips it.
+[HarmonyPatch(typeof(NavalAgentMoraleInteractionLogic), nameof(NavalAgentMoraleInteractionLogic.OnShipRammed))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class RoutedRamMoralePatch
+{
+    // Skips vanilla's ram morale inside a routed ram apply.
+    [HarmonyPrefix]
+    private static bool Prefix() => NavalShipDamageGate.AllowsRamMorale();
+}
+
+// Sail HP from weapons and fire missiles; a hit on another owner's sail goes to that owner.
 [HarmonyPatch(typeof(MissionShip), nameof(MissionShip.DealDamageToSails))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipSailDamagePatch
 {
+    // Runs vanilla when the gate allows the hit, otherwise reports no damage.
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, Agent attackerAgent, float rawDamage, float inflictedDamage,
         MissionSail sailHit, ref float __result)
@@ -83,10 +113,12 @@ internal class ShipSailDamagePatch
     }
 }
 
+// Fire HP from fire hits; a hit on another owner's hull goes to that owner.
 [HarmonyPatch(typeof(MissionShip), nameof(MissionShip.DealFireDamage))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipFireDamagePatch
 {
+    // Runs vanilla when the gate allows the hit, otherwise reports no damage.
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, float fireDamage, ref float __result)
     {
@@ -102,15 +134,17 @@ internal class ShipFireDamagePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipContactScopePatch
 {
+    // Opens the contact scope of the callback's hull.
     [HarmonyPrefix]
     private static void Prefix(MissionShip __instance, WeakGameEntity entity1, out MissionShip __state)
     {
         __state = NavalShipDamageGate.EnterContact(__instance);
 #if DEBUG
-        NavalShipDamageGate.LogHullContact(__instance, entity1);
+        NavalContactProbe.CountContact(__instance, entity1);
 #endif
     }
 
+    // Closes the contact scope, also when vanilla throws.
     [HarmonyFinalizer]
     private static void Finalizer(MissionShip __state) => NavalShipDamageGate.ExitContact(__state);
 }
@@ -120,6 +154,7 @@ internal class ShipContactScopePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipContactCollisionQueuePatch
 {
+    // Queues the impact only for an own rammer.
     [HarmonyPrefix]
     private static bool Prefix() => NavalShipDamageGate.KeepsContactCollision();
 }
@@ -129,59 +164,39 @@ internal class ShipContactCollisionQueuePatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ShipQueuedCollisionScopePatch
 {
+    // Opens the queued contact scope.
     [HarmonyPrefix]
     private static void Prefix() => NavalShipDamageGate.EnterQueuedContact();
 
+    // Closes the queued contact scope, also when vanilla throws.
     [HarmonyFinalizer]
     private static void Finalizer() => NavalShipDamageGate.ExitQueuedContact();
 }
 
-// Vanilla's ram damage tick on every client: only the rammer's owner deals the hit, routed by ShipCollisionDamagePatch,
-// and every client breaks the target's deck parts and kills only its own agents at the impact (NavalRamKills).
+// Vanilla's ram tick runs on every client: ShipCollisionDamagePatch drops a copy rammer's hit, deck parts break locally, and
+// the kill loop spares another owner's puppet (NavalRamKills), so each ram death happens once, on its owner.
 [HarmonyPatch(typeof(MissionShipRam), nameof(MissionShipRam.OnTick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RamTickPatch
 {
-    [HarmonyPrefix]
-    private static bool Prefix(MissionShipRam __instance)
+    // Routes the tick's one Agent.Die call through NavalRamKills.DieUnlessPuppet; fails closed when vanilla's tick changed.
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        TickRam(__instance, DealsRamHit(NavalForeignHulls.Contains(__instance._ownerShip)));
-        return false;
-    }
-
-    /// <summary>Whether this client deals a ram's hit: only for a ram on a hull it simulates.</summary>
-    internal static bool DealsRamHit(bool ownerIsCopy) => !ownerIsCopy;
-
-    // MissionShipRam.OnTick in vanilla's order: hit, cooldown, deck parts and kills, effect, then the impact is spent.
-    private static void TickRam(MissionShipRam ram, bool dealsHit)
-    {
-        var impact = ram._ramDamageData;
-        if (!impact.IsValid) return;
-
-        float damage = impact.CalculatedDamage;
-        if (damage > 0f)
+        var die = AccessTools.DeclaredMethod(typeof(Agent), nameof(Agent.Die), new[] { typeof(Blow), typeof(Agent.KillInfo) });
+        var dieUnlessPuppet = AccessTools.DeclaredMethod(typeof(NavalRamKills), nameof(NavalRamKills.DieUnlessPuppet));
+        var result = instructions.ToList();
+        int replaced = 0;
+        foreach (var instruction in result)
         {
-            if (dealsHit) impact.TargetShip.DealCollisionDamage(ram._ownerShip, isRamDamage: true, impact.SelectedIntersectionPoint, damage);
-            ram._ownerShip.UpdateDamageCooldown(impact.TargetShip);
-            NavalRamKills.ApplyImpact(ram);
+            if (!instruction.Calls(die)) continue;
+
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = dieUnlessPuppet;
+            replaced++;
         }
-#if DEBUG
-        if (!dealsHit) NavalContactProbe.CountGatedCopyRamTick();
-#endif
-        ram.TriggerRamCollisionParticleAndSoundEffect(impact.TargetShip.Index, impact.TargetShip.GameEntity, impact.CapsuleData, damage);
-        ram._ramDamageData = default;
+
+        if (replaced != 1) throw new InvalidOperationException("Ram tick kill call changed.");
+        return result;
     }
 }
-
-#if DEBUG
-// Probe: the ram's raycast picks its target here, on a physics thread, before any contact or damage.
-[HarmonyPatch(typeof(MissionShipRam), nameof(MissionShipRam.RamCollisionCheckTick))]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class ShipRamProbePatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(MissionShipRam __instance) =>
-        NavalContactProbe.CountRamCheck(__instance._ownerShip, __instance._ramCollisionData.TargetShip,
-            __instance._ramCollisionData.HasPoint);
-}
-#endif

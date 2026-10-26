@@ -16,14 +16,6 @@ public class NavalMigrationRulesTests
     }
 
     [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void BattleAuthorityMigrator_ChargesAdoptedLandFormationsButNotShipCrews(bool isShipCrew, bool expected)
-    {
-        Assert.Equal(expected, BattleAuthorityMigrator.ShouldChargeAdoptedFormation(isShipCrew));
-    }
-
-    [Theory]
     [InlineData(true, true, false, false, false, true)]
     [InlineData(false, true, false, false, false, false)]
     [InlineData(true, false, false, false, false, false)]

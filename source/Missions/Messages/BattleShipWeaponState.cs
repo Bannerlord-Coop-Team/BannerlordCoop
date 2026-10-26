@@ -35,5 +35,6 @@ public sealed class BattleShipWeaponState
         previous == null || previous.WeaponState != WeaponState || previous.AmmoCount != AmmoCount
         || Math.Abs(previous.Direction - Direction) > AimTolerance || Math.Abs(previous.ReleaseAngle - ReleaseAngle) > AimTolerance;
 
+    // Whether a float off the wire is a real number.
     private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 }

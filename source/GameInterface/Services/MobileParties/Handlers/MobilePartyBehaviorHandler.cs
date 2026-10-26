@@ -202,8 +202,11 @@ internal class MobilePartyBehaviorHandler : IHandler
         }
     }
 
+    // Skipped during a mission, where the menu context can have no handler; MapState.OnActivate refreshes it on return
     private static void RefreshCurrentMenu()
     {
+        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+
         var menuContext = Campaign.Current?.CurrentMenuContext;
         if (menuContext == null) return;
 

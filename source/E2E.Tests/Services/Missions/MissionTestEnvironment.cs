@@ -233,7 +233,10 @@ public class MissionTestEnvironment : E2ETestEnvironment
                 Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated(controllerId, mapEventId));
             }
 
-            Server.Resolve<IMessageBroker>().Publish(this, new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
+            // The server's membership handler withdraws a disconnect at sea too (D4).
+            bool withdraws = wasRetreat || Server.Resolve<IBattleHostRetentionPolicy>().DisconnectWithdraws(mapEventId);
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty, withdraws));
         });
     }
 

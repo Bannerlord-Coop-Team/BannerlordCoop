@@ -114,6 +114,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_CurrentlyUsedGameObject", nameof(Agent_get_CurrentlyUsedGameObject));
         Prefix(typeof(Agent), nameof(Agent.UseGameObject), nameof(Agent_UseGameObject));
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Agent_StopUsingGameObject));
+        Prefix(typeof(Agent), nameof(Agent.StopUsingGameObjectMT), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
         Prefix(typeof(Agent), nameof(Agent.CreateBloodBurstAtLimb), nameof(Agent_CreateBloodBurstAtLimb));

@@ -41,7 +41,7 @@ namespace Missions.Battles;
 /// casualty; peer-side puppet kill.</item>
 /// <item><see cref="PuppetSpawner"/> — peer-side puppet spawn/buffer/drain.</item>
 /// <item><see cref="BattleDamageRouter"/> — puppet hits routed to and applied by the owner.</item>
-/// <item><see cref="BattleAuthorityMigrator"/> — player-party withdrawal and host migration.</item>
+/// <item><see cref="BattlePartyWithdrawal"/> / <see cref="BattleAuthorityMigrator"/> — player-party withdrawal; host migration.</item>
 /// <item><see cref="ReinforcementFielder"/> — the host fields new AI parties mid-battle.</item>
 /// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result report.</item>
 /// <item><see cref="BattleDeploymentCoordinator"/> — deployment activation ("any client" NPC release) and the
@@ -119,7 +119,8 @@ public class CoopBattleController : CoopMissionController
         IMissionWeaponDataMapper missionWeaponDataMapper,
         ISiegeGateHitApplier siegeGateHitApplier,
         IBattleTeamResolver teamResolver,
-        IBattleAgentFader agentFader)
+        IBattleAgentFader agentFader,
+        IBattlePlayerPartyResolver playerParties)
         : base(
             network,
             messageBroker,
@@ -164,8 +165,12 @@ public class CoopBattleController : CoopMissionController
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         OwnedAgentReplicator ownedAgentReplicator = null;
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
-            resultCommitter, agentFader, changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+        Action<IReadOnlyCollection<Guid>> authorityChanged = changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds);
+        var troopWithdrawal = new BattleTroopWithdrawal(coopMissionComponent, lifecycle, casualties);
+        var partyWithdrawal = new BattlePartyWithdrawal(coopMissionComponent, session, troopWithdrawal, agentFader, playerParties,
+            authorityChanged);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, deployment, formationAssigner, missionContext, reinforcementFielder,
+            resultCommitter, partyWithdrawal, playerParties, authorityChanged);
         ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,
@@ -207,7 +212,7 @@ public class CoopBattleController : CoopMissionController
         Deployment = deployment;
         ResultCommitter = resultCommitter;
         Context = new BattleContext(session, deployment, coopMissionComponent, hostEpochPolicy, resultCommitter, reinforcementFielder,
-            missionContext, new BattleTroopWithdrawal(coopMissionComponent, lifecycle, casualties), authorityMigrator);
+            missionContext, troopWithdrawal, partyWithdrawal);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);

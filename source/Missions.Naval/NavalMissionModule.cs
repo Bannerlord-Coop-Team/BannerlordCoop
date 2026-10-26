@@ -41,8 +41,8 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalAsyncAgentTick>()
             .As<IAsyncAgentTick>()
             .InstancePerDependency();
-        builder.RegisterType<NavalFormationTacticRefresh>()
-            .As<INavalFormationTacticRefresh>()
+        builder.RegisterType<NavalLateHullDeployment>()
+            .As<INavalLateHullDeployment>()
             .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()

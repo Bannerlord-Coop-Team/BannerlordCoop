@@ -48,10 +48,10 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     void ApplyRemoteGuardStates();
 
     /// <summary>
-    /// Owned agents the seam holds seated at a ship station send no action changes: the station machine animates their
-    /// puppet on every peer, and a replicated channel action makes the helm drop its pilot. Null turns it off.
+    /// Owned agents seated at a ship station send no action changes: the station machine animates their puppet on every peer,
+    /// and a replicated channel action makes the helm drop its pilot. Null turns it off.
     /// </summary>
-    void ConfigureShipDeck(IShipDeckSeam seam);
+    void ConfigureStationSeats(IShipStationSeats seats);
 
     /// <summary>[Game thread] Reapply retained defend input after continuous movement replay.</summary>
     void RefreshRemoteGuardStatesAfterMovement();
@@ -82,9 +82,9 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
 
-    private IShipDeckSeam shipDeck;
+    private IShipStationSeats stationSeats;
 
-    public void ConfigureShipDeck(IShipDeckSeam seam) => shipDeck = seam;
+    public void ConfigureStationSeats(IShipStationSeats seats) => stationSeats = seats;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
@@ -249,7 +249,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             actionSyncedAgent);
 #endif
-        if (!actionSyncedAgent || shipDeck?.IsSeatedAtStation(info) == true) return;
+        if (!actionSyncedAgent || stationSeats?.IsOwnSeat(info.AgentId) == true) return;
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;

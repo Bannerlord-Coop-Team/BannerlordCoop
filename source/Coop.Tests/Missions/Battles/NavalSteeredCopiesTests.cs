@@ -11,6 +11,7 @@ using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>R45 roll: a tracked copy's owner crew load, from Track to Forget as the crew load patch finds it, and the load it keeps.</summary>
+[Collection("Mission.Current")]
 public class NavalSteeredCopiesTests
 {
     [Fact]
@@ -19,13 +20,15 @@ public class NavalSteeredCopiesTests
         var physics = ShipTestHulls.Uninitialized<NavalPhysicsScript>();
         var ship = ShipTestHulls.Uninitialized<MissionShip>();
         ship._physics = physics;
-        AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(ship, NavalShipEngineTests.ValidEntity());
+        var entity = NavalShipEngineTests.ValidEntity();
+        AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(ship, entity);
         var copies = new NavalSteeredCopies(new CopySteeringKnobs());
 
         try
         {
             copies.Track(ship);
             Assert.True(NavalForeignHulls.Contains(ship));
+            Assert.True(NavalForeignHulls.IsCopyRoot(entity));
             Assert.True(NavalForeignHulls.TryGetCopy(physics, out var copy));
             Assert.Null(copy.CrewLoad);
             // The owner decides a copy, so it is left without an auto-updated controller.
@@ -33,6 +36,7 @@ public class NavalSteeredCopiesTests
 
             copies.Forget(ship);
             Assert.False(NavalForeignHulls.Contains(ship));
+            Assert.False(NavalForeignHulls.IsCopyRoot(entity));
             Assert.False(NavalForeignHulls.TryGetCopy(physics, out _));
         }
         finally

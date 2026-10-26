@@ -118,7 +118,7 @@ public class NavalShipEngine : INavalShipEngine
         return ship;
     }
 
-    // The late hull patch made an enemy copy's helm AI-only, and vanilla only opens it to the player when a unit leaves its
+    // The late hull deployment made an enemy copy's helm AI-only, and vanilla only opens it to the player when a unit leaves its
     // formation; a copy's formation may never get one here (a late joiner's emptied AI hull), and puppets never pick a station.
     private static void OpenEmptyEnemyHelm(MissionShip ship, Team playerTeam)
     {
@@ -217,8 +217,8 @@ public class NavalShipEngine : INavalShipEngine
         var weapon = ship.ShipSiegeWeapon;
         int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State, copyWeaponStates.Take(weapon));
 
-        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull, as in RemoveHull.
-        NavalRopes.BreakConnections(ship);
+        // Breaks the old hull's ropes before vanilla's removal, as in RemoveHull.
+        NavalRopeRemoval.BreakConnections(ship);
         SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 
@@ -378,9 +378,9 @@ public class NavalShipEngine : INavalShipEngine
         var shipsLogic = ShipsLogic;
         if (shipsLogic == null || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
-        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull. A copy stays a copy until the
-        // behavior's ShipRemovedEvent handler drops it, so the copy gates hold for the whole removal.
-        NavalRopes.BreakConnections(ship);
+        // The one targeted break of the leaving hull's ropes, as Quest5's RemoveShipInternal does; vanilla's removal then breaks
+        // only ropes on this hull (RopeShipRemovalPatch). A copy stays a copy until the ShipRemovedEvent handler drops it.
+        NavalRopeRemoval.BreakConnections(ship);
         switch (RemovalPathOf(shipsLogic, ship))
         {
             case HullRemovalPath.Assigned:
@@ -950,7 +950,7 @@ public class NavalShipEngine : INavalShipEngine
         if (previous != null && previous.WeaponState == state.WeaponState) return;
 
         var weaponState = (RangedSiegeWeapon.WeaponState)state.WeaponState;
-        SiegeMachineStateReplicator.PlayWeaponStateAnimation(siegeWeapon, weaponState);
+        RangedSiegeWeaponPresentation.PlayWeaponStateAnimation(siegeWeapon, weaponState);
         ShowLoadedProjectile(siegeWeapon,
             weaponState == RangedSiegeWeapon.WeaponState.Idle || weaponState == RangedSiegeWeapon.WeaponState.WaitingBeforeIdle);
     }
@@ -961,7 +961,7 @@ public class NavalShipEngine : INavalShipEngine
         var mission = Mission.Current;
         if (mission == null || !siegeWeapon.GameEntity.IsValid) return false;
 
-        shooter = shooter ?? SiegeWeaponFireReplicator.FindStandInShooter();
+        shooter = shooter ?? RangedSiegeWeaponPresentation.FindStandInShooter();
         var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
         if (shooter == null || missileItem == null) return false;
 
@@ -971,7 +971,7 @@ public class NavalShipEngine : INavalShipEngine
             shot.Orientation, shot.BaseSpeed, shot.Speed, addRigidBody: false, ignored);
         if (!playLaunchEffects) return true;
 
-        SiegeWeaponFireReplicator.PlayFireAnimation(siegeWeapon);
+        RangedSiegeWeaponPresentation.PlayFireAnimation(siegeWeapon);
         ShowLoadedProjectile(siegeWeapon, false);
         if (siegeWeapon.FireSoundIndex >= 0)
             SoundManager.StartOneShotEventWithIndex(siegeWeapon.FireSoundIndex, siegeWeapon.GameEntity.GetGlobalFrame().origin);

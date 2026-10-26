@@ -37,53 +37,6 @@ internal class NavalShipSpawnPatch
     }
 }
 
-// MissionShip.OnDeploymentFinished only runs on hulls spawned before deployment ends, so a later hull (AI fleet, foreign copy,
-// hull swap) gets the weapon, helm and crew steps here. Ammo and anchor stay as spawned, so a swap doesn't refill ammo.
-[HarmonyPatch(typeof(NavalShipsLogic), nameof(NavalShipsLogic.SpawnShip),
-    new[] { typeof(Formation), typeof(MatrixFrame), typeof(bool), typeof(bool) },
-    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class LateHullDeploymentPatch
-{
-    // Runs the deployment steps a late hull needs; each one is safe to repeat on a pooled hull that vanilla deployed before.
-    [HarmonyPostfix]
-    private static void Postfix(NavalShipsLogic __instance, MissionShip __result)
-    {
-        if (__result == null) return;
-        if (!FinishesDeployment(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
-
-        // A ballista lists its ship targets once, at its own deployment (ThreatSeeker.InitializeTargetableObjects), so in vanilla
-        // every hull is in every list; here hulls arrive after deployment, so the hulls already fielded learn of this one.
-        RefreshShipWeaponTargets(__instance.AllShips, __result);
-
-        // Readies the ballista AI's threat seeker, otherwise ThreatSeeker.GetAllThreats throws on its first tick.
-        __result.ShipSiegeWeapon?.OnDeploymentFinished();
-        // Adds the helm's standing point components, makes an enemy helm AI-only and sets the logic its vacancy check reads.
-        __result.ShipControllerMachine.OnDeploymentFinished();
-        // The first unit's party feeds a crew perk; a fresh AI fleet or copy formation has no unit yet, so that perk is left out.
-        __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
-            .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
-        // Checked from the mission tick, not here: the async team tick may be reordering this formation's behaviours.
-        NavalFormationTacticRefresh.Active?.Note(__result.Formation);
-    }
-
-    /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>
-    internal static void RefreshShipWeaponTargets(IEnumerable<MissionShip> ships, MissionShip spawned)
-    {
-        foreach (var ai in WeaponAisToRefresh(ships, spawned))
-            ai.InitializeThreatSeeker();
-    }
-
-    /// <summary>The ranged weapon AIs of the hulls still in the mission, the newly spawned one excepted.</summary>
-    internal static IEnumerable<RangedSiegeWeaponAi> WeaponAisToRefresh(IEnumerable<MissionShip> ships, MissionShip spawned) =>
-        ships.Where(ship => ship != null && ship != spawned && !ship.IsRemoved)
-            .Select(ship => ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)
-            .Where(ai => ai != null);
-
-    // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
-    internal static bool FinishesDeployment(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
-}
-
 // Only the owner runs a hull's ship order; a foreign copy follows the owner's frames.
 [HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.Tick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
@@ -217,26 +170,30 @@ internal class PlayerFleetDeploymentSlotPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerFleetDeploymentSlotPatch>();
 
-    // Moves the own PlayerTeam's initial plan back to its player slot; other teams and replans keep vanilla's offset.
+    // Moves the own PlayerTeam's initial plan to its player slot when the side has more than one player; other teams and
+    // replans keep vanilla's offset.
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
     {
         var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
         int rank = NavalPlayerDeploymentSlot.Rank;
+        int playerCount = NavalPlayerDeploymentSlot.PlayerCount;
         var mission = Mission.Current;
-        if (planningSide == null || rank <= 0 || mission == null || team != mission.PlayerTeam) return;
+        if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 
         var spawnPath = mission.GetInitialSpawnPathData(team.Side);
-        float ownTeamRange = planningSide.GetTeamSpawnPathOffsetRange(spawnPath.Path, team);
         float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
             .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
-        float spaced = NavalPlayerDeploymentSlot.SpacedSpawnPathOffset(spawnPathOffset, rank, longestTeamRange);
-        // SpawnPathData.ClampPathOffset keeps a relative offset at or above -PivotOffset, the start of the path.
-        float slot = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, ownTeamRange,
-            longestTeamRange, -spawnPath.PivotOffset);
-        if (slot != spaced)
-            Logger.Warning("[NavalBattle] The {PathLength} m spawn path is too short for deployment rank {Rank}; this fleet " +
-                "is clamped to the path start, inside vanilla's gap to the fleet ahead or overlapping it", spawnPath.PathLength, rank);
+        float slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, playerCount, longestTeamRange, out float baseOffset,
+            out bool fits);
+        Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, side base " +
+            "{BaseOffset}, slot {Slot} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
+            baseOffset, slot, spawnPath.PivotOffset, spawnPath.PathLength);
+        if (!fits)
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for {PlayerCount} player fleets; " +
+                "fleet {Rank} at {Slot} (vanilla {VanillaOffset}, side base {BaseOffset}, pivot {PivotOffset}) can overlap " +
+                "another player's fleet", spawnPath.PathLength, playerCount, rank, slot, spawnPathOffset, baseOffset,
+                spawnPath.PivotOffset);
         spawnPathOffset = slot;
     }
 }
@@ -361,34 +318,5 @@ internal class CapturedFormationConnectionPatch
 
         __result = false;
         return false;
-    }
-}
-
-// The host plans the AI fleet's side after deployment ended; the deployment views (boundary markers) that listen
-// for plans are done by then and throw, and nothing else listens, so that one late plan is not announced.
-[HarmonyPatch(typeof(Mission), nameof(Mission.OnDeploymentPlanMade))]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class LateDeploymentPlanNotificationPatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix() => !NavalLateDeploymentPlan.IsMaking;
-}
-
-/// <summary>[Game thread] Makes a battle side's deployment plan after deployment, without notifying mission listeners.</summary>
-internal static class NavalLateDeploymentPlan
-{
-    internal static bool IsMaking { get; private set; }
-
-    internal static void MakeForSide(DefaultNavalMissionLogic navalLogic, BattleSideEnum side)
-    {
-        IsMaking = true;
-        try
-        {
-            navalLogic.MakeDeploymentPlansForSide(side);
-        }
-        finally
-        {
-            IsMaking = false;
-        }
     }
 }
