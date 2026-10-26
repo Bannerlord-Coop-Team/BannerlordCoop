@@ -13,11 +13,13 @@ internal class QuestEventRelay : IQuestEventRelay
 
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IQuestTypeRegistry registry;
+    private readonly IIssueCancellationCoordinator cancellation;
 
-    public QuestEventRelay(IOutcomeDispatcher dispatcher, IQuestTypeRegistry registry)
+    public QuestEventRelay(IOutcomeDispatcher dispatcher, IQuestTypeRegistry registry, IIssueCancellationCoordinator cancellation)
     {
         this.dispatcher = dispatcher;
         this.registry = registry;
+        this.cancellation = cancellation;
     }
 
     public void Relay(string listenerName, Type[] parameterTypes, params object[] arguments)
@@ -25,7 +27,8 @@ internal class QuestEventRelay : IQuestEventRelay
         dispatcher.RunAsOwners<QuestBase>(quest =>
         {
             var issue = quest.QuestGiver?.Issue;
-            if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()))
+            if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()) ||
+                (listenerName == "OnHeroKilled" && cancellation.IsPending(issue)))
             {
                 return;
             }

@@ -22,7 +22,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
     private readonly IActiveIssueDismisser dismisser;
-    private readonly HashSet<IssueBase> pending = new HashSet<IssueBase>();
+    private readonly Dictionary<IssueBase, TextObject> pending = new Dictionary<IssueBase, TextObject>();
 
     public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser)
     {
@@ -31,11 +31,18 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         this.dismisser = dismisser;
     }
 
+    public bool IsPending(IssueBase issue) => issue != null && pending.ContainsKey(issue);
+
     public bool BeforeGiverDeath(Hero victim, out IDisposable owner)
     {
         owner = null;
         if (victim.Issue == null) return true;
-        if (!PrepareCancellation(victim.Issue, out owner)) return false;
+        if (!PrepareCancellation(victim.Issue, out owner))
+        {
+            if (victim.Issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(victim.Issue.GetType()))
+                pending[victim.Issue] = BuildGiverDeathLog(victim.Issue);
+            return false;
+        }
 
         if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing && registry.IsRegistered(victim.Issue.GetType()))
         {
@@ -66,7 +73,11 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
     public bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner)
     {
-        if (!PrepareCancellation(issue, out owner)) return false;
+        if (!PrepareCancellation(issue, out owner))
+        {
+            if (log != null) pending[issue] = log;
+            return false;
+        }
 
         if (issue.IssueQuest != null && issue.IssueQuest.IsOngoing && registry.IsRegistered(issue.GetType()))
         {
@@ -115,7 +126,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         if (ownerHero.PartyBelongedTo == null)
         {
-            pending.Add(issue);
+            pending.TryAdd(issue, null);
             return false;
         }
 
@@ -124,7 +135,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         {
             if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
             {
-                pending.Add(issue);
+                pending.TryAdd(issue, null);
                 return false;
             }
 
@@ -142,8 +153,9 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (ModInformation.IsClient) return;
 
-        foreach (var issue in pending.ToList())
+        foreach (var entry in pending.ToList())
         {
+            var issue = entry.Key;
             try
             {
                 if (issue.IssueOwner.Issue != issue)
@@ -152,7 +164,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                     continue;
                 }
 
-                issue.CompleteIssueWithCancel();
+                issue.CompleteIssueWithCancel(entry.Value);
             }
             catch (Exception e)
             {
