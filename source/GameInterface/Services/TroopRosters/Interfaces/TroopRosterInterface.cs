@@ -54,7 +54,7 @@ public interface ITroopRosterInterface : IGameAbstraction
 
     /// <summary>
     /// Runs troop recruitment logic for client requests.
-    /// Returns how many cart entries were not recruited.
+    /// Returns how many cart entries were not recruited because the volunteers or the gold changed.
     /// </summary>
     int HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
 
@@ -326,7 +326,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
     {
         troopsInCart ??= Array.Empty<TroopInfo>();
 
-        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return troopsInCart.Length;
+        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return 0;
 
         List<(Hero, CharacterObject, int)> herosValidated = new();
         HashSet<(Hero, int)> claimedSlots = new();
