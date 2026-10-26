@@ -48,7 +48,7 @@ public sealed class MissionLocationFinalizePatchTests
 
         Hero hero = CreateHero("finalize-hero");
         tavern._characterList.Add(CreateLocationCharacter(hero));
-        var npc = new CharacterObject { StringId = "finalize-npc" };
+        var npc = new CharacterObject { StringId = "finalize-npc", BodyPropertyRange = new MBBodyProperty() };
         tavern._characterList.Add(LocationCharacterFactory.Create(
             npc,
             originParty: null,
