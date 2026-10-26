@@ -585,7 +585,7 @@ public class LadysKnightOutTests : IDisposable
         byte[] serverStart = Array.Empty<byte>();
         scenario.Server.Call(() => serverStart = scenario.Server.SerializeForWire(
             new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, false,
-                new[] { Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries).LogText })));
+                new[] { new IssueJournalEntry(Assert.Single(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries)) })));
         scenario.ClientA.Call(() =>
         {
             var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
