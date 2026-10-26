@@ -72,9 +72,10 @@ internal class VillageNeedsToolsJournalHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)
-                || !(issue.IssueQuest is Quest quest) || !quest.IsOngoing) return;
+                || !(issue.IssueQuest is Quest quest) || (!quest.IsOngoing && !quest.IsFinalized)) return;
 
-            quest.AddLog(new TextObject("{=!}" + data.Text));
+            if (!quest.JournalEntries.Any(log => log.LogText?.ToString() == data.Text))
+                quest.AddLog(new TextObject("{=!}" + data.Text));
         }, context: nameof(VillageNeedsToolsJournalHandler));
     }
 
