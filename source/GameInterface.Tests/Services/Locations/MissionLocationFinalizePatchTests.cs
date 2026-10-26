@@ -9,6 +9,7 @@ using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
