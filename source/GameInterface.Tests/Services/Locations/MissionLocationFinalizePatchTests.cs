@@ -1,4 +1,5 @@
 using Common.Util;
+using GameInterface.Services.Locations.Patches;
 using SandBox.Missions.MissionLogics;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -20,7 +21,7 @@ public sealed class MissionLocationFinalizePatchTests
             campaign.LocationEncounter = null;
             var logic = (MissionLocationLogic)FormatterServices.GetUninitializedObject(typeof(MissionLocationLogic));
 
-            logic.OnRemoveBehavior();
+            Assert.False(MissionLocationFinalizePatch.Prefix(logic));
         }
         finally
         {
