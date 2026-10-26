@@ -137,9 +137,12 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess));
             var patches = Harmony.GetPatchInfo(target);
 
-            Assert.DoesNotContain(patches?.Prefixes ?? Array.Empty<HarmonyLib.Patch>(), prefix =>
-                prefix.PatchMethod.DeclaringType?.FullName ==
-                "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
+            if (patches?.Prefixes != null)
+            {
+                Assert.DoesNotContain(patches.Prefixes, prefix =>
+                    prefix.PatchMethod.DeclaringType?.FullName ==
+                    "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
+            }
         });
     }
 
