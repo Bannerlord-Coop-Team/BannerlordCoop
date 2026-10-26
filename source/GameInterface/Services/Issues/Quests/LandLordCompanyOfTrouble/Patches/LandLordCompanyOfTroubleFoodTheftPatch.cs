@@ -1,5 +1,5 @@
 ﻿using Common;
-using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -21,15 +21,15 @@ internal class LandLordCompanyOfTroubleFoodTheftPatch
             return true;
         }
 
-        var food = FindFood();
-        if (food == null)
+        if (!HasFood())
         {
             return false;
         }
 
-        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+            dispatcher.BeforeQuestBranch(__instance, (byte)LandLordCompanyOfTroubleBranch.FoodStolen))
         {
-            messageBroker.Publish(__instance, new LandLordCompanyOfTroubleFoodStolen(__instance, food));
+            return true;
         }
 
         ShowTheft(__instance);
@@ -37,22 +37,9 @@ internal class LandLordCompanyOfTroubleFoodTheftPatch
         return false;
     }
 
-    private static ItemObject FindFood()
+    private static bool HasFood()
     {
-        var roster = MobileParty.MainParty.ItemRoster;
-
-        for (int i = 0; i < roster.Count; i++)
-        {
-            var element = roster[i];
-            var item = element.EquipmentElement.Item;
-
-            if (!element.IsEmpty && item.IsFood)
-            {
-                return item;
-            }
-        }
-
-        return null;
+        return MobileParty.MainParty.ItemRoster.TotalFood > 0;
     }
 
     private static void ShowTheft(Quest quest)

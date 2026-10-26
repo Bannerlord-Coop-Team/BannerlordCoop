@@ -253,18 +253,22 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         var serverGrainBefore = GrainIn(Server);
         var ownerGrainBefore = GrainIn(Owner);
 
-        Server.Call(() => AttachQuest(Server, companyTroopCount: 4));
+        Quest serverQuest = null!;
+        Server.Call(() => serverQuest = (Quest)AttachQuest(Server, companyTroopCount: 4).IssueQuest);
 
         Owner.Call(() =>
         {
-            var quest = AttachQuest(Owner, companyTroopCount: 4).IssueQuest;
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 4).IssueQuest;
+            MakeTheOwnersPartyTheMainParty(Owner);
 
-            Owner.Resolve<IMessageBroker>().Publish(this, new LandLordCompanyOfTroubleFoodStolen(quest, DefaultItems.Grain));
+            quest.TryToStealItemFromPlayer();
         });
+        Server.PumpGameThread();
         TestEnvironment.FlushCoalescer();
 
         Assert.Equal(serverGrainBefore - 1, GrainIn(Server));
         Assert.Equal(ownerGrainBefore - 1, GrainIn(Owner));
+        Assert.Equal(1, serverQuest._thieveryCount);
     }
 
     [Fact]
@@ -605,7 +609,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         });
         TestEnvironment.FlushCoalescer();
 
-        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestLandLordCompanyOfTroubleFoodTheft>());
+        Assert.Single(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal(grainBefore, GrainIn(Owner));
     }
 

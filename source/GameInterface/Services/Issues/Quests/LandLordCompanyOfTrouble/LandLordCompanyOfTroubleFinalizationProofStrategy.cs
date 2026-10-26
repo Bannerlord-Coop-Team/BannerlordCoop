@@ -30,6 +30,9 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
             case LandLordCompanyOfTroubleBranch.CompanyTurnedHostile:
                 TurnCompanyHostile(companyQuest);
                 return true;
+            case LandLordCompanyOfTroubleBranch.FoodStolen:
+                StealFood(companyQuest);
+                return true;
             default:
                 return false;
         }
@@ -76,5 +79,24 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
 
         SetPartyAiAction.GetActionForEngagingParty(quest._companyOfTroubleParty, MobileParty.MainParty, MobileParty.NavigationType.Default, isFromPort: false);
         quest._companyOfTroubleParty.Ai.SetDoNotMakeNewDecisions(true);
+    }
+
+    // Vanilla's TryToStealItemFromPlayer without its pop-ups, which the owner's client already showed
+    private static void StealFood(Quest quest)
+    {
+        var roster = MobileParty.MainParty.ItemRoster;
+
+        for (int i = 0; i < roster.Count; i++)
+        {
+            var element = roster[i];
+            var item = element.EquipmentElement.Item;
+
+            if (!element.IsEmpty && item.IsFood)
+            {
+                roster.AddToCounts(item, -1);
+                quest._thieveryCount++;
+                return;
+            }
+        }
     }
 }
