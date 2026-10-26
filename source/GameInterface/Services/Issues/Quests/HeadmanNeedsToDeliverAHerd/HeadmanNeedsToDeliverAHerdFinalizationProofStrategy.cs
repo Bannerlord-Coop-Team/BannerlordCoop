@@ -13,6 +13,7 @@ internal enum HeadmanHerdBranch : byte
 
 internal class HeadmanNeedsToDeliverAHerdFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private static readonly Serilog.ILogger Logger = Common.Logging.LogManager.GetLogger<HeadmanNeedsToDeliverAHerdFinalizationProofStrategy>();
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest herd)) return false;
@@ -23,6 +24,8 @@ internal class HeadmanNeedsToDeliverAHerdFinalizationProofStrategy : IFinalizati
             case HeadmanHerdBranch.Deliver:
                 if (herd.GetAvailableRequestedItemCountOnPlayer(herd._herdTypeToDeliver) >= herd._animalCountToDeliver)
                     herd.DeliverHerdOnConsequence();
+                else
+                    Logger.Warning("The owner of {quest} does not carry the requested herd for branch {proof}", herd.StringId, proof);
                 return true;
             case HeadmanHerdBranch.Keep:
                 herd.DeliverHerdRejectOnConsequence();

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
@@ -108,7 +109,9 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
-            using (new AllowedThread()) quest.AddLog(data.Text);
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
+                quest.AddLog(data.Text);
         }, context: nameof(HeadmanHerdJournalHandler));
     }
 }
