@@ -100,7 +100,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SiegeSacrifice>().As<ISiegeSacrifice>().InstancePerDependency();
 
         // Graceful restart, in Release too.
-        builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerJoinAdmission>().As<IServerJoinAdmission>().InstancePerLifetimeScope();
         // AutoActivate so it sees the GameLoaded save name.
         builder.RegisterType<ServerShutdownCoordinator>()
             .As<IServerShutdownCoordinator>()

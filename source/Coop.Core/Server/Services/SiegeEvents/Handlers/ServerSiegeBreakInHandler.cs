@@ -57,12 +57,26 @@ internal class ServerSiegeBreakInHandler : IHandler
     {
         if (!(payload.Who is NetPeer peer)) return;
         var request = payload.What;
-        GameThread.RunSafe(() => network.Send(peer, Apply(peer, request)), context: nameof(NetworkRequestBreakIn));
+        GameThread.RunSafe(() => network.Send(peer, Answer(peer, request)), context: nameof(NetworkRequestBreakIn));
     }
 
-    private NetworkBreakInResult Apply(NetPeer peer, NetworkRequestBreakIn request)
+    // Every failure still answers, so the client's Reject lock always clears.
+    private NetworkBreakInResult Answer(NetPeer peer, NetworkRequestBreakIn request)
     {
         var rejected = new NetworkBreakInResult(request.RequestId, false, Array.Empty<uint>(), Array.Empty<int>(), -1);
+        try
+        {
+            return Apply(peer, request, rejected);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to apply break in request {RequestId}", request.RequestId);
+            return rejected;
+        }
+    }
+
+    private NetworkBreakInResult Apply(NetPeer peer, NetworkRequestBreakIn request, NetworkBreakInResult rejected)
+    {
         if (!playerManager.TryGetPlayer(peer, out var player) ||
             !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var controlled) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) ||
@@ -98,23 +112,16 @@ internal class ServerSiegeBreakInHandler : IHandler
             return new NetworkBreakInResult(request.RequestId, receipt.Result.Approved,
                 receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
 
-        try
-        {
-            int losses = breakOut.GetBreakInCasualties(party, siege);
-            var paidReceipt = new BreakInReceipts.Receipt { Siege = siege, Peer = peer, Result = rejected };
-            var paid = sacrifice.TryApply(party, losses, () => receipts.Set(party, paidReceipt));
-            if (paid == null) return rejected;
-            paidReceipt.Result = new NetworkBreakInResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
-            return paidReceipt.Result;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to apply break in request {RequestId}", request.RequestId);
-            return rejected;
-        }
+        int losses = breakOut.GetBreakInCasualties(party, siege);
+        var paidReceipt = new BreakInReceipts.Receipt { Siege = siege, Peer = peer, Result = rejected };
+        var paid = sacrifice.TryApply(party, losses, () => receipts.Set(party, paidReceipt));
+        if (paid == null) return rejected;
+        paidReceipt.Result = new NetworkBreakInResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
+        return paidReceipt.Result;
     }
 
-    // Same lifetime as the break out receipts, so a paid or failed break in never outlives the encounter it was for.
+    // Dropped on enter, leave and disconnect, so a paid or failed break in never outlives the encounter it was for.
+    // Break out keeps its own receipts in ServerSiegeBreakOutHandler, which always drop on enter and have no disconnect cleanup.
     private void HandleEnter(MessagePayload<PartyEnterSettlementAttempted> payload)
     {
         var party = payload.What.MobileParty;

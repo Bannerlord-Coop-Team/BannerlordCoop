@@ -25,11 +25,9 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
     private readonly string clanId;
     private readonly Quest serverQuest;
     private readonly Quest ownerQuest;
-    private readonly ITestOutputHelper output;
 
     public ScoutSettlementOwnerChangeTests(ITestOutputHelper output)
     {
-        this.output = output;
         environment = new E2ETestEnvironment(output);
         targetIds = Enumerable.Range(0, 3).Select(_ => environment.CreateRegisteredObject<Settlement>()).ToArray();
         var townIds = Enumerable.Range(0, 3).Select(_ => environment.CreateRegisteredObject<Town>()).ToArray();
@@ -148,18 +146,8 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
     [Fact]
     public void ReapplyingTheAcceptCapturePreservesTheServersExistingProgressLog()
     {
-        scenario.ClientA.Call(() =>
-        {
-            foreach (var entry in ownerQuest.JournalEntries)
-                Describe("owner", entry);
-        });
         scenario.Server.Call(() =>
         {
-            foreach (var entry in serverQuest.JournalEntries)
-                Describe("server", entry);
-            foreach (var request in scenario.Server.InternalMessages.GetMessages<RequestQuestJournal>())
-                foreach (var entry in request.Entries)
-                    Describe("wire", entry.ToJournalLog());
             var log = serverQuest._startQuestLog;
             Assert.NotNull(log);
             var issue = Get<Hero>(scenario.Server, scenario.NotableId).Issue;
@@ -168,23 +156,6 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
             Assert.Same(log, serverQuest._startQuestLog);
             Assert.Same(log, Assert.Single(serverQuest.JournalEntries));
         });
-    }
-
-    private void Describe(string side, JournalLog entry)
-    {
-        output.WriteLine("{0}: time={1} progress={2} range={3} type={4}", side,
-            entry.LogTime.NumTicks, entry.CurrentProgress, entry.Range, entry.Type);
-        output.WriteLine("{0} text: {1}", side, DescribeText(entry.LogText));
-        output.WriteLine("{0} task: {1}", side, DescribeText(entry.TaskName));
-    }
-
-    private static string DescribeText(TextObject text)
-    {
-        if (text == null) return "<null>";
-        var attributes = text.Attributes?.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-            .Select(pair => pair.Key + "=" + (pair.Value is TextObject nested ? DescribeText(nested) :
-                pair.Value?.GetType().FullName + ":" + pair.Value));
-        return text.Value + " {" + string.Join(", ", attributes ?? Enumerable.Empty<string>()) + "}";
     }
 
     private static T Get<T>(EnvironmentInstance instance, string id) where T : class

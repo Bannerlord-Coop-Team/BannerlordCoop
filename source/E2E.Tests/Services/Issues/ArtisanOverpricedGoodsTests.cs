@@ -129,6 +129,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution();
         });
 
+        Assert.Equal(2f, Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>()).Difficulty);
         Assert.Equal(2f, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()).Difficulty);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Equal(2f, Get<Hero>(instance, scenario.NotableId).Issue._issueDifficultyMultiplier));
@@ -335,8 +336,13 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     public void StaleDirectAccept_DoesNotReplaceAnAcceptedLordSolution()
     {
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        using var notifications = new MethodCallRecorder(
+            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithQuest()));
 
+        Assert.Equal(1, notifications.CountFor(ClientA));
+        Assert.Equal(0, notifications.CountFor(ClientB));
+        Assert.Equal(0, notifications.CountFor(Server));
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
         ClientA.Call(() =>
         {
@@ -616,6 +622,10 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             else issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
         });
         environment.FlushCoalescer();
+        var decision = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+            request => request.Operation != LordSolutionOperation.Start);
+        Assert.Equal(acceptMerchant ? LordSolutionOperation.AcceptCounterOffer : LordSolutionOperation.RefuseCounterOffer, decision.Operation);
+        Assert.Equal(0f, decision.Difficulty);
         var outcome = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome;
         Assert.Equal(acceptMerchant ? IssueOutcome.LordAcceptedCounterOffer : IssueOutcome.LordRefusedCounterOffer, outcome);
         AssertFinished(acceptMerchant ? 2470 : 2530, acceptMerchant ? 10000 : 10900);
