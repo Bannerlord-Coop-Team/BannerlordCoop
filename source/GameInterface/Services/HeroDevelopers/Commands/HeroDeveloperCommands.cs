@@ -204,6 +204,64 @@ internal class HeroDeveloperCommands
         }
     }
 
+    /// <summary>
+    /// Set one skill of a hero to a level, lower or higher, with its skill xp to match.
+    /// Example:
+    /// coop.debug.hero_developer.set_skill RandomPlayer Riding 300 1023
+    /// </summary>
+    public sealed class HeroDeveloperSetSkillCoopCommand : ICoopCommand
+    {
+        private const int MaxSkillLevel = 1023;
+
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroDeveloperSetSkillCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
+        public string Prefix => "coop.debug.hero_developer";
+
+        public string Name => "set_skill";
+
+        public string Description => "Sets a hero's skill and its skill xp to a level if the current level still matches.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("skill_name", "The skill object name.", isRequired: true),
+            new ExpectedArgs("level", $"The new skill level, 0 to {MaxSkillLevel}.", isRequired: true),
+            new ExpectedArgs("expected_level", "The current skill level, as shown by coop.debug.hero_developer.stats.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            SkillObject skillObject = GetSkillByName(strings[1]);
+            if (skillObject == null) return Failed("Unable to find SkillObject by provided name.");
+
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+            if (!objectManager.TryGetId(hero, out var heroId)) return Failed($"Hero {hero.Name} is not registered.");
+            if (hero.HeroDeveloper == null) return Failed($"Hero {hero.Name} has no hero developer.");
+
+            var before = hero.GetSkillValue(skillObject);
+            if (!int.TryParse(strings[2], out var level) || level < 0 || level > MaxSkillLevel ||
+                !int.TryParse(strings[3], out var expected) || expected != before)
+                return Failed($"Use a level from 0 to {MaxSkillLevel} and the current expected level {before}.");
+
+            // Same calls as vanilla campaign.set_skill_player, so leftover skill xp cant raise the level again
+            hero.HeroDeveloper.SetInitialSkillLevel(skillObject, level);
+
+            return Succeeded(JsonConvert.SerializeObject(new { heroId, skill = skillObject.StringId, before, value = hero.GetSkillValue(skillObject) }));
+        }
+    }
+
     public sealed class HeroSocialParameterCoopCommand : ICoopCommand
     {
         // Resolves hero arguments by name or id.
