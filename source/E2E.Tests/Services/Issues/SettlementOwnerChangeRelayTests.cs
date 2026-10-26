@@ -16,6 +16,7 @@ using Xunit.Abstractions;
 using GangLeaderQuest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 using GarrisonQuest = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssueQuest;
 using SmugglersQuest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
+using RaidAnEnemyTerritoryQuest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -148,6 +149,7 @@ public class SettlementOwnerChangeRelayTests : IDisposable
     [InlineData(typeof(GangLeaderQuest))]
     [InlineData(typeof(GarrisonQuest))]
     [InlineData(typeof(SmugglersQuest))]
+    [InlineData(typeof(RaidAnEnemyTerritoryQuest))]
     public void ExistingNativeListenersAreReachedOnce(Type questType)
     {
         using var calls = new MethodCallRecorder(AccessTools.Method(questType, "OnSettlementOwnerChanged"));

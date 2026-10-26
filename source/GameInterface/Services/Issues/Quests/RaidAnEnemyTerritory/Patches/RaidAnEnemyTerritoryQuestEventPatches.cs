@@ -5,7 +5,6 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
@@ -36,13 +35,6 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
         RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
         return false;
     }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
-    [HarmonyPostfix]
-    private static void OnSettlementOwnerChangedPostfix(object[] __args) =>
-        RunAsOwners(quest => quest.OnSettlementOwnerChanged(
-            (Settlement)__args[0], (bool)__args[1], (Hero)__args[2], (Hero)__args[3],
-            (Hero)__args[4], (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)__args[5]));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMakePeace))]
     [HarmonyPostfix]
