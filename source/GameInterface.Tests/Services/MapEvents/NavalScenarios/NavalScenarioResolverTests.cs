@@ -86,6 +86,20 @@ public class NavalScenarioResolverTests
         Assert.Equal(15, Resolve("duel", "reserve=15").ReserveTroops);
     }
 
+    // The forced-failure knob is opt-in and reaches clients over the real scenario message contract.
+    [Fact]
+    public void FleetFailure_IsOptIn_AndRoundTripsToTheBattleHost()
+    {
+        Assert.False(Resolve("vs_pirates").FailNpcFleet);
+        Assert.False(Resolve("vs_pirates", "fleet_fail=0").FailNpcFleet);
+        var config = Resolve("vs_pirates", "fleet_fail=1");
+        using var stream = new System.IO.MemoryStream();
+        ProtoBuf.Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        Assert.True(ProtoBuf.Serializer.Deserialize<NavalScenarioConfig>(stream).FailNpcFleet);
+        Assert.Equal("fleet_fail must be 0 or 1.", Refuse("vs_pirates", "fleet_fail=yes"));
+    }
+
     [Fact]
     public void Resolve_CopiesThePresetValues()
     {

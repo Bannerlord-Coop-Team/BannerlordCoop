@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [controllerId...]; " +
+        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [fleet_fail=0|1] [controllerId...]; " +
         "delay counts from this client's deployment end (sink, disconnect, retreat) or, for late_join, from staging";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
@@ -130,6 +130,10 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 if (!TryParseInt(value, 0, NavalScenarioPresets.MaxShipsPerPlayer, out int rams))
                     return $"ram must be a whole number from 0 to {NavalScenarioPresets.MaxShipsPerPlayer}.";
                 config.RammedShipsPerParty = rams;
+                return null;
+            case "fleet_fail":
+                if (value != "0" && value != "1") return "fleet_fail must be 0 or 1.";
+                config.FailNpcFleet = value == "1";
                 return null;
             case "reserve":
                 if (!TryParseInt(value, 0, NavalScenarioPresets.MaxReserveTroops, out int reserve))

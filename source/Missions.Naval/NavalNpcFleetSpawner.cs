@@ -30,6 +30,10 @@ public interface INavalNpcFleetSpawner : IDisposable
 {
     /// <summary>[Game thread] Spawns the fleet once its conditions hold.</summary>
     void Tick();
+#if DEBUG
+    /// <summary>Arms a failure inside this battle host's next eligible spawn attempt; returns a refusal or null.</summary>
+    string FailNextSpawn();
+#endif
 
     /// <summary>The side whose fleet this spawner tried to field and could not, otherwise <see cref="BattleSideEnum.None"/>.</summary>
     BattleSideEnum FailedSide { get; }
@@ -65,6 +69,19 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     // The battle's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
     private NetworkNpcFleetAttempted attempt;
     private bool attemptedHere;
+#if DEBUG
+    private bool failNextSpawn;
+    private readonly Func<bool> scenarioFailsSpawn;
+
+    // The battle host owns AI fielding, so this debug mutation runs there rather than on the campaign server.
+    public string FailNextSpawn()
+    {
+        if (!session.IsLocalHost) return "Run fleet_fail on the battle host client.";
+        if (HasAttempt) return "The AI fleet was already attempted in this battle.";
+        failNextSpawn = true;
+        return null;
+    }
+#endif
     private string state = WaitingForHost;
     private int hullsSpawned;
     private int troopsFielded;
@@ -78,7 +95,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        BattleSideEnum enemySide)
+        BattleSideEnum enemySide
+#if DEBUG
+        , Func<bool> scenarioFailsSpawn = null
+#endif
+        )
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -88,6 +109,9 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.enemySide = enemySide;
+#if DEBUG
+        this.scenarioFailsSpawn = scenarioFailsSpawn;
+#endif
 
         messageBroker.Subscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -125,10 +149,25 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         state = Decide(session.IsLocalHost, mission.IsDeploymentFinished, supplier?.IsPopulated == true, parties.Count);
         if (state != Ready) return;
 
+        AttemptFleet(() => SpawnFleet(mission, supplier, parties));
+    }
+
+    // Settles and broadcasts a single eligible spawn attempt, including a DEBUG-injected failure.
+    internal void AttemptFleet(Action spawn)
+    {
+        if (HasAttempt) return;
+
         // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
         try
         {
-            SpawnFleet(mission, supplier, parties);
+#if DEBUG
+            if (failNextSpawn || scenarioFailsSpawn?.Invoke() == true)
+            {
+                failNextSpawn = false;
+                throw new InvalidOperationException("DEBUG fleet_fail: forced AI fleet spawn failure");
+            }
+#endif
+            spawn();
         }
         catch (Exception exception)
         {

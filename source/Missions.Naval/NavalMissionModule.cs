@@ -62,6 +62,9 @@ public class NavalMissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 #if DEBUG
+        builder.RegisterType<NavalFleetFailCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalDebugHulls>()
             .As<INavalDebugHulls>()
             .InstancePerDependency();
