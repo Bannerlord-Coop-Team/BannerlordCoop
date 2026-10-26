@@ -211,6 +211,7 @@ internal class HeroDeveloperCommands
     /// </summary>
     public sealed class HeroDeveloperSetSkillCoopCommand : ICoopCommand
     {
+        // DefaultCharacterDevelopmentModel only has xp thresholds up to 1023
         private const int MaxSkillLevel = 1023;
 
         // Resolves hero arguments by name or id.
@@ -246,16 +247,19 @@ internal class HeroDeveloperCommands
             SkillObject skillObject = GetSkillByName(strings[1]);
             if (skillObject == null) return Failed("Unable to find SkillObject by provided name.");
 
+            if (!int.TryParse(strings[2], out var level) || level < 0 || level > MaxSkillLevel)
+                return Failed($"Use a level from 0 to {MaxSkillLevel}.");
+            if (!int.TryParse(strings[3], out var expected)) return Failed("An integer expected level is required.");
+
             if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
             if (!objectManager.TryGetId(hero, out var heroId)) return Failed($"Hero {hero.Name} is not registered.");
             if (hero.HeroDeveloper == null) return Failed($"Hero {hero.Name} has no hero developer.");
 
             var before = hero.GetSkillValue(skillObject);
-            if (!int.TryParse(strings[2], out var level) || level < 0 || level > MaxSkillLevel ||
-                !int.TryParse(strings[3], out var expected) || expected != before)
-                return Failed($"Use a level from 0 to {MaxSkillLevel} and the current expected level {before}.");
+            if (expected != before) return Failed($"Expected level {expected} but the current level is {before}.");
 
-            // Same calls as vanilla campaign.set_skill_player, so leftover skill xp cant raise the level again
+            // Same calls as vanilla campaign.set_skill_player, so leftover skill xp cant raise the level again.
+            // Perks, hero level and total xp are left as they are, like vanilla.
             hero.HeroDeveloper.SetInitialSkillLevel(skillObject, level);
 
             return Succeeded(JsonConvert.SerializeObject(new { heroId, skill = skillObject.StringId, before, value = hero.GetSkillValue(skillObject) }));

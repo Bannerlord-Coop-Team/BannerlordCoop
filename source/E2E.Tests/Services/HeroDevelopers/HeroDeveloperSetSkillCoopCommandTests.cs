@@ -45,12 +45,66 @@ public class HeroDeveloperSetSkillCoopCommandTests : IDisposable
             Assert.Equal(xpForLevel, hero.HeroDeveloper.GetSkillXp(DefaultSkills.Riding));
         });
 
+        testEnvironment.FlushCoalescer();
+
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(client.ObjectManager.TryGetObject<SkillObject>(RidingSkillId, out var riding));
             Assert.Equal(300, hero.GetSkillValue(riding));
+            client.Call(() =>
+                Assert.Equal(
+                    Campaign.Current.Models.CharacterDevelopmentModel.GetXpRequiredForSkillLevel(300),
+                    hero.HeroDeveloper.GetSkillXp(riding)));
         }
+    }
+
+    [Fact]
+    public void Riding_SetToZeroOnTheServer_ClearsTheXpOnClients()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+        RegisterRidingSkill();
+
+        Server.Call(() =>
+        {
+            Assert.True(Execute(Server, heroId, "Riding", "300", "0").Succeeded);
+            var result = Execute(Server, heroId, "Riding", "0", "300");
+
+            Assert.True(result.Succeeded, result.Output);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(0f, hero.HeroDeveloper.GetSkillXp(DefaultSkills.Riding));
+        });
+
+        testEnvironment.FlushCoalescer();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(client.ObjectManager.TryGetObject<SkillObject>(RidingSkillId, out var riding));
+            Assert.Equal(0, hero.GetSkillValue(riding));
+            Assert.Equal(0f, hero.HeroDeveloper.GetSkillXp(riding));
+        }
+    }
+
+    [Fact]
+    public void Riding_WithXpNearIntMax_IsLoweredAndStaysLoweredAfterXpGain()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero.SetSkillValue(DefaultSkills.Riding, 1023);
+            hero.HeroDeveloper.SetSkillXp(DefaultSkills.Riding, 1_066_984_724f);
+
+            var result = Execute(Server, heroId, "Riding", "300", "1023");
+            hero.HeroDeveloper.AddSkillXp(DefaultSkills.Riding, 100f, isAffectedByFocusFactor: false, shouldNotify: false);
+
+            Assert.True(result.Succeeded, result.Output);
+            Assert.Equal(300, hero.GetSkillValue(DefaultSkills.Riding));
+            var xpForLevel = Campaign.Current.Models.CharacterDevelopmentModel.GetXpRequiredForSkillLevel(300);
+            Assert.InRange(hero.HeroDeveloper.GetSkillXp(DefaultSkills.Riding), xpForLevel, xpForLevel + 100f);
+        });
     }
 
     [Fact]
