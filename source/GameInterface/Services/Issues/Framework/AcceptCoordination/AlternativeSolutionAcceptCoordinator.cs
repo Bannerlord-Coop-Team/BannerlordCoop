@@ -13,6 +13,7 @@ using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
+
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -38,6 +39,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IAlternativeSolutionTroopValidator troopValidator;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IAlternativeSolutionCommitments commitments;
     private readonly IQuestJournalOwnerResolver journal;
 
     public AlternativeSolutionAcceptCoordinator(
@@ -50,6 +52,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IAlternativeSolutionTroopValidator troopValidator,
         IControllerIdProvider controllerIdProvider,
         IIssueAcceptPreconditions acceptPreconditions,
+        IAlternativeSolutionCommitments commitments,
         IQuestJournalOwnerResolver journal)
     {
         this.messageBroker = messageBroker;
@@ -61,6 +64,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.troopValidator = troopValidator;
         this.controllerIdProvider = controllerIdProvider;
         this.acceptPreconditions = acceptPreconditions;
+        this.commitments = commitments;
         this.journal = journal;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
@@ -118,9 +122,11 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
     private void AcceptOnServer(NetPeer peer, Player player, RequestAlternativeSolutionAccept data)
     {
+        data = new RequestAlternativeSolutionAccept(data.IssueOwnerId, data.IssueId, data.DifficultyMultiplier,
+            commitments.Consume(player.HeroId, data.IssueOwnerId, data.IssueId, data.SentTroops));
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, "player hero missing");
             return;
         }
 
@@ -129,7 +135,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             !issue.IsOngoingWithoutQuest ||
             !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, "issue unavailable or preconditions refused");
             return;
         }
 
@@ -147,7 +153,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         if (!alternativeSolutionIsAcceptable || !troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, troopsAreValid ? "issue unavailable" : "committed troops do not satisfy the alternative solution");
             return;
         }
 
@@ -169,7 +175,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             Logger.Error(e, "Starting the alternative solution of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
             journal.DiscardArchive(issue);
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, "starting the alternative solution threw");
             return;
         }
 
@@ -182,8 +188,9 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             player.ControllerId));
     }
 
-    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero)
+    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero, string reason)
     {
+        Logger.Warning("Rejected alternative accept {IssueId}: {Reason}", data.IssueId, reason);
         if (playerHero?.PartyBelongedTo != null)
         {
             troopValidator.ReturnTroopsToParty(playerHero.PartyBelongedTo, data.SentTroops);

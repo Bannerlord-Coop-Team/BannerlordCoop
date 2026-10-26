@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
@@ -42,6 +43,8 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly ISettlementEncounterDistanceValidator distanceValidator;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISettlementInterface settlementInterface;
+    private readonly ISiegeBreakOut breakOut;
+    private readonly IBreakInReceipts breakInReceipts;
 
     public ServerSiegeEntryHandler(
         IMessageBroker messageBroker,
@@ -50,7 +53,9 @@ internal class ServerSiegeEntryHandler : IHandler
         IPlayerManager playerManager,
         ISettlementEncounterDistanceValidator distanceValidator,
         ISiegeEventInterface siegeEventInterface,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        ISiegeBreakOut breakOut,
+        IBreakInReceipts breakInReceipts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -59,6 +64,8 @@ internal class ServerSiegeEntryHandler : IHandler
         this.distanceValidator = distanceValidator;
         this.siegeEventInterface = siegeEventInterface;
         this.settlementInterface = settlementInterface;
+        this.breakOut = breakOut;
+        this.breakInReceipts = breakInReceipts;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
@@ -107,7 +114,11 @@ internal class ServerSiegeEntryHandler : IHandler
             return false;
 
         var alreadyEntered = ReferenceEquals(party.CurrentSettlement, settlement);
-        if (!CanApplyBreakInContinuation(party, settlement, alreadyEntered))
+        // Getting in needs the break in troops paid first, unless breaking in costs nothing (vanilla then goes straight in).
+        // A party already inside only gets the entry resent.
+        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered) ||
+            (!alreadyEntered && !breakInReceipts.IsPaid(party, settlement.SiegeEvent) &&
+            breakOut.GetBreakInCasualties(party, settlement.SiegeEvent) > 0))
         {
             Logger.Warning("Rejecting break-in request {RequestId} for party {PartyId} and settlement {SettlementId}",
                 request.RequestId, request.PartyId, request.SettlementId);
@@ -126,7 +137,9 @@ internal class ServerSiegeEntryHandler : IHandler
             settlementInterface.PartyEnterSettlement(party, settlement);
         }
 
-        return ReferenceEquals(party.CurrentSettlement, settlement);
+        if (!ReferenceEquals(party.CurrentSettlement, settlement)) return false;
+        breakInReceipts.Remove(party);
+        return true;
     }
 
     private bool DoesPeerControlParty(
@@ -140,27 +153,6 @@ internal class ServerSiegeEntryHandler : IHandler
         Logger.Warning("Rejecting break-in request {RequestId} from a peer that does not control party {PartyId}",
             request.RequestId, request.PartyId);
         return false;
-    }
-
-    private static bool CanApplyBreakInContinuation(
-        MobileParty party,
-        Settlement settlement,
-        bool alreadyEntered)
-    {
-        if (!party.IsActive) return false;
-        if (party.CurrentSettlement != null && !alreadyEntered) return false;
-        if (party.BesiegerCamp != null) return false;
-
-        var partyBase = party.Party;
-        var mapEventSide = partyBase.MapEventSide;
-        var validEnteredMapEvent = alreadyEntered &&
-            ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
-            partyBase.Side == BattleSideEnum.Defender;
-        if (mapEventSide != null && !validEnteredMapEvent) return false;
-
-        var siegeEvent = settlement.SiegeEvent;
-        return siegeEvent != null &&
-            siegeEvent.CanPartyJoinSide(partyBase, BattleSideEnum.Defender);
     }
 
     private void SendBreakInContinuationResult(

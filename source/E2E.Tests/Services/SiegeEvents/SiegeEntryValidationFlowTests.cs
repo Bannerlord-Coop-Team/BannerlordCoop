@@ -414,19 +414,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         foreach (var instance in Clients.Append(Server))
         {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
-                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
-                Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
-                using (new AllowedThread())
-                {
-                    settlement.SetSettlementComponent(town);
-                    town.OwnerClan = defenderClan;
-                    CreatePresentedSiege(party, settlement);
-                }
-            }, SiegeCreationDisabledMethods);
+            instance.Call(() => CreatePresentedTownSiege(instance, context), SiegeCreationDisabledMethods);
         }
         ClearMessages();
 
@@ -572,21 +560,17 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         {
             instance.Call(() =>
             {
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
-                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
-                Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                var settlement = CreatePresentedTownSiege(instance, context, (party, besiegedSettlement) =>
+                {
+                    party.CurrentSettlement = besiegedSettlement;
+                    besiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
+                    mapEvent.DefenderSide.LeaderParty = besiegedSettlement.Party;
+                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                    mapEvent.MapEventSettlement = besiegedSettlement;
+                });
                 using (new AllowedThread())
                 {
-                    settlement.SetSettlementComponent(town);
-                    town.OwnerClan = defenderClan;
-                    party.CurrentSettlement = settlement;
-                    settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                    mapEvent.DefenderSide.LeaderParty = settlement.Party;
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                    mapEvent.MapEventSettlement = settlement;
-                    CreatePresentedSiege(party, settlement);
                     // The skipped scene initializer also creates the collections read by siege strength calculations.
                     settlement.SiegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
                         BattleSideEnum.Attacker, null);
@@ -941,6 +925,28 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                 out var settlement));
             Assert.Same(settlement.SiegeEvent.BesiegerCamp, party.BesiegerCamp);
         });
+    }
+
+    // Wires the context's town on this instance and presents a siege on it. beforeSiege runs after the
+    // town is wired and before the siege is created.
+    private static Settlement CreatePresentedTownSiege(
+        EnvironmentInstance instance,
+        EntryContext context,
+        Action<MobileParty, Settlement>? beforeSiege = null)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+        Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+        Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+        using (new AllowedThread())
+        {
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = defenderClan;
+            beforeSiege?.Invoke(party, settlement);
+            CreatePresentedSiege(party, settlement);
+        }
+
+        return settlement;
     }
 
     private static void CreatePresentedSiege(

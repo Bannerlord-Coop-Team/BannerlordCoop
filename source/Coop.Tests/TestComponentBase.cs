@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Clans;
 using GameInterface.Services.UI.PlayerList;
 using Autofac;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -107,6 +108,7 @@ internal abstract class TestComponentBase
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
+        RegisterMock<ICoopCommandArgsFactory>(builder);
         RegisterMock<IGameInterface>(builder);
         var modConfig = new Mock<IModConfig>();
         modConfig.SetupGet(config => config.Data).Returns(new ModConfigData());
@@ -157,10 +159,14 @@ internal abstract class TestComponentBase
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
+        // AgentHitSoundFixtureHandler (MissionModule, auto-activated in DEBUG) needs the args factory,
+        // which the real containers get from GameInterfaceModule.
+        builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
+        RegisterMock<IQuestFeatureFlag>(builder);
         RegisterMock<IEducationCampaignBehaviorInterface>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);

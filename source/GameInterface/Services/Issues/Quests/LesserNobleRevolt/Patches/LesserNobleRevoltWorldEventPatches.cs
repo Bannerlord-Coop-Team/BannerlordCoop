@@ -9,6 +9,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.Le
 
 namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class LesserNobleRevoltWorldEventPatches
 {

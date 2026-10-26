@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Captures branch and completion-callback logs before vanilla detaches the quest.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedJournalPatch
 {

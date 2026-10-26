@@ -115,8 +115,6 @@ internal class PlayerLocationEntryPatches
             return;
         }
 
-        LocationMissionTracker.TryRegister(mission);
-
         foreach (var behavior in behaviors)
         {
             if (behavior is MissionBehavior missionBehavior)
@@ -125,6 +123,7 @@ internal class PlayerLocationEntryPatches
                 Logger.Information("[LocationSync] Attached {Behavior} to mission '{Scene}'", behavior.GetType().Name, mission.SceneName);
             }
         }
+        LocationMissionTracker.TryRegister(mission);
     }
 }
 

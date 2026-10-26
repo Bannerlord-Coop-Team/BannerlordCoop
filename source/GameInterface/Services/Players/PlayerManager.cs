@@ -72,6 +72,11 @@ public interface IPlayerManager
     bool TryGetPlayer(NetPeer peer, out Player player);
 
     /// <summary>
+    /// Resolves the controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
+    /// </summary>
+    bool TryGetCurrentController(NetPeer peer, out string controllerId);
+
+    /// <summary>
     /// Resolves the Player controlling the given hero.
     /// </summary>
     bool TryGetPlayer(Hero hero, out Player player);
@@ -83,11 +88,10 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
-    /// Checks whether a message sender is the peer controlling the leader of the given clan, logging
-    /// a warning when it isn't, so a handler can ignore a clan edit from a player who does not lead it.
-    /// Reads campaign state, so call it on the game thread.
+    /// Resolves the hero controlled by the peer that sent a message, so a handler can check what
+    /// that player may do. Reads the object registry, so call it on the game thread.
     /// </summary>
-    bool IsSenderClanLeader(object sender, Clan clan);
+    bool TryGetSenderHero(object sender, out Hero hero);
 
     /// <summary>
     /// Checks whether the given player has a connected peer.
@@ -391,6 +395,21 @@ public class PlayerManager : IPlayerManager
         return peerToPlayer.TryGetValue(peer, out player);
     }
 
+    public bool TryGetCurrentController(NetPeer peer, out string controllerId)
+    {
+        controllerId = null;
+        lock (registrySync)
+        {
+            if (!peerToPlayer.TryGetValue(peer, out var player) ||
+                !controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer))
+                return false;
+
+            controllerId = player.ControllerId;
+            return true;
+        }
+    }
+
     public bool TryGetPlayer(Hero hero, out Player player)
     {
         player = null;
@@ -406,14 +425,11 @@ public class PlayerManager : IPlayerManager
         return false;
     }
 
-    public bool IsSenderClanLeader(object sender, Clan clan)
+    public bool TryGetSenderHero(object sender, out Hero hero)
     {
-        if (clan != null && sender is NetPeer peer && TryGetPlayer(peer, out var player) &&
-            objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
-            hero.Clan == clan && clan.Leader == hero) return true;
-
-        logger.Warning("Ignoring a request for clan {ClanId} from a peer that does not lead it", clan?.StringId);
-        return false;
+        hero = null;
+        return sender is NetPeer peer && TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObject(player.HeroId, out hero);
     }
 
     public bool IsConnected(Player player)

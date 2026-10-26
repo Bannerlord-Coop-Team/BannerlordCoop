@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials.Pat
 /// The raid and coercion endings are decided by the server, which runs the quest's listeners as each owning
 /// player. The framework relays war and kingdom changes; these two events are specific to a village giver.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class VillageNeedsCraftingMaterialsWorldEventPatches
 {
