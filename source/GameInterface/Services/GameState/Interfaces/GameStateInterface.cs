@@ -99,30 +99,25 @@ internal class GameStateInterface : IGameStateInterface
     public void StartNewGame()
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.RunSafe(() =>
-        {
-            MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
-        }, context: nameof(StartNewGame));
+        GameThread.RunSafe(StartNewCampaign, context: nameof(StartNewGame));
     }
 
     public void LoadGame(string saveName)
     {
-        messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() =>
-        {
-            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
-
-            if (save == null)
-            {
-                Logger.Error("Failed to load save with name {SaveName}", saveName);
-                return;
-            }
-
-            ForceLoadSave(save);
-        }, blocking: true);
+        LoadSave(saveName, () => Logger.Error("Failed to load save with name {SaveName}", saveName));
     }
 
     public void LoadGameOrStartNew(string saveName)
+    {
+        LoadSave(saveName, () =>
+        {
+            Logger.Information("No save named {SaveName}, starting a new campaign", saveName);
+            StartNewCampaign();
+        });
+    }
+
+    // Loads the named save on the game thread, blocking until it started, or runs onMissing there when no save has that name.
+    private void LoadSave(string saveName, Action onMissing)
     {
         messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
@@ -131,13 +126,18 @@ internal class GameStateInterface : IGameStateInterface
 
             if (save == null)
             {
-                Logger.Information("No save named {SaveName}, starting a new campaign", saveName);
-                MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
+                onMissing();
                 return;
             }
 
             ForceLoadSave(save);
         }, blocking: true);
+    }
+
+    // Starts a new sandbox campaign; game thread only.
+    private static void StartNewCampaign()
+    {
+        MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
     }
 
     private void ForceLoadSave(SaveGameFileInfo save)
