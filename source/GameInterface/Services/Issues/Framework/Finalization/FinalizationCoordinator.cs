@@ -218,8 +218,10 @@ internal class FinalizationCoordinator : IHandler
             {
                 if (quest != null)
                 {
+                    var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    if (IsOlderSnapshot(quest, logs)) return;
                     quest._journalEntries.Clear();
-                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    foreach (var log in logs)
                         quest._journalEntries.Add(log.ToJournalLog());
                     CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
                 }
@@ -288,6 +290,21 @@ internal class FinalizationCoordinator : IHandler
                 Replay(issue, data.Outcome, isOwner);
             }
         }, context: nameof(FinalizationCoordinator));
+    }
+
+    private static bool IsOlderSnapshot(QuestBase quest, IssueJournalEntry[] entries)
+    {
+        var localLatest = quest.JournalEntries
+            .Where(log => log.LogText != null)
+            .Select(log => log.LogTime.NumTicks)
+            .DefaultIfEmpty(long.MinValue)
+            .Max();
+        var receivedLatest = entries
+            .Where(log => log.Text != null)
+            .Select(log => log.Time.NumTicks)
+            .DefaultIfEmpty(long.MinValue)
+            .Max();
+        return entries.Length < quest.JournalEntries.Count && receivedLatest <= localLatest;
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
