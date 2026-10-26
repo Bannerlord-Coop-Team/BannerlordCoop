@@ -1,4 +1,4 @@
-\xef\xbb\xbfusing HarmonyLib;
+﻿using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Locations;

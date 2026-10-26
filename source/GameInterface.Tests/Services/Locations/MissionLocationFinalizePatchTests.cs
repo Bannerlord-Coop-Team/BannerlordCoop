@@ -1,4 +1,4 @@
-\xef\xbb\xbfusing Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Locations.Patches;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
