@@ -5,8 +5,10 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.UI;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents;
@@ -44,6 +46,8 @@ public class CoopTournamentController : CoopMissionController
     private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
     private readonly IMissionContext missionContext;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
     private CoopTournamentFightMissionController fightController;
@@ -147,7 +151,9 @@ public class CoopTournamentController : CoopMissionController
         INetworkWorldItemRegistry worldItemRegistry,
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
         IGuardedHitWindow guardedHitWindow,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        MissionMapTimeView mapTimeView,
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -155,6 +161,9 @@ public class CoopTournamentController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Tournament)
     {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+
         this.relayNetwork = relayNetwork;
         this.worldItemRegistry = worldItemRegistry;
         this.guardedHitWindow = guardedHitWindow;
@@ -2183,16 +2192,17 @@ public class CoopTournamentController : CoopMissionController
         session.Reset();
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
-        messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
-        messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
-        messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
-        messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
-        messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-        pendingLocalDamage.Clear();
-        guardedHitWindow.Dispose();
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated),
+            () => messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated),
+            () => messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage),
+            () => messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut),
+            () => messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState),
+            () => messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded),
+            () => pendingLocalDamage.Clear(),
+            guardedHitWindow.Dispose,
+            base.DisposeMission);
     }
 }

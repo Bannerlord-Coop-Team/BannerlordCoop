@@ -1,5 +1,8 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
 using QuestSettlement = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.QuestSettlement;
@@ -13,10 +16,13 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
 internal class ScoutEnemyGarrisonsQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
     private readonly ScoutEnemyGarrisonsCreationCaptureStrategy targets;
+    private readonly IIssueOwnerResolver ownerResolver;
 
-    public ScoutEnemyGarrisonsQuestSolutionAcceptStrategy(ScoutEnemyGarrisonsCreationCaptureStrategy targets)
+    public ScoutEnemyGarrisonsQuestSolutionAcceptStrategy(
+        ScoutEnemyGarrisonsCreationCaptureStrategy targets, IIssueOwnerResolver ownerResolver)
     {
         this.targets = targets;
+        this.ownerResolver = ownerResolver;
     }
 
     public byte[] Capture(IssueBase issue) => targets.Capture(issue);
@@ -40,5 +46,14 @@ internal class ScoutEnemyGarrisonsQuestSolutionAcceptStrategy : IQuestSolutionAc
         quest._questSettlement1 = new QuestSettlement(settlements[0], 0);
         quest._questSettlement2 = new QuestSettlement(settlements[1], 0);
         quest._questSettlement3 = new QuestSettlement(settlements[2], 0);
+
+        if (ModInformation.IsServer && issue.IsSolvingWithQuest && quest._startQuestLog == null &&
+            ownerResolver.TryResolveOwnerHero(issue, out var owner))
+        {
+            // World-event listeners read this progress log without starting the server's quest.
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                quest._startQuestLog = quest.AddDiscreteLog(quest.PlayerStartsQuestLogText,
+                    new TextObject("{=jpBpwgAs}Settlements"), quest._scoutedSettlementCount, 3);
+        }
     }
 }
