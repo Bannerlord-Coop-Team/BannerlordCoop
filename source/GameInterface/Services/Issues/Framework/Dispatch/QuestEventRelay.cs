@@ -10,6 +10,8 @@ internal class QuestEventRelay : IQuestEventRelay
 {
     private static readonly ConcurrentDictionary<(Type Quest, string Listener), MethodInfo> Listeners =
         new ConcurrentDictionary<(Type Quest, string Listener), MethodInfo>();
+    private static readonly ConcurrentDictionary<(Type Quest, string Listener), byte> MissingListeners =
+        new ConcurrentDictionary<(Type Quest, string Listener), byte>();
 
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IQuestTypeRegistry registry;
@@ -31,9 +33,22 @@ internal class QuestEventRelay : IQuestEventRelay
             }
 
             // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
-            var listener = Listeners.GetOrAdd((quest.GetType(), listenerName), key => FindListener(key.Quest, key.Listener, parameterTypes));
+            var key = (quest.GetType(), listenerName);
+            if (MissingListeners.ContainsKey(key)) return;
 
-            listener?.Invoke(quest, arguments);
+            if (!Listeners.TryGetValue(key, out var listener))
+            {
+                listener = FindListener(key.Quest, key.Listener, parameterTypes);
+                if (listener == null)
+                {
+                    MissingListeners.TryAdd(key, 0);
+                    return;
+                }
+
+                Listeners.TryAdd(key, listener);
+            }
+
+            listener.Invoke(quest, arguments);
         });
     }
 

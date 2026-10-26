@@ -71,10 +71,9 @@ public class QuestWorldEventRelayTests : IDisposable
             relay.Relay("AbsentListener", Type.EmptyTypes);
             relay.Relay("AbsentListener", Type.EmptyTypes);
 
-            var listeners = (ConcurrentDictionary<(Type, string), MethodInfo>)typeof(QuestEventRelay)
-                .GetField("Listeners", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
-            Assert.True(listeners.TryGetValue((typeof(ListenerQuest), "AbsentListener"), out var listener));
-            Assert.Null(listener);
+            var missing = (ConcurrentDictionary<(Type, string), byte>)typeof(QuestEventRelay)
+                .GetField("MissingListeners", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+            Assert.True(missing.ContainsKey((typeof(ListenerQuest), "AbsentListener")));
         });
     }
 
