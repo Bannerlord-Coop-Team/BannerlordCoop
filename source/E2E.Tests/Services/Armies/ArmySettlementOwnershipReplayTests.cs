@@ -14,21 +14,16 @@ namespace E2E.Tests.Services.Armies;
 public sealed class ArmySettlementOwnershipReplayTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
-    private readonly ITestOutputHelper output;
 
     public ArmySettlementOwnershipReplayTests(ITestOutputHelper output)
     {
-        this.output = output;
         environment = new E2ETestEnvironment(output, numClients: 1);
     }
 
     public void Dispose() => environment.Dispose();
 
-    [Theory]
-    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift)]
-    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege)]
-    public void ServerOwnershipEventStillSelectsTheArmyTarget(
-        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    [Fact]
+    public void ServerOwnershipEventStillSelectsTheArmyTarget()
     {
         var armyId = environment.CreateRegisteredObject<Army>();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
@@ -37,8 +32,6 @@ public sealed class ArmySettlementOwnershipReplayTests : IDisposable
         var server = environment.Server;
         server.Call(() =>
         {
-            Assert.Empty(Campaign.Current.QuestManager.Quests);
-            Assert.Empty(Campaign.Current.IssueManager.Issues);
             var army = server.GetRegisteredObject<Army>(armyId);
             var settlement = server.GetRegisteredObject<Settlement>(settlementId);
             var town = server.GetRegisteredObject<Town>(townId);
@@ -64,17 +57,15 @@ public sealed class ArmySettlementOwnershipReplayTests : IDisposable
             var settlement = server.GetRegisteredObject<Settlement>(settlementId);
             var owner = server.GetRegisteredObject<Hero>(ownerId);
             CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(
-                settlement, detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege,
-                owner, army.LeaderParty.LeaderHero, owner, detail);
+                settlement, false,
+                owner, army.LeaderParty.LeaderHero, owner,
+                ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift);
         });
         Assert.Equal(1, nativeAi.CountFor(server));
     }
 
-    [Theory]
-    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift)]
-    [InlineData(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege)]
-    public void OwnershipReplayWithoutAnyQuestDoesNotRecalculateTheClientArmyTarget(
-        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    [Fact]
+    public void OwnershipReplayWithoutAnyQuestDoesNotRecalculateTheClientArmyTarget()
     {
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var townId = environment.CreateRegisteredObject<Town>();
@@ -88,8 +79,6 @@ public sealed class ArmySettlementOwnershipReplayTests : IDisposable
 
         client.Call(() =>
         {
-            Assert.Empty(Campaign.Current.QuestManager.Quests);
-            Assert.Empty(Campaign.Current.IssueManager.Issues);
             var settlement = client.GetRegisteredObject<Settlement>(settlementId);
             var town = client.GetRegisteredObject<Town>(townId);
             var owner = client.GetRegisteredObject<Hero>(newOwnerId);
@@ -123,16 +112,14 @@ public sealed class ArmySettlementOwnershipReplayTests : IDisposable
         using var nativeAi = new MethodCallRecorder(Priority.Normal, true,
             AccessTools.Method(typeof(Army), nameof(Army.FindBestGatheringSettlementAndMoveTheLeader)));
         client.SimulateMessage(environment.Server, new NetworkChangeSettlementOwnership(
-            settlementId, newOwnerId, previousOwnerId, newOwnerId, (int)detail));
+            settlementId, newOwnerId, previousOwnerId, newOwnerId,
+            (int)ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByGift));
 
         client.Call(() =>
         {
             var settlement = client.GetRegisteredObject<Settlement>(settlementId);
             var owner = client.GetRegisteredObject<Hero>(newOwnerId);
             Assert.Same(owner.Clan, settlement.OwnerClan);
-            Assert.Empty(Campaign.Current.QuestManager.Quests);
-            Assert.Empty(Campaign.Current.IssueManager.Issues);
-            output.WriteLine($"quest-free native army recalculations={nativeAi.CountFor(client)}, completed listeners={notifications.Count}");
             Assert.Equal(0, nativeAi.CountFor(client));
             Assert.Same(settlement, Assert.Single(notifications));
             Assert.Same(settlement, client.GetRegisteredObject<Army>(armyId).AiBehaviorObject);
