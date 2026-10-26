@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -401,7 +402,8 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         observer.Resolve<IMovementBatchSender>(), observer.Resolve<IPuppetMountStateRepairer>(),
         observer.Resolve<IAgentVisualActionAccessor>(), observer.Resolve<IMovementRateController>(),
         observer.Resolve<IMovementPriorityScheduler>(), observer.Resolve<IMissionContext>(),
-        observer.Resolve<ICoopBattleMissionRegistry>(), relay);
+        observer.Resolve<ICoopBattleMissionRegistry>(),
+        observer.Resolve<ILocationNpcAuthorityState>(), relay);
 
     private static byte[] RelayPayload(IPacket packet, ProtoBufSerializer serializer, MovementPacketCompressor compressor)
     {

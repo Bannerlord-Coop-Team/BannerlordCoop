@@ -34,6 +34,19 @@ public class NetworkModuleInfoTests
         Assert.Null(copied.Name);
     }
 
+    [Fact]
+    public void Serialize_KingdomDecisionTypes_RoundTrip()
+    {
+        var message = new NetworkModuleVersionsValidate(System.Array.Empty<ModuleInfo>(), null) with
+        {
+            KingdomDecisionTypes = new[] { "SomeMod.CouncilSeatDecision" }
+        };
+
+        var copy = RoundTrip(message);
+
+        Assert.Equal("SomeMod.CouncilSeatDecision", Assert.Single(copy.KingdomDecisionTypes!));
+    }
+
     private static NetworkModuleVersionsValidate RoundTrip(NetworkModuleVersionsValidate message)
     {
         using var stream = new MemoryStream();

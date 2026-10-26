@@ -65,7 +65,7 @@ E2E.Tests.Services.Issues.IssueCreationSyncTests	0.80
 E2E.Tests.Services.Issues.IssueEndedWhileQuestRunsTests	0.97
 E2E.Tests.Services.Issues.IssueSafetyTests	0.80
 E2E.Tests.Services.Issues.OutcomeDispatcherRunAsOwnersTests	0.85
-E2E.Tests.Services.Issues.PlayerHeroIssueOwnerGateTests	0.75
+E2E.Tests.Services.Issues.PlayerHeroIssueOwnerPatchTests	0.75
 E2E.Tests.Services.Issues.QuestRequestOwnershipTests	0.90
 E2E.Tests.Services.Issues.QuestSolutionAcceptRaceTests	0.86
 E2E.Tests.Services.Issues.QuestTraitXpTests	0.69

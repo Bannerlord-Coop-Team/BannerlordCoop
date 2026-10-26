@@ -4,6 +4,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssu
 
 namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]
 internal class VillageNeedsCraftingMaterialsSuccessPatch
 {

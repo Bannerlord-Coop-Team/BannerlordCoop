@@ -5,12 +5,15 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 docker_image=${E2E_IMAGE:-garrettluskey/bannerlordcoop:latest}
 shard_count=${E2E_SHARDS:-4}
+# Where the test image holds the game assemblies; builds and tests resolve them through BANNERLORD_DIR.
+image_bannerlord_dir=/home/mb2
 run_id="bannerlordcoop-e2e-$(date +%s)-$$"
 seed_container="${run_id}-seed"
 local_image="${run_id}:workspace"
 status_dir=$(mktemp -d)
 container_names=()
 
+# Removes every container, image and temp folder this run created.
 cleanup() {
     for container_name in "${container_names[@]}"; do
         docker rm --force "$container_name" >/dev/null 2>&1 || true
@@ -45,9 +48,12 @@ docker exec "$seed_container" /bin/sh -c 'mkdir -p /workspace'
 docker cp "$repo_root/source" "$seed_container:/workspace/source"
 docker cp "$repo_root/deploy" "$seed_container:/workspace/deploy"
 docker cp "$repo_root/.github/scripts/run-e2e-shard.sh" "$seed_container:/workspace/run-e2e-shard.sh"
-docker exec "$seed_container" /bin/sh -eu -c '
+docker exec --env BANNERLORD_DIR="$image_bannerlord_dir" "$seed_container" /bin/sh -eu -c '
     find /workspace/source -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
-    ln -s /home/mb2 /workspace/mb2
+    if [ ! -d "$BANNERLORD_DIR/bin/Win64_Shipping_Client" ]; then
+        echo "image has no game assemblies at $BANNERLORD_DIR" >&2
+        exit 1
+    fi
     dotnet build /workspace/source/CoopTests.slnf -c Release
 '
 docker commit "$seed_container" "$local_image" >/dev/null
@@ -57,7 +63,7 @@ echo "running $shard_count Docker E2E shards"
 for ((shard_index = 0; shard_index < shard_count; shard_index++)); do
     container_name="${run_id}-${shard_index}"
     container_names+=("$container_name")
-    docker run --rm --name "$container_name" "$local_image" /bin/sh -eu -c \
+    docker run --rm --name "$container_name" --env BANNERLORD_DIR="$image_bannerlord_dir" "$local_image" /bin/sh -eu -c \
         "cd /workspace/source && sh /workspace/run-e2e-shard.sh $shard_index $shard_count" \
         >"$status_dir/$shard_index.log" 2>&1 &
     echo "$!" > "$status_dir/$shard_index.pid"
