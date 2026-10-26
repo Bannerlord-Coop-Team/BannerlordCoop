@@ -3,7 +3,6 @@ using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Patches;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
-using Moq;
 using SandBox.Missions.MissionLogics;
 using System;
 using System.Runtime.Serialization;
@@ -44,6 +43,9 @@ public sealed class MissionLocationFinalizePatchTests
     public void FinalizeAfterSettlementEncounterWasCleared_CleansFallbackRosterAndUsesInstalledPatch()
     {
         GameBootStrap.Initialize();
+        Campaign previousCampaign = Campaign.Current;
+        LocationEncounter previousLocationEncounter = Campaign.Current.LocationEncounter;
+        ICampaignMission previousMission = CampaignMission.Current;
         var complex = new LocationComplex();
         var tavern = CreateLocation("tavern", complex);
         complex._locations.Add(tavern.StringId, tavern);
@@ -62,15 +64,10 @@ public sealed class MissionLocationFinalizePatchTests
             fixedLocation: false,
             useCivilianEquipment: true));
 
-        var campaignMission = new Mock<ICampaignMission>();
-        campaignMission.SetupGet(value => value.Location).Returns(tavern);
-        ICampaignMission previousMission = CampaignMission.Current;
-        Campaign previousCampaign = Campaign.Current;
-        CampaignMission.Current = campaignMission.Object;
-        Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
+        CampaignMission.Current = null;
         Campaign.Current.LocationEncounter = null;
 
-        var logic = (MissionLocationLogic)FormatterServices.GetUninitializedObject(typeof(MissionLocationLogic));
+        var logic = new MissionLocationLogic(tavern);
         var harmony = new Harmony($"{nameof(MissionLocationFinalizePatchTests)}.{Guid.NewGuid():N}");
         try
         {
@@ -86,6 +83,7 @@ public sealed class MissionLocationFinalizePatchTests
         {
             harmony.UnpatchAll(harmony.Id);
             CampaignMission.Current = previousMission;
+            previousCampaign.LocationEncounter = previousLocationEncounter;
             Campaign.Current = previousCampaign;
         }
     }

@@ -20,7 +20,8 @@ internal static class MissionLocationFinalizePatch
         if (locationComplex != null)
             return true;
 
-        locationComplex = CampaignMission.Current?.Location?._ownerComplex;
+        locationComplex = __instance._currentLocation?._ownerComplex ??
+            CampaignMission.Current?.Location?._ownerComplex;
         if (locationComplex != null)
         {
             foreach (Location location in locationComplex.GetListOfLocations())
