@@ -4,6 +4,7 @@ using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -19,7 +20,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior
 namespace GameInterface.Tests.Services.Issues;
 
 [Collection(nameof(CampaignCurrentCollection))]
-public class ExtortionByDesertersSyncTests
+public class ExtortionByDesertersHandlerTests
 {
     private static readonly (MethodBase Target, MethodInfo Prefix)[] DeferredPrefixes =
     {
@@ -53,7 +54,7 @@ public class ExtortionByDesertersSyncTests
     [InlineData(true)]
     public void Install_DefersNativePrefixesUntilCollectorDrainWithoutDuplicates(bool questsOn)
     {
-        var harmony = new Harmony($"{nameof(ExtortionByDesertersSyncTests)}.{Guid.NewGuid():N}");
+        var harmony = new Harmony($"{nameof(ExtortionByDesertersHandlerTests)}.{Guid.NewGuid():N}");
         using var collector = new AutoSyncPatchCollector(harmony);
         using var sync = CreateSync(collector, questsOn);
 
@@ -88,8 +89,8 @@ public class ExtortionByDesertersSyncTests
         }
     }
 
-    private static ExtortionByDesertersSync CreateSync(IAutoSyncPatchCollector collector, bool questsOn) =>
-        new ExtortionByDesertersSync(
+    private static ExtortionByDesertersHandler CreateSync(IAutoSyncPatchCollector collector, bool questsOn) =>
+        new ExtortionByDesertersHandler(
             Mock.Of<IMessageBroker>(), Mock.Of<INetwork>(), Mock.Of<IObjectManager>(),
             Mock.Of<IIssueResolver>(), Mock.Of<IIssueOwnerResolver>(), Mock.Of<IControllerIdProvider>(),
             Mock.Of<IPlayerManager>(), collector, new TestQuestFeatureFlag(questsOn));

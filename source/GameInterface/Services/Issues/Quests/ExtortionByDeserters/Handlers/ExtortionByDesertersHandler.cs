@@ -5,6 +5,7 @@ using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -16,10 +17,10 @@ using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
-namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 
 /// <summary>Connects personal quest state to the server's existing world parties.</summary>
-internal class ExtortionByDesertersSync : IHandler
+internal class ExtortionByDesertersHandler : IHandler
 {
     private readonly IMessageBroker broker;
     private readonly INetwork network;
@@ -29,7 +30,7 @@ internal class ExtortionByDesertersSync : IHandler
     private readonly IControllerIdProvider controller;
     private readonly IPlayerManager players;
 
-    public ExtortionByDesertersSync(IMessageBroker broker, INetwork network, IObjectManager objects,
+    public ExtortionByDesertersHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
         IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag)
     {
@@ -132,6 +133,6 @@ internal class ExtortionByDesertersSync : IHandler
             {
                 quest.StartAmbushEncounter();
             }
-        }, context: nameof(ExtortionByDesertersSync));
+        }, context: nameof(ExtortionByDesertersHandler));
     }
 }

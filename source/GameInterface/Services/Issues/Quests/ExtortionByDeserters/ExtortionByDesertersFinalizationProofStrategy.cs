@@ -1,4 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
@@ -43,7 +45,7 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
             party.IgnoreByOtherPartiesTill(CampaignTime.Now - CampaignTime.Hours(1f));
             if (deserterQuest.QuestSettlement.MilitiaPartyComponent != null)
                 deserterQuest.QuestSettlement.MilitiaPartyComponent.MobileParty.MapEventSide = null;
-            if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(deserterQuest, ambush: true);
+            if (ContainerProvider.TryResolve<ExtortionByDesertersHandler>(out var sync)) sync.Send(deserterQuest, ambush: true);
             return true;
         }
 
@@ -58,7 +60,7 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
             }
             deserterQuest.DestroyDefenderParty();
             deserterQuest._defenderMobileParty = null;
-            if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(deserterQuest);
+            if (ContainerProvider.TryResolve<ExtortionByDesertersHandler>(out var sync)) sync.Send(deserterQuest);
             return true;
         }
 

@@ -1,7 +1,8 @@
 ﻿using Common;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
@@ -15,21 +16,49 @@ internal class ExtortionByDesertersRewardPatches
 {
     internal static bool ApplyQuestResultPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestCompletionDialogFlow), MethodType.Getter)]
-    [HarmonyPostfix]
-    private static void RewardDialogPostfix(Quest __instance, DialogFlow __result)
+    [HarmonyPatch]
+    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
+    private static class FullRewardBranchPatch
     {
-        var choices = __result.Lines.Where(line => line.ConsequenceDelegate != null).ToArray();
-        for (var i = 0; i < choices.Length; i++)
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Quest), "<get_QuestCompletionDialogFlow>b__57_1");
+
+        [HarmonyPrefix]
+        private static bool Prefix(Quest __instance)
         {
-            var proof = (byte)((byte)ExtortionByDesertersBranch.FullReward + i);
-            var consequence = choices[i].ConsequenceDelegate;
-            choices[i].ConsequenceDelegate = () =>
-            {
-                if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
-                    dispatcher.BeforeQuestBranch(__instance, proof)) consequence();
-            };
+            return BeforeBranch(__instance, ExtortionByDesertersBranch.FullReward);
         }
+    }
+
+    [HarmonyPatch]
+    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
+    private static class HalfRewardBranchPatch
+    {
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Quest), "<get_QuestCompletionDialogFlow>b__57_3");
+
+        [HarmonyPrefix]
+        private static bool Prefix(Quest __instance)
+        {
+            return BeforeBranch(__instance, ExtortionByDesertersBranch.HalfReward);
+        }
+    }
+
+    [HarmonyPatch]
+    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
+    private static class RefuseRewardBranchPatch
+    {
+        private static MethodBase TargetMethod() => AccessTools.Method(typeof(Quest), "<get_QuestCompletionDialogFlow>b__57_5");
+
+        [HarmonyPrefix]
+        private static bool Prefix(Quest __instance)
+        {
+            return BeforeBranch(__instance, ExtortionByDesertersBranch.RefuseReward);
+        }
+    }
+
+    private static bool BeforeBranch(Quest quest, ExtortionByDesertersBranch branch)
+    {
+        return ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
+            dispatcher.BeforeQuestBranch(quest, (byte)branch);
     }
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) })]
@@ -37,7 +66,7 @@ internal class ExtortionByDesertersRewardPatches
     private static void AddLogPrefix(QuestBase __instance, TextObject text)
     {
         if (ModInformation.IsServer && __instance is Quest quest &&
-            ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync))
+            ContainerProvider.TryResolve<ExtortionByDesertersHandler>(out var sync))
         {
             sync.Send(quest, text);
         }

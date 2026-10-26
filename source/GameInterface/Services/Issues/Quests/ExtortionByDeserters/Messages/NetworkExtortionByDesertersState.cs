@@ -2,7 +2,7 @@
 using ProtoBuf;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 
 internal enum ExtortionByDesertersNotice : byte
 {

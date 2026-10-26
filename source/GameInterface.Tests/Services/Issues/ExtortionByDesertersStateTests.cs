@@ -1,5 +1,7 @@
 ﻿using Common.Serialization;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Surrogates;
 using System.Collections.Generic;

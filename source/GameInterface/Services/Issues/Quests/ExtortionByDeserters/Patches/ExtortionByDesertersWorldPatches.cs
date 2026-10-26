@@ -1,7 +1,7 @@
 ﻿using Common;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using HarmonyLib;
 using Helpers;
 using System;
@@ -23,18 +23,6 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 [HarmonyPatch]
 internal class ExtortionByDesertersWorldPatches
 {
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPrefix]
-    private static void HeroKilledPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
-    {
-        Run(quest =>
-        {
-            // Notables can transfer the issue before the dispatcher's IssueManager receiver runs.
-            if (quest.QuestGiver == victim)
-                Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);
-        });
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
     private static void HourlyTickPostfix() => Run(quest => quest.HourlyTick());
@@ -161,11 +149,8 @@ internal class ExtortionByDesertersWorldPatches
         if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
 
         // Native capture clears the hero's membership before this battle callback runs.
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-            !players.TryGetPlayer(Hero.MainHero, out var player) ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
-            !objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty)) return false;
-        var owner = ownerParty.Party;
+        if (!ContainerProvider.TryResolve<IIssueManagerLifecycleService>(out var lifecycle) ||
+            !lifecycle.TryResolveMainHeroParty(out var owner)) return false;
         // Like vanilla, a battle without the owner, such as the village militia's, leaves the quest alone here;
         // the FinalizeEventAux postfix cancels it if the deserters were destroyed.
         if (!mapEvent.InvolvedParties.Contains(owner)) return false;
@@ -178,8 +163,7 @@ internal class ExtortionByDesertersWorldPatches
         }
         else
         {
-            SetPartyAiAction.GetActionForRaidingSettlement(deserters, __instance.QuestSettlement,
-                MobileParty.NavigationType.Default, false, false);
+            SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
             __instance._currentState = State.DesertersDefeatedPlayer;
         }
         Sync(__instance, __instance._currentState == State.DesertersAreDefeated
@@ -240,8 +224,7 @@ internal class ExtortionByDesertersWorldPatches
             case State.DesertersMovingToSettlement:
                 if (ownerParty.CurrentSettlement == __instance.QuestSettlement)
                 {
-                    SetPartyAiAction.GetActionForRaidingSettlement(deserters, __instance.QuestSettlement,
-                        MobileParty.NavigationType.Default, false, false);
+                    SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
                 }
                 else if (deserters.Position.Distance(ownerParty.Position) <= deserters.SeeingRange * 0.8f)
                 {
@@ -271,8 +254,7 @@ internal class ExtortionByDesertersWorldPatches
                 else __instance.HandleDesertersRunningAway();
                 break;
             case State.DesertersDefeatedPlayer:
-                SetPartyAiAction.GetActionForRaidingSettlement(deserters, __instance.QuestSettlement,
-                    MobileParty.NavigationType.Default, false, false);
+                SetRaidBehaviorIfNeeded(deserters, __instance.QuestSettlement);
                 break;
         }
         return false;
@@ -285,6 +267,17 @@ internal class ExtortionByDesertersWorldPatches
 
     private static void Sync(Quest quest, ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
-        if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(quest, notice: notice);
+        if (ContainerProvider.TryResolve<ExtortionByDesertersHandler>(out var sync)) sync.Send(quest, notice: notice);
+    }
+
+    private static void SetRaidBehaviorIfNeeded(MobileParty deserters, Settlement settlement)
+    {
+        if (deserters.DefaultBehavior == AiBehavior.RaidSettlement)
+        {
+            return;
+        }
+
+        SetPartyAiAction.GetActionForRaidingSettlement(deserters, settlement,
+            MobileParty.NavigationType.Default, false, false);
     }
 }

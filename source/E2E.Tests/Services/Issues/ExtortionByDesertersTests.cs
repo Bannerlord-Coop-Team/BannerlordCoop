@@ -10,6 +10,8 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
@@ -746,6 +748,24 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
+    public void ExistingRaidBehavior_IsNotReappliedByQuestTick()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var raidAction = new MethodCallRecorder(
+            AccessTools.Method(typeof(SetPartyAiAction), nameof(SetPartyAiAction.GetActionForRaidingSettlement)));
+        Server.Call(() =>
+        {
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            deserters.DefaultBehavior = AiBehavior.RaidSettlement;
+            quest._deserterMobileParty = deserters;
+            quest._currentState = State.DesertersDefeatedPlayer;
+            quest.TickDesertersPartyLogic();
+        });
+        Assert.Equal(0, raidAction.CountFor(Server));
+    }
+
+    [Fact]
     public void AmbushHandoff_PreservesAnEncounterAlreadyAttachedToTheReplicatedRaid()
     {
         Accept();
@@ -768,7 +788,7 @@ public class ExtortionByDesertersTests : IDisposable
             defenders.MapEventSide = raid.DefenderSide;
             ownerParty.MapEventSide = raid.DefenderSide;
             Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
-            Server.Resolve<ExtortionByDesertersSync>().Send(quest);
+            Server.Resolve<ExtortionByDesertersHandler>().Send(quest);
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
         using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
         using var menus = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
@@ -1082,12 +1102,16 @@ public class ExtortionByDesertersTests : IDisposable
         Server.Call(() =>
         {
             var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            deserters.MemberRoster.AddToCounts(troop, 1);
             var victors = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            victors.MemberRoster.AddToCounts(troop, 1);
             quest._deserterMobileParty = deserters;
             deserters.SetPartyUsedByQuest(true);
             var battle = CreateBattle(deserters, victors.Party, false);
-            battle._battleState = BattleState.DefenderVictory;
-            DestroyPartyAction.Apply(null, deserters);
+            victors.MapEventSide = battle.DefenderSide;
+            battle.SetOverrideWinner(BattleSideEnum.Defender);
+            Assert.True(deserters.IsActive);
             battle.FinalizeEventAux();
             Assert.False(deserters.IsActive);
             Assert.False(quest.IsOngoing);

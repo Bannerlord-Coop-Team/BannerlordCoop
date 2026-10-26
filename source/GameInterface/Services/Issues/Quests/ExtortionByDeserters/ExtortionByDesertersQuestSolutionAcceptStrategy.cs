@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using TaleWorlds.CampaignSystem.Issues;
@@ -9,9 +10,9 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 /// <summary>The server's constructor creates the party, then binds the owner's quest to it.</summary>
 internal class ExtortionByDesertersQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private readonly Func<ExtortionByDesertersSync> sync;
+    private readonly Func<ExtortionByDesertersHandler> sync;
 
-    public ExtortionByDesertersQuestSolutionAcceptStrategy(Func<ExtortionByDesertersSync> sync)
+    public ExtortionByDesertersQuestSolutionAcceptStrategy(Func<ExtortionByDesertersHandler> sync)
     {
         this.sync = sync;
     }
