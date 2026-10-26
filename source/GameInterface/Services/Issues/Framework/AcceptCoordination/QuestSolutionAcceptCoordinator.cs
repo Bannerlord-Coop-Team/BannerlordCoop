@@ -39,7 +39,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
     private readonly IQuestJournalOwnerResolver journal;
-    private readonly HashSet<QuestBase> acceptingQuests = new();
+    private readonly Dictionary<QuestBase, int> acceptingQuests = new();
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -113,7 +113,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         var quest = issue.IssueQuest;
         if (quest == null) return;
 
-        acceptingQuests.Add(quest);
+        if (!acceptingQuests.ContainsKey(quest)) acceptingQuests.Add(quest, 0);
     }
 
     private void Handle_QuestAcceptanceStarted(MessagePayload<QuestAcceptanceStarted> payload)
@@ -125,7 +125,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             !issueResolver.TryResolve(issueOwnerId, issue.StringId, out _, out _, out _)) return;
 
         // StartQuest runs before the acceptance callback writes its introduction, sometimes on a later dialogue turn.
-        acceptingQuests.Add(quest);
+        if (!acceptingQuests.ContainsKey(quest)) acceptingQuests.Add(quest, 0);
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
@@ -136,16 +136,21 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     {
         if (ModInformation.IsServer || acceptingQuests.Count == 0) return;
 
-        var quests = acceptingQuests.ToArray();
-        acceptingQuests.Clear();
-        foreach (var quest in quests)
+        foreach (var entry in acceptingQuests.ToArray())
         {
+            var quest = entry.Key;
             var issue = IssueManager.GetIssueOfQuest(quest);
-            if (issue == null) continue;
+            if (issue == null || !quest.IsOngoing)
+            {
+                acceptingQuests.Remove(quest);
+                continue;
+            }
 
             // The callback can update a discrete log after AddLog has announced it.
-            for (var index = 0; index < quest.JournalEntries.Count; index++)
+            for (var index = entry.Value; index < quest.JournalEntries.Count; index++)
                 SendAcceptanceLog(issue, quest, index);
+
+            acceptingQuests[quest] = quest.JournalEntries.Count;
         }
     }
 
