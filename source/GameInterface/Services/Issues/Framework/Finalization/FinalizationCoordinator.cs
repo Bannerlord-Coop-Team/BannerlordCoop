@@ -218,16 +218,9 @@ internal class FinalizationCoordinator : IHandler
             {
                 if (quest != null)
                 {
-                    var received = (data.Logs ?? Array.Empty<IssueJournalEntry>()).Select(log => log.ToJournalLog()).ToList();
-                    // IssueFinalized can observe the issue after a quest-specific ending log was sent. Keep any
-                    // local entries that the server snapshot did not contain instead of erasing that ending line.
-                    foreach (var existing in quest.JournalEntries)
-                    {
-                        if (!received.Any(log => SameJournalEntry(log, existing)))
-                            received.Add(existing);
-                    }
                     quest._journalEntries.Clear();
-                    quest._journalEntries.AddRange(received);
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                        quest._journalEntries.Add(log.ToJournalLog());
                     CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
                 }
                 else
@@ -245,12 +238,6 @@ internal class FinalizationCoordinator : IHandler
             }
         }, context: nameof(FinalizationCoordinator));
     }
-
-    private static bool SameJournalEntry(JournalLog first, JournalLog second) =>
-        first.Type == second.Type && first.Range == second.Range &&
-        first.LogTime.NumTicks == second.LogTime.NumTicks &&
-        first.LogText?.ToString() == second.LogText?.ToString() &&
-        first.TaskName?.ToString() == second.TaskName?.ToString();
 
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
