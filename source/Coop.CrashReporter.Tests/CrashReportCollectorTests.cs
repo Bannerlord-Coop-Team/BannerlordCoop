@@ -72,6 +72,49 @@ namespace Coop.CrashReporter.Tests
             Assert.Equal(processId, copiedProcessId);
         }
 
+        [Fact]
+        public void IsCleanExit_TreatsMinusOneAfterEngineShutdownAsClean()
+        {
+            int processId = Process.GetCurrentProcess().Id;
+            CrashReporterOptions options = CreateOptions(processId);
+            WriteEngineLog(
+                options,
+                processId,
+                "[23:40:13.551] Managed Interface deleted.\r\n" +
+                "[23:40:13.655] \r\nError: Non-Zero Device Reference Count! (ERC4)\r\n");
+            var collector = new CrashReportCollector(options);
+
+            Assert.True(collector.IsCleanExit(-1));
+        }
+
+        [Fact]
+        public void IsCleanExit_ReportsMinusOneWithoutEngineShutdown()
+        {
+            int processId = Process.GetCurrentProcess().Id;
+            CrashReporterOptions options = CreateOptions(processId);
+            WriteEngineLog(
+                options,
+                processId,
+                "[01:00:30.298] Before Daily Tick: Summer 12, 374 \r\n");
+            var collector = new CrashReportCollector(options);
+
+            Assert.False(collector.IsCleanExit(-1));
+        }
+
+        [Fact]
+        public void IsCleanExit_ReportsCrashAfterEngineShutdown()
+        {
+            int processId = Process.GetCurrentProcess().Id;
+            CrashReporterOptions options = CreateOptions(processId);
+            WriteEngineLog(
+                options,
+                processId,
+                "[23:40:13.551] Managed Interface deleted.\r\n");
+            var collector = new CrashReportCollector(options);
+
+            Assert.False(collector.IsCleanExit(-1073741819));
+        }
+
         public void Dispose()
         {
             try
@@ -97,6 +140,18 @@ namespace Coop.CrashReporter.Tests
                 "test",
                 tempRoot,
                 Path.Combine(tempRoot, "reports"));
+        }
+
+        private static void WriteEngineLog(
+            CrashReporterOptions options,
+            int processId,
+            string lastLines)
+        {
+            string logsRoot = Path.Combine(options.BannerlordDataRoot, "logs");
+            Directory.CreateDirectory(logsRoot);
+            File.WriteAllText(
+                Path.Combine(logsRoot, "rgl_log_" + processId + ".txt"),
+                new string('x', 10000) + "\r\n" + lastLines);
         }
 
         private static void WriteMinidump(string path, int processId)
