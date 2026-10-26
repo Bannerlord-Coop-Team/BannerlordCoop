@@ -13,6 +13,9 @@ namespace Coop.CrashReporter
     internal sealed class CrashReportCollector
     {
         private const string RuntimeArgumentsMarker = "#TW#Runtime#TW#Arguments#TW#";
+        private const int EngineShutdownExitCode = -1;
+        private const string EngineShutdownLogLine = "Managed Interface deleted.";
+        private const int EngineLogTailBytes = 4096;
         private static readonly TimeSpan CrashDumpDiscoveryTimeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DumpCompletionTimeout = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(250);
@@ -59,7 +62,7 @@ namespace Coop.CrashReporter
             process.WaitForExit();
             int exitCode = process.ExitCode;
 
-            // Walked before anything waits on a dump: the zero exit-code path spends up to
+            // Walked before anything waits on a dump: the clean exit path spends up to
             // 30 seconds looking for one, and a launcher update inside that window would rewrite
             // the very files being listed. A clean exit pays for a walk whose result is then
             // thrown away, but the game's own binaries are still in the file cache it just used
@@ -67,10 +70,11 @@ namespace Coop.CrashReporter
             GameBinariesManifest binaries = GameBinariesManifest.Capture(
                 options.GameBinariesDirectory);
 
-            string dumpPath = exitCode == 0
+            bool cleanExit = IsCleanExit(exitCode);
+            string dumpPath = cleanExit
                 ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
                 : null;
-            if (exitCode == 0 && dumpPath == null)
+            if (cleanExit && dumpPath == null)
                 return 0;
 
             string reportDirectory = CreateReportDirectory();
@@ -109,6 +113,45 @@ namespace Coop.CrashReporter
                 manifestWritten ? manifestPath : null,
                 copiedLogs);
             return 0;
+        }
+
+        // Bannerlord's own Exit Game ends the process with -1 after the engine finishes shutting down,
+        // so -1 is only a crash when the engine log stops before that shutdown line.
+        internal bool IsCleanExit(int exitCode)
+        {
+            if (exitCode == 0)
+                return true;
+
+            return exitCode == EngineShutdownExitCode && EngineLogShowsShutdown();
+        }
+
+        private bool EngineLogShowsShutdown()
+        {
+            string logPath = Path.Combine(
+                options.BannerlordDataRoot,
+                "logs",
+                "rgl_log_" + options.ProcessId.ToString(CultureInfo.InvariantCulture) + ".txt");
+            try
+            {
+                using (var stream = new FileStream(
+                    logPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete))
+                {
+                    stream.Seek(Math.Max(0L, stream.Length - EngineLogTailBytes), SeekOrigin.Begin);
+                    using (var reader = new StreamReader(stream))
+                        return reader.ReadToEnd().Contains(EngineShutdownLogLine);
+                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         private HashSet<string> FindDumps()
