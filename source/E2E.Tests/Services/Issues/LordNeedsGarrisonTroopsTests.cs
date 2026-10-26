@@ -235,10 +235,11 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             {
                 expected = Assert.IsType<TextObject>(AccessTools.PropertyGetter(typeof(Quest), "SuccessQuestLogText")!.Invoke(serverQuest, null)).ToString();
                 serverQuest._questState = QuestBase.QuestStates.Ongoing;
+                var requestedTroopAmount = serverQuest._requestedTroopAmount;
                 serverQuest._settlement.Town!.GarrisonParty!.MemberRoster.AddToCounts(
-                    Get<CharacterObject>(scenario.Server, troopId), 5);
+                    Get<CharacterObject>(scenario.Server, troopId), requestedTroopAmount);
                 var party = Get<MobileParty>(scenario.Server, scenario.OwnerPartyId);
-                party.MemberRoster.AddToCounts(Get<CharacterObject>(scenario.Server, troopId), 5);
+                party.MemberRoster.AddToCounts(Get<CharacterObject>(scenario.Server, troopId), requestedTroopAmount);
                 Campaign.Current.MainParty = party;
 
                 var owner = Get<Hero>(scenario.Server, scenario.OwnerHeroId);
