@@ -33,7 +33,16 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     public bool BeforeGiverDeath(Hero victim, out IDisposable owner)
     {
         owner = null;
-        return victim.Issue == null || PrepareCancellation(victim.Issue, out owner);
+        if (victim.Issue == null) return true;
+        if (!PrepareCancellation(victim.Issue, out owner)) return false;
+
+        if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing)
+        {
+            CancelQuestAndIssue(victim.Issue, null);
+            return false;
+        }
+
+        return true;
     }
 
     public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
@@ -48,14 +57,8 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                 if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
                     !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
 
-                try
-                {
-                    quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Cancelling quest {questId} during heir selection failed", quest.StringId);
-                }
+                try { CancelQuestAndIssue(issue, new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.")); }
+                catch (Exception e) { Logger.Error(e, "Cancelling quest {questId} during heir selection failed", quest.StringId); }
             }
         }
     }
@@ -67,7 +70,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (issue.IssueQuest != null && issue.IssueQuest.IsOngoing && registry.IsRegistered(issue.GetType()))
         {
             // OnQuestCompleted ends the issue; letting the enclosing issue method run would end it twice.
-            issue.IssueQuest.CompleteQuestWithCancel(log);
+            CancelQuestAndIssue(issue, log);
             return false;
         }
 
@@ -148,12 +151,26 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                     continue;
                 }
 
-                issue.CompleteIssueWithCancel();
+                CancelQuestAndIssue(issue, null);
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Retrying cancellation of {issue} failed", issue.StringId);
             }
+        }
+    }
+
+    private void CancelQuestAndIssue(IssueBase issue, TextObject log)
+    {
+        var quest = issue.IssueQuest;
+        if (quest != null && quest.IsOngoing)
+            quest.CompleteQuestWithCancel(log);
+
+        if (issue.IssueOwner?.Issue == issue)
+        {
+            issue.IssueFinalized();
+            if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+                dispatcher.After(issue, IssueOutcome.QuestCancel);
         }
     }
 }
