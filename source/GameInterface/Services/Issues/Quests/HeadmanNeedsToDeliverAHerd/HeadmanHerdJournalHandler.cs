@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
