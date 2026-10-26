@@ -13,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -37,6 +38,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly HashSet<IssueBase> announcedIssues = new HashSet<IssueBase>();
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -262,6 +264,11 @@ internal class FinalizationCoordinator : IHandler
         // An ending callback can run again while succession replays the native character-change event.
         // Ownership is removed with the first announcement, so do not broadcast the same issue twice.
         if (!ownership.TryGetOwner(issueOwnerId, issue.StringId, out _))
+        {
+            return;
+        }
+
+        if (!announcedIssues.Add(issue))
         {
             return;
         }
