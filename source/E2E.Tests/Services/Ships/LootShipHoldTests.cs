@@ -61,6 +61,31 @@ public class LootShipHoldTests : SyncTestBase
                 instance.GetRegisteredObject<Ship>(takenId).Owner));
     }
 
+    // An empty handle array arrives as null over the wire, so a loot screen closed with no offered ship still releases the hold.
+    [Fact]
+    public void DiscardListingNoShips_DestroysEveryShipStillHeldForTheLooter()
+    {
+        var loserId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var looterId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherLooterId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var heldId = GiveShip(loserId);
+        var othersId = GiveShip(loserId);
+        Server.Call(() =>
+        {
+            Hold().Hold(Server.GetRegisteredObject<Ship>(heldId), Server.GetRegisteredObject<MobileParty>(looterId).Party);
+            Hold().Hold(Server.GetRegisteredObject<Ship>(othersId), Server.GetRegisteredObject<MobileParty>(otherLooterId).Party);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetHandle(Server.GetRegisteredObject<MobileParty>(looterId), out var partyHandle));
+            Server.SimulateMessage(Clients.First().NetPeer, new NetworkDiscardLootShips(partyHandle, null!));
+        });
+
+        AssertDestroyed(heldId);
+        AssertAlive(othersId);
+    }
+
     // The ship screen opens only after the troop and item loot and any conversations, so a slow looter keeps its ships; only
     // its disconnect or the long fallback ends the hold.
     [Fact]

@@ -21,10 +21,10 @@ public interface ILootShipHold
     void Hold(Ship ship, PartyBase looter);
 
     /// <summary>
-    /// The looter's ship loot screen closed and its discard listed <paramref name="offered"/>, which LootShipsHandler takes care
-    /// of: those are forgotten, and any other ship still held unclaimed for the looter is destroyed.
+    /// The looter's ship loot screen closed and LootShipsHandler destroyed the offered ships it left: the taken or gone ships
+    /// are forgotten, and any other ship still held unclaimed for the looter is destroyed.
     /// </summary>
-    void Release(PartyBase looter, IReadOnlyCollection<Ship> offered);
+    void Release(PartyBase looter);
 
     /// <summary>
     /// Forgets the taken or gone ships, and destroys each one nobody took once its looter disconnected or, for a looter whose
@@ -70,13 +70,13 @@ public class LootShipHold : ILootShipHold
         held[ship] = new HeldShip(shipId, looter, UtcNow() + FallbackHoldTime);
     }
 
-    public void Release(PartyBase looter, IReadOnlyCollection<Ship> offered)
+    public void Release(PartyBase looter)
     {
         foreach (var entry in held.Where(entry => entry.Value.Looter == looter).ToList())
         {
             var ship = entry.Key;
             held.Remove(ship);
-            if (offered.Contains(ship) || IsClaimedOrGone(ship))
+            if (IsClaimedOrGone(ship))
             {
                 LogReleased(entry.Value, ReleaseOutcome(ship));
                 continue;
@@ -111,13 +111,9 @@ public class LootShipHold : ILootShipHold
     // Taken through the loot screen, or already destroyed (its discard, a finalize).
     private bool IsClaimedOrGone(Ship ship) => ship.Owner != null || !objectManager.TryGetId(ship, out _);
 
-    // What became of a released ship: taken by a party, destroyed already, or left ownerless for the discard to destroy.
-    private string ReleaseOutcome(Ship ship)
-    {
-        if (ship.Owner != null) return "taken by " + ship.Owner.Id;
-
-        return objectManager.TryGetId(ship, out _) ? "discarded by its loot screen" : "already destroyed (discarded)";
-    }
+    // What became of a released ship: taken by a party, or already destroyed (its discard, a finalize).
+    private static string ReleaseOutcome(Ship ship) =>
+        ship.Owner != null ? "taken by " + ship.Owner.Id : "already destroyed (discarded)";
 
     // One line per ship leaving the hold without the hold destroying it.
     private static void LogReleased(HeldShip heldShip, string outcome) =>

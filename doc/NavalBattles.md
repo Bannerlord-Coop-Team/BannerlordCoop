@@ -452,14 +452,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   the after-defeat damage on top of their battle HP, as in vanilla. A player's share is held by `LootShipHold`: it
   leaves the losing party at once (a replicated `Owner = null`, no destroy), so that party's finalize (`RemoveParty`
   destroys its ships) no longer kills ships the loot screen still offers. Taking one (`ApplyByLooting`) and discarding
-  the rest (`LootShipsHandler`) work after the finalize. The discard releases the hold; a held ship nobody took is
-  destroyed when its looter disconnects or its party is removed, or after a 2 hour fallback for a loot screen that never
-  closes (the ship screen comes after the troop and item loot and any conversations).
+  the rest (`LootShipsHandler`) work after the finalize. The same handler then releases the hold; a held ship nobody
+  took is destroyed when its looter disconnects or its party is removed, or after a 2 hour fallback for a loot screen that
+  never closes (the ship screen comes after the troop and item loot and any conversations).
 - **Server log (Information, `[NavalSync]`, one line per ship).** The applier logs `Ship <id> of <party> grants its Boatswain
   XP for <n> mitigated damage`, `Ship <id> of <party> sank in battle; destroying it (hp, sail)` and `Ship <id> of <party>
   keeps its battle condition: hp <old> -> <new>, sail <old> -> <new>`. The loot path logs `Loot ship <id> of <loser> went to no
-  winner; the battle results destroy it` (a postfix on the distribution, `NavalLootShipDistributionLogPatches`), and
-  the hold logs `Holding loot ship`, `Released loot ship <id> held for <looter>: taken by <party> | discarded ...` and
+  winner; destroying it` (at the destroy in `MapEventResultsInterface.LootDefeatedPartyShips`), and the hold logs
+  `Holding loot ship`, `Released loot ship <id> held for <looter>: taken by <party> | discarded ...` and
   `Destroying unclaimed loot ship <id> held for <looter>: <reason>`.
 
 ## 4. Status
