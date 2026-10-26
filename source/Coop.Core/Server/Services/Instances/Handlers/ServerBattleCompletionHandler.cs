@@ -287,6 +287,9 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.InstanceId,
                 entry.ControllerId,
                 entry.IsFirstMember);
+            // A new instance of the map event must not inherit the kept-host deadline of the one that emptied.
+            if (entry.IsFirstMember)
+                keptHostDeadlines.Remove(entry.InstanceId);
             RemovePendingJoiner(entry.InstanceId, entry.ControllerId, Guid.Empty);
             // Keep campaign objects alive until the entrant's loaded mission reports its own result.
         });

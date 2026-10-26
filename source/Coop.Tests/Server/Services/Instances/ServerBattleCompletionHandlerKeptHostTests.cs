@@ -3,12 +3,14 @@ using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using Missions.Messages;
 using Moq;
 using System;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Instances;
@@ -21,13 +23,15 @@ public class ServerBattleCompletionHandlerKeptHostTests : IDisposable
     private readonly TestMessageBroker broker = new();
     private readonly Mock<IBattleHostRegistry> hostRegistry = new();
     private readonly Mock<IBattleCompletionTracker> completionTracker = new();
+    private readonly Mock<IMissionManager> missionManager = new();
     private readonly ServerBattleCompletionHandler handler;
 
     public ServerBattleCompletionHandlerKeptHostTests()
     {
+        missionManager.Setup(manager => manager.TakeExpiredConclusions()).Returns(Array.Empty<string>());
         handler = new ServerBattleCompletionHandler(
             broker,
-            new MissionManager(Mock.Of<IPlayerManager>()),
+            missionManager.Object,
             Mock.Of<IObjectManager>(),
             Mock.Of<IPlayerManager>(),
             hostRegistry.Object,
@@ -61,6 +65,50 @@ public class ServerBattleCompletionHandlerKeptHostTests : IDisposable
 
         completionTracker.Verify(tracker => tracker.StopWaitingForMembers(It.IsAny<string>()), Times.Never);
         Assert.Equal(TimeSpan.FromMinutes(2), handler.KeptHostReportTimeout);
+    }
+
+    // S21 M1: the first member of a new instance on the same map event drops the deadline of the instance that emptied, so
+    // it never stops the new battle from waiting for its members.
+    [Fact]
+    public void FirstMemberOfANewInstance_DropsTheOldKeptHostDeadline()
+    {
+        SetAssignment(kept: true);
+        handler.KeptHostReportTimeout = TimeSpan.Zero;
+        Publish(new BattleHostAssignmentChanged(MapEventId));
+
+        Publish(new MissionMemberEntered("newcomer", MapEventId, isFirstMember: true));
+        Publish(new CampaignTick());
+
+        completionTracker.Verify(tracker => tracker.StopWaitingForMembers(It.IsAny<string>()), Times.Never);
+    }
+
+    // A later member of the same instance keeps the deadline.
+    [Fact]
+    public void LaterMemberOfTheSameInstance_KeepsTheKeptHostDeadline()
+    {
+        SetAssignment(kept: true);
+        handler.KeptHostReportTimeout = TimeSpan.Zero;
+        Publish(new BattleHostAssignmentChanged(MapEventId));
+
+        Publish(new MissionMemberEntered("rejoiner", MapEventId, isFirstMember: false));
+        Publish(new CampaignTick());
+
+        completionTracker.Verify(tracker => tracker.StopWaitingForMembers(MapEventId), Times.Once);
+    }
+
+    // An applied conclusion of the battle drops its deadline.
+    [Fact]
+    public void AppliedConclusion_DropsTheKeptHostDeadline()
+    {
+        SetAssignment(kept: true);
+        handler.KeptHostReportTimeout = TimeSpan.Zero;
+        missionManager.Setup(manager => manager.CompleteInstanceConclusion(MapEventId, true)).Returns(true);
+        Publish(new BattleHostAssignmentChanged(MapEventId));
+
+        Publish(new BattleStateChangeProcessed(MapEventId, BattleState.DefenderVictory, applied: true));
+        Publish(new CampaignTick());
+
+        completionTracker.Verify(tracker => tracker.StopWaitingForMembers(It.IsAny<string>()), Times.Never);
     }
 
     // The server's assignment for the battle, kept after its host left or not.
