@@ -23,17 +23,3 @@ internal class LordNeedsGarrisonTroopsHandInPatch
         return dispatcher.BeforeQuestBranch(__instance, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered);
     }
 }
-
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
-internal class LordNeedsGarrisonTroopsSuccessJournalPatch
-{
-    [HarmonyPrefix]
-    private static void Prefix(QuestBase __instance)
-    {
-        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed() && __instance is Quest quest)
-        {
-            quest.AddLog(quest.SuccessQuestLogText);
-        }
-    }
-}

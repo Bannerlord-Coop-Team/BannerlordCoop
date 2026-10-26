@@ -129,6 +129,20 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         });
     }
 
+    [Fact]
+    public void DirectHandInSuccessDoesNotInstallAClientSuccessJournalAdder()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess));
+            var patches = Harmony.GetPatchInfo(target);
+
+            Assert.DoesNotContain(patches?.Prefixes ?? Array.Empty<HarmonyLib.Patch>(), prefix =>
+                prefix.PatchMethod.DeclaringType?.FullName ==
+                "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
+        });
+    }
+
     [Theory]
     [InlineData(4, 0)]
     [InlineData(5, 1)]
