@@ -38,6 +38,16 @@ public class NavalCopyProbeLogic : MissionLogic
     /// <summary>The battle's steered copies, which the inspect summary reads the drift of.</summary>
     internal INavalSteeredCopies SteeredCopies => steeredCopies;
 
+    /// <summary>The active or completed roll sampler, owned by this mission rather than a command instance.</summary>
+    internal INavalRollProbe RollProbe { get; set; }
+
+    /// <summary>Stops partial measurements before the mission and its hulls are released.</summary>
+    public override void OnEndMissionInternal()
+    {
+        RollProbe?.Stop("mission_end");
+        base.OnEndMissionInternal();
+    }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
@@ -45,6 +55,7 @@ public class NavalCopyProbeLogic : MissionLogic
         frameMilliseconds.Add(time, dt * 1000f);
         steerMilliseconds.Add(time, steeredCopies.LastTickMilliseconds);
         MeasureCollections(time);
+        RollProbe?.Tick();
         MeasureDrift(time);
         MeasureApproaches(time);
     }
