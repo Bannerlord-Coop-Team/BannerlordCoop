@@ -40,7 +40,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (victim.Issue == null) return true;
         if (!PrepareCancellation(victim.Issue, out owner))
         {
-            if (victim.Issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(victim.Issue.GetType()))
+            if (ModInformation.IsServer && victim.Issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(victim.Issue.GetType()))
                 pending[victim.Issue] = BuildGiverDeathLog(victim.Issue);
             return false;
         }
@@ -76,7 +76,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (!PrepareCancellation(issue, out owner))
         {
-            if (log != null) pending[issue] = log;
+            if (ModInformation.IsServer && log != null) pending[issue] = log;
             return false;
         }
 
