@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -11,7 +10,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
-using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -50,7 +48,6 @@ public readonly struct HeadmanHerdLogAdded : IEvent
 
 internal class HeadmanHerdJournalHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeadmanHerdJournalHandler>();
     private readonly IMessageBroker broker;
     private readonly INetwork network;
     private readonly IObjectManager objects;
@@ -113,10 +110,6 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
-            var existing = quest.JournalEntries.Where(log => log.LogText != null)
-                .Select(log => $"{log.LogText.GetID()}:{log.LogText}").ToArray();
-            Logger.Information("herd journal receive {issue} {textId}:{text} existing={existing}", data.IssueId,
-                data.Text?.GetID(), data.Text, string.Join("|", existing));
             if (data.Text != null && quest.JournalEntries.Any(log =>
                     log.LogText?.GetID() == data.Text.GetID() || log.LogText?.ToString() == data.Text.ToString())) return;
             using (new AllowedThread())

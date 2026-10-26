@@ -92,6 +92,7 @@ public class HeadmanHerdSuccessionTests
         var otherInventory = new Dictionary<EnvironmentInstance, (EquipmentElement, int)[]>();
         var otherRoster = new Dictionary<EnvironmentInstance, (string, int, int, int)[]>();
         var otherJournal = new Dictionary<EnvironmentInstance, JournalLog[]>();
+        JournalLog[] ownerJournal = null!;
         foreach (var instance in instances)
             instance.Call(() =>
             {
@@ -101,6 +102,7 @@ public class HeadmanHerdSuccessionTests
                     .Select(element => (element.Character.StringId, element.Number, element.WoundedNumber, element.Xp)).ToArray();
                 otherJournal[instance] = Object<Hero>(instance, otherGiverId).Issue.IssueQuest?.JournalEntries.ToArray() ?? Array.Empty<JournalLog>();
             });
+        scenario.ClientA.Call(() => ownerJournal = Object<Hero>(scenario.ClientA, scenario.NotableId).Issue.IssueQuest!.JournalEntries.ToArray());
         var bystanderGold = 0;
         var totalGold = 0;
         var livestockId = string.Empty;
@@ -186,14 +188,14 @@ public class HeadmanHerdSuccessionTests
             }
             checks.Add(() =>
             {
-                JournalLog[] authoritative = null!;
-                scenario.Server.Call(() => authoritative = Archive().GetEntries().ToArray());
                 scenario.ClientA.Call(() =>
                 {
                     var archive = Archive();
                     Assert.True(archive.IsEnded());
                     Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
-                    AssertHistory(authoritative, archive.GetEntries());
+                    var entries = archive.GetEntries().ToArray();
+                    Assert.Equal(ownerJournal.Length + 1, entries.Length);
+                    AssertHistory(ownerJournal, entries.Take(ownerJournal.Length));
                 });
                 scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                     entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId))));
