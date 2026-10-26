@@ -1,6 +1,5 @@
 using HarmonyLib;
 using SandBox.Missions.MissionLogics;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 
@@ -16,15 +15,7 @@ internal static class MissionLocationFinalizePatch
     [HarmonyPrefix]
     internal static bool Prefix(MissionLocationLogic __instance)
     {
-        LocationComplex locationComplex = null;
-        try
-        {
-            locationComplex = LocationComplex.Current;
-        }
-        catch (NullReferenceException)
-        {
-            // Campaign teardown can clear the encounter object while the mission still owns its location.
-        }
+        LocationComplex locationComplex = Campaign.Current?.LocationEncounter?.Settlement?.LocationComplex;
 
         if (locationComplex != null)
             return true;
