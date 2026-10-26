@@ -4,7 +4,6 @@ using Missions.Naval;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using TaleWorlds.Library;
 using Xunit;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
@@ -21,7 +20,7 @@ namespace Coop.Tests.Missions.Battles;
 public class NavalRopeRemovalTests
 {
     [Fact]
-    public void ForgetTarget_ClearsOnlyThePreferencesForTheRemovedHull()
+    public void ForgetRemovedHull_ClearsOnlyThePreferencesForTheRemovedHull_AndItsRecords()
     {
         var removed = Hull();
         var other = Hull();
@@ -29,21 +28,29 @@ public class NavalRopeRemovalTests
         var preferringOther = Machine(owner: Hull(), preferred: other);
         var remaining = Hull(preferringRemoved, preferringOther);
 
-        NavalRopes.ForgetTarget(new[] { remaining, other }, removed);
+        var removedStation = Machine(owner: removed, preferred: null);
+        removed._attachmentMachines.Add(removedStation);
+        NavalRopes.Clear();
+        NavalRopes.records[removedStation] = new NavalRopes.RopeRecord { Generation = 2 };
+        NavalRopes.records[preferringOther] = new NavalRopes.RopeRecord { Generation = 1 };
+
+        NavalRopeRemoval.ForgetRemovedHull(new[] { remaining, other }, removed);
 
         Assert.Null(preferringRemoved.GetPreferredTargetShip());
         Assert.Same(other, preferringOther.GetPreferredTargetShip());
+        Assert.Null(NavalRopes.RecordOf(removedStation));
+        Assert.NotNull(NavalRopes.RecordOf(preferringOther));
+        NavalRopes.Clear();
     }
 
     [Fact]
-    public void AllowConnection_RefusesAPointOnARemovedHull_AndDropsTheStalePreference()
+    public void AllowConnection_RefusesAPointOnARemovedHull()
     {
         var removed = Hull();
         removed._isRemoved = true;
         var source = Machine(owner: Hull(), preferred: removed);
 
         Assert.False(NavalRopes.AllowConnection(source, Point(removed)));
-        Assert.Null(source.GetPreferredTargetShip());
     }
 
     [Fact]
@@ -72,7 +79,7 @@ public class NavalRopeRemovalTests
         target._isRemoved = targetRemoved;
         var joint = JointBetween(sourceMissing ? null : source, targetMissing ? null : target);
 
-        Assert.Equal(expected, NavalRopes.JointHasHulls(joint));
+        Assert.Equal(expected, NavalRopeRemoval.JointHasHulls(joint));
     }
 
     // Review follow-up: the joint guard alone would skip a hull-less joint forever, so the rope tick breaks its rope too.
@@ -95,7 +102,7 @@ public class NavalRopeRemovalTests
         attachment.AttachmentTarget = Point(targetHull);
         attachment.ShipAttachmentJoint = JointBetween(sourceHull, jointMissingTarget ? null : targetHull);
 
-        Assert.Equal(expected, NavalRopes.EndIsGone(attachment));
+        Assert.Equal(expected, NavalRopeRemoval.EndIsGone(attachment));
     }
 
     [Fact]
@@ -103,11 +110,47 @@ public class NavalRopeRemovalTests
     {
         NavalRopes.Clear();
 
-        Assert.True(NavalRopes.AllowJointStep(JointBetween(Hull(), Hull())));
-        Assert.False(NavalRopes.AllowJointStep(JointBetween(Hull(), null)));
-        Assert.False(NavalRopes.AllowJointStep(JointBetween(Hull(), null)));
-        Assert.Equal(2L, Interlocked.Read(ref NavalRopes.jointStepsSkipped));
+        Assert.True(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), Hull())));
+        Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
+        Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
+        Assert.Equal(2L, NavalRopeRemoval.JointStepsSkipped);
         NavalRopes.Clear();
+    }
+
+    // S17 A1 / R49: vanilla's removal broke every rope in the battle; in co-op only a rope with an end on the removed hull breaks.
+    [Theory]
+    [InlineData(true, "source", true)]
+    [InlineData(true, "target", true)]
+    [InlineData(true, "other", false)]
+    [InlineData(true, "flying", false)]
+    [InlineData(false, "other", true)]
+    public void BreaksOnRemoval_OnlyARopeWithAnEndOnTheRemovedHull(bool coopBattle, string removedEnd, bool expected)
+    {
+        var source = Hull();
+        var target = Hull();
+        var removed = removedEnd == "source" ? source : removedEnd == "target" ? target : Hull();
+        var rope = Rope(source, removedEnd == "flying" ? null : target);
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        try
+        {
+            CoopNavalMissionScope.IsActive = coopBattle;
+
+            Assert.Equal(expected, NavalRopeRemoval.BreaksOnRemoval(rope, removed));
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
+
+    // A constructor-skipped rope from a station on the source hull, hooked to a point on the target hull when one is given.
+    internal static Attachment Rope(MissionShip source, MissionShip target)
+    {
+        var rope = (Attachment)RuntimeHelpers.GetUninitializedObject(typeof(Attachment));
+        rope._state = RopeState.RopesPulling;
+        rope.AttachmentSource = Machine(source, preferred: null);
+        rope.AttachmentTarget = target == null ? null : Point(target);
+        return rope;
     }
 
     // A constructor-skipped joint between two hulls, either of which may be missing.
@@ -120,7 +163,7 @@ public class NavalRopeRemovalTests
     }
 
     // A constructor-skipped hull carrying the given rope stations.
-    private static MissionShip Hull(params ShipAttachmentMachine[] machines)
+    internal static MissionShip Hull(params ShipAttachmentMachine[] machines)
     {
         var hull = ShipTestHulls.Uninitialized<MissionShip>();
         hull._attachmentMachines = new MBList<ShipAttachmentMachine>(machines);
@@ -128,7 +171,7 @@ public class NavalRopeRemovalTests
     }
 
     // A constructor-skipped rope station on the owner hull whose AI prefers the given hull.
-    private static ShipAttachmentMachine Machine(MissionShip owner, MissionShip preferred)
+    internal static ShipAttachmentMachine Machine(MissionShip owner, MissionShip preferred)
     {
         var machine = ShipTestHulls.Uninitialized<ShipAttachmentMachine>();
         machine.OwnerShip = owner;
@@ -137,7 +180,7 @@ public class NavalRopeRemovalTests
     }
 
     // A constructor-skipped attachment point on the hull.
-    private static ShipAttachmentPointMachine Point(MissionShip hull)
+    internal static ShipAttachmentPointMachine Point(MissionShip hull)
     {
         var point = ShipTestHulls.Uninitialized<ShipAttachmentPointMachine>();
         point.OwnerShip = hull;

@@ -144,13 +144,13 @@ public class CoopNavalBattleBehavior : MissionLogic
         Services.OnBeforeHullRemoved(ship, reason, shipsLogic.IsMissionEnding);
     }
 
-    // A removed hull is pooled during deployment and its entity removed later, so no copy reference or rope AI preference may
-    // outlive it, whichever path removed it (a departure, a migration replace or vanilla's own retreat).
+    // A removed hull is pooled during deployment and its entity removed later, so no copy reference, rope record or rope AI
+    // preference may outlive it, whichever path removed it (a departure, a migration replace or vanilla's own retreat).
     private void OnShipRemoved(MissionShip ship)
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
         steeredCopies.Forget(ship);
-        NavalRopes.ForgetTarget(shipsLogic.AllShips, ship);
+        NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship);
         if (shipsLogic.IsMissionEnding) return;
 
         Logger.Information("[NavalSync] Hull {Index} on {Team} formation {Formation} removed (copy {Copy}, pooled {Pooled})",
