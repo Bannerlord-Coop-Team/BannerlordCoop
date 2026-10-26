@@ -117,6 +117,13 @@ public interface INavalShipEngine
     /// <summary>The hull the agent crews: the hull of its formation; null when its formation has none.</summary>
     MissionObject CrewHullOf(Agent agent);
 
+    /// <summary>
+    /// [Game thread] Makes the agent vanilla's crew of <paramref name="hull"/>, its <see cref="CrewHullOf"/>: tracked on the hull
+    /// unless already tracked on one, and its own record of its formation's hull pointing at it. Vanilla's off-ship check moves
+    /// AI crew between hulls and assumes both.
+    /// </summary>
+    void EnlistCrew(Agent agent, MissionObject hull);
+
     /// <summary>The nearest afloat hull of a team friendly to the agent's, other than <paramref name="excluded"/>; null when none.</summary>
     MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded);
 

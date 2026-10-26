@@ -665,6 +665,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         // Fall back to the troop-class default only if the puppet has no formation yet.
         var formation = agent.Formation ?? formationAssigner.Assign(agent);
         formation?.SetControlledByAI(true);
+        // Published once its formation is set, so a naval battle can enlist the agent as its hull's crew.
+        messageBroker.Publish(this, new BattleAgentAdopted(agent));
 
         // In a live battle, wake the AI the same way the NPC-release path does. Without this an adopted agent
         // is AI-controlled but not alarmed and holds stale enemy caches, so it ignores its formation's Charge

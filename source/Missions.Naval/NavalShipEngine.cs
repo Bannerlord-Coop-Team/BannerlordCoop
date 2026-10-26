@@ -253,11 +253,13 @@ public class NavalShipEngine : INavalShipEngine
             ? CarriedAmmo(localAmmo, localState == RangedSiegeWeapon.WeaponState.Idle)
             : CarriedAmmo(replicated.AmmoCount, replicated.WeaponState == (int)RangedSiegeWeapon.WeaponState.Idle);
 
+    // Puts the parked agents back on the hull's deck and enlists its crew again, which its parking took off vanilla's tracking.
     public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
     {
+        if (agents == null) return;
+
         var ship = hull as MissionShip;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agents == null) return;
         if (agentsLogic == null || ship == null || ship.IsRemoved || !ship.GameEntity.IsValid || ship.Team == null)
         {
             UnparkWhereTheyStood(agents);
@@ -276,7 +278,7 @@ public class NavalShipEngine : INavalShipEngine
                 agent.TeleportToPosition(frame.TransformToParent(moved.DeckLocal));
             }
 
-            if (moved.IsCrew) agentsLogic.AddAgentToShip(agent, ship);
+            if (moved.IsCrew) EnlistCrew(agent, ship);
         }
 
         // Vanilla seats the helm and oars and moves their crew onto them.
@@ -316,6 +318,18 @@ public class NavalShipEngine : INavalShipEngine
         if (formation == null || shipsLogic == null) return null;
 
         return shipsLogic.GetShip(formation, out var ship) ? ship : null;
+    }
+
+    // AddAgentToShip keeps any record the agent already has. OnShipCaptured is vanilla's re-read of the formation's hull, which
+    // also re-points crew a swap moved to a fresh hull of the same formation off the removed one.
+    public void EnlistCrew(Agent agent, MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || !agent.IsActive() || ship.IsRemoved || ship.Team == null) return;
+
+        agentsLogic.AddAgentToShip(agent, ship);
+        if (agent.Formation != null) agent.GetComponent<AgentNavalComponent>()?.OnShipCaptured();
     }
 
     public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
