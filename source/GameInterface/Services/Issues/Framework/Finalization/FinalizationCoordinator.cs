@@ -15,6 +15,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using static TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
@@ -185,6 +186,8 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
+        if (issue.IssueQuest is VillageNeedsToolsIssueQuest)
+            return;
         if (issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
