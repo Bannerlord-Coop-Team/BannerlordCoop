@@ -168,7 +168,7 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         // Same as vanilla PlayerCaptivityCampaignBehavior.OnPrisonerTaken
         var executer = payload.What.CapturerParty?.LeaderHero;
-        if (executer != null && executer.GetRelation(hero) < -30f && MBRandom.RandomFloat <= 0.02f)
+        if (executer != null && !executer.IsPlayerHero() && executer.GetRelation(hero) < -30f && MBRandom.RandomFloat <= 0.02f)
             pendingExecutions[hero] = executer;
     }
 
