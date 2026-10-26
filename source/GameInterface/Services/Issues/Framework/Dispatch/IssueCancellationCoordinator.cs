@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -38,7 +39,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing)
         {
-            CancelQuestAndIssue(victim.Issue, null);
+            CancelQuestAndIssue(victim.Issue, BuildGiverDeathLog(victim.Issue));
             return false;
         }
 
@@ -151,13 +152,20 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                     continue;
                 }
 
-                CancelQuestAndIssue(issue, null);
+                issue.CompleteIssueWithCancel();
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Retrying cancellation of {issue} failed", issue.StringId);
             }
         }
+    }
+
+    private static TextObject BuildGiverDeathLog(IssueBase issue)
+    {
+        var text = new TextObject("{=rTvWdMXF}{DIED_HERO.LINK} died and your agreement with {?DIED_HERO.GENDER}her{?}him{\\?} canceled.");
+        StringHelpers.SetCharacterProperties("DIED_HERO", issue.IssueOwner.CharacterObject, text);
+        return text;
     }
 
     private void CancelQuestAndIssue(IssueBase issue, TextObject log)
