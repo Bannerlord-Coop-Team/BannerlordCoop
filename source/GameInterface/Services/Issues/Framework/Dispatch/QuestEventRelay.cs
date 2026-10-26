@@ -33,7 +33,7 @@ internal class QuestEventRelay : IQuestEventRelay
             }
 
             // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
-            var key = (quest.GetType(), listenerName);
+            var key = (Quest: quest.GetType(), Listener: listenerName);
             if (MissingListeners.ContainsKey(key)) return;
 
             if (!Listeners.TryGetValue(key, out var listener))
