@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -126,7 +127,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         if (ownerHero.PartyBelongedTo == null)
         {
-            pending.TryAdd(issue, null);
+            if (!pending.ContainsKey(issue)) pending.Add(issue, null);
             return false;
         }
 
@@ -135,7 +136,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         {
             if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
             {
-                pending.TryAdd(issue, null);
+                if (!pending.ContainsKey(issue)) pending.Add(issue, null);
                 return false;
             }
 
