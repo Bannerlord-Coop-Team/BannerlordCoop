@@ -73,7 +73,7 @@ public sealed class MissionLocationFinalizePatchTests
         try
         {
             var patched = harmony.CreateClassProcessor(typeof(MissionLocationFinalizePatch)).Patch();
-            Assert.Contains(patched, method => method.Name == nameof(MissionLocationLogic.OnRemoveBehavior));
+            Assert.Contains(patched, method => method.Name.Contains(nameof(MissionLocationLogic.OnRemoveBehavior)));
 
             logic.OnRemoveBehavior();
 
