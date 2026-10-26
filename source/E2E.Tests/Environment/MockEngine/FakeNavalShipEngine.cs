@@ -167,7 +167,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     // A copy here stands in for one whose body simulates.
     public string BodyMode(MissionObject hull) => Of(hull).IsCopy ? "steered" : "own";
 
-    public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "copy" : "simulated";
+    // The ship controller type names the live engine reports: none on a copy, AI on a hull this client simulates.
+    public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "None" : "AI";
 
     public MissionObject GetSupportHull(Agent agent) => null!;
 
@@ -207,7 +208,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         var fake = HullOfStation(point);
         if (inUse) fake.Seats[point] = agent;
         else if (fake.Seats.TryGetValue(point, out var seated) && ReferenceEquals(seated, agent)) fake.Seats.Remove(point);
-        fake.StationUses++;
     }
 
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
@@ -217,7 +217,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public bool IsMainAgent(Agent agent) => agent != null && agent == Mission.Current?.MainAgent;
 
-    public void PinToStation(Agent agent, UsableMissionObject point) => HullOfStation(point).Pins++;
+    // A fake hull has no agent physics, so nothing drifts off a station to pin back.
+    public void PinToStation(Agent agent, UsableMissionObject point) { }
 
     public void ReleaseHull(MissionObject hull)
     {
@@ -719,8 +720,6 @@ public sealed class FakeHull
     public BattleShipMotion Motion { get; set; }
     public int FinalRopesApplied { get; set; }
     public int AppliedConditions { get; set; }
-    public int StationUses { get; set; }
-    public int Pins { get; set; }
     public List<NetworkApplyShipDamage> AppliedDamage { get; } = new();
     /// <summary>The hitter hull each routed hit resolved to here, null when it was not known.</summary>
     public List<MissionObject?> AppliedHitters { get; } = new();

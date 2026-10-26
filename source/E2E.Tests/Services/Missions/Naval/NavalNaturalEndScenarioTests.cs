@@ -133,7 +133,7 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
 
         a.Call(() =>
         {
-            var crewByHull = new NavalSideTallyReader(a.Engine, a.Ships, a.MigrationReserve)
+            var crewByHull = new NavalSideTallyReader(a.Engine, a.Services.ConditionStream, a.MigrationReserve)
                 .CrewByHull(crew.Append(swimmer));
 
             Assert.Equal(2, Assert.Single(crewByHull).Value);

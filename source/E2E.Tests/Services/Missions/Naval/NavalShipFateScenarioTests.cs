@@ -350,17 +350,7 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
     public void ConfirmStillQueuedAtTheCaptorsResultReport_IsAppliedFirst_AndReportedAheadOfTheResult()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
-        var shipId = GiveShip(AddAiParty(battle));
-        var prize = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);
-        var captorHull = battle.FieldPlayerHull(b, new Vec3(0f, 0f, 0f), formationIndex: 0);
-        battle.CommitAll();
-        battle.TickAll();
-        a.Hull(prize).IsVacant = true;
-        b.SettleMesh = null;
-
-        b.ElapseCaptureTimer(prize, captorHull);
-        a.TickArrivals();
-        Assert.Null(b.Ship(prize).CaptorControllerId);
+        var prize = QueueCaptureConfirm(battle, a, b);
         b.Call(() =>
         {
             b.Controller.ResultCommitter.AcceptResolvedState(BattleState.AttackerVictory);
@@ -373,6 +363,61 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         int resultAt = sent.FindIndex(message => message is NetworkBattleResultReady);
         Assert.True(captureAt >= 0 && resultAt > captureAt, $"capture report at {captureAt}, result at {resultAt}");
     }
+
+    // S3 D5: a result report from outside the mission tick while the async agent tick runs applies nothing, so the queued
+    // confirm waits for the next mission tick and the capture report follows the result.
+    [Fact]
+    public void ConfirmStillQueuedAtTheCaptorsResultReport_DuringTheAsyncAgentTick_WaitsForTheNextTick()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        var prize = QueueCaptureConfirm(battle, a, b);
+        b.AsyncAgentTick.IsRunning = true;
+        b.Call(() =>
+        {
+            b.Controller.ResultCommitter.AcceptResolvedState(BattleState.AttackerVictory);
+            b.Controller.ResultCommitter.ReportAcceptedResult();
+        }, VictoryConclusionDisabledMethods());
+
+        Assert.Null(b.Ship(prize).CaptorControllerId);
+        Assert.DoesNotContain(b.Instance.NetworkSentMessages.Messages, message => message is NetworkBattleShipCaptured);
+
+        b.AsyncAgentTick.IsRunning = false;
+        b.Tick();
+        Assert.Equal("B", b.Ship(prize).CaptorControllerId);
+    }
+
+    // S3 D5: only this battle's result report applies the arrivals early; another instance's leaves them queued.
+    [Fact]
+    public void ResultReportOfAnotherInstance_LeavesTheQueuedConfirmForTheNextTick()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        var prize = QueueCaptureConfirm(battle, a, b);
+
+        b.Call(() => b.Broker.Publish(b, new BattleResultReporting("another battle")));
+
+        Assert.Null(b.Ship(prize).CaptorControllerId);
+        b.Tick();
+        Assert.Equal("B", b.Ship(prize).CaptorControllerId);
+    }
+
+    // The host A fields the AI party's hull and B claims it with its own hull; the host's confirm waits in B's arrivals.
+    private Guid QueueCaptureConfirm(NavalBattle battle, NavalPeer host, NavalPeer captor)
+    {
+        var shipId = GiveShip(AddAiParty(battle));
+        var prize = battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);
+        var captorHull = battle.FieldPlayerHull(captor, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        battle.CommitAll();
+        battle.TickAll();
+        host.Hull(prize).IsVacant = true;
+        captor.SettleMesh = null;
+
+        captor.ElapseCaptureTimer(prize, captorHull);
+        host.TickArrivals();
+        battle.DeliverMesh();
+        Assert.Null(captor.Ship(prize).CaptorControllerId);
+        return prize;
+    }
+
 
     private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
     {

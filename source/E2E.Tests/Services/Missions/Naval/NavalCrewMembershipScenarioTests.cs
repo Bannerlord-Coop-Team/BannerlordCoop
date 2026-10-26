@@ -37,7 +37,7 @@ public class NavalCrewMembershipScenarioTests : NavalBattleTestEnvironment
         var crew = battle.Peers.ToDictionary(peer => peer.Id, peer => peer.RegisterAgent(crewId, "A", peer.Mission.DefenderTeam));
 
         // The host's crew member joins p1, which is formation 3 there and formation 1 on its peers.
-        JoinHull(a, crew["A"], p1);
+        JoinHull(battle, a, crew["A"], p1);
         Assert.All(new[] { b, c }, peer => Assert.Same(peer.Ship(p1).Formation, crew[peer.Id].Formation));
 
         battle.MigrateHost(a, "B");
@@ -48,13 +48,14 @@ public class NavalCrewMembershipScenarioTests : NavalBattleTestEnvironment
         Assert.Same(c.Ship(p1).Formation, crew["C"].Formation);
 
         // On the new host the crew member swims to p0 (vanilla CheckAgentOffShip's TransferAgentToShip), and the observer follows.
-        JoinHull(b, crew["B"], p0);
+        JoinHull(battle, b, crew["B"], p0);
         Assert.Same(c.Ship(p0).Formation, crew["C"].Formation);
         Assert.Same(b.Ship(p0).Formation, crew["B"].Formation);
     }
 
-    // The owner moves its agent onto the hull's formation, as NavalShipAgents.AddAgent does, and flushes the update.
-    private static void JoinHull(NavalPeer owner, Agent agent, Guid shipId)
+    // The owner moves its agent onto the hull's formation, as NavalShipAgents.AddAgent does, and flushes the update, which
+    // reaches the peers a tick later.
+    private static void JoinHull(NavalBattle battle, NavalPeer owner, Agent agent, Guid shipId)
     {
         owner.Call(() =>
         {
@@ -62,5 +63,6 @@ public class NavalCrewMembershipScenarioTests : NavalBattleTestEnvironment
             owner.Broker.Publish(owner, new BattleAgentFormationChanged(agent));
         });
         owner.TickController();
+        battle.DeliverMesh();
     }
 }

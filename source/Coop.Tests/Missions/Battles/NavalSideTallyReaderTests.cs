@@ -13,7 +13,7 @@ public class NavalSideTallyReaderTests
     private const int Afloat = 0;
 
     private readonly Mock<INavalShipEngine> engine = new Mock<INavalShipEngine>();
-    private readonly Mock<IBattleShipReplicator> replicator = new Mock<IBattleShipReplicator>();
+    private readonly Mock<IBattleShipConditionStream> conditions = new Mock<IBattleShipConditionStream>();
     private readonly Mock<INavalMigrationReserveFielder> migrationReserve = new Mock<INavalMigrationReserveFielder>();
     private readonly List<MissionObject> hulls = new List<MissionObject>();
 
@@ -52,7 +52,7 @@ public class NavalSideTallyReaderTests
         Assert.Equal(0, Reader().Count(BattleSideEnum.Defender, liveHumans: 0, NavalSideTallyReader.NoCrew).Hulls);
     }
 
-    private NavalSideTallyReader Reader() => new NavalSideTallyReader(engine.Object, replicator.Object, migrationReserve.Object);
+    private NavalSideTallyReader Reader() => new NavalSideTallyReader(engine.Object, conditions.Object, migrationReserve.Object);
 
     private MissionObject Hull(BattleSideEnum side, int sinkingState, int reserve)
     {
@@ -60,7 +60,7 @@ public class NavalSideTallyReaderTests
         hulls.Add(hull);
         engine.Setup(e => e.SideOf(hull)).Returns(side);
         engine.Setup(e => e.ReadCondition(hull)).Returns(new BattleShipCondition(100f, 100f, 0f, null, sinkingState));
-        replicator.Setup(r => r.HullReserve(hull)).Returns(reserve);
+        conditions.Setup(c => c.HullReserve(hull)).Returns(reserve);
         return hull;
     }
 }

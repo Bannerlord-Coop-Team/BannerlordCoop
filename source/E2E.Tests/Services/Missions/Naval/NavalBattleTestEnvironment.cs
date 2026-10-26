@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
@@ -141,7 +142,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         {
             var crewByHull = peer.Registry.Ships.Where(ship => ship.Hull != null).ToDictionary(ship => ship.Hull,
                 ship => crew != null && crew.TryGetValue(ship.ShipId, out int count) ? count : 0);
-            tally = new NavalSideTallyReader(peer.Engine, peer.Ships, peer.MigrationReserve).Count(side, liveHumans, crewByHull);
+            tally = new NavalSideTallyReader(peer.Engine, peer.Services.ConditionStream, peer.MigrationReserve)
+                .Count(side, liveHumans, crewByHull);
         });
         return tally;
     }
@@ -161,7 +163,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         private readonly MissionEngineFixture fixture = new();
         private readonly Dictionary<string, NavalPeer> peers = new();
         private readonly NavalLoggedFailures failures = new();
+        private readonly IVirtualNetworkScheduler mesh;
 
+        // Mesh traffic takes one tick to arrive, so what a client sends in a round reaches the others in the next one.
         public NavalBattle(NavalBattleTestEnvironment environment, string mapEventId, string[] successionOrder, int hostEpoch)
         {
             this.environment = environment;
@@ -169,6 +173,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             HostId = successionOrder[0];
             Successors = successionOrder.Skip(1).ToArray();
             HostEpoch = hostEpoch;
+            mesh = environment.Server.Resolve<IVirtualNetworkScheduler>();
+            mesh.DefaultLatency = TimeSpan.FromSeconds(TickSeconds);
         }
 
         public string MapEventId { get; }
@@ -216,16 +222,19 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             foreach (var other in Peers)
                 other.Members.Enter(id);
             peer.SettleMesh = SettleArrivals;
+            peer.AdvanceMesh = AdvanceMesh;
+            peer.DeliverMesh = DeliverMesh;
             peers[id] = peer;
             return peer;
         }
 
         /// <summary>
-        /// <paramref name="departed"/> leaves the battle gracefully: its mission ends and the server tells every other member, as
-        /// after a retreat. Its last mesh traffic can still arrive later.
+        /// <paramref name="departed"/> leaves the battle gracefully: what it sent arrives, its mission ends and the server tells
+        /// every other member, as after a retreat. Its last mesh traffic can still arrive later.
         /// </summary>
         public void Leave(NavalPeer departed)
         {
+            DeliverMesh();
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
@@ -239,11 +248,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
 
         /// <summary>
-        /// <paramref name="departed"/> drops off the mesh without leaving, and the server tells every other member it left, as
-        /// it sends a naval disconnect (D4).
+        /// <paramref name="departed"/> drops off the mesh without leaving once what it sent arrived, and the server tells every
+        /// other member it left, as it sends a naval disconnect (D4).
         /// </summary>
         public void Disconnect(NavalPeer departed)
         {
+            DeliverMesh();
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
@@ -265,8 +275,11 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return returned;
         }
 
-        /// <summary>Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch.</summary>
-        public void MigrateHost(NavalPeer departed, string newHost)
+        /// <summary>
+        /// Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch;
+        /// without <paramref name="settle"/> the host change waits in each client's arrivals for its next tick.
+        /// </summary>
+        public void MigrateHost(NavalPeer departed, string newHost, bool settle = true)
         {
             Disconnect(departed);
 
@@ -276,30 +289,45 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer,
                     new NetworkBattleHostAssigned(MapEventId, HostId, Successors, HostEpoch)));
-            // The AI hulls move from the tick, as every client applies hull traffic (R48 L6); settled here so tests read the result.
-            SettleArrivals();
+            // The AI hulls move from the tick, as every client applies hull traffic (R48 L6).
+            if (settle) SettleArrivals();
         }
 
         /// <summary>
-        /// Applies every client's arrivals and runs the capture steps of its tick, three rounds, so hull traffic and a capture's
-        /// request, decision and confirm all land (they apply from the mission tick, R48 L6) without advancing anything else.
+        /// Delivers the mesh traffic in flight, then applies every client's arrivals and runs the capture steps of its tick, three
+        /// rounds, so hull traffic and a capture's request, decision and confirm all land without advancing anything else.
         /// </summary>
         public void SettleArrivals()
         {
             for (int round = 0; round < 3; round++)
+            {
+                DeliverMesh();
                 foreach (var peer in Peers)
                     peer.TickArrivals();
+            }
         }
 
-        /// <summary>Advances every client on the mesh by <paramref name="ticks"/> mission ticks.</summary>
-        public void TickAll(int ticks = 1, float dt = TickSeconds)
+        /// <summary>
+        /// Advances every client by <paramref name="ticks"/> mission ticks, each round's traffic arriving for the next; with
+        /// <paramref name="settle"/> the last round's traffic is applied too, as the clients' next tick starts.
+        /// </summary>
+        public void TickAll(int ticks = 1, float dt = TickSeconds, bool settle = true)
         {
             for (int tick = 0; tick < ticks; tick++)
+            {
                 foreach (var peer in Peers)
-                    peer.Tick(dt);
-            // What the last round sent applies as each client's next tick starts, so tests read it as they did before.
-            ApplyArrivals();
+                    peer.TickInRound(dt);
+                AdvanceMesh(dt);
+            }
+
+            if (settle) ApplyArrivals();
         }
+
+        /// <summary>Moves mesh time on by <paramref name="dt"/>, delivering the traffic due by then.</summary>
+        public void AdvanceMesh(float dt) => mesh.AdvanceBy(TimeSpan.FromSeconds(dt));
+
+        /// <summary>Delivers every message still in flight on the mesh, however late it is due.</summary>
+        public void DeliverMesh() => mesh.RunUntilIdle();
 
         /// <summary>Finishes every client's deployment, which announces its hulls at the next tick.</summary>
         public void CommitAll()
@@ -323,11 +351,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return shipId;
         }
 
-        /// <summary>Applies every client's arrived hull and capture traffic, as each client's next tick starts.</summary>
+        /// <summary>Delivers the mesh traffic in flight and applies every client's arrivals, as each client's next tick starts.</summary>
         public void ApplyArrivals()
         {
+            DeliverMesh();
             foreach (var peer in Peers)
-                peer.Call(() => peer.Services.Arrivals.ApplyAll());
+                peer.Call(() => peer.ServicesInternals.Arrivals.ApplyAll());
         }
 
         /// <summary>
@@ -345,6 +374,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Instance.Call(peer.DisposeShipServices);
             if (!alreadyFailed) Collect(violations, failures.AssertNone);
             failures.Dispose();
+            mesh.DefaultLatency = TimeSpan.Zero;
             BattleSpawnGate.EndBattle();
             fixture.Dispose();
             if (violations.Count > 0) throw new AggregateException(violations);
@@ -447,8 +477,11 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             });
             Services = instance.Resolve<INavalBattleServicesFactory>().Create(
                 controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine,
-                engine, Mock.Of<IAsyncAgentTick>());
+                engine, AsyncAgentTick);
         }
+
+        /// <summary>The async agent tick the ship services read; idle unless a scenario sets it running.</summary>
+        public FakeAsyncAgentTick AsyncAgentTick { get; } = new();
 
         /// <summary>The membership the ship services' gate reads.</summary>
         public NavalMissionMembers Members { get; }
@@ -465,7 +498,6 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public INavalBattleServices Services { get; }
         public IBattleShipReplicator Ships => Services.ShipReplicator;
         public IBattleShipCaptureReplicator Captures => Services.ShipCaptureReplicator;
-        public IShipCaptureApplier Applier => Services.CaptureApplier;
         /// <summary>The battle's capture settling, which <see cref="ElapseCaptureTimer"/> runs after the timer.</summary>
         public Action? SettleMesh { get; set; }
         public IAgentStationUseReplicator Stations => Services.StationUseReplicator;
@@ -479,24 +511,45 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
+        /// <summary>The battle's mesh clock, which <see cref="Tick"/> moves on by its step so the traffic due by then arrives.</summary>
+        public Action<float>? AdvanceMesh { get; set; }
+
         /// <summary>
-        /// One naval services tick in the live order (no NPC fleet here), then the removal invariant and logged failure checks.
+        /// This client's tick alone: mesh time moves on by <paramref name="dt"/>, delivering what is due, then
+        /// <see cref="TickInRound"/>.
         /// </summary>
-        public void Tick(float dt = TickSeconds) => Call(() =>
+        public void Tick(float dt = TickSeconds)
+        {
+            AdvanceMesh?.Invoke(dt);
+            TickInRound(dt);
+        }
+
+        /// <summary>
+        /// One naval services tick in the live order (no NPC fleet here), then the removal invariant and logged failure checks;
+        /// mesh time stays, as in a round of <see cref="NavalBattle.TickAll"/>.
+        /// </summary>
+        public void TickInRound(float dt = TickSeconds) => Call(() =>
         {
             Services.Tick(dt);
             Engine.AssertRemovalInvariant();
             failures.AssertNone();
         });
 
-        /// <summary>The arrivals, capture and station steps of the services tick alone, without advancing clocks.</summary>
-        public void TickArrivals() => Call(() =>
+        /// <summary>
+        /// Delivers the mesh traffic in flight, then the arrivals, capture and station steps of the services tick alone, without
+        /// advancing clocks.
+        /// </summary>
+        public void TickArrivals()
         {
-            Services.Arrivals.ApplyAll();
-            Applier.Tick(0f);
-            Captures.Tick(0f);
-            Stations.Tick(0f);
-        });
+            DeliverMesh?.Invoke();
+            Call(ServicesInternals.ApplyTraffic);
+        }
+
+        /// <summary>The battle's delivery of every message in flight on the mesh.</summary>
+        public Action? DeliverMesh { get; set; }
+
+        /// <summary>The services past their interface, for the arrivals and traffic steps only the harness settles on their own.</summary>
+        internal NavalBattleServices ServicesInternals => (NavalBattleServices)Services;
 
         public void Ticks(int count)
         {
@@ -696,7 +749,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 false, -1));
         });
 
-        /// <summary>A ram tip of <paramref name="rammerId"/> hitting this client's hull <paramref name="shipId"/>, as MissionShipRam deals it.</summary>
+        /// <summary>
+        /// The ship damage patch's event for a ram hit of <paramref name="rammerId"/> on this client's hull <paramref name="shipId"/>;
+        /// it starts at the router, so the ram tick and collision patches that decide a hit never run here.
+        /// </summary>
         public void Ram(Guid shipId, Guid rammerId, float damage) => Call(() =>
         {
             Assert.True(Registry.TryGet(shipId, out var ship));

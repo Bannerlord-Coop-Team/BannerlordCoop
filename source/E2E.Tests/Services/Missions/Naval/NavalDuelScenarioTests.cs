@@ -29,7 +29,8 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
 
         a.Hit(hullB, 25f);
         b.Hit(hullA, 40f);
-        battle.TickAll();
+        // Each owner applies the hit it was sent, and its new condition reaches the other client's copy a tick later.
+        battle.TickAll(2);
 
         Assert.Single(b.Hull(hullB).AppliedDamage);
         Assert.Single(a.Hull(hullA).AppliedDamage);

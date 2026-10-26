@@ -105,4 +105,23 @@ public class NavalVsPiratesScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(-1f, a.Hull(hullB).Motion.Velocity.y);
         Assert.Equal(0.1f, a.Hull(hullB).Motion.YawRate);
     }
+
+    // Mesh traffic takes a tick: an AI hull fielded before a round arrives as the round ends, after its peer ticked, so the peer
+    // takes it in its next tick, whatever order the clients tick in.
+    [Fact]
+    public void AiHullFieldedBeforeARound_ReachesItsPeerInTheNextTick()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        var a = battle["A"];
+        var b = battle["B"];
+        battle.CommitAll();
+        battle.TickAll();
+
+        var pirate = a.FieldAiHull(BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), battle.PirateMapEventPartyId);
+        battle.TickAll(settle: false);
+        Assert.False(b.Has(pirate));
+
+        b.Tick();
+        Assert.True(b.Has(pirate));
+    }
 }
