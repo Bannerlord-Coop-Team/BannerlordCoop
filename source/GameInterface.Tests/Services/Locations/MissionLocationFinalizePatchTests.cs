@@ -8,6 +8,7 @@ using SandBox.Missions.MissionLogics;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -88,6 +89,28 @@ public sealed class MissionLocationFinalizePatchTests
         }
     }
 
+    [Fact]
+    public void ActiveSettlementEncounter_UsesVanillaCleanup()
+    {
+        Campaign previousCampaign = Campaign.Current;
+        Campaign campaign = ObjectHelper.SkipConstructor<Campaign>();
+        Campaign.Current = campaign;
+        try
+        {
+            var complex = new LocationComplex();
+            var settlement = new Settlement(new TextObject("Finalize Settlement"), complex, null);
+            campaign.LocationEncounter = new TestLocationEncounter(settlement);
+
+            var logic = (MissionLocationLogic)FormatterServices.GetUninitializedObject(typeof(MissionLocationLogic));
+
+            Assert.True(MissionLocationFinalizePatch.Prefix(logic));
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
     private static Hero CreateHero(string id)
     {
         var hero = new Hero { StringId = id };
@@ -127,4 +150,9 @@ public sealed class MissionLocationFinalizePatchTests
             characterRelation: (int)LocationCharacter.CharacterRelations.Neutral,
             fixedLocation: false,
             useCivilianEquipment: true);
+
+    private sealed class TestLocationEncounter : LocationEncounter
+    {
+        public TestLocationEncounter(Settlement settlement) : base(settlement) { }
+    }
 }
