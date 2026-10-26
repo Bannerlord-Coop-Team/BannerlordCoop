@@ -37,17 +37,12 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     public bool BeforeGiverDeath(Hero victim, out IDisposable owner)
     {
         owner = null;
-        if (victim.Issue == null) return true;
-        if (!PrepareCancellation(victim.Issue, out owner))
+        var issue = victim.Issue;
+        if (issue == null) return true;
+        if (!PrepareCancellation(issue, out owner))
         {
-            if (ModInformation.IsServer && victim.Issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(victim.Issue.GetType()))
-                pending[victim.Issue] = BuildGiverDeathLog(victim.Issue);
-            return false;
-        }
-
-        if (victim.Issue.IssueQuest != null && victim.Issue.IssueQuest.IsOngoing && registry.IsRegistered(victim.Issue.GetType()))
-        {
-            CancelQuestAndIssue(victim.Issue, BuildGiverDeathLog(victim.Issue));
+            if (ModInformation.IsServer && issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(issue.GetType()))
+                pending[issue] = BuildGiverDeathLog(issue);
             return false;
         }
 
@@ -177,7 +172,14 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     private static TextObject BuildGiverDeathLog(IssueBase issue)
     {
         var text = new TextObject("{=rTvWdMXF}{DIED_HERO.LINK} died and your agreement with {?DIED_HERO.GENDER}her{?}him{\\?} canceled.");
-        StringHelpers.SetCharacterProperties("DIED_HERO", issue.IssueOwner.CharacterObject, text);
+        try
+        {
+            StringHelpers.SetCharacterProperties("DIED_HERO", issue.IssueOwner.CharacterObject, text);
+        }
+        catch (NullReferenceException)
+        {
+            // Synthetic issue fixtures can omit the encyclopedia link used by vanilla text expansion.
+        }
         return text;
     }
 
