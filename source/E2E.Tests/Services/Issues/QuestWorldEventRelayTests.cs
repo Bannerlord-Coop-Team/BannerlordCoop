@@ -62,7 +62,7 @@ public class QuestWorldEventRelayTests : IDisposable
     }
 
     [Fact]
-    public void MissingListenerIsCachedAsNullAndSkippedOnSubsequentEvents()
+    public void MissingListenerIsRecordedAndSkippedOnSubsequentEvents()
     {
         scenario.Server.Call(() =>
         {

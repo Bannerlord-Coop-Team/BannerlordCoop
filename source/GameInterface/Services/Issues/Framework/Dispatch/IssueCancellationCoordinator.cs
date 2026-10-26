@@ -48,7 +48,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                 if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
                     !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
 
-                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
             }
         }
     }
