@@ -300,6 +300,7 @@ internal class FinalizationCoordinator : IHandler
 
         using (new AllowedThread())
         using (new QuestEndingReplay())
+        using (new QuestJournalReplay())
         {
             Replay(issue, data.Outcome, isOwner);
         }
