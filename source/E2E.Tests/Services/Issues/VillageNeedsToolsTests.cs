@@ -489,7 +489,7 @@ public class VillageNeedsToolsTests : IDisposable
         Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Equal("You brought the promised tools.", ending.Text);
-        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
+        Assert.Single(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
 
         TestEnvironment.FlushCoalescer();
         foreach (var instance in Instances)
