@@ -12,6 +12,7 @@ internal class VillageNeedsToolsDescriptor : IQuestTypeDescriptor
     public IQuestSolutionAcceptStrategy QuestSolutionAcceptStrategy { get; }
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool UsesSpecializedEndingJournal => true;
 
     public VillageNeedsToolsDescriptor(
         VillageNeedsToolsCreationCaptureStrategy creationCaptureStrategy,
