@@ -49,6 +49,31 @@ public class ChatServiceTests
         playerManager.VerifyGet(manager => manager.Players, Times.Never);
     }
 
+    [Theory]
+    [InlineData(ChatChannel.Clan)]
+    [InlineData(ChatChannel.Kingdom)]
+    public void Receive_GroupMessage_RefreshesFactionMembership(ChatChannel channel)
+    {
+        var localPlayer = Player("local");
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.Setup(manager => manager.TryGetPlayer("local", out localPlayer)).Returns(true);
+        var factionMembership = new Mock<IChatFactionMembership>();
+        using var service = CreateService(
+            playerManager: playerManager,
+            factionMembership: factionMembership);
+
+        service.Receive(new NetworkChatMessage(
+            channel,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "group message"));
+
+        factionMembership.Verify(membership => membership.GetClan(localPlayer), Times.Once);
+        factionMembership.Verify(membership => membership.GetKingdom(localPlayer), Times.Once);
+    }
+
     [Fact]
     public void VisibilityOption_LoadsAndAppliesWithoutRecreatingService()
     {
@@ -86,6 +111,7 @@ public class ChatServiceTests
         Mock<INetwork>? network = null,
         Mock<IPlayerManager>? playerManager = null,
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
+        Mock<IChatFactionMembership>? factionMembership = null,
         Mock<ICoopOptionsStore>? optionsStore = null,
         IMessageBroker? messageBroker = null,
         Mock<IChatEventLog>? eventLog = null)
@@ -93,6 +119,7 @@ public class ChatServiceTests
         network ??= new Mock<INetwork>();
         playerManager ??= new Mock<IPlayerManager>();
         playerNameResolver ??= new Mock<IChatPlayerNameResolver>();
+        factionMembership ??= new Mock<IChatFactionMembership>();
         if (optionsStore == null)
         {
             optionsStore = new Mock<ICoopOptionsStore>();
@@ -108,6 +135,7 @@ public class ChatServiceTests
             playerManager.Object,
             playerNameResolver.Object,
             controllerIdProvider.Object,
+            factionMembership.Object,
             optionsStore.Object,
             messageBroker,
             eventLog.Object,
