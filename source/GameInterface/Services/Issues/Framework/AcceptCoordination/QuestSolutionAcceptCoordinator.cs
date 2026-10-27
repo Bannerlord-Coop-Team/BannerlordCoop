@@ -219,7 +219,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
@@ -240,7 +241,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue.IssueDueTime = CampaignTime.Never;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkQuestSolutionAcceptRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
@@ -253,7 +254,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         var data = payload.What;
 
         // Cancelling the stray quest takes its dialog lines, which the player may still be answering
-        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(data.IssueOwnerId, () => CancelStrayQuest(data)),
+        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(() => CancelStrayQuest(data), data.IssueOwnerId),
             context: nameof(QuestSolutionAcceptCoordinator));
     }
 
@@ -277,6 +278,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         issue.IsTriedToSolveBefore = false;
 
         // With no winner the server still offers the issue, so undo the local accept
+        // Read when this runs, which keeps message order, so a winner's accept that came first is in even if it waited
         var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
         if (!hasOwner)
         {

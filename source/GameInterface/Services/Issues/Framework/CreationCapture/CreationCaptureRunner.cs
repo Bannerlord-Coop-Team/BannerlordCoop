@@ -81,7 +81,8 @@ internal class CreationCaptureRunner : IHandler
 
         var data = payload.What;
         
-        GameThread.RunSafe(() =>
+        // The giver may still hold an issue the server ended, kept until this player's conversation with them ends
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.IssueOwnerId, out var issueOwner))
             {
@@ -93,9 +94,6 @@ internal class CreationCaptureRunner : IHandler
                 Logger.Error("Received an issue of unregistered type {type}", data.IssueTypeName);
                 return;
             }
-
-            // The server already ended the issue a conversation with this giver held back
-            conversationGuard.RunDeferred(data.IssueOwnerId);
 
             if (issueOwner.Issue != null)
             {
@@ -127,6 +125,6 @@ internal class CreationCaptureRunner : IHandler
                 issue.StringId = data.IssueId;
             }
             strategy.ApplyAfterCreation(issue, captured);
-        }, context: nameof(CreationCaptureRunner));
+        }, data.IssueOwnerId), context: nameof(CreationCaptureRunner));
     }
 }

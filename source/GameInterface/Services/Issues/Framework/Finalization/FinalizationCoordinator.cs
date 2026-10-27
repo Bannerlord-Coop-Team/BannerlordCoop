@@ -264,25 +264,45 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
-            var isOwner = hasOwner && owner == controller.ControllerId;
-            if (hasOwner) ownership.Remove(data.IssueOwnerId);
-
-            // The server can end the issue while this player talks to its giver, and replaying it then leaves their dialog hanging
-            conversationGuard.RunWhenNotTalkingTo(data.IssueOwnerId, () =>
+            // An offer or a stray quest may still be on screen, while the owner's running quest ends mid dialog as in vanilla
+            if (IsOfferOrStrayQuest(data))
             {
-                if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-                {
-                    return;
-                }
-
-                using (new AllowedThread())
-                using (new QuestEndingReplay())
-                {
-                    Replay(issue, data.Outcome, isOwner);
-                }
-            });
+                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
+            }
+            else
+            {
+                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
+            }
         }, context: nameof(FinalizationCoordinator));
+    }
+
+    private void ReplayEnding(NetworkIssueFinalized data)
+    {
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
+        var isOwner = hasOwner && owner == controller.ControllerId;
+        if (hasOwner) ownership.Remove(data.IssueOwnerId);
+
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+        {
+            return;
+        }
+
+        using (new AllowedThread())
+        using (new QuestEndingReplay())
+        {
+            Replay(issue, data.Outcome, isOwner);
+        }
+    }
+
+    private bool IsOfferOrStrayQuest(NetworkIssueFinalized data)
+    {
+        if (!objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
+        {
+            return false;
+        }
+
+        var isOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) && owner == controller.ControllerId;
+        return issueOwner.Issue.IsOngoingWithoutQuest || (!isOwner && issueOwner.Issue.IssueQuest != null);
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)

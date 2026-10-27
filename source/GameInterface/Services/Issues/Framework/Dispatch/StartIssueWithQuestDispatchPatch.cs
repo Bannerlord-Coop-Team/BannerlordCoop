@@ -21,7 +21,7 @@ internal class StartIssueWithQuestDispatchPatch
             ContainerProvider.TryResolve<IIssueConversationGuard>(out var conversationGuard))
         {
             // No quest is made, so nothing would answer the accept line
-            conversationGuard.EndUnavailableAccept();
+            conversationGuard.EndUnavailableAccept(__instance.IssueOwner);
             // IssueManager treats false as a failed offer and finalizes the existing issue.
             __result = true;
             return false;

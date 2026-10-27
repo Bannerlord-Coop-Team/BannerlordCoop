@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -17,13 +18,15 @@ internal class StartIssueQuestGatePatch
     [HarmonyPrefix]
     private static bool Prefix(IssueManager __instance, Hero issueOwner, ref bool __result)
     {
+        if (ModInformation.IsServer) return true;
+
         if ((issueOwner != null && __instance.Issues.ContainsKey(issueOwner)) ||
             !ContainerProvider.TryResolve<IIssueConversationGuard>(out var conversationGuard))
         {
             return true;
         }
 
-        conversationGuard.EndUnavailableAccept();
+        conversationGuard.EndUnavailableAccept(issueOwner);
         __result = false;
         return false;
     }

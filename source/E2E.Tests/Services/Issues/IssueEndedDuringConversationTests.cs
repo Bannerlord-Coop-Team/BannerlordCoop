@@ -1,10 +1,11 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -52,7 +53,7 @@ public class IssueEndedDuringConversationTests : IDisposable
     [Fact]
     public void AnIssueTimedOutWhileThePlayerReadsItsOfferStaysUntilTheConversationEnds()
     {
-        TalkToTheNotable(scenario.ClientA, OfferToken, AddOfferLines);
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
 
         scenario.Server.Call(() => Notable(scenario.Server).Issue.CompleteIssueWithTimedOut());
 
@@ -79,15 +80,13 @@ public class IssueEndedDuringConversationTests : IDisposable
     [Fact]
     public void AcceptingAnIssueAnotherPlayerTookClosesTheConversation()
     {
-        TalkToTheNotable(scenario.ClientA, OfferToken, AddOfferLines);
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
         scenario.Accept(scenario.ClientB);
-        using var notices = new MethodCallRecorder(
-            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
 
-        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        var shown = QuickInformationShownBy(() => scenario.ClientA.Call(() => Conversation.DoOption(0)));
         scenario.ClientA.Call(ClickContinue);
 
-        Assert.Equal(1, notices.CountFor(scenario.ClientA));
+        Assert.Single(shown);
         Assert.Empty(quests.CreatedFor(scenario.ClientA));
         scenario.ClientA.Call(() =>
         {
@@ -100,18 +99,16 @@ public class IssueEndedDuringConversationTests : IDisposable
     public void AcceptingAnIssueThatMovedToARelativeClosesTheConversation()
     {
         var relativeId = TestEnvironment.CreateRegisteredObject<Hero>();
-        TalkToTheNotable(scenario.ClientA, OfferToken, AddOfferLines);
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
 
         scenario.Server.Call(() => Campaign.Current.IssueManager.ChangeIssueOwner(
             Notable(scenario.Server).Issue, scenario.Server.GetRegisteredObject<Hero>(relativeId)));
         scenario.ClientA.Call(() => Assert.Null(Notable(scenario.ClientA).Issue));
-        using var notices = new MethodCallRecorder(
-            AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
 
-        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        var shown = QuickInformationShownBy(() => scenario.ClientA.Call(() => Conversation.DoOption(0)));
         scenario.ClientA.Call(ClickContinue);
 
-        Assert.Equal(1, notices.CountFor(scenario.ClientA));
+        Assert.Single(shown);
         Assert.Empty(quests.CreatedFor(scenario.ClientA));
         scenario.ClientA.Call(() => Assert.False(Conversation.IsConversationInProgress));
     }
@@ -127,11 +124,7 @@ public class IssueEndedDuringConversationTests : IDisposable
         var strayQuest = Assert.Single(quests.CreatedFor(scenario.ClientA));
 
         // The refusal arrives while the quest's own lines are on screen
-        TalkToTheNotable(scenario.ClientA, QuestToken, conversation =>
-        {
-            conversation.AddDialogLine(PlayerLine("test_quest_option", QuestToken, "test_quest_answer", relatedObject: strayQuest));
-            conversation.AddDialogLine(NpcLine("test_quest_answer", "test_quest_answer", "close_window", relatedObject: strayQuest));
-        });
+        TalkToTheNotable(scenario.ClientA, QuestToken, QuestLines(strayQuest));
         router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
         TestEnvironment.FlushCoalescer();
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
@@ -155,7 +148,7 @@ public class IssueEndedDuringConversationTests : IDisposable
     }
 
     [Fact]
-    public void ANewIssueForTheGiverArrivesWhileTheirEndedOneWaitsForTheConversation()
+    public void ANewIssueForTheGiverWaitsBehindTheirEndedOneUntilTheConversationEnds()
     {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
@@ -171,11 +164,16 @@ public class IssueEndedDuringConversationTests : IDisposable
             });
         }
 
-        TalkToTheNotable(scenario.ClientA, OfferToken, AddOfferLines);
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines(QuestToken));
         scenario.Server.Call(() => Notable(scenario.Server).Issue.CompleteIssueWithTimedOut());
 
-        // The player accepts the ended issue and is still reading the answer when the giver gets a new one
-        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        // The player accepts the ended issue, and the quest it made has its lines on screen when the giver gets a new one
+        scenario.ClientA.Call(() =>
+        {
+            Conversation.DoOption(0);
+            QuestLines(Notable(scenario.ClientA).Issue.IssueQuest)(Conversation);
+            Conversation.GetPlayerSentenceOptions();
+        });
         scenario.Server.Call(() =>
         {
             var potentialIssue = new PotentialIssueData(
@@ -185,22 +183,115 @@ public class IssueEndedDuringConversationTests : IDisposable
 
             Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potentialIssue, Notable(scenario.Server)));
         });
-
         var created = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+
+        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Equal("test_quest_answer", CurrentLineId());
+            Assert.Equal(QuestScenario.IssueId, Notable(scenario.ClientA).Issue?.StringId);
+        });
+
+        scenario.ClientA.Call(ClickContinue);
+
         var strayQuest = Assert.Single(quests.CreatedFor(scenario.ClientA));
         scenario.ClientA.Call(() =>
         {
-            Assert.True(Conversation.IsConversationInProgress);
-            Assert.Equal(created.IssueId, Notable(scenario.ClientA).Issue?.StringId);
+            Assert.False(Conversation.IsConversationInProgress);
             Assert.True(strayQuest.IsFinalized);
+            Assert.Equal(created.IssueId, Notable(scenario.ClientA).Issue?.StringId);
+        });
+    }
+
+    [Fact]
+    public void AnIssueMovedToARelativeWaitsBehindTheStrayQuestTheConversationHolds()
+    {
+        var relativeId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        // Player A accepts as well before hearing that player B was first
+        router.PauseLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        scenario.Accept(scenario.ClientB);
+        scenario.Accept(scenario.ClientA);
+        var strayQuest = Assert.Single(quests.CreatedFor(scenario.ClientA));
+        TalkToTheNotable(scenario.ClientA, QuestToken, QuestLines(strayQuest));
+
+        // The server then hands the issue player B took to a relative, as when the giver dies
+        scenario.Server.Call(() => Campaign.Current.IssueManager.ChangeIssueOwner(
+            Notable(scenario.Server).Issue, scenario.Server.GetRegisteredObject<Hero>(relativeId)));
+        router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        TestEnvironment.FlushCoalescer();
+
+        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Equal("test_quest_answer", CurrentLineId());
+            Assert.Equal(QuestScenario.IssueId, Notable(scenario.ClientA).Issue?.StringId);
         });
 
         scenario.ClientA.Call(ClickContinue);
 
         scenario.ClientA.Call(() =>
         {
+            var moved = scenario.ClientA.GetRegisteredObject<Hero>(relativeId).Issue;
             Assert.False(Conversation.IsConversationInProgress);
-            Assert.Equal(created.IssueId, Notable(scenario.ClientA).Issue?.StringId);
+            Assert.True(strayQuest.IsFinalized);
+            Assert.Null(Notable(scenario.ClientA).Issue);
+            Assert.Equal(QuestScenario.IssueId, moved?.StringId);
+            Assert.True(moved!.IsSolvingWithQuest);
+            Assert.True(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(relativeId, QuestScenario.IssueId, out var owner));
+            Assert.Equal(QuestScenario.ControllerB, owner);
+        });
+    }
+
+    [Fact]
+    public void AnOwnersQuestEndedDuringTheirConversationWithTheGiverReplaysAtOnce()
+    {
+        scenario.Accept(scenario.ClientA);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                ownerQuest.StartQuest();
+            }
+        });
+
+        // The owner ends the quest from its dialog with the giver, the way a hand in does
+        TalkToTheNotable(scenario.ClientA, QuestToken, QuestLines(ownerQuest));
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<IMessageBroker>().Publish(this,
+            new QuestOutcomeRequested(ownerQuest, IssueOutcome.QuestCancel)));
+
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(Conversation.IsConversationInProgress);
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Null(Notable(scenario.ClientA).Issue);
+        });
+    }
+
+    [Fact]
+    public void AnotherGiversIssueEndedDuringTheConversationReplaysAtOnce()
+    {
+        const string otherIssueId = "issue_other_giver";
+        var otherGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        scenario.AddIssue(otherGiverId, otherIssueId);
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
+
+        scenario.Server.Call(() =>
+        {
+            Notable(scenario.Server).Issue.CompleteIssueWithTimedOut();
+            scenario.Server.GetRegisteredObject<Hero>(otherGiverId).Issue.CompleteIssueWithTimedOut();
+        });
+
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
+            finalized => finalized.IssueId == otherIssueId);
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(Conversation.IsConversationInProgress);
+            Assert.Equal(QuestScenario.IssueId, Notable(scenario.ClientA).Issue?.StringId);
+            Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(otherGiverId).Issue);
         });
     }
 
@@ -215,23 +306,30 @@ public class IssueEndedDuringConversationTests : IDisposable
             var character = ObjectHelper.SkipConstructor<CharacterObject>();
             character.HeroObject = Notable(client);
 
-            addLines(Conversation);
             Conversation.SetupAndStartMapConversation(
                 null, new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
+            addLines(Conversation);
             Conversation.ActiveToken = Conversation.GetStateIndex(token);
             Conversation.GetPlayerSentenceOptions();
         }, new[] { StartNewMethod });
     }
 
-    private static void AddOfferLines(ConversationManager conversation)
+    private static Action<ConversationManager> OfferLines(string answerOutput = "close_window") => conversation =>
     {
         // Vanilla's issue_offer_player_accept_quest
         conversation.AddDialogLine(PlayerLine("test_issue_accept", OfferToken, "issue_classic_quest_start",
             () => Campaign.Current.IssueManager.StartIssueQuest(Hero.OneToOneConversationHero)));
-        // Stands in for the offer line vanilla's quest adds when the accept makes it
-        conversation.AddDialogLine(NpcLine("test_quest_offer", "issue_classic_quest_start", "close_window",
-            () => Hero.OneToOneConversationHero.Issue?.IssueQuest != null));
-    }
+        // Stands in for the offer line vanilla's quest adds when the accept makes it, gone with the issue
+        conversation.AddDialogLine(NpcLine("test_quest_offer", "issue_classic_quest_start", answerOutput,
+            () => Hero.OneToOneConversationHero.Issue?.IssueQuest != null, Hero.OneToOneConversationHero.Issue));
+    };
+
+    // A player option and its answer that belong to the quest, like the steps of its own dialog
+    private static Action<ConversationManager> QuestLines(QuestBase quest) => conversation =>
+    {
+        conversation.AddDialogLine(PlayerLine("test_quest_option", QuestToken, "test_quest_answer", relatedObject: quest));
+        conversation.AddDialogLine(NpcLine("test_quest_answer", "test_quest_answer", "close_window", relatedObject: quest));
+    };
 
     private static ConversationSentence PlayerLine(string id, string input, string output,
         ConversationSentence.OnConsequenceDelegate? consequence = null, object? relatedObject = null)
@@ -254,6 +352,26 @@ public class IssueEndedDuringConversationTests : IDisposable
 
         Conversation.GetPlayerSentenceOptions();
         Conversation.ContinueConversation();
+    }
+
+    private static List<string> QuickInformationShownBy(Action action)
+    {
+        var shown = new List<string>();
+        Action<string, int, BasicCharacterObject, Equipment, string> capture = (message, _, _, _, _) => shown.Add(message);
+        // The publicized backing field shares the event's name, so the event is found by name
+        var quickInformation = typeof(MBInformationManager).GetEvent("FiringQuickInformation", BindingFlags.Public | BindingFlags.Static)!;
+
+        quickInformation.AddEventHandler(null, capture);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            quickInformation.RemoveEventHandler(null, capture);
+        }
+
+        return shown;
     }
 
     private static string CurrentLineId() => Conversation._sentences[Conversation._currentSentence].Id;

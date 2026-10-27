@@ -77,12 +77,9 @@ internal class IssueOwnerChangeCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // Work a conversation holds back can name the old owner, and the new owner may still hold an ended issue
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
-            // Removals a conversation held back name the old owner, and the new owner may still hold an ended issue
-            conversationGuard.RunDeferred(data.OldOwnerId);
-            conversationGuard.RunDeferred(data.NewOwnerId);
-
             MoveOwnership(data.OldOwnerId, data.NewOwnerId, data.IssueId);
 
             if (!issueResolver.TryResolve(data.OldOwnerId, data.IssueId, out _, out var issue, out _))
@@ -99,7 +96,7 @@ internal class IssueOwnerChangeCoordinator : IHandler
             {
                 Campaign.Current.IssueManager.ChangeIssueOwner(issue, newOwner);
             }
-        }, context: nameof(IssueOwnerChangeCoordinator));
+        }, data.OldOwnerId, data.NewOwnerId), context: nameof(IssueOwnerChangeCoordinator));
     }
 
     private void MoveOwnership(string oldOwnerId, string newOwnerId, string issueId)
