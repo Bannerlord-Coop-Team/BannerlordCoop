@@ -8,7 +8,7 @@ namespace GameInterface.Services.GuantletMapEventVisuals;
 /// </summary>
 public static class MapEventVisualSyncFilter
 {
-    // GauntletMapEventVisual is the only registered visual. The others (the dedicated server's creator,
+    // GauntletMapEventVisual is the only visual with a registry (GauntletMapEventVisualRegistry). The others (the dedicated server's creator,
     // MapEventBattleFactory's fallback) don't render anything, and they are matched by type rather than by
     // name because the released dedicated server is obfuscated.
     public static bool IsHeadless(IMapEventVisual visual) => visual is not GauntletMapEventVisual;

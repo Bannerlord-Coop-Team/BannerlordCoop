@@ -1,10 +1,9 @@
+using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
-using System;
-using System.Reflection;
+using SandBox.GauntletUI.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit;
-using FormatterServices = System.Runtime.Serialization.FormatterServices;
 
 namespace GameInterface.Tests.Services.GuantletMapEventVisuals;
 
@@ -20,10 +19,7 @@ public class MapEventVisualSyncFilterTests
     [Fact]
     public void GauntletVisual_IsNotHeadless()
     {
-        var gauntletType = Assembly.Load("SandBox.GauntletUI").GetType("SandBox.GauntletUI.Map.GauntletMapEventVisual", true);
-        var visual = (IMapEventVisual)FormatterServices.GetUninitializedObject(gauntletType);
-
-        Assert.False(MapEventVisualSyncFilter.IsHeadless(visual));
+        Assert.False(MapEventVisualSyncFilter.IsHeadless(ObjectHelper.SkipConstructor<GauntletMapEventVisual>()));
     }
 
     private sealed class f
