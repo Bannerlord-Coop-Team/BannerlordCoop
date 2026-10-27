@@ -264,14 +264,14 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // An offer or a stray quest may still be on screen, while the owner's running quest ends mid dialog as in vanilla
-            if (IsOfferOrStrayQuest(data))
+            // The owner's running quest ends mid dialog as in vanilla, anything else waits, the lines on screen read the issue or its quest
+            if (IsOwnersRunningQuest(data))
             {
-                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
+                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
             }
             else
             {
-                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
+                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -294,15 +294,17 @@ internal class FinalizationCoordinator : IHandler
         }
     }
 
-    private bool IsOfferOrStrayQuest(NetworkIssueFinalized data)
+    // The quest Replay drives, a hand in for example, rather than one it would only discard
+    private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
     {
-        if (!objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
+        if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
+            !objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
         {
             return false;
         }
 
-        var isOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) && owner == controller.ControllerId;
-        return issueOwner.Issue.IsOngoingWithoutQuest || (!isOwner && issueOwner.Issue.IssueQuest != null);
+        var quest = issueOwner.Issue.IssueQuest;
+        return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)

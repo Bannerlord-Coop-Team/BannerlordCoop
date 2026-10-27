@@ -24,6 +24,7 @@ public class IssueEndedDuringConversationTests : IDisposable
 {
     private const string OfferToken = "test_issue_offer_player_response";
     private const string QuestToken = "test_quest_player_options";
+    private const string MainOptionsToken = "hero_main_options";
 
     // StartNew reads character data the test campaign never loads, so each test puts the dialog at its step instead
     private static readonly MethodBase StartNewMethod =
@@ -150,20 +151,7 @@ public class IssueEndedDuringConversationTests : IDisposable
     [Fact]
     public void ANewIssueForTheGiverWaitsBehindTheirEndedOneUntilTheConversationEnds()
     {
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
-        {
-            instance.Call(() =>
-            {
-                using (new AllowedThread())
-                {
-                    // Making the issue picks a counter offer hero from the giver's settlement
-                    Notable(instance).StayingInSettlement = instance.GetRegisteredObject<Settlement>(settlementId);
-                    Notable(instance).Occupation = Occupation.GangLeader;
-                }
-            });
-        }
-
+        PlaceTheNotableInASettlement();
         TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines(QuestToken));
         scenario.Server.Call(() => Notable(scenario.Server).Issue.CompleteIssueWithTimedOut());
 
@@ -174,15 +162,7 @@ public class IssueEndedDuringConversationTests : IDisposable
             QuestLines(Notable(scenario.ClientA).Issue.IssueQuest)(Conversation);
             Conversation.GetPlayerSentenceOptions();
         });
-        scenario.Server.Call(() =>
-        {
-            var potentialIssue = new PotentialIssueData(
-                (in PotentialIssueData _, Hero hero) => new AllowedIssue(hero, null),
-                typeof(AllowedIssue),
-                IssueBase.IssueFrequency.Common);
-
-            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potentialIssue, Notable(scenario.Server)));
-        });
+        scenario.Server.Call(() => MakeNewIssue(Notable(scenario.Server)));
         var created = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
 
         scenario.ClientA.Call(() => Conversation.DoOption(0));
@@ -295,6 +275,123 @@ public class IssueEndedDuringConversationTests : IDisposable
         });
     }
 
+    [Fact]
+    public void AnIssueAnotherPlayerSentTroopsForStaysUntilTheConversationEnds()
+    {
+        // Player B sent troops for the issue, as every machine records it
+        foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Notable(instance).Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                }
+
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                    scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerB));
+            });
+        }
+
+        // Player A asks the giver about it while the server ends it
+        TalkToTheNotable(scenario.ClientA, MainOptionsToken, TaskGivenLines());
+        scenario.Server.Call(() => Notable(scenario.Server).Issue.CompleteIssueWithStayAliveConditionsFailed());
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        scenario.ClientA.Call(() => Conversation.DoOption(0));
+        scenario.ClientA.Call(() => Assert.Equal("test_alternative_solution_discuss", CurrentLineId()));
+
+        scenario.ClientA.Call(ClickContinue);
+
+        scenario.ClientA.Call(() =>
+        {
+            Assert.False(Conversation.IsConversationInProgress);
+            Assert.Null(Notable(scenario.ClientA).Issue);
+            Assert.False(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(
+                scenario.NotableId, QuestScenario.IssueId, out _));
+        });
+    }
+
+    [Fact]
+    public void ALordSolutionForTheGiversNewIssueWaitsBehindItsCreation()
+    {
+        PlaceTheNotableInASettlement();
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
+        scenario.Server.Call(() =>
+        {
+            Notable(scenario.Server).Issue.CompleteIssueWithTimedOut();
+            MakeNewIssue(Notable(scenario.Server));
+        });
+        var created = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+
+        // Player B starts the new issue's lord solution while player A still holds the ended one
+        scenario.ClientA.SimulateMessage(this, new NetworkLordSolutionStarted(
+            scenario.NotableId, created.IssueId, QuestScenario.ControllerB, 1f));
+        scenario.ClientA.Call(() => Assert.Equal(QuestScenario.IssueId, Notable(scenario.ClientA).Issue?.StringId));
+
+        scenario.ClientA.Call(() => Conversation.EndConversation());
+
+        scenario.ClientA.Call(() =>
+        {
+            var issue = Notable(scenario.ClientA).Issue;
+            Assert.Equal(created.IssueId, issue?.StringId);
+            Assert.True(issue!.IsSolvingWithLordSolution);
+            Assert.True(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(
+                scenario.NotableId, created.IssueId, out var owner));
+            Assert.Equal(QuestScenario.ControllerB, owner);
+        });
+    }
+
+    [Fact]
+    public void WorkForARelativeBehindAWaitingMoveWaitsWhileTheGiverStillTalks()
+    {
+        var relativeId = TestEnvironment.CreateRegisteredObject<Hero>();
+        TalkToTheNotable(scenario.ClientA, OfferToken, OfferLines());
+        var ran = new List<string>();
+
+        scenario.ClientA.Call(() =>
+        {
+            var conversationGuard = scenario.ClientA.Resolve<IIssueConversationGuard>();
+            conversationGuard.RunWhenNotTalkingTo(() => ran.Add("giver"), scenario.NotableId);
+            conversationGuard.RunInOrder(() => ran.Add("move"), scenario.NotableId, relativeId);
+            conversationGuard.RunInOrder(() => ran.Add("relative"), relativeId);
+
+            // The relative's work only shares a hero with the move, which waits for the giver still being talked to
+            conversationGuard.OnConversationEnded();
+            Assert.Empty(ran);
+
+            Conversation.EndConversation();
+            Assert.Equal(new[] { "giver", "move", "relative" }, ran);
+        });
+    }
+
+    private void PlaceTheNotableInASettlement()
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    // Making an issue picks a counter offer hero from the giver's settlement
+                    Notable(instance).StayingInSettlement = instance.GetRegisteredObject<Settlement>(settlementId);
+                    Notable(instance).Occupation = Occupation.GangLeader;
+                }
+            });
+        }
+    }
+
+    private static void MakeNewIssue(Hero giver)
+    {
+        var potentialIssue = new PotentialIssueData(
+            (in PotentialIssueData _, Hero hero) => new AllowedIssue(hero, null),
+            typeof(AllowedIssue),
+            IssueBase.IssueFrequency.Common);
+
+        Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potentialIssue, giver));
+    }
+
     private void TalkToTheNotable(EnvironmentInstance client, string token, Action<ConversationManager> addLines)
     {
         client.Call(() =>
@@ -329,6 +426,14 @@ public class IssueEndedDuringConversationTests : IDisposable
     {
         conversation.AddDialogLine(PlayerLine("test_quest_option", QuestToken, "test_quest_answer", relatedObject: quest));
         conversation.AddDialogLine(NpcLine("test_quest_answer", "test_quest_answer", "close_window", relatedObject: quest));
+    };
+
+    // Vanilla's hero_task_given_alternative and issue_alternative_solution_discuss, whose answer reads the giver's issue
+    private static Action<ConversationManager> TaskGivenLines() => conversation =>
+    {
+        conversation.AddDialogLine(PlayerLine("test_task_given_alternative", MainOptionsToken, "issue_discuss_alternative_solution"));
+        conversation.AddDialogLine(NpcLine("test_alternative_solution_discuss", "issue_discuss_alternative_solution", "close_window",
+            () => Hero.OneToOneConversationHero.Issue is IssueBase issue && issue.IsThereAlternativeSolution && issue.IsSolvingWithAlternative));
     };
 
     private static ConversationSentence PlayerLine(string id, string input, string output,

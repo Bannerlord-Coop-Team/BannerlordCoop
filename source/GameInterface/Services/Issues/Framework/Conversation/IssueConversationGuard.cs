@@ -49,6 +49,8 @@ internal sealed class IssueConversationGuard : IIssueConversationGuard
 
     public void OnConversationEnded()
     {
+        if (waiting.Count == 0) return;
+
         var stillWaiting = new HashSet<string>();
         var index = 0;
 

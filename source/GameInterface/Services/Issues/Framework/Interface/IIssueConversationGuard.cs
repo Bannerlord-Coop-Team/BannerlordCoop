@@ -5,7 +5,7 @@ namespace GameInterface.Services.Issues.Framework.Interface;
 
 internal interface IIssueConversationGuard
 {
-    // Runs the removal of an offer or a stray quest now, or once this player's conversation with the giver ends
+    // Runs a removal of the giver's issue or its quest now, or once this player's conversation with the giver ends
     void RunWhenNotTalkingTo(Action removal, string issueOwnerId);
 
     // Runs now, or behind work still waiting for any of these givers, so their messages apply in the order they came
