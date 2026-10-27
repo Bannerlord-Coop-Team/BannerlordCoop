@@ -485,6 +485,7 @@ public class VillageNeedsToolsTests : IDisposable
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
 
         var ending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Equal("You brought the promised tools.", ending.Text);

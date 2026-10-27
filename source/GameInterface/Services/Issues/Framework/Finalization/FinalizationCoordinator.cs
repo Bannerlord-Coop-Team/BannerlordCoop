@@ -193,7 +193,7 @@ internal class FinalizationCoordinator : IHandler
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
 
-        if (issueResolver.TryResolve(giverId, issue.StringId,
+        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
             out _, out _, out var descriptor) && descriptor is ISpecializedEndingJournalDescriptor)
             return;
 
