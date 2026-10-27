@@ -40,6 +40,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueAcceptPreconditions acceptPreconditions;
     private readonly IQuestJournalOwnerResolver journal;
     private readonly HashSet<QuestBase> acceptingQuests = new();
+    private readonly IIssueConversationGuard conversationGuard;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -51,7 +52,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IControllerIdProvider controllerIdProvider,
         IIssueConversationTracker conversationTracker,
         IIssueAcceptPreconditions acceptPreconditions,
-        IQuestJournalOwnerResolver journal)
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -63,6 +65,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.conversationTracker = conversationTracker;
         this.acceptPreconditions = acceptPreconditions;
         this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
@@ -305,7 +308,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
@@ -327,7 +331,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
             if (data.HasQuestDueTime && issue.IssueQuest != null)
                 issue.IssueQuest.ChangeQuestDueTime(new CampaignTime(data.QuestDueTimeTicks));
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkQuestSolutionAcceptRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
@@ -339,40 +343,45 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // Cancelling the stray quest takes its dialog lines, which the player may still be answering
+        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(() => CancelStrayQuest(data), data.IssueOwnerId),
+            context: nameof(QuestSolutionAcceptCoordinator));
+    }
+
+    private void CancelStrayQuest(NetworkQuestSolutionAcceptRejected data)
+    {
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-            {
-                return;
-            }
+            return;
+        }
 
-            var strayQuest = issue.IssueQuest;
-            if (strayQuest == null)
-            {
-                return;
-            }
+        var strayQuest = issue.IssueQuest;
+        if (strayQuest == null)
+        {
+            return;
+        }
 
-            // set to null first so cancelling the quest does not finalize the issue the winner owns
-            issue.IssueQuest = null;
+        // set to null first so cancelling the quest does not finalize the issue the winner owns
+        issue.IssueQuest = null;
 
-            // This player never held the issue, so its ending must not be credited to them
-            issue.IsTriedToSolveBefore = false;
+        // This player never held the issue, so its ending must not be credited to them
+        issue.IsTriedToSolveBefore = false;
 
-            // With no winner the server still offers the issue, so undo the local accept
-            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
-            if (!hasOwner)
-            {
-                issue._issueState = IssueBase.IssueState.Ongoing;
-            }
+        // With no winner the server still offers the issue, so undo the local accept
+        // Read when this runs, which keeps message order, so a winner's accept that came first is in even if it waited
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
+        if (!hasOwner)
+        {
+            issue._issueState = IssueBase.IssueState.Ongoing;
+        }
 
-            using (new AllowedThread())
-            {
-                strayQuest.CompleteQuestWithCancel();
-            }
+        using (new AllowedThread())
+        {
+            strayQuest.CompleteQuestWithCancel();
+        }
 
-            journal.DiscardArchive(issue);
-            if (data.IssueDueTimeTicks.HasValue && !hasOwner)
-                issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        journal.DiscardArchive(issue);
+        if (data.IssueDueTimeTicks.HasValue && !hasOwner)
+            issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
     }
 }
