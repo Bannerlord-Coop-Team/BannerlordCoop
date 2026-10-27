@@ -58,13 +58,6 @@ it once the user agrees:
 - **Send owner-only messages to the owner's peer.** `SendAll` for a journal or state message that only the owner
   reads sends it to everyone for every issue. Look the owner up in `IIssueOwnershipRegistry`. `issue.IssueOwner`
   is the NPC giver, not the player. (#3795)
-- **Hold a removal while the player talks to the giver.** A replay that takes an issue or its quest out mid
-  conversation strands the dialog, because the options on screen point at lines by index. Route a client removal of
-  an offer or a stray quest through `IIssueConversationGuard.RunWhenNotTalkingTo`, but let the owner's own quest
-  ending replay at once, as vanilla does.
-- **Queue a giver's later messages behind a held removal instead of flushing it.** Running it early so a new issue or
-  an owner change can land pulls the lines out under the dialog anyway. Apply them with
-  `IIssueConversationGuard.RunInOrder`, which also keeps an accept for a new issue behind that issue's creation.
 
 ## Review learnings
 
