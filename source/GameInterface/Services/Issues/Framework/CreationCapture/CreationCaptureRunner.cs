@@ -23,17 +23,20 @@ internal class CreationCaptureRunner : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IQuestTypeRegistry registry;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public CreationCaptureRunner(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IQuestTypeRegistry registry)
+        IQuestTypeRegistry registry,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.registry = registry;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<IssueCreated>(Handle_IssueCreated);
         messageBroker.Subscribe<NetworkIssueCreated>(Handle_NetworkIssueCreated);
@@ -90,6 +93,9 @@ internal class CreationCaptureRunner : IHandler
                 Logger.Error("Received an issue of unregistered type {type}", data.IssueTypeName);
                 return;
             }
+
+            // The server already ended the issue a conversation with this giver held back
+            conversationGuard.RunDeferred(data.IssueOwnerId);
 
             if (issueOwner.Issue != null)
             {

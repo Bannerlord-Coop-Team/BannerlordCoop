@@ -19,19 +19,22 @@ internal class IssueOwnerChangeCoordinator : IHandler
     private readonly IObjectManager objectManager;
     private readonly IIssueResolver issueResolver;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public IssueOwnerChangeCoordinator(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IIssueResolver issueResolver,
-        IIssueOwnershipRegistry ownership)
+        IIssueOwnershipRegistry ownership,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.issueResolver = issueResolver;
         this.ownership = ownership;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<IssueOwnerChanged>(Handle_IssueOwnerChanged);
         messageBroker.Subscribe<NetworkIssueOwnerChanged>(Handle_NetworkIssueOwnerChanged);
@@ -76,6 +79,10 @@ internal class IssueOwnerChangeCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // Removals a conversation held back name the old owner, and the new owner may still hold an ended issue
+            conversationGuard.RunDeferred(data.OldOwnerId);
+            conversationGuard.RunDeferred(data.NewOwnerId);
+
             MoveOwnership(data.OldOwnerId, data.NewOwnerId, data.IssueId);
 
             if (!issueResolver.TryResolve(data.OldOwnerId, data.IssueId, out _, out var issue, out _))

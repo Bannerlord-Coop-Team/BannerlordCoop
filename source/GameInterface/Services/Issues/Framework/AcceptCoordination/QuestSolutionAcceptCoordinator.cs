@@ -36,6 +36,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
     private readonly IQuestJournalOwnerResolver journal;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -47,7 +48,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IControllerIdProvider controllerIdProvider,
         IIssueConversationTracker conversationTracker,
         IIssueAcceptPreconditions acceptPreconditions,
-        IQuestJournalOwnerResolver journal)
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -59,6 +61,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.conversationTracker = conversationTracker;
         this.acceptPreconditions = acceptPreconditions;
         this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -249,40 +252,44 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // Cancelling the stray quest takes its dialog lines, which the player may still be answering
+        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(data.IssueOwnerId, () => CancelStrayQuest(data)),
+            context: nameof(QuestSolutionAcceptCoordinator));
+    }
+
+    private void CancelStrayQuest(NetworkQuestSolutionAcceptRejected data)
+    {
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-            {
-                return;
-            }
+            return;
+        }
 
-            var strayQuest = issue.IssueQuest;
-            if (strayQuest == null)
-            {
-                return;
-            }
+        var strayQuest = issue.IssueQuest;
+        if (strayQuest == null)
+        {
+            return;
+        }
 
-            // set to null first so cancelling the quest does not finalize the issue the winner owns
-            issue.IssueQuest = null;
+        // set to null first so cancelling the quest does not finalize the issue the winner owns
+        issue.IssueQuest = null;
 
-            // This player never held the issue, so its ending must not be credited to them
-            issue.IsTriedToSolveBefore = false;
+        // This player never held the issue, so its ending must not be credited to them
+        issue.IsTriedToSolveBefore = false;
 
-            // With no winner the server still offers the issue, so undo the local accept
-            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
-            if (!hasOwner)
-            {
-                issue._issueState = IssueBase.IssueState.Ongoing;
-            }
+        // With no winner the server still offers the issue, so undo the local accept
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
+        if (!hasOwner)
+        {
+            issue._issueState = IssueBase.IssueState.Ongoing;
+        }
 
-            using (new AllowedThread())
-            {
-                strayQuest.CompleteQuestWithCancel();
-            }
+        using (new AllowedThread())
+        {
+            strayQuest.CompleteQuestWithCancel();
+        }
 
-            journal.DiscardArchive(issue);
-            if (data.IssueDueTimeTicks.HasValue && !hasOwner)
-                issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        journal.DiscardArchive(issue);
+        if (data.IssueDueTimeTicks.HasValue && !hasOwner)
+            issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
     }
 }

@@ -35,6 +35,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -44,7 +45,8 @@ internal class FinalizationCoordinator : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IControllerIdProvider controller,
-        IAlternativeSolutionCommitments commitments)
+        IAlternativeSolutionCommitments commitments,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,6 +56,7 @@ internal class FinalizationCoordinator : IHandler
         this.playerManager = playerManager;
         this.controller = controller;
         this.commitments = commitments;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -265,16 +268,20 @@ internal class FinalizationCoordinator : IHandler
             var isOwner = hasOwner && owner == controller.ControllerId;
             if (hasOwner) ownership.Remove(data.IssueOwnerId);
 
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+            // The server can end the issue while this player talks to its giver, and replaying it then leaves their dialog hanging
+            conversationGuard.RunWhenNotTalkingTo(data.IssueOwnerId, () =>
             {
-                return;
-            }
+                if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+                {
+                    return;
+                }
 
-            using (new AllowedThread())
-            using (new QuestEndingReplay())
-            {
-                Replay(issue, data.Outcome, isOwner);
-            }
+                using (new AllowedThread())
+                using (new QuestEndingReplay())
+                {
+                    Replay(issue, data.Outcome, isOwner);
+                }
+            });
         }, context: nameof(FinalizationCoordinator));
     }
 
