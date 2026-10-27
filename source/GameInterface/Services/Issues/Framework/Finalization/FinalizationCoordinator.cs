@@ -264,7 +264,7 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // The owner's running quest ends mid dialog as in vanilla, anything else waits, the lines on screen read the issue or its quest
+            // The owner's running quest ends mid dialog as in vanilla. Anything else waits, because the lines on screen read the issue or its quest
             if (IsOwnersRunningQuest(data))
             {
                 conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);

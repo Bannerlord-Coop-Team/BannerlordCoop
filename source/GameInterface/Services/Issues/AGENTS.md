@@ -40,6 +40,7 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    applies the message and empties it when the replay runs, and it applies a giver's messages in the order they came
    through `IIssueConversationGuard.RunInOrder`. So while a replay waits for the player's conversation with the giver
    (rule 8), later quest, troops and lord solution accepts, owner changes and new issues for that giver wait behind it.
+   A refused troops accept is the exception and runs at once, see `AlternativeSolutionAcceptCoordinator`.
    `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside `IssueBase.CheckPreconditions` so
    vanilla's one-issue-per-type check counts only the player's own issues, so a stale mirror changes whether a player
    can accept.

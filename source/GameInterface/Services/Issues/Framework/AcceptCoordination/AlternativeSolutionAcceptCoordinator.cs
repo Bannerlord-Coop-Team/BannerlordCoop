@@ -254,7 +254,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        // Runs at once, behind waiting work it would find the sent companions cleared by a held replay or the issue moved away
+        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
