@@ -35,11 +35,13 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private readonly IIssueAcceptPreconditions preconditions;
     private readonly IControllerIdProvider controller;
     private readonly IQuestJournalOwnerResolver journal;
+    private readonly IIssueConversationGuard conversationGuard;
     private readonly HashSet<IssueBase> pendingDecisions = new HashSet<IssueBase>();
 
     public LordSolutionCoordinator(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnershipRegistry ownership, IPlayerManager players,
-        IIssueAcceptPreconditions preconditions, IControllerIdProvider controller, IQuestJournalOwnerResolver journal)
+        IIssueAcceptPreconditions preconditions, IControllerIdProvider controller, IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.network = network;
@@ -50,6 +52,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         this.preconditions = preconditions;
         this.controller = controller;
         this.journal = journal;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<RequestLordSolution>(HandleRequest);
         broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
         broker.Subscribe<NetworkLordSolutionRejected>(HandleRejected);
@@ -198,7 +201,8 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
             ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
@@ -222,6 +226,6 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             // artisan is still talking, the menu event after that conversation brings the merchant, as in vanilla.
             if (data.ControllerId == controller.ControllerId && Campaign.Current.ConversationManager?.IsConversationInProgress != true)
                 issue.BeforeGameMenuOpened(null);
-        }, context: nameof(LordSolutionCoordinator));
+        }, data.IssueOwnerId), context: nameof(LordSolutionCoordinator));
     }
 }
