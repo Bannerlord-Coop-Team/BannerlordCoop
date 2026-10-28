@@ -131,6 +131,10 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalOrderCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalBurnCoopCommand>()
+            .As<INavalBurnCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalShipFireCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
