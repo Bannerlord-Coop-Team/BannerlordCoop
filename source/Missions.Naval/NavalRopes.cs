@@ -38,6 +38,12 @@ internal static class NavalRopes
         internal float CurveAngle;
         internal int DecorationPlanks;
         internal int RemovedRepeats;
+        internal DateTime? LastIncludedSampleUtc;
+        internal DateTime? SamplesOmittedUtc;
+        internal DateTime? LastAcceptedSampleUtc;
+        internal DateTime? ReplicaRemovalAppliedUtc;
+        internal DateTime? ReplicaRemovalPreviousSampleUtc;
+        internal string ReplicaRemovalReason;
     }
 
     /// <summary>
@@ -122,6 +128,7 @@ internal static class NavalRopes
         record.Attachment = machine.CurrentAttachment;
         record.Generation++;
         record.CurveTarget = null;
+        record.LastIncludedSampleUtc = record.SamplesOmittedUtc = null;
     }
 
     /// <summary>The owned hull's rope at every station that ever threw, for its next sample; null when there is none.</summary>
@@ -145,7 +152,11 @@ internal static class NavalRopes
                 record.RemovedRepeats = 0;
             }
 
-            if (record.Last != null) result.Add(record.Last);
+            if (record.Last != null)
+            {
+                result.Add(record.Last);
+                record.LastIncludedSampleUtc = DateTime.UtcNow;
+            }
             if (result.Count == BattleRopeState.MaxRopesPerHull) break;
         }
 
@@ -156,7 +167,11 @@ internal static class NavalRopes
     private static bool RepeatRemoval(RopeRecord record)
     {
         if (record.Last.State != BattleRopeState.Removed) record.Last = Removed(record.Last);
-        if (record.RemovedRepeats == RemovedRepeatSamples) return false;
+        if (record.RemovedRepeats == RemovedRepeatSamples)
+        {
+            if (record.SamplesOmittedUtc == null) record.SamplesOmittedUtc = DateTime.UtcNow;
+            return false;
+        }
 
         record.RemovedRepeats++;
         return true;
@@ -229,12 +244,20 @@ internal static class NavalRopes
     {
         if (final && values == null) return;
 
+        var sampleUtc = DateTime.UtcNow;
         BypassReplicaGates = true;
         try
         {
             foreach (var value in values ?? Array.Empty<BattleRopeState>())
-                ApplyCounted(value.SourceKey, () => ApplyOne(copy, value, hullOf));
-            if (!final) RemoveOmitted(copy, values);
+                ApplyCounted(value.SourceKey, () => ApplyOne(copy, value, hullOf, sampleUtc));
+            if (!final)
+            {
+                RemoveOmitted(copy, values, sampleUtc);
+                foreach (var source in copy.AttachmentMachines)
+                {
+                    if (records.TryGetValue(source, out var record)) record.LastAcceptedSampleUtc = sampleUtc;
+                }
+            }
         }
         finally
         {
@@ -248,7 +271,7 @@ internal static class NavalRopes
     }
 
     // An owner's sample carries every live rope, so a replica it omits lost its rope while this client missed the removal.
-    private static void RemoveOmitted(MissionShip copy, BattleRopeState[] values)
+    private static void RemoveOmitted(MissionShip copy, BattleRopeState[] values, DateTime sampleUtc)
     {
         foreach (var source in copy.AttachmentMachines)
         {
@@ -263,9 +286,20 @@ internal static class NavalRopes
             ApplyCounted(key, () =>
             {
                 attachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
+                RecordReplicaRemoval(record, "omitted", sampleUtc);
                 return null;
             });
         }
+    }
+
+    // Keeps the removal apply and preceding accepted sample clocks for the stalled-peer check.
+    private static void RecordReplicaRemoval(RopeRecord record, string reason, DateTime sampleUtc)
+    {
+        if (record.ReplicaRemovalAppliedUtc != null) return;
+
+        record.ReplicaRemovalAppliedUtc = sampleUtc;
+        record.ReplicaRemovalPreviousSampleUtc = record.LastAcceptedSampleUtc;
+        record.ReplicaRemovalReason = reason;
     }
 
     // Runs one rope's apply, so one bad rope doesn't stop the others; counts a reject, and logs the mission's first fault.
@@ -292,7 +326,7 @@ internal static class NavalRopes
     }
 
     // Applies one owner state to its station's replica; returns why it was rejected, or null.
-    private static string ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf)
+    private static string ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf, DateTime sampleUtc)
     {
         var source = Resolve<ShipAttachmentMachine>(copy, value.SourceKey);
         if (source == null) return "source_station_missing";
@@ -307,6 +341,7 @@ internal static class NavalRopes
         {
             // The copy's machine tick destroys it next frame, as vanilla does on the owner.
             source.CurrentAttachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
+            RecordReplicaRemoval(record, "removed_state", sampleUtc);
             return null;
         }
 
@@ -317,6 +352,11 @@ internal static class NavalRopes
             source.CheckCurrentAttachmentAndInitializeRopeBoundingBox();
             record.Attachment = null;
         }
+        if (value.Generation > record.Generation)
+        {
+            record.ReplicaRemovalAppliedUtc = record.ReplicaRemovalPreviousSampleUtc = null;
+            record.ReplicaRemovalReason = null;
+        }
         record.Generation = value.Generation;
 
         var target = value.HasTarget && hullOf(value.TargetShipId) is MissionShip targetHull
@@ -326,6 +366,8 @@ internal static class NavalRopes
         if (reject != null) return reject;
 
         Present(source, target, value);
+        if (value.State == (int)RopeState.BrokenAndWaitingForRemoval)
+            RecordReplicaRemoval(record, "broken_state", sampleUtc);
         return null;
     }
 
@@ -562,6 +604,13 @@ internal static class NavalRopes
             plankNavmesh = attachment?._navMeshBridge?.WeakEntity.IsValid == true,
             plankOccupants = attachment?._navMeshBridge == null ? (int?)null : PlankOccupants(attachment),
             decorationPlanks = record?.DecorationPlanks ?? 0,
+            lastIncludedSampleUtc = record?.LastIncludedSampleUtc,
+            samplesOmittedUtc = record?.SamplesOmittedUtc,
+            removedRepeatSamples = record?.RemovedRepeats ?? 0,
+            lastAcceptedSampleUtc = record?.LastAcceptedSampleUtc,
+            replicaRemovalAppliedUtc = record?.ReplicaRemovalAppliedUtc,
+            replicaRemovalPreviousSampleUtc = record?.ReplicaRemovalPreviousSampleUtc,
+            replicaRemovalReason = record?.ReplicaRemovalReason,
         };
     }
 
