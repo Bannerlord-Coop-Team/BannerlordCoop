@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters.Data;
@@ -164,7 +165,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
             offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) },
-            offeredPeace: true);
+            offeredPeace: true,
+            offeredMarriages: new[] { new PlayerPartyMarriageOfferData("hero-1", "spouse-1") });
 
         var result = RoundTrip(original);
 
@@ -180,6 +182,9 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Single(result.OfferedPrisoners);
         Assert.Equal(2u, result.OfferedPrisoners[0].CharacterId);
         Assert.True(result.OfferedPeace);
+        Assert.Single(result.OfferedMarriages);
+        Assert.Equal("hero-1", result.OfferedMarriages[0].HeroId);
+        Assert.Equal("spouse-1", result.OfferedMarriages[0].SpouseId);
     }
 
     [Fact]

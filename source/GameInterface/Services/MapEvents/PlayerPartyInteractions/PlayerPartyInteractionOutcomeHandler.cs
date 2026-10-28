@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
@@ -37,6 +38,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages;
+    public readonly PlayerPartyMarriageOfferData[] ResponderOfferedMarriages;
     public readonly PlayerPartyInteractionProposal Proposal;
     public readonly bool IsHostile;
     public readonly string ActorPartyId;
@@ -64,6 +67,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        InitiatorOfferedMarriages = session.InitiatorOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
+        ResponderOfferedMarriages = session.ResponderOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
         Proposal = session.Proposal;
         IsHostile = session.IsHostile;
         ActorPartyId = actorPartyId;
@@ -491,7 +496,30 @@ internal class PlayerPartyInteractionOutcomeHandler
         {
             ApplyPeace(initiatorParty, responderParty);
         }
+
+        ApplyMarriages(initiatorParty, responderParty, outcome.InitiatorOfferedMarriages);
+        ApplyMarriages(responderParty, initiatorParty, outcome.ResponderOfferedMarriages);
         return true;
+    }
+
+    private void ApplyMarriages(PartyBase sourceParty, PartyBase targetParty, PlayerPartyMarriageOfferData[] offeredMarriages)
+    {
+        foreach (var offer in offeredMarriages)
+        {
+            if (!objectManager.TryGetObjectWithLogging(offer.HeroId, out Hero hero)) continue;
+            if (!objectManager.TryGetObjectWithLogging(offer.SpouseId, out Hero spouse)) continue;
+
+            if (!PlayerPartyMarriageBarterable.CanOfferMarriage(sourceParty, targetParty, hero, spouse))
+            {
+                Logger.Warning(
+                    "Unable to apply player-party trade marriage: eligibility changed before acceptance. HeroId={HeroId}, SpouseId={SpouseId}",
+                    offer.HeroId,
+                    offer.SpouseId);
+                continue;
+            }
+
+            MarriageAction.Apply(hero, spouse);
+        }
     }
 
     private static void ApplyPeace(PartyBase initiatorParty, PartyBase responderParty)
