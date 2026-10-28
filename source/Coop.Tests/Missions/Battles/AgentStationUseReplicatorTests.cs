@@ -56,24 +56,20 @@ public class AgentStationUseReplicatorTests
     [Fact]
     public void RefreshAppliedSeats_ReseatsALocalReleaseOnlyOncePerOwnerRevision()
     {
-        var engine = new Mock<INavalShipEngine>();
-        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
-        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(false);
-        var hull = ShipTestHulls.Create();
-        var point = CreatePoint();
-        StationOf(engine, point, hull);
-        using var replicator = CreateReplicator(engine.Object);
-        var agentId = Guid.NewGuid();
-        replicator.RecordAppliedSeat(agentId, null!, hull, point);
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
 
         replicator.RefreshAppliedSeats();
         replicator.RefreshAppliedSeats();
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), point, true), Times.Once);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
 
-        replicator.RecordAppliedSeat(agentId, null!, hull, point);
+        replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 2, "owner"));
         replicator.RefreshAppliedSeats();
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), point, true), Times.Exactly(2));
-        engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(4));
+        crew.Engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
     }
 
     [Fact]
@@ -732,6 +728,44 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(0, (long)inspected["ownerReleases"]!);
         Assert.Equal(0, (int)inspected["appliedSeats"]!);
         Assert.False(seated);
+    }
+
+    // R50 F2: the seat a counted local release came from can be cleaned up before the owner's delayed release arrives, which
+    // must still settle the count.
+    [Theory]
+    [InlineData("died")]
+    [InlineData("unregistered")]
+    [InlineData("hullDeparted")]
+    [InlineData("hullRemoved")]
+    public void Tick_SettlesADelayedOwnerRelease_AfterItsSeatWasCleanedUp(string cleanup)
+    {
+        var crew = new RemoteCrew();
+        bool seated = false;
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, It.IsAny<bool>()))
+            .Callback<Agent, UsableMissionObject, bool>((_, _, inUse) => seated = inUse);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        seated = false;
+        replicator.Tick(0f);
+
+        if (cleanup == "died") crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(false);
+        if (cleanup == "unregistered") crew.Registered = false;
+        if (cleanup == "hullDeparted") replicator.ReleaseSeatsOn(crew.Hull);
+        if (cleanup == "hullRemoved") crew.Engine.Setup(e => e.IsHullRemoved(crew.Hull)).Returns(true);
+        replicator.Tick(0f);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(0, (long)inspected["ownerReleases"]!);
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(0, (int)inspected["pending"]!);
     }
 
     // R50 F2: a seat vanilla took from a puppet whose owner's next revision keeps it seated is the desync the counter reports.
