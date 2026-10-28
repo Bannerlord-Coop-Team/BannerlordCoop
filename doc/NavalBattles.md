@@ -165,6 +165,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - If the replace fails or throws, the parked agents go back aboard the old hull. A client that hands a hull away turns it
   back into a steered copy (`ReleaseHull`).
 - `coop.debug.naval.reswap` runs a swap without a migration.
+- Vanilla tracks only the agents its own spawn put on a hull, never a puppet. An agent the migration adopts becomes vanilla's
+  crew of its formation's hull as it turns AI (`BattleAgentAdopted`, `INavalHullAuthority.EnlistCrew`), or later, once
+  deployment ended and that hull is not mid-swap or leaving. Otherwise vanilla's off-ship check throws in
+  `TransferAgentToShip` when it moves the agent off a sinking hull, which no swap re-crews (R50 F1). `BoardHullAgents`
+  enlists the same way, which also points the crew's own hull record (`AgentNavalComponent.FormationShip`) at the new hull.
 
 ### Capture
 

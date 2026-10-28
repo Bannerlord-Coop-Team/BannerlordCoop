@@ -414,6 +414,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public MissionObject CrewHullOf(Agent agent) => crews.TryGetValue(agent, out var crew) && IsCrewOf(agent, crew) ? crew.Hull : null!;
 
+    /// <summary>Every agent made vanilla's crew of a hull, in order; vanilla's tracking itself is not modelled here.</summary>
+    public List<(Agent Agent, MissionObject Hull)> Enlistments { get; } = new();
+
+    // Records the enlistment; vanilla's tracking is not modelled.
+    public void EnlistCrew(Agent agent, MissionObject hull) => Enlistments.Add((agent, hull));
+
     public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
     {
         var from = DeckOf(agent);

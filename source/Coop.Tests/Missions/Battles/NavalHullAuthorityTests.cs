@@ -247,6 +247,92 @@ public class NavalHullAuthorityTests
         Assert.True(authority.IsSettledFor(Peer));
     }
 
+    // R50 F1: vanilla's off-ship check can move an adopted agent in the very tick it turns AI, so it is enlisted at once.
+    [Fact]
+    public void EnlistCrew_EnlistsOnTheCrewHullAtOnce_AndOnlyOnce()
+    {
+        var (authority, _, engine, _) = Create();
+        var agent = CreateAgent();
+        var hull = ShipTestHulls.Create();
+        engine.Setup(e => e.IsAlive(agent)).Returns(true);
+        engine.Setup(e => e.CrewHullOf(agent)).Returns(hull);
+
+        authority.EnlistCrew(agent);
+        authority.Tick();
+
+        engine.Verify(e => e.EnlistCrew(agent, hull), Times.Once);
+    }
+
+    // AddAgentToShip makes room on a full hull during deployment by parking someone else, so enlisting waits it out.
+    [Fact]
+    public void EnlistCrew_WaitsOutDeployment()
+    {
+        var (authority, _, engine, _) = Create();
+        var agent = CreateAgent();
+        var hull = ShipTestHulls.Create();
+        engine.Setup(e => e.IsAlive(agent)).Returns(true);
+        engine.Setup(e => e.CrewHullOf(agent)).Returns(hull);
+        engine.SetupGet(e => e.IsDeploymentMode).Returns(true);
+
+        authority.EnlistCrew(agent);
+        authority.Tick();
+        engine.Verify(e => e.EnlistCrew(It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        engine.SetupGet(e => e.IsDeploymentMode).Returns(false);
+        authority.Tick();
+
+        engine.Verify(e => e.EnlistCrew(agent, hull), Times.Once);
+    }
+
+    // Vanilla's removal fades the crew it tracks on the hull, so an agent whose hull a swap replaces is enlisted on the fresh one.
+    [Fact]
+    public void EnlistCrew_WaitsWhileItsHullIsReplaced_ThenEnlistsOnTheFreshHull()
+    {
+        var (authority, registry, engine, _) = Create();
+        var agent = CreateAgent();
+        var hull = ShipTestHulls.Create();
+        var fresh = ShipTestHulls.Create();
+        var crewHull = hull;
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_2", true, hull, null);
+        registry.TryRegister(ship);
+        engine.Setup(e => e.IsAlive(agent)).Returns(true);
+        engine.Setup(e => e.CrewHullOf(agent)).Returns(() => crewHull);
+        engine.Setup(e => e.ParkHullAgents(hull)).Returns(Array.Empty<HullSwapAgent>());
+        engine.Setup(e => e.ReplaceHull(hull)).Callback(() => crewHull = fresh).Returns(fresh);
+        authority.Replace(ship.ShipId);
+        authority.Tick();
+
+        authority.EnlistCrew(agent);
+        engine.Verify(e => e.EnlistCrew(It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        authority.Tick();
+
+        engine.Verify(e => e.EnlistCrew(agent, fresh), Times.Once);
+        engine.Verify(e => e.EnlistCrew(agent, hull), Times.Never);
+    }
+
+    // A departing hull takes its crew out with it; one that died or has no crew hull left is dropped, not retried.
+    [Fact]
+    public void EnlistCrew_NeverEnlistsOnADepartingHull_AndDropsAnAgentWithNoCrewHullLeft()
+    {
+        var (authority, _, engine, _) = Create();
+        var agent = CreateAgent();
+        var departing = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, ShipTestHulls.Create(), null);
+        MissionObject? crewHull = departing.Hull;
+        engine.Setup(e => e.IsAlive(agent)).Returns(true);
+        engine.Setup(e => e.CrewHullOf(agent)).Returns(() => crewHull!);
+        engine.Setup(e => e.ParkHullAgents(departing.Hull)).Returns(Array.Empty<HullSwapAgent>());
+        engine.Setup(e => e.RemoveHull(departing.Hull)).Callback(() => crewHull = null);
+        authority.Remove(new[] { departing }, DepartingCrew.None);
+
+        authority.EnlistCrew(agent);
+        authority.Tick();
+        authority.Tick();
+        crewHull = ShipTestHulls.Create();
+        authority.Tick();
+
+        engine.Verify(e => e.RemoveHull(departing.Hull), Times.Once);
+        engine.Verify(e => e.EnlistCrew(It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {

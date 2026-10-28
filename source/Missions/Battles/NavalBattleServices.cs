@@ -127,6 +127,7 @@ public class NavalBattleServices : INavalBattleServices
             new BattleWaterTimeEstimator());
 
         messageBroker.Subscribe<BattleResultReporting>(Handle_BattleResultReporting);
+        messageBroker.Subscribe<BattleAgentAdopted>(Handle_BattleAgentAdopted);
     }
 
     public IBattleShipReplicator ShipReplicator { get; }
@@ -206,6 +207,11 @@ public class NavalBattleServices : INavalBattleServices
         FateReporter.Flush();
     }
 
+    // [Game thread] Published by the authority migrator as it turns a puppet into this client's AI, which vanilla's off-ship check
+    // runs from the next agent tick on, so the agent is enlisted on its hull right here.
+    private void Handle_BattleAgentAdopted(MessagePayload<BattleAgentAdopted> payload) =>
+        hullAuthority.EnlistCrew(payload.What.Agent);
+
     // Applies what arrived ahead of a result report or the mission end. Outside the mission tick (a result reported from the
     // queue drain or the leave screen) the async agent tick may be running; then nothing waits, and the arrivals stay for the
     // next mission tick, which a continuing mission still runs.
@@ -235,6 +241,7 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.CaptureApplied -= OnCaptureApplied;
 #endif
         messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
+        messageBroker.Unsubscribe<BattleAgentAdopted>(Handle_BattleAgentAdopted);
         DisposeLogged(ShipWeaponReplicator);
         DisposeLogged(ShipDamageRouter);
         DisposeLogged(DeckPoses);

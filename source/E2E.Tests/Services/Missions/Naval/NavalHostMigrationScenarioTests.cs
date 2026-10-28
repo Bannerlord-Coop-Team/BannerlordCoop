@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MapEvents.TroopSupply;
+using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -121,6 +122,29 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
 
         battle.TickAll(2);
         Assert.Equal(new[] { 8, 7 }, pirates.Select(pirate => (int)c.Stream(pirate)["reserve"]!));
+    }
+
+    // R50 F1: vanilla never tracked a puppet on its hull, and no swap re-crews a sunk hull, so its adopted swimmer must become
+    // vanilla's crew of it as it turns AI; otherwise vanilla's off-ship check throws in TransferAgentToShip moving it on.
+    [Fact]
+    public void Migration_EnlistsTheAdoptedCrewOfASunkHull_AsItTurnsAi()
+    {
+        using var battle = StartPirateBattle(out var a, out var b, out _, out var pirates);
+        var sunk = pirates[0];
+        b.Hit(sunk, 150f);
+        a.Tick();
+        battle.TickAll(3);
+        Assert.Equal(BattleShipCondition.Sunk, b.Hull(sunk).SinkingState);
+        var swimmer = b.RegisterAgent(Guid.NewGuid(), "A", b.Mission.DefenderTeam);
+        b.Engine.AssignCrew(swimmer, b.Hull(sunk).Hull);
+
+        battle.MigrateHost(a, "B");
+
+        Assert.Equal(AgentControllerType.AI, swimmer.Controller);
+        Assert.Equal((swimmer, b.Hull(sunk).Hull), Assert.Single(b.Engine.Enlistments));
+        b.Ticks(3);
+        Assert.Single(b.Engine.Enlistments);
+        Assert.True(b.Hull(sunk).IsCopy);
     }
 
     // M6 D1: every copy of an AI hull, and the hull the promoted host swaps in for its copy, keeps the campaign ship id the
