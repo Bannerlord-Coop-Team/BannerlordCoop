@@ -41,6 +41,20 @@ public class NavalScenarioResolverTests
         }
     }
 
+    /// <summary>R53 keeps a successor and an observer in the battle while the original host leaves.</summary>
+    [Fact]
+    public void Migration_StagesThreeClientsWithGracefulHostDeparture()
+    {
+        var clients = new[] { "testclient1", "testclient2", "testclient3" };
+        Assert.True(new NavalScenarioResolver().TryResolve(
+            new[] { "migration", "drop=leave", "delay=120", "weapons=2", "testclient1", "testclient2", "testclient3" },
+            clients, out var config, out var error), error);
+        Assert.Equal(clients, config.ControllerIds);
+        Assert.True(config.GracefulDisconnect);
+        Assert.Equal("testclient1", config.DisconnectingControllerId("testclient1"));
+        Assert.Equal(new[] { "testclient2", "testclient3" }, config.ControllerIds.Where(id => id != config.DisconnectingControllerId("testclient1")));
+    }
+
     [Fact]
     public void Resolve_WithoutIdsTakesTheConnectedPlayersInOrderUpToThePresetMaximum()
     {

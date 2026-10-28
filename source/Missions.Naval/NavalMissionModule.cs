@@ -89,6 +89,12 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalFleetFailCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalWeaponProbe>()
+            .As<INavalWeaponProbe>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalWeaponCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalRollProbe>()
             .As<INavalRollProbe>()
             .InstancePerDependency();
