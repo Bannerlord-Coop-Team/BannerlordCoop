@@ -2,7 +2,6 @@
 using System.Linq;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -164,8 +163,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             encounter._defenderParty = encounter._encounteredParty;
             encounter.PlayerSide = BattleSideEnum.Attacker;
             encounter.EncounterState = PlayerEncounterState.End;
-            encounter.BattleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
-            encounter.BattleSimulation._mapEvent = encounter._mapEvent;
+            encounter.BattleSimulation = new BattleSimulation(null, null);
             encounter.BattleSimulation.IsSimulationFinished = true;
             var mapState = Game.Current.GameStateManager.CreateState<MapState>();
             mapState._battleSimulation = encounter.BattleSimulation;
