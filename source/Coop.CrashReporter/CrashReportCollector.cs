@@ -22,6 +22,7 @@ namespace Coop.CrashReporter
         private readonly CrashReporterOptions options;
         private readonly TimeSpan dumpCompletionTimeout;
         private readonly TimeSpan retryInterval;
+        private readonly TimeSpan dumpDiscoveryTimeout;
         private readonly Func<string, string, bool> tryCopyDumpAttempt;
 
         public CrashReportCollector(CrashReporterOptions options)
@@ -41,7 +42,8 @@ namespace Coop.CrashReporter
             CrashReporterOptions options,
             TimeSpan dumpCompletionTimeout,
             TimeSpan retryInterval,
-            Func<string, string, bool> tryCopyDumpAttempt)
+            Func<string, string, bool> tryCopyDumpAttempt,
+            TimeSpan? dumpDiscoveryTimeout = null)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
 #pragma warning disable CA1512 // ThrowIfLessThanOrEqual is unavailable on .NET Framework 4.7.2.
@@ -55,6 +57,7 @@ namespace Coop.CrashReporter
             this.dumpCompletionTimeout = dumpCompletionTimeout;
             this.retryInterval = retryInterval;
             this.tryCopyDumpAttempt = tryCopyDumpAttempt ?? TryCopyDumpOnce;
+            this.dumpDiscoveryTimeout = dumpDiscoveryTimeout ?? CrashDumpDiscoveryTimeout;
         }
 
         public int Run(Process process)
@@ -72,7 +75,7 @@ namespace Coop.CrashReporter
 
             bool cleanExit = IsCleanExit(exitCode);
             string dumpPath = cleanExit
-                ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
+                ? WaitForMatchingDump(dumpDiscoveryTimeout)
                 : null;
             if (cleanExit && dumpPath == null)
                 return 0;
@@ -87,7 +90,7 @@ namespace Coop.CrashReporter
             string binariesSummary = binaries.Write(manifestPath, out manifestWritten);
 
             if (dumpPath == null)
-                dumpPath = WaitForMatchingDump(CrashDumpDiscoveryTimeout);
+                dumpPath = WaitForMatchingDump(dumpDiscoveryTimeout);
 
             string copiedDumpPath = Path.Combine(reportDirectory, "dump.dmp");
             bool dumpCopied = dumpPath != null &&
@@ -135,6 +138,10 @@ namespace Coop.CrashReporter
                 "rgl_log_" + options.ProcessId.ToString(CultureInfo.InvariantCulture) + ".txt");
             try
             {
+                // A reused pid can leave an earlier game's clean log behind.
+                if (File.GetLastWriteTimeUtc(logPath) < GetProcessStartUtc())
+                    return false;
+
                 using (var stream = new FileStream(
                     logPath,
                     FileMode.Open,
@@ -180,9 +187,7 @@ namespace Coop.CrashReporter
 
         internal string WaitForMatchingDump(TimeSpan initialTimeout)
         {
-            DateTime processStartUtc =
-                new DateTime(options.ProcessStartUtcTicks, DateTimeKind.Utc)
-                    .AddSeconds(-1);
+            DateTime processStartUtc = GetProcessStartUtc();
             var stopwatch = Stopwatch.StartNew();
             do
             {
@@ -206,6 +211,12 @@ namespace Coop.CrashReporter
             while (stopwatch.Elapsed < initialTimeout);
 
             return null;
+        }
+
+        private DateTime GetProcessStartUtc()
+        {
+            return new DateTime(options.ProcessStartUtcTicks, DateTimeKind.Utc)
+                .AddSeconds(-1);
         }
 
         private string CreateReportDirectory()
