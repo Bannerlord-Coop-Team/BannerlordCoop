@@ -36,6 +36,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -46,7 +47,8 @@ internal class FinalizationCoordinator : IHandler
         IPlayerManager playerManager,
         IControllerIdProvider controller,
         IAlternativeSolutionCommitments commitments,
-        IIssueConversationGuard conversationGuard)
+        IIssueConversationGuard conversationGuard,
+        IQuestSolutionAcceptCoordinator acceptCoordinator)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -57,6 +59,7 @@ internal class FinalizationCoordinator : IHandler
         this.controller = controller;
         this.commitments = commitments;
         this.conversationGuard = conversationGuard;
+        this.acceptCoordinator = acceptCoordinator;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -94,7 +97,8 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+            network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log)));
     }
 
     // Client only.
@@ -111,7 +115,8 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+            network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof)));
     }
 
     // Server only.

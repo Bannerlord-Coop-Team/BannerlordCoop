@@ -141,6 +141,9 @@ public class QuestRequestOwnershipTests : IDisposable
         router.AdvanceBy(TimeSpan.FromSeconds(1));
         TestEnvironment.FlushCoalescer();
         Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Collection(scenario.ClientA.NetworkSentMessages.Where(message => message is RequestQuestJournal || message is RequestQuestBranch),
+            message => Assert.Equal("early branch row", Assert.Single(Assert.IsType<RequestQuestJournal>(message).Entries).Text.Value),
+            message => Assert.IsType<RequestQuestBranch>(message));
         Assert.Equal(1, branches.CountFor(scenario.Server));
         scenario.Server.Call(() => Assert.Equal("early branch row",
             Assert.Single(scenario.QuestOf(scenario.Server).JournalEntries).LogText.Value));

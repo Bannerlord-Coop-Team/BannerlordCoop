@@ -75,7 +75,6 @@ internal class MerchantOutlawsProgressHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(id, out var party)) continue;
                 quest._validPartiesList.Add(party);
-
             }
 
             foreach (var id in data.TrackedPartyIds ?? Array.Empty<string>())
@@ -92,7 +91,6 @@ internal class MerchantOutlawsProgressHandler : IHandler
                 notice.SetTextVariable("TOTAL_COUNT", quest._totalPartyCount);
                 MBInformationManager.AddQuickInformation(notice);
             }
-
         }, context: nameof(MerchantOutlawsProgressHandler));
     }
 }
