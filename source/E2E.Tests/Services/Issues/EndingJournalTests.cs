@@ -276,17 +276,22 @@ public class EndingJournalTests : IDisposable
             ownerQuest.RemoveLog(removed);
         });
 
+        using var restartedBroker = new MessageBroker();
+        var serverBroker = scenario.Server.Resolve<IMessageBroker>();
+        Action<MessagePayload<RequestQuestJournal>> forwardJournal = payload => restartedBroker.Publish(payload.Who, payload.What);
         QuestJournalMirrorHandler restarted = null!;
         scenario.Server.Call(() =>
         {
             scenario.Server.Resolve<QuestJournalMirrorHandler>().Dispose();
+            serverBroker.Subscribe(forwardJournal);
             serverQuest._journalEntries.Clear();
             serverQuest._journalEntries.AddRange(loaded);
-            restarted = new QuestJournalMirrorHandler(scenario.Server.Resolve<IMessageBroker>(), scenario.Server.Resolve<INetwork>(),
+            restarted = new QuestJournalMirrorHandler(restartedBroker, scenario.Server.Resolve<INetwork>(),
                 scenario.Server.Resolve<IObjectManager>(), scenario.Server.Resolve<IIssueResolver>(),
                 scenario.Server.Resolve<IIssueOwnershipRegistry>(), scenario.Server.Resolve<IQuestTypeRegistry>(),
                 scenario.Server.Resolve<IControllerIdProvider>(), scenario.Server.Resolve<IPlayerManager>());
-            scenario.Server.Resolve<IMessageBroker>().Publish(this, new CampaignReady());
+            // Only the restarted handler needs startup here, other subscribers require a running engine.
+            restartedBroker.Publish(this, new CampaignReady());
             serverQuest.AddLog(new TextObject("authoritative row written after load"));
         });
         try
@@ -306,7 +311,11 @@ public class EndingJournalTests : IDisposable
         }
         finally
         {
-            scenario.Server.Call(() => restarted.Dispose());
+            scenario.Server.Call(() =>
+            {
+                serverBroker.Unsubscribe(forwardJournal);
+                restarted.Dispose();
+            });
         }
     }
 
