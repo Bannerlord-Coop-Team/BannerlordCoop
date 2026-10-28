@@ -1,9 +1,15 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
+using Common.Messaging;
+using Common.Network;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -227,6 +233,112 @@ public class EndingJournalTests : IDisposable
             Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == serverText.Value);
         });
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Fact]
+    public void RemovedOwnerRowStaysRemovedAfterJournalLoadAndServerHandlerRestart()
+    {
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        JournalLog removed = null!;
+        List<JournalLog> loaded = null!;
+        scenario.ClientA.Call(() =>
+        {
+            ownerQuest.AddLog(new TextObject("retained owner row"));
+            removed = ownerQuest.AddLog(new TextObject("removed while disconnected"));
+        });
+        scenario.Server.Call(() =>
+        {
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(serverQuest.JournalEntries.ToList(), metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("restart_journal", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("restart_journal"), loadAsLateInitialize: true));
+            loaded = Assert.IsType<List<JournalLog>>(load.RootObject);
+            Assert.Equal(2, loaded.Count);
+            Assert.NotSame(serverQuest.JournalEntries[0], loaded[0]);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            // The owner removes this while the server is offline, so it only appears in the next full snapshot.
+            using var replay = new QuestJournalReplay();
+            ownerQuest.RemoveLog(removed);
+        });
+
+        QuestJournalMirrorHandler restarted = null!;
+        scenario.Server.Call(() =>
+        {
+            scenario.Server.Resolve<IEnumerable<IHandler>>().OfType<QuestJournalMirrorHandler>().Single().Dispose();
+            serverQuest._journalEntries.Clear();
+            serverQuest._journalEntries.AddRange(loaded);
+            restarted = new QuestJournalMirrorHandler(scenario.Server.Resolve<IMessageBroker>(), scenario.Server.Resolve<INetwork>(),
+                scenario.Server.Resolve<IObjectManager>(), scenario.Server.Resolve<IIssueResolver>(),
+                scenario.Server.Resolve<IIssueOwnershipRegistry>(), scenario.Server.Resolve<IQuestTypeRegistry>(),
+                scenario.Server.Resolve<IControllerIdProvider>(), scenario.Server.Resolve<IPlayerManager>());
+            scenario.Server.Resolve<IMessageBroker>().Publish(this, new CampaignReady());
+            serverQuest.AddLog(new TextObject("authoritative row written after load"));
+        });
+        try
+        {
+            scenario.ClientA.Call(() => ownerQuest.AddLog(new TextObject("first owner snapshot after restart")));
+            scenario.Server.Call(() =>
+            {
+                Assert.DoesNotContain(serverQuest.JournalEntries, log => log.LogText.Value == "removed while disconnected");
+                Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == "authoritative row written after load");
+                using var owner = OwnerScope();
+                serverQuest.CompleteQuestWithCancel(Ending());
+            });
+            environment.FlushCoalescer();
+            AssertSavedHistoryMatches(ownerQuest, serverQuest);
+            scenario.ClientA.Call(() => Assert.DoesNotContain(ownerQuest.JournalEntries,
+                log => log.LogText.Value == "removed while disconnected"));
+        }
+        finally
+        {
+            scenario.Server.Call(() => restarted.Dispose());
+        }
+    }
+
+    [Fact]
+    public void JournalWrittenBeforeDelayedAcceptReplyIsMirroredWhenOwnershipIsConfirmed()
+    {
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        scenario.AddIssue(giverId, "delayed_journal_issue");
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.SetLatency(scenario.Server.NetPeer, scenario.ClientA.NetPeer, TimeSpan.FromSeconds(1));
+        QuestBase ownerQuest = null!;
+        QuestBase serverQuest = null!;
+        scenario.ClientA.Call(() =>
+        {
+            var giver = scenario.ClientA.GetRegisteredObject<Hero>(giverId);
+            giver.Issue.StartIssueWithQuest();
+            ownerQuest = giver.Issue.IssueQuest;
+            using (new AllowedThread()) ownerQuest.StartQuest();
+            ownerQuest.AddLog(new TextObject("written before the delayed accept reply"));
+            Assert.False(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, giver.Issue.StringId, out _));
+        });
+        scenario.Server.Call(() =>
+        {
+            serverQuest = scenario.Server.GetRegisteredObject<Hero>(giverId).Issue.IssueQuest;
+            Assert.Empty(serverQuest.JournalEntries);
+        });
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            Assert.Equal("written before the delayed accept reply", Assert.Single(serverQuest.JournalEntries).LogText.Value);
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        environment.FlushCoalescer();
         AssertSavedHistoryMatches(ownerQuest, serverQuest);
     }
 
