@@ -1,15 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
-using Common.Network;
-using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
-using Moq;
 using SandBox.ViewModelCollection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -129,7 +125,9 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                     .SetValue(scoreboard, (System.Action)mapState.EndBattleSimulation);
                 var inquiries = new List<InquiryData>();
                 void RecordInquiry(InquiryData inquiry, bool pause, bool prioritize) => inquiries.Add(inquiry);
-                InformationManager.OnShowInquiry += RecordInquiry;
+                // Publicizer exposes both the event and its backing field under the same name.
+                var showInquiry = typeof(InformationManager).GetEvent("OnShowInquiry");
+                showInquiry.AddEventHandler(null, (System.Action<InquiryData, bool, bool>)RecordInquiry);
                 try
                 {
                     simulation.Pause();
@@ -143,7 +141,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 }
                 finally
                 {
-                    InformationManager.OnShowInquiry -= RecordInquiry;
+                    showInquiry.RemoveEventHandler(null, (System.Action<InquiryData, bool, bool>)RecordInquiry);
                 }
             }, MapEventDisabledMethods
                 .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu))));
