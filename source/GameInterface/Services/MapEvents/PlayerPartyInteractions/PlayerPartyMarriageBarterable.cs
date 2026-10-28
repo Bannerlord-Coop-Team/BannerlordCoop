@@ -53,15 +53,18 @@ internal class PlayerPartyMarriageBarterable : Barterable
         return -1;
     }
 
-    // Shows the viewing player the hero from the other clan, like vanilla marriage barters.
-    private Hero DisplayedHero => HeroBeingMarried.Clan == Hero.MainHero?.Clan ? Spouse : HeroBeingMarried;
-
-    // CharacterCode.CreateFrom(character) leaves the colours unset, which draws the clothes in default gray.
     public override ImageIdentifier GetVisualIdentifier()
-    {
-        var character = DisplayedHero.CharacterObject;
-        var mapFaction = DisplayedHero.MapFaction;
+        => CreatePortrait(HeroBeingMarried);
 
+    public ImageIdentifier GetSpouseVisualIdentifier()
+        => CreatePortrait(Spouse);
+
+    private static ImageIdentifier CreatePortrait(Hero hero)
+    {
+        var character = hero.CharacterObject;
+        var mapFaction = hero.MapFaction;
+
+        // CharacterCode.CreateFrom(character) leaves the colours unset, which draws the clothes in default gray.
         return new CharacterImageIdentifier(CharacterCode.CreateFrom(
             character.Equipment?.CalculateEquipmentCode(),
             character.GetBodyProperties(character.Equipment),
@@ -73,8 +76,9 @@ internal class PlayerPartyMarriageBarterable : Barterable
             character.Race));
     }
 
+    // Links the hero from the other clan for the viewing player, like vanilla marriage barters.
     public override string GetEncyclopediaLink()
-        => DisplayedHero.EncyclopediaLink;
+        => (HeroBeingMarried.Clan == Hero.MainHero?.Clan ? Spouse : HeroBeingMarried).EncyclopediaLink;
 
     // Every pair is listed on both sides so either player can propose it; the other side's copy hides once offered.
     public static IEnumerable<(Hero, Hero)> GetMarriageCandidates(PartyBase ownerParty, PartyBase otherParty)

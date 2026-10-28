@@ -85,7 +85,19 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return;
 
         activeBarterVM = barterVM;
+        UseMarriageItemVMs(barterVM.LeftOtherList);
+        UseMarriageItemVMs(barterVM.RightOtherList);
         RefreshBarterControls();
+    }
+
+    // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
+    private static void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (items[i].Barterable is PlayerPartyMarriageBarterable marriage)
+                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, activeBarterVM.OnOfferedAmountChange);
+        }
     }
 
     public static void UpdateAcceptance(bool localAccepted, bool remoteAccepted)
