@@ -3747,6 +3747,7 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var client = Clients.First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        MapEvent completedBattle = null!;
 
         try
         {
@@ -3758,6 +3759,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 // Simulation rounds can't resolve in the test campaign, so the battle is already decided and the
                 // disconnect only has to end the session.
                 Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                completedBattle = mapEvent;
                 mapEvent._battleState = BattleState.AttackerVictory;
 
                 using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
@@ -3773,8 +3775,10 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>()).MapEventId);
             Server.Call(() =>
             {
-                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-                Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
+                Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out _));
+                Assert.True(completedBattle.IsFinalized);
+                Assert.False(completedBattle.BattleObserver is ForwardingBattleObserver);
+                Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
             }, MapEventDisabledMethods);
 
             // The session was forgotten, so a late advance finds nothing to finish again.
