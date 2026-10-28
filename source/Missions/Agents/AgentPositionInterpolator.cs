@@ -410,12 +410,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 _evict.Add(agent);
                 continue;
             }
-            bool deckTeleport = false;
-            if (deck)
-            {
-                deckTeleport = ExceedsSnapDistance(agent, target.Position) && ClaimDeckTeleport(agent, target.UpdateSequence);
-                deckDiagnostics.Sample(agent, pair.Value.Deck.Value, hull, deckTeleport, elapsed);
-            }
+            // A deck puppet snaps at most once per owner update and walks the rest.
+            bool teleport = ExceedsSnapDistance(agent, target.Position)
+                && (!deck || ClaimDeckTeleport(agent, target.UpdateSequence));
+            if (deck) deckDiagnostics.Sample(agent, pair.Value.Deck.Value, hull, teleport, elapsed);
 
             // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
             if (agent.MountAgent != null)
@@ -432,13 +430,10 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             if (LocationPoseLock.IsPointOwned(agent))
                 continue;
 
-            if (deck ? !deckTeleport : !ExceedsSnapDistance(agent, target.Position))
-                MoveTowardTarget(agent, target);
-            else
-            {
-                if (deck) deckDiagnostics.Teleported();
+            if (teleport)
                 Teleport(agent, target);
-            }
+            else
+                MoveTowardTarget(agent, target);
             target.AgentState.Apply(agent);
         }
 

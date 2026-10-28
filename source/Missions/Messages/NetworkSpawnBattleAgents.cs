@@ -90,7 +90,7 @@ public class BattleAgentSpawnData
     [ProtoMember(2)]
     public readonly string CharacterId;
     [ProtoMember(4)]
-    public readonly Vec3 Position;
+    public Vec3 Position { get; private set; }
     [ProtoMember(5)]
     public readonly BattleSideEnum Side;
     [ProtoMember(6)]
@@ -210,5 +210,13 @@ public class BattleAgentSpawnData
         SiegeEquipmentGrant = siegeEquipmentGrant;
         SiegeEquipmentGrantRevision = siegeEquipmentGrantRevision;
         ShipId = shipId;
+    }
+
+    /// <summary>This record with another spawn position and every other field kept.</summary>
+    public BattleAgentSpawnData WithPosition(Vec3 position)
+    {
+        var moved = (BattleAgentSpawnData)MemberwiseClone();
+        moved.Position = position;
+        return moved;
     }
 }

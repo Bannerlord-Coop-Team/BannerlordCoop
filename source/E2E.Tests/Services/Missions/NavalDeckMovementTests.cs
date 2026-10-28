@@ -305,7 +305,9 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
 
             Assert.Equal(1, afterOneUpdate);
             Assert.Equal(2, receiver.Mirror.TeleportToPositionCalls);
-            Assert.Equal(2, (long)receiver.Deck["interpolator"]!["deckTeleports"]!);
+            // The first snap lands the new placement; only the second corrects drift on a deck already followed (R50 F3).
+            Assert.Equal(1, (long)receiver.Deck["interpolator"]!["deckPlacementTeleports"]!);
+            Assert.Equal(1, (long)receiver.Deck["interpolator"]!["deckTeleports"]!);
         });
     }
 

@@ -18,7 +18,7 @@ internal sealed class NavalDeckDiagnostics
     private readonly NavalDeckErrorMetric error = new NavalDeckErrorMetric();
     // Puppets whose target moved onto a new deck since their last deck error sample.
     private readonly HashSet<Agent> placements = new HashSet<Agent>();
-    private long targetsSet, transitions, ticks, evictions, teleports;
+    private long targetsSet, transitions, ticks, evictions, teleports, placementTeleports;
 #if DEBUG
     // DEBUG: an error past this is no lag but a pose read against the wrong hull or a parked agent (R41b, 206 to 561 m).
     private const float LargeErrorMetres = 20f;
@@ -35,7 +35,7 @@ internal sealed class NavalDeckDiagnostics
     /// <summary>Starts over for a new battle.</summary>
     public void Reset()
     {
-        targetsSet = transitions = ticks = evictions = teleports = 0;
+        targetsSet = transitions = ticks = evictions = teleports = placementTeleports = 0;
         error.Reset();
         Clear();
     }
@@ -69,21 +69,26 @@ internal sealed class NavalDeckDiagnostics
     /// <summary>Counts a deck target replaced by a world or mounted one.</summary>
     public void LeftDeck() => transitions++;
 
-    /// <summary>Samples the deck error of one tick; a teleport's or a new placement's sample still measures the old spot, so it
-    /// only counts as skipped.</summary>
+    /// <summary>Samples one tick's deck error and counts its teleport; a teleport's or a new placement's sample still measures
+    /// the old spot, so it only counts as skipped.</summary>
     public void Sample(Agent agent, NavalDeckTarget deck, in MatrixFrame hull, bool teleporting, float elapsed)
     {
         ticks++;
         float sample = deck.HorizontalError(hull, agent.Position);
         bool placement = placements.Remove(agent);
         error.Record(sample, placement || teleporting);
+        if (teleporting) CountTeleport(placement);
 #if DEBUG
         LogLargeError(agent, deck, hull, sample, elapsed);
 #endif
     }
 
-    /// <summary>Counts a deck puppet teleported to its target.</summary>
-    public void Teleported() => teleports++;
+    // A snap onto a new placement (a spawn or another hull) is expected; one on a deck already followed is a drift correction.
+    private void CountTeleport(bool placement)
+    {
+        if (placement) placementTeleports++;
+        else teleports++;
+    }
 
     /// <summary>Counts a deck puppet whose hull stopped resolving.</summary>
     public void Evicted() => evictions++;
@@ -92,9 +97,11 @@ internal sealed class NavalDeckDiagnostics
     public object Inspect(int tracked) => new
     {
         tracked, deckTargetsSet = targetsSet, deckTransitions = transitions, deckTicks = ticks, deckEvictions = evictions,
-        deckTeleports = teleports, lastDeckError = error.Last, maxDeckError = error.Max, deckSamplesSkipped = error.Skipped,
+        deckTeleports = teleports, deckPlacementTeleports = placementTeleports, lastDeckError = error.Last,
+        maxDeckError = error.Max, deckSamplesSkipped = error.Skipped,
         measurement = "Horizontal puppet-to-target error in the current follower hull frame, sampled before each native target write; " +
-            "a teleport's or a new deck placement's sample is skipped (deckSamplesSkipped), the puppet is still at its old spot then."
+            "a teleport's or a new deck placement's sample is skipped (deckSamplesSkipped), the puppet is still at its old spot then. " +
+            "deckTeleports counts drift snaps on a deck already followed; deckPlacementTeleports counts snaps onto a new placement."
     };
 
 #if DEBUG
