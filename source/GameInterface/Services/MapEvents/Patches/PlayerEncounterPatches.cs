@@ -115,6 +115,8 @@ internal class PlayerEncounterPatches
             return false;
         }
 
+        RetargetFriendlySiegeToCamp(__instance);
+
         if (!ContainerProvider.TryResolve<MapEventCreationCoordinator>(out var coordinator))
         {
             Logger.Error("Unable to resolve {Coordinator}; aborting client battle start", nameof(MapEventCreationCoordinator));
@@ -155,6 +157,19 @@ internal class PlayerEncounterPatches
         __instance._mapEvent = mapEvent;
         __result = mapEvent;
         return false;
+    }
+
+    // "Assault the siege camp" restarts the encounter onto the camp leader, but on a client that restart waits for
+    // server approval, so the encounter menu starts the battle against the settlement itself. Against a settlement
+    // the player is not at war with that would be a siege assault with the player leading the besiegers.
+    private static void RetargetFriendlySiegeToCamp(PlayerEncounter encounter)
+    {
+        var settlement = encounter._defenderParty?.Settlement;
+        var campLeader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        if (campLeader == null || campLeader.MapEvent != null) return;
+        if (encounter._attackerParty.MapFaction.IsAtWarWith(settlement.MapFaction)) return;
+
+        encounter.SetupFields(encounter._attackerParty, campLeader.Party);
     }
 
     private static void QueueRejectedEncounterRecovery(PlayerEncounter rejectedEncounter)
