@@ -1,8 +1,9 @@
-﻿using Common;
+﻿﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network.Messages;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -11,6 +12,7 @@ using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
@@ -30,6 +32,7 @@ internal class ActiveIssueDismisser : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IIssueDismisser issueDismisser;
+    private readonly IIssueOwnerResolver ownerResolver;
 
     public ActiveIssueDismisser(
         IMessageBroker messageBroker,
@@ -37,7 +40,8 @@ internal class ActiveIssueDismisser : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IIssueDismisser issueDismisser)
+        IIssueDismisser issueDismisser,
+        IIssueOwnerResolver ownerResolver)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
@@ -45,6 +49,7 @@ internal class ActiveIssueDismisser : IHandler
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.issueDismisser = issueDismisser;
+        this.ownerResolver = ownerResolver;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -144,6 +149,20 @@ internal class ActiveIssueDismisser : IHandler
     private void DismissQuest(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
+
+        var quest = issue.IssueQuest;
+        var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
+        if (journals != null && ownerResolver.TryResolveOwnerHero(issue, out var owner))
+        {
+            // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                if (quest != null)
+                    journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
+                else if (issue.IsSolvingWithLordSolution)
+                    journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
+            }
+        }
 
         issueDismisser.Dismiss(issue);
 
