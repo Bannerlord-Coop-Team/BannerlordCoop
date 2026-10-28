@@ -529,7 +529,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        // Leave must not reuse battle references whose party sides were already removed.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
         encounter.EncounterState = PlayerEncounterState.Begin;
         GameMenu.SwitchToMenu("encounter");
         return true;
