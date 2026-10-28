@@ -27,14 +27,20 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IMessageBroker messageBroker;
 
-    public PlayerEncounterInterface() : this(null)
+    public PlayerEncounterInterface() : this(null, null)
     {
     }
 
-    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface) : this(siegeEventInterface, null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface, IMessageBroker messageBroker)
     {
         this.siegeEventInterface = siegeEventInterface;
+        this.messageBroker = messageBroker;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -130,7 +136,8 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {
         var mapEvent = playerEncounter._mapEvent;
-        var continueRaid = mapEvent?.IsRaidHostileAction() == true &&
+        var continueRaid = playerEncounter.BattleSimulation != null &&
+            mapEvent?.IsRaidHostileAction() == true &&
             mapEvent.WinningSide == BattleSideEnum.Attacker &&
             playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
             playerEncounter._attackerParty == PartyBase.MainParty &&
@@ -151,15 +158,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         if (!continueRaid || settlement == null)
             return;
-        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
-            messageBroker = MessageBroker.Instance;
+        var broker = messageBroker ?? MessageBroker.Instance;
 
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
         // approval creates the next raid through the authoritative server path.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
         PlayerEncounter.Current.ForceRaid = true;
-        messageBroker.Publish(this, new VillageHostileActionAttempted(
+        broker.Publish(this, new VillageHostileActionAttempted(
             VillageHostileAction.Raid,
             MobileParty.MainParty,
             settlement));

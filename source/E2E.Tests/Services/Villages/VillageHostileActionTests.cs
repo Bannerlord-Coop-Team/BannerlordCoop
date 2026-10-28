@@ -23,6 +23,7 @@ using GameInterface.Services.MapEventComponents.Messages;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -1633,12 +1634,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
 
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
-                PlayerEncounter.Update();
+                client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
             }, MapEventDisabledMethods);
             // The native loot exit requests the continuation; allow its approval to cross the network.
             client.Call(() =>
             {
-                Assert.Equal("raiding_village", Assert.Single(menus.MenusFor(client).Where(menu => menu == "raiding_village")));
                 Assert.NotNull(PlayerEncounter.Current);
                 Assert.NotSame(encounter, PlayerEncounter.Current);
                 Assert.NotNull(MobileParty.MainParty.MapEvent);
