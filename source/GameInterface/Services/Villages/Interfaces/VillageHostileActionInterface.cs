@@ -278,7 +278,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
         }
 
-        if (settlement.Village.VillageState != Village.VillageStates.Normal)
+        bool continuingRaid = action == VillageHostileAction.Raid &&
+            settlement.Village.VillageState == Village.VillageStates.BeingRaided &&
+            settlement.SettlementHitPoints > 0f;
+        if (settlement.Village.VillageState != Village.VillageStates.Normal && !continuingRaid)
         {
             reason = VillageHostileActionDeniedReason.InvalidVillageState;
             return false;

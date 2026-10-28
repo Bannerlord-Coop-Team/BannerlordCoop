@@ -1620,6 +1620,10 @@ public class VillageHostileActionTests : MapEventTestBase
 
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
                 PlayerEncounter.Update();
+            }, MapEventDisabledMethods);
+            // The native loot exit requests the continuation; allow its approval to cross the network.
+            client.Call(() =>
+            {
                 Assert.Equal("raiding_village", Assert.Single(menus.MenusFor(client).Where(menu => menu == "raiding_village")));
                 Assert.NotNull(PlayerEncounter.Current);
                 Assert.NotSame(encounter, PlayerEncounter.Current);
@@ -4897,6 +4901,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEventId!,
             raiderMobilePartyId,
             raiderPartyId,
+            target.SettlementId,
             target.OwnerFactionId);
     }
 
@@ -4941,6 +4946,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEventId!,
             raiderMobilePartyId,
             raiderPartyId,
+            target.SettlementId,
             target.OwnerFactionId);
     }
 
@@ -4996,5 +5002,6 @@ public class VillageHostileActionTests : MapEventTestBase
         string MapEventId,
         string AttackerMobilePartyId,
         string AttackerPartyId,
+        string SettlementId,
         string OwnerFactionId);
 }

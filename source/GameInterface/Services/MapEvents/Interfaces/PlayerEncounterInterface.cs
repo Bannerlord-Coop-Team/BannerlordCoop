@@ -1,6 +1,10 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.Villages.Data;
+using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
@@ -22,14 +26,16 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IMessageBroker messageBroker;
 
-    public PlayerEncounterInterface() : this(null)
+    public PlayerEncounterInterface() : this(null, null)
     {
     }
 
-    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface, IMessageBroker messageBroker = null)
     {
         this.siegeEventInterface = siegeEventInterface;
+        this.messageBroker = messageBroker;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -124,7 +130,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {
-        //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
+        var mapEvent = playerEncounter._mapEvent;
+        var continueRaid = mapEvent?.IsRaidHostileAction() == true &&
+            mapEvent.WinningSide == BattleSideEnum.Attacker &&
+            playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
+            mapEvent.MapEventSettlement?.IsVillage == true &&
+            mapEvent.MapEventSettlement.SettlementHitPoints > 0f;
+        var settlement = continueRaid ? mapEvent.MapEventSettlement : null;
+
         playerEncounter._stateHandled = true;
 
         // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd
@@ -133,5 +146,17 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             return;
 
         PlayerEncounter.Finish(true);
+
+        if (!continueRaid || settlement == null || messageBroker == null)
+            return;
+
+        // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
+        // approval creates the next raid through the authoritative server path.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlement.Party, settlement);
+        messageBroker.Publish(this, new VillageHostileActionAttempted(
+            VillageHostileAction.Raid,
+            MobileParty.MainParty,
+            settlement));
     }
 }
