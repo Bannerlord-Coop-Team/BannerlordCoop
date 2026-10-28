@@ -16,5 +16,4 @@ public interface IQuestTypeDescriptor
 
     // Null if the quest has no outcome branch that needs to be told apart
     [CanBeNull] IFinalizationProofStrategy FinalizationProofStrategy { get; }
-
 }
