@@ -1,11 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Helpers;
+using Missions.Messages;
 using SandBox.Missions.MissionLogics;
 using Serilog;
 using System.Collections.Generic;
@@ -45,17 +47,20 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly INetwork network;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.network = network;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -68,7 +73,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         }
 
         // MissionCombatantsLogic.EarlyStart throws on a side with no combatant, and the loading screen then retries
-        // forever. Refusing turns that into a logged failure; recovering the join is left to the caller.
+        // forever. Refusing turns that into a logged failure and tells the server, so the join it reserved for this
+        // client does not hold the battle's conclusion until it expires. Reopening later is left to the caller.
         var sideWithoutCombatant = FindSideWithoutCombatant(mapEvent);
         if (sideWithoutCombatant != BattleSideEnum.None)
         {
@@ -76,6 +82,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 "(local side {LocalSide}, defender parties {DefenderParties}, attacker parties {AttackerParties})",
                 mapEventId, sideWithoutCombatant, PartyBase.MainParty?.Side,
                 mapEvent.DefenderSide.Parties.Count, mapEvent.AttackerSide.Parties.Count);
+            network.SendAll(new NetworkFieldBattleOpenRefused(mapEventId));
             return null;
         }
 

@@ -59,6 +59,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Subscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Subscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
+        messageBroker.Subscribe<NetworkFieldBattleOpenRefused>(Handle_NetworkFieldBattleOpenRefused);
         messageBroker.Subscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -73,6 +74,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Unsubscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Unsubscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
+        messageBroker.Unsubscribe<NetworkFieldBattleOpenRefused>(Handle_NetworkFieldBattleOpenRefused);
         messageBroker.Unsubscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -270,6 +272,33 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
+    // A client that refused to open the field battle will not enter it, so its join no longer holds the conclusion.
+    private void Handle_NetworkFieldBattleOpenRefused(MessagePayload<NetworkFieldBattleOpenRefused> payload)
+    {
+        var mapEventId = payload.What.MapEventId;
+        if (payload.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId))
+        {
+            Logger.Warning("Ignoring refused field battle open for {Instance}: sender is not a current player", mapEventId);
+            return;
+        }
+
+        RunSerialized(() =>
+        {
+            int released = RemovePeerReservations(mapEventId, controllerId, peer);
+            if (released == 0)
+            {
+                // The reservation already expired or the player entered, so there is nothing left to release.
+                Logger.Information("Refused field battle open from {Controller} for {Instance} had no pending join to release",
+                    controllerId, mapEventId);
+                return;
+            }
+
+            Logger.Information("Released {Count} pending join(s) for {Controller} in {Instance}: the client refused to open the field battle",
+                released, controllerId, mapEventId);
+            TryConcludeReportedBattle(mapEventId);
+        });
+    }
+
     private void Handle_MissionMemberEntered(MessagePayload<MissionMemberEntered> payload)
     {
         var entry = payload.What;
@@ -448,6 +477,28 @@ public class ServerBattleCompletionHandler : IHandler
 
             if (joiners.Count == 0)
                 pendingJoiners.Remove(instanceId);
+        }
+    }
+
+    // Only reservations made through the sending peer, so a refusal never releases a join another connection holds.
+    private int RemovePeerReservations(string instanceId, string controllerId, NetPeer peer)
+    {
+        lock (pendingJoinersGate)
+        {
+            if (!pendingJoiners.TryGetValue(instanceId, out var joiners))
+                return 0;
+
+            var peerReservations = joiners
+                .Where(entry => entry.Value.ControllerId == controllerId && ReferenceEquals(entry.Value.Peer, peer))
+                .Select(entry => entry.Key)
+                .ToList();
+            foreach (var reservationId in peerReservations)
+                joiners.Remove(reservationId);
+
+            if (joiners.Count == 0)
+                pendingJoiners.Remove(instanceId);
+
+            return peerReservations.Count;
         }
     }
 
