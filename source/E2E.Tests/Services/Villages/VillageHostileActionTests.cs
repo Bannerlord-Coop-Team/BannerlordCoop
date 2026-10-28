@@ -1546,8 +1546,8 @@ public class VillageHostileActionTests : MapEventTestBase
     public void CompletedRaidSimulation_AfterPartyAndLootDone_ResumesRaiding()
     {
         var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
         var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.Raid);
+        RegisterPeer(client, "PlayerOne");
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         EnableHeadlessEncounterFinish(client);
