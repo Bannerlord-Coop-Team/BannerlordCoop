@@ -7,6 +7,7 @@ using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Utils.Commands;
 using Helpers;
 using SandBox.CampaignBehaviors;
 using SandBox.Conversation.MissionLogics;
@@ -42,6 +43,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitFixtureStartCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitFixtureStartCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_fixture_start";
@@ -52,9 +60,9 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
-            new ExpectedArgs("hero_registry_id", "The registered owner hero id."),
+            new ExpectedArgs("hero_registry_id", "Owner hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -62,12 +70,12 @@ public class AlleyRecruitDebugCommand
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
             if (fixture != null) return Failed("The alley recruit fixture is already active.");
 
-            if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out var error)) return Failed(error);
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
                 !ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
                 !ContainerProvider.TryResolve<INetwork>(out var network))
                 return Failed("Unable to resolve the alley recruit fixture services.");
-            if (!objectManager.TryGetObjectWithLogging<Hero>(args[2], out var owner)) return Failed($"Hero '{args[2]}' not found.");
+            if (!resolver.TryResolveHero(args[2], out var owner, out var ownerError)) return Failed(ownerError);
             if (owner.PartyBelongedTo == null) return Failed($"Hero '{args[2]}' has no party.");
             if (!objectManager.TryGetIdWithLogging(alley, out var alleyId) ||
                 !objectManager.TryGetIdWithLogging(owner, out var ownerId) ||
@@ -102,7 +110,7 @@ public class AlleyRecruitDebugCommand
                     managementData.LastRecruitTimeTicks));
                 network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
 
-                return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={args[0]} alley={args[1]} " +
+                return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={alley.Settlement.StringId} alley={args[1]} " +
                        $"owner={owner.StringId} party={owner.PartyBelongedTo.StringId} " +
                        $"originalOwner={fixture.OriginalOwner?.StringId ?? "none"} " +
                        $"originalRosterEntries={fixture.MemberRoster.Length}");
@@ -140,6 +148,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitRosterCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitRosterCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_roster";
@@ -150,21 +165,19 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_registry_id", "The registered hero id."),
+            new ExpectedArgs("hero_registry_id", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve IObjectManager.");
-            if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var hero))
-                return Failed($"Hero '{args[0]}' not found.");
+            if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
+                return Failed(heroError);
             if (hero.PartyBelongedTo == null) return Failed($"Hero '{args[0]}' has no party.");
 
             var roster = hero.PartyBelongedTo.MemberRoster;
             var result = new StringBuilder();
             result.AppendLine(
-                $"ALLEY_RECRUIT_ROSTER hero={hero.StringId} registry={args[0]} " +
+                $"ALLEY_RECRUIT_ROSTER hero={hero.StringId} registry={resolver.DisplayId(hero)} " +
                 $"party={hero.PartyBelongedTo.StringId} total={roster.TotalManCount}");
             for (var index = 0; index < roster.Count; index++)
             {
@@ -179,6 +192,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitFixtureRestoreCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitFixtureRestoreCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_fixture_restore";
@@ -189,7 +209,7 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "An optional extra character id to reset.", false),
+            new ExpectedArgs("character_id", "An optional extra character name or id to reset; quote names with spaces.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -212,8 +232,8 @@ public class AlleyRecruitDebugCommand
                     .ToList();
                 foreach (var characterId in args)
                 {
-                    if (!objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character))
-                        return Failed($"Character '{characterId}' not found.");
+                    if (!resolver.TryResolveCharacterObject(characterId, out var character, out var characterError))
+                        return Failed(characterError);
                     charactersToReset.Add(character);
                 }
 
@@ -407,6 +427,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitOverseerStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitOverseerStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_overseer_state";
@@ -417,14 +444,14 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Run this command on the owning client.");
-            if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out var error)) return Failed(error);
             if (Mission.Current == null) return Succeeded("ALLEY_RECRUIT_OVERSEER_STATE mission=False present=False");
 
             var behavior = Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
@@ -441,6 +468,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitConversationStartCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitConversationStartCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_conversation_start";
@@ -451,14 +485,14 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlement_id", "The settlement StringId."),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("alley_index", "The zero-based alley index."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Run this command on the owning client.");
-            if (!TryGetAlley(args[0], args[1], out var alley, out var error)) return Failed(error);
+            if (!TryGetAlley(resolver, args[0], args[1], out var alley, out var error)) return Failed(error);
             if (Mission.Current == null) return Failed("Enter the alley location before starting the conversation.");
 
             var behavior = Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
@@ -575,6 +609,13 @@ public class AlleyRecruitDebugCommand
 
     public sealed class AlleyRecruitStartLooterBattleCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AlleyRecruitStartLooterBattleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.alley";
 
         public string Name => "recruit_start_looter_battle";
@@ -585,16 +626,14 @@ public class AlleyRecruitDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_registry_id", "The registered fixture-owner hero id."),
+            new ExpectedArgs("hero_registry_id", "Fixture-owner hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve IObjectManager.");
-            if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var owner))
-                return Failed($"Hero '{args[0]}' not found.");
+            if (!resolver.TryResolveHero(args[0], out var owner, out var ownerError))
+                return Failed(ownerError);
             var playerParty = owner.PartyBelongedTo;
             if (playerParty == null || playerParty.MapEvent != null)
                 return Failed("The fixture owner must lead a party outside a map event.");
@@ -628,16 +667,13 @@ public class AlleyRecruitDebugCommand
         inventoryLogic.InitialEquipmentCharacter = character;
     }
 
-    private static bool TryGetAlley(string settlementId, string indexArg, out Alley alley, out string error)
+    // Resolves a settlement by name or id plus a numeric alley index to an alley, with a ready-to-show error on failure.
+    private static bool TryGetAlley(ICommandObjectResolver resolver, string settlementId, string indexArg, out Alley alley, out string error)
     {
         alley = null;
-        error = null;
-        var settlement = Settlement.Find(settlementId);
-        if (settlement == null)
-        {
-            error = $"Settlement with id '{settlementId}' not found.";
+        if (!resolver.TryResolveSettlement(settlementId, out var settlement, out error))
             return false;
-        }
+
         if (!int.TryParse(indexArg, out var index) ||
             settlement.Alleys == null ||
             index < 0 ||

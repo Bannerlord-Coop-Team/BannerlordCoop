@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -10,10 +11,12 @@ public readonly struct QuestOutcomeRequested : IEvent
 {
     public readonly QuestBase Quest;
     public readonly IssueOutcome Outcome;
+    public readonly TextObject Log;
 
-    public QuestOutcomeRequested(QuestBase quest, IssueOutcome outcome)
+    public QuestOutcomeRequested(QuestBase quest, IssueOutcome outcome, TextObject log = null)
     {
         Quest = quest;
         Outcome = outcome;
+        Log = log;
     }
 }

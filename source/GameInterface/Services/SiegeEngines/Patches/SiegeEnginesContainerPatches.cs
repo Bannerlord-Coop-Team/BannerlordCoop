@@ -30,9 +30,9 @@ internal class SiegeEnginesContainerPatches
 
         if (ModInformation.IsClient)
         {
-            // The map production popup is the only client caller; route the build order to the server.
-            // The progress object the popup made locally is an unregistered ghost, so the request
-            // carries the engine type and the server does its own reserve-lookup-or-create.
+            // No native client caller reaches this (DoSiegeAction is server-only, MapSiegeProductionPatches routes the popup);
+            // kept so a future caller routes instead of deploying a locally made, unregistered ghost. The request carries
+            // the engine type and the server does its own reserve-lookup-or-create.
             if (!TryDescribeContainer(__instance, out var siegeEvent, out var side))
             {
                 Logger.Error("Client tried to deploy a siege engine on a container outside its own siege");
@@ -85,8 +85,8 @@ internal class SiegeEnginesContainerPatches
         return true;
     }
 
-    // The container has no back-reference to its siege or side; on a client the only native caller is
-    // the local player's production popup, so the player's own siege identifies it.
+    // The container has no back-reference to its siege or side; a client only touches its own siege's containers,
+    // so the player's siege identifies it.
     private static bool TryDescribeContainer(SiegeEnginesContainer container, out SiegeEvent siegeEvent, out BattleSideEnum side)
     {
         siegeEvent = PlayerSiege.PlayerSiegeEvent;

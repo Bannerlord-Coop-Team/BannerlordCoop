@@ -1,6 +1,7 @@
 ﻿using Common.Commands;
 using Autofac;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -148,15 +149,18 @@ public class BesiegerCampDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
-            new ExpectedArgs("strategyId", "The strategy id."),
+            new ExpectedArgs("strategyId", "Siege strategy name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SetBesiegerCampSiegeStrategyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            string getPossibleStragegyIds() => string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
-            string idTipMsg = $"{Environment.NewLine}SiegeStrategy Id must be one of the following:{getPossibleStragegyIds()}";
-
-
             string besiegerCampId = args[0];
             string strategyId = args[1];
 
@@ -170,11 +174,15 @@ public class BesiegerCampDebugCommand
                 return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
             }
 
-            // Attempt to create or retrieve the SiegeStrategy based on the strategyId
+            // The case-insensitive StringId match is tried first so existing usage keeps working, then the resolver handles names
             SiegeStrategy siegeStrategy = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, strategyId, StringComparison.OrdinalIgnoreCase));
-            if (siegeStrategy == null)
+            if (siegeStrategy == null && !resolver.TryResolve(strategyId, SiegeStrategy.All, s => s.Name?.ToString(), out siegeStrategy, out var error))
             {
-                return Failed($"Invalid SiegeStrategy ID :'{strategyId}'{idTipMsg}");
+                if (resolver.IsAmbiguous(error))
+                    return Failed(error);
+
+                var possibleIds = string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
+                return Failed($"{error}{Environment.NewLine}SiegeStrategy Id must be one of the following:{possibleIds}");
             }
 
             // Assign the strategy to the besieger camp
@@ -204,14 +212,20 @@ public class BesiegerCampDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
-            new ExpectedArgs("partyId", "The party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SetBesiegerCampLeaderPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
             string besiegerCampId = args[0];
-            string partyId = args[1];
 
             if (TryGetObjectManager(out var objectManager) == false)
             {
@@ -223,9 +237,9 @@ public class BesiegerCampDebugCommand
                 return Failed($"{nameof(BesiegerCamp)} with ID: '{besiegerCampId}' not found");
             }
 
-            if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
+            if (!resolver.TryResolveMobileParty(args[1], out var party, out var error))
             {
-                return Failed($"{nameof(MobileParty)} with ID: '{partyId}' not found");
+                return Failed(error);
             }
 
             besiegerCamp._leaderParty = party;
@@ -254,14 +268,20 @@ public class BesiegerCampDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
-            new ExpectedArgs("partyId", "The party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public AddPartyToBesiegerCampCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
             string besiegerCampId = args[0];
-            string partyId = args[1];
 
             if (!TryGetObjectManager(out var objectManager))
             {
@@ -273,13 +293,14 @@ public class BesiegerCampDebugCommand
                 return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
             }
 
-            if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+            if (!resolver.TryResolveMobileParty(args[1], out var mobileParty, out var error))
             {
-                return Failed($"MobileParty with ID: '{partyId}' not found");
+                return Failed(error);
             }
 
             besiegerCamp._besiegerParties.Add(mobileParty);
 
+            var partyId = resolver.DisplayId(mobileParty);
             return Succeeded($"MobileParty {partyId} added to BesiegerCamp {besiegerCampId}");
 
         }
@@ -304,14 +325,20 @@ public class BesiegerCampDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
-            new ExpectedArgs("partyId", "The party id."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public RemovePartyFromBesiegerCampCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
             string besiegerCampId = args[0];
-            string partyId = args[1];
 
             if (!TryGetObjectManager(out var objectManager))
             {
@@ -323,10 +350,12 @@ public class BesiegerCampDebugCommand
                 return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
             }
 
-            if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+            if (!resolver.TryResolveMobileParty(args[1], out var mobileParty, out var error))
             {
-                return Failed($"MobileParty with ID: '{partyId}' not found");
+                return Failed(error);
             }
+
+            var partyId = resolver.DisplayId(mobileParty);
 
             if (!besiegerCamp._besiegerParties.Remove(mobileParty))
             {

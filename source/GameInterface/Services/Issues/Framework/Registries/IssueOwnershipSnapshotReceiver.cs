@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Finalization;
+using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using System.Linq;
@@ -15,11 +17,16 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueResolver resolver;
+    private readonly IControllerIdProvider controller;
 
-    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership)
+    public IssueOwnershipSnapshotReceiver(IMessageBroker messageBroker, IIssueOwnershipRegistry ownership,
+        IIssueResolver resolver, IControllerIdProvider controller)
     {
         this.messageBroker = messageBroker;
         this.ownership = ownership;
+        this.resolver = resolver;
+        this.controller = controller;
 
         messageBroker.Subscribe<NetworkIssueOwnershipSnapshot>(Handle_NetworkIssueOwnershipSnapshot);
     }
@@ -36,7 +43,12 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             return;
         }
 
-        var owners = payload.What.Owners ?? Array.Empty<IssueOwnershipData>();
+        GameThread.RunSafe(() => Apply(payload.What), context: nameof(IssueOwnershipSnapshotReceiver));
+    }
+
+    private void Apply(NetworkIssueOwnershipSnapshot snapshot)
+    {
+        var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
         foreach (var remembered in ownership.GetAll()
                      .Where(remembered => !owners.Any(owner =>
                          owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId)))
@@ -47,14 +59,15 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
                 remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel));
         }
 
-        // Clear every remembered controller before applying the authoritative snapshot. TrySetOwner is
-        // first-wins by design for accept races, so it cannot replace a controller during a reconnect.
+        // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
         foreach (var remembered in ownership.GetAll())
             ownership.Remove(remembered.IssueOwnerId);
 
         foreach (var owner in owners)
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
+            if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))
+                issue.IsTriedToSolveBefore = owner.ControllerId == controller.ControllerId;
         }
     }
 }

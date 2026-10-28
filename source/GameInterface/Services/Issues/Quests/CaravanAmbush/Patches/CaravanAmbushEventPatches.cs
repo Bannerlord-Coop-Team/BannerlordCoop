@@ -12,6 +12,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.Carava
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class CaravanAmbushEventPatches
 {

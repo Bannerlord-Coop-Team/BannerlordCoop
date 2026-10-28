@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Bandits.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
@@ -288,7 +289,11 @@ internal class BanditInteractionsHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
                 messageBroker.Publish(this, new BanditPartyRecruitedByPlayer(mobileParty, mainParty));
-                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
+                // Recruitment listeners need the player from this encounter on the dedicated server.
+                using (new MainHeroSubstitutionScope(mainParty.LeaderHero, mainParty))
+                {
+                    CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
+                }
                 DestroyPartyAction.Apply(mainParty.Party, mobileParty);
             }
         });

@@ -1,6 +1,7 @@
 ﻿using Common.Network;
 using Common.Tests.Utils;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Settlements.Handlers;
 using Moq;
 using Xunit;
@@ -14,7 +15,8 @@ public class SettlementHandlerTests
     public void Dispose_RemovesAllHandlers()
     {
         var broker = new TestMessageBroker();
-        var handler = new SettlementHandler(broker, new Mock<INetwork>().Object, new Mock<IObjectManager>().Object);
+        var handler = new SettlementHandler(broker, new Mock<INetwork>().Object, new Mock<IObjectManager>().Object,
+            new Mock<IEncounterMenuConditionRefresher>().Object);
 
         Assert.True(broker.GetTotalSubscribers() > 0);
 
@@ -29,9 +31,10 @@ public class SettlementHandlerTests
         var broker = new TestMessageBroker();
         var network = new Mock<INetwork>().Object;
         var objectManager = new Mock<IObjectManager>().Object;
-        var first = new SettlementHandler(broker, network, objectManager);
+        var refresher = new Mock<IEncounterMenuConditionRefresher>().Object;
+        var first = new SettlementHandler(broker, network, objectManager, refresher);
         int handlerSubscribers = broker.GetTotalSubscribers();
-        var second = new SettlementHandler(broker, network, objectManager);
+        var second = new SettlementHandler(broker, network, objectManager, refresher);
 
         first.Dispose();
 

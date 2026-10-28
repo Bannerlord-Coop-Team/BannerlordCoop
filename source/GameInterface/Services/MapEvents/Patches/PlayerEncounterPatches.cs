@@ -258,7 +258,6 @@ internal class PlayerEncounterPatches
 
         // Preserve vanilla's local pending state so a delayed server response cannot enqueue duplicate surrender requests.
         if (__instance._playerSurrender) return false;
-        __instance._playerSurrender = true;
 
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
@@ -267,11 +266,44 @@ internal class PlayerEncounterPatches
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
 
-        var message = new PlayerSurrendered(PlayerEncounter.Current._mapEvent, MobileParty.MainParty);
+        // Latching before the request can be sent would leave Surrender dead for the rest of the encounter.
+        if (!IsSurrenderRequestReady(__instance))
+        {
+            Logger.Warning("Surrender clicked before the server's map event reached this client; request not sent");
+            return false;
+        }
+
+        __instance._playerSurrender = true;
+
+        var message = new PlayerSurrendered(GetSurrenderMapEvent(__instance), MobileParty.MainParty);
 
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    /// <summary>
+    /// The map event a surrender asks the server to resolve: the encounter's own, or the main party's when the
+    /// encounter has not adopted it yet (vanilla's UpdateInternal and InitAux adopt MapEvent.PlayerMapEvent the
+    /// same way; <see cref="EncounterMenuConditionRefresher"/> reruns that init when the event lands late).
+    /// </summary>
+    internal static MapEvent GetSurrenderMapEvent(PlayerEncounter encounter)
+        => encounter?._mapEvent ?? MapEvent.PlayerMapEvent;
+
+    /// <summary>
+    /// The surrender request names <see cref="GetSurrenderMapEvent"/>, so it can only be sent once that event has
+    /// reached this client and finished initializing.
+    /// </summary>
+    internal static bool IsSurrenderRequestReady(PlayerEncounter encounter)
+    {
+        var mapEvent = GetSurrenderMapEvent(encounter);
+        if (mapEvent == null) return false;
+
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) && barrier.IsPending(mapEvent))
+            return false;
+
+        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+               objectManager.TryGetId(mapEvent, out _);
     }
 
     [HarmonyPatch(nameof(PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent))]
@@ -319,6 +351,27 @@ internal class PlayerEncounterPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
+    [HarmonyPrefix]
+    private static bool FinishPrefix()
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+            return true;
+
+        // Receive callbacks must not finalize a live raid owned by this encounter.
+        var mapEvent = PlayerEncounter.Battle;
+        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)
+            return true;
+
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            Logger.Debug("Ignored received raid encounter finish for {MapEventId}. {StackTrace}",
+                mapEvent.StringId, System.Environment.StackTrace);
+        else
+            MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+
+        return false;
+    }
+
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
     // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
     // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the
@@ -326,9 +379,9 @@ internal class PlayerEncounterPatches
     // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
     [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPostfix]
-    private static void FinishPostfix()
+    private static void FinishPostfix(bool __runOriginal)
     {
-        if (ModInformation.IsServer) return;
+        if (!__runOriginal || ModInformation.IsServer) return;
 
         // The server holds the AI party this player was conversing with; tell it the encounter is over.
         MessageBroker.Instance.Publish(null, new ConversationEnded());

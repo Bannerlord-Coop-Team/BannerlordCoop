@@ -2,6 +2,7 @@
 using Common.Network;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,11 +17,16 @@ internal class ArtisanOverpricedGoodsFinalizationProofStrategy : IFinalizationPr
     private static readonly ILogger Logger = LogManager.GetLogger<ArtisanOverpricedGoodsFinalizationProofStrategy>();
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IIssueOwnershipRegistry ownership;
+    private readonly IPlayerManager players;
 
-    public ArtisanOverpricedGoodsFinalizationProofStrategy(INetwork network, IObjectManager objectManager)
+    public ArtisanOverpricedGoodsFinalizationProofStrategy(INetwork network, IObjectManager objectManager,
+        IIssueOwnershipRegistry ownership, IPlayerManager players)
     {
         this.network = network;
         this.objectManager = objectManager;
+        this.ownership = ownership;
+        this.players = players;
     }
 
     public bool TryRunBranch(QuestBase questBase, byte proof)
@@ -77,9 +83,11 @@ internal class ArtisanOverpricedGoodsFinalizationProofStrategy : IFinalizationPr
             quest.DeliverItemsFullyOnConsequence();
         }
 
-        if (objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId))
+        if (objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId) &&
+            ownership.TryGetOwner(giverId, issue.StringId, out var controllerId) &&
+            players.TryGetPeer(controllerId, out var peer))
         {
-            network.SendAll(new NetworkArtisanDeliveryProgress(giverId, issue.StringId, quest._givenTradeGoods));
+            network.Send(peer, new NetworkArtisanDeliveryProgress(giverId, issue.StringId, quest._givenTradeGoods));
         }
 
         if (branch == ArtisanOverpricedGoodsBranch.FullDelivery) quest.CompleteQuestWithSuccess();

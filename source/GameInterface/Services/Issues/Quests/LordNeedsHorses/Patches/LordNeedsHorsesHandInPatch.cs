@@ -11,6 +11,7 @@ namespace GameInterface.Services.Issues.Quests.LordNeedsHorses.Patches;
 /// Vanilla only checks the mounts in the hand-in dialog, which is the owner's machine. The server runs the
 /// success as the owning player and refuses it when that player does not carry the mounts.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
 internal class LordNeedsHorsesHandInPatch
 {
