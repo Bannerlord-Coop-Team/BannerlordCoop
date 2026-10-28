@@ -151,7 +151,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
-        builder.RegisterType<SiegeMachineAuthorityRegistry>().As<ISiegeMachineAuthorityRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<SiegeMachineAuthorityRegistry>().As<ISiegeMachineAuthorityRegistry>().SingleInstance();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().SingleInstance();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
