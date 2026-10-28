@@ -149,9 +149,10 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         PlayerEncounter.Finish(true);
 
-        if (!continueRaid || settlement == null ||
-            !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+        if (!continueRaid || settlement == null)
             return;
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+            messageBroker = MessageBroker.Instance;
 
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
         // approval creates the next raid through the authoritative server path.
