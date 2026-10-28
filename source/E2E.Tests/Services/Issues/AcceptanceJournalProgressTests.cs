@@ -51,7 +51,8 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
             unrelated.RunConsequence(Game.Current);
             Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
             var introduction = new ConversationSentence("introduction", new TextObject("agreed"), "next", "close_window",
-                null, null, () => quest.AddLog(new TextObject("The introduction arrived on a later dialogue turn.")));
+                null, null, () => quest.AddDiscreteLog(new TextObject("The introduction arrived on a later dialogue turn."),
+                    new TextObject("Acceptance introduction"), 0, 3));
             introduction.RunConsequence(Game.Current);
             Campaign.Current.ConversationManager.EndConversation();
             quest.AddLog(new TextObject("Later gameplay text is outside the acceptance conversation."));
