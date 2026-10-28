@@ -403,7 +403,8 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         observer.Resolve<IControllerIdProvider>(), observer.Resolve<IAgentEquipmentApplier>(),
         observer.Resolve<IMovementBatchSender>(), observer.Resolve<IPuppetMountStateRepairer>(),
         observer.Resolve<IAgentVisualActionAccessor>(), observer.Resolve<IMovementRateController>(),
-        observer.Resolve<IMovementPriorityScheduler>(), observer.Resolve<IMissionContext>(), relay);
+        observer.Resolve<IMovementPriorityScheduler>(), observer.Resolve<IMissionContext>(),
+        observer.Resolve<INavalDeckMovementProbe>(), relay);
 
     private static byte[] RelayPayload(IPacket packet, ProtoBufSerializer serializer, MovementPacketCompressor compressor)
     {
