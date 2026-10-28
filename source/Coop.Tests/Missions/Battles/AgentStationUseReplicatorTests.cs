@@ -72,6 +72,28 @@ public class AgentStationUseReplicatorTests
         crew.Engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
     }
 
+    // A new owner's use waiting for the migration is no applied revision, so its retries neither re-seat nor re-count.
+    [Fact]
+    public void Tick_KeepsOneReseatAttemptWhileANewOwnersUseWaitsForTheMigration()
+    {
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "new"));
+        replicator.Tick(0f);
+        replicator.Tick(0f);
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(1, (int)inspected["pending"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
+    }
+
     [Fact]
     public void RefreshAppliedSeats_NeverReseatsOntoAHullThatLeftTheMission()
     {

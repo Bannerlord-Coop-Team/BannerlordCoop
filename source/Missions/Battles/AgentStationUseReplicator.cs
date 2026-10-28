@@ -62,7 +62,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly Dictionary<Guid, AuthorityStamp> appliedStamps = new Dictionary<Guid, AuthorityStamp>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
-    // Puppets the refresh found released here and re-seated once, counted unowned until their owner's next revision judges it;
+    // Puppets the refresh found released here and re-seated once, counted unowned until their owner's next revision takes effect;
     // kept apart from the seat, which cleanup can drop before a delayed owner release arrives.
     private readonly HashSet<Guid> unjudgedLocalReleases = new HashSet<Guid>();
     private readonly List<string> joinersAwaitingSeats = new List<string>();
@@ -343,7 +343,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // A release whose puppet or hull is already gone; its stamp still orders the sender's older uses, so none of them seats later.
     private bool SettleObsoleteRelease(NetworkAgentStationUse use, string reason)
     {
-        appliedStamps[use.AgentId] = use.Stamp;
+        CommitRevision(use);
         obsoleteReleases++;
         Logger.Debug("[NavalSync] Settled station release {Revision} of agent {AgentId} on hull {ShipId}: {Reason}",
             use.Revision, use.AgentId, use.ShipId, reason);
@@ -376,8 +376,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             staleUses++;
             return true;
         }
-
-        bool confirmsLocalRelease = JudgeLocalRelease(use);
 
         // A puppet that died or withdrew has no seat to leave, and one not spawned yet has none to take.
         var agents = missionComponent.AgentRegistry;
@@ -418,27 +416,25 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         // Vanilla here can release a puppet before its owner's release for the same cause (a ramp over an oar) arrives, and the
         // refresh may have re-seated it meanwhile.
-        if (!use.InUse && (confirmsLocalRelease || !engine.IsSeated(info.Agent, point)))
+        if (!use.InUse && (unjudgedLocalReleases.Contains(use.AgentId) || !engine.IsSeated(info.Agent, point)))
             return SettleLocalRelease(use, info.Agent, point);
 
         // A sinking hull seats nobody; a late use from its owner only lets the puppet go.
         bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
         if (!use.InUse) ownerReleases++;
         else if (!inUse) sinkingUseReleases++;
-        appliedStamps[use.AgentId] = use.Stamp;
+        CommitRevision(use);
         Apply(info.Agent, point, inUse);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
     }
 
-    // The owner's next revision after a counted local release judges it: a release (the seat's own, as uses arrive in order)
-    // shows vanilla let the puppet go for the owner's cause, so the count is withdrawn; a use leaves it standing.
-    private bool JudgeLocalRelease(NetworkAgentStationUse use)
+    // Records an owner revision that took effect, which judges a local release the refresh counted before it: a release (the
+    // seat's own, as uses arrive in order) shows vanilla let the puppet go for the owner's cause; a use leaves the count standing.
+    private void CommitRevision(NetworkAgentStationUse use)
     {
-        if (!unjudgedLocalReleases.Remove(use.AgentId) || use.InUse) return false;
-
-        unownedPuppetReleases--;
-        return true;
+        appliedStamps[use.AgentId] = use.Stamp;
+        if (unjudgedLocalReleases.Remove(use.AgentId) && !use.InUse) unownedPuppetReleases--;
     }
 
     // The owner's release of a puppet vanilla let go here first has nothing left to do but undo the refresh's re-seat.
