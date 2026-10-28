@@ -48,7 +48,16 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance, createIssue);
+            AddIssue(instance, NotableId, IssueId, createIssue);
+        }
+    }
+
+    // Gives another hero an issue nobody has taken, on every machine
+    public void AddIssue(string heroId, string issueId)
+    {
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            AddIssue(instance, heroId, issueId, null);
         }
     }
 
@@ -148,21 +157,22 @@ internal sealed class QuestScenario
         return player;
     }
 
-    private void AddIssue(EnvironmentInstance instance, Func<EnvironmentInstance, Hero, IssueBase>? createIssue)
+    private static void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
+        Func<EnvironmentInstance, Hero, IssueBase>? createIssue)
     {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
 
             using (new AllowedThread())
             {
-                var issue = createIssue == null ? new AllowedIssue(notable, null) : createIssue(instance, notable);
-                prepare?.Invoke(instance, notable);
-                issue.StringId = IssueId;
+                var issue = createIssue == null ? new AllowedIssue(hero, null) : createIssue(instance, hero);
+                prepare?.Invoke(instance, hero);
+                issue.StringId = issueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
-                Campaign.Current.IssueManager._issues.Add(notable, issue);
-                notable.OnIssueCreatedForHero(issue);
+                Campaign.Current.IssueManager._issues.Add(hero, issue);
+                hero.OnIssueCreatedForHero(issue);
             }
         });
     }

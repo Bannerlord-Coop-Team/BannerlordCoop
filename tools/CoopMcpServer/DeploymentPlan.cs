@@ -62,7 +62,7 @@ public sealed class DeploymentPlan : IDeploymentPlan
         if (!string.Equals(Path.GetFileName(bin), "Win64_Shipping_Client", StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(Path.GetFileName(Path.GetDirectoryName(bin)), "bin", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("Profile executable must be in the installation's bin/Win64_Shipping_Client directory.");
-        string game = Path.GetDirectoryName(Path.GetDirectoryName(bin));
+        string game = profile.GameRoot();
         string module = Path.Combine(game, "Modules", "Coop");
         paths.NoLinks(module);
         if (!File.Exists(Path.Combine(game, "Modules", "Native", "SubModule.xml")) || !Directory.Exists(module))

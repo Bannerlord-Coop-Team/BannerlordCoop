@@ -10,6 +10,8 @@ using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents.Packets;
@@ -47,6 +49,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     private readonly ILocationConversationAgentGuard conversationAgentGuard;
     private readonly ILocationPartyPuppetRegistrar partyPuppetRegistrar;
     private readonly ILocationNpcAuthorityState authorityState;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -69,7 +73,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         ILocationNpcAuthorityState authorityState,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
-        ICoopMissionComponent coopMissionComponent)
+        ICoopMissionComponent coopMissionComponent,
+        MissionMapTimeView mapTimeView,
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -77,6 +83,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Location)
     {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+
         this.relayNetwork = relayNetwork;
         this.controllerIdProvider = controllerIdProvider;
         this.hostRegistry = hostRegistry;
@@ -110,16 +119,15 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-
-        npcReplicator.Dispose();
-        npcPuppetSpawner.Dispose();
-        populationDirector.Dispose();
-        authorityMigrator.Dispose();
-
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation),
+            npcReplicator.Dispose,
+            npcPuppetSpawner.Dispose,
+            populationDirector.Dispose,
+            authorityMigrator.Dispose,
+            base.DisposeMission);
     }
 
     public override void OnMissionTick(float dt)

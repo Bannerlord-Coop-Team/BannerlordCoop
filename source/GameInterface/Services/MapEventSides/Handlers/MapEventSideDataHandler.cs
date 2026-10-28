@@ -98,6 +98,7 @@ internal class MapEventSideDataHandler : IHandler
                         side._nearbyPartiesAddedToPlayerMapEvent.Remove(party.Party.MobileParty);
                     if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;
                 }
+                encounterMenuConditionRefresher.RefreshForMapEvent(side.MapEvent);
             }
             catch (Exception e)
             {
