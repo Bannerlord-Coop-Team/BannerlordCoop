@@ -1547,7 +1547,7 @@ public class VillageHostileActionTests : MapEventTestBase
     {
         var client = Clients.First();
         var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.Raid);
-        RegisterPeer(client, "PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         BattleSimulation completedSimulation = null;
