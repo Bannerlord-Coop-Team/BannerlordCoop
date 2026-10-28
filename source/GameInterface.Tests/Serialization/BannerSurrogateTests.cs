@@ -35,11 +35,32 @@ public class BannerSurrogateTests
     }
 
     [Fact]
-    public void RoundTrip_BannerWithNoLayers_GivesDefaultBanner()
+    public void RoundTrip_EmptyBanner_StaysEmptyBanner()
     {
+        // A weapon without a banner is sent with an empty one.
         Banner roundTripped = RoundTrip(new Banner());
 
-        Assert.False(roundTripped.IsBannerDataListEmpty());
+        Assert.NotNull(roundTripped);
+        Assert.True(roundTripped.IsBannerDataListEmpty());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void FromEmptyCode_GivesEmptyBanner(string bannerCode)
+    {
+        Banner banner = RoundTripCode(bannerCode);
+
+        Assert.NotNull(banner);
+        Assert.True(banner.IsBannerDataListEmpty());
+    }
+
+    [Fact]
+    public void RoundTrip_CodeWithoutLayers_GivesDefaultBanner()
+    {
+        Banner banner = RoundTripCode("11.9001");
+
+        Assert.False(banner.IsBannerDataListEmpty());
     }
 
     [Theory]
@@ -54,10 +75,12 @@ public class BannerSurrogateTests
         Assert.Equal(first.Serialize(), second.Serialize());
     }
 
-    private static Banner RoundTrip(Banner banner)
-    {
-        BannerSurrogate surrogate = banner;
+    private static Banner RoundTrip(Banner banner) => RoundTripSurrogate(banner);
 
+    private static Banner RoundTripCode(string bannerCode) => RoundTripSurrogate(new BannerSurrogate { Data = bannerCode });
+
+    private static Banner RoundTripSurrogate(BannerSurrogate surrogate)
+    {
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, surrogate);
         stream.Position = 0;
