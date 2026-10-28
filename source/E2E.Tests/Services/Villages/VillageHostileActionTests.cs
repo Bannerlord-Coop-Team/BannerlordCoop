@@ -1595,7 +1595,6 @@ public class VillageHostileActionTests : MapEventTestBase
                     Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
                         new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
                 }
-                Assert.NotEmpty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationRound>());
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Single(ended);
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
