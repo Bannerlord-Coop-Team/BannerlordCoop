@@ -159,8 +159,8 @@ internal class ActiveIssueDismisser : IHandler
             {
                 if (quest != null)
                     journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
-                else if (issue.IsSolvingWithLordSolution)
-                    journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
+                // The issue's accepted status takes precedence over the quest detail in IsEnded.
+                journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
             }
         }
 

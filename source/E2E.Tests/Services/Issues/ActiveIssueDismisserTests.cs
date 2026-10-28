@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -322,12 +323,12 @@ public class ActiveIssueDismisserTests : IDisposable
         {
             var ended = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
             Assert.Same(archive, ended);
+            Assert.Equal(ControllerId, Assert.IsType<PlayerJournalLogEntry>(ended).OwnerControllerId);
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, ended._lastIssueStatus);
+            if (!lordSolution)
+                Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
             Assert.True(ended.IsEnded());
             Assert.True(ended.IsEndedUnsuccessfully());
-            if (lordSolution)
-                Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, ended._lastIssueStatus);
-            else
-                Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
             Assert.Equal("Follow the caravan", Assert.Single(ended.GetEntries()).LogText.ToString());
             Assert.False(unrelated.IsEnded());
             Assert.Null(issue.IssueOwner.Issue);
