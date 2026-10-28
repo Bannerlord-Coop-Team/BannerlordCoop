@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -19,7 +19,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
