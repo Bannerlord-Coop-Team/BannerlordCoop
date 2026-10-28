@@ -295,6 +295,8 @@ public class ActiveIssueDismisserTests : IDisposable
             }
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
+                if (!lordSolution)
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, owner);
                 if (lordSolution)
                     issue.AddLog(new JournalLog(CampaignTime.Zero, new TextObject("Follow the caravan")));
                 else
@@ -304,6 +306,8 @@ public class ActiveIssueDismisserTests : IDisposable
             unrelated = new JournalLogEntry(new TextObject("Unrelated active quest"), null, null, false);
             Campaign.Current.LogEntryHistory._logs.Add(unrelated);
             Assert.False(archive.IsEnded());
+            if (!lordSolution)
+                Assert.Equal(IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, archive._lastIssueStatus);
             Assert.DoesNotContain(issue.IssueQuest, Campaign.Current.QuestManager.Quests);
             Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
         }, JournalTextLinks);
