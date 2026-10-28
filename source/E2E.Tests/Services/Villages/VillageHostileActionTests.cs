@@ -1550,6 +1550,7 @@ public class VillageHostileActionTests : MapEventTestBase
         RegisterPeer(client, "PlayerOne");
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        BattleSimulation completedSimulation = null;
         EnableHeadlessEncounterFinish(client);
         var encounter = SetMockPlayerEncounter(client, mapEventId: context.MapEventId);
         client.Call(() =>
@@ -1603,7 +1604,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 }
                 var states = Game.Current.GameStateManager;
                 var mapState = states.GameStates.OfType<MapState>().Single();
-                var simulation = encounter.BattleSimulation;
+            var simulation = encounter.BattleSimulation;
+            completedSimulation = simulation;
                 mapState.EndBattleSimulation();
                 simulation.OnFinished();
                 PlayerEncounter.Update();
@@ -1628,7 +1630,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.NotNull(PlayerEncounter.Current);
                 Assert.NotSame(encounter, PlayerEncounter.Current);
                 Assert.NotNull(MobileParty.MainParty.MapEvent);
-                Assert.NotSame(simulation.MapEvent, MobileParty.MainParty.MapEvent);
+                Assert.NotSame(completedSimulation.MapEvent, MobileParty.MainParty.MapEvent);
                 Assert.True(MobileParty.MainParty.MapEvent.IsRaid);
                 Assert.False(MobileParty.MainParty.MapEvent.HasWinner);
             }, MapEventDisabledMethods);
