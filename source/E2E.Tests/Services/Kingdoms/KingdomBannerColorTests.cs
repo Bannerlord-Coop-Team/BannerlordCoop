@@ -25,8 +25,8 @@ public class KingdomBannerColorTests : SyncTestBase
     private const string OriginalBannerCode = "11.9001.9001.1528.1528.764.764.1.0.0.133.9002.9002.512.512.764.764.0.0.0";
     private const string EditedBannerCode = "11.9001.9001.1528.1528.764.764.1.0.0.133.9003.9003.512.512.764.764.0.0.0";
 
-    // Clan.PreAfterLoad first asks whether the save is from an older game version, and MBSaveLoad reads the
-    // version from Modules/Native/SubModule.xml, which CI's game folder doesn't have. Load as a save from this version.
+    // Clan.PreAfterLoad first asks whether the save is from an older game version, which reads the game
+    // version from the install. Load as a save from this version so the test doesn't depend on the install.
     private static readonly MethodBase[] SaveFromThisVersion =
     {
         AccessTools.PropertyGetter(typeof(MBSaveLoad), nameof(MBSaveLoad.IsUpdatingGameVersion)),
@@ -260,6 +260,7 @@ public class KingdomBannerColorTests : SyncTestBase
             Assert.NotNull(kingdom.Banner);
             Assert.False(kingdom.Banner.IsBannerDataListEmpty());
             Assert.Equal(BackgroundColorId, kingdom.Banner.GetPrimaryColorId());
+            Assert.Equal(OriginalBannerCode, rulerClan.ClanOriginalBanner.Serialize());
             Assert.Single(kingdom.Clans, clan => clan == rulerClan);
         }, SaveFromThisVersion);
     }
