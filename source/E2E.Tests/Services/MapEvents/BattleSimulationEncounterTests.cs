@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
 using HarmonyLib;
