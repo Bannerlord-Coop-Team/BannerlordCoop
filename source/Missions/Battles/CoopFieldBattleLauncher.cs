@@ -67,6 +67,18 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
             return null;
         }
 
+        // MissionCombatantsLogic.EarlyStart throws on a side with no combatant, and the loading screen then retries
+        // forever. Refusing turns that into a logged failure; recovering the join is left to the caller.
+        var sideWithoutCombatant = FindSideWithoutCombatant(mapEvent);
+        if (sideWithoutCombatant != BattleSideEnum.None)
+        {
+            Logger.Error("[BattleSync] Cannot open coop field battle for {MapEventId}: no party on the {Side} side on this client " +
+                "(local side {LocalSide}, defender parties {DefenderParties}, attacker parties {AttackerParties})",
+                mapEventId, sideWithoutCombatant, PartyBase.MainParty?.Side,
+                mapEvent.DefenderSide.Parties.Count, mapEvent.AttackerSide.Parties.Count);
+            return null;
+        }
+
         var mission = CreateCoopFieldBattle(rec, mapEventId);
         if (mission == null) return null;
 
@@ -172,6 +184,17 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         Logger.Information("[BattleSync] Opened coop field battle for {MapEventId} (player side {Side})",
             mapEventId, PartyBase.MainParty.Side);
         return mission;
+    }
+
+    // The first side with no involved party, matched by IBattleCombatant.Side as EarlyStart does; None when both have one.
+    internal static BattleSideEnum FindSideWithoutCombatant(MapEvent mapEvent)
+    {
+        var combatants = (IEnumerable<IBattleCombatant>)mapEvent.InvolvedParties;
+        foreach (var side in new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker })
+            if (!combatants.Any(combatant => combatant.Side == side))
+                return side;
+
+        return BattleSideEnum.None;
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
