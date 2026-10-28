@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents.Handlers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
 
