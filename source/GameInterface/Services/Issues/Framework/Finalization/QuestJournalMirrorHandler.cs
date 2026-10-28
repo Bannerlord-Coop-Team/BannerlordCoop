@@ -164,18 +164,10 @@ internal class QuestJournalMirrorHandler : IHandler
     private static bool SameText(TextObject first, TextObject second)
     {
         if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
+        // TextObject.ToString() is rendered text and can differ between the
+        // dedicated server and a client when localization functions are not
+        // loaded on the server. The Value is the native localization key and
+        // remains stable across those endpoints.
+        return first != null && second != null && first.Value == second.Value;
     }
 }

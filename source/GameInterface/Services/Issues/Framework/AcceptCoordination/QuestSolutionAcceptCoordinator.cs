@@ -185,8 +185,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
             // An accept strategy may already have written this stage; repeated packets must not duplicate it.
             if (data.Index < quest.JournalEntries.Count) return;
             if (quest.JournalEntries.Any(log =>
-                    log.LogText?.ToString() == data.Text.ToString() &&
-                    log.TaskName?.ToString() == data.TaskName?.ToString() &&
+                    SameText(log.LogText, data.Text) &&
+                    SameText(log.TaskName, data.TaskName) &&
                     log.CurrentProgress == data.Progress && log.Range == data.Range && log.Type == data.Type))
                 return;
             if (data.Index != quest.JournalEntries.Count)
@@ -202,6 +202,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
             }
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }
+
+    private static bool SameText(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 
     private void Handle_RequestQuestSolutionAccept(MessagePayload<RequestQuestSolutionAccept> payload)
     {
