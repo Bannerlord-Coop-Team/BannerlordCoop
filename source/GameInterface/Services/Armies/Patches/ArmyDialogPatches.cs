@@ -1,8 +1,13 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -20,6 +25,8 @@ namespace GameInterface.Services.Armies.Patches;
 [HarmonyPatch]
 internal class ArmyDialogPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ArmyDialogPatches>();
+
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_army_join_on_consequence))]
     [HarmonyPrefix]
     private static bool Prefix(EncounterGameMenuBehavior __instance, MenuCallbackArgs args)
@@ -36,9 +43,16 @@ internal class ArmyDialogPatches
     {
         var message = new MobilePartyInArmyAdded(Hero.OneToOneConversationHero.PartyBelongedTo.Army, MobileParty.MainParty, true);
         MessageBroker.Instance.Publish(__instance, message);
-        if (PlayerEncounter.InsideSettlement)
+        if (GameThread.WaitWhilePumping(() => MobileParty.MainParty != null, DateTime.UtcNow.AddSeconds(5)))
         {
-            GameMenu.SwitchToMenu("army_wait_at_settlement");
+            if (PlayerEncounter.InsideSettlement)
+            {
+                GameMenu.SwitchToMenu("army_wait_at_settlement");
+            }
+        }
+        else
+        {
+            Logger.Error($"Player could not join army");
         }
         return false;
     }
