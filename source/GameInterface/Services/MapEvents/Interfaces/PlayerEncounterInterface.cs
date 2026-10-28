@@ -141,6 +141,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             mapEvent.WinningSide == BattleSideEnum.Attacker &&
             playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
             playerEncounter._attackerParty == PartyBase.MainParty &&
+            mapEvent.AttackerSide?.LeaderParty == PartyBase.MainParty &&
             (MobileParty.MainParty.Army == null ||
              MobileParty.MainParty.Army.LeaderParty == MobileParty.MainParty) &&
             mapEvent.MapEventSettlement?.IsVillage == true &&

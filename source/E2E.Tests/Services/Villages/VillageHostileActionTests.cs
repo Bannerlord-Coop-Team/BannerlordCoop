@@ -3738,8 +3738,11 @@ public class VillageHostileActionTests : MapEventTestBase
             hostileAction.MapEventId,
             hostileAction.AttackerMobilePartyId)), MapEventDisabledMethods);
 
-        var finished = Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Single();
-        Assert.Equal(hostileAction.MapEventId, finished.MapEventId);
+        var cancelled = Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>().Single();
+        Assert.Equal(hostileAction.MapEventId, cancelled.MapEventId);
+        Assert.Equal((int)BattleStartMode.Unclaimed,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>()).Mode);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkOpenBattleSimulation>());
 
         Server.Call(() =>
@@ -3747,6 +3750,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
             Assert.True(mapEvent.IsVillageHostileActionWithMultiplePlayerParties());
             Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
+            Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
         }, MapEventDisabledMethods);
     }
 
@@ -3908,6 +3912,39 @@ public class VillageHostileActionTests : MapEventTestBase
             client.Call(() => client.Resolve<INetwork>().SendAll(
                 new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1)), MapEventDisabledMethods);
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
+    public void MultiPlayerRaid_BattleSimulationPacerDisconnect_WithoutWinner_CancelsOnceOnTheNextPump()
+    {
+        var client = Clients.First();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        try
+        {
+            StartBattleSimulation(client, hostileAction);
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
+                var handler = Server.Resolve<BattleSimulationRunHandler>();
+                Assert.Null(RunOnServerPoller(() => handler.Handle_PlayerDisconnected(
+                    new MessagePayload<Common.Network.Messages.PlayerDisconnected>(
+                        this, new Common.Network.Messages.PlayerDisconnected(client.NetPeer, default)))));
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+            }, MapEventDisabledMethods);
+            Server.PumpGameThread();
+
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+            Assert.Equal((int)BattleStartMode.Unclaimed,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>()).Mode);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            Server.Call(() => Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)), MapEventDisabledMethods);
         }
         finally
         {
