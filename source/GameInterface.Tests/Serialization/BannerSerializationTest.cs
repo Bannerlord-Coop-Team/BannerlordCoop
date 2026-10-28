@@ -3,7 +3,6 @@ using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
-using System.Linq;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -11,6 +10,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BannerSerializationTest
     {
+        private const string BannerCode = "11.4.4.1528.1528.764.764.1.0.0.133.5.5.512.512.764.764.0.0.0";
+
         ILifetimeScope container;
         public BannerSerializationTest()
         {
@@ -20,7 +21,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Banner_Full_Serialization()
         {
-            Banner testBanner = new Banner();
+            Banner testBanner = new Banner(BannerCode);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             BannerBinaryPackage package = new BannerBinaryPackage(testBanner, factory);
@@ -40,10 +41,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             Banner newBanner = returnedPackage.Unpack<Banner>(deserializeFactory);
 
-            foreach (var data in testBanner.BannerDataList.Zip(newBanner.BannerDataList, (bannerData, newBannerData) => new { bannerData, newBannerData }))
-            {
-                Assert.Equal(data.bannerData, data.newBannerData);
-            }
+            Assert.Equal(testBanner.Serialize(), newBanner.Serialize());
+        }
+
+        [Fact]
+        public void Banner_WithNoLayers_UnpacksToNoBanner()
+        {
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            BannerBinaryPackage package = new BannerBinaryPackage(new Banner(), factory);
+
+            package.Pack();
+
+            var returnedPackage = (BannerBinaryPackage)BinaryPackageSerializer.Deserialize(BinaryPackageSerializer.Serialize(package));
+
+            // A banner with no layers throws on the next colour change, so it must not come back as one.
+            Assert.Null(returnedPackage.Unpack<Banner>(container.Resolve<IBinaryPackageFactory>()));
         }
     }
 }

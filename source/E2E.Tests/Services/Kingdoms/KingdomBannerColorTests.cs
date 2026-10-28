@@ -156,6 +156,56 @@ public class KingdomBannerColorTests : SyncTestBase
         });
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("11.9001")]
+    [InlineData("11.9001.9001.1528.1528.764.764.1.0.x")]
+    public void BannerEdit_WithUnreadableCode_KeepsBannerAndIsNotRelayed(string bannerCode)
+    {
+        Server.SimulateMessage(memberClient.NetPeer, new NetworkUpdatePlayerBanner(bannerCode, memberClanId, BackgroundColor, NewIconColor));
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>());
+        Server.Call(() =>
+        {
+            Assert.Equal(OriginalBannerCode, Server.GetRegisteredObject<Clan>(memberClanId).Banner.Serialize());
+        });
+    }
+
+    [Fact]
+    public void RelayedBannerEdit_WithUnreadableCode_KeepsClientBanner()
+    {
+        memberClient.SimulateMessage(Server, new NetworkUpdatePlayerBanner("11.9001", memberClanId, BackgroundColor, NewIconColor));
+        memberClient.PumpGameThread();
+
+        memberClient.Call(() =>
+        {
+            Assert.Equal(OriginalBannerCode, memberClient.GetRegisteredObject<Clan>(memberClanId).Banner.Serialize());
+        });
+    }
+
+    [Fact]
+    public void ClanWithEmptyBanner_GetsDefaultBannerOnLoad()
+    {
+        Server.Call(() =>
+        {
+            var memberClan = Server.GetRegisteredObject<Clan>(memberClanId);
+
+            using (new AllowedThread())
+            {
+                memberClan._banner = new Banner();
+            }
+
+            // Vanilla repaints the kingdom colours here and reads the first banner layer.
+            memberClan.PreAfterLoad();
+
+            Assert.False(memberClan.Banner.IsBannerDataListEmpty());
+            Assert.Equal(BackgroundColorId, memberClan.Banner.GetPrimaryColorId());
+
+            memberClan.UpdateBannerColorsAccordingToKingdom();
+        });
+    }
+
     private void SendRulerBannerEdit(EnvironmentInstance sender)
     {
         Server.SimulateMessage(sender.NetPeer, new NetworkUpdatePlayerBanner(EditedBannerCode, rulerClanId, BackgroundColor, NewIconColor));
