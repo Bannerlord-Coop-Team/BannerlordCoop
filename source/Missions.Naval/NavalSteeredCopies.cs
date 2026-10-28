@@ -199,8 +199,8 @@ public class NavalSteeredCopies : INavalSteeredCopies
         if (step.DeltaYawRate != 0f) entity.SetAngularVelocity(new Vec3(angular.x, angular.y, angular.z + step.DeltaYawRate));
     }
 
-    // Teleports the copy with its crew (vanilla) and anyone else standing on it, released from what they use, then gives it the
-    // owner's motion.
+    // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion. Like vanilla's
+    // crew teleport, a rider keeps a station of this hull, which moved with it; only a point off the hull is let go.
     private static void Snap(MissionShip ship, SteeredCopy copy, MatrixFrame target)
     {
         var entity = ship.GameEntity;
@@ -211,8 +211,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var after = entity.GetGlobalFrame();
         foreach (var rider in riders)
         {
-            // A rider still bound to a machine or plank would be left holding a point that moved away from it.
-            if (rider.CurrentlyUsedGameObject != null) rider.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            if (UsesPointOffHull(rider, ship)) rider.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             rider.TeleportToPosition(after.TransformToParent(before.TransformToLocalNonOrthogonal(rider.Position)));
         }
 
@@ -220,6 +219,13 @@ public class NavalSteeredCopies : INavalSteeredCopies
         entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
         entity.SetAngularVelocity(new Vec3(0f, 0f, copy.Steering.FeedForwardYawRate));
         Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Riders} rider(s) moved along)", ship.Index, riders.Count);
+    }
+
+    // Whether the agent holds a point that isn't part of the hull, like another hull's plank, which the snap would leave behind.
+    private static bool UsesPointOffHull(Agent agent, MissionShip ship)
+    {
+        var point = agent.CurrentlyUsedGameObject;
+        return point != null && NavalShipEngine.EntityPath(point.GameEntity, ship.GameEntity) == null;
     }
 
     // Agents standing on the copy that aren't its crew, like a local main agent that boarded it; TeleportShip moves only the crew.

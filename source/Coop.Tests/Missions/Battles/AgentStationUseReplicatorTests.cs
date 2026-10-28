@@ -56,24 +56,42 @@ public class AgentStationUseReplicatorTests
     [Fact]
     public void RefreshAppliedSeats_ReseatsALocalReleaseOnlyOncePerOwnerRevision()
     {
-        var engine = new Mock<INavalShipEngine>();
-        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
-        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(false);
-        var hull = ShipTestHulls.Create();
-        var point = CreatePoint();
-        StationOf(engine, point, hull);
-        using var replicator = CreateReplicator(engine.Object);
-        var agentId = Guid.NewGuid();
-        replicator.RecordAppliedSeat(agentId, null!, hull, point);
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
 
         replicator.RefreshAppliedSeats();
         replicator.RefreshAppliedSeats();
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), point, true), Times.Once);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
 
-        replicator.RecordAppliedSeat(agentId, null!, hull, point);
+        replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 2, "owner"));
         replicator.RefreshAppliedSeats();
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), point, true), Times.Exactly(2));
-        engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(4));
+        crew.Engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+    }
+
+    // A new owner's use waiting for the migration is no applied revision, so its retries neither re-seat nor re-count.
+    [Fact]
+    public void Tick_KeepsOneReseatAttemptWhileANewOwnersUseWaitsForTheMigration()
+    {
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "new"));
+        replicator.Tick(0f);
+        replicator.Tick(0f);
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(1, (int)inspected["pending"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
     }
 
     [Fact]
@@ -444,6 +462,7 @@ public class AgentStationUseReplicatorTests
         var engine = new Mock<INavalShipEngine>();
         var point = CreatePoint();
         engine.Setup(e => e.ResolveStation(hull, "oar", 0)).Returns(point);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
         using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object);
 
         Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 3, "old")));
@@ -660,20 +679,141 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["dropped"]!);
     }
 
-    // S12 D1: vanilla's removal releases a dying puppet's station, which is no desync; a live puppet's local release is one.
-    [Theory]
-    [InlineData(false, 0)]
-    [InlineData(true, 1)]
-    public void AnnounceStationUse_CountsAPuppetsLocalReleaseOnlyWhileItLives(bool alive, long expected)
+    // R50 F2: vanilla releases a live puppet for the same causes as its owner (a ramp over an oar), so the release alone is no desync.
+    [Fact]
+    public void AnnounceStationUse_LeavesAPuppetsLocalReleaseToTheRefresh()
     {
         var crew = new RemoteCrew();
-        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(alive);
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
         var broker = new MessageBroker();
-        using var replicator = crew.CreateReplicator(broker);
+        var network = new Mock<IBattleNetwork>();
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, broker, network: network.Object);
 
         GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(crew.Agent, crew.Point, inUse: false)), blocking: true);
 
-        Assert.Equal(expected, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+        Assert.Equal(0, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkAgentStationUse>()), Times.Never);
+    }
+
+    // R50 F2: the owner's release for a puppet vanilla already let go here has nothing left to release.
+    [Fact]
+    public void Tick_SettlesTheOwnersReleaseOfAPuppetVanillaAlreadyReleased_AsObsolete()
+    {
+        var crew = new RemoteCrew();
+        bool seated = true;
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        seated = false;
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(0, (long)inspected["ownerReleases"]!);
+        Assert.Equal(0, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        crew.Engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), false), Times.Never);
+    }
+
+    // R50 F2: the owner's release for the same cause can still be in transit when the refresh finds the seat gone; once it
+    // arrives the local release was the owner's, whether or not the refresh managed to re-seat the puppet meanwhile.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Tick_SettlesAnOwnerReleaseArrivingAfterTheRefresh_AsTheLocalReleasesCause(bool reseatHolds)
+    {
+        var crew = new RemoteCrew();
+        bool seated = false;
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, It.IsAny<bool>()))
+            .Callback<Agent, UsableMissionObject, bool>((_, _, inUse) => seated = inUse);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        seated = false;
+        if (!reseatHolds)
+            crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, true));
+        replicator.Tick(0f);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(0, (long)inspected["ownerReleases"]!);
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.False(seated);
+    }
+
+    // R50 F2: the seat a counted local release came from can be cleaned up before the owner's delayed release arrives, which
+    // must still settle the count.
+    [Theory]
+    [InlineData("died")]
+    [InlineData("unregistered")]
+    [InlineData("hullDeparted")]
+    [InlineData("hullRemoved")]
+    public void Tick_SettlesADelayedOwnerRelease_AfterItsSeatWasCleanedUp(string cleanup)
+    {
+        var crew = new RemoteCrew();
+        bool seated = false;
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, It.IsAny<bool>()))
+            .Callback<Agent, UsableMissionObject, bool>((_, _, inUse) => seated = inUse);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        seated = false;
+        replicator.Tick(0f);
+
+        if (cleanup == "died") crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(false);
+        if (cleanup == "unregistered") crew.Registered = false;
+        if (cleanup == "hullDeparted") replicator.ReleaseSeatsOn(crew.Hull);
+        if (cleanup == "hullRemoved") crew.Engine.Setup(e => e.IsHullRemoved(crew.Hull)).Returns(true);
+        replicator.Tick(0f);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(1, (long)inspected["obsoleteReleases"]!);
+        Assert.Equal(0, (long)inspected["ownerReleases"]!);
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(0, (int)inspected["pending"]!);
+    }
+
+    // R50 F2: a seat vanilla took from a puppet whose owner's next revision keeps it seated is the desync the counter reports.
+    [Fact]
+    public void Tick_CountsAnUnownedReleaseWhenTheOwnersNextRevisionKeepsTheSeat()
+    {
+        var crew = new RemoteCrew();
+        bool seated = false;
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, It.IsAny<bool>()))
+            .Callback<Agent, UsableMissionObject, bool>((_, _, inUse) => seated = inUse);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        seated = false;
+        replicator.Tick(0f);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 2, "owner"));
+        replicator.Tick(0f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (long)inspected["unownedPuppetReleases"]!);
+        Assert.Equal(0, (long)inspected["obsoleteReleases"]!);
+        Assert.True(seated);
     }
 
     // S12 A5: a puppet adopted in place while seated keeps its seat as this client's own, announced under this client's stamp.
