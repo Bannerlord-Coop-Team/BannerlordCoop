@@ -733,7 +733,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     would target a copy; its client logs a warning when its hull is captured.
 - **Weapon target lists are snapshots (follow-up B, fixed R46).** A ballista lists its ship targets once, at its own
   deployment (`ThreatSeeker.InitializeTargetableObjects`); `NavalLateHullDeployment` refreshes every fielded hull's list
-  on the mission tick after a later hull spawns, so co-op hulls arriving after deployment are targets as in vanilla.
+  (through `NavalBallistaTargets`) on the mission tick after a later hull spawns, so co-op hulls arriving after deployment
+  are targets as in vanilla.
+- **A hull leaving mid-battle leaves no ballista target (R51 B4).** Vanilla's `RemoveShipAux` frees the entity of a hull
+  removed outside deployment, and a ballista keeps a listed target until it is disabled, so its next `GetAllThreats` read
+  the freed entity (`HasTag`, an AccessViolation). `CoopNavalBattleBehavior.OnShipRemoved`, which runs before the free on
+  every removal path, has `NavalBallistaTargets.ForgetHull` drop the hull's weapon and `ShipTargetMissionObject` from every
+  remaining ballista's list, threat search and aim.
 - **A captured prize's ballista may stay idle (vanilla).** `GetAllThreats` drops a target on the weapon's own side for good,
   so before the capture the prize's ballista already dropped its old side's hulls; after it (`RangedSiegeWeapon.OnShipCaptured`
   only sets `DefaultSide`) it can't target its new enemies' hulls and skips formations in melee, as in singleplayer. Unlike

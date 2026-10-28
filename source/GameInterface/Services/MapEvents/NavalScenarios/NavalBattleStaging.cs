@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Commands;
 using System;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ namespace GameInterface.Services.MapEvents.NavalScenarios;
 /// </summary>
 public interface INavalBattleStaging
 {
-    /// <summary>The player's party, once its client is ready; false and why otherwise.</summary>
+    /// <summary>The player's party, once its client is ready and its hero free to fight; false and why otherwise.</summary>
     bool TryGetReadyPlayerParty(string controllerId, out MobileParty party, out string error);
 
     /// <summary>The ready players' parties, each of which must own a ship.</summary>
@@ -51,16 +52,37 @@ public class NavalBattleStaging : INavalBattleStaging
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerManager playerManager;
 
-    public NavalBattleStaging(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker)
+    // Takes the player manager, which names a staged player's hero.
+    public NavalBattleStaging(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.playerManager = playerManager;
     }
 
-    public bool TryGetReadyPlayerParty(string controllerId, out MobileParty party, out string error) =>
-        MapEventDebugCommands.TryGetPlayerParty(controllerId, requireReady: true, out _, out party, out error);
+    // R51 B4: a captive's party is parked and emptied, so topping it up and fielding it gave a battle with no player hero.
+    public bool TryGetReadyPlayerParty(string controllerId, out MobileParty party, out string error)
+    {
+        if (!MapEventDebugCommands.TryGetPlayerParty(controllerId, requireReady: true, out _, out party, out error)) return false;
+
+        bool isPrisoner = playerManager.TryGetPlayer(controllerId, out var player)
+            && objectManager.TryGetObject<Hero>(player.HeroId, out var hero) && hero.IsPrisoner;
+        error = CaptivityRefusal(controllerId, player?.HeroId, isPrisoner, party.IsActive);
+        return error == null;
+    }
+
+    /// <summary>Why a player can't be staged into a battle while captive or parked, or null when it can.</summary>
+    internal static string CaptivityRefusal(string controllerId, string heroId, bool isPrisoner, bool partyActive)
+    {
+        if (isPrisoner)
+            return $"Player {controllerId} is a prisoner; free them first with coop.debug.player_captivity.release_player {heroId}.";
+        if (!partyActive) return $"Player {controllerId}'s party is inactive (parked), so it can't join a battle.";
+        return null;
+    }
 
     public bool TryResolvePlayerFleets(IReadOnlyList<string> controllerIds, out MobileParty[] playerParties, out string error)
     {
