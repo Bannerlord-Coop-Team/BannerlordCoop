@@ -157,7 +157,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
         // approval creates the next raid through the authoritative server path.
         PlayerEncounter.Start();
-        PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlement.Party, settlement);
+        PlayerEncounter.Current.ForceRaid = true;
         messageBroker.Publish(this, new VillageHostileActionAttempted(
             VillageHostileAction.Raid,
             MobileParty.MainParty,
