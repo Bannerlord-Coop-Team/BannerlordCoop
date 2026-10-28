@@ -185,5 +185,4 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
         }
     }
-
 }
