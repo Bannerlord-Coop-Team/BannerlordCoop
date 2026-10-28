@@ -66,9 +66,8 @@ internal class BattleMissionStartHandler : IHandler
         new ConcurrentDictionary<string, MissionInitializerRecord>();
     private readonly Random terrainSeedRandom = new Random();
 
-    // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
-    // so a joiner entering mid-assault loads the same scene as the first entrant even though the campaign-side
-    // container keeps syncing. Evicted with the terrain seed when the event finalizes.
+    // Server-side: the siege mission inputs, rebuilt on each new mission claim and shared by joiners while that
+    // mission is open so they load the same scene. Evicted with the terrain seed when the event finalizes.
     private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
 
     public BattleMissionStartHandler(

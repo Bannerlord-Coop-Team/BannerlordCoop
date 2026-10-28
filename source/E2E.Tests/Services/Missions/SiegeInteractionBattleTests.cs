@@ -255,8 +255,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         Assert.All(attackStarts, start => Assert.Equal("e2e_land_battle", start.MissionInitializer.SceneName));
     }
 
-    // A snapshot only exists while its mission is open, so claim the mission too, otherwise the next start
-    // request is a new claim and rebuilds the snapshot from the campaign.
+    // Joiners only share a snapshot while its mission is open, so claim the mission too, otherwise the next
+    // start request is a new claim and rebuilds the snapshot from the campaign.
     private void SeedSiegeMissionSnapshot(string mapEventId, bool isSallyOut)
     {
         Server.Call(() =>
@@ -324,12 +324,19 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         }
 
         var secondStarts = RequestSiegeMission(battle);
-        Assert.All(secondStarts, start => Assert.Equal(40f, Assert.Single(start.AttackerEngines).Health));
-        foreach (var client in Clients.Take(2))
+        Assert.All(secondStarts, start =>
+        {
+            Assert.Equal(40f, Assert.Single(start.AttackerEngines).Health);
+            Assert.False(start.IsSallyOut);
+        });
+        var clients = Clients.ToArray();
+        foreach (var client in clients.Take(2))
         {
             var start = Assert.Single(client.InternalMessages.GetMessages<NetworkStartSiegeMission>());
             Assert.Equal(40f, Assert.Single(start.AttackerEngines).Health);
         }
+        Assert.Empty(clients[2].InternalMessages.GetMessages<NetworkStartSiegeMission>());
+        Assert.Empty(clients[2].InternalMessages.GetMessages<NetworkStartAttackMission>());
     }
 
     private NetworkStartSiegeMission[] RequestSiegeMission(InteractionContext battle)
