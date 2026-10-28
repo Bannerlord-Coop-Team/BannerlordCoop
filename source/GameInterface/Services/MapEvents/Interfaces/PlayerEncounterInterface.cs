@@ -133,7 +133,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         var continueRaid = mapEvent?.IsRaidHostileAction() == true &&
             mapEvent.WinningSide == BattleSideEnum.Attacker &&
             playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
-            playerEncounter._attackerParty == PartyBase.MainParty.Party &&
+            playerEncounter._attackerParty == PartyBase.MainParty &&
             (MobileParty.MainParty.Army == null ||
              MobileParty.MainParty.Army.LeaderParty == MobileParty.MainParty) &&
             mapEvent.MapEventSettlement?.IsVillage == true &&
