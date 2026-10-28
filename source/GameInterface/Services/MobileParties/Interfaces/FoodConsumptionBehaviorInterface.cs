@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Armies.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
 using Serilog;
@@ -199,7 +200,10 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
 
                         if ((int)CampaignTime.Now.ToDays % 3 == 0 && mobileParty.MemberRoster.TotalManCount > 1)
                         {
-                            TraitLevelingHelper.OnPartyStarved(); // TODO
+                            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                            {
+                                TraitLevelingHelper.OnPartyStarved();
+                            }
                         }
                     }
                 }
@@ -210,7 +214,10 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
                     // Replace IsMainParty check
                     if (!wasStarving && !isNowStarving && mobileParty.IsPlayerParty() && mobileParty.Morale >= 90f && mobileParty.MemberRoster.TotalRegulars >= 20 && (int)CampaignTime.Now.ToDays % 10 == 0)
                     {
-                        TraitLevelingHelper.OnPartyTreatedWell(); // TODO
+                        using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                        {
+                            TraitLevelingHelper.OnPartyTreatedWell();
+                        }
                     }
                 }
             }

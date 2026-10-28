@@ -124,6 +124,8 @@ public sealed class ModOptionsData
 
     public bool? ShowPlayerNameplates { get; set; }
 
+    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

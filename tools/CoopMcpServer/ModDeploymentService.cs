@@ -102,7 +102,7 @@ public sealed class ModDeploymentService : IModDeploymentService
         try
         {
             Save(report);
-            await builds.BuildAsync(layout.Repository, config, report.ArtifactDirectory, cancellationToken, layout.Configuration);
+            await builds.BuildAsync(layout.Repository, launch, report.ArtifactDirectory, cancellationToken, layout.Configuration);
             cancellationToken.ThrowIfCancellationRequested();
             var inputs = plan.Collect(layout, launch);
             long replacementBytes = inputs.Sum(i => new FileInfo(i.Source).Length);

@@ -1,0 +1,27 @@
+<Brushes>
+  <!-- Native ButtonBrush1 with the green fill hue-shifted to red; the grey metal frame has almost no saturation, so the shift leaves it as is. -->
+  <Brush Name="Coop.Button.Red">
+    <Layers>
+      <BrushLayer Name="Default" Sprite="General\Button\main_button_done" ExtendLeft="22" ExtendTop="22" ExtendRight="22" ExtendBottom="22" HueFactor="-60" />
+      <BrushLayer Name="HoverLayer" Sprite="General\Button\main_button_done_hover" ExtendLeft="22" ExtendTop="22" ExtendRight="22" ExtendBottom="22" HueFactor="-60" />
+    </Layers>
+    <Styles>
+      <Style Name="Default">
+        <BrushLayer Name="Default" ColorFactor="1.0" />
+        <BrushLayer Name="HoverLayer" IsHidden="true" />
+      </Style>
+      <Style Name="Hovered">
+        <BrushLayer Name="Default" IsHidden="true" />
+        <BrushLayer Name="HoverLayer" AlphaFactor="1" />
+      </Style>
+      <Style Name="Pressed">
+        <BrushLayer Name="Default" AlphaFactor="1" ColorFactor="0.8" />
+        <BrushLayer Name="HoverLayer" IsHidden="true" />
+      </Style>
+      <Style Name="Disabled">
+        <BrushLayer Name="Default" AlphaFactor="1" SaturationFactor="-50" ValueFactor="-50" />
+        <BrushLayer Name="HoverLayer" IsHidden="true" />
+      </Style>
+    </Styles>
+  </Brush>
+</Brushes>
