@@ -140,6 +140,9 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         var continueRaid = mapEvent?.IsRaidHostileAction() == true &&
             mapEvent.WinningSide == BattleSideEnum.Attacker &&
             playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
+            playerEncounter._attackerParty == PartyBase.MainParty.Party &&
+            (MobileParty.MainParty.Army == null ||
+             MobileParty.MainParty.Army.LeaderParty == MobileParty.MainParty) &&
             mapEvent.MapEventSettlement?.IsVillage == true &&
             mapEvent.MapEventSettlement.SettlementHitPoints > 0f;
         var settlement = continueRaid ? mapEvent.MapEventSettlement : null;
