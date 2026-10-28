@@ -91,7 +91,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #if DEBUG
         var targetBefore = copy.Steering.HasTarget ? copy.Steering.Target.Position : (Vec2?)null;
 #endif
-        copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
+        copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate, motion.RollRate);
 #if DEBUG
         float jump = targetBefore.HasValue ? (copy.Steering.Target.Position - targetBefore.Value).Length : 0f;
         copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, jump);

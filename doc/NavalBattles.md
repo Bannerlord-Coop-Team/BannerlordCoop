@@ -30,9 +30,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   Heave, pitch and roll come from this client's buoyancy on its own water, which now runs on the battle host's water
   time, so they should match the owner's (see "Waves are synced" in section 6). A roped copy's roll is also steered
   (D3 amendment, R53): while a rope or bridge holds the hull (`MissionShip.ComputeActiveShipAttachmentCount() > 0`), the
-  step pulls its roll rate about the forward axis toward the owner's roll rate, finite-differenced from consecutive
-  samples (the samples carry no roll rate), plus `copy_steer roll=` (default 5/s) x the error to the owner's roll
-  extrapolated like the yaw, clamped at 10 degrees/s and blended over the same tau. The owner heels under the joint's
+  step pulls its roll rate about the forward axis toward the owner's body roll rate, which each sample carries
+  (`RollRate`, ProtoMember 17; differencing frames would turn arrival jitter and teleports into false rates), plus
+  `copy_steer roll=` (default 5/s) x the error to the owner's roll extrapolated like the yaw, clamped at 10 degrees/s
+  and blended over the same tau. The owner heels under the joint's
   rail forces (`ShipAttachmentJoint` bridge constraints at the rail point), which `RopeForcePatch` keeps off copies, so
   without this a roped copy missed about 3.4 degrees of heel plus a 0.1-0.4 Hz sway (R51 item 25). A
   free copy's roll stays physics only, as R46 measured it within the limits. The crew's weight is the owner's: vanilla

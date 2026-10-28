@@ -154,29 +154,18 @@ internal sealed class CopySteering
     public bool IsOwnerStale => SecondsSinceSample > StaleSeconds;
 
     /// <summary>Takes the owner's latest sample; a jump past the snap distance from where the last one led queues a snap.</summary>
-    public void ObserveOwner(MatrixFrame frame, Vec2 velocity, float yawRate)
+    public void ObserveOwner(MatrixFrame frame, Vec2 velocity, float yawRate, float rollRate = 0f)
     {
         var led = Extrapolate(StaleSeconds, knobs.LeadSeconds).Position;
         if (HasTarget && (frame.origin.AsVec2 - led).Length > knobs.SnapMetres) IsSnapQueued = true;
 
-        float roll = RollOf(frame.rotation);
-        sampleRollRate = OwnerRollRate(roll);
-        sampleRoll = roll;
+        sampleRoll = RollOf(frame.rotation);
+        sampleRollRate = rollRate;
         sampleFrame = frame;
         sampleVelocity = velocity;
         sampleYawRate = yawRate;
         SecondsSinceSample = 0f;
         HasTarget = true;
-    }
-
-    // The owner's roll rate from its previous sample over the physics time stepped since, as samples carry none: a sample
-    // with no step since the last keeps the last rate, and the first sample or one after a stale gap has none.
-    private float OwnerRollRate(float roll)
-    {
-        if (!HasTarget || IsOwnerStale) return 0f;
-        if (!(SecondsSinceSample > 0f)) return sampleRollRate;
-
-        return WrapAngle(roll - sampleRoll) / SecondsSinceSample;
     }
 
     /// <summary>The planar position and yaw the copy steers toward right now.</summary>

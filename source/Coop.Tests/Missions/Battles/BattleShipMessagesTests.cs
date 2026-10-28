@@ -45,11 +45,11 @@ public class BattleShipMessagesTests
         Assert.Equal(7, copy.Sequence);
     }
 
-    // M10: copies extrapolate the owner's frame with the body velocity and yaw rate the sample carries.
+    // M10: copies extrapolate the owner's frame with the body velocity, yaw rate and roll rate the sample carries.
     [Fact]
     public void Sample_RoundTripsTheOwnersBodyMotion()
     {
-        var motion = new BattleShipMotion(new Vec2(4.5f, -1.25f), 0.2f);
+        var motion = new BattleShipMotion(new Vec2(4.5f, -1.25f), 0.2f, rollRate: -0.07f);
         var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: motion);
 
@@ -58,6 +58,7 @@ public class BattleShipMessagesTests
         Assert.Equal(4.5f, copy.Motion.Velocity.x);
         Assert.Equal(-1.25f, copy.Motion.Velocity.y);
         Assert.Equal(0.2f, copy.Motion.YawRate);
+        Assert.Equal(-0.07f, copy.Motion.RollRate);
     }
 
     // R45 roll: copies heel under the owner's crew load, which rides each sample as mass and a hull-local centre.
