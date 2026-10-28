@@ -3,6 +3,7 @@ using System.Linq;
 using Common.Messaging;
 using Common.Network;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
@@ -130,6 +131,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
                 Assert.Same(mapEvent, Assert.Single(ended));
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationLoot>());
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+                Assert.False(ServerBattleModeArbiter.IsClaimed(context.MapEventId));
             }
             finally
             {
