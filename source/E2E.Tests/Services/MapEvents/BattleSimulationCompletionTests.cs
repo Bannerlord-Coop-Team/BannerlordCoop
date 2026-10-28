@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using GameInterface.Services.MapEvents.Handlers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -42,8 +43,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
             }
         }, MapEventDisabledMethods);
 
-        AssertMapEventRemoved(Server, context.MapEventId);
-        foreach (var client in Clients)
-            AssertMapEventRemoved(client, context.MapEventId);
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
     }
 }
