@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -295,6 +296,8 @@ public class ActiveIssueDismisserTests : IDisposable
             }
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
+                if (!lordSolution)
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, owner);
                 if (lordSolution)
                     issue.AddLog(new JournalLog(CampaignTime.Zero, new TextObject("Follow the caravan")));
                 else
@@ -304,6 +307,8 @@ public class ActiveIssueDismisserTests : IDisposable
             unrelated = new JournalLogEntry(new TextObject("Unrelated active quest"), null, null, false);
             Campaign.Current.LogEntryHistory._logs.Add(unrelated);
             Assert.False(archive.IsEnded());
+            if (!lordSolution)
+                Assert.Equal(IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution, archive._lastIssueStatus);
             Assert.DoesNotContain(issue.IssueQuest, Campaign.Current.QuestManager.Quests);
             Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
         }, JournalTextLinks);
@@ -318,12 +323,12 @@ public class ActiveIssueDismisserTests : IDisposable
         {
             var ended = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
             Assert.Same(archive, ended);
+            Assert.Equal(ControllerId, Assert.IsType<PlayerJournalLogEntry>(ended).OwnerControllerId);
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, ended._lastIssueStatus);
+            if (!lordSolution)
+                Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
             Assert.True(ended.IsEnded());
             Assert.True(ended.IsEndedUnsuccessfully());
-            if (lordSolution)
-                Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, ended._lastIssueStatus);
-            else
-                Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
             Assert.Equal("Follow the caravan", Assert.Single(ended.GetEntries()).LogText.ToString());
             Assert.False(unrelated.IsEnded());
             Assert.Null(issue.IssueOwner.Issue);
