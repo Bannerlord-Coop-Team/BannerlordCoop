@@ -40,10 +40,12 @@ public class IssueCancellationTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void PlayerDeathCancelsOnlyItsPersonalMirrorBeforeInheritance(bool dead, bool special)
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    public void PlayerCharacterChangeCancelsOnlyItsPersonalMirrorBeforeInheritance(bool dead, bool special, bool hasOriginalParty)
     {
         scenario.Accept(scenario.ClientA);
         var otherGiverId = environment.CreateRegisteredObject<Hero>();
@@ -51,6 +53,7 @@ public class IssueCancellationTests : IDisposable
         {
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
             Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var originalParty));
+            if (!hasOriginalParty) originalParty = null;
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(otherGiverId, out var otherGiver));
             using (new AllowedThread())
             {
@@ -76,12 +79,12 @@ public class IssueCancellationTests : IDisposable
             var cancellations = scenario.Server.Resolve<IIssueCancellationCoordinator>();
             cancellations.CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
             cancellations.CancelForPlayerDeath(QuestScenario.ControllerA, owner, originalParty);
-            if (dead && !special)
+            if (!special)
             {
                 var call = Assert.Single(calls);
                 Assert.Same(quest, call.Item1);
                 Assert.Same(owner, call.Item2);
-                Assert.Same(originalParty, call.Item3);
+                Assert.Same(originalParty ?? previousParty, call.Item3);
                 Assert.False(call.Item4);
                 Assert.True(quest.IsFinalized);
                 Assert.Null(Giver().Issue);
@@ -95,7 +98,7 @@ public class IssueCancellationTests : IDisposable
             Assert.Same(previousHero, Hero.MainHero);
             Assert.Same(previousParty, MobileParty.MainParty);
         });
-        if (dead && !special) AssertFinalizedEverywhere();
+        if (!special) AssertFinalizedEverywhere();
         else Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
@@ -280,6 +283,51 @@ public class IssueCancellationTests : IDisposable
                 Assert.Equal(0, other.MemberRoster.GetTroopCount(troop));
                 // The test bootstrap replaces ChangeState before its production field-store replication runs.
                 if (instance == scenario.Server) Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AlternativeCancellationUpdatesTheOwnerBeforeDetachingWithoutReturningTroopsAgain(bool triedBefore)
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        StageAlternative(companionId, troopId);
+        var updates = new List<(IssueBase Issue, IssueBase.IssueUpdateDetails Detail, Hero Solver, bool Attached, int Troops)>();
+        Hero expectedSolver = null!;
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            giver.Issue.IsTriedToSolveBefore = triedBefore;
+            expectedSolver = triedBefore ? Hero.MainHero : null;
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(this, (issue, detail, solver) =>
+                updates.Add((issue, detail, solver, giver.Issue == issue, issue.AlternativeSolutionSentTroops.TotalManCount)));
+        });
+
+        scenario.Server.Call(() => Giver().Issue.CompleteIssueWithCancel());
+        environment.FlushCoalescer();
+
+        var update = Assert.Single(updates);
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, update.Detail);
+        Assert.Equal(QuestScenario.IssueId, update.Issue.StringId);
+        Assert.Same(expectedSolver, update.Solver);
+        Assert.True(update.Attached);
+        Assert.Equal(4, update.Troops);
+        AssertFinalizedEverywhere();
+        foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(scenario.OtherPartyId, out var other));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(3, party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(0, other.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(0, Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.TotalManCount);
             });
         }
     }

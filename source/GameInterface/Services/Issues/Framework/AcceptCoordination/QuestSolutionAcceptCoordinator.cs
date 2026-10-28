@@ -69,6 +69,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
+        messageBroker.Subscribe<QuestAcceptanceJournalFlushRequested>(Handle_QuestAcceptanceJournalFlushRequested);
         messageBroker.Subscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
@@ -81,6 +82,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     {
         messageBroker.Unsubscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Unsubscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
+        messageBroker.Unsubscribe<QuestAcceptanceJournalFlushRequested>(Handle_QuestAcceptanceJournalFlushRequested);
         messageBroker.Unsubscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Unsubscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
@@ -133,10 +135,13 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
 
+    private void Handle_QuestAcceptanceJournalFlushRequested(MessagePayload<QuestAcceptanceJournalFlushRequested> payload) => FlushAcceptanceJournals();
+
     private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload)
     {
         FlushAcceptanceJournals();
-        acceptingQuests.Clear();
+        if (payload.What.Quest != null) acceptingQuests.Remove(payload.What.Quest);
+        else acceptingQuests.Clear();
     }
 
     private void FlushAcceptanceJournals()

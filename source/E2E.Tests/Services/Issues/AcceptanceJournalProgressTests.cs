@@ -38,6 +38,36 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
         finally { preconditions.Dispose(); }
     }
 
+    [Fact]
+    public void AnUnrelatedDialogueLineKeepsTrackingTheLaterAcceptanceIntroduction()
+    {
+        Accept(ClientA, FirstGiverId);
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            var quest = giver.Issue.IssueQuest;
+            var unrelated = new ConversationSentence("unrelated", new TextObject("continue"), "start", "next",
+                null, null, () => { });
+            unrelated.RunConsequence(Game.Current);
+            Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+            var introduction = new ConversationSentence("introduction", new TextObject("agreed"), "next", "close_window",
+                null, null, () => quest.AddLog(new TextObject("The introduction arrived on a later dialogue turn.")));
+            introduction.RunConsequence(Game.Current);
+            Campaign.Current.ConversationManager.EndConversation();
+            quest.AddLog(new TextObject("Later gameplay text is outside the acceptance conversation."));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var sent = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+        Assert.Equal("The introduction arrived on a later dialogue turn.", sent.Text.ToString());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            AssertMetadata(sent, Assert.Single(giver.Issue.IssueQuest.JournalEntries));
+        });
+        Assert.Empty(ClientB.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -70,6 +100,7 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
                         if (endInsideCallback) ownerQuest.CompleteQuestWithCancel();
                     });
                 sentence.RunConsequence(Game.Current);
+                Campaign.Current.ConversationManager.EndConversation();
             }
         });
         TestEnvironment.FlushCoalescer();

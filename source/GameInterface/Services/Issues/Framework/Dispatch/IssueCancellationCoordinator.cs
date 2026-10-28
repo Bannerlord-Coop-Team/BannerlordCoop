@@ -51,7 +51,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
     public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
     {
-        if (ModInformation.IsClient || !oldHero.IsDead || originalParty == null) return;
+        if (ModInformation.IsClient) return;
 
         using (new MainHeroSubstitutionScope(oldHero, originalParty))
         {
@@ -96,6 +96,8 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
             // Troops are already returned by the server; replay only detaches this issue.
             if (issue.IssueQuest == null && issue.IsSolvingWithAlternative)
             {
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel,
+                    issue.IsTriedToSolveBefore ? Hero.MainHero : null);
                 issue.IssueFinalized();
                 return false;
             }
