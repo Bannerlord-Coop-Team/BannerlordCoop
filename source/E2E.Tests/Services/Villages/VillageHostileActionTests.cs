@@ -42,6 +42,7 @@ using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using Helpers;
 using Missions.Messages;
 using Moq;
 using SandBox.CampaignBehaviors;
@@ -1539,6 +1540,109 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Equal(0, menuExit.Count);
         if (repeatFinalizeRequest)
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+    }
+
+    [Fact]
+    public void CompletedRaidSimulation_AfterPartyAndLootDone_ResumesRaiding()
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.Raid);
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: context.MapEventId);
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId);
+            var mapEvent = encounter._mapEvent;
+            encounter._attackerParty = MobileParty.MainParty.Party;
+            encounter._defenderParty = mapEvent.MapEventSettlement.Party;
+            encounter._encounteredParty = encounter._defenderParty;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            encounter.ForceRaid = true;
+            encounter.BattleSimulation = new BattleSimulation(null, null);
+            encounter._alternativeReceivedLootShips = new List<TaleWorlds.CampaignSystem.Naval.Ship>();
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = encounter.BattleSimulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+        }, MapEventDisabledMethods);
+
+        var ended = new List<MapEvent>();
+        var harmony = new Harmony($"raid-result-ui.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootPartyScreen)));
+        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(MapEventTestBase), nameof(OpenLootInventoryScreen)));
+        using var menus = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        try
+        {
+            Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
+            StartBattleSimulation(client, context);
+            Server.Call(() =>
+            {
+                var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
+                mapEvent.BattleState = BattleState.AttackerVictory;
+                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
+                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                Assert.True(mapEvent.IsFinalized);
+                Assert.Single(ended);
+                Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
+            }, MapEventDisabledMethods);
+
+            client.Call(() =>
+            {
+                Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+                // Supply visible loot to exercise both native result-screen completion callbacks.
+                using (new AllowedThread())
+                {
+                    encounter.RosterToReceiveLootMembers.AddToCounts(client.GetRegisteredObject<CharacterObject>(troopId), 1);
+                    encounter.RosterToReceiveLootItems.AddToCounts(client.GetRegisteredObject<ItemObject>(itemId), 1);
+                }
+                var states = Game.Current.GameStateManager;
+                var mapState = states.GameStates.OfType<MapState>().Single();
+                var simulation = encounter.BattleSimulation;
+                mapState.EndBattleSimulation();
+                simulation.OnFinished();
+                PlayerEncounter.Update();
+                Assert.IsType<PartyState>(states.ActiveState);
+                Assert.Same(encounter, PlayerEncounter.Current);
+                Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
+
+                encounter.OnPlayerLootMembersAndPrisonerEnd(null, null, null, null, null, null, false);
+                states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                PlayerEncounter.Update();
+                Assert.IsType<InventoryState>(states.ActiveState);
+                Assert.Same(encounter, PlayerEncounter.Current);
+                Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
+
+                states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                PlayerEncounter.Update();
+                Assert.Equal("raiding_village", Assert.Single(menus.MenusFor(client).Where(menu => menu == "raiding_village")));
+                Assert.NotNull(PlayerEncounter.Current);
+                Assert.NotSame(encounter, PlayerEncounter.Current);
+                Assert.NotNull(MobileParty.MainParty.MapEvent);
+                Assert.NotSame(simulation.MapEvent, MobileParty.MainParty.MapEvent);
+                Assert.True(MobileParty.MainParty.MapEvent.IsRaid);
+                Assert.False(MobileParty.MainParty.MapEvent.HasWinner);
+            }, MapEventDisabledMethods);
+            Server.Call(() =>
+            {
+                Assert.Single(ended);
+                var raid = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId).MapEvent;
+                Assert.NotNull(raid);
+                Assert.True(raid.IsRaid);
+                Assert.False(raid.HasWinner);
+                Assert.Equal(Village.VillageStates.BeingRaided, raid.MapEventSettlement.Village.VillageState);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
+        }
     }
 
     [Fact]
