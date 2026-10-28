@@ -77,7 +77,7 @@ public readonly struct ModOptions
     [ProtoMember(27)]
     public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
     [ProtoMember(28)]
-    public readonly int KingdomDecisionMissionHoldLimitMinutes { get; } = 0;
+    public readonly int KingdomDecisionMissionHoldLimitMinutes { get; } = 10;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {

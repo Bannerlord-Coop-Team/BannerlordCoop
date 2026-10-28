@@ -1500,47 +1500,120 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     public void KingdomDecisionVotes_MissionHoldLimitResolvesRound()
     {
         const string instanceId = "kingdom_vote_long_battle";
-        TimeSpan holdLimit = TimeSpan.FromMinutes(10);
-        ModOptions previousOptions = ModConfigProvider.ModOptions;
-        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+        TimeSpan holdLimit = TimeSpan.FromMinutes(15);
+        ModConfigProvider.LoadModConfig(new ModOptionsData
         {
             KingdomDecisionMissionHoldLimitMinutes = (int)holdLimit.TotalMinutes,
         });
-        try
-        {
-            var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomLongBattleVoter");
+        var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomLongBattleVoter");
 
-            // The hold can't start before the voter enters the mission, so this bounds the limit from below.
-            DateTime enteredMission = DateTime.UtcNow;
-            Server.Call(() => Assert.True(Server.Resolve<IMissionManager>().TryEnterMission(
+        // The hold can't start before the voter enters the mission, so this bounds the limit from below.
+        DateTime enteredMission = DateTime.UtcNow;
+        Server.Call(() => Assert.True(Server.Resolve<IMissionManager>().TryEnterMission(
+            client2.NetPeer,
+            SecondControllerId,
+            instanceId,
+            out _)));
+        client1.SimulateMessage(
+            this,
+            new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+        DateTime voted = DateTime.UtcNow;
+
+        DateTime beforeLimit = enteredMission + holdLimit - TimeSpan.FromSeconds(1);
+        Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        AssertDeadlineCappedAtHoldLimitAndResolves(kingdomId, enteredMission + holdLimit, voted + holdLimit);
+    }
+
+    [Fact]
+    public void KingdomDecisionVotes_MissionHoldLimitKeepsCountingAfterVoterReentersMission()
+    {
+        const string instanceId = "kingdom_vote_back_to_back_battles";
+        TimeSpan holdLimit = TimeSpan.FromMinutes(15);
+        TimeSpan pastRound = KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1);
+        ModConfigProvider.LoadModConfig(new ModOptionsData
+        {
+            KingdomDecisionMissionHoldLimitMinutes = (int)holdLimit.TotalMinutes,
+        });
+        var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomBackToBackVoter");
+
+        DateTime enteredMission = DateTime.UtcNow;
+        Server.Call(() => Assert.True(Server.Resolve<IMissionManager>().TryEnterMission(
+            client2.NetPeer,
+            SecondControllerId,
+            instanceId,
+            out _)));
+        client1.SimulateMessage(
+            this,
+            new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+        DateTime voted = DateTime.UtcNow;
+
+        DateTime afterFirstDeadline = voted + pastRound;
+        Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(afterFirstDeadline));
+
+        // Each mission change is processed in the same game-thread call so a background round tick can't run in between.
+        DateTime returnedAt = afterFirstDeadline + TimeSpan.FromSeconds(1);
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IMissionManager>().TryLeaveMission(
                 client2.NetPeer,
                 SecondControllerId,
                 instanceId,
-                out _)));
-            client1.SimulateMessage(
-                this,
-                new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
-            DateTime voted = DateTime.UtcNow;
+                out _));
+            GetConcreteVoteManager(Server).ProcessVotingRounds(returnedAt);
+        });
 
-            DateTime beforeLimit = enteredMission + holdLimit - TimeSpan.FromSeconds(1);
-            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit));
-
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
-
-            // The extension stops at the hold limit instead of running a full round past it.
-            DateTime cappedDeadline = new DateTime(GetLatestRoundStatus(kingdomId).DeadlineUtcTicks, DateTimeKind.Utc);
-            Assert.InRange(cappedDeadline, enteredMission + holdLimit, voted + holdLimit);
-
-            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(cappedDeadline));
-
-            Assert.Single(
-                Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
-                message => message.KingdomId == kingdomId);
-        }
-        finally
+        DateTime beforeLimit = enteredMission + holdLimit - TimeSpan.FromSeconds(1);
+        Server.Call(() =>
         {
-            ModConfigProvider.ModOptions = previousOptions;
-        }
+            Assert.True(Server.Resolve<IMissionManager>().TryEnterMission(
+                client2.NetPeer,
+                SecondControllerId,
+                instanceId,
+                out _));
+            GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        AssertDeadlineCappedAtHoldLimitAndResolves(kingdomId, enteredMission + holdLimit, voted + holdLimit);
+    }
+
+    [Fact]
+    public void KingdomDecisionVotes_MissionVisitBeforeDeadlineKeepsDeadline()
+    {
+        const string instanceId = "kingdom_vote_tavern_visit";
+        var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomTavernVoter");
+        client1.SimulateMessage(
+            this,
+            new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+        long deadlineTicks = GetLatestRoundStatus(kingdomId).DeadlineUtcTicks;
+
+        DateTime visitedAt = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        Server.Call(() =>
+        {
+            IMissionManager missionManager = Server.Resolve<IMissionManager>();
+            KingdomDecisionVoteManager voteManager = GetConcreteVoteManager(Server);
+            Assert.True(missionManager.TryEnterMission(client2.NetPeer, SecondControllerId, instanceId, out _));
+            voteManager.ProcessVotingRounds(visitedAt);
+            Assert.True(missionManager.TryLeaveMission(client2.NetPeer, SecondControllerId, instanceId, out _));
+            voteManager.ProcessVotingRounds(visitedAt + TimeSpan.FromSeconds(5));
+        });
+
+        Assert.Equal(deadlineTicks, GetLatestRoundStatus(kingdomId).DeadlineUtcTicks);
+    }
+
+    // Checks the held round's extension stops inside the hold limit window, then resolves once that deadline passes.
+    private void AssertDeadlineCappedAtHoldLimitAndResolves(string kingdomId, DateTime earliestLimit, DateTime latestLimit)
+    {
+        DateTime cappedDeadline = new DateTime(GetLatestRoundStatus(kingdomId).DeadlineUtcTicks, DateTimeKind.Utc);
+        Assert.InRange(cappedDeadline, earliestLimit, latestLimit);
+
+        Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(cappedDeadline));
+
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
     }
 
     [Fact]

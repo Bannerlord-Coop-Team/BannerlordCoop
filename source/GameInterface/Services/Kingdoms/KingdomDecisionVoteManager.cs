@@ -1824,6 +1824,7 @@ namespace GameInterface.Services.Kingdoms
         {
             if (TryGetOutstandingVoterInMission(state, out string heldClanId))
             {
+                // Set once per round so leaving and re-entering a mission doesn't restart the hold limit.
                 if (!state.MissionHoldStartedUtc.HasValue) state.MissionHoldStartedUtc = utcNow;
                 if (utcNow < state.RoundDeadlineUtc.Value) return;
 
@@ -1838,13 +1839,14 @@ namespace GameInterface.Services.Kingdoms
                 if (holdLimitUtc.HasValue && holdLimitUtc.Value < extendedDeadlineUtc) extendedDeadlineUtc = holdLimitUtc.Value;
 
                 state.SetRoundDeadline(extendedDeadlineUtc);
+                state.IsDeadlineExtendedForMission = true;
                 LogRoundDeadlineMoved(state, $"extended because clan {heldClanId} is in a mission");
                 return;
             }
 
-            if (!state.MissionHoldStartedUtc.HasValue) return;
+            if (!state.IsDeadlineExtendedForMission) return;
 
-            state.MissionHoldStartedUtc = null;
+            state.IsDeadlineExtendedForMission = false;
             state.SetRoundDeadline(utcNow + VotingRoundDuration);
             LogRoundDeadlineMoved(state, "restarted because no unvoted voter is in a mission");
         }
@@ -2232,6 +2234,7 @@ namespace GameInterface.Services.Kingdoms
             public DateTime? RoundDeadlineUtc { get; private set; }
             public bool IsResolved { get; set; }
             public DateTime? MissionHoldStartedUtc { get; set; }
+            public bool IsDeadlineExtendedForMission { get; set; }
             public bool HasRoundSnapshot => RoundClans.Count > 0;
 
             public bool HasAllVotes => EligibleClanIds.Count > 0 && EligibleClanIds.All(clanId => FinalVotes.ContainsKey(clanId));
