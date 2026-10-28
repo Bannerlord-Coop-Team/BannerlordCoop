@@ -71,7 +71,14 @@ public class NavalRopesTests
                 Assert.Equal(3L, removal.Generation);
             }
 
+            Assert.Null(records[station].SamplesOmittedUtc);
+            Assert.NotNull(records[station].LastIncludedSampleUtc);
             Assert.Null(Capture(hull, _ => Guid.Empty));
+            var omittedUtc = records[station].SamplesOmittedUtc;
+            Assert.NotNull(omittedUtc);
+            Assert.True(omittedUtc >= records[station].LastIncludedSampleUtc);
+            Assert.Null(Capture(hull, _ => Guid.Empty));
+            Assert.Equal(omittedUtc, records[station].SamplesOmittedUtc);
         }
         finally
         {

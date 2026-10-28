@@ -119,6 +119,10 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalRopeDebugCommands.RopeListCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalRopeCutCoopCommand>()
+            .As<INavalRopeCutCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalRopeDebugCommands.RopeThrowCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
