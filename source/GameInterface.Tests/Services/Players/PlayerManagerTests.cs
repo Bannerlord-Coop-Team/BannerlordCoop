@@ -282,6 +282,19 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void IsSenderControllingParty_EmptyPartyIdOnBothSides_ReturnsFalse()
+    {
+        var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.False(playerManager.IsSenderControllingParty(peer, string.Empty));
+        Assert.False(playerManager.IsSenderControllingParty(peer, null));
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);
