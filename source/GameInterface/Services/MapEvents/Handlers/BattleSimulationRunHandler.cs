@@ -54,7 +54,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IPlayerManager playerManager;
 
-    private sealed class ActiveSimulation
+    internal sealed class ActiveSimulation
     {
         public NetPeer Peer;
         public MapEvent MapEvent;
@@ -931,7 +931,7 @@ internal class BattleSimulationRunHandler : IHandler
     /// allocations (mirroring <c>MapEvent.SimulateBattleRoundEndSession</c>), then restore the observer
     /// that was swapped out when the simulation began.
     /// </summary>
-    private static void EndSimulationSession(ActiveSimulation sim)
+    internal static void EndSimulationSession(ActiveSimulation sim)
     {
         foreach (var side in sim.MapEvent._sides)
         {
