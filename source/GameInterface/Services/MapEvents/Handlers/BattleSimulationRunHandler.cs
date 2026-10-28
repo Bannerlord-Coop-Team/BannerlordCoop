@@ -901,6 +901,15 @@ internal class BattleSimulationRunHandler : IHandler
                     sim.MapEvent.SimulatePlayerEncounterBattle();
                 }
 
+                if (sim.MapEvent.HasWinner && PlayerWonSimulation(sim.MapEvent))
+                {
+                    network.SendAll(new NetworkBattleSimulationLoot(
+                        entry.Key,
+                        sim.MapEvent.BattleState,
+                        CollectDefeatedCasualties(sim.MapEvent),
+                        CollectWinnerContributions(sim.MapEvent)));
+                }
+
                 EndSimulationSession(sim, completed: sim.MapEvent.HasWinner);
                 mapEventLogger.DebugMapEvent(sim.MapEvent, "Battle simulation client disconnected; finished server-side. BattleState={BattleState}", sim.MapEvent.BattleState);
 

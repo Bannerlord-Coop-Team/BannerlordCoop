@@ -1585,9 +1585,14 @@ public class VillageHostileActionTests : MapEventTestBase
             Server.Call(() =>
             {
                 var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-                mapEvent.BattleState = BattleState.AttackerVictory;
-                Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
-                    new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                for (var advance = 0; advance < 200 &&
+                     Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Count == 0;
+                     advance++)
+                {
+                    Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
+                        new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                }
+                Assert.NotEmpty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationRound>());
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Single(ended);
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
@@ -3883,6 +3888,7 @@ public class VillageHostileActionTests : MapEventTestBase
 
             Assert.Equal(hostileAction.MapEventId,
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>()).MapEventId);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationLoot>());
             Server.Call(() =>
             {
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out _));
