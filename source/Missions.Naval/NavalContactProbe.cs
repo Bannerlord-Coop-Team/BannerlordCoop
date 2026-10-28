@@ -23,6 +23,10 @@ internal static class NavalContactProbe
     private static long contactOwnOnCopy, contactCopyOnOwn, contactCopyOnCopy, copyPairsFiltered;
     private static long collisionVanilla, collisionSent, collisionDropped, ramVanilla, ramSent, ramDropped;
     private static long routedCollisionApplies, ramPuppetsSpared;
+    private static readonly Queue<Guid> sparedAgentIds = new Queue<Guid>();
+    private static readonly Queue<Guid> receivedDeathAgentIds = new Queue<Guid>();
+    private static readonly Queue<Guid> deathBroadcastAgentIds = new Queue<Guid>();
+    private static readonly object agentIdsLock = new object();
 
     private static readonly Dictionary<(Guid, Guid), HullPairApproach> approaches = new Dictionary<(Guid, Guid), HullPairApproach>();
 
@@ -63,7 +67,32 @@ internal static class NavalContactProbe
     internal static void CountSparedRamPuppet(Agent puppet)
     {
         Interlocked.Increment(ref ramPuppetsSpared);
+        var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
+        if (controller != null && controller.MissionComponent.AgentRegistry.TryGetAgentInfo(puppet, out var info))
+            RecordAgentId(sparedAgentIds, info.AgentId);
         Logger.Debug("[NavalSync] Ram impact spared puppet agent {Agent}; its owner kills it", puppet.Index);
+    }
+
+    /// <summary>Records an owner's actual outgoing death message, using the same network id as the spared puppet.</summary>
+    internal static void RecordDeathBroadcast(Guid agentId) => RecordAgentId(deathBroadcastAgentIds, agentId);
+
+    /// <summary>Records an incoming owner death broadcast independently of its deferred puppet apply.</summary>
+    internal static void RecordReceivedDeath(Guid agentId) => RecordAgentId(receivedDeathAgentIds, agentId);
+
+    /// <summary>Keeps at most 128 recent ids per stream; repeats preserve repeated ram ticks.</summary>
+    private static void RecordAgentId(Queue<Guid> ids, Guid agentId)
+    {
+        lock (agentIdsLock)
+        {
+            if (ids.Count == 128) ids.Dequeue();
+            ids.Enqueue(agentId);
+        }
+    }
+
+    /// <summary>Copies an id stream while the send callback may be writing it.</summary>
+    private static Guid[] RecentAgentIds(Queue<Guid> ids)
+    {
+        lock (agentIdsLock) return ids.ToArray();
     }
 
     /// <summary>[Game thread] The owner applied a peer's collision report through vanilla DealCollisionDamage.</summary>
@@ -137,6 +166,9 @@ internal static class NavalContactProbe
             ramDropped = Interlocked.Read(ref ramDropped),
             routedApplies = Interlocked.Read(ref routedCollisionApplies),
             ramPuppetsSpared = Interlocked.Read(ref ramPuppetsSpared),
+            ramPuppetsSparedAgentIds = RecentAgentIds(sparedAgentIds),
+            deathBroadcastAgentIds = RecentAgentIds(deathBroadcastAgentIds),
+            receivedDeathAgentIds = RecentAgentIds(receivedDeathAgentIds),
         },
         closestApproach = InspectApproaches(),
     };
@@ -155,6 +187,12 @@ internal static class NavalContactProbe
         Interlocked.Exchange(ref ramDropped, 0);
         Interlocked.Exchange(ref routedCollisionApplies, 0);
         Interlocked.Exchange(ref ramPuppetsSpared, 0);
+        lock (agentIdsLock)
+        {
+            sparedAgentIds.Clear();
+            deathBroadcastAgentIds.Clear();
+            receivedDeathAgentIds.Clear();
+        }
         approaches.Clear();
     }
 

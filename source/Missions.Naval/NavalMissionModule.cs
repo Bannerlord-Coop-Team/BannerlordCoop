@@ -69,6 +69,13 @@ public class NavalMissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 #if DEBUG
+        builder.RegisterType<NavalRamInspect>()
+            .As<INavalRamInspect>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalRamStageCoopCommand>()
+            .As<INavalRamStageCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalLateHullProbe>()
             .As<INavalLateHullProbe>()
             .InstancePerDependency();

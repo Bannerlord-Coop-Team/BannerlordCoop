@@ -15,6 +15,13 @@ namespace Missions.Naval;
 /// <summary>Reports the local coop naval battle: session, setup guard's reserve check and per-hull state.</summary>
 public sealed class NavalInspectCoopCommand : ICoopCommand
 {
+#if DEBUG
+    private readonly INavalRamInspect ramInspect;
+
+    /// <summary>Reads owner-side crew morale independently of the other inspect sections.</summary>
+    public NavalInspectCoopCommand(INavalRamInspect ramInspect) => this.ramInspect = ramInspect;
+#endif
+
     public string Prefix => "coop.debug.naval";
 
     public string Name => "inspect";
@@ -55,6 +62,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             shipDamageGate = NavalShipDamageGate.Inspect(),
 #if DEBUG
             // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
+            ramProbe = ramInspect.Inspect(mission, controller),
             copyProbe = mission.GetMissionBehavior<NavalCopyProbeLogic>()?.Inspect(),
 #endif
             shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipWeaponReplicator.Inspect(),
