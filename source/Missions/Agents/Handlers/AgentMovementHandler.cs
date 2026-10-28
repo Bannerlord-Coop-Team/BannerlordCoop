@@ -53,6 +53,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     /// <summary>[Game thread] The naval deck counters (diagnostics).</summary>
     object InspectShipDecks();
 
+    /// <summary>Per-mission deck diagnostics and DEBUG receiver rejection control.</summary>
+    INavalDeckMovementProbe DeckMovementProbe { get; }
+
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 
     /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
@@ -455,6 +458,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext,
+        INavalDeckMovementProbe deckMovementProbe,
         IRelayNetwork relayNetwork = null)
     {
         if (movementRateController == null) throw new ArgumentNullException(nameof(movementRateController));
@@ -475,6 +479,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        DeckMovementProbe = deckMovementProbe;
         this.relayNetwork = relayNetwork;
         _interpolator = new AgentPositionInterpolator(agentRegistry);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
@@ -1022,7 +1027,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
-            if (WithholdSeatedMovement(recipient, captured)) continue;
+            if (WithholdSeatedMovement(controllerId, recipient, captured)) continue;
             bool shouldSend = captured.IsMount
                 ? ShouldSendMovement(recipient, agentId, captured.MountData)
                 : ShouldSendMovement(recipient, agentId, captured.AgentData);
@@ -1094,7 +1099,13 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             EnumerateAgentMovementBatches(priorityMovement, movement),
             firstLegacyBatch: null,
             CreateMovementPacket,
-            (agentId, data) => RecordSentMovement(recipient, agentId, data),
+            (agentId, data) =>
+            {
+                RecordSentMovement(recipient, agentId, data);
+                bool ai = data.DeckShip != Guid.Empty && agentRegistry.TryGetAgentInfo(agentId, out var info)
+                    && info.Agent.Controller == AgentControllerType.AI;
+                DeckMovementProbe.Record(controllerId, agentId, data, ai, totalSimulationTime);
+            },
             mountMovement.Compact.Values,
             mountMovement.Legacy,
             CreateMountMovementPacket,
@@ -1846,7 +1857,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 if (data.DeckShipIndex != 0)
                 {
                     RecordMovementSequence(agentInfo, snapshot.SampleSequence);
-                    ApplyDeckMovement(agent, data);
+                    ApplyDeckMovement(agentInfo.AgentId, agent, data);
                     continue;
                 }
 
@@ -2160,6 +2171,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         {
             if (_disposed) return;
             recipientMovementStates.Remove(controllerId);
+            DeckMovementProbe.RemoveRecipient(controllerId);
             movementBatchSender.RemoveRecipient(controllerId);
         });
     }

@@ -10,6 +10,8 @@ namespace Missions.Agents.Handlers;
 /// <summary>Naval movement: deck-relative poses for agents on a hull, and no world movement for agents seated at a ship station.</summary>
 public partial class AgentMovementHandler
 {
+    public INavalDeckMovementProbe DeckMovementProbe { get; }
+
     private IShipDeckSeam shipDeck;
     private IShipStationSeats stationSeats;
     private long deckStamped, deckAccepted, deckRejected, seatedWithheld;
@@ -17,6 +19,7 @@ public partial class AgentMovementHandler
     public void ConfigureShipDeck(IShipDeckSeam seam)
     {
         shipDeck = seam;
+        DeckMovementProbe.Reset();
         deckStamped = deckAccepted = deckRejected = seatedWithheld = 0;
         _interpolator.ConfigureNavalDeck(seam == null ? null : seam.TryResolveDeckFrame);
     }
@@ -69,9 +72,14 @@ public partial class AgentMovementHandler
 
     // [Game thread] A deck pose never falls back to world; one that cannot resolve clears the buffered target and halts the
     // puppet, as an evicted deck target does.
-    private void ApplyDeckMovement(Agent agent, AgentData data)
+    private void ApplyDeckMovement(Guid agentId, Agent agent, AgentData data)
     {
-        if (data.HasValidDeck && data.MountData == null && !agent.HasMount && _interpolator.TrySetRiderDeckTarget(agent, data))
+#if DEBUG
+        bool reject = DeckMovementProbe.ShouldReject(agentId);
+#else
+        bool reject = false;
+#endif
+        if (!reject && data.HasValidDeck && data.MountData == null && !agent.HasMount && _interpolator.TrySetRiderDeckTarget(agent, data))
         {
             deckAccepted++;
             return;
@@ -82,13 +90,14 @@ public partial class AgentMovementHandler
     }
 
     // A seated agent's pose belongs to its station, which peers replay through the station-use stream.
-    private bool WithholdSeatedMovement(RecipientMovementState recipient, CapturedMovement captured)
+    private bool WithholdSeatedMovement(string controllerId, RecipientMovementState recipient, CapturedMovement captured)
     {
         if (stationSeats == null || captured.IsMount || !stationSeats.IsOwnSeat(captured.AgentInfo.AgentId)) return false;
 
         // Nothing is sent or deferred, so leaving the station compares against no baseline.
         recipient.LastSentMovement.Remove(captured.AgentInfo.AgentId);
         recipient.MovementPendingSince.Remove(captured.AgentInfo.AgentId);
+        DeckMovementProbe.Record(controllerId, captured.AgentInfo.AgentId, default, false, totalSimulationTime);
         seatedWithheld++;
         return true;
     }
@@ -100,6 +109,7 @@ public partial class AgentMovementHandler
         accepted = deckAccepted,
         rejected = deckRejected,
         seatedWithheld,
+        sendProbe = DeckMovementProbe.Inspect(totalSimulationTime),
         interpolator = _interpolator.InspectNavalDeck(),
     };
 }

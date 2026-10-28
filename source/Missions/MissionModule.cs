@@ -275,6 +275,7 @@ public class MissionModule : Module
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
+        builder.RegisterType<NavalDeckMovementProbe>().As<INavalDeckMovementProbe>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
