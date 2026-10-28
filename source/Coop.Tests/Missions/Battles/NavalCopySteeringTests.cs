@@ -355,6 +355,7 @@ public class NavalCopySteeringTests
     [InlineData("deadzone", "1", "Unknown knob")]
     [InlineData("lead", "2", "lead (s) must be")]
     [InlineData("softzone", "x", "softzone (m) must be")]
+    [InlineData("roll", "-1", "roll (1/s) must be")]
     public void Knobs_RefuseUnknownOrOutOfRangeValues(string key, string value, string expected)
     {
         Assert.StartsWith(expected, new CopySteeringKnobs().TryApply(key, value));
