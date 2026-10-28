@@ -159,6 +159,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         if (!continueRaid || settlement == null)
             return;
+        PartyBase.MainParty._mapEventSide = null;
         var broker = messageBroker ?? MessageBroker.Instance;
 
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
