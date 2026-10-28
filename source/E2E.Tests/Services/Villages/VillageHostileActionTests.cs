@@ -1604,8 +1604,8 @@ public class VillageHostileActionTests : MapEventTestBase
                 }
                 var states = Game.Current.GameStateManager;
                 var mapState = states.GameStates.OfType<MapState>().Single();
-            var simulation = encounter.BattleSimulation;
-            completedSimulation = simulation;
+                var simulation = encounter.BattleSimulation;
+                completedSimulation = simulation;
                 mapState.EndBattleSimulation();
                 simulation.OnFinished();
                 PlayerEncounter.Update();
