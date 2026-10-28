@@ -27,16 +27,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
     private readonly ISiegeEventInterface siegeEventInterface;
-    private readonly IMessageBroker messageBroker;
 
-    public PlayerEncounterInterface() : this(null, null)
+    public PlayerEncounterInterface() : this(null)
     {
     }
 
-    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface, IMessageBroker messageBroker = null)
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
     {
         this.siegeEventInterface = siegeEventInterface;
-        this.messageBroker = messageBroker;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -148,14 +146,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         PlayerEncounter.Finish(true);
 
-        if (!continueRaid || settlement == null || messageBroker == null)
+        if (!continueRaid || settlement == null)
             return;
 
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
         // approval creates the next raid through the authoritative server path.
         PlayerEncounter.Start();
         PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlement.Party, settlement);
-        messageBroker.Publish(this, new VillageHostileActionAttempted(
+        MessageBroker.Instance.Publish(this, new VillageHostileActionAttempted(
             VillageHostileAction.Raid,
             MobileParty.MainParty,
             settlement));
