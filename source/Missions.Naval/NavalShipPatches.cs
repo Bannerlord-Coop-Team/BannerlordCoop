@@ -227,7 +227,7 @@ internal class AgentStationUsePatch
 // Every release path (death, order, AI, player) ends in StopUsingGameObjectAux.
 [HarmonyPatch(typeof(Agent), nameof(Agent.StopUsingGameObjectAux))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class AgentStationReleasePatch
+internal partial class AgentStationReleasePatch
 {
     [HarmonyPrefix]
     private static void Prefix(Agent __instance, out UsableMissionObject __state) => __state = __instance.CurrentlyUsedGameObject;
@@ -239,6 +239,9 @@ internal class AgentStationReleasePatch
             || __instance.CurrentlyUsedGameObject == __state)
             return;
 
+#if DEBUG
+        ObserveRelease(__instance, __state);
+#endif
         MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, __state, inUse: false));
     }
 }
