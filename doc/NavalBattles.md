@@ -28,7 +28,14 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
   then the owner's velocity and yaw rate.
   Heave, pitch and roll come from this client's buoyancy on its own water, which now runs on the battle host's water
-  time, so they should match the owner's (see "Waves are synced" in section 6). The crew's weight is the owner's: vanilla
+  time, so they should match the owner's (see "Waves are synced" in section 6). A roped copy's roll is also steered
+  (D3 amendment, R53): while a rope or bridge holds the hull (`MissionShip.ComputeActiveShipAttachmentCount() > 0`), the
+  step pulls its roll rate about the forward axis toward the owner's roll rate, finite-differenced from consecutive
+  samples (the samples carry no roll rate), plus `copy_steer roll=` (default 5/s) x the error to the owner's roll
+  extrapolated like the yaw, clamped at 10 degrees/s and blended over the same tau. The owner heels under the joint's
+  rail forces (`ShipAttachmentJoint` bridge constraints at the rail point), which `RopeForcePatch` keeps off copies, so
+  without this a roped copy missed about 3.4 degrees of heel plus a 0.1-0.4 Hz sway (R51 item 25). A
+  free copy's roll stays physics only, as R46 measured it within the limits. The crew's weight is the owner's: vanilla
   pushes a hull down with the agents on its deck (`NavalPhysics.ApplyAgentForces`: committed agent mass x
   `StepAgentWeightMultiplier`, 2 on ships, x g at their mass-weighted centre), and a copy's puppets stand and sit elsewhere
   than the owner's crew (R45: copies of AI-crewed hulls heeled 2.5-4.2 degrees off). Each sample carries the owner's
@@ -607,14 +614,17 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     roll match its owner's too. R45 confirmed the water (0.02 m) and heave (0.02-0.05 m mean), but copies of AI-crewed
     hulls rolled 1.9-4.3 degrees off, from the puppets' weight (see section 1). With the crew load fix, R46 measured
     copies' crew mass and centre equal to the owner's and free-hull roll at mean <= 0.06 degrees, sd <= 0.51 degrees,
-    gain 0.99-1.01. Roll is pass/fail per free copy over windows of at least 60 s without sinking, snap, ram contact or
-    a rope, on the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees, and a gain of 0.9 to 1.1
-    (slope of the copy's roll on the owner's, both de-meaned). Roped hulls are excluded, see the next item.
-  - **Roped hulls rolled off (fix pending a live check).** R46 measured roll sd 1.7-4.4 degrees and a gain up to 1.56 on
-    copies tied by ropes, even with an empty deck. Copy-copy contacts are refused, so contact force doesn't explain it: the
-    rope joint's `StabilizeShipUps` roll spring was filtered on copies with the joint's other forces. `RopeForcePatch` now
-    lets that torque through (it acts only about each hull's own forward axis) and keeps filtering the yaw and planar
-    forces. Roll stays report-only for a roped copy until a live run measures it against the free-hull criteria.
+    gain 0.99-1.01. Roll is pass/fail per copy over windows of at least 60 s without sinking, snap or ram contact, on
+    the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees, and a gain of 0.9 to 1.1. The gain is
+    the least-squares slope of the de-meaned copy roll on the de-meaned owner roll, the share of the owner's roll the copy
+    reproduces in phase; motion on the copy alone that is uncorrelated with the owner's doesn't move it, so it checks
+    amplitude while the sd checks everything else. The same limits hold for free and roped copies (section 7).
+  - **Roped hulls roll with their owner (fix pending a live check, R53).** R46 measured roped copies at roll sd 1.7-4.4
+    degrees and a gain up to 1.56: the rope joint's `StabilizeShipUps` roll spring was filtered on copies with its other
+    forces. `RopeForcePatch` now lets that torque through, and R51 then measured the owner rolling more than its copy
+    (mean 3.38 degrees, sd 3.55 degrees, gain 0.59): the copy matched the owner's wave roll at about unit gain, and the
+    owner added the heel and sway from the bridge springs' rail forces, which stay filtered on copies. A roped copy's roll
+    is now steered toward its owner's (section 1).
   - `coop.debug.naval.water_clock` reports the patch status, the written and vanilla water time, their offset and the
     battle's offset estimate.
   - **Each game-version port must re-check the signature** and update it if it no longer matches: the scene field
@@ -775,7 +785,7 @@ Run `water_clock` on both clients and verify `redirected=true` and a settled sha
 
 `roll status` reports `NAVAL_ROLL_STATUS` JSON. Preserve each client's log after both report `reason=elapsed`. `roll stop` explicitly ends a partial run. Each `NAVAL_ROLL` record has `type=header|sample|end` and a `data` object. Sample data includes `instance`, full `shipId`, `controller`, `authority`, `role=owner|copy`, actual `timeS` (shared water seconds), signed `rollDeg`, signed `pitchDeg`, and world height `heaveM`. Sampling runs at most 20 Hz on mission ticks, without synthesizing missing samples. Header/end records include the requested interval, count, last sample time, local means and stop reason. Authority/hull replacement, removal, clock loss/reversal or invalid samples end the run explicitly. Local means are not paired error statistics. The lab MCP `wait_for_drift` polls the older `coop.debug.naval_lab.drift-status` protocol with operation/incarnation ids; it cannot wait for this command. Poll `coop.debug.naval.roll status` through the normal debug-command tool instead.
 
-For item 25, pair only the same instance, full ship id and unchanged authority, with one `owner` and one `copy`. Restrict to a common continuous **60 s** interval inside both 65 s runs. Linearly interpolate each client's actual samples onto the same 20 Hz time grid; do not pair by row number, round timestamps into bins, extrapolate, or bridge a gap over 0.15 s. Reject an incomplete interval or a non-`elapsed` run. For paired roll arrays `c` and `o`, compute `d = c - o`, `mean = average(d)`, `sd = sqrt(average((d - mean)^2))` (population standard deviation), and centered RMS amplitude gain `sqrt(average((c-average(c))^2)) / sqrt(average((o-average(o))^2))`. If owner amplitude is zero, report gain unavailable instead of passing. Pass when `abs(mean) <= 0.5 deg`, `sd <= 1.0 deg`, and `0.9 <= gain <= 1.1`. Record the covered interval, sample counts, maximum gap and owner RMS alongside the result. The command does not itself verify rope continuity; retain the rope evidence separately.
+For item 25, pair only the same instance, full ship id and unchanged authority, with one `owner` and one `copy`. Restrict to a common continuous **60 s** interval inside both 65 s runs. Linearly interpolate each client's actual samples onto the same 20 Hz time grid; do not pair by row number, round timestamps into bins, extrapolate, or bridge a gap over 0.15 s. Reject an incomplete interval or a non-`elapsed` run. For paired roll arrays `c` and `o`, compute `d = c - o`, `mean = average(d)`, `sd = sqrt(average((d - mean)^2))` (population standard deviation), and the gain as the least-squares slope of the copy on the owner, `average((c-average(c))*(o-average(o))) / average((o-average(o))^2)`. If owner amplitude is zero, report gain unavailable instead of passing. Use the slope, not the centered RMS ratio: the ratio counts any extra motion on either side as amplitude, which the sd already measures, while the slope only moves with roll the copy reproduces in phase (R51 B6: slope 0.59, RMS ratio 0.78, both failing). R46's free-hull baseline used the slope. Pass when `abs(mean) <= 0.5 deg`, `sd <= 1.0 deg`, and `0.9 <= gain <= 1.1`. Record the covered interval, sample counts, maximum gap and owner RMS alongside the result. The command does not itself verify rope continuity; retain the rope evidence separately. For a free-hull control, run the same pair on a hull no rope or bridge holds (`rope_status` shows none for it), for example before the boarding preset's ropes connect; it must pass the same limits.
 
 ### Commands (`coop.debug.naval.*`)
 
@@ -794,7 +804,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `try_helm <ship> [force]` | client | Has the main agent try a hull's helm as the use key would: vanilla's `CanUseObject` (the helm's `IsDisabledForPlayers`), a free seat and `IsAbleToUseMachine`, then `HandleStartUsingAction`, where `ForeignHelmUsePatch` refuses a copy's helm unless the copy is an enemy (to capture it; an orphan has no team, so it stays refused). One `NAVAL_TRY_HELM` line with `enemy`, `copy`, `canUseObject`, `vacant`, `ableToUse` and `result=REFUSED_BY_VANILLA\|BLOCKED\|ALLOWED`. An enemy helm is only offered once vanilla would allow a capture (the hull vacant and connected), so `force` skips vanilla's gates to test the co-op block directly (a friendly copy or an orphan reads `BLOCKED`). An allowed seat is released again. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
-| `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live; a tuning holds across battles until this client leaves the session. |
+| `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap roll`; `roll=0` leaves a roped copy's roll to its buoyancy), live; a tuning holds across battles until this client leaves the session. |
 | `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre, null for none or an empty deck) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
