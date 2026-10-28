@@ -35,6 +35,11 @@ public interface IBattleSession
     /// <summary>Whether this client's battle mission is a naval one; set once when its naval services open with it.</summary>
     bool IsNaval { get; }
 
+#if DEBUG
+    /// <summary>Withholds this mission's result and departure announcements without stopping relay networking.</summary>
+    bool DebugWithholdCompletion { get; set; }
+#endif
+
     /// <summary>Records that this client's battle mission is a naval one.</summary>
     void MarkNaval();
 
@@ -83,6 +88,10 @@ public class BattleSession : IBattleSession
         : 0;
 
     public bool IsNaval { get; private set; }
+
+#if DEBUG
+    public bool DebugWithholdCompletion { get; set; }
+#endif
 
     public void MarkNaval() => IsNaval = true;
 

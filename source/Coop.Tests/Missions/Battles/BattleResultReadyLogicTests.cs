@@ -131,6 +131,9 @@ public class BattleResultReadyLogicTests
     public void UnresolvedRetreatMission_ReportsCurrentBattleRetreat()
     {
         var session = new Mock<IBattleSession>(MockBehavior.Strict);
+#if DEBUG
+        session.SetupGet(value => value.DebugWithholdCompletion).Returns(false);
+#endif
         session.SetupGet(value => value.HasInstance).Returns(true);
         session.SetupGet(value => value.InstanceId).Returns("battle");
         

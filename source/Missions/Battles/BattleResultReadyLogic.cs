@@ -73,6 +73,9 @@ public class BattleResultReadyLogic : MissionLogic
     // Only report retreats triggered by the retreat action
     public override void OnRetreatMission()
     {
+#if DEBUG
+        if (session.DebugWithholdCompletion) return;
+#endif
         if (!hasResolvedMissionResult && session.HasInstance) relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
     }
 }
