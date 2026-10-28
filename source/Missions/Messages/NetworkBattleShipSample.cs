@@ -35,6 +35,8 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(15)] public readonly float CrewLocalZ;
     /// <summary>Whether the sample carries a crew load at all; a zero <see cref="CrewMass"/> then means a known-empty deck.</summary>
     [ProtoMember(16)] public readonly bool HasCrewLoad;
+    /// <summary>The owner's body roll rate in rad/s about its forward axis, so a copy needn't differentiate unevenly arriving frames.</summary>
+    [ProtoMember(17)] public readonly float RollRate;
 
     /// <summary>One sample; the motion is flattened into the velocity, yaw rate and crew load members.</summary>
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
@@ -45,6 +47,7 @@ public sealed class NetworkBattleShipSample : IEvent
         VelocityX = motion.Velocity.x;
         VelocityY = motion.Velocity.y;
         YawRate = motion.YawRate;
+        RollRate = motion.RollRate;
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;
@@ -65,7 +68,7 @@ public sealed class NetworkBattleShipSample : IEvent
 
     /// <summary>The sampled motion rebuilt from the wire members; a crew load that isn't finite or is negative arrives as unknown.</summary>
     public BattleShipMotion Motion => new BattleShipMotion(new Vec2(VelocityX, VelocityY), YawRate,
-        HasCrewLoad ? BattleShipCrewLoad.Create(CrewMass, new Vec3(CrewLocalX, CrewLocalY, CrewLocalZ)) : null);
+        HasCrewLoad ? BattleShipCrewLoad.Create(CrewMass, new Vec3(CrewLocalX, CrewLocalY, CrewLocalZ)) : null, RollRate);
 
     public static float[] FromFrame(MatrixFrame frame) => new[]
     {

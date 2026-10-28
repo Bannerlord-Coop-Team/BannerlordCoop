@@ -497,7 +497,9 @@ public class NavalShipEngine : INavalShipEngine
         var entity = ship.GameEntity;
         if (!entity.IsValid) return default;
 
-        return new BattleShipMotion(entity.GetLinearVelocity().AsVec2, entity.GetAngularVelocity().z, ReadCrewLoad(ship));
+        var angular = entity.GetAngularVelocity();
+        float rollRate = Vec3.DotProduct(angular, ship.GlobalFrame.rotation.f);
+        return new BattleShipMotion(entity.GetLinearVelocity().AsVec2, angular.z, ReadCrewLoad(ship), rollRate);
     }
 
     /// <summary>

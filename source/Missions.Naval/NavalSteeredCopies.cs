@@ -91,7 +91,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #if DEBUG
         var targetBefore = copy.Steering.HasTarget ? copy.Steering.Target.Position : (Vec2?)null;
 #endif
-        copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
+        copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate, motion.RollRate);
 #if DEBUG
         float jump = targetBefore.HasValue ? (copy.Steering.Target.Position - targetBefore.Value).Length : 0f;
         copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, jump);
@@ -185,9 +185,11 @@ public class NavalSteeredCopies : INavalSteeredCopies
     {
         var entity = ship.GameEntity;
         var frame = entity.GetBodyWorldTransform();
+        var forward = frame.rotation.f;
         var velocity = entity.GetLinearVelocity();
         var angular = entity.GetAngularVelocity();
-        var step = copy.Steering.Compute(dt, frame.origin, CopySteering.YawOf(frame.rotation.f), velocity.AsVec2, angular.z);
+        var roll = IsRoped(ship) ? (CopySteering.RollOf(frame.rotation), Vec3.DotProduct(angular, forward)) : ((float, float)?)null;
+        var step = copy.Steering.Compute(dt, frame.origin, CopySteering.YawOf(forward), velocity.AsVec2, angular.z, roll);
 #if DEBUG
         copy.Diagnostics.RecordStep(Mission.Current?.CurrentTime ?? 0f, dt, knobs.TauSeconds, step);
 #endif
@@ -196,8 +198,13 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var deltaVelocity = step.DeltaVelocity;
         if (deltaVelocity.x != 0f || deltaVelocity.y != 0f)
             entity.SetLinearVelocity(new Vec3(velocity.x + deltaVelocity.x, velocity.y + deltaVelocity.y, velocity.z));
-        if (step.DeltaYawRate != 0f) entity.SetAngularVelocity(new Vec3(angular.x, angular.y, angular.z + step.DeltaYawRate));
+        if (step.DeltaYawRate != 0f || step.DeltaRollRate != 0f)
+            entity.SetAngularVelocity(angular + new Vec3(0f, 0f, step.DeltaYawRate) + (forward * step.DeltaRollRate));
     }
+
+    // Whether a rope or bridge holds the hull. Its owner heels under the joint's rail forces, which RopeForcePatch drops on
+    // this copy, so only a roped copy's roll is steered; a free copy's roll already matches from local buoyancy (R46).
+    private static bool IsRoped(MissionShip ship) => ship.ComputeActiveShipAttachmentCount() > 0;
 
     // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion. Like vanilla's
     // crew teleport, a rider keeps a station of this hull, which moved with it; only a point off the hull is let go.
