@@ -184,6 +184,12 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
             var quest = issue.IssueQuest;
             // An accept strategy may already have written this stage; repeated packets must not duplicate it.
             if (data.Index < quest.JournalEntries.Count) return;
+            if (quest.JournalEntries.Any(log =>
+                    log.LogTime.NumTicks == data.Time.NumTicks &&
+                    log.LogText?.ToString() == data.Text.ToString() &&
+                    log.TaskName?.ToString() == data.TaskName?.ToString() &&
+                    log.CurrentProgress == data.Progress && log.Range == data.Range && log.Type == data.Type))
+                return;
             if (data.Index != quest.JournalEntries.Count)
             {
                 Logger.Warning("Ignoring out-of-order acceptance journal {index} for {issue}", data.Index, data.IssueId);
