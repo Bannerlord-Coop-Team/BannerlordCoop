@@ -328,6 +328,8 @@ public class LordNeedsHorsesTests : IDisposable
             var picker = ClientA.Resolve<IAlternativeSolutionPicker>();
             picker.Open(issue);
             var callbacks = 0;
+            Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             var logic = new PartyScreenLogic();
             var initializationData = PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
                 issue.AlternativeSolutionSentTroops,
@@ -348,22 +350,32 @@ public class LordNeedsHorsesTests : IDisposable
             var state = manager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
             state.PartyScreenLogic = logic;
             manager._gameStates.Add(state);
-            // Record the engine-facing pop, leaving native close, callback and refund logic running.
-            using var pops = new E2E.Tests.Util.MethodCallRecorder(
-                AccessTools.Method(typeof(GameStateManager), nameof(GameStateManager.PopState)));
-            if (nativeCancel)
+            var previousManager = GameStateManager.Current;
+            GameStateManager._current = manager;
+            try
             {
-                Helpers.PartyScreenHelper.CloseScreen(false, fromCancel: true);
-                Assert.Equal(1, callbacks);
-                Assert.Null(state.PartyScreenLogic);
+                // Record the engine-facing pop, leaving native close, callback and refund logic running.
+                using var pops = new E2E.Tests.Util.MethodCallRecorder(
+                    AccessTools.Method(typeof(GameStateManager), nameof(GameStateManager.PopState)));
+                if (nativeCancel)
+                {
+                    Assert.Same(state, Helpers.PartyScreenHelper.GetActivePartyState());
+                    Helpers.PartyScreenHelper.CloseScreen(false, fromCancel: true);
+                    Assert.Equal(1, callbacks);
+                    Assert.Null(state.PartyScreenLogic);
+                }
+                else
+                {
+                    picker.Close(issue, cancel: true);
+                    Assert.Equal(0, callbacks);
+                }
+                Assert.False(picker.TryGetIssue(issue.AlternativeSolutionSentTroops, out _, out _));
+                Assert.Equal(1, pops.CountFor(ClientA));
             }
-            else
+            finally
             {
-                picker.Close(issue, cancel: true);
-                Assert.Equal(0, callbacks);
+                GameStateManager._current = previousManager;
             }
-            Assert.False(picker.TryGetIssue(issue.AlternativeSolutionSentTroops, out _, out _));
-            Assert.Equal(1, pops.CountFor(ClientA));
         });
         Assert.Single(ClientA.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.AcceptCoordination.RequestAlternativeSolutionCancellation>());
     }
