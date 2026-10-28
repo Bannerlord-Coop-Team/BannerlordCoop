@@ -1586,7 +1586,7 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
                 for (var advance = 0; advance < 200 &&
-                     Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Count == 0;
+                     !Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Any();
                      advance++)
                 {
                     Server.Resolve<IMessageBroker>().Publish(client.NetPeer,
