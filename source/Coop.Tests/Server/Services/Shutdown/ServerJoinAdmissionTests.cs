@@ -149,11 +149,13 @@ public class ServerJoinAdmissionTests
         var serverTransport = new NetManager(serverListener);
         var clientTransport = new NetManager(clientListener);
 
-        AppDomain.CurrentDomain.FirstChanceException += record;
         try
         {
             Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            // Record only from the connect on: LiteNetLib's socket setup catches its own errors (IPv6 multicast
+            // throws on the Linux CI runner), and only the join path matters here.
+            AppDomain.CurrentDomain.FirstChanceException += record;
             var data = new NetDataWriter();
             data.Put(connectData);
             clientTransport.Connect(new IPEndPoint(IPAddress.Loopback, serverTransport.LocalPort), data);
