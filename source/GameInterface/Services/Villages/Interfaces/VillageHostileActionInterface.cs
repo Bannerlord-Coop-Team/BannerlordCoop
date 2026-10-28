@@ -201,7 +201,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (!TryValidateHostileActionSettlement(settlement, out reason))
             return false;
 
-        if (!TryValidateHostileActionState(mobileParty, settlement, allowPendingApproval, out reason))
+        if (!TryValidateHostileActionState(mobileParty, settlement, action, allowPendingApproval, out reason))
             return false;
 
         var village = settlement.Village;
@@ -259,6 +259,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private bool TryValidateHostileActionState(
         MobileParty mobileParty,
         Settlement settlement,
+        VillageHostileAction action,
         bool allowPendingApproval,
         out VillageHostileActionDeniedReason reason)
     {
