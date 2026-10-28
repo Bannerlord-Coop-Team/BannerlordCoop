@@ -1,10 +1,14 @@
 using Common.Commands;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.HeroDevelopers.Commands;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.HeroDevelopers;
@@ -90,6 +94,8 @@ public class HeroDeveloperSetSkillCoopCommandTests : IDisposable
     public void Riding_WithXpNearIntMax_IsLoweredAndStaysLoweredAfterXpGain()
     {
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+        RegisterRidingSkill();
+        var xpForLevel = 0;
 
         Server.Call(() =>
         {
@@ -102,8 +108,42 @@ public class HeroDeveloperSetSkillCoopCommandTests : IDisposable
 
             Assert.True(result.Succeeded, result.Output);
             Assert.Equal(300, hero.GetSkillValue(DefaultSkills.Riding));
-            var xpForLevel = Campaign.Current.Models.CharacterDevelopmentModel.GetXpRequiredForSkillLevel(300);
+            xpForLevel = Campaign.Current.Models.CharacterDevelopmentModel.GetXpRequiredForSkillLevel(300);
             Assert.InRange(hero.HeroDeveloper.GetSkillXp(DefaultSkills.Riding), xpForLevel, xpForLevel + 100f);
+        });
+
+        testEnvironment.FlushCoalescer();
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(client.ObjectManager.TryGetObject<SkillObject>(RidingSkillId, out var riding));
+            Assert.Equal(300, hero.GetSkillValue(riding));
+            Assert.InRange(hero.HeroDeveloper.GetSkillXp(riding), xpForLevel, xpForLevel + 100f);
+        }
+    }
+
+    [Fact]
+    public void ModSkill_SetOnTheServer_IsFoundByItsStringIdInAnyCase()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            // The harness leaves War Sails out, so stand Mariner in the way the DLC registers it.
+            // Game start skills keep their StringId, the server auto registry would rename this one to Created_N.
+            SkillObject mariner;
+            using (new AllowedThread())
+            {
+                mariner = MBObjectManager.Instance.RegisterPresumedObject(new SkillObject("Mariner"));
+            }
+
+            var result = Execute(Server, heroId, "mariner", "50", "0");
+
+            Assert.True(result.Succeeded, result.Output);
+            Assert.Contains("\"skill\":\"Mariner\"", result.Output);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(50, hero.GetSkillValue(mariner));
         });
     }
 
@@ -150,6 +190,59 @@ public class HeroDeveloperSetSkillCoopCommandTests : IDisposable
             var result = Execute(Server, heroId, "Horseback", "300", "0");
 
             Assert.False(result.Succeeded);
+            Assert.Contains("OneHanded", result.Output);
+            Assert.Contains("Riding", result.Output);
+        });
+    }
+
+    [Fact]
+    public void Skill_ForAnUnknownHero_IsRefused()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            var result = Execute(Server, "set_skill_no_such_hero", "Riding", "300", "0");
+
+            Assert.False(result.Succeeded);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(0, hero.GetSkillValue(DefaultSkills.Riding));
+        });
+    }
+
+    [Fact]
+    public void Skill_ForAnUnregisteredHero_IsRefused()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            // The real resolver still finds the hero, but this object manager has no id for it
+            var result = new HeroDeveloperCommands.HeroDeveloperSetSkillCoopCommand(Server.Resolve<ICommandObjectResolver>(), Mock.Of<IObjectManager>())
+                .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { heroId, "Riding", "300", "0" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("not registered", result.Output);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(0, hero.GetSkillValue(DefaultSkills.Riding));
+        });
+    }
+
+    [Fact]
+    public void Skill_ForAHeroWithoutAHeroDeveloper_IsRefused()
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero._heroDeveloper = null;
+
+            var result = Execute(Server, heroId, "Riding", "300", "0");
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("no hero developer", result.Output);
+            Assert.Equal(0, hero.GetSkillValue(DefaultSkills.Riding));
         });
     }
 

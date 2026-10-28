@@ -7,10 +7,12 @@ using Newtonsoft.Json;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using Serilog;
 using System.Collections.Generic;
-using System.Reflection;
+using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.HeroDevelopers.Commands;
@@ -51,7 +53,7 @@ internal class HeroDeveloperCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces.", isRequired: true),
-            new ExpectedArgs("skill_name", "The skill object name.", isRequired: true),
+            new ExpectedArgs("skill_name", "The skill id, such as OneHanded or Riding; skills from other mods work too.", isRequired: true),
             new ExpectedArgs("xp_amount", "The amount of skill experience.", isRequired: true),
         };
 
@@ -61,7 +63,7 @@ internal class HeroDeveloperCommands
 
 
             SkillObject skillObject = GetSkillByName(strings[1]);
-            if (skillObject == null) return Failed("Unable to find SkillObject by provided name.");
+            if (skillObject == null) return Failed(UnknownSkillError(strings[1]));
 
             if (!int.TryParse(strings[2], out int xpGain)) return Failed("An integer amount of xp is required.");
 
@@ -207,7 +209,7 @@ internal class HeroDeveloperCommands
     /// <summary>
     /// Set one skill of a hero to a level, lower or higher, with its skill xp to match.
     /// Example:
-    /// coop.debug.hero_developer.set_skill RandomPlayer Riding 300 1023
+    /// coop.debug.hero_developer.set_skill RandomPlayer Riding 50 120
     /// </summary>
     public sealed class HeroDeveloperSetSkillCoopCommand : ICoopCommand
     {
@@ -235,7 +237,7 @@ internal class HeroDeveloperCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces.", isRequired: true),
-            new ExpectedArgs("skill_name", "The skill object name.", isRequired: true),
+            new ExpectedArgs("skill_name", "The skill id, such as OneHanded or Riding; skills from other mods work too.", isRequired: true),
             new ExpectedArgs("level", $"The new skill level, 0 to {MaxSkillLevel}.", isRequired: true),
             new ExpectedArgs("expected_level", "The current skill level, as shown by coop.debug.hero_developer.stats.", isRequired: true),
         };
@@ -245,7 +247,7 @@ internal class HeroDeveloperCommands
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
             SkillObject skillObject = GetSkillByName(strings[1]);
-            if (skillObject == null) return Failed("Unable to find SkillObject by provided name.");
+            if (skillObject == null) return Failed(UnknownSkillError(strings[1]));
 
             if (!int.TryParse(strings[2], out var level) || level < 0 || level > MaxSkillLevel)
                 return Failed($"Use a level from 0 to {MaxSkillLevel}.");
@@ -337,12 +339,12 @@ internal class HeroDeveloperCommands
         }
     }
 
-    private static SkillObject GetSkillByName(string skillName)
-    {
-        var property = typeof(DefaultSkills).GetProperty(skillName, BindingFlags.Public | BindingFlags.Static | BindingFlags.IgnoreCase);
+    // Every skill is in the object manager under its StringId, vanilla (OneHanded) and DLC or mod skills alike.
+    private static MBReadOnlyList<SkillObject> AllSkills => MBObjectManager.Instance.GetObjectTypeList<SkillObject>();
 
-        if (property == null) return null;
+    private static SkillObject GetSkillByName(string skillName) =>
+        AllSkills.FirstOrDefault(skill => string.Equals(skill.StringId, skillName, StringComparison.OrdinalIgnoreCase));
 
-        return property.GetValue(null) as SkillObject;
-    }
+    private static string UnknownSkillError(string skillName) =>
+        $"Unknown skill {skillName}. Use one of {string.Join(", ", AllSkills.Select(skill => skill.StringId))}.";
 }
