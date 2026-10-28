@@ -604,11 +604,18 @@ public class MapEventDebugCommands
         }
     }
 
+    // Asks the server, through the battle start coordinator, to open the main party's current battle as a mission.
     private static CoopCommandResult StartAttackMissionCore(ICoopCommandArgs args)
     {
         if (ModInformation.IsServer)
         {
             return Failed("Run this command on a client");
+        }
+
+        // R51 B4: forcing the mission open past the captivity menu fielded the captive's emptied party with no hero.
+        if (Hero.MainHero?.IsPrisoner == true)
+        {
+            return Failed("The main hero is a prisoner, so it can't start a battle");
         }
 
         var mainParty = MobileParty.MainParty;
