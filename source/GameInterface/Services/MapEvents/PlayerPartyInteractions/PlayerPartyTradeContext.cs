@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
@@ -85,9 +86,19 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return;
 
         activeBarterVM = barterVM;
-        UseMarriageItemVMs(barterVM.LeftOtherList);
-        UseMarriageItemVMs(barterVM.RightOtherList);
+        UseMarriageItemVMs(barterVM.LeftDiplomaticList);
+        UseMarriageItemVMs(barterVM.RightDiplomaticList);
         RefreshBarterControls();
+    }
+
+    // Vanilla never maps a group to the Diplomatic column, so marriages take it over as their own category.
+    public static void AddMarriageGroupLists(BarterVM barterVM, BarterData barterData)
+    {
+        var group = barterData?.GetBarterGroup<PlayerPartyMarriageBarterGroup>();
+        if (group == null) return;
+
+        barterVM._leftList[group] = barterVM.LeftDiplomaticList;
+        barterVM._rightList[group] = barterVM.RightDiplomaticList;
     }
 
     // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
@@ -269,10 +280,8 @@ internal static class PlayerPartyTradeContext
     {
         if (activeBarterVM == null) return;
 
-        activeBarterVM.DiplomaticLbl = string.Empty;
+        activeBarterVM.DiplomaticLbl = "Marriages";
         activeBarterVM.OtherLbl = "Misc";
-        activeBarterVM.LeftDiplomaticList?.Clear();
-        activeBarterVM.RightDiplomaticList?.Clear();
         activeBarterVM.OfferLbl = "Accept";
         activeBarterVM.IsOfferDisabled = LocalAccepted;
         RefreshResetButton();
@@ -299,8 +308,8 @@ internal static class PlayerPartyTradeContext
             hidden.List.Add(hidden.Item);
         }
 
-        HideBlockedMarriages(activeBarterVM.LeftOtherList, offeredHeroes);
-        HideBlockedMarriages(activeBarterVM.RightOtherList, offeredHeroes);
+        HideBlockedMarriages(activeBarterVM.LeftDiplomaticList, offeredHeroes);
+        HideBlockedMarriages(activeBarterVM.RightDiplomaticList, offeredHeroes);
     }
 
     private static void HideBlockedMarriages(MBBindingList<BarterItemVM> items, HashSet<Hero> offeredHeroes)
@@ -621,7 +630,7 @@ internal static class PlayerPartyTradeContext
             Contains(barterVM.LeftOtherList, item) ||
             Contains(barterVM.LeftDiplomaticList, item) ||
             Contains(barterVM.LeftGoldList, item) ||
-            hiddenMarriageItems.Contains((item, barterVM.LeftOtherList)))
+            hiddenMarriageItems.Contains((item, barterVM.LeftDiplomaticList)))
             return barterVM.LeftOfferList;
 
         return barterVM.RightOfferList;

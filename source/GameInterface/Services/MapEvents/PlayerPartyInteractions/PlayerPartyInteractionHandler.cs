@@ -1746,6 +1746,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         barterData.AddBarterGroup(new PrisonerBarterGroup());
         barterData.AddBarterGroup(new ItemBarterGroup());
         barterData.AddBarterGroup(new OtherBarterGroup());
+        barterData.AddBarterGroup(new PlayerPartyMarriageBarterGroup());
         barterData.AddBarterGroup(new GoldBarterGroup());
     }
 
@@ -1894,7 +1895,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         foreach (var (hero, spouse) in PlayerPartyMarriageBarterable.GetMarriageCandidates(ownerParty, otherParty))
         {
-            barterData.AddBarterable<OtherBarterGroup>(
+            barterData.AddBarterable<PlayerPartyMarriageBarterGroup>(
                 new PlayerPartyMarriageBarterable(ownerHero, ownerParty, hero, spouse),
                 false);
         }
