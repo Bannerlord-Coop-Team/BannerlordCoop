@@ -38,7 +38,7 @@ public class HeroDebugCommandTests
 
         Assert.Equal(
             "Hero StringId: 'lord_1_1', Issue StringId: 'issue_1', " +
-            "Issue Type: 'TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior+LesserNobleRevoltIssue'",
+            $"Issue Type: '{typeof(LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssue).FullName}'",
             HeroDebugCommand.HeroIssuesCoopCommand.FormatHeroIssue(hero));
     }
 }
