@@ -303,6 +303,70 @@ public class LordNeedsHorsesTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClosingAnAlternativePickerRequestsOnlyOneStatePop(bool nativeCancel)
+    {
+        ClientA.Call(() =>
+        {
+            var giver = ClientA.GetRegisteredObject<Hero>(giverId);
+            var owner = ClientA.GetRegisteredObject<Hero>(ownerHeroId);
+            var party = ClientA.GetRegisteredObject<MobileParty>(ownerPartyId);
+            using var ownerScope = new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(owner, party);
+            Issue issue;
+            using (new AllowedThread())
+            {
+                owner._partyBelongedTo = party;
+                issue = new Issue(giver) { StringId = IssueId };
+                Campaign.Current.IssueManager._issues.Add(giver, issue);
+                giver.OnIssueCreatedForHero(issue);
+            }
+            var agent = new Moq.Mock<IAgent>();
+            agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
+            Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            var picker = ClientA.Resolve<IAlternativeSolutionPicker>();
+            picker.Open(issue);
+            var callbacks = 0;
+            var logic = new PartyScreenLogic();
+            logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
+                issue.AlternativeSolutionSentTroops,
+                TaleWorlds.CampaignSystem.Roster.TroopRoster.CreateDummyTroopRoster(),
+                PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.NotTransferable,
+                PartyScreenLogic.TransferState.Transferable, null,
+                Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage));
+            logic.PartyScreenClosedEvent += (_, _, _, _, _, _, fromCancel) =>
+                {
+                    Assert.True(fromCancel);
+                    callbacks++;
+                    TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior
+                        .issue_offer_player_accept_alternative_5_b_consequence();
+                };
+            var manager = Game.Current.GameStateManager;
+            manager._gameStates.Add(manager.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>());
+            var state = manager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
+            state.PartyScreenLogic = logic;
+            manager._gameStates.Add(state);
+            // Record the engine-facing pop, leaving native close, callback and refund logic running.
+            using var pops = new E2E.Tests.Util.MethodCallRecorder(
+                AccessTools.Method(typeof(GameStateManager), nameof(GameStateManager.PopState)));
+            if (nativeCancel)
+            {
+                Helpers.PartyScreenHelper.CloseScreen(false, fromCancel: true);
+                Assert.Equal(1, callbacks);
+                Assert.Null(state.PartyScreenLogic);
+            }
+            else
+            {
+                picker.Close(issue, cancel: true);
+                Assert.Equal(0, callbacks);
+            }
+            Assert.False(picker.TryGetIssue(issue.AlternativeSolutionSentTroops, out _, out _));
+            Assert.Equal(1, pops.CountFor(ClientA));
+        });
+        Assert.Single(ClientA.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.AcceptCoordination.RequestAlternativeSolutionCancellation>());
+    }
+
     // The success texts read the companion's encyclopedia link, which these test heroes do not have. The troops coming back is what is tested.
     private static readonly System.Reflection.MethodBase[] LogTexts =
     {

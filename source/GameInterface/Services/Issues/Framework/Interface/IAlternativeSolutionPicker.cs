@@ -9,5 +9,5 @@ public interface IAlternativeSolutionPicker
     void Open(IssueBase issue);
     void Track(PartyScreenLogic logic);
     bool TryGetIssue(TroopRoster roster, out string giverId, out string issueId);
-    void Close(IssueBase issue, bool cancel);
+    void Close(IssueBase issue, bool cancel, bool closeScreen = true);
 }

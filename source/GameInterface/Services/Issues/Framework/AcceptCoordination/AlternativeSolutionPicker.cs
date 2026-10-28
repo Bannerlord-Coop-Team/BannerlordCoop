@@ -77,7 +77,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
         return true;
     }
 
-    public void Close(IssueBase issue, bool cancel)
+    public void Close(IssueBase issue, bool cancel, bool closeScreen = true)
     {
         if (ModInformation.IsServer || !pickers.TryGetValue(issue.AlternativeSolutionSentTroops, out var picker)) return;
         pickers.Remove(issue.AlternativeSolutionSentTroops);
@@ -86,7 +86,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
             if (picker.Logic != null)
             {
                 picker.Logic.Reset(true);
-                if (Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic)
+                if (closeScreen && Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic)
                     Game.Current.GameStateManager.PopState();
             }
             troops.ReturnToMainParty(issue);
