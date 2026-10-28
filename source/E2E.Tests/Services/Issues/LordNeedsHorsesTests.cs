@@ -329,19 +329,20 @@ public class LordNeedsHorsesTests : IDisposable
             picker.Open(issue);
             var callbacks = 0;
             var logic = new PartyScreenLogic();
-            logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
+            var initializationData = PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
                 issue.AlternativeSolutionSentTroops,
                 TaleWorlds.CampaignSystem.Roster.TroopRoster.CreateDummyTroopRoster(),
                 PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.NotTransferable,
                 PartyScreenLogic.TransferState.Transferable, null,
-                Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage));
-            logic.PartyScreenClosedEvent += (_, _, _, _, _, _, fromCancel) =>
+                Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage);
+            initializationData.PartyScreenClosedDelegate = (_, _, _, _, _, _, fromCancel) =>
                 {
                     Assert.True(fromCancel);
                     callbacks++;
                     TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior
                         .issue_offer_player_accept_alternative_5_b_consequence();
                 };
+            logic.Initialize(initializationData);
             var manager = Game.Current.GameStateManager;
             manager._gameStates.Add(manager.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>());
             var state = manager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
