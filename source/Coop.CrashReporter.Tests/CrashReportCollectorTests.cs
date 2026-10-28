@@ -173,6 +173,11 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void Run_ReportsMinusOneAfterEngineShutdownWithAMatchingDump()
         {
+            // Only Windows gives a process a -1 exit code (Linux codes are 0-255), and the reporter only runs beside
+            // the Windows game, so the Run tests are Windows only.
+            if (!OperatingSystem.IsWindows())
+                return;
+
             using (Process process = StartProcessExitingMinusOne())
             {
                 CrashReporterOptions options = CreateOptions(process.Id);
@@ -201,6 +206,9 @@ namespace Coop.CrashReporter.Tests
         [Fact]
         public void Run_SkipsMinusOneAfterEngineShutdownWithoutADump()
         {
+            if (!OperatingSystem.IsWindows())
+                return;
+
             using (Process process = StartProcessExitingMinusOne())
             {
                 CrashReporterOptions options = CreateOptions(process.Id);
