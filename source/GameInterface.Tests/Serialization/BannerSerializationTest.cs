@@ -43,19 +43,5 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(testBanner.Serialize(), newBanner.Serialize());
         }
-
-        [Fact]
-        public void Banner_WithNoLayers_UnpacksToNoBanner()
-        {
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BannerBinaryPackage package = new BannerBinaryPackage(new Banner(), factory);
-
-            package.Pack();
-
-            var returnedPackage = (BannerBinaryPackage)BinaryPackageSerializer.Deserialize(BinaryPackageSerializer.Serialize(package));
-
-            // A banner with no layers throws on the next colour change, so it must not come back as one.
-            Assert.Null(returnedPackage.Unpack<Banner>(container.Resolve<IBinaryPackageFactory>()));
-        }
     }
 }

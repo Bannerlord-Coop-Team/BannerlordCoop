@@ -189,11 +189,14 @@ public class KingdomBannerColorTests : SyncTestBase
     {
         Server.Call(() =>
         {
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
             var memberClan = Server.GetRegisteredObject<Clan>(memberClanId);
 
             using (new AllowedThread())
             {
                 memberClan._banner = new Banner();
+                // Kingdom clans aren't saved, PreAfterLoad adds each clan back.
+                kingdom._clans.Remove(memberClan);
             }
 
             // Vanilla repaints the kingdom colours here and reads the first banner layer.
@@ -201,8 +204,31 @@ public class KingdomBannerColorTests : SyncTestBase
 
             Assert.False(memberClan.Banner.IsBannerDataListEmpty());
             Assert.Equal(BackgroundColorId, memberClan.Banner.GetPrimaryColorId());
+            Assert.Single(kingdom.Clans, clan => clan == memberClan);
+        });
+    }
 
-            memberClan.UpdateBannerColorsAccordingToKingdom();
+    [Fact]
+    public void RulingClanWithEmptyKingdomBanner_GetsDefaultKingdomBannerOnLoad()
+    {
+        Server.Call(() =>
+        {
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var rulerClan = Server.GetRegisteredObject<Clan>(rulerClanId);
+
+            using (new AllowedThread())
+            {
+                kingdom.Banner = new Banner();
+                kingdom._clans.Remove(rulerClan);
+            }
+
+            // A ruling clan's Banner is the kingdom banner, which vanilla repaints here.
+            rulerClan.PreAfterLoad();
+
+            Assert.False(kingdom.Banner.IsBannerDataListEmpty());
+            Assert.Equal(BackgroundColorId, kingdom.Banner.GetPrimaryColorId());
+            Assert.Equal(OriginalBannerCode, rulerClan.ClanOriginalBanner.Serialize());
+            Assert.Single(kingdom.Clans, clan => clan == rulerClan);
         });
     }
 
