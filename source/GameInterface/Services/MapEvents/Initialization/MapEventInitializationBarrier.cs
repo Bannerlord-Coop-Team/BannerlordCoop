@@ -519,6 +519,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
+        // A winning simulation still needs the encounter references for the native loot-end continuation.
+        if (mapEvent.WinningSide == encounter.PlayerSide)
+            return false;
+
         if (PlayerCaptivity.IsCaptive)
         {
             PlayerEncounter.LeaveEncounter = true;
