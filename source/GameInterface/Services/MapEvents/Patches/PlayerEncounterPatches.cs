@@ -159,15 +159,16 @@ internal class PlayerEncounterPatches
         return false;
     }
 
-    // "Assault the siege camp" restarts the encounter onto the camp leader, but on a client that restart waits for
-    // server approval, so the encounter menu starts the battle against the settlement itself. Against a settlement
-    // the player is not at war with that would be a siege assault with the player leading the besiegers.
+    // Mirrors the camp restart in game_menu_join_encounter_help_defenders_on_consequence, which waits for server
+    // approval on a client, so any client StartBattle against a friendly besieged settlement targets its camp.
     private static void RetargetFriendlySiegeToCamp(PlayerEncounter encounter)
     {
         var settlement = encounter._defenderParty?.Settlement;
         var campLeader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
         if (campLeader == null || campLeader.MapEvent != null) return;
-        if (encounter._attackerParty.MapFaction.IsAtWarWith(settlement.MapFaction)) return;
+
+        var attackerFaction = encounter._attackerParty?.MapFaction;
+        if (attackerFaction == null || attackerFaction.IsAtWarWith(settlement.MapFaction)) return;
 
         encounter.SetupFields(encounter._attackerParty, campLeader.Party);
     }
