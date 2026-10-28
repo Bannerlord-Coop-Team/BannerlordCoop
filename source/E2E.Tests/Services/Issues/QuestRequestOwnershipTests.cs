@@ -124,6 +124,29 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Fact]
+    public void ABranchWaitsForAcceptConfirmationAndTheOwnersJournal()
+    {
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.SetLatency(scenario.Server.NetPeer, scenario.ClientA.NetPeer, TimeSpan.FromSeconds(1));
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread()) quest.StartQuest();
+            quest.AddLog(new TaleWorlds.Localization.TextObject("early branch row"));
+            scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
+        });
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal(0, branches.CountFor(scenario.Server));
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        TestEnvironment.FlushCoalescer();
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal(1, branches.CountFor(scenario.Server));
+        scenario.Server.Call(() => Assert.Equal("early branch row",
+            Assert.Single(scenario.QuestOf(scenario.Server).JournalEntries).LogText.Value));
+    }
+
+    [Fact]
     public void ABranchRequestFromAPlayerWhoDoesNotOwnTheIssueIsIgnored()
     {
         scenario.Accept(scenario.ClientA);

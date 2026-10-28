@@ -307,7 +307,7 @@ public class EndingJournalTests : IDisposable
     }
 
     [Fact]
-    public void JournalWrittenBeforeDelayedAcceptReplyIsMirroredWhenOwnershipIsConfirmed()
+    public void CancellationBeforeDelayedAcceptReplyKeepsTheEarlyJournal()
     {
         var giverId = environment.CreateRegisteredObject<Hero>();
         scenario.AddIssue(giverId, "delayed_journal_issue");
@@ -323,20 +323,23 @@ public class EndingJournalTests : IDisposable
             using (new AllowedThread()) ownerQuest.StartQuest();
             ownerQuest.AddLog(new TextObject("written before the delayed accept reply"));
             Assert.False(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, giver.Issue.StringId, out _));
+            ownerQuest.CompleteQuestWithCancel(Ending());
         });
         scenario.Server.Call(() =>
         {
             serverQuest = scenario.Server.GetRegisteredObject<Hero>(giverId).Issue.IssueQuest;
             Assert.Empty(serverQuest.JournalEntries);
+            Assert.True(serverQuest.IsOngoing);
         });
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         router.AdvanceBy(TimeSpan.FromSeconds(1));
         environment.FlushCoalescer();
         scenario.Server.Call(() =>
         {
-            Assert.Equal("written before the delayed accept reply", Assert.Single(serverQuest.JournalEntries).LogText.Value);
-            using var owner = OwnerScope();
-            serverQuest.CompleteQuestWithCancel(Ending());
+            Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == "written before the delayed accept reply");
+            Assert.True(serverQuest.IsFinalized);
         });
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         router.AdvanceBy(TimeSpan.FromSeconds(1));
         environment.FlushCoalescer();
         AssertSavedHistoryMatches(ownerQuest, serverQuest);
