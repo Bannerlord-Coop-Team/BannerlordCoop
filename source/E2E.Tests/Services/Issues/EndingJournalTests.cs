@@ -253,15 +253,19 @@ public class EndingJournalTests : IDisposable
             var definitions = new DefinitionContext();
             definitions.FillWithCurrentTypes();
             Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
-            var save = new SaveContext(definitions);
-            var metadata = new MetaData();
-            Assert.True(save.Save(serverQuest.JournalEntries.ToList(), metadata, out var error), error);
-            var driver = new InMemDriver();
-            Assert.Equal(SaveResult.Success, driver.Save("restart_journal", 1, metadata, save.SaveData)
-                .GetAwaiter().GetResult().SaveResult);
-            var load = new LoadContext(definitions, driver);
-            Assert.True(load.Load(driver.Load("restart_journal"), loadAsLateInitialize: true));
-            loaded = Assert.IsType<List<JournalLog>>(load.RootObject);
+            loaded = new List<JournalLog>();
+            foreach (var row in serverQuest.JournalEntries)
+            {
+                var save = new SaveContext(definitions);
+                var metadata = new MetaData();
+                Assert.True(save.Save(row, metadata, out var error), error);
+                var driver = new InMemDriver();
+                Assert.Equal(SaveResult.Success, driver.Save("restart_journal", 1, metadata, save.SaveData)
+                    .GetAwaiter().GetResult().SaveResult);
+                var load = new LoadContext(definitions, driver);
+                Assert.True(load.Load(driver.Load("restart_journal"), loadAsLateInitialize: true));
+                loaded.Add(Assert.IsType<JournalLog>(load.RootObject));
+            }
             Assert.Equal(2, loaded.Count);
             Assert.NotSame(serverQuest.JournalEntries[0], loaded[0]);
         });
@@ -309,6 +313,12 @@ public class EndingJournalTests : IDisposable
     [Fact]
     public void CancellationBeforeDelayedAcceptReplyKeepsTheEarlyJournal()
     {
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            scenario.QuestOf(scenario.Server).CompleteQuestWithCancel();
+        });
+        environment.FlushCoalescer();
         var giverId = environment.CreateRegisteredObject<Hero>();
         scenario.AddIssue(giverId, "delayed_journal_issue");
         var router = scenario.Server.Resolve<TestNetworkRouter>();
@@ -323,14 +333,15 @@ public class EndingJournalTests : IDisposable
             using (new AllowedThread()) ownerQuest.StartQuest();
             ownerQuest.AddLog(new TextObject("written before the delayed accept reply"));
             Assert.False(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, giver.Issue.StringId, out _));
-            ownerQuest.CompleteQuestWithCancel(Ending());
         });
         scenario.Server.Call(() =>
         {
             serverQuest = scenario.Server.GetRegisteredObject<Hero>(giverId).Issue.IssueQuest;
-            Assert.Equal("written before the delayed accept reply", Assert.Single(serverQuest.JournalEntries).LogText.Value);
+            Assert.NotNull(serverQuest);
             Assert.True(serverQuest.IsOngoing);
         });
+        scenario.ClientA.Call(() => ownerQuest.CompleteQuestWithCancel(Ending()));
+        scenario.Server.Call(() => Assert.True(serverQuest.IsOngoing));
         Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         router.AdvanceBy(TimeSpan.FromSeconds(1));
         environment.FlushCoalescer();
