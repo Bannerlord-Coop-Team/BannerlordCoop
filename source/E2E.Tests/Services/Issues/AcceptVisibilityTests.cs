@@ -310,7 +310,7 @@ public class AcceptVisibilityTests : IDisposable
     }
 
     [Fact]
-    public void ASnapshotForADifferentIssueKeepsTheNewIssueOwnerAfterQueuedFinalization()
+    public void APollerSnapshotForADifferentIssueKeepsTheNewOwnerAfterGameThreadApplication()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
@@ -323,7 +323,12 @@ public class AcceptVisibilityTests : IDisposable
             })));
 
         Assert.True(Other.PendingGameThreadActionCount > 0);
-        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out _)));
+        Other.Call(() =>
+        {
+            Assert.False(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out _));
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var remembered));
+            Assert.Equal("stale-player", remembered);
+        });
 
         Other.PumpGameThread();
 
