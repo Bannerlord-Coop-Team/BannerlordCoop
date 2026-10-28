@@ -28,12 +28,13 @@ public class ServerTroopRosterHandlerTests : IDisposable
     private readonly Mock<ITroopRosterInterface> troopRosters = new();
     private readonly TroopInfo[] troops = { new TroopInfo("recruiter", "imperial_recruit", 0) };
     private readonly NetPeer peer;
+    private readonly PlayerManager players;
     private readonly ServerTroopRosterHandler handler;
 
     public ServerTroopRosterHandlerTests()
     {
         var objectManager = Mock.Of<IObjectManager>();
-        var players = new PlayerManager(logger.Object, objectManager, new ControllerIdProvider());
+        players = new PlayerManager(logger.Object, objectManager, new ControllerIdProvider());
         Assert.True(players.AddPlayer(new Player("requester", "hero", OwnPartyId, "clan", "character")));
         peer = network.CreatePeer();
         players.SetPeer("requester", peer);
@@ -73,6 +74,18 @@ public class ServerTroopRosterHandlerTests : IDisposable
     {
         // Test peers share one endpoint, and peers compare by endpoint, so give this one its own address.
         Send(network.CreatePeer("10.0.0.8"), OwnPartyId);
+
+        VerifyNotApplied();
+        VerifyWarned(Times.Once());
+    }
+
+    [Fact]
+    public void RecruitmentFromAPeerReplacedByAReconnect_IsSkipped()
+    {
+        // The same player reconnected on a new peer, so the old one no longer speaks for their party.
+        players.SetPeer("requester", network.CreatePeer("10.0.0.9"));
+
+        Send(peer, OwnPartyId);
 
         VerifyNotApplied();
         VerifyWarned(Times.Once());

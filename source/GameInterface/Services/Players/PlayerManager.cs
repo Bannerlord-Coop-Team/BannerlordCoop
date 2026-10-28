@@ -434,7 +434,8 @@ public class PlayerManager : IPlayerManager
     public bool IsSenderControllingParty(object sender, string mobilePartyId)
     {
         var peer = sender as NetPeer;
-        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetPlayer(peer, out var player) && player.MobilePartyId == mobilePartyId) return true;
+        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && player.MobilePartyId == mobilePartyId) return true;
 
         logger.Warning("Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it", mobilePartyId, peer?.Id);
         return false;

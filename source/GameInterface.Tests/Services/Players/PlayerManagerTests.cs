@@ -234,6 +234,23 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void IsSenderControllingParty_StalePeerAfterReconnect_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var network = new TestNetwork();
+        // Test peers share one endpoint, and peers compare by endpoint, so the old peer gets its own address.
+        var stalePeer = network.CreatePeer("10.0.0.8");
+        var currentPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, stalePeer);
+        playerManager.SetPeer(ControllerId, currentPeer);
+
+        Assert.False(playerManager.IsSenderControllingParty(stalePeer, PartyId));
+        Assert.True(playerManager.IsSenderControllingParty(currentPeer, PartyId));
+    }
+
+    [Fact]
     public void TryGetCurrentController_UnregisteredPeer_ReturnsFalse()
     {
         var playerManager = CreatePlayerManager(out _);
