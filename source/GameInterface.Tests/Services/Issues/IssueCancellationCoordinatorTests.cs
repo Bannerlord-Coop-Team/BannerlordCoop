@@ -29,7 +29,7 @@ public class IssueCancellationCoordinatorTests
         GameBootStrap.Initialize();
         var previousRole = ModInformation.IsServer;
         var issues = Campaign.Current.IssueManager._issues.ToArray();
-        var previousHero = Hero.MainHero;
+        var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
         var previousParty = MobileParty.MainParty;
         try
         {
@@ -56,7 +56,7 @@ public class IssueCancellationCoordinatorTests
             Assert.Same(hero, quest.CancellingHero);
             Assert.Same(party ?? previousParty, quest.CancellingParty);
             Assert.True(quest.IsFinalized);
-            Assert.Same(previousHero, Hero.MainHero);
+            Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
             Assert.Same(previousParty, MobileParty.MainParty);
         }
         finally
