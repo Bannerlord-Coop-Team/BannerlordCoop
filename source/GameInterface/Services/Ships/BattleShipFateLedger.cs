@@ -17,6 +17,9 @@ public interface IBattleShipFateLedger
     /// </summary>
     void Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision);
 
+    /// <summary>[Game thread] Copies pending fates and captures for server diagnostics without consuming them.</summary>
+    object Inspect();
+
     /// <summary>Whether any fate of the battle waits to be applied.</summary>
     bool HasFates(string mapEventId);
 
@@ -69,6 +72,39 @@ public class BattleShipFateLedger : IBattleShipFateLedger
         var kept = candidate.Supersedes(held) ? candidate : held;
         ships[fate.CampaignShipId] = new HeldFate(kept.Fate.WithMitigatedDamage(mitigatedDamage), kept.HostEpoch, kept.Revision);
     }
+
+    // Copies the retained reports, including captures still waiting for their first new-authority report.
+    public object Inspect() => battles.Keys.Union(captures.Keys).OrderBy(id => id).Select(instance =>
+    {
+        battles.TryGetValue(instance, out var fates);
+        captures.TryGetValue(instance, out var captured);
+        var ids = (fates?.Keys.AsEnumerable() ?? Enumerable.Empty<string>())
+            .Union(captured?.Keys.AsEnumerable() ?? Enumerable.Empty<string>());
+        return new
+        {
+            instance,
+            ships = ids.OrderBy(id => id).Select(id =>
+            {
+                var held = fates != null && fates.TryGetValue(id, out var fate) ? (HeldFate?)fate : null;
+                var capture = captured != null && captured.TryGetValue(id, out var record) ? (CaptureRecord?)record : null;
+                bool awaitingCaptureReport = held?.HostEpoch == int.MinValue;
+                return new
+                {
+                    campaignShipId = id,
+                    pendingFate = held.HasValue,
+                    hitPoints = held?.Fate.HitPoints,
+                    sailHitPoints = held?.Fate.SailHitPoints,
+                    sunk = held?.Fate.Sunk,
+                    mitigatedDamage = held?.Fate.MitigatedDamage,
+                    hostEpoch = awaitingCaptureReport ? null : held?.HostEpoch,
+                    revision = awaitingCaptureReport ? null : held?.Revision,
+                    captor = capture?.Captor,
+                    captureSequence = capture?.Sequence,
+                    awaitingCaptureReport = held.HasValue ? (bool?)awaitingCaptureReport : null,
+                };
+            }).ToArray(),
+        };
+    }).ToArray();
 
     public bool HasFates(string mapEventId) => battles.TryGetValue(mapEventId, out var ships) && ships.Count > 0;
 
