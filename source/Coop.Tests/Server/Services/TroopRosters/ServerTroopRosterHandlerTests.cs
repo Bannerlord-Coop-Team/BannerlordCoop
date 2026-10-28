@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.TroopRosters.Messages;
 using Coop.Core.Server.Services.TroopRosters.Handlers;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -89,6 +90,28 @@ public class ServerTroopRosterHandlerTests : IDisposable
 
         VerifyNotApplied();
         VerifyWarned(Times.Once());
+    }
+
+    [Fact]
+    public void SkippedCartEntries_TellTheRecruitingClient()
+    {
+        troopRosters.Setup(service => service.HandleOnRecruitmentDone(OwnPartyId, It.IsAny<TroopInfo[]>())).Returns(2);
+
+        Send(peer, OwnPartyId);
+
+        var message = Assert.Single(network.GetPeerMessagesFromType<SendInformationMessage>(peer));
+        Assert.StartsWith("2 troop(s) could not be recruited", message.Text);
+    }
+
+    [Fact]
+    public void FullyRecruitedCart_SendsNoMessage()
+    {
+        troopRosters.Setup(service => service.HandleOnRecruitmentDone(OwnPartyId, It.IsAny<TroopInfo[]>())).Returns(0);
+
+        Send(peer, OwnPartyId);
+
+        troopRosters.Verify(service => service.HandleOnRecruitmentDone(OwnPartyId, It.IsAny<TroopInfo[]>()), Times.Once);
+        Assert.False(network.SentNetworkMessages.ContainsKey(peer.Id));
     }
 
     private void Send(object sender, string partyId)
