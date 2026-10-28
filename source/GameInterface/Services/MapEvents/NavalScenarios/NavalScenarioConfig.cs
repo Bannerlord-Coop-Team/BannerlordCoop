@@ -99,6 +99,10 @@ public sealed class NavalScenarioConfig
     [ProtoMember(26)]
     public int ReserveTroops { get; set; }
 
+    /// <summary>Fails the battle host's first AI fleet spawn attempt through its exception path, before any hulls spawn.</summary>
+    [ProtoMember(27)]
+    public bool FailNpcFleet { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>
