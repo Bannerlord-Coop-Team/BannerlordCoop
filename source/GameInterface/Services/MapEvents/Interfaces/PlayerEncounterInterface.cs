@@ -27,14 +27,21 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IMessageBroker messageBroker;
 
     public PlayerEncounterInterface() : this(null)
     {
     }
 
     public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+        : this(siegeEventInterface, null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface, IMessageBroker messageBroker)
     {
         this.siegeEventInterface = siegeEventInterface;
+        this.messageBroker = messageBroker;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -153,7 +160,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         // approval creates the next raid through the authoritative server path.
         PlayerEncounter.Start();
         PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlement.Party, settlement);
-        MessageBroker.Instance.Publish(this, new VillageHostileActionAttempted(
+        messageBroker?.Publish(this, new VillageHostileActionAttempted(
             VillageHostileAction.Raid,
             MobileParty.MainParty,
             settlement));
