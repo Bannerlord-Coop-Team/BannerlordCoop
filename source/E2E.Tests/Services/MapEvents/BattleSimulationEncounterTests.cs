@@ -53,40 +53,54 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.False(PlayerCaptivity.IsCaptive);
         }, MapEventDisabledMethods);
 
-        Server.Call(() =>
+        var ended = new List<MapEvent>();
+        try
         {
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                context.MapEventId, context.AttackerPartyId));
-            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
-            Server.GetRegisteredObject<MapEvent>(context.MapEventId).BattleState = BattleState.DefenderVictory;
-            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
-        }, MapEventDisabledMethods);
+            Server.Call(() =>
+            {
+                CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add);
+                Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+                    System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
+                    context.MapEventId, context.AttackerPartyId));
+                Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+                Server.GetRegisteredObject<MapEvent>(context.MapEventId).BattleState = BattleState.DefenderVictory;
+                Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkAdvanceBattleSimulation(context.MapEventId, 1));
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+                Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
+                Assert.Single(ended);
+            }, MapEventDisabledMethods);
 
-        client.Call(() =>
+            client.Call(() =>
+            {
+                var encounter = PlayerEncounter.Current;
+                Assert.NotNull(encounter);
+                var simulation = encounter.BattleSimulation;
+                Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().EndBattleSimulation();
+                simulation.OnFinished();
+                PlayerEncounter.Update();
+                Assert.Equal(PlayerEncounterState.Begin, encounter.EncounterState);
+                Assert.Null(encounter._mapEvent);
+                Assert.Null(encounter.BattleSimulation);
+
+                if (menuConsequence)
+                    new TaleWorlds.CampaignSystem.CampaignBehaviors.EncounterGameMenuBehavior()
+                        .game_menu_encounter_leave_on_consequence(null);
+                else
+                    MenuHelper.EncounterLeaveConsequence();
+
+                Assert.Null(PlayerEncounter.Current);
+                Assert.Null(MobileParty.MainParty.Party.MapEventSide);
+            }, MapEventDisabledMethods
+                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
+                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
+                // Headless campaigns have no navigation mesh for vanilla's post-encounter displacement.
+                .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius))));
+            Server.Call(() => Assert.Single(ended));
+        }
+        finally
         {
-            var encounter = PlayerEncounter.Current;
-            Assert.NotNull(encounter);
-            var simulation = encounter.BattleSimulation;
-            Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().EndBattleSimulation();
-            simulation.OnFinished();
-            PlayerEncounter.Update();
-            Assert.Equal(PlayerEncounterState.Begin, encounter.EncounterState);
-
-            if (menuConsequence)
-                new TaleWorlds.CampaignSystem.CampaignBehaviors.EncounterGameMenuBehavior()
-                    .game_menu_encounter_leave_on_consequence(null);
-            else
-                MenuHelper.EncounterLeaveConsequence();
-
-            Assert.Null(PlayerEncounter.Current);
-            Assert.Null(MobileParty.MainParty.Party.MapEventSide);
-        }, MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)))
-            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
-            // Headless campaigns have no navigation mesh for vanilla's post-encounter displacement.
-            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius))));
+            Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
+        }
     }
 
     [Fact]
