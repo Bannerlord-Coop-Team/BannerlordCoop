@@ -72,7 +72,7 @@ internal sealed class QuestScenario
         PlayerA = RegisterPlayer(ClientA, ControllerA);
         PlayerB = RegisterPlayer(ClientB, ControllerB);
 
-        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance, issueFactory);
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance, NotableId, IssueId, issueFactory);
     }
 
     public void Accept(EnvironmentInstance client)
@@ -157,7 +157,7 @@ internal sealed class QuestScenario
         return player;
     }
 
-    private static void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
+    private void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
         Func<EnvironmentInstance, Hero, IssueBase>? createIssue)
     {
         instance.Call(() =>
