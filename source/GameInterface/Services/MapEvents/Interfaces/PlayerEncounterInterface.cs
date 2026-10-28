@@ -165,6 +165,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         // approval creates the next raid through the authoritative server path.
         PlayerEncounter.Start();
         PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        PlayerEncounter.Current._mapEvent = null;
         PlayerEncounter.Current.ForceRaid = true;
         broker.Publish(this, new VillageHostileActionAttempted(
             VillageHostileAction.Raid,

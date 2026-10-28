@@ -214,7 +214,10 @@ internal class BattleSimulationRunHandler : IHandler
                 ServerBattleModeArbiter.Release(mapEventId);
 
             if (unsupportedHostileAction)
-                network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
+            {
+                network.Send(requestingPeer, new NetworkBattleSimulationCancelled(mapEventId));
+                network.Send(requestingPeer, new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+            }
             else
                 network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             return;
@@ -892,11 +895,18 @@ internal class BattleSimulationRunHandler : IHandler
                 // No client left to pace the playback, so resolve whatever remains and let the battle
                 // reach its decision (casualties still sync to the other clients via the troop-roster
                 // patches) instead of leaving the map event half-simulated.
-                int rounds = 0;
-                while (rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
+                try
                 {
-                    rounds++;
-                    sim.MapEvent.SimulatePlayerEncounterBattle();
+                    int rounds = 0;
+                    while (rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
+                    {
+                        rounds++;
+                        sim.MapEvent.SimulatePlayerEncounterBattle();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Logger.Warning(exception, "Battle simulation disconnect cleanup could not resolve another round; cancelling the session");
                 }
 
                 if (sim.MapEvent.HasWinner && PlayerWonSimulation(sim.MapEvent))
