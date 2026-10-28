@@ -807,6 +807,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
 | `fleet_fail` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt in this mission to throw through its normal failure path. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawner.state=failed` and `npcFleet.spawner.failure` containing `DEBUG fleet_fail`. Mission-scoped, no retry after migration. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
+| `boatswain <partyId> [prepare]` | both; prepare server only | DEBUG. Reads the effective First Mate hero id, Boatswain level, XP and learning rate, plus campaign ship ids, hull/sail HP and a read-only 100-damage model probe. `prepare` sets that hero to Boatswain 100 (resetting its skill XP baseline) and raises focus to 5 before any map event, through normal replicated skill APIs. Capture the XP baseline after preparation. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |
 | `ram_stage <shipId-prefix>` | own hull authority client | DEBUG: places only the invoking client's hull 15 m off a selected foreign enemy hull's broadside, bow toward it, using scenario placement and `TeleportShip` (crew travels with it). Refuses before deployment, same-authority/friendly targets, missing ram, sinking or roped hulls. Prints `NAVAL_RAM_STAGE ship=... target=... targetAuthority=... gap=15`. Let the hull settle 2 s, then `helm 0 1 1 30` drives a real ram. |
@@ -853,6 +854,29 @@ Run `coop.debug.naval.scenario vs_pirates hulls=3 weapons=1 testclient1 testclie
 
 `solo`, `vs_pirates`, `boarding`, `ramming`, `sinking`, `migration`, `late_join`, `fleet`, `duel`, `allied_npc`,
 `retreat`, `encounter`, `blockade` (`GameInterface/Services/MapEvents/NavalScenarios/NavalScenarioPresets.cs`).
+
+For R53 item 34, damage reduction comes from the effective First Mate's Boatswain skill, not a hull upgrade
+(`NavalDLCCampaignShipDamageModel.GetShipDamage` and `NavalSkillEffects.ShipDamageReduction`). Vanilla grants
+`0.1 * max(rawDamage - finalDamage, 0)` base XP to that hero; learning rate changes the observed XP increase.
+The mission accumulates this mitigation and the server awards it through M6 when applying the battle's fates.
+
+1. On the server, use `coop.debug.mobileparty.list` to find the player's registered party id. The R52 fixture used
+   `MobileParty_Player` and `MobileParty_Player563`; substitute the id returned by that lookup if the save differs.
+2. Before staging, run `coop.debug.naval.boatswain MobileParty_Player prepare` on the server. It prepares the
+   effective First Mate, which may be a companion, and prints that hero's registry id. Also run
+   `coop.debug.naval.boatswain MobileParty_Player563 prepare` for the second player. Record both XP baselines.
+3. Run `coop.debug.naval.scenario migration delay=60 reconnect=10 who=nonhost` on the server. When deployed,
+   run `coop.debug.naval.inspect summary` on the nonhost player's client, then `coop.debug.naval.damage` with
+   that client's own hull id and amount `100`. At the staged skill of 100, the damage probe reports 75 final
+   damage and 25 mitigated damage. Record the actual hull HP before the scenario disconnects the nonhost.
+4. After rejoin, run `coop.debug.naval.inspect summary` on both clients. The rejoined hull must retain its recorded
+   damaged HP; damage it again with `100` on its current authority to exercise the second fate report too.
+5. Run `coop.debug.naval.win` on the current battle host and finish the post-battle screens on every client.
+   Run `coop.debug.naval.boatswain MobileParty_Player` and `coop.debug.naval.boatswain MobileParty_Player563` on the server and their owning clients.
+   Compare the same hero's
+   XP against step 2 and campaign ship HP against its last mission HP. Expect an XP increase on both machines,
+   matching ship HP, and one server `grants its Boatswain XP` log for the summed mitigation. Read again without
+   fighting or repairing: XP must stay unchanged. Do not run `prepare` between the baseline and final readings.
 
 `encounter` takes scenario players off a raft first (a player released at sea is on one, and `PlayerRaftVisibilityPatches`
 turns an engage order on a player's raft into `GoToPoint`; R41b P4), as landing would: the raft ends, the raft's `DisableAi`
