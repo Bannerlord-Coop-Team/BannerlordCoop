@@ -243,6 +243,45 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void IsSenderControllingParty_OwnParty_ReturnsTrue()
+    {
+        var logger = new Mock<ILogger>();
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.True(playerManager.IsSenderControllingParty(peer, PartyId));
+        logger.Verify(log => log.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never());
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_AnotherParty_ReturnsFalseAndWarnsWithThePeer()
+    {
+        var logger = new Mock<ILogger>();
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.False(playerManager.IsSenderControllingParty(peer, "PartyTwo"));
+        logger.Verify(log => log.Warning(
+            "Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it",
+            "PartyTwo", (int?)peer.Id), Times.Once());
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_UnregisteredPeerOrNoPeer_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.IsSenderControllingParty(new TestNetwork().CreatePeer("10.0.0.8"), PartyId));
+        Assert.False(playerManager.IsSenderControllingParty(new object(), PartyId));
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);
