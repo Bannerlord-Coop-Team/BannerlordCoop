@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -74,6 +75,8 @@ internal class VillageNeedsToolsJournalHandler : IHandler
             if (!issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)
                 || !(issue.IssueQuest is Quest quest) || !quest.IsOngoing) return;
 
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             quest.AddLog(new TextObject("{=!}" + data.Text));
         }, context: nameof(VillageNeedsToolsJournalHandler));
     }

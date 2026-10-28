@@ -972,6 +972,17 @@ public class VillageNeedsToolsTests : IDisposable
         else Assert.Empty(finalized);
     }
 
+    [Fact]
+    public void ReceivedServerJournalDoesNotEchoAnOwnerSnapshot()
+    {
+        Accept();
+        var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        ClientA.SimulateMessage(Server.NetPeer, new NetworkVillageNeedsToolsJournal(notableId, IssueId, "server progress row"));
+        TestEnvironment.FlushCoalescer();
+        ClientA.Call(() => Assert.Single(QuestOfHere(ClientA).JournalEntries, log => log.LogText.ToString() == "server progress row"));
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before));
+    }
+
     private void Accept()
     {
         ClientA.Call(() =>

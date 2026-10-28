@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -62,6 +63,7 @@ internal class QuestJournalMirrorHandler : IHandler
         broker.Subscribe<QuestJournalProgressChanged>(HandleProgress);
         broker.Subscribe<QuestJournalChanged>(HandleChanged);
         broker.Subscribe<RequestQuestJournal>(HandleRequest);
+        broker.Subscribe<CampaignReady>(HandleCampaignReady);
     }
 
     public void Dispose()
@@ -69,6 +71,21 @@ internal class QuestJournalMirrorHandler : IHandler
         broker.Unsubscribe<QuestJournalProgressChanged>(HandleProgress);
         broker.Unsubscribe<QuestJournalChanged>(HandleChanged);
         broker.Unsubscribe<RequestQuestJournal>(HandleRequest);
+        broker.Unsubscribe<CampaignReady>(HandleCampaignReady);
+    }
+
+    private void HandleCampaignReady(MessagePayload<CampaignReady> payload)
+    {
+        if (ModInformation.IsClient) return;
+        GameThread.RunSafe(() =>
+        {
+            // Loaded stages were already shared with the owner before the restart.
+            foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+            {
+                if (issue.IssueQuest != null && registry.IsRegistered(issue.GetType()))
+                    ownerEntries.GetValue(issue.IssueQuest, quest => new HashSet<JournalLog>(quest.JournalEntries));
+            }
+        }, context: nameof(QuestJournalMirrorHandler));
     }
 
     private void HandleChanged(MessagePayload<QuestJournalChanged> payload) => SendJournal(payload.What.Quest);
