@@ -15,7 +15,6 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using static TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
@@ -189,12 +188,14 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IssueQuest is VillageNeedsToolsIssueQuest)
-            return;
         if (issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
+
+        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
+            out _, out _, out var descriptor) && descriptor is ISpecializedEndingJournalDescriptor)
+            return;
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
@@ -224,7 +225,7 @@ internal class FinalizationCoordinator : IHandler
                     quest._journalEntries.Clear();
                     foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
                         quest._journalEntries.Add(log.ToJournalLog());
-                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                 }
                 else
                 {

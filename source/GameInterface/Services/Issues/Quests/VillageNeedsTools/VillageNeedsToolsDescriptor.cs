@@ -5,7 +5,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.Vi
 namespace GameInterface.Services.Issues.Quests.VillageNeedsTools;
 
 /// <summary>Registers the village tools quest with the shared issue lifecycle.</summary>
-internal class VillageNeedsToolsDescriptor : IQuestTypeDescriptor
+internal class VillageNeedsToolsDescriptor : IQuestTypeDescriptor, ISpecializedEndingJournalDescriptor
 {
     public Type IssueType => typeof(Issue);
     public ICreationCaptureStrategy CreationCaptureStrategy { get; }

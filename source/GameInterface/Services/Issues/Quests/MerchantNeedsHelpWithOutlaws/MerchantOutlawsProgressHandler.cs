@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -44,6 +45,8 @@ internal class MerchantOutlawsProgressHandler : IHandler
             if (data.ControllerId != controllerIdProvider.ControllerId ||
                 !issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)) return;
 
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             if (data.AlternativeLogs != null && issue is MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue)
             {
                 for (var i = issue.JournalEntries.Count; i < data.AlternativeLogs.Length; i++)

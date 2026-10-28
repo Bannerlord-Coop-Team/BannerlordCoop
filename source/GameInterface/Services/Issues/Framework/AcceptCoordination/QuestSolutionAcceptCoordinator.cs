@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -232,6 +233,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             // The accepting player already ran the accept locally
             if (data.ControllerId == controllerIdProvider.ControllerId)
             {
+                if (issue.IssueQuest != null)
+                    messageBroker.Publish(this, new QuestJournalChanged(issue.IssueQuest));
                 return;
             }
 
