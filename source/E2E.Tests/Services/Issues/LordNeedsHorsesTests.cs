@@ -328,6 +328,8 @@ public class LordNeedsHorsesTests : IDisposable
             var picker = ClientA.Resolve<IAlternativeSolutionPicker>();
             picker.Open(issue);
             var callbacks = 0;
+            Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             var logic = new PartyScreenLogic();
             var initializationData = PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
                 issue.AlternativeSolutionSentTroops,
