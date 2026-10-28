@@ -1209,12 +1209,14 @@ public class MerchantOutlawsTests : IDisposable
     public void ReceivedServerProgressDoesNotEchoAnOwnerSnapshot()
     {
         Accept();
-        ClientA.Call(() => Quest(ClientA)._totalPartyCount = 1);
+        var total = 0;
+        ClientA.Call(() => total = Quest(ClientA)._totalPartyCount);
+        Assert.True(total > 0);
         var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
         ClientA.SimulateMessage(Server.NetPeer, new NetworkMerchantOutlawsProgress(scenario.NotableId,
-            QuestScenario.IssueId, QuestScenario.ControllerA, 1, 0, Array.Empty<string>(), Array.Empty<string>()));
+            QuestScenario.IssueId, QuestScenario.ControllerA, total, 0, Array.Empty<string>(), Array.Empty<string>()));
         environment.FlushCoalescer();
-        ClientA.Call(() => Assert.Equal(1, Quest(ClientA)._questProgressLogTest.CurrentProgress));
+        ClientA.Call(() => Assert.Equal(total, Quest(ClientA)._questProgressLogTest.CurrentProgress));
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before));
     }
 
