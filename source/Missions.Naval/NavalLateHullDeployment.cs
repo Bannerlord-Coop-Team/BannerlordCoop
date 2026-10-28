@@ -22,8 +22,15 @@ public interface INavalLateHullDeployment
 /// <summary>Deploys late hulls as they spawn and defers what reads the team AI to the mission tick.</summary>
 public class NavalLateHullDeployment : INavalLateHullDeployment
 {
+    private readonly INavalBallistaTargets ballistaTargets;
     private readonly List<Formation> joined = new List<Formation>();
     private bool targetsStale;
+
+    // Takes the ballista targets, which a late hull's arrival refreshes.
+    public NavalLateHullDeployment(INavalBallistaTargets ballistaTargets)
+    {
+        this.ballistaTargets = ballistaTargets;
+    }
 
     /// <summary>How many formations wait for the next check (diagnostics, tests).</summary>
     internal int Noted => joined.Count;
@@ -48,8 +55,7 @@ public class NavalLateHullDeployment : INavalLateHullDeployment
     {
         if (targetsStale)
         {
-            // A ballista lists its ship targets once, at its own deployment (ThreatSeeker.InitializeTargetableObjects).
-            foreach (var ai in WeaponAisToRefresh(ships)) ai.InitializeThreatSeeker();
+            ballistaTargets.Refresh(ships);
             targetsStale = false;
         }
 
@@ -58,12 +64,6 @@ public class NavalLateHullDeployment : INavalLateHullDeployment
         foreach (var formation in joined) Refresh(formation);
         joined.Clear();
     }
-
-    /// <summary>The ranged weapon AIs of the hulls still in the mission.</summary>
-    internal static IEnumerable<RangedSiegeWeaponAi> WeaponAisToRefresh(IEnumerable<MissionShip> ships) =>
-        ships.Where(ship => ship != null && !ship.IsRemoved)
-            .Select(ship => ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)
-            .Where(ai => ai != null);
 
     // The tactic re-weights formations only when their count or order changes, which swimmers already in the formation hide,
     // and walks a ship list cached 5 s; so the lists expire, as vanilla's ManageFormationCounts does, and the tactic re-applies.

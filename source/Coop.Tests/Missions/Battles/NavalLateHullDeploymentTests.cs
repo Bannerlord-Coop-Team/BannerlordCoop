@@ -19,26 +19,11 @@ public class NavalLateHullDeploymentTests
         Assert.NotNull(AccessTools.DeclaredMethod(typeof(RangedSiegeWeaponAi), nameof(RangedSiegeWeaponAi.InitializeThreatSeeker)));
     }
 
-    // R46: weapons list ship targets once, so a late hull refreshes every fielded hull's ballista but a removed one's.
-    [Fact]
-    public void WeaponAisToRefresh_EveryFieldedHullsBallistaButRemovedOnes()
-    {
-        var (fielded, fieldedAi) = ArmedHull();
-        var (spawned, spawnedAi) = ArmedHull();
-        var (removed, _) = ArmedHull();
-        removed._isRemoved = true;
-        var unarmed = ShipTestHulls.Uninitialized<MissionShip>();
-
-        var refreshed = NavalLateHullDeployment.WeaponAisToRefresh(new[] { fielded, spawned, removed, unarmed, null });
-
-        Assert.Equal(new[] { fieldedAi, spawnedAi }, refreshed);
-    }
-
     // A formation noted twice is checked once; one without a formation AI is left alone, and the next tick starts empty.
     [Fact]
     public void Apply_ChecksEachNotedFormationOnce_ThenForgetsThem()
     {
-        var deployment = new NavalLateHullDeployment();
+        var deployment = new NavalLateHullDeployment(new NavalBallistaTargets());
         var formation = (Formation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Formation));
 
         deployment.Note(null!);
@@ -59,17 +44,6 @@ public class NavalLateHullDeploymentTests
     public void NeedsTacticReapply_OnlyForUnitsWithEveryBehaviourWeightless(int units, bool anyWeighted, bool expected)
     {
         Assert.Equal(expected, NavalLateHullDeployment.NeedsTacticReapply(units, anyWeighted));
-    }
-
-    // A constructor-skipped hull carrying a ballista whose AI is already built.
-    private static (MissionShip Hull, RangedSiegeWeaponAi Ai) ArmedHull()
-    {
-        var hull = ShipTestHulls.Uninitialized<MissionShip>();
-        var weapon = ShipTestHulls.CreateWeapon();
-        var ai = (RangedSiegeWeaponAi)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(BallistaAI));
-        AccessTools.Field(typeof(UsableMachine), "_ai").SetValue(weapon, ai);
-        hull.ShipSiegeWeapon = weapon;
-        return (hull, ai);
     }
 }
 #endif

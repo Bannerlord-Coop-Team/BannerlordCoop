@@ -44,6 +44,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalLateHullDeployment>()
             .As<INavalLateHullDeployment>()
             .InstancePerDependency();
+        builder.RegisterType<NavalBallistaTargets>()
+            .As<INavalBallistaTargets>()
+            .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
             .InstancePerDependency();

@@ -56,6 +56,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly Func<INavalTickFailureLog> tickFailureLogs;
     private readonly IAsyncAgentTick asyncAgentTick;
     private readonly INavalLateHullDeployment lateHullDeployment;
+    private readonly INavalBallistaTargets ballistaTargets;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -77,7 +78,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IPlayerManager playerManager,
         Func<INavalTickFailureLog> tickFailureLogs,
         IAsyncAgentTick asyncAgentTick,
-        INavalLateHullDeployment lateHullDeployment
+        INavalLateHullDeployment lateHullDeployment,
+        INavalBallistaTargets ballistaTargets
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -94,6 +96,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.tickFailureLogs = tickFailureLogs;
         this.asyncAgentTick = asyncAgentTick;
         this.lateHullDeployment = lateHullDeployment;
+        this.ballistaTargets = ballistaTargets;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
@@ -260,7 +263,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 #endif
             );
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
-            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment));
+            mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
+            ballistaTargets));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.HullLedger, tallyReader,

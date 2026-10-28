@@ -25,13 +25,14 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalTickFailureLog fixedTickFailures;
     private readonly INavalTickFailureLog missionTickFailures;
     private readonly INavalLateHullDeployment lateHullDeployment;
+    private readonly INavalBallistaTargets ballistaTargets;
     private int lastAgentCount = -1;
     private bool retreated;
 
     // Takes one failure log per tick kind, so a flood on one of them can't hide the first lines of the other.
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
-        INavalLateHullDeployment lateHullDeployment)
+        INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets)
     {
         Services = services;
         this.steeredCopies = steeredCopies;
@@ -40,6 +41,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.fixedTickFailures = fixedTickFailures;
         this.missionTickFailures = missionTickFailures;
         this.lateHullDeployment = lateHullDeployment;
+        this.ballistaTargets = ballistaTargets;
         shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
@@ -144,13 +146,14 @@ public class CoopNavalBattleBehavior : MissionLogic
         Services.OnBeforeHullRemoved(ship, reason, shipsLogic.IsMissionEnding);
     }
 
-    // A removed hull is pooled during deployment and its entity removed later, so no copy reference, rope record or rope AI
-    // preference may outlive it, whichever path removed it (a departure, a migration replace or vanilla's own retreat).
+    // Vanilla frees a removed hull's entity right after this event, or pools it during deployment, so no copy reference, rope
+    // record, rope AI preference or ballista target may outlive it, whichever path removed it (departure, replace, retreat).
     private void OnShipRemoved(MissionShip ship)
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
         steeredCopies.Forget(ship);
         NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship);
+        ballistaTargets.ForgetHull(shipsLogic.AllShips, ship);
         if (shipsLogic.IsMissionEnding) return;
 
         Logger.Information("[NavalSync] Hull {Index} on {Team} formation {Formation} removed (copy {Copy}, pooled {Pooled})",
