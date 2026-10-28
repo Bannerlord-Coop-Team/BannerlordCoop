@@ -75,8 +75,9 @@ public class RecruitmentCommitTests : IDisposable
     {
         Server.Call(() => Get<Hero>(notableId).VolunteerTypes[0] = null);
 
-        Recruit(new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, archerId, 1));
+        int skipped = Recruit(new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, archerId, 1));
 
+        Assert.Equal(1, skipped);
         AssertRecruited(infantry: 0, archers: 1);
     }
 
@@ -85,8 +86,9 @@ public class RecruitmentCommitTests : IDisposable
     {
         Server.Call(() => Get<Hero>(notableId).VolunteerTypes[0] = Get<CharacterObject>(archerId));
 
-        Recruit(new TroopInfo(notableId, infantryId, 0));
+        int skipped = Recruit(new TroopInfo(notableId, infantryId, 0));
 
+        Assert.Equal(1, skipped);
         AssertRecruited(infantry: 0, archers: 0);
         Server.Call(() => Assert.Same(Get<CharacterObject>(archerId), Get<Hero>(notableId).VolunteerTypes[0]));
     }
@@ -94,32 +96,72 @@ public class RecruitmentCommitTests : IDisposable
     [Fact]
     public void IndexOutOfRange_IsSkipped_AndTheRestOfTheCartIsRecruited()
     {
-        Recruit(new TroopInfo(notableId, infantryId, 6), new TroopInfo(notableId, archerId, 1));
+        int skipped = Recruit(new TroopInfo(notableId, infantryId, 6), new TroopInfo(notableId, archerId, 1));
 
+        Assert.Equal(1, skipped);
         AssertRecruited(infantry: 0, archers: 1);
     }
 
     [Fact]
     public void SameSlotTwiceInOneCart_RecruitsOneTroop()
     {
-        Recruit(new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, infantryId, 0));
+        int skipped = Recruit(new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, infantryId, 0));
 
+        Assert.Equal(1, skipped);
         AssertRecruited(infantry: 1, archers: 0);
+        Server.Call(() => Assert.Null(Get<Hero>(notableId).VolunteerTypes[0]));
     }
 
-    private void Recruit(params TroopInfo[] cart)
+    [Fact]
+    public void NotEnoughGold_RecruitsNothing_AndSkipsTheWholeCart()
     {
-        Server.Call(() => Server.Resolve<ITroopRosterInterface>().HandleOnRecruitmentDone(partyId, cart), disabledMethods);
+        const int startingGold = (TroopCost * 2) - 1;
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Get<Hero>(leaderId).Gold = startingGold;
+            }
+        });
+
+        int skipped = Recruit(new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, archerId, 1));
+
+        Assert.Equal(2, skipped);
+        AssertRecruited(infantry: 0, archers: 0, startingGold);
+        Server.Call(() =>
+        {
+            Assert.Same(Get<CharacterObject>(infantryId), Get<Hero>(notableId).VolunteerTypes[0]);
+            Assert.Same(Get<CharacterObject>(archerId), Get<Hero>(notableId).VolunteerTypes[1]);
+        });
     }
 
-    private void AssertRecruited(int infantry, int archers)
+    [Fact]
+    public void UnknownParty_RecruitsNothing_AndSkipsNothing()
+    {
+        int skipped = 0;
+        var cart = new[] { new TroopInfo(notableId, infantryId, 0) };
+        Server.Call(() => skipped = Server.Resolve<ITroopRosterInterface>().HandleOnRecruitmentDone("unknown party", cart), disabledMethods);
+
+        Assert.Equal(0, skipped);
+        AssertRecruited(infantry: 0, archers: 0);
+        Server.Call(() => Assert.Same(Get<CharacterObject>(infantryId), Get<Hero>(notableId).VolunteerTypes[0]));
+    }
+
+    private int Recruit(params TroopInfo[] cart)
+    {
+        int skipped = 0;
+        Server.Call(() => skipped = Server.Resolve<ITroopRosterInterface>().HandleOnRecruitmentDone(partyId, cart), disabledMethods);
+        return skipped;
+    }
+
+    private void AssertRecruited(int infantry, int archers, int startingGold = StartingGold)
     {
         Server.Call(() =>
         {
             var party = Get<MobileParty>(partyId);
             Assert.Equal(infantry, party.MemberRoster.GetTroopRoster().Where(e => e.Character == Get<CharacterObject>(infantryId)).Sum(e => e.Number));
             Assert.Equal(archers, party.MemberRoster.GetTroopRoster().Where(e => e.Character == Get<CharacterObject>(archerId)).Sum(e => e.Number));
-            Assert.Equal(StartingGold - ((infantry + archers) * TroopCost), Get<Hero>(leaderId).Gold);
+            Assert.Equal(startingGold - ((infantry + archers) * TroopCost), Get<Hero>(leaderId).Gold);
         });
     }
 

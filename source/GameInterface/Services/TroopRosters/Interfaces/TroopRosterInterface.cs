@@ -355,7 +355,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
         int skipped = troopsInCart.Length - herosValidated.Count;
         if (skipped > 0)
         {
-            Logger.Warning("Skipped {Skipped} of {Total} recruitment cart entries whose volunteer slot changed", skipped, troopsInCart.Length);
+            Logger.Warning("Skipped {Skipped} of {Total} recruitment cart entries that did not match a free volunteer slot", skipped, troopsInCart.Length);
         }
 
         // Calculate cost before changing any data
