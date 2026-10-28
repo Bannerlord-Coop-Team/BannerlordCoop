@@ -85,6 +85,10 @@ public class BattleResultCommitter : IBattleResultCommitter
 
     public void ReportAcceptedResult()
     {
+#if DEBUG
+        // Retain the accepted result so turning the fixture off can report it normally.
+        if (session.DebugWithholdCompletion) return;
+#endif
         if (!session.HasInstance || !TryGetResolvedState(out var battleState))
             return;
 
