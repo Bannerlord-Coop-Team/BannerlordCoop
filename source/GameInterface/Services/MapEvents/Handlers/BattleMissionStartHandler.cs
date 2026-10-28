@@ -68,8 +68,7 @@ internal class BattleMissionStartHandler : IHandler
 
     // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
     // so a joiner entering mid-assault loads the same scene as the first entrant even though the campaign-side
-    // container keeps syncing. Rebuilt for each new mission claim, and evicted with the terrain seed when the
-    // event finalizes.
+    // container keeps syncing. Evicted with the terrain seed when the event finalizes.
     private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
 
     public BattleMissionStartHandler(
@@ -239,11 +238,6 @@ internal class BattleMissionStartHandler : IHandler
                     reserveBuilder.PrepareMissionReserves(mapEvent, attackerMobileParty);
                 }
 
-                // A new claim means no mission is open, so a snapshot left by an earlier assault on this event is
-                // stale. Drop it so the engine and wall damage that assault wrote back is read again.
-                if (isNewMissionClaim)
-                    siegeMissionSnapshots.TryRemove(payload.What.MapEventId, out _);
-
                 IMessage missionStartMessage;
                 if (hideoutRaid != null)
                 {
@@ -259,7 +253,11 @@ internal class BattleMissionStartHandler : IHandler
                           (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)))
                 {
                     operation = "build siege mission snapshot";
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    // A new claim means no mission is open, so re-read the engine and wall damage the last one wrote
+                    // back, keeping the siege kind it opened with.
+                    var snapshot = isNewMissionClaim
+                        ? siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent)
+                        : siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     missionStartMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,

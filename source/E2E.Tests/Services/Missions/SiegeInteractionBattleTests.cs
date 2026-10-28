@@ -281,9 +281,12 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     }
 
     // Issue #1842: when the assault mission empties the siege map event lives on, so the next assault on it
-    // must load the engine damage the last assault wrote back, not that assault's cached snapshot.
-    [Fact]
-    public void SiegeReassault_AfterInstanceEmptied_LoadsEngineDamageFromLastAssault()
+    // must load the engine damage the last assault wrote back, not that assault's cached snapshot. Relief
+    // parties can flip the live type to SiegeOutside while it is empty, and the reassault still opens as a siege.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SiegeReassault_AfterInstanceEmptied_LoadsEngineDamageFromLastAssault(bool flipsToSiegeOutside)
     {
         const string engineTypeId = "issue_1842_test_catapult";
         var battle = SetupInteraction(MapEvent.BattleTypes.Siege, isSiegeAmbush: false, includeAiParties: false);
@@ -308,6 +311,17 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             Array.Empty<SiegeEngineState>())), MapEventDisabledMethods);
         Server.Call(() => Assert.Equal(40f, engine!.Hitpoints));
         DepartBattle("attacker", battle.MapEventId, wasRetreat: true, isInstanceEmpty: true);
+        if (flipsToSiegeOutside)
+        {
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                    mapEvent._mapEventType = MapEvent.BattleTypes.SiegeOutside;
+                });
+            }
+        }
 
         var secondStarts = RequestSiegeMission(battle);
         Assert.All(secondStarts, start => Assert.Equal(40f, Assert.Single(start.AttackerEngines).Health));
