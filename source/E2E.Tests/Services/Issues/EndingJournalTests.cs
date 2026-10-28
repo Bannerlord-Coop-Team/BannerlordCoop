@@ -1,11 +1,11 @@
-﻿using Common.Util;
-using E2E.Tests.Environment;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
+using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -275,7 +275,7 @@ public class EndingJournalTests : IDisposable
         QuestJournalMirrorHandler restarted = null!;
         scenario.Server.Call(() =>
         {
-            scenario.Server.Resolve<IEnumerable<IHandler>>().OfType<QuestJournalMirrorHandler>().Single().Dispose();
+            scenario.Server.Resolve<QuestJournalMirrorHandler>().Dispose();
             serverQuest._journalEntries.Clear();
             serverQuest._journalEntries.AddRange(loaded);
             restarted = new QuestJournalMirrorHandler(scenario.Server.Resolve<IMessageBroker>(), scenario.Server.Resolve<INetwork>(),
