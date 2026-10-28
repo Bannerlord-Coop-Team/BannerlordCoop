@@ -1,10 +1,9 @@
 ﻿using Common.Logging;
 using Common.Util;
+using GameInterface.Services.Banners.Extensions;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Banners.Patches;
 
@@ -15,7 +14,7 @@ internal class ClanBannerLoadRepairPatch
 
     // PreAfterLoad repaints the clan banner next, which is the kingdom banner for a ruling clan, and throws
     // on one with no layers. The replacement is vanilla's default for a clan or kingdom without a banner,
-    // seeded by the id so every peer loading the save gets the same one.
+    // seeded by the StringId so every peer loading the save gets the same one.
     [HarmonyPrefix]
     private static void RepairEmptyBanners(Clan __instance)
     {
@@ -24,7 +23,7 @@ internal class ClanBannerLoadRepairPatch
         {
             using (new AllowedThread())
             {
-                __instance._banner = CreateDefaultBanner(__instance.StringId);
+                __instance._banner = __instance.StringId.ToSeededDefaultBanner();
             }
 
             Logger.Warning("Gave clan {ClanId} a default banner because its saved banner had no layers", __instance.StringId);
@@ -36,13 +35,10 @@ internal class ClanBannerLoadRepairPatch
         {
             using (new AllowedThread())
             {
-                kingdom.Banner = CreateDefaultBanner(kingdom.StringId);
+                kingdom.Banner = kingdom.StringId.ToSeededDefaultBanner();
             }
 
-            Logger.Warning("Gave kingdom {KingdomId} a default banner because its saved banner had no layers", kingdom.StringId);
+            Logger.Warning("Gave kingdom {KingdomId} a default banner because its saved banner was missing or had no layers", kingdom.StringId);
         }
     }
-
-    private static Banner CreateDefaultBanner(string stringId) =>
-        Banner.CreateRandomClanBanner(stringId.GetDeterministicHashCode());
 }

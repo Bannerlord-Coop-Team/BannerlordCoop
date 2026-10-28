@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.Banners.Extensions;
+using System;
 using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.External
@@ -19,7 +20,8 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = new Banner(bannerData);
+            // A joining player's clan banner arrives here inside the packed main hero.
+            Object = bannerData.ToBannerWithLayers();
         }
     }
 }

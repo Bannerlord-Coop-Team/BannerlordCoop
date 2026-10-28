@@ -4,6 +4,7 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
@@ -42,6 +43,28 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Banner newBanner = returnedPackage.Unpack<Banner>(deserializeFactory);
 
             Assert.Equal(testBanner.Serialize(), newBanner.Serialize());
+        }
+
+        [Fact]
+        public void Banner_WithNoLayers_UnpacksToDefaultBanner()
+        {
+            // The default banner takes its colours from the palette, which is empty outside the game.
+            BannerManager.Initialize();
+            if (BannerManager.Instance.ReadOnlyColorPalette.Count == 0)
+            {
+                BannerManager.Instance._colorPalette[9101] = new BannerColor(0xFF102030, true, true);
+                BannerManager.Instance.ReadOnlyColorPalette = BannerManager.Instance._colorPalette.GetReadOnlyDictionary();
+            }
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            BannerBinaryPackage package = new BannerBinaryPackage(new Banner(), factory);
+
+            package.Pack();
+
+            var returnedPackage = (BannerBinaryPackage)BinaryPackageSerializer.Deserialize(BinaryPackageSerializer.Serialize(package));
+            Banner newBanner = returnedPackage.Unpack<Banner>(container.Resolve<IBinaryPackageFactory>());
+
+            Assert.False(newBanner.IsBannerDataListEmpty());
         }
     }
 }

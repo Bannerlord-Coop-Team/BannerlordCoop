@@ -7,7 +7,7 @@ namespace GameInterface.Services.Banners.Extensions;
 
 internal static class BannerCodeExtensions
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<Banner>();
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(BannerCodeExtensions));
 
     /// <summary>
     /// Whether a banner code parses to at least one layer. A code this side can't read (corrupt, or
@@ -29,7 +29,14 @@ internal static class BannerCodeExtensions
         if (bannerCode.HasBannerLayers()) return new Banner(bannerCode);
 
         Logger.Warning("Received a banner code with no readable layers ({BannerCode}), using a default banner", bannerCode);
-        // A seed of -1 means unseeded, so keep it positive.
-        return Banner.CreateRandomClanBanner(bannerCode.GetDeterministicHashCode() & int.MaxValue);
+        // A received banner has no owner here, so the code is the seed. Saved objects use their StringId.
+        return bannerCode.ToSeededDefaultBanner();
     }
+
+    /// <summary>
+    /// Vanilla's default banner for a clan or kingdom without one, seeded by <paramref name="seedText"/> so every peer builds the same one.
+    /// </summary>
+    public static Banner ToSeededDefaultBanner(this string seedText) =>
+        // A seed of -1 means unseeded, so keep it positive.
+        Banner.CreateRandomClanBanner(seedText.GetDeterministicHashCode() & int.MaxValue);
 }
