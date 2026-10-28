@@ -1611,6 +1611,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 }
                 var states = Game.Current.GameStateManager;
                 var mapState = states.GameStates.OfType<MapState>().Single();
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            starter.AddGameMenu("encounter", "Encounter", _ => { });
+            starter.AddGameMenu("raiding_village", "Raiding village", _ => { });
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
                 var simulation = encounter.BattleSimulation;
                 completedSimulation = simulation;
                 mapState.EndBattleSimulation();
