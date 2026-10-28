@@ -106,7 +106,7 @@ public class BattleSimulationCompletionTests : MapEventTestBase
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
         Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
         var lootSawRegisteredEvent = new List<bool>();
-        client.Resolve<IMessageBroker>().Subscribe<NetworkBattleSimulationLoot>(_ =>
+        client.Resolve<IMessageBroker>().Subscribe<NetworkBattleSimulationLoot>(payload =>
             lootSawRegisteredEvent.Add(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _)));
 
         Server.Call(() =>
