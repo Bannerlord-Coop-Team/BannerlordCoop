@@ -118,6 +118,7 @@ internal class CaravanAmbushPatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class CaravanAmbushServerListeners
 {
