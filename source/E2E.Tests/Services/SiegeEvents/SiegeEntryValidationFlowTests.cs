@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Extensions;
@@ -407,6 +408,75 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void BesiegedTownEncounter_RepeatedArrival_RequestsOnce()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() => CreatePresentedTownSiege(instance, context), SiegeCreationDisabledMethods);
+        }
+        ClearMessages();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            Assert.True(settlement.IsUnderSiege);
+            Campaign.Current.PlayerEncounter = null;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, SiegeCreationDisabledMethods);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(encounter);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+
+            // Client time keeps running under the menu, so the map tick arrives here again.
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, SiegeCreationDisabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SettlementArrival_WithoutEncounterAtThatSettlement_StillRequestsEntry(bool otherSettlementEncounter)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            PlayerEncounter? encounter = null;
+            if (otherSettlementEncounter)
+            {
+                encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter.EncounterSettlementAux = GameObjectCreator.CreateInitializedObject<Settlement>();
+            }
+            Campaign.Current.PlayerEncounter = encounter;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+    }
+
+    [Fact]
     public void GenericTownMenu_WithoutBattle_DoesNotRequestEncounterRecovery()
     {
         var client = Clients.First();
@@ -490,21 +560,17 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         {
             instance.Call(() =>
             {
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
-                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
-                Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                var settlement = CreatePresentedTownSiege(instance, context, (party, besiegedSettlement) =>
+                {
+                    party.CurrentSettlement = besiegedSettlement;
+                    besiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
+                    mapEvent.DefenderSide.LeaderParty = besiegedSettlement.Party;
+                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                    mapEvent.MapEventSettlement = besiegedSettlement;
+                });
                 using (new AllowedThread())
                 {
-                    settlement.SetSettlementComponent(town);
-                    town.OwnerClan = defenderClan;
-                    party.CurrentSettlement = settlement;
-                    settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                    mapEvent.DefenderSide.LeaderParty = settlement.Party;
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                    mapEvent.MapEventSettlement = settlement;
-                    CreatePresentedSiege(party, settlement);
                     // The skipped scene initializer also creates the collections read by siege strength calculations.
                     settlement.SiegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
                         BattleSideEnum.Attacker, null);
@@ -859,6 +925,28 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                 out var settlement));
             Assert.Same(settlement.SiegeEvent.BesiegerCamp, party.BesiegerCamp);
         });
+    }
+
+    // Wires the context's town on this instance and presents a siege on it. beforeSiege runs after the
+    // town is wired and before the siege is created.
+    private static Settlement CreatePresentedTownSiege(
+        EnvironmentInstance instance,
+        EntryContext context,
+        Action<MobileParty, Settlement>? beforeSiege = null)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+        Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+        Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+        using (new AllowedThread())
+        {
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = defenderClan;
+            beforeSiege?.Invoke(party, settlement);
+            CreatePresentedSiege(party, settlement);
+        }
+
+        return settlement;
     }
 
     private static void CreatePresentedSiege(

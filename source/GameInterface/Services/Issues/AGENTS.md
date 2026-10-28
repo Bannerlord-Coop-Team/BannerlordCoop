@@ -10,8 +10,17 @@ Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
   vanilla issue behavior, named without `IssueBehavior`. If `Framework/` needs a change for one quest, stop and ask.
 - A quest is registered only by having a descriptor. `IssuesModule` registers every class in
   `GameInterface.Services.Issues.Quests` that implements `IQuestTypeDescriptor` or a strategy interface, and
-  `Framework/Gating/IssueTypeAllowlistGate.cs` turns off `RegisterEvents` for every other issue behavior. Do not
-  add a per-quest "disable this behavior" patch, it will fight the gate.
+  `Framework/CreationCapture/UnregisteredIssueBehaviorPatches.cs` turns off `RegisterEvents` for every other issue
+  behavior. Do not add a per-quest "disable this behavior" patch, it will fight those patches.
+- Quests sit behind `IQuestFeatureFlag`, on only in builds compiled with `TESTER` (the nightly workflow and
+  local Debug builds of `GameInterface`). With it off `QuestTypeRegistry` stays empty, so
+  `UnregisteredIssueBehaviorPatches` keeps every issue behavior off, and `UnregisteredIssuePurger` ends taken issues on
+  the server through `IIssueDismisser`, not vanilla cancel, which sends troops to the host's missing
+  `MobileParty.MainParty`. Every patch in this folder carries `[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]`,
+  which `GameInterfacePatchInstaller` applies only with the flag on. The four always-on safety patches
+  (`UnregisteredIssueBehaviorPatches`, `PlayerHeroIssueOwnerPatch`, `DisableIssuesCampaignBehavior`,
+  `IssuesCampaignBehaviorSettlementEnteredPatch`) stay uncategorized. A new quest patch needs the category.
+  Tests turn the flag on in `E2E.Tests` `TestEnvironment` and `GameInterface.Tests` `PatchBootstrap`.
 - `IssuesLayoutTests` in `GameInterface.Tests` checks that `Framework/` interfaces sit in `Framework.Interface` and that
   messages are public readonly structs, with network commands as `[ProtoContract(SkipConstructor = true)]`.
 
@@ -26,10 +35,15 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
    `QuestSuccess` for your descriptor.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
-   keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
-   `NetworkIssueFinalized`. `Framework/Gating/SimilarCommitmentsGatePatch.cs` reads it inside
-   `IssueBase.CheckPreconditions` so vanilla's one-issue-per-type check counts only the player's own issues, so a
-   stale mirror changes whether a player can accept.
+   keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
+   `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`. A client sets or moves its mirror when it
+   applies the message and empties it when the replay runs, and it applies a giver's messages in the order they came
+   through `IIssueConversationGuard.RunInOrder`. So while a replay waits for the player's conversation with the giver
+   (rule 8), later quest, troops and lord solution accepts, owner changes and new issues for that giver wait behind it.
+   A refused troops accept is the exception and runs at once, see `AlternativeSolutionAcceptCoordinator`.
+   `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside `IssueBase.CheckPreconditions` so
+   vanilla's one-issue-per-type check counts only the player's own issues, so a stale mirror changes whether a player
+   can accept.
 4. A non-owner client ends with the issue marked taken (`_issueState` set) and nothing else: no quest, no
    `AddLog`, no `OnIssueUpdated`, `IsTriedToSolveBefore` left false (vanilla uses it to pick the solver). For sent
    troops `AlternativeSolutionAcceptCoordinator.AddPlaceholderLog` also puts an empty entry straight into
@@ -43,20 +57,26 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 7. UI bookkeeping the server runs for players leaks into the save a joiner downloads. The server skips quest
    pop-ups and unread markers (`Services/UI/Notifications/Patches/ServerQuest*Patches.cs`). For a new server path,
    check what reacts to `AddLog`, `OnIssueUpdated` and `OnQuestCompleted`.
-8. A client never ends a registered quest on its own under `AllowedThread`. A quest listener still fires inside a
-   replay (a war, an army's removal), and `OutcomeDispatcher.BeforeQuestOutcome` drops that ending unless
-   `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
-   clan's kingdom change, still sends its ending to the server as a request.
-9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
+8. A client never ends a registered quest or issue on its own under `AllowedThread`. A listener still fires inside a
+   replay (a war, an army's removal, a settlement entry), and `OutcomeDispatcher.BeforeQuestOutcome` and
+   `BeforeIssueOutcome` drop that ending unless `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`).
+   A quest listener outside `AllowedThread`, like a clan's kingdom change, still sends its ending to the server as a
+   request. An issue ending there is dropped. The client's `Replay` waits while its player talks to the giver
+   (`Framework/Conversation/IssueConversationGuard.cs`), and so does cancelling the stray quest of a refused accept,
+   because the lines on screen read the issue or belong to its quest and the options point at them by index. That
+   covers an offer nobody took, a stray quest, and an issue another player holds, like vanilla's "About the task you
+   gave me..." line for troops someone else sent. Only the ending of the owner's running quest, a hand in for example,
+   replays at once unless work is already waiting for that giver, as vanilla ends quests mid dialog.
+9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal, a settlement owner change) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed` and `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
    listener names as strings because `Framework/` cannot name quest types.
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.
-11. Players and their clans never offer issues. `Framework/Gating/PlayerHeroIssueOwnerGate.cs` turns
+11. Players and their clans never offer issues. `Framework/CreationCapture/PlayerHeroIssueOwnerPatch.cs` turns
     `Hero.CanHaveCampaignIssues` off for them on the server, vanilla only excludes `Clan.PlayerClan`.
 
 ## Adding a quest type

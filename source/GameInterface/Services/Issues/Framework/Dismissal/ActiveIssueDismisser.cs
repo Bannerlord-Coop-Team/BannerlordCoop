@@ -1,4 +1,4 @@
-﻿using Common;
+﻿﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network.Messages;
@@ -12,10 +12,8 @@ using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
@@ -33,6 +31,7 @@ internal class ActiveIssueDismisser : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
+    private readonly IIssueDismisser issueDismisser;
     private readonly IIssueOwnerResolver ownerResolver;
 
     public ActiveIssueDismisser(
@@ -41,6 +40,7 @@ internal class ActiveIssueDismisser : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IObjectManager objectManager,
+        IIssueDismisser issueDismisser,
         IIssueOwnerResolver ownerResolver)
     {
         this.messageBroker = messageBroker;
@@ -48,6 +48,7 @@ internal class ActiveIssueDismisser : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
+        this.issueDismisser = issueDismisser;
         this.ownerResolver = ownerResolver;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
@@ -163,7 +164,7 @@ internal class ActiveIssueDismisser : IHandler
             }
         }
 
-        issue.IssueFinalized();
+        issueDismisser.Dismiss(issue);
 
         if (announce)
         {
@@ -175,32 +176,11 @@ internal class ActiveIssueDismisser : IHandler
     {
         Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
 
-        var settlement = issue.IssueOwner?.CurrentSettlement ?? issue.IssueOwner?.HomeSettlement;
-
-        foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
-        {
-            if (element.Character.IsHero && element.Character.HeroObject.HeroState == Hero.CharacterStates.Disabled)
-            {
-                FreeCompanion(element.Character.HeroObject, settlement);
-            }
-        }
-
-        issue.IssueFinalized();
+        issueDismisser.Dismiss(issue);
 
         if (announce)
         {
             messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
         }
-    }
-
-    private static void FreeCompanion(Hero companion, Settlement settlement)
-    {
-        if (settlement == null)
-        {
-            companion.ChangeState(Hero.CharacterStates.Active);
-            return;
-        }
-
-        TeleportHeroAction.ApplyImmediateTeleportToSettlement(companion, settlement);
     }
 }

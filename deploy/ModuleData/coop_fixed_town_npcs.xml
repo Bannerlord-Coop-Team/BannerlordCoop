@@ -567,7 +567,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="If you’ve come for trouble, you’ll find it. If not, you’re welcome here."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
