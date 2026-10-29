@@ -44,6 +44,11 @@ internal static class NavalRopes
         internal DateTime? ReplicaRemovalAppliedUtc;
         internal DateTime? ReplicaRemovalPreviousSampleUtc;
         internal string ReplicaRemovalReason;
+#if DEBUG
+        internal BattleRopeState HeldRemovalLiveState;
+        internal DateTime? RemovalHoldStartedUtc;
+        internal DateTime? RemovalHoldReleasedUtc;
+#endif
     }
 
     /// <summary>
@@ -127,6 +132,10 @@ internal static class NavalRopes
 
         record.Attachment = machine.CurrentAttachment;
         record.Generation++;
+#if DEBUG
+        record.HeldRemovalLiveState = null;
+        record.RemovalHoldStartedUtc = record.RemovalHoldReleasedUtc = null;
+#endif
         record.CurveTarget = null;
         record.LastIncludedSampleUtc = record.SamplesOmittedUtc = null;
     }
@@ -154,7 +163,12 @@ internal static class NavalRopes
 
             if (record.Last != null)
             {
+#if DEBUG
+                // Keep the replica alive through the normal repeat window; the eventual omission remains untouched.
+                result.Add(record.HeldRemovalLiveState ?? record.Last);
+#else
                 result.Add(record.Last);
+#endif
                 record.LastIncludedSampleUtc = DateTime.UtcNow;
             }
             if (result.Count == BattleRopeState.MaxRopesPerHull) break;
@@ -162,6 +176,33 @@ internal static class NavalRopes
 
         return result.Count == 0 ? null : result.ToArray();
     }
+
+#if DEBUG
+    /// <summary>Holds only this generation's removal entries, leaving the normal sample omission clock running.</summary>
+    internal static bool HoldRemoval(ShipAttachmentMachine source)
+    {
+        var record = RecordOf(source);
+        if (record?.Last == null || record.Last.Generation != record.Generation
+            || (record.Last.State != BattleRopeState.RopesPulling && !record.Last.IsPlank)
+            || record.HeldRemovalLiveState != null) return false;
+
+        record.HeldRemovalLiveState = record.Last;
+        record.RemovalHoldStartedUtc = DateTime.UtcNow;
+        record.RemovalHoldReleasedUtc = null;
+        return true;
+    }
+
+    /// <summary>Restores normal capture for this station; an expired repeat window stays omitted.</summary>
+    internal static bool ReleaseRemoval(ShipAttachmentMachine source)
+    {
+        var record = RecordOf(source);
+        if (record?.HeldRemovalLiveState == null) return false;
+
+        record.HeldRemovalLiveState = null;
+        record.RemovalHoldReleasedUtc = DateTime.UtcNow;
+        return true;
+    }
+#endif
 
     // Turns the station's last state into its removal; false once the removal has gone out for the whole repeat window.
     private static bool RepeatRemoval(RopeRecord record)
@@ -604,6 +645,11 @@ internal static class NavalRopes
             plankNavmesh = attachment?._navMeshBridge?.WeakEntity.IsValid == true,
             plankOccupants = attachment?._navMeshBridge == null ? (int?)null : PlankOccupants(attachment),
             decorationPlanks = record?.DecorationPlanks ?? 0,
+#if DEBUG
+            removalHeld = record?.HeldRemovalLiveState != null,
+            removalHoldStartedUtc = record?.RemovalHoldStartedUtc,
+            removalHoldReleasedUtc = record?.RemovalHoldReleasedUtc,
+#endif
             lastIncludedSampleUtc = record?.LastIncludedSampleUtc,
             samplesOmittedUtc = record?.SamplesOmittedUtc,
             removedRepeatSamples = record?.RemovedRepeats ?? 0,

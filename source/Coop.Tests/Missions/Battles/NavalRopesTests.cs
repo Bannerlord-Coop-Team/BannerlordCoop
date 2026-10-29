@@ -86,6 +86,75 @@ public class NavalRopesTests
         }
     }
 
+#if DEBUG
+    /// <summary>The debug hold preserves the live entry for the repeat window without delaying omission.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Capture_HeldRemovalExpiresByOmissionOrCanBeReleased(bool releaseEarly)
+    {
+        var (hull, station, _) = ReplicaOnCopy();
+        station.CurrentAttachment = null;
+        Clear();
+        try
+        {
+            var live = BattleRopeStateTests.Rope(3, BattleRopeState.RopesPulling);
+            records[station] = new RopeRecord { Generation = 3, Last = live };
+            Assert.True(HoldRemoval(station));
+            Assert.False(HoldRemoval(station));
+            Assert.NotNull(records[station].RemovalHoldStartedUtc);
+
+            Assert.Same(live, Assert.Single(Capture(hull, _ => Guid.Empty)));
+            Assert.Equal(BattleRopeState.Removed, records[station].Last.State);
+            if (releaseEarly) Assert.True(ReleaseRemoval(station));
+
+            for (int sample = 1; sample < RemovedRepeatSamples; sample++)
+            {
+                var sent = Assert.Single(Capture(hull, _ => Guid.Empty));
+                Assert.Equal(releaseEarly ? BattleRopeState.Removed : BattleRopeState.RopesPulling, sent.State);
+                Assert.Equal(3, sent.Generation);
+            }
+
+            Assert.Null(Capture(hull, _ => Guid.Empty));
+            Assert.Equal(RemovedRepeatSamples, records[station].RemovedRepeats);
+            Assert.NotNull(records[station].SamplesOmittedUtc);
+            if (!releaseEarly) Assert.True(ReleaseRemoval(station));
+            Assert.NotNull(records[station].RemovalHoldReleasedUtc);
+            Assert.False(ReleaseRemoval(station));
+            Assert.Null(Capture(hull, _ => Guid.Empty));
+            Clear();
+            Assert.Null(RecordOf(station));
+            Assert.False(ReleaseRemoval(station));
+        }
+        finally
+        {
+            Clear();
+        }
+    }
+
+    /// <summary>A hold cannot arm for an unpublished, stale or already removed generation.</summary>
+    [Theory]
+    [InlineData(2, BattleRopeState.RopesPulling)]
+    [InlineData(3, BattleRopeState.Removed)]
+    [InlineData(3, BattleRopeState.RopeThrown)]
+    public void HoldRemoval_RejectsUnusablePublishedStates(long generation, int state)
+    {
+        var (_, station, _) = ReplicaOnCopy();
+        Clear();
+        try
+        {
+            Assert.False(HoldRemoval(station));
+            records[station] = new RopeRecord { Generation = 3, Last = BattleRopeStateTests.Rope(generation, state) };
+            Assert.False(HoldRemoval(station));
+            Assert.Null(records[station].HeldRemovalLiveState);
+        }
+        finally
+        {
+            Clear();
+        }
+    }
+#endif
+
     // S17 re-review R1: a peer that missed the whole removal window still drops the replica once a sample omits its station.
     [Fact]
     public void Apply_RemovesAReplicaTheOwnersSampleOmits()
