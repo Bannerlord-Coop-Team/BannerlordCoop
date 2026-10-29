@@ -113,7 +113,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Coop", isOfficial: false),
             Module("SomeDlc", isOfficial: true, isDlc: true));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {}, navalSupported: false);
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, navalSupported: false);
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);

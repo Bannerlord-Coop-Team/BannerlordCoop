@@ -4,8 +4,10 @@ using Common.Messaging;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
 using GameInterface.Registry;
+using GameInterface.Services.Clans;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.Interfaces;
@@ -35,7 +37,8 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
         var game = new Mock<IGameStateInterface>();
         using var broker = new MessageBroker();
         using var state = new InitialServerState(Mock.Of<IServerLogic>(), broker, Mock.Of<IRegistryManager>(),
-            Mock.Of<IMapEventLoadCleaner>(), Mock.Of<IModuleInfoProvider>(), Mock.Of<IModuleValidator>(),
+            Mock.Of<IMapEventLoadCleaner>(), Mock.Of<ILeaderlessClanResolver>(),
+            Mock.Of<IEmptyLordPartyResetter>(), Mock.Of<IModuleInfoProvider>(), Mock.Of<IModuleValidator>(),
             game.Object, Mock.Of<ILoadingInterface>());
 
         state.Start();

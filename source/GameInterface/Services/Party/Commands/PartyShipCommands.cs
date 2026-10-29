@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -304,8 +305,8 @@ public class PartyShipCommands
 
         if (objectManager.TryGetObject<object>(id, out var registered))
             party = registered is MobileParty mobileParty ? mobileParty.Party : registered as PartyBase;
-        if (party == null && CommandHelpers.TryGetMobileParty(id, out var campaignParty, out _))
-            party = campaignParty.Party;
+        if (party == null)
+            party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(id)?.Party;
         if (party != null)
         {
             error = null;
