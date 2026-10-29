@@ -1637,6 +1637,16 @@ public class VillageHostileActionTests : MapEventTestBase
                 client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
             }, MapEventDisabledMethods);
             // The native loot exit requests the continuation; allow its approval to cross the network.
+            Console.WriteLine($"raid continuation immediate client messages={string.Join(',', client.NetworkSentMessages.Messages.Select(message => message.GetType().Name))}");
+            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            Server.PumpGameThread();
+            Server.Call(() =>
+            {
+                var serverParty = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId);
+                Console.WriteLine($"raid continuation server messages={string.Join(',', Server.NetworkSentMessages.Messages.Select(message => message.GetType().Name))}");
+            }, MapEventDisabledMethods);
+            client.PumpGameThread();
+            Console.WriteLine($"raid continuation client messages={string.Join(',', client.InternalMessages.Messages.Select(message => message.GetType().Name))}");
             Server.PumpGameThread();
             Server.Call(() =>
             {
@@ -1646,8 +1656,6 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.True(Server.ObjectManager.TryGetId(serverParty.MapEvent, out var resumedMapEventId));
                 Console.WriteLine($"raid continuation server event={resumedMapEventId} messages={string.Join(',', Server.NetworkSentMessages.Messages.Select(message => message.GetType().Name))}");
             }, MapEventDisabledMethods);
-            client.PumpGameThread();
-            Console.WriteLine($"raid continuation client messages={string.Join(',', client.InternalMessages.Messages.Select(message => message.GetType().Name))}");
             client.Call(() =>
             {
                 Assert.NotNull(PlayerEncounter.Current);
