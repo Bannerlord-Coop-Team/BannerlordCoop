@@ -52,8 +52,8 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fatherId, out var father));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(motherId, out var mother));
 
-            // _basicName isn't saved and InitializeCharactersAfterLoad only restores it on template copies,
-            // so a player's character has none after the server reloads its save
+            // Staged, the E2E harness can't reload a save. On the server a player's own character has no base name
+            // after a reload, since _basicName isn't saved and InitializeCharactersAfterLoad only restores template copies
             (playerIsMother ? mother : father).CharacterObject._basicName = null;
             Campaign.Current.Models.PregnancyModel = new FixedPregnancyModel(isFemale);
 
