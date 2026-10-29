@@ -43,6 +43,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IIssueAcceptPreconditions acceptPreconditions;
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IQuestJournalOwnerResolver journal;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -55,7 +56,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IControllerIdProvider controllerIdProvider,
         IIssueAcceptPreconditions acceptPreconditions,
         IAlternativeSolutionCommitments commitments,
-        IQuestJournalOwnerResolver journal)
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -68,6 +70,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.acceptPreconditions = acceptPreconditions;
         this.commitments = commitments;
         this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -214,7 +217,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
@@ -244,7 +248,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
             ApplyState(issue, data.State);
             descriptor.AlternativeSolutionAcceptStrategy?.Apply(issue, data.Captured);
-        }, context: nameof(AlternativeSolutionAcceptCoordinator));
+        }, data.IssueOwnerId), context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkAlternativeSolutionAcceptRejected(MessagePayload<NetworkAlternativeSolutionAcceptRejected> payload)
@@ -256,6 +260,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
+        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))

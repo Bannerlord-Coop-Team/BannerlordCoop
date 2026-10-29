@@ -136,6 +136,68 @@ public class MerchantOutlawsTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompanionReturnProgressIsAuthoritativeInEitherSnapshotAndDailyTickOrder(bool snapshotFirst)
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var issue = Get<Hero>(instance, scenario.NotableId).Issue;
+                using (new AllowedThread())
+                {
+                    issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(10);
+                    issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+                    issue._areIssueEffectsResolved = false;
+                    issue._journalEntries.Clear();
+                    issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TaleWorlds.Localization.TextObject("returning"),
+                        currentProgress: instance == Server ? 3 : 2, range: 10));
+                }
+                instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA);
+            });
+        }
+        void Snapshot() => Server.Call(() => Server.Resolve<IMerchantOutlawsProgress>().Send(Get<Hero>(Server, scenario.NotableId).Issue));
+        void Tick()
+        {
+            foreach (var client in new[] { ClientA, ClientB })
+                client.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
+        }
+
+        if (snapshotFirst)
+        {
+            Snapshot();
+            Tick();
+        }
+        else
+        {
+            Tick();
+            ClientA.Call(() => Assert.Equal(2, Get<Hero>(ClientA, scenario.NotableId).Issue.JournalEntries[0].CurrentProgress));
+            Snapshot();
+        }
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithAlternative);
+            Assert.Equal(3, Assert.Single(issue.JournalEntries).CurrentProgress);
+        });
+        foreach (var client in new[] { ClientA, ClientB })
+            client.Call(() =>
+            {
+                var issue = Get<Hero>(client, scenario.NotableId).Issue;
+                Assert.True(issue._areIssueEffectsResolved);
+                Assert.True(issue.IsSolvingWithAlternative);
+                Assert.Single(issue.JournalEntries);
+                Assert.Equal(client == ClientA ? 3 : 2, issue.JournalEntries[0].CurrentProgress);
+            });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
+    }
+
     [Fact]
     public void HideoutBanditsStayUntrackedWhenAcceptedAndProgressIsReplayed()
     {
