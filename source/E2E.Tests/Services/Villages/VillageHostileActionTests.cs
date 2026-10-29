@@ -1637,6 +1637,17 @@ public class VillageHostileActionTests : MapEventTestBase
                 client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
             }, MapEventDisabledMethods);
             // The native loot exit requests the continuation; allow its approval to cross the network.
+            Server.PumpGameThread();
+            Server.Call(() =>
+            {
+                var serverParty = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId);
+                Assert.NotNull(serverParty.MapEvent);
+                Assert.NotSame(completedSimulation.MapEvent, serverParty.MapEvent);
+                Assert.True(Server.ObjectManager.TryGetId(serverParty.MapEvent, out var resumedMapEventId));
+                Console.WriteLine($"raid continuation server event={resumedMapEventId} messages={string.Join(',', Server.NetworkSentMessages.Messages.Select(message => message.GetType().Name))}");
+            }, MapEventDisabledMethods);
+            client.PumpGameThread();
+            Console.WriteLine($"raid continuation client messages={string.Join(',', client.InternalMessages.Messages.Select(message => message.GetType().Name))}");
             client.Call(() =>
             {
                 Assert.NotNull(PlayerEncounter.Current);
