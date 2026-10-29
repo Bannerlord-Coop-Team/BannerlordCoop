@@ -13,7 +13,7 @@
   <PropertyGroup>
     <!-- Whether to build and ship the War Sails (NavalDLC) code. Defaults to whether War Sails is installed;
          pass -p:CoopNavalDlc=false to build as a machine without it would. -->
-    <CoopNavalDlc Condition="'$(CoopNavalDlc)' == '' And Exists('$(MSBuildThisFileDirectory)..\mb2\Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.dll')">true</CoopNavalDlc>
+    <CoopNavalDlc Condition="'$(CoopNavalDlc)' == '' And Exists('$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.dll')">true</CoopNavalDlc>
     <CoopNavalDlc Condition="'$(CoopNavalDlc)' != 'true'">false</CoopNavalDlc>
   </PropertyGroup>
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">

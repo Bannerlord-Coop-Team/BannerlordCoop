@@ -21,25 +21,25 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
-      <HintPath>..\..\mb2\Modules\Coop\bin\Win64_Shipping_Client\0Harmony.dll</HintPath>
+      <HintPath>$(BannerlordDir)Modules\Coop\bin\Win64_Shipping_Client\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.View">
-      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+      <HintPath>$(BannerlordDir)Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.CampaignSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Core">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Engine">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
