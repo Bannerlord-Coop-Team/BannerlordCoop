@@ -36,6 +36,17 @@ public class NavalDeckPoses : INavalDeckPoses
     // (ShipAttachmentMachine.BridgeConnectedInteractionDistanceSquared = 100).
     internal const float FootprintMarginMetres = 15f;
 
+    // A still agent's hull-local position jitters by float32 steps (2^-12 m at 3600 m from the origin, up to ~3 mm per
+    // sample), so one 33 ms sample reads up to 0.1 m/s; a 0.1 s baseline cuts that to about 0.03 m/s.
+    internal const float DeckSpeedBaselineSeconds = 0.1f;
+
+    // Deck speeds at or under this are idle and report 0; a walking crew member moves at 1 m/s or more.
+    // The deck movement probe classes a send as idle by the same speed.
+    internal const float IdleDeckSpeed = 0.1f;
+
+    // A baseline older than this, e.g. after the agent sent no deck pose for a while, restarts the measurement.
+    private const float DeckSpeedResetSeconds = 0.5f;
+
     private readonly ICoopMissionComponent missionComponent;
     private readonly INavalShipEngine engine;
 
@@ -95,20 +106,22 @@ public class NavalDeckPoses : INavalDeckPoses
         local.x >= min.x - FootprintMarginMetres && local.x <= max.x + FootprintMarginMetres
         && local.y >= min.y - FootprintMarginMetres && local.y <= max.y + FootprintMarginMetres;
 
-    // Finite difference of hull-local positions, so the puppet's walk throttle never includes hull motion.
+    // Deck speed over a baseline of at least DeckSpeedBaselineSeconds, held in between, with idle noise snapped to 0, so the
+    // puppet's walk throttle excludes hull motion and a still crew member's speed never changes.
     private float DeckSpeed(Guid agentId, Guid shipId, Vec3 local, float time)
     {
-        deckSpeeds.TryGetValue(agentId, out var previous);
-        float dt = time - previous.Time;
-        if (previous.Ship != shipId || dt < 0f || dt > 0.5f)
+        deckSpeeds.TryGetValue(agentId, out var baseline);
+        float dt = time - baseline.Time;
+        if (baseline.Ship != shipId || dt < 0f || dt > DeckSpeedResetSeconds)
         {
             deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, time, 0f);
             return 0f;
         }
 
-        if (dt < 0.005f) return previous.Speed;
+        if (dt < DeckSpeedBaselineSeconds) return baseline.Speed;
 
-        float speed = (local - previous.Local).AsVec2.Length / dt;
+        float speed = (local - baseline.Local).AsVec2.Length / dt;
+        if (speed <= IdleDeckSpeed) speed = 0f;
         deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, time, speed);
         return speed;
     }
@@ -122,7 +135,7 @@ public class NavalDeckPoses : INavalDeckPoses
         return FrameValidation.IsValid(hullFrame);
     }
 
-    // An agent's last deck-speed sample: the ship, its hull-local position, the time and the speed measured then.
+    // An agent's deck-speed baseline: the ship, its hull-local position, the time and the speed measured then.
     private readonly struct DeckSpeedSample
     {
         public DeckSpeedSample(Guid ship, Vec3 local, float time, float speed)

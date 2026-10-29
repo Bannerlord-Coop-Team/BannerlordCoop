@@ -28,7 +28,7 @@ public interface INavalDeckMovementProbe
 public sealed class NavalDeckMovementProbe : INavalDeckMovementProbe
 {
     private const float WindowSeconds = 10f;
-    private const float IdleSpeed = 0.1f;
+    private const float IdleSpeed = NavalDeckPoses.IdleDeckSpeed;
     private readonly Dictionary<(string Recipient, Guid Agent), Queue<(float Time, Guid Ship, float Speed)>> sends = new();
 #if DEBUG
     private Guid rejectAgent;
