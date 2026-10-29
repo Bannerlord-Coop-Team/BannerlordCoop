@@ -75,6 +75,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalRamInspect>()
             .As<INavalRamInspect>()
             .InstancePerDependency();
+        builder.RegisterType<NavalRamStaging>()
+            .As<INavalRamStaging>()
+            .InstancePerDependency();
         builder.RegisterType<NavalRamStageCoopCommand>()
             .As<INavalRamStageCoopCommand>()
             .As<ICoopCommand>()

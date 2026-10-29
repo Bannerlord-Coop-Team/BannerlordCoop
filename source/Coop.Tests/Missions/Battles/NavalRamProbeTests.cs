@@ -56,7 +56,7 @@ public class NavalRamProbeTests
     [Fact]
     public void RamStage_WithoutTarget_ShowsUsage()
     {
-        var result = new NavalRamStageCoopCommand(Mock.Of<INavalDebugHulls>()).ProcessCommand(Mock.Of<ICoopCommandArgs>());
+        var result = new NavalRamStageCoopCommand(Mock.Of<INavalDebugHulls>(), Mock.Of<INavalRamStaging>()).ProcessCommand(Mock.Of<ICoopCommandArgs>());
         Assert.False(result.Succeeded);
         Assert.Equal("Usage: coop.debug.naval.ram_stage <shipId-prefix>", result.Output);
     }
