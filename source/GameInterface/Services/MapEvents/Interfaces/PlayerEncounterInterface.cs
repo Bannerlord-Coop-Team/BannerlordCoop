@@ -161,7 +161,9 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             return;
         PartyBase.MainParty._mapEventSide = null;
         settlement.Party._mapEventSide = null;
-        var broker = messageBroker ?? MessageBroker.Instance;
+        var broker = messageBroker;
+        if (broker == null && !ContainerProvider.TryResolve<IMessageBroker>(out broker))
+            broker = MessageBroker.Instance;
 
         // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
         // approval creates the next raid through the authoritative server path.
