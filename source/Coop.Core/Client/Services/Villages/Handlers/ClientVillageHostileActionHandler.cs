@@ -57,11 +57,11 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_VillageHostileActionAttempted(MessagePayload<VillageHostileActionAttempted> payload)
     {
         var message = payload.What;
-        if (!playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current))
-            return;
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        if (!playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current))
+            return;
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
@@ -71,7 +71,7 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () =>
             {
-                playerEncounterInterface.ClearPendingHostileAction(PlayerEncounter.Current);
+                playerEncounterInterface.ClearPendingHostileAction();
                 villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
             },
             context: nameof(Handle_NetworkVillageHostileActionStarted));

@@ -20,7 +20,7 @@ public interface IPlayerEncounterInterface : IGameAbstraction
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
     public bool TrackPendingHostileAction(PlayerEncounter playerEncounter);
-    public void ClearPendingHostileAction(PlayerEncounter playerEncounter);
+    public void ClearPendingHostileAction();
     public void RecoverRejectedHostileAction();
 }
 
@@ -98,15 +98,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     public void RecoverRejectedHostileAction()
     {
         var expectedEncounter = pendingHostileActionEncounter;
+        pendingHostileActionEncounter = null;
         GameThread.RunSafe(() =>
         {
             var encounter = PlayerEncounter.Current;
             if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
-                !ReferenceEquals(pendingHostileActionEncounter, expectedEncounter) ||
                 encounter._mapEvent != null || encounter.BattleSimulation != null)
                 return;
 
-            pendingHostileActionEncounter = null;
             encounter._stateHandled = true;
             PlayerEncounter.LeaveEncounter = true;
             PlayerEncounter.Finish(true);
@@ -122,11 +121,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         return true;
     }
 
-    public void ClearPendingHostileAction(PlayerEncounter playerEncounter)
-    {
-        if (ReferenceEquals(pendingHostileActionEncounter, playerEncounter))
-            pendingHostileActionEncounter = null;
-    }
+    public void ClearPendingHostileAction() => pendingHostileActionEncounter = null;
 
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)
     {
