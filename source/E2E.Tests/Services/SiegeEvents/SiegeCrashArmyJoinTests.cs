@@ -77,12 +77,37 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
         Server.PumpGameThread();
     }
 
+    [Fact]
+    public void ArmyLeaderCrashesMidSiege_OnlinePlayerMemberKeepsItsSiegeRole()
+    {
+        var army = CreatePlayerLedSiegeArmy();
+
+        DisconnectPlayer(Clients.First(), "SiegeArmyLeader");
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(army.LeaderId, out var leader));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(army.PlayerMemberId, out var playerMember));
+                Assert.True(instance.ObjectManager.TryGetObject<BesiegerCamp>(army.CampId, out var camp));
+
+                Assert.Null(leader.BesiegerCamp);
+                Assert.Same(camp, playerMember.BesiegerCamp);
+                Assert.Contains(playerMember, camp._besiegerParties);
+            });
+        }
+
+        Server.PumpGameThread();
+    }
+
     private ArmyContext CreatePlayerLedSiegeArmy()
     {
         var armyId = TestEnvironment.CreateRegisteredObject<Army>();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var followerId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var outsideSiegeMemberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var (_, playerMemberId) = CreatePlayerHeroParty("SiegeArmyPlayerMember");
         string? leaderId = null;
 
         Server.Call(() =>
@@ -91,15 +116,19 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(army.LeaderParty, out leaderId));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(followerId, out var follower));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(outsideSiegeMemberId, out var outsideSiegeMember));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMemberId, out var playerMember));
 
             follower.Army = army;
             follower.AttachedTo = army.LeaderParty;
             outsideSiegeMember.Army = army;
+            playerMember.Army = army;
+            playerMember.AttachedTo = army.LeaderParty;
+            Server.Resolve<IPlayerManager>().SetPeer("SiegeArmyPlayerMember", Clients.Last().NetPeer);
         });
         Assert.NotNull(leaderId);
 
         RegisterAsPlayerParty("SiegeArmyLeader", heroId, leaderId!);
-        SetupSiege(leaderId!, followerId);
+        var campId = SetupSiege(leaderId!, followerId, playerMemberId);
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -117,10 +146,10 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
             });
         }
 
-        return new ArmyContext(armyId, leaderId!, followerId, outsideSiegeMemberId);
+        return new ArmyContext(armyId, campId, leaderId!, followerId, outsideSiegeMemberId, playerMemberId);
     }
 
-    private void SetupSiege(params string[] attackerPartyIds)
+    private string SetupSiege(params string[] attackerPartyIds)
     {
         var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
         ConfigureSiegeTeardownModels();
@@ -159,6 +188,8 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
                 camp._faction = camp._leaderParty.MapFaction;
             });
         }
+
+        return campId!;
     }
 
     private void ConfigureSiegeTeardownModels()
@@ -190,5 +221,11 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
         });
     }
 
-    private readonly record struct ArmyContext(string ArmyId, string LeaderId, string FollowerId, string OutsideSiegeMemberId);
+    private readonly record struct ArmyContext(
+        string ArmyId,
+        string CampId,
+        string LeaderId,
+        string FollowerId,
+        string OutsideSiegeMemberId,
+        string PlayerMemberId);
 }

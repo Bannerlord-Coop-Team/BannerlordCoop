@@ -323,11 +323,14 @@ internal class PlayerPartyVisibilityHandler : IHandler
             "Removing disconnected party {PartyId} from its siege camp before parking",
             party.StringId);
 
-        // An army leader takes its attached members along, otherwise they stay in the camp attached to a parked party
+        // AI army members leave with their parked leader, otherwise they stay in the camp attached to it; players keep their siege role
         if (party.Army?.LeaderParty == party)
-            siegeEventInterface.BreakSiege(party);
-        else
-            siegeEventInterface.BreakSiegeForPartyOnly(party);
+        {
+            foreach (var member in party.AttachedParties.Where(member => member.BesiegerCamp != null && !playerManager.Contains(member)).ToArray())
+                siegeEventInterface.BreakSiegeForPartyOnly(member);
+        }
+
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 
     /// <summary>
