@@ -25,6 +25,7 @@ using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -331,12 +332,21 @@ internal class PlayerPartyVisibilityHandler : IHandler
         {
             foreach (var member in army.Parties.Where(member => member != party && !playerManager.Contains(member)).ToArray())
             {
-                if (member.BesiegerCamp != null)
-                    siegeEventInterface.BreakSiegeForPartyOnly(member);
+                // One member's broken state must not stop the leader from being parked
+                try
+                {
+                    if (member.BesiegerCamp != null)
+                        siegeEventInterface.BreakSiegeForPartyOnly(member);
 
-                // Same pair the army-removal network flow uses, the publish replicates it to clients
-                messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
-                ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+                    // Same pair the army-removal network flow uses, the publish replicates it to clients
+                    messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
+                    ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Could not take army member {MemberId} out of parked leader {PartyId}'s siege and army",
+                        member.StringId, party.StringId);
+                }
             }
         }
 

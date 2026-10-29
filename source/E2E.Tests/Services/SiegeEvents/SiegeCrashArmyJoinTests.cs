@@ -20,15 +20,8 @@ namespace E2E.Tests.Services.SiegeEvents;
 /// #4110: a client crash mid-siege parks its party on the server, the army it leads
 /// must not be left split between the parked leader and the siege camp
 /// </summary>
-public class SiegeCrashArmyJoinTests : MapEventTestBase
+public class SiegeCrashArmyJoinTests : SiegeTestBase
 {
-    private static IReadOnlyList<MethodBase> SiegeCreationDisabledMethods => new[]
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-        AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
-    };
-
     public SiegeCrashArmyJoinTests(ITestOutputHelper output) : base(output)
     {
     }
@@ -97,7 +90,8 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
                 Assert.Null(leader.BesiegerCamp);
                 Assert.Same(camp, playerMember.BesiegerCamp);
                 Assert.Contains(playerMember, camp._besiegerParties);
-                Assert.Same(leader.Army, playerMember.Army);
+                Assert.NotNull(playerMember.Army);
+                Assert.Same(leader, playerMember.Army.LeaderParty);
             });
         }
 
@@ -131,7 +125,7 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
         Assert.NotNull(leaderId);
 
         RegisterAsPlayerParty("SiegeArmyLeader", heroId, leaderId!);
-        var campId = SetupSiege(leaderId!, followerId, playerMemberId);
+        var campId = SetupSiege(leaderId!, followerId, playerMemberId).CampId;
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -150,78 +144,6 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
         }
 
         return new ArmyContext(armyId, campId, leaderId!, followerId, outsideSiegeMemberId, playerMemberId);
-    }
-
-    private string SetupSiege(params string[] attackerPartyIds)
-    {
-        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
-        ConfigureSiegeTeardownModels();
-        string? campId = null;
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
-            Assert.True(Server.ObjectManager.TryGetId(siegeEvent.BesiegerCamp, out campId));
-        });
-        Assert.NotNull(campId);
-
-        foreach (var instance in Clients.Append(Server))
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<BesiegerCamp>(campId!, out var camp));
-                camp._besiegerParties.Clear();
-
-                foreach (var partyId in attackerPartyIds)
-                {
-                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                    if (party.Ai == null)
-                    {
-                        using (new AllowedThread())
-                        {
-                            party.Ai = new MobilePartyAi(party);
-                        }
-                    }
-
-                    party._besiegerCamp = camp;
-                    camp._besiegerParties.Add(party);
-                }
-
-                camp._leaderParty = camp._besiegerParties[0];
-                camp._faction = camp._leaderParty.MapFaction;
-            });
-        }
-
-        return campId!;
-    }
-
-    private void ConfigureSiegeTeardownModels()
-    {
-        foreach (var instance in Clients.Append(Server))
-        {
-            instance.Call(() =>
-            {
-                var models = Campaign.Current.Models.GetGameModels().ToList();
-                models.Add(new DefaultEncounterModel());
-                models.Add(new DefaultPartyImpairmentModel());
-                models.Add(new DefaultPartyNavigationModel());
-                var gameModels = new GameModels(models);
-
-                instance.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
-                Campaign.Current._gameModels = gameModels;
-            });
-        }
-    }
-
-    private void DisconnectPlayer(EnvironmentInstance disconnectedClient, string controllerId)
-    {
-        Server.Call(() =>
-        {
-            Server.Resolve<IPlayerManager>().SetPeer(controllerId, disconnectedClient.NetPeer);
-            Server.Resolve<IMessageBroker>().Publish(
-                this,
-                new PlayerDisconnected(disconnectedClient.NetPeer, default));
-        });
     }
 
     private readonly record struct ArmyContext(
