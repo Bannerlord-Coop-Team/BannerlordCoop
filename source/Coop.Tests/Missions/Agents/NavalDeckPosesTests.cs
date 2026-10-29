@@ -70,7 +70,7 @@ public class NavalDeckPosesTests
         Assert.Equal(Vec3.Zero, local);
     }
 
-    // Deck speed is a finite difference of hull-local poses: reset on a new ship or a gap over 0.5 s, held inside 5 ms.
+    // Deck speed is a finite difference of hull-local poses: reset on a new ship or a gap over 0.5 s, held inside the 0.1 s baseline.
     [Fact]
     public void TryCaptureDeck_MeasuresDeckSpeedFromHullLocalPoses()
     {
@@ -86,6 +86,53 @@ public class NavalDeckPosesTests
         Assert.Equal(5f, walking, 3);
         Assert.Equal(walking, repeated);
         Assert.Equal(0f, afterGap);
+    }
+
+    // R53 item 15: a still crew member at x ~ 3626 m jitters by float32 steps (2^-12 m), which read as fake speed every sample.
+    [Fact]
+    public void TryCaptureDeck_StillAgentWithFloatJitter_ReportsZeroDeckSpeed()
+    {
+        var deck = new Deck();
+        using var poses = deck.Create();
+
+        for (int sample = 0; sample <= SampleRate; sample++)
+        {
+            float speed = Speed(poses, deck, JitteredStillX(sample), (float)sample / SampleRate);
+
+            Assert.Equal(0f, speed);
+        }
+    }
+
+    // A crew member who starts walking after standing still reports its walking speed within two baselines.
+    [Fact]
+    public void TryCaptureDeck_WalkingAfterStandingStill_ReportsTheWalkingSpeed()
+    {
+        const float walkSpeed = 1.5f;
+        var deck = new Deck();
+        using var poses = deck.Create();
+        for (int sample = 0; sample < SampleRate; sample++) Speed(poses, deck, JitteredStillX(sample), (float)sample / SampleRate);
+
+        float firstMovingAt = float.NaN, last = 0f;
+        for (int step = 0; step <= SampleRate; step++)
+        {
+            float elapsed = (float)step / SampleRate;
+            last = Speed(poses, deck, StillX + (walkSpeed * elapsed), 1f + elapsed);
+            if (last > 0f && float.IsNaN(firstMovingAt)) firstMovingAt = elapsed;
+        }
+
+        Assert.InRange(firstMovingAt, 0f, 2f * NavalDeckPoses.DeckSpeedBaselineSeconds);
+        Assert.Equal(walkSpeed, last, 1);
+    }
+
+    private const int SampleRate = 30;
+    private const float StillX = 3625.803f;
+
+    // The observed R53 jitter: the world x wanders 0 to 3 float32 steps either side of a fixed point.
+    private static float JitteredStillX(int sample)
+    {
+        const float step = 1f / 4096f;
+        int sign = sample % 2 == 0 ? 1 : -1;
+        return StillX + (sign * (sample % 4) * step);
     }
 
     [Fact]
