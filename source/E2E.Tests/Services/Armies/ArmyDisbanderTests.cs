@@ -105,4 +105,30 @@ public class ArmyDisbanderTests : MapEventTestBase
             Assert.Empty(notifications);
         }, MapEventDisabledMethods);
     }
+
+    [Fact]
+    public void ServerMainPartyArmyDispersed_OpensTheMenuLikeVanilla()
+    {
+        var dispersals = new List<bool>();
+
+        Server.Call(() =>
+        {
+            // Vanilla's own check, only the server's own main party counts as the player's army
+            var leader = MobileParty.MainParty;
+            Assert.NotNull(leader);
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
+            follower.Army = army;
+            follower.AttachedTo = leader;
+
+            ObjectHelper.SkipConstructor<PlayerArmyWaitBehavior>().RegisterEvents();
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, (_, _, isPlayersArmy) => dispersals.Add(isPlayersArmy));
+
+            Server.Resolve<IArmyDisbander>().Disband(army, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Null(follower.Army);
+            Assert.True(Assert.Single(dispersals));
+            Assert.Equal("army_dispersed", Campaign.Current.GameMenuManager.NextGameMenuId);
+        }, MapEventDisabledMethods);
+    }
 }
