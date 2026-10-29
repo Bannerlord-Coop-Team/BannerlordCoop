@@ -15,6 +15,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -138,6 +139,16 @@ internal class MapEventPatches
         if (__instance.IsFinalized)
             return false;
 
+        // A receive callback's AllowedThread does not authorize ending a server-owned raid.
+        if (ModInformation.IsClient && __instance.IsRaidHostileAction() &&
+            AllowedThread.IsThisThreadAllowed() &&
+            !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+        {
+            Logger.Debug("Ignored received raid finalization for {MapEventId}. {StackTrace}",
+                __instance.StringId, System.Environment.StackTrace);
+            return false;
+        }
+
         if (ModInformation.IsServer)
             MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
@@ -168,6 +179,34 @@ internal class MapEventPatches
         MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
     }
 
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyFinalizer]
+    private static Exception Finalizer_FinalizeEventAux(MapEvent __instance, Exception __exception)
+    {
+        // Vanilla sets WaitingRemoval before running listeners and detaching parties, so a throw past that point
+        // leaves every party linked to a battle the map event manager drops next tick (#3129).
+        if (__exception == null || ModInformation.IsClient || !__instance.IsFinalized)
+            return __exception;
+
+        Logger.Error(__exception, "Map event {MapEventId} failed while finalizing, releasing its parties", __instance.StringId);
+
+        if (!ContainerProvider.TryResolve<IMapEventLoadCleaner>(out var loadCleaner))
+            return __exception;
+
+        try
+        {
+            loadCleaner.ReleaseFailedFinalization(__instance);
+        }
+        catch (Exception releaseException)
+        {
+            Logger.Error(releaseException, "Could not release the parties of map event {MapEventId}", __instance.StringId);
+        }
+
+        return null;
+    }
+
+    // A client skips an unchanged winner, and writes a coop mission victory straight to the field so the managed
+    // setter never reports it; the server and allowed writes run vanilla.
     [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
     [HarmonyPrefix]
     private static bool Prefix_SetOverrideWinner(MapEvent __instance, BattleSideEnum winner)
@@ -183,8 +222,23 @@ internal class MapEventPatches
         };
 
         // Skip unchanged client writes before the managed setter reports them.
-        return state != __instance.BattleState;
+        if (state == __instance.BattleState) return false;
+
+        // A coop mission's victory winds the local mission down (PlayerEncounter.SetPlayerVictoriousInternal); the server
+        // applies it after every member reports, so the client writes only the field (its OnBattleWon is skipped anyway).
+        if (IsCoopMissionVictory(state))
+        {
+            __instance._battleState = state;
+            return false;
+        }
+
+        return true;
     }
+
+    // A victory set inside a coop battle mission, which the server applies only after every member reports.
+    private static bool IsCoopMissionVictory(BattleState state) =>
+        (state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
+        && BattleConclusionGate.IsInCoopBattleMission;
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
@@ -226,8 +280,7 @@ internal class MapEventPatches
         // Coop mission victories use NetworkBattleResultReady so the server can wait for every member and
         // accepted joiner. The local set still runs so this mission winds down; the server applies the result
         // only after the completion barrier publishes the authoritative state change.
-        if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission)
+        if (IsCoopMissionVictory(value))
         {
             return true;
         }
@@ -517,6 +570,9 @@ internal class MapEventPatches
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
 
+            if (ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
+                hostileActions.ResolveRaidDefenders(__instance);
+
             // Slow raids need campaign-map progress, but not while their battle mission is occupied.
             if (__instance.IsActiveSlowVillageRaid())
                 return !HasOccupiedBattleMission(__instance);
@@ -530,6 +586,18 @@ internal class MapEventPatches
             return false;
 
         return true;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.Update))]
+    [HarmonyPostfix]
+    private static void PostfixUpdate(MapEvent __instance, bool __runOriginal)
+    {
+        // Only battles the gate above checked and handed to vanilla, not its setup or receive fast path.
+        if (!__runOriginal || __instance.IsFinalized || CallOriginalPolicy.IsOriginalAllowed())
+            return;
+
+        if (ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver))
+            resolver.TryResolve(__instance);
     }
 
     private static bool RepairLeaderParties(MapEvent mapEvent)
@@ -614,39 +682,18 @@ internal class MapEventPatches
     }
 
     /// <summary>A player party with no registered owner counts as connected, which keeps the battle waiting.</summary>
-    private static bool HasConnectedPlayerParty(MapEvent mapEvent)
-    {
-        // without the player manager, keep waiting like before
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent) =>
+        // without the resolver, keep waiting like before
+        !ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) ||
+        resolver.HasConnectedPlayerParty(mapEvent);
 
-        return mapEvent.InvolvedParties.Any(party =>
-            party != null &&
-            party.IsMobile &&
-            !party.MobileParty.IsControlledByThisInstance() &&
-            !playerManager.IsOwnerOfPartyDisconnected(party.MobileParty));
-    }
+    private static bool IsBattleModeBusy(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.IsBattleModeBusy(mapEvent);
 
-    private static bool IsBattleModeBusy(MapEvent mapEvent)
-    {
-        if (HasOccupiedBattleMission(mapEvent))
-            return true;
-
-        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
-            objectManager.TryGetId(mapEvent, out var mapEventId) &&
-            ServerBattleModeArbiter.TryGetMode(mapEventId, out var mode) &&
-            mode == BattleStartMode.Simulation;
-    }
-
-    private static bool HasOccupiedBattleMission(MapEvent mapEvent)
-    {
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
-            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry))
-            return false;
-
-        return ServerBattleModeArbiter.IsMissionClaimed(mapEventId) &&
-               membershipRegistry.IsInstanceOccupied(mapEventId);
-    }
+    private static bool HasOccupiedBattleMission(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.HasOccupiedBattleMission(mapEvent);
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MapEvent.Initialize))]

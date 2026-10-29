@@ -4,6 +4,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -12,17 +13,20 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Commands;
 internal sealed class ScoutEnemyGarrisonsGotoCoopCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyBehaviorSnapshot behaviorSnapshot;
 
     public ScoutEnemyGarrisonsGotoCoopCommand(
         IObjectManager objectManager,
+        ICommandObjectResolver resolver,
         IPlayerManager playerManager,
         IMessageBroker messageBroker,
         IMobilePartyBehaviorSnapshot behaviorSnapshot)
     {
         this.objectManager = objectManager;
+        this.resolver = resolver;
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.behaviorSnapshot = behaviorSnapshot;
@@ -38,7 +42,7 @@ internal sealed class ScoutEnemyGarrisonsGotoCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = {
         new ExpectedArgs("controller_id", "The controller id of the player to teleport, see coop.debug.players.list."),
-        new ExpectedArgs("settlement_id", "The settlement to scout, setup lists the targets, for example town_ES1."),
+        new ExpectedArgs("settlement_id", "Name or id of the settlement to scout, setup lists the targets, for example town_ES1 or Danustica; quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -49,9 +53,9 @@ internal sealed class ScoutEnemyGarrisonsGotoCoopCommand : ICoopCommand
             return Failed($"The party of player '{args[0]}' was not found");
         }
 
-        if (!objectManager.TryGetObject<Settlement>(args[1], out var settlement))
+        if (!resolver.TryResolveSettlement(args[1], out var settlement, out var error))
         {
-            return Failed($"Settlement '{args[1]}' not found");
+            return Failed(error);
         }
 
         if (playerParty.CurrentSettlement != null || playerParty.MapEvent != null || playerParty.SiegeEvent != null || playerParty.Army != null)

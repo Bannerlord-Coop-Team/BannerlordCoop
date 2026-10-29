@@ -9,9 +9,11 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
+
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -37,6 +39,9 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IAlternativeSolutionTroopValidator troopValidator;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IAlternativeSolutionCommitments commitments;
+    private readonly IQuestJournalOwnerResolver journal;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -47,7 +52,10 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IPlayerManager playerManager,
         IAlternativeSolutionTroopValidator troopValidator,
         IControllerIdProvider controllerIdProvider,
-        IIssueAcceptPreconditions acceptPreconditions)
+        IIssueAcceptPreconditions acceptPreconditions,
+        IAlternativeSolutionCommitments commitments,
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -58,6 +66,9 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.troopValidator = troopValidator;
         this.controllerIdProvider = controllerIdProvider;
         this.acceptPreconditions = acceptPreconditions;
+        this.commitments = commitments;
+        this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -114,9 +125,11 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
     private void AcceptOnServer(NetPeer peer, Player player, RequestAlternativeSolutionAccept data)
     {
+        data = new RequestAlternativeSolutionAccept(data.IssueOwnerId, data.IssueId, data.DifficultyMultiplier,
+            commitments.Consume(player.HeroId, data.IssueOwnerId, data.IssueId, data.SentTroops));
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, "player hero missing");
             return;
         }
 
@@ -125,22 +138,25 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             !issue.IsOngoingWithoutQuest ||
             !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, "issue unavailable or preconditions refused");
             return;
         }
 
         bool troopsAreValid;
+        bool alternativeSolutionIsAcceptable;
         using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
         {
             using (new IssueDifficultyOverride(data.DifficultyMultiplier))
             {
+                alternativeSolutionIsAcceptable = descriptor.AlternativeSolutionAcceptStrategy is not IAlternativeSolutionAcceptPrecondition precondition ||
+                    precondition.CanAccept(issue, playerHero);
                 troopsAreValid = troopValidator.AreValid(issue, data.SentTroops);
             }
         }
 
-        if (!troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
+        if (!alternativeSolutionIsAcceptable || !troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
-            Reject(peer, data, playerHero);
+            Reject(peer, data, playerHero, troopsAreValid ? "issue unavailable" : "committed troops do not satisfy the alternative solution");
             return;
         }
 
@@ -161,7 +177,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the alternative solution of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
-            Reject(peer, data, playerHero);
+            journal.DiscardArchive(issue);
+            Reject(peer, data, playerHero, "starting the alternative solution threw");
             return;
         }
 
@@ -174,8 +191,9 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             player.ControllerId));
     }
 
-    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero)
+    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero, string reason)
     {
+        Logger.Warning("Rejected alternative accept {IssueId}: {Reason}", data.IssueId, reason);
         if (playerHero?.PartyBelongedTo != null)
         {
             troopValidator.ReturnTroopsToParty(playerHero.PartyBelongedTo, data.SentTroops);
@@ -193,7 +211,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
@@ -223,7 +242,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
             ApplyState(issue, data.State);
             descriptor.AlternativeSolutionAcceptStrategy?.Apply(issue, data.Captured);
-        }, context: nameof(AlternativeSolutionAcceptCoordinator));
+        }, data.IssueOwnerId), context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkAlternativeSolutionAcceptRejected(MessagePayload<NetworkAlternativeSolutionAcceptRejected> payload)
@@ -235,6 +254,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
+        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))

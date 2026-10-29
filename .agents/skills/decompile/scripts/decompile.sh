@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Decompiles Bannerlord game types from the DLLs under the mb2 junction.
+# Decompiles Bannerlord game types from the DLLs in the BANNERLORD_DIR game install.
 #   decompile.sh <Full.Type.Name> [out.cs]   decompile a type to a scratch file
 #   decompile.sh -l <pattern>                find a type name and its owning DLL
 set -euo pipefail
@@ -25,27 +25,28 @@ tool_path() {
     if command -v wslpath >/dev/null 2>&1; then wslpath -w "$1"; else echo "$1"; fi
 }
 
-# Walks up from cwd to a checkout with the mb2 junction, then falls back to the main checkout of a worktree.
-find_game_bin() {
-    local dir="$PWD"
-    while :; do
-        if [ -d "$dir/mb2/bin/Win64_Shipping_Client" ]; then
-            echo "$dir/mb2/bin/Win64_Shipping_Client"
-            return 0
-        fi
-        local parent
-        parent=$(dirname "$dir")
-        [ "$parent" = "$dir" ] && break
-        dir="$parent"
-    done
-
-    local common
-    common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 1
-    [ -d "$(dirname "$common")/mb2/bin/Win64_Shipping_Client" ] || return 1
-    echo "$(dirname "$common")/mb2/bin/Win64_Shipping_Client"
+# Converts a Windows-style path (C:\... or C:/...) to this shell's form under Git Bash or WSL.
+unix_path() {
+    case "$1" in
+        [A-Za-z]:[\\/]*) ;;
+        *) echo "$1"; return 0 ;;
+    esac
+    if command -v cygpath >/dev/null 2>&1; then cygpath -u "$1"; return 0; fi
+    if command -v wslpath >/dev/null 2>&1; then wslpath -u "$1"; return 0; fi
+    echo "$1"
 }
 
-BIN=$(find_game_bin) || die "no mb2/bin/Win64_Shipping_Client found above $PWD or in the main checkout"
+# Resolves the game's top-level bin folder from BANNERLORD_DIR, the Bannerlord install root.
+find_game_bin() {
+    [ -n "${BANNERLORD_DIR:-}" ] || die "BANNERLORD_DIR is not set; run runmefirst.cmd (Windows) or linux-only-runmefirst.sh, then restart the shell"
+    local root
+    root=$(unix_path "$BANNERLORD_DIR")
+    root="${root%/}"
+    [ -d "$root/bin/Win64_Shipping_Client" ] || die "BANNERLORD_DIR=$BANNERLORD_DIR has no bin/Win64_Shipping_Client; point it at the Bannerlord install root"
+    echo "$root/bin/Win64_Shipping_Client"
+}
+
+BIN=$(find_game_bin)
 
 # Core/campaign assemblies in the top-level bin; module assemblies (SandBox, Alley, GauntletUI)
 # live under Modules/*/bin/Win64_Shipping_Client instead.

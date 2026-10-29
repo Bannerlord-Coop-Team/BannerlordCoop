@@ -1,19 +1,15 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
-using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
-using Serilog;
-using System;
 
 namespace Coop.Core.Server.Services.TroopRosters.Handlers;
 internal class ServerTroopRosterHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ServerTroopRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -37,17 +33,15 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
         var data = payload.What;
+        var peer = payload.Who as NetPeer;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(ClientRequestRecruitment));
-            }
+            int skipped = troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
+
+            // The client closed its recruit screen on Done, so tell it why its party did not get the whole cart
+            if (skipped > 0 && peer != null)
+                network.Send(peer, new SendInformationMessage($"{skipped} troop(s) could not be recruited because the volunteers or your gold changed. Open the recruit screen again to see what is left."));
         });
     }
 }

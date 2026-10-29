@@ -1,6 +1,10 @@
 ﻿using GameInterface.Services.MapEvents;
 using Common.Messaging;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies;
+using GameInterface.Services.Players;
+using Serilog;
+using Serilog.Events;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using TaleWorlds.CampaignSystem;
@@ -16,7 +20,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void FinalizePlayerMapEvents_OrphanPlayerEvent_ReleasesAndParksOfflineParty()
+    public void CleanUpLoadedMapEvents_OrphanPlayerEvent_ReleasesAndParksOfflineParty()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -39,7 +43,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(playerParty.IsVisible);
             Assert.Same(mapEvent, playerParty.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(playerParty.Party.MapEventSide);
@@ -54,7 +58,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_StaleParticipantSideLink_RepairsAndCompletes()
+    public void CleanUpLoadedMapEvents_StaleParticipantSideLink_RepairsAndCompletes()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -72,7 +76,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             defender.Party._mapEventSide = null;
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Empty(mapEvent.AttackerSide.Parties);
@@ -82,7 +86,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_CrossLinkedParticipantSide_RepairsAndCompletes()
+    public void CleanUpLoadedMapEvents_CrossLinkedParticipantSide_RepairsAndCompletes()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -97,7 +101,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             defender.Party._mapEventSide = mapEvent.AttackerSide;
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Empty(mapEvent.AttackerSide.Parties);
@@ -107,7 +111,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_DuplicateParticipantEntry_PrunesAndCompletes()
+    public void CleanUpLoadedMapEvents_DuplicateParticipantEntry_PrunesAndCompletes()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -122,7 +126,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Equal(2, mapEvent.DefenderSide.Parties.Count(party => ReferenceEquals(party.Party, defender.Party)));
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Empty(mapEvent.AttackerSide.Parties);
@@ -132,10 +136,10 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_PartyInAnotherEvent_PreservesAuthoritativeMembership()
+    public void CleanUpLoadedMapEvents_PartyInAnotherEvent_PreservesAuthoritativeMembership()
     {
         var loadedEventContext = CreateServerMapEvent(commit: false);
-        var activeEventContext = CreateServerMapEvent(commit: false);
+        var activeEventContext = CreateServerMapEvent();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterAsPlayerParty("offline-player-foreign-event", heroId, loadedEventContext.AttackerPartyId);
 
@@ -149,7 +153,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             defender.Party._mapEventSide = activeEvent.AttackerSide;
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, loadedEvent.State);
             Assert.DoesNotContain(loadedEvent.InvolvedParties, party => ReferenceEquals(party, defender.Party));
@@ -159,7 +163,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
+    public void CleanUpLoadedMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -178,7 +182,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.Remove(playerParty));
             Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out _));
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(playerParty.Party.MapEventSide);
@@ -188,7 +192,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_HalfFinalizedOrphan_DetachesAndParksOfflineParty()
+    public void CleanUpLoadedMapEvents_HalfFinalizedOrphan_DetachesAndParksOfflineParty()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -210,7 +214,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Same(mapEvent, playerParty.MapEvent);
             Assert.Same(mapEvent, aiParty.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.Null(playerParty.Party.MapEventSide);
             Assert.Null(aiParty.Party.MapEventSide);
@@ -224,7 +228,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
+    public void CleanUpLoadedMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         RegisterAsPlayerParty(
@@ -251,7 +255,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             messageBroker.Subscribe<MapEventFinalized>(CountFinalization);
             try
             {
-                Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+                Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
             }
             finally
             {
@@ -264,7 +268,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent()
+    public void CleanUpLoadedMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent()
     {
         var mapEventContext = CreateServerMapEvent();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -299,7 +303,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Same(mapEvent, follower.MapEvent);
             Assert.Null(gatheringFollower.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
             TestEnvironment.FlushCoalescer();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
@@ -337,7 +341,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_PlayerFollowerInAiLedArmy_PreservesArmy()
+    public void CleanUpLoadedMapEvents_PlayerFollowerInAiLedArmy_PreservesArmy()
     {
         var mapEventContext = CreateServerMapEvent();
         var (_, playerPartyId) = CreatePlayerHeroParty("loaded-player-follower");
@@ -355,7 +359,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
             Assert.Same(mapEvent, playerFollower.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
             Assert.True(Server.ObjectManager.TryGetObject<Army>(armyId, out _));
@@ -374,7 +378,75 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
-    public void FinalizePlayerMapEvents_AiEvent_RemainsActive()
+    public void CleanUpLoadedMapEvents_AiPartiesInUnregisteredEvent_ReleasesParties()
+    {
+        // a save where an AI battle already left the map event manager but its parties still link to it
+        var mapEventContext = CreateServerMapEvent(commit: false);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.DoesNotContain(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+            Assert.Same(mapEvent, attacker.MapEvent);
+
+            attacker.PartyMoveMode = MoveModeType.Party;
+            attacker.MoveTargetParty = defender;
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+            Assert.Equal(MoveModeType.Hold, attacker.PartyMoveMode);
+            Assert.Null(attacker.MoveTargetParty);
+
+            // the old battle keeps no participants and no network registration
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Empty(mapEvent.InvolvedParties);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }, MapEventDisabledMethods);
+
+        // only the cleaner's own retirement, FinalizeEventAux does not run the ended battle again
+        Assert.Single(Server.InternalMessages.GetMessages<MapEventFinalized>());
+    }
+
+    [Fact]
+    public void CleanUpLoadedMapEvents_AiPartiesInFinalizedEvent_ReleasesParties()
+    {
+        // a save where an AI battle was already finalized but its parties still link to it
+        var mapEventContext = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            mapEvent._state = MapEventState.WaitingRemoval;
+            Assert.Same(mapEvent, attacker.MapEvent);
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }, MapEventDisabledMethods);
+
+        Assert.Single(Server.InternalMessages.GetMessages<MapEventFinalized>());
+
+        foreach (var client in Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }
+    }
+
+    [Fact]
+    public void CleanUpLoadedMapEvents_AiEvent_RemainsActive()
     {
         var mapEventContext = CreateServerMapEvent();
 
@@ -384,7 +456,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
 
-            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 
             Assert.False(mapEvent.IsFinalized);
             Assert.Same(mapEvent, attacker.MapEvent);
@@ -396,5 +468,57 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }
+    }
+
+    [Fact]
+    public void ReleaseEndedMapEventLinks_FirstCallbackThrows_ReleasesAndReportsRemainingParties()
+    {
+        // the first party's broadcast fails after the ended battle already cleared every party's side,
+        // so a second run could never find the rest again
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var logger = new CapturingLogger();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+
+            var cleaner = new MapEventLoadCleaner(
+                logger,
+                Server.Resolve<IMessageBroker>(),
+                Server.Resolve<IPlayerManager>(),
+                Server.ObjectManager,
+                Server.Resolve<IArmyDisbander>(),
+                Server.Resolve<IStalledMapEventResolver>());
+            var reportedParties = new List<PartyBase>();
+
+            var releasedParties = cleaner.ReleaseEndedMapEventLinks(party =>
+            {
+                if (reportedParties.Count == 0)
+                {
+                    reportedParties.Add(party);
+                    throw new InvalidOperationException("broadcast failed");
+                }
+
+                reportedParties.Add(party);
+            });
+
+            Assert.Equal(2, releasedParties.Length);
+            Assert.Contains(attacker.Party, releasedParties);
+            Assert.Contains(defender.Party, releasedParties);
+            Assert.Equal(releasedParties, reportedParties);
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+
+        var warning = Assert.Single(logger.Events, logEvent => logEvent.Exception is InvalidOperationException);
+        Assert.Equal(LogEventLevel.Warning, warning.Level);
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<LogEvent> Events { get; } = new();
+
+        public void Write(LogEvent logEvent) => Events.Add(logEvent);
     }
 }

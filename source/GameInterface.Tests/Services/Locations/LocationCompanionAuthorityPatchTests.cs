@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Locations;
+﻿using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Patches;
 using System;
 using TaleWorlds.CampaignSystem.AgentOrigins;
@@ -62,7 +64,7 @@ public class LocationCompanionAuthorityPatchTests
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void DefaultLocationSpawn_BypassesNpcGateOnlyForOwnedCompanions(
+    public void DefaultLocationSpawn_BypassesNativeSpawnSuppressionOnlyForOwnedCompanions(
         bool isOwnedCompanion,
         bool suppressNativeSpawns,
         bool expected)
@@ -77,7 +79,7 @@ public class LocationCompanionAuthorityPatchTests
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void EnteringLocationSpawn_BypassesNpcGateOnlyForOwnedCompanions(
+    public void EnteringLocationSpawn_BypassesNativeSpawnSuppressionOnlyForOwnedCompanions(
         bool isOwnedCompanion,
         bool suppressNativeSpawns,
         bool expected)
@@ -93,7 +95,9 @@ public class LocationCompanionAuthorityPatchTests
     {
         var mainAgent = CreateAgentWithSimpleOrigin();
 
-        Assert.True(LocationNpcGate.IsPlayerPartyAgent(mainAgent, mainAgent));
+        using var state = CreateAuthorityState();
+
+        Assert.True(state.IsPlayerPartyAgent(mainAgent, mainAgent));
     }
 
     [Fact]
@@ -101,27 +105,23 @@ public class LocationCompanionAuthorityPatchTests
     {
         var remotePartyPuppet = CreateAgentWithSimpleOrigin();
         var ambientNpc = CreateAgentWithSimpleOrigin();
-        LocationNpcGate.BeginMission(
+        using var state = CreateAuthorityState();
+        state.BeginMission(
             "settlement|tavern",
             agent => ReferenceEquals(agent, remotePartyPuppet));
 
-        try
+        using (state.ReplayNativePopulation())
         {
-            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: true,
-                remotePartyPuppet));
-            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: true,
-                ambientNpc));
-            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: false,
-                remotePartyPuppet));
+            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
+            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, ambientNpc, mainAgent: null));
         }
-        finally
-        {
-            LocationNpcGate.EndMission();
-        }
+
+        Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
     }
+
+    /// <summary>Builds an authority state over a real, empty host registry.</summary>
+    private static LocationNpcAuthorityState CreateAuthorityState()
+        => new LocationNpcAuthorityState(new LocationHostRegistry(new ControllerIdProvider()));
 
     private static Agent CreateAgentWithSimpleOrigin()
     {

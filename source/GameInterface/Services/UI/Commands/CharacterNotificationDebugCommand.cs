@@ -3,8 +3,8 @@ using Common;
 using Common.Commands;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Data;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -44,13 +44,13 @@ internal class CharacterNotificationDebugCommand
     /// <summary>Uses production clan joining and development actions to prepare two real players.</summary>
     public sealed class CharacterNotificationPrepareCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objects;
+        private readonly ICommandObjectResolver resolver;
         private readonly IPlayerManager players;
         private readonly IClanJoinRules clanJoin;
 
-        public CharacterNotificationPrepareCoopCommand(IObjectManager objects, IPlayerManager players, IClanJoinRules clanJoin)
+        public CharacterNotificationPrepareCoopCommand(ICommandObjectResolver resolver, IPlayerManager players, IClanJoinRules clanJoin)
         {
-            this.objects = objects;
+            this.resolver = resolver;
             this.players = players;
             this.clanJoin = clanJoin;
         }
@@ -61,17 +61,18 @@ internal class CharacterNotificationDebugCommand
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("actor_hero_id", "Actor registry id."),
-            new ExpectedArgs("observer_hero_id", "Observer registry id."),
+            new ExpectedArgs("actor_hero_id", "Actor hero name or id; quote names with spaces."),
+            new ExpectedArgs("observer_hero_id", "Observer hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient || Campaign.Current == null)
                 return Failed("Requires a server campaign.");
-            if (!objects.TryGetObjectWithLogging<Hero>(args[0], out var actor) ||
-                !objects.TryGetObjectWithLogging<Hero>(args[1], out var observer))
-                return Failed("Registered heroes unavailable.");
+            if (!resolver.TryResolveHero(args[0], out var actor, out var actorError))
+                return Failed(actorError);
+            if (!resolver.TryResolveHero(args[1], out var observer, out var observerError))
+                return Failed(observerError);
             if (actor == observer || !players.Contains(actor) || !players.Contains(observer) ||
                 actor.Clan == null || observer.Clan == null)
                 return Failed("Requires two distinct registered players with clans.");
@@ -119,12 +120,12 @@ internal class CharacterNotificationDebugCommand
     /// <summary>Drives real skill experience and notification events on the authoritative server.</summary>
     public sealed class CharacterNotificationAdvanceCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objects;
+        private readonly ICommandObjectResolver resolver;
         private readonly IPlayerManager players;
 
-        public CharacterNotificationAdvanceCoopCommand(IObjectManager objects, IPlayerManager players)
+        public CharacterNotificationAdvanceCoopCommand(ICommandObjectResolver resolver, IPlayerManager players)
         {
-            this.objects = objects;
+            this.resolver = resolver;
             this.players = players;
         }
 
@@ -132,13 +133,15 @@ internal class CharacterNotificationDebugCommand
         public string Name => "advance";
         public string Description => "Advances a registered player's skill through production XP processing.";
         public CoopCommandSide Side => CoopCommandSide.Server;
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("actor_hero_id", "Actor registry id.") };
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("actor_hero_id", "Actor hero name or id; quote names with spaces.") };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient || Campaign.Current == null)
                 return Failed("Requires a server campaign.");
-            if (!objects.TryGetObjectWithLogging<Hero>(args[0], out var hero) || !players.Contains(hero))
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error))
+                return Failed(error);
+            if (!players.Contains(hero))
                 return Failed("Requires a registered player hero.");
             var perk = PerkObject.All.Where(value => value.RequiredSkillValue > hero.GetSkillValue(value.Skill) &&
                 !hero.GetPerkValue(value) && (value.AlternativePerk == null || !hero.GetPerkValue(value.AlternativePerk)))
