@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Services.Armies;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.UI.Notifications.Messages;
 using SandBox.CampaignBehaviors;
@@ -50,29 +51,30 @@ public class ArmyDisbanderTests : MapEventTestBase
     }
 
     [Fact]
-    public void LoadedPlayerLedArmyDispersed_StillNotifiesThePlayerParty()
+    public void AiArmyDispersed_ServerOpensNoMenuAndSendsNoPlayerNotification()
     {
-        var mapEventContext = CreateServerMapEvent();
-        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        RegisterAsPlayerParty("loaded-player", heroId, mapEventContext.AttackerPartyId);
+        var dispersals = new List<bool>();
         var notifications = new List<ArmyDispersed>();
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var playerLeader));
+            var leader = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), playerLeader, Army.ArmyTypes.Raider);
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
             follower.Army = army;
-            follower.AttachedTo = playerLeader;
+            follower.AttachedTo = leader;
 
+            ObjectHelper.SkipConstructor<PlayerArmyWaitBehavior>().RegisterEvents();
             ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, (_, _, isPlayersArmy) => dispersals.Add(isPlayersArmy));
             Server.Resolve<IMessageBroker>().Subscribe<ArmyDispersed>(payload => notifications.Add(payload.What));
 
-            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+            Server.Resolve<IArmyDisbander>().Disband(army, Army.ArmyDispersionReason.Unknown);
 
-            var notification = Assert.Single(notifications);
-            Assert.Same(army, notification.Army);
-            Assert.Same(playerLeader, Assert.Single(notification.PlayerParties));
+            Assert.Null(follower.Army);
+            Assert.Null(Campaign.Current.GameMenuManager.NextGameMenuId);
+            Assert.False(Assert.Single(dispersals));
+            Assert.Empty(notifications);
         }, MapEventDisabledMethods);
     }
 }
