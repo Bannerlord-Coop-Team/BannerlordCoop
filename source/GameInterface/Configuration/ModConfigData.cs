@@ -124,6 +124,8 @@ public sealed class ModOptionsData
 
     public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
+    public float? TournamentMaximumBetMultiplier { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

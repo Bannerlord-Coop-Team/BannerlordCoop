@@ -17,6 +17,22 @@ public class TournamentBettingMathTests
     }
 
     [Theory]
+    [InlineData(150, 1f, 150)]
+    [InlineData(150, 4f, 600)]
+    [InlineData(300, 2.5f, 750)]
+    [InlineData(150, 0.7f, 105)]
+    [InlineData(150, 0f, 0)]
+    [InlineData(150, -1f, 150)]
+    [InlineData(150, 1e9f, int.MaxValue)]
+    public void ScaleMaximumBet_AppliesTheServerMultiplier(
+        int maximumBet,
+        float multiplier,
+        int expected)
+    {
+        Assert.Equal(expected, TournamentBettingMath.ScaleMaximumBet(maximumBet, multiplier));
+    }
+
+    [Theory]
     [InlineData(-1, 0, 150, 1000)]
     [InlineData(int.MaxValue, 1, 150, int.MaxValue)]
     [InlineData(51, 100, 150, 1000)]
