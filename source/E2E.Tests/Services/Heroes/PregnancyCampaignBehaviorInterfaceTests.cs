@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
 
+/// <summary>
+/// Server side delivery of a pregnancy where one parent is a player hero (<see cref="IPregnancyCampaignBehaviorInterface"/>).
+/// </summary>
 public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
 {
     private E2ETestEnvironment TestEnvironment { get; }
@@ -28,16 +31,20 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    // The girl case is the control, she uses the mother's template which has a base name
+    // A son uses the father's character as his template and a daughter the mother's, so the child of the
+    // other sex is the control, its template has a base name
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CheckOffspringToDeliver_PlayerFather_DeliversTheChildAndEndsThePregnancy(bool isFemale)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    public void CheckOffspringToDeliver_PlayerParent_DeliversTheChildAndEndsThePregnancy(bool playerIsMother, bool isFemale)
     {
         var fatherId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var motherId = TestEnvironment.CreateRegisteredObject<Hero>();
-        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", fatherId, partyId, "", ""))));
+        var playerHeroId = playerIsMother ? motherId : fatherId;
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", playerHeroId, partyId, "", ""))));
         TestEnvironment.ConnectRegisteredPlayer(TestEnvironment.Clients.First(), "player-A");
 
         Server.Call(() =>
@@ -47,7 +54,7 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
 
             // _basicName isn't saved and InitializeCharactersAfterLoad only restores it on template copies,
             // so a player's character has none after the server reloads its save
-            father.CharacterObject._basicName = null;
+            (playerIsMother ? mother : father).CharacterObject._basicName = null;
             Campaign.Current.Models.PregnancyModel = new FixedPregnancyModel(isFemale);
 
             var town = GameObjectCreator.CreateInitializedObject<Settlement>();
@@ -59,7 +66,8 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
             behavior._heroPregnancies.Add(pregnancy);
             mother.IsPregnant = true;
 
-            Server.Resolve<IPregnancyCampaignBehaviorInterface>().CheckOffspringToDeliver(behavior, pregnancy);
+            // The vanilla call, so the server's reroute to the interface is covered too
+            behavior.CheckOffspringToDeliver(pregnancy);
 
             var child = Assert.Single(mother.Children);
             Assert.Same(father, child.Father);
