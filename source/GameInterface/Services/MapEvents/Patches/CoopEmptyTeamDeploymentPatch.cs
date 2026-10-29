@@ -1,38 +1,32 @@
 ﻿using System;
-#if DEBUG
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+#if DEBUG
 using Common;
 using Common.Commands;
 using Newtonsoft.Json;
 #endif
+using Common.Logging;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// In a coop field battle a client only fields the troops it OWNS, so a team it does not field — e.g. a non-host's
-/// AI-ally team, whose troops arrive as host-driven puppets over the mesh — is EMPTY at deployment.
-/// <c>DefaultBattleMissionAgentSpawnLogic.CheckDeployment</c> only spawns a side once EVERY team on it reports
-/// <c>IsPlanMade</c>, and an empty team never gets a plan (there is nothing to deploy) → the client never spawns its
-/// own troops (a spectator).
-/// <para>
-/// Treat an empty team as already-planned so the spawn gate proceeds — BUT only when <c>CheckDeployment</c> reads it
-/// as the spawn gate, NOT while <c>MakeTeamPlans</c> is running. <c>MakeTeamPlans</c> uses the SAME
-/// <c>IsPlanMade(team)</c> as its "already planned?" guard, and at plan time EVERY team is still empty (troops spawn
-/// later), so forcing it true there would skip making the real plans — the troops then spawn into an unplanned team
-/// and crash (the host's <c>SpawnAgent</c> "Nullable object must have a value"). The <see cref="_inMakeTeamPlans"/>
-/// flag scopes the override out of that path. <c>IsReinforcementPlanMade</c> is deliberately NOT overridden: leaving
-/// it false for an empty team keeps <c>CheckDeployment</c>'s plan-making loop alive (it gates the SKIP on
-/// <c>IsPlanMade &amp;&amp; IsReinforcementPlanMade</c>) so the fillable teams still get real plans. Scoped to coop.
-/// </para>
+/// Lets <c>DefaultBattleMissionAgentSpawnLogic.CheckDeployment</c> spawn a side whose other teams this client never
+/// fields (e.g. an empty AI-ally team filled by puppets) by treating those unplanned teams as planned at its call sites.
 /// </summary>
-[HarmonyPatch] // bare class-level marker so PatchAll discovers this multi-target (MakeTeamPlans + IsPlanMade) class
+/// <remarks>
+/// The override rewrites <c>CheckDeployment</c> itself instead of postfixing <c>IsPlanMade</c>: the JIT inlines that
+/// small getter into a <c>CheckDeployment</c> compiled before coop patches exist (any battle earlier in the process),
+/// which silently skipped the postfix and left the player's side unspawned. Patching the caller rebuilds it from IL.
+/// </remarks>
+[HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment")]
 internal class CoopEmptyTeamDeploymentPatch
 {
-    // True while the engine is building a team's deployment plan — see the class remarks for why the override must
-    // stand down here. Game-thread only; ThreadStatic is belt-and-suspenders.
-    [ThreadStatic] private static bool _inMakeTeamPlans;
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopEmptyTeamDeploymentPatch>();
 
 #if DEBUG
     private static readonly List<WeakReference> observedTeams = new List<WeakReference>();
@@ -45,29 +39,51 @@ internal class CoopEmptyTeamDeploymentPatch
     private static int lastOverrideActiveAgents;
 #endif
 
-    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
-    [HarmonyPrefix]
-    private static void MakeTeamPlans_Prefix() => _inMakeTeamPlans = true;
-
-    // Finalizer (not postfix) so the flag is cleared even if MakeTeamPlans throws.
-    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
-    [HarmonyFinalizer]
-    private static void MakeTeamPlans_Finalizer() => _inMakeTeamPlans = false;
-
-    [HarmonyPatch(typeof(DefaultMissionDeploymentPlan), nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) })]
-    [HarmonyPostfix]
-    private static void IsPlanMade_Postfix(Team team, ref bool __result)
+    // Routes CheckDeployment's IsPlanMade(team) reads through the spawn-gate override. The other callers keep the native
+    // answer: MakeTeamPlans must still plan the teams this client fields, and PhaseTick must only clear real plans.
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
     {
-        if (!__result && !_inMakeTeamPlans
-            && BattleSpawnConfig.Enabled && IsForeignTeam(team)
-            && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
-            && missionRegistry.IsCoopBattleActive)
+        var isPlanMade = AccessTools.Method(typeof(DefaultMissionDeploymentPlan),
+            nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) });
+        var replacement = AccessTools.Method(typeof(CoopEmptyTeamDeploymentPatch), nameof(IsPlanMadeForSpawnGate));
+
+        var replacements = 0;
+        foreach (var code in instructions)
         {
-            __result = true;
-#if DEBUG
-            TrackOverride(team);
-#endif
+            if ((code.opcode == OpCodes.Call || code.opcode == OpCodes.Callvirt)
+                && code.operand is MethodInfo method && method == isPlanMade)
+            {
+                code.opcode = OpCodes.Call;
+                code.operand = replacement;
+                replacements++;
+            }
+            yield return code;
         }
+
+        if (replacements == 0)
+            Logger.Warning("Redirected no IsPlanMade calls in {Method}; a game update may have changed the method",
+                original?.Name);
+    }
+
+    // CheckDeployment's view of a team's plan: the native answer, or planned for a team only puppets fill.
+    internal static bool IsPlanMadeForSpawnGate(DefaultMissionDeploymentPlan plan, Team team)
+        => ApplySpawnGateOverride(team, plan.IsPlanMade(team));
+
+    // Answers planned for an unplanned foreign team inside a coop battle, otherwise keeps the native answer.
+    internal static bool ApplySpawnGateOverride(Team team, bool isPlanMade)
+    {
+        if (isPlanMade || !BattleSpawnConfig.Enabled || !IsForeignTeam(team))
+            return isPlanMade;
+
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
+            return isPlanMade;
+
+#if DEBUG
+        TrackOverride(team);
+#endif
+        return true;
     }
 
 #if DEBUG
@@ -202,8 +218,8 @@ internal class CoopEmptyTeamDeploymentPatch
     // OWN party (into PlayerTeam, which gets a real plan via MakeTeamPlans); every OTHER team on its side is filled
     // by puppets replicated from their owner, which are NOT deployment-spawned and so never get a deployment plan.
     // Such a team must not stall the spawn gate (an empty-only check fails once puppets populate the ally team).
-    // Only fires when there's no real plan (the `!__result` guard), so a foreign team the host DOES field — which
-    // gets a real plan in MakeTeamPlans — is unaffected.
+    // Only consulted when there's no real plan, so a foreign team the host DOES field — which gets a real plan in
+    // MakeTeamPlans — is unaffected.
     private static bool IsForeignTeam(Team team)
     {
         var mission = Mission.Current;
