@@ -1635,7 +1635,8 @@ public class VillageHostileActionTests : MapEventTestBase
 
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
                 client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
-            }, MapEventDisabledMethods);
+            }, MapEventDisabledMethods.Append(
+                AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))).ToList());
             // The native loot exit requests the continuation; allow its approval to cross the network.
             Console.WriteLine($"raid continuation immediate client messages={string.Join(',', client.NetworkSentMessages.Messages.Select(message => message.GetType().Name))}");
             Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
