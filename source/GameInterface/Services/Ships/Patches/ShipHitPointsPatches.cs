@@ -11,8 +11,8 @@ namespace GameInterface.Services.Ships.Patches;
 [HarmonyPatch(typeof(Ship))]
 internal class ShipHitPointsPatches
 {
-    // Port menu options like repair ships read the main party's ship hit points. Skipped during a mission, where the menu
-    // context can have no handler; MapState.OnActivate refreshes the menu on return.
+    // Port menu options like repair ships read the main party's ship hit points. Skipped during a mission, and while the
+    // menu context has no handler yet (MapScreen binds it on its next tick and builds the options fresh).
     [HarmonyPatch(nameof(Ship.HitPoints), MethodType.Setter)]
     [HarmonyPostfix]
     public static void HitPointsSetterPostfix(Ship __instance)
@@ -22,7 +22,7 @@ internal class ShipHitPointsPatches
         if (Mission.Current != null) return;
 
         var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null) return;
+        if (menuContext?.Handler == null) return;
 
         Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
