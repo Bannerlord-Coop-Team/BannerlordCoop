@@ -157,7 +157,7 @@ internal class ActiveIssueDismisser : IHandler
             // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
-                if (quest != null)
+                if (quest != null && quest.IsOngoing)
                     journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
                 // The issue's accepted status takes precedence over the quest detail in IsEnded.
                 journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
