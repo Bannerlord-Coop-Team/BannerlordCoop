@@ -773,15 +773,14 @@ internal class BattleSimulationRunHandler : IHandler
         {
             if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId)) return;
 
-            bool isSpectator = BattleSimulationReplay.IsSpectator;
             var encounter = PlayerEncounter.Current;
             var simulation = encounter?.BattleSimulation;
+            var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+            bool mapStateOwnsSimulation = simulation != null && mapState?._battleSimulation == simulation;
             
             BattleSimulationReplay.ConfirmCancellation(payload.What.MapEventId);
 
-            if (!isSpectator) return;
-
-            if (Game.Current?.GameStateManager?.ActiveState is MapState mapState ) 
+            if (mapStateOwnsSimulation)
                 mapState.EndBattleSimulation();
 
             if (encounter != null && ReferenceEquals(encounter.BattleSimulation, simulation))

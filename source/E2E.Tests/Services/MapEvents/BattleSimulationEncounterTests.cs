@@ -185,4 +185,38 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
         }
     }
+
+    [Fact]
+    public void ServerCancellation_ClosesInitiatingSimulation()
+    {
+        var context = CreateServerMapEvent();
+        var client = Clients.First();
+        RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), context.AttackerPartyId);
+        Server.Resolve<IPlayerManager>().SetPeer("1", client.NetPeer);
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
+                System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
+                context.MapEventId, context.AttackerPartyId));
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(context.AttackerPartyId);
+            var encounter = SetMockPlayerEncounter(client, context.DefenderPartyId, context.MapEventId);
+            var simulation = new BattleSimulation(null, null);
+            encounter.BattleSimulation = simulation;
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._battleSimulation = simulation;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            BattleSimulationReplay.Begin(context.MapEventId, spectator: false);
+
+            client.SimulateMessage(Server.NetPeer, new NetworkBattleSimulationCancelled(context.MapEventId));
+
+            Assert.False(mapState.IsSimulationActive);
+            Assert.Null(encounter.BattleSimulation);
+            Assert.False(BattleSimulationReplay.IsActiveFor(context.MapEventId));
+        }, MapEventDisabledMethods);
+    }
 }
