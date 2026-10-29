@@ -1,10 +1,10 @@
 ﻿#if DEBUG
 using Common.Commands;
-using GameInterface.Services.MapEvents.NavalScenarios;
 using Missions.Battles;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using System.Linq;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -17,13 +17,18 @@ public interface INavalRamStageCoopCommand : ICoopCommand { }
 public sealed class NavalRamStageCoopCommand : INavalRamStageCoopCommand
 {
     private readonly INavalDebugHulls hulls;
+    private readonly INavalRamStaging staging;
 
-    /// <summary>Uses the existing own-hull selection and scenario placement geometry.</summary>
-    public NavalRamStageCoopCommand(INavalDebugHulls hulls) => this.hulls = hulls;
+    /// <summary>Uses the own-hull selection and measured ram approach geometry.</summary>
+    public NavalRamStageCoopCommand(INavalDebugHulls hulls, INavalRamStaging staging)
+    {
+        this.hulls = hulls;
+        this.staging = staging;
+    }
 
     public string Prefix => "coop.debug.naval";
     public string Name => "ram_stage";
-    public string Description => "Places the own hull 15 m from a foreign enemy hull, bow toward its broadside.";
+    public string Description => "Launches the own ram tip 6 m from a foreign enemy broadside at 10 m/s relative closing speed.";
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
@@ -52,16 +57,19 @@ public sealed class NavalRamStageCoopCommand : INavalRamStageCoopCommand
         if (own._ram == null) return Failed("The own hull has no ram. Stage the scenario with ram=1.");
         if (own.GetIsConnected() || target.GetIsConnected()) return Failed("Disconnect ropes before staging a ram.");
 
+        var capsule = own._ram.GetRamCapsuleData(0f, getDataForNextFrame: false);
+        var ramTip = own.GlobalFrame.TransformToLocal(capsule.P2);
+        var bounds = GameEntityPhysicsExtensions.GetLocalPhysicsBoundingBox(target.GameEntity, false);
         var targetFrame = target.GlobalFrame;
-        var pose = NavalScenarioMissionLogic.PlacementPose(NavalScenarioPlacement.Ramming, targetFrame.origin.AsVec2,
-            targetFrame.rotation.f.AsVec2, own.MissionShipObject.DeploymentArea, target.MissionShipObject.DeploymentArea, 15f, true);
-        var frame = MatrixFrame.Identity;
-        frame.rotation.f = pose.Direction.ToVec3().NormalizedCopy();
-        frame.rotation.OrthonormalizeAccordingToForwardAndKeepUpAsZAxis();
-        frame.origin = pose.Position.ToVec3();
+        var contact = targetFrame.TransformToParent(new Vec3(bounds.max.x, bounds.center.y, 0f));
+        var targetVelocity = target.GameEntity.GetLinearVelocityAtGlobalPointForEntityWithDynamicBody(contact);
+        var approach = staging.Approach(targetFrame, bounds.min, bounds.max, ramTip, capsule.Radius, targetVelocity);
         NavalHelmOverride.Clear();
-        ships.TeleportShip(own, frame, checkFreeArea: false);
-        return new CoopCommandResult(true, $"NAVAL_RAM_STAGE ship={hulls.ShipIdOf(own)} target={id} targetAuthority={targetInfo.CurrentAuthority} gap=15; settle 2 s, then helm 0 1 1 30");
+        own.SetAnchor(false);
+        ships.TeleportShip(own, approach.Frame, checkFreeArea: false);
+        own.GameEntity.SetAngularVelocity(Vec3.Zero);
+        own.GameEntity.SetLinearVelocity(approach.Velocity);
+        return new CoopCommandResult(true, $"NAVAL_RAM_STAGE ship={hulls.ShipIdOf(own)} target={id} targetAuthority={targetInfo.CurrentAuthority} gap=6 closingSpeed=10; launched, inspect both clients after 2 s (no helm or settling wait)");
     }
 
     /// <summary>Reports a refused staging request without changing either hull.</summary>
