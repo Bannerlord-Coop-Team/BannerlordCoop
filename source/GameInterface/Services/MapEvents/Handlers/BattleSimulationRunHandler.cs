@@ -937,7 +937,10 @@ internal class BattleSimulationRunHandler : IHandler
                 // Tell the spectators the simulation is over, otherwise they stay stuck in the spectator window now
                 // that the pacing client (which would have driven it to completion) is gone.
                 if (sim.MapEvent.HasWinner)
+                {
+                    network.SendAll(new NetworkBattleModeSet(entry.Key, (int)BattleStartMode.Unclaimed));
                     network.SendAll(new NetworkBattleSimulationFinished(entry.Key));
+                }
             }
         }, then: () =>
         {
