@@ -1549,6 +1549,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var client = Clients.First();
         var context = CreateHostileActionWithOnePlayerParty(VillageHostileAction.Raid);
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        client.Call(() => client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne"));
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         BattleSimulation completedSimulation = null;
@@ -1579,6 +1580,12 @@ public class VillageHostileActionTests : MapEventTestBase
         using var menus = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        var visualPatch = new Harmony($"raid-continuation-visual.{Guid.NewGuid()}");
+        var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
+            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent), typeof(MapEvent.BattleTypes) });
+        visualPatch.Patch(initialize,
+            prefix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ProvideHeadlessVisual)),
+            postfix: new HarmonyMethod(typeof(VillageHostileActionTests), nameof(ClearHeadlessVisual)));
         try
         {
             Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
@@ -1634,9 +1641,29 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.DoesNotContain("raiding_village", menus.MenusFor(client));
 
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                client.NetworkSentMessages.Clear();
+                Server.NetworkSentMessages.Clear();
                 client.Resolve<IPlayerEncounterInterface>().UpdateInternalAfterBattle(encounter);
-            }, MapEventDisabledMethods);
-            // The native loot exit requests the continuation; allow its approval to cross the network.
+            }, MapEventDisabledMethods
+                .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+            // The native loot exit requests the continuation. Keep each handoff explicit so a failure
+            // identifies whether the client request, server approval, or authoritative map-event start
+            // is missing instead of collapsing into the final identity assertion.
+            var continuationRequest = Assert.Single(
+                client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+            var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().ToList();
+            var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().ToList();
+            Assert.True(started.Count + denied.Count == 1,
+                $"server did not resolve continuation approval: started={started.Count}, denied={denied.Count}");
+            if (denied.Count == 1)
+                Assert.Fail($"server denied continuation approval: {denied[0].Reason}");
+
+            var createRequests = client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>();
+            Assert.Single(createRequests);
+            var createdReplies = Server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>().ToList();
+            Assert.Single(createdReplies);
+            Assert.Equal(MapEventCreationOutcome.Created, createdReplies[0].Outcome);
+
             client.Call(() =>
             {
                 Assert.NotNull(PlayerEncounter.Current);
@@ -1658,6 +1685,7 @@ public class VillageHostileActionTests : MapEventTestBase
         }
         finally
         {
+            visualPatch.UnpatchAll(visualPatch.Id);
             harmony.UnpatchAll(harmony.Id);
             Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
         }
@@ -4717,6 +4745,10 @@ public class VillageHostileActionTests : MapEventTestBase
             settlementId,
             client.Resolve<IControllerIdProvider>().ControllerId)), disabledMethods);
     }
+
+    private static void ProvideHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = MockMapEventVisual();
+
+    private static void ClearHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = null;
 
     private static void SetMapEventCreationTimeout(EnvironmentInstance instance, TimeSpan timeout)
     {
