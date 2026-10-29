@@ -14,6 +14,7 @@ using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -136,8 +137,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertPartyState(instance, partyId, expectMapEvent: false, expectCamp: false);
     }
 
+    // No-camp attacker is covered by SiegeDisconnectTests.BreakSiegeRequest_WithNoCampDuringAssault_*.
     [Theory]
-    [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]
@@ -199,6 +200,62 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         }
         foreach (var instance in Clients.Append(Server))
             AssertPartyState(instance, mapEvent.AttackerPartyId, expectMapEvent: !lastBesieger, expectCamp: false);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LeaveSoldiersBehindAccept_InSiegeBattle_SacrificesBeforeLeaving(bool sallyOut)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId,
+            sallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        SetMapEventType(mapEvent.MapEventId,
+            sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
+        var leavingClient = Clients.First();
+        SetMainParty(leavingClient, partyId);
+        var heroId = SetMainHero(leavingClient);
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(leavingClient, "PlayerOne");
+        var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
+        SetCamp(Server, partyId, siegeEventId);
+        AddEncounterGameMenuBehavior(Server);
+
+        using var recorder = new LeftSoldiersBehindRecorder();
+        leavingClient.Call(InvokePatchedLeaveSoldiersBehindAccept, LeaveSoldiersBehindDisabledMethods);
+
+        // The sacrifice goes out ahead of the siege break, so the server applies it while the party is still in its battle.
+        var sent = leavingClient.NetworkSentMessages.ToList();
+        int sacrificeIndex = sent.FindIndex(message => message is NetworkPlayerLeftSoldiersBehind);
+        int breakIndex = sent.FindIndex(message => message is NetworkRequestBreakSiege);
+        Assert.NotEqual(-1, sacrificeIndex);
+        Assert.NotEqual(-1, breakIndex);
+        Assert.True(sacrificeIndex < breakIndex);
+
+        Assert.Equal(new[] { true }, recorder.InMapEvent);
+        AssertPartyState(Server, partyId, expectMapEvent: false, expectCamp: false);
+    }
+
+    [Fact]
+    public void RepeatedLeaveSoldiersBehind_SameMapEvent_SacrificesOnce()
+    {
+        var mapEvent = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddEncounterGameMenuBehavior(Server);
+        var client = Clients.First();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+
+        using var recorder = new LeftSoldiersBehindRecorder();
+        client.Call(() =>
+        {
+            var network = client.Resolve<INetwork>();
+            network.SendAll(new NetworkPlayerLeftSoldiersBehind(heroId, partyId));
+            network.SendAll(new NetworkPlayerLeftSoldiersBehind(heroId, partyId));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(new[] { true }, recorder.InMapEvent);
     }
 
     [Fact]
@@ -328,10 +385,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 encounter!._encounteredParty = settlement.Party;
             }
 
-            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
-            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
-            mapState._menuContext.GameMenu = new GameMenu(menuId);
-            Game.Current.GameStateManager._gameStates.Add(mapState);
+            OpenClientMenu(menuId);
             involvedPartyIds = mapEvent._sides.SelectMany(side => side.Parties).Select(party =>
             {
                 Assert.True(client.ObjectManager.TryGetId(party, out var id));
@@ -345,8 +399,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             if (message.Contains("Failed to apply") && message.Contains("NetworkAddInvolvedParties"))
                 Interlocked.Increment(ref applyFailures);
         };
-        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+        using var menuSwitchRecorder = CreateMenuSwitchRecorder();
         OutputSinkManager.AddLogCallback(captureFailure);
         try
         {
@@ -386,8 +439,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
-        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+        using var menuSwitchRecorder = CreateMenuSwitchRecorder();
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
@@ -407,10 +459,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
             Campaign.Current.PlayerEncounter = encounter;
 
-            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
-            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
-            mapState._menuContext.GameMenu = new GameMenu("join_siege_event");
-            Game.Current.GameStateManager._gameStates.Add(mapState);
+            OpenClientMenu("join_siege_event");
 
             Assert.False(InvokeJoinSiegeConsequencePrefix());
             Assert.Same(mapEvent, PlayerEncounter.Battle);
@@ -523,9 +572,52 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     [Fact]
     public void JoinActiveSiege_DefersInitialMenuActivationUntilAuthoritativeSnapshot()
     {
+        var client = Clients.First();
+        using var menuActivationRecorder = CreateMenuActivationRecorder();
+        using var menuSwitchRecorder = CreateMenuSwitchRecorder();
+
+        var (_, involvedParties, joinReply) = StageDeferredSiegeJoin(client);
+        Assert.Empty(menuActivationRecorder.MenusFor(client));
+
+        client.SimulateMessage(Server.NetPeer, involvedParties);
+        Assert.Equal(new[] { "join_siege_event" }, menuActivationRecorder.MenusFor(client));
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.MenusFor(client));
+        client.SimulateMessage(Server.NetPeer, joinReply);
+    }
+
+    [Fact]
+    public void DeferredJoinMenu_WhenEncounterChanges_SnapshotSkipsActivationAndEncounterSwitch()
+    {
+        var client = Clients.First();
+        using var menuActivationRecorder = CreateMenuActivationRecorder();
+        using var menuSwitchRecorder = CreateMenuSwitchRecorder();
+        var (mapEventId, involvedParties, joinReply) = StageDeferredSiegeJoin(client);
+
+        // A new encounter on the same battle with join_siege_event open would otherwise take the encounter-switch fallback.
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            var changedEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            changedEncounter._mapEvent = mapEvent;
+            changedEncounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            Campaign.Current.PlayerEncounter = changedEncounter;
+
+            OpenClientMenu("join_siege_event");
+        });
+        menuActivationRecorder.Clear();
+        menuSwitchRecorder.Clear();
+
+        client.SimulateMessage(Server.NetPeer, involvedParties);
+        Assert.Empty(menuActivationRecorder.MenusFor(client));
+        Assert.Empty(menuSwitchRecorder.MenusFor(client));
+        client.SimulateMessage(Server.NetPeer, joinReply);
+    }
+
+    /// <summary>Stages a client siege join whose menu is deferred, and returns the server's undelivered snapshot and reply.</summary>
+    private (string mapEventId, NetworkAddInvolvedParties involvedParties, NetworkJoinBattleReply joinReply) StageDeferredSiegeJoin(EnvironmentInstance client)
+    {
         var mapEventContext = CreateServerMapEvent();
         var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
-        var client = Clients.First();
         RegisterAsPlayerParty("PlayerOne", heroId, partyId);
         TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         SetMainParty(client, partyId);
@@ -539,10 +631,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
-        using var menuActivationRecorder = new MethodCallRecorder(Priority.Last,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
-        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
@@ -568,7 +656,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Null(party.MapEvent);
         }, disabledMethods);
 
-        Assert.Empty(menuActivationRecorder.MenusFor(client));
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
 
         Server.NetworkSentMessages.Clear();
@@ -577,41 +664,10 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Server.SimulateMessage(client.NetPeer, request);
         }
 
-        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single().Accepted);
+        var joinReply = Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single();
+        Assert.True(joinReply.Accepted);
         var involvedParties = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
-        Assert.Empty(menuActivationRecorder.MenusFor(client));
-
-        client.SimulateMessage(Server.NetPeer, involvedParties);
-        Assert.Equal(new[] { "join_siege_event" }, menuActivationRecorder.MenusFor(client));
-        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.MenusFor(client));
-        client.SimulateMessage(Server.NetPeer, Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single());
-    }
-
-    [Fact]
-    public void DeferredJoinMenu_WhenEncounterChanges_ConsumesSnapshotWithoutActivation()
-    {
-        var mapEventContext = CreateServerMapEvent();
-        var (_, partyId) = CreatePlayerHeroParty("PlayerOne");
-        var client = Clients.First();
-        SetMapEventType(mapEventContext.MapEventId, MapEvent.BattleTypes.Siege);
-        SetMainParty(client, partyId);
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-
-            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            encounter._mapEvent = mapEvent;
-            Campaign.Current.PlayerEncounter = encounter;
-
-            var activationGate = client.Container.Resolve<ISiegeJoinMenuActivationGate>();
-            activationGate.ArmJoinRequest(mapEvent, party.Party);
-            Assert.True(activationGate.TryDeferActivation());
-
-            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            Assert.True(activationGate.ResumeAfterSnapshot(mapEvent));
-        }, MapEventDisabledMethods);
+        return (mapEventContext.MapEventId, involvedParties, joinReply);
     }
 
     [Fact]
@@ -819,6 +875,45 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
     }
 
+    private List<MethodBase> LeaveSoldiersBehindDisabledMethods => MapEventDisabledMethods
+        .Concat(SiegeCreationDisabledMethods)
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+        .ToList();
+
+    private string SetMainHero(EnvironmentInstance instance)
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Game.Current.PlayerTroop = hero.CharacterObject;
+            Assert.Same(hero, Hero.MainHero);
+        });
+        return heroId;
+    }
+
+    private static void AddEncounterGameMenuBehavior(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            if (Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>() != null) return;
+
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
+                new CampaignBehaviorBase[] { new EncounterGameMenuBehavior() }));
+        });
+    }
+
+    private static void InvokePatchedLeaveSoldiersBehindAccept()
+    {
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence));
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, new object[] { null! });
+    }
+
     private static void AssertPartyState(
         EnvironmentInstance instance,
         string partyId,
@@ -840,6 +935,23 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.All(involvedParties, party => Assert.Contains(party, mapEvent.TroopUpgradeTracker._mapEventParties));
     }
 
+    /// <summary>Records menu ids passed to <see cref="GameMenu.ActivateGameMenu(string)"/>.</summary>
+    private static MethodCallRecorder CreateMenuActivationRecorder() => new MethodCallRecorder(Priority.Last,
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+
+    /// <summary>Records menu ids passed to <see cref="GameMenu.SwitchToMenu(string)"/>.</summary>
+    private static MethodCallRecorder CreateMenuSwitchRecorder() => new MethodCallRecorder(Priority.First,
+        AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+
+    /// <summary>Pushes a map state showing <paramref name="menuId"/>; must run inside the client's game call.</summary>
+    private static void OpenClientMenu(string menuId)
+    {
+        var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+        mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+        mapState._menuContext.GameMenu = new GameMenu(menuId);
+        Game.Current.GameStateManager._gameStates.Add(mapState);
+    }
+
     private static bool InvokeJoinSiegeConsequencePrefix()
     {
         var patchType = AccessTools.TypeByName("GameInterface.Services.SiegeEvents.Patches.SiegeEntryFlowPatches");
@@ -856,6 +968,38 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, new object[] { "join_siege_event" })!;
+    }
+
+    // Records each server sacrifice and whether the party was still in its map event. The body is skipped
+    // because it needs live campaign models.
+    private sealed class LeftSoldiersBehindRecorder : IDisposable
+    {
+        private static readonly MethodInfo ConsequenceMethod = AccessTools.Method(
+            typeof(EncounterGameMenuBehaviorInterface),
+            nameof(EncounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence));
+
+        private static List<bool> inMapEvent = new();
+
+        private readonly Harmony harmony = new($"leave-soldiers-behind-recorder-{Guid.NewGuid()}");
+
+        public IReadOnlyList<bool> InMapEvent => inMapEvent;
+
+        public LeftSoldiersBehindRecorder()
+        {
+            inMapEvent = new List<bool>();
+            harmony.Patch(ConsequenceMethod, prefix: new HarmonyMethod(typeof(LeftSoldiersBehindRecorder), nameof(Record)));
+        }
+
+        public void Dispose()
+        {
+            harmony.Unpatch(ConsequenceMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool Record(MobileParty mainParty)
+        {
+            inMapEvent.Add(mainParty.MapEvent != null);
+            return false;
+        }
     }
 
     private sealed class NetworkDeliveryBlocker : IDisposable

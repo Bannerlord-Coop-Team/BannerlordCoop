@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -32,6 +33,17 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     // The menu vanilla's encounter shows while its pre-battle conversation runs.
     private const string EncounterMeetingMenuId = "encounter_meeting";
+
+    private readonly ISiegeEventInterface siegeEventInterface;
+
+    public PlayerEncounterInterface() : this(null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    {
+        this.siegeEventInterface = siegeEventInterface;
+    }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
     {
@@ -150,6 +162,12 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     {
         //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
+
+        // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd
+        // (#3903); this finishes the encounter itself, otherwise the stale assault menu stays up with only Leave
+        if (siegeEventInterface?.TryRouteToAftermath(playerEncounter._mapEvent) == true)
+            return;
+
         PlayerEncounter.Finish(true);
     }
 }

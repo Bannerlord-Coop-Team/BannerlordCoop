@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.TroopRosters.Data;
@@ -15,6 +16,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -87,6 +89,57 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
 
         messageBroker.Publish(this, new VillageHostileActionAttempted(action, mobileParty, settlement));
+    }
+
+    public void ResolveRaidDefenders(MapEvent mapEvent)
+    {
+        var settlement = mapEvent?.MapEventSettlement;
+        if (ModInformation.IsClient || !mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized ||
+            mapEvent.HasWinner || settlement?.IsVillage != true ||
+            mapEvent.DefenderSide.LeaderParty != settlement.Party ||
+            !mapEvent.AttackerSide.Parties.Any(party => party.Party.MobileParty?.IsPlayerParty() == true) ||
+            mapEvent.DefenderSide.Parties.Any(party => party.Party.MobileParty?.IsPlayerParty() == true) ||
+            !mapEvent.AttackerSide.MapFaction.IsAtWarWith(mapEvent.DefenderSide.MapFaction))
+            return;
+
+        // An accepted mission owns the defenders while its first client is still loading.
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) ||
+            ServerBattleModeArbiter.IsClaimed(mapEventId))
+            return;
+
+        var defenders = mapEvent.DefenderSide.Parties;
+        bool emptyDefenders = defenders.All(party => party.Party.MemberRoster.TotalHealthyCount == 0);
+        if (!emptyDefenders)
+        {
+            // Match EncounterGameMenuBehavior.ConsiderVillageSurrenderPossibility without a host encounter.
+            if (defenders.Any(party => party.Party.MobileParty?.IsLordParty == true))
+                return;
+
+            float defenderStrength = defenders.Sum(party =>
+                party.Party.GetCustomStrength(BattleSideEnum.Defender, MapEvent.PowerCalculationContext.Village));
+            float attackerStrength = 0f;
+            foreach (var party in mapEvent.AttackerSide.Parties)
+            {
+                var mobileParty = party.Party.MobileParty;
+                if (mobileParty?.Army == null)
+                    attackerStrength += party.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Village);
+                else if (mobileParty.Army.LeaderParty == mobileParty)
+                    foreach (var attached in mobileParty.AttachedParties)
+                        attackerStrength += attached.Party.GetCustomStrength(BattleSideEnum.Attacker, MapEvent.PowerCalculationContext.Village);
+            }
+
+            var ownerParty = settlement.OwnerClan?.Leader?.PartyBelongedTo;
+            float surrenderFactor = ownerParty != null ? ownerParty.Party.RandomFloatWithSeed(1u, 0.05f, 0.15f) : 0.1f;
+            if (attackerStrength * surrenderFactor <= defenderStrength)
+                return;
+
+            for (int i = defenders.Count - 1; i >= 0; i--)
+                if (defenders[i].Party.IsMobile)
+                    defenders[i].Party.MapEventSide = null;
+        }
+
+        if (settlement.Militia != 0f)
+            settlement.Militia = 0f;
     }
 
     public void BeginHostileActionPresentation(VillageHostileAction action)
@@ -245,7 +298,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         BeHostileAction.ApplyEncounterHostileAction(mobileParty.Party, settlement.Party);
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
-            DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
+        {
+            using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
+        }
     }
 
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)

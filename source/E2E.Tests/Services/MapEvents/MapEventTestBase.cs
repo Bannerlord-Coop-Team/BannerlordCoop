@@ -258,6 +258,40 @@ public abstract class MapEventTestBase : IDisposable
         return partyId!;
     }
 
+    /// <summary>Creates a <see cref="MobileParty"/> on the server (replicated to every client) that is in no
+    /// battle yet; join it later with <see cref="JoinServerPartyToSide"/>.</summary>
+    protected string CreateServerParty()
+    {
+        string? partyId = null;
+
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(partyId);
+        return partyId!;
+    }
+
+    /// <summary>Joins an existing server party to a side of a map event through the same vanilla
+    /// <see cref="PartyBase.MapEventSide"/> setter as <see cref="JoinNewServerPartyToSide"/>, so the clients
+    /// receive the real battle party attach.</summary>
+    protected void JoinServerPartyToSide(string mapEventId, string partyId, BattleSideEnum side)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
+        }, disabledMethods);
+    }
+
     /// <summary>
     /// Asserts that the <see cref="MapEventParty"/> with <paramref name="mapEventPartyId"/> is part of the
     /// side with <paramref name="mapEventSideId"/> on the supplied <paramref name="instance"/>.
@@ -337,22 +371,6 @@ public abstract class MapEventTestBase : IDisposable
             hero.PartyBelongedToAsPrisoner = captor.Party;
 
             Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
-        }, MapEventDisabledMethods);
-    }
-
-    /// <summary>
-    /// Releases the hero with <paramref name="heroId"/> from captivity on the server, syncing the cleared
-    /// state to all clients.
-    /// </summary>
-    protected void EndCaptivity(string heroId)
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            hero.PartyBelongedToAsPrisoner = null;
-
-            Assert.Null(hero.PartyBelongedToAsPrisoner);
         }, MapEventDisabledMethods);
     }
 
@@ -707,7 +725,11 @@ public abstract class MapEventTestBase : IDisposable
                 PartyScreenHelper.PartyScreenMode.Normal,
                 Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
 
-            Server.Resolve<IMessageBroker>().Publish(this, message);
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(captorHero, out var captor));
+            Assert.True(playerManager.TryGetPeer(captor.ControllerId, out var captorPeer));
+
+            Server.Resolve<IMessageBroker>().Publish(captorPeer, message);
         }, disabledMethods);
     }
 
@@ -1008,19 +1030,6 @@ public abstract class MapEventTestBase : IDisposable
 
         Assert.NotNull(encounter);
         return encounter!;
-    }
-
-    /// <summary>
-    /// Clears <c>PlayerEncounter.Current</c> on the given <paramref name="instance"/>, simulating the player
-    /// leaving an encounter.
-    /// </summary>
-    protected void ClearPlayerEncounter(EnvironmentInstance instance)
-    {
-        instance.Call(() =>
-        {
-            Campaign.Current.PlayerEncounter = null;
-            Assert.Null(PlayerEncounter.Current);
-        }, MapEventDisabledMethods);
     }
 
     /// <summary>

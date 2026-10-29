@@ -38,14 +38,17 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
+    private readonly IPartyNavigationRepair partyNavigationRepair;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager,
-        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
+        IPartyNavigationRepair partyNavigationRepair)
     {
+        this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
@@ -112,7 +115,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             List<MobileParty> attachedParties = null;
             if (ModInformation.IsServer && data.ForcePosition)
             {
-                attachedParties = ApplyServerForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                attachedParties = party.ApplyForcedPositionWithAttachedParties(data.PartyPosition, data.IsCurrentlyAtSea);
                 if (data.ResetMovementToHold)
                 {
                     party.SetMoveModeHold();
@@ -132,7 +135,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                     return;
 
                 if (ModInformation.IsClient && data.ForcePosition)
-                    ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                    party.ApplyForcedPosition(data.PartyPosition, data.IsCurrentlyAtSea);
 
                 // A party spawned at sea or one whose transition only ran on the server has no local transition to get there
                 if (ModInformation.IsClient && !data.ForcePosition && !party.IsControlledByThisInstance() &&
@@ -169,7 +172,12 @@ internal class MobilePartyBehaviorHandler : IHandler
             }
 
             if (ModInformation.IsServer)
+            {
                 PublishAuthoritativeBehavior(party, data);
+
+                // A player order is the moment a frozen server copy shows: free it before it is ticked.
+                partyNavigationRepair.TryRepairForOrder(party);
+            }
 
             if (attachedParties != null)
             {
@@ -182,59 +190,6 @@ internal class MobilePartyBehaviorHandler : IHandler
             apply();
         else
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
-    }
-
-    private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
-    {
-        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
-        if (party.IsTransitionInProgress)
-            party.CancelNavigationTransition();
-
-        party.Position = position;
-
-        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
-        {
-            party.ChangeIsCurrentlyAtSeaCheat();
-
-            // Settlement menu options like leave and set sail depend on the sea state
-            if (party == MobileParty.MainParty)
-                RefreshCurrentMenu();
-        }
-    }
-
-    // Skipped during a mission, where the menu context can have no handler; MapState.OnActivate refreshes it on return
-    private static void RefreshCurrentMenu()
-    {
-        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
-
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null) return;
-
-        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
-    }
-
-    private static List<MobileParty> ApplyServerForcedPosition(
-        MobileParty party,
-        CampaignVec2 position,
-        bool isCurrentlyAtSea)
-    {
-        ApplyForcedPosition(party, position, isCurrentlyAtSea);
-
-        if (party.Army == null)
-            return null;
-
-        List<MobileParty> attachedParties = null;
-        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
-        {
-            if (attachedParty == party)
-                continue;
-
-            attachedParty.Position = position;
-            attachedParties ??= new List<MobileParty>();
-            attachedParties.Add(attachedParty);
-        }
-
-        return attachedParties;
     }
 
     private void PublishForcedPosition(MobileParty party)

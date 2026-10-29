@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -32,6 +33,10 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IIssueConversationTracker conversationTracker;
+    private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IQuestJournalOwnerResolver journal;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -40,7 +45,11 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IIssueConversationTracker conversationTracker,
+        IIssueAcceptPreconditions acceptPreconditions,
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -49,6 +58,10 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.conversationTracker = conversationTracker;
+        this.acceptPreconditions = acceptPreconditions;
+        this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -116,15 +129,20 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) ||
             !issue.IsOngoingWithoutQuest ||
+            (issue.GetType().Name == "TheConquestOfSettlementIssue" &&
+                !conversationTracker.TryGet(data.IssueOwnerId, player.ControllerId, data.IssueId)) ||
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId) ||
             !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
             Reject(peer, data);
             return;
         }
 
+        var dueTime = issue.IssueDueTime;
+
         try
         {
-            // Creates the quest object the owner's outcomes run on, it is never started so it registers no events
+            // Creates the quest object the owner's outcomes run on, unless its accept strategy starts it, it registers no events
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
                 using (new IssueDifficultyOverride(data.DifficultyMultiplier))
@@ -133,12 +151,15 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)
         {
             Logger.Error(e, "Starting the quest of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
+            OfferAgain(issue, dueTime);
             Reject(peer, data);
             return;
         }
@@ -151,9 +172,42 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             data.Captured));
     }
 
+    // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
+    private void OfferAgain(IssueBase issue, CampaignTime dueTime)
+    {
+        try
+        {
+            var strayQuest = issue.IssueQuest;
+
+            // set to null first so cancelling the quest does not finalize the issue
+            issue.IssueQuest = null;
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            issue.IsTriedToSolveBefore = false;
+            issue.IssueDueTime = dueTime;
+
+            if (strayQuest != null && strayQuest.IsOngoing)
+            {
+                using (new AllowedThread())
+                {
+                    strayQuest.CompleteQuestWithCancel();
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Offering {issue} again after a failed accept failed", issue.StringId);
+        }
+        finally
+        {
+            journal.DiscardArchive(issue);
+        }
+    }
+
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
-        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
+        long? dueTime = issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) &&
+            issue.IsOngoingWithoutQuest ? issue.IssueDueTime.NumTicks : (long?)null;
+        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId, dueTime));
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -165,7 +219,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
@@ -186,7 +241,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue.IssueDueTime = CampaignTime.Never;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkQuestSolutionAcceptRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
@@ -198,26 +253,45 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // Cancelling the stray quest takes its dialog lines, which the player may still be answering
+        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(() => CancelStrayQuest(data), data.IssueOwnerId),
+            context: nameof(QuestSolutionAcceptCoordinator));
+    }
+
+    private void CancelStrayQuest(NetworkQuestSolutionAcceptRejected data)
+    {
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-            {
-                return;
-            }
+            return;
+        }
 
-            var strayQuest = issue.IssueQuest;
-            if (strayQuest == null)
-            {
-                return;
-            }
+        var strayQuest = issue.IssueQuest;
+        if (strayQuest == null)
+        {
+            return;
+        }
 
-            // set to null first so cancelling the quest does not finalize the issue the winner owns
-            issue.IssueQuest = null;
+        // set to null first so cancelling the quest does not finalize the issue the winner owns
+        issue.IssueQuest = null;
 
-            using (new AllowedThread())
-            {
-                strayQuest.CompleteQuestWithCancel();
-            }
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        // This player never held the issue, so its ending must not be credited to them
+        issue.IsTriedToSolveBefore = false;
+
+        // With no winner the server still offers the issue, so undo the local accept
+        // Read when this runs, which keeps message order, so a winner's accept that came first is in even if it waited
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
+        if (!hasOwner)
+        {
+            issue._issueState = IssueBase.IssueState.Ongoing;
+        }
+
+        using (new AllowedThread())
+        {
+            strayQuest.CompleteQuestWithCancel();
+        }
+
+        journal.DiscardArchive(issue);
+        if (data.IssueDueTimeTicks.HasValue && !hasOwner)
+            issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
     }
 }

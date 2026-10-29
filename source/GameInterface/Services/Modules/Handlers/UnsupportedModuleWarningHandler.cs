@@ -23,6 +23,7 @@ public class UnsupportedModuleWarningHandler
     private const string DedicatedServerModulePrefix = "DedicatedServer.";
     
     private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IModuleNameProvider moduleNameProvider;
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action<Exception> reportError;
     private readonly bool navalSupported;
@@ -31,15 +32,18 @@ public class UnsupportedModuleWarningHandler
     private bool warningsSuppressed; 
     private bool modulesEvaluated;
     private bool promptShown;
-    private string[] unsupportedModuleIds = Array.Empty<string>();
+    private string[] unsupportedModuleLabels = Array.Empty<string>();
     
     public UnsupportedModuleWarningHandler(
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         ICoopOptionsStore optionsStore,
         Action<Exception> reportError,
         bool navalSupported)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
+        if (moduleNameProvider == null) throw new ArgumentNullException(nameof(moduleNameProvider));
+        this.moduleNameProvider = moduleNameProvider;
         this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
         this.reportError = reportError;
         this.navalSupported = navalSupported;
@@ -59,7 +63,7 @@ public class UnsupportedModuleWarningHandler
         }
 
         EvaluateModules();
-        if (unsupportedModuleIds.Length == 0)
+        if (unsupportedModuleLabels.Length == 0)
         {
             return;
         }
@@ -72,7 +76,7 @@ public class UnsupportedModuleWarningHandler
         promptShown = true;
         showInquiry(new InquiryData(
             PromptTitle,
-            BuildPromptText(unsupportedModuleIds),
+            BuildPromptText(unsupportedModuleLabels),
             true,
             true,
             "Continue",
@@ -133,14 +137,26 @@ public class UnsupportedModuleWarningHandler
         var modules = moduleInfoProvider.GetModuleInfos().ToArray();
         var hasConflictingCoopVariants = modules.Any(module => IsCoopVariant(module, CoopModuleId)) &&
                                          modules.Any(module => IsCoopVariant(module, CoopNightlyModuleId));
-        unsupportedModuleIds = modules
+        unsupportedModuleLabels = modules
             .Where(module => IsUnsupported(module) ||
                              (hasConflictingCoopVariants && IsCoopVariant(module)))
-            .Select(module => module.Id)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .Where(module => !string.IsNullOrWhiteSpace(module.Id))
+            .GroupBy(module => module.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => GetDisplayLabel(group.First()))
+            .OrderBy(label => label, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    // Players know mods by the launcher name, the id still matches the folder in Modules.
+    private string GetDisplayLabel(ModuleInfo module)
+    {
+        var name = moduleNameProvider.GetDisplayName(module.Id)?.Trim();
+        if (string.IsNullOrEmpty(name) || string.Equals(name, module.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return module.Id;
+        }
+
+        return $"{name} ({module.Id})";
     }
 
     // Whether a module belongs in the warning; NavalDLC is left out only by a build that shipped the naval code.
@@ -174,11 +190,11 @@ public class UnsupportedModuleWarningHandler
             : string.Equals(module.Id, moduleId, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildPromptText(string[] moduleIds)
+    private static string BuildPromptText(string[] moduleLabels)
     {
         return "Bannerlord Coop may be unstable when used with additional modules. " +
                "The following active modules are not supported:\n\n" +
-               string.Join("\n", moduleIds.Select(id => "- " + id)) +
+               string.Join("\n", moduleLabels.Select(label => "- " + label)) +
                "\n\nContinue at your own risk.";
     }
 }

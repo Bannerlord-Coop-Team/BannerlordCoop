@@ -55,6 +55,11 @@ internal class EncounterManagerPatches
         if (!attackerParty.IsControlledByThisInstance())
             return false;
 
+        // Client time keeps running under the encounter menu, so the map tick re-fires this for a besieged
+        // town the party stays outside of. The approval would be a no-op, so don't ask again.
+        if (attackerParty == MobileParty.MainParty && PlayerEncounter.EncounterSettlement == settlement)
+            return false;
+
         // The map keeps ticking under an open encounter, so a party still engaging a settlement it didn't enter retries every tick
         if (PlayerEncounter.Current != null)
             return false;

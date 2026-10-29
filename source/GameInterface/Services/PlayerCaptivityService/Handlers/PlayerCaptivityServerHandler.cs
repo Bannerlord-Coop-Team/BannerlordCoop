@@ -64,6 +64,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IPlayerPartyLookup playerPartyLookup;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
@@ -174,6 +175,11 @@ internal class PlayerCaptivityServerHandler : IHandler
         RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
+
+        // Same as vanilla PlayerCaptivityCampaignBehavior.OnPrisonerTaken
+        var executer = payload.What.CapturerParty?.LeaderHero;
+        if (executer != null && !executer.IsPlayerHero() && executer.GetRelation(hero) < -30f && MBRandom.RandomFloat <= 0.02f)
+            pendingExecutions[hero] = executer;
     }
 
     // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
@@ -444,6 +450,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                if (!playerManager.IsSenderControllingHero(peer, heroId))
+                    return;
                 if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
                     return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))
@@ -694,6 +702,14 @@ internal class PlayerCaptivityServerHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
+
+        // Deferred like native OnGameMenuOpened, so the kill doesn't run mid battle capture processing.
+        foreach (var execution in pendingExecutions.ToArray())
+        {
+            pendingExecutions.Remove(execution.Key);
+            if (execution.Key.IsPrisoner)
+                KillCharacterAction.ApplyByExecution(execution.Key, execution.Value);
+        }
 
         foreach (var (hero, mobileParty) in PlayerHeros())
         {

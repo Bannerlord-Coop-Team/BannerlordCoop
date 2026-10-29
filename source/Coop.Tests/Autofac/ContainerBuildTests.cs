@@ -58,6 +58,10 @@ namespace Coop.Tests.Autofac
                 $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
             Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.map_event.kms");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
 
             ICoopCommand[] missionCommands = registeredCommands
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
@@ -136,7 +140,7 @@ namespace Coop.Tests.Autofac
 
             // The restart command is an operator command, so Release servers have it too.
             Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
-            Assert.Same(container.Resolve<IServerAdmissionGate>(), container.Resolve<IServerAdmissionGate>());
+            Assert.Same(container.Resolve<IServerJoinAdmission>(), container.Resolve<IServerJoinAdmission>());
             Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
 
 #if DEBUG

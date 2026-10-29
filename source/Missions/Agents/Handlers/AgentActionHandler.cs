@@ -81,6 +81,7 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
 
     private IShipStationSeats stationSeats;
 
@@ -135,7 +136,8 @@ public class AgentActionHandler : IAgentActionHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IRemoteAgentActionProcessor remoteActionProcessor,
-        IGuardReactionHandler guardReactionHandler)
+        IGuardReactionHandler guardReactionHandler,
+        ILocationNpcAuthorityState locationAuthorityState)
     {
         this.client = client;
         this.packetManager = packetManager;
@@ -144,6 +146,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.controllerIdProvider = controllerIdProvider;
         this.remoteActionProcessor = remoteActionProcessor;
         this.guardReactionHandler = guardReactionHandler;
+        this.locationAuthorityState = locationAuthorityState;
 
         this.packetManager.RegisterPacketHandler(this);
         this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
@@ -381,7 +384,7 @@ public class AgentActionHandler : IAgentActionHandler
 
         // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
         bool locationAmbientAgent =
-            LocationNpcGate.IsCoopLocationMissionActive
+            locationAuthorityState.IsCoopLocationMissionActive
             && !isPlayerControlled
             && agent.CurrentlyUsedGameObject == null;
         bool publishAction0Speed =
@@ -609,7 +612,7 @@ public class AgentActionHandler : IAgentActionHandler
                 // not only held defend/guard state. Point users are excluded: the joiner's spawn
                 // record carries the used point id and the local point animates the puppet.
                 bool locationAmbient =
-                    LocationNpcGate.IsCoopLocationMissionActive
+                    locationAuthorityState.IsCoopLocationMissionActive
                     && agent.Controller != AgentControllerType.Player
                     && agent.CurrentlyUsedGameObject == null
                     && (agent.GetCurrentAction(0) != ActionIndexCache.act_none

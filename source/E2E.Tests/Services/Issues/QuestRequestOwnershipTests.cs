@@ -17,6 +17,7 @@ public class QuestRequestOwnershipTests : IDisposable
     private const byte Branch = (byte)GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods;
 
     private readonly StubIssueQuestGenerator quests = new();
+    private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly MethodCallRecorder branches;
     private readonly QuestScenario scenario;
 
@@ -36,6 +37,7 @@ public class QuestRequestOwnershipTests : IDisposable
         branches.Dispose();
         TestEnvironment.Dispose();
         quests.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]

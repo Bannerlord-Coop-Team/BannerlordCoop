@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -33,11 +34,16 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 {
     private readonly IMessageBroker messageBroker;
     private readonly ISessionWorkshopPlayerDataInterface workshopData;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
 
-    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopData)
+    public ApplyHeirSelectionActionInterface(
+        IMessageBroker messageBroker,
+        ISessionWorkshopPlayerDataInterface workshopData,
+        ILeaderlessClanResolver leaderlessClanResolver)
     {
         this.messageBroker = messageBroker;
         this.workshopData = workshopData;
+        this.leaderlessClanResolver = leaderlessClanResolver;
     }
 
     public void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty)
@@ -60,11 +66,17 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
                 .OrderBy(candidate => candidate.IsPlayerHero())
                 .FirstOrDefault();
 
+            // a kingdom clan must not stay without a leader (#4166): any adult can take over, even one
+            // the retirement order skips (a prisoner, someone travelling)
+            if (successor == null && clan.Kingdom != null)
+                successor = leaderlessClanResolver.FindSuccessor(clan, originalHero);
+
             if (successor != null)
             {
+                // the retiring hero is still the leader here, so the full vanilla action applies
                 ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, successor);
             }
-            else
+            else if (clan.Kingdom == null)
             {
                 // The vanilla leader change action leaves the retired hero as leader when there is no successor.
                 clan.SetLeader(null);
@@ -73,6 +85,10 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 
         DisableHeroAction.Apply(originalHero);
         RecordRetirement(originalHero);
+
+        // nobody can lead the kingdom clan: close it without killing the retired hero or the children
+        if (clan?.Kingdom != null && clan.Leader == originalHero)
+            leaderlessClanResolver.CloseClan(clan);
     }
 
     public void AppointClanLeader(Hero originalHero, Hero successor)

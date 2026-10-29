@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Traits;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 using System;
@@ -34,6 +35,7 @@ public interface ICoopSession
     AgingPlayerData AgingPlayerData { get; }
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     NavalPlayerData NavalPlayerData { get; }
+    PlayerTraitData PlayerTraitData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -50,7 +52,7 @@ public class CoopSession : ICoopSession
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
         new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
-        new TradePlayerData(new(), new(), new(), new()),
+        new TradePlayerData(new(), new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
         new HeroMeetingData(new()),
         new AgingPlayerData(new()),
@@ -81,6 +83,8 @@ public class CoopSession : ICoopSession
     [ProtoMember(12)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     [ProtoMember(13)]
+    public PlayerTraitData PlayerTraitData { get; }
+    [ProtoMember(14)]
     public NavalPlayerData NavalPlayerData { get; }
 
     public CoopSession(
@@ -96,7 +100,8 @@ public class CoopSession : ICoopSession
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
         NavalPlayerData navalPlayerData,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        PlayerTraitData playerTraitData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -111,5 +116,6 @@ public class CoopSession : ICoopSession
         AgingPlayerData = agingPlayerData;
         NavalPlayerData = navalPlayerData;
         ClanFinance = clanFinance ?? new();
+        PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
     }
 }

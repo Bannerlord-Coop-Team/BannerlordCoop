@@ -1,5 +1,6 @@
 ﻿using Common.Commands;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -25,6 +26,13 @@ internal class CharacterObjectCommands
     /// </summary>
     public sealed class CharacterObjectsInfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public CharacterObjectsInfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.character_objects";
 
         public string Name => "info";
@@ -35,13 +43,12 @@ internal class CharacterObjectCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "The registered character id.", isRequired: true),
+            new ExpectedArgs("character_id", "Character name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return Failed("Unable to resolve object manager");
-            if (objectManager.TryGetObject<CharacterObject>(args[0], out var character) == false) return Failed($"Unable to find character with id: {args[0]}");
+            if (resolver.TryResolveCharacterObject(args[0], out var character, out var error) == false) return Failed(error);
 
             var stringBuilder = new StringBuilder();
             for (Type type = typeof(CharacterObject); type != null && type != typeof(object); type = type.BaseType)

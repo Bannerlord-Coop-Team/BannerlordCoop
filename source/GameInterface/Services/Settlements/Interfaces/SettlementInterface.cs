@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Locations;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -139,6 +140,10 @@ internal class SettlementInterface : ISettlementInterface
     public void EndSettlementEncounter(SettlementLeaveType leaveType = SettlementLeaveType.Leave)
     {
         var mainParty = MobileParty.MainParty;
+        var mapEvent = PlayerEncounter.Battle;
+        // Only an encounter that owns the raid must wait for server battle teardown.
+        if (ModInformation.IsClient && mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized)
+            return;
 
         // Mirror the native leave consequence (game_menu_settlement_leave_on_consequence). The party must
         // be moved to the settlement gate (outside) BEFORE finishing — LeaveSettlementAction only clears

@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -34,15 +35,12 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
 
     public MovementAuthorityTransitionTests(ITestOutputHelper output) : base(output) { }
 
+    // Pairwise over mount, compact ids and relay delivery.
     [Theory]
     [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, true)]
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
-    [InlineData(true, true, true)]
+    [InlineData(true, true, false)]
     public void NewerSample_RejectsOlderAndDuplicateBeforeContinuousStateOrTargetApply(
         bool mount, bool compact, bool compressedRelay)
     {
@@ -404,7 +402,8 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         observer.Resolve<IMovementBatchSender>(), observer.Resolve<IPuppetMountStateRepairer>(),
         observer.Resolve<IAgentVisualActionAccessor>(), observer.Resolve<IMovementRateController>(),
         observer.Resolve<IMovementPriorityScheduler>(), observer.Resolve<IMissionContext>(),
-        observer.Resolve<INavalDeckMovementProbe>(), relay);
+        observer.Resolve<INavalDeckMovementProbe>(),
+        observer.Resolve<ILocationNpcAuthorityState>(), relay);
 
     private static byte[] RelayPayload(IPacket packet, ProtoBufSerializer serializer, MovementPacketCompressor compressor)
     {

@@ -2,6 +2,7 @@
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Interface;
 
@@ -12,9 +13,9 @@ public interface IOutcomeDispatcher
 {
     // Whether vanilla may run the quest outcome. A client hands it to the server instead.
     // observed is the issue the server must announce after the outcome ran, null when nothing is to be announced.
-    bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed);
+    bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed, TextObject log = null);
 
-    // Same for the outcomes vanilla finishes an issue with when it has no quest
+    // Same for the outcomes vanilla finishes an issue with, announced only when the issue has no quest or its quest still runs
     bool BeforeIssueOutcome(IssueBase issue, IssueOutcome outcome, out IssueBase observed);
 
     bool BeforeQuestBranch(QuestBase quest, byte proof);
@@ -24,5 +25,14 @@ public interface IOutcomeDispatcher
 
     void After(IssueBase observed, IssueOutcome outcome);
 
+    // Records vanilla's actual completion detail, which may differ from the method that began the ending.
+    void ObserveQuestCompletion(QuestBase quest, QuestBase.QuestCompleteDetails detail);
+
+    // Unwinds one quest completion call, announcing only after its outermost successful return.
+    void AfterQuestOutcome(QuestBase quest, IssueBase observed, Exception exception);
+
     void AfterAlternativeSolutionCompletion(IssueBase issue, IDisposable owner);
+
+    // Server: runs a vanilla quest listener on every running quest of that type, as its owning player
+    void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase;
 }

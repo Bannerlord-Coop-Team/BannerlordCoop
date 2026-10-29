@@ -270,7 +270,7 @@ public class BattleDamageRouter : IBattleDamageRouter
             else
                 Logger.Error("Failed to resolve routed missile weapon at source index {MissileIndex}", missileIndex);
 
-            if (coopMissionComponent.MissileHandler.TryTakeLocalShot(missileIndex,
+            if (coopMissionComponent.MissileHandler.TryGetLocalShot(missileIndex,
                 out Guid shotAgentId, out shotSequence))
             {
                 if (attackerId != Guid.Empty && attackerId != shotAgentId)

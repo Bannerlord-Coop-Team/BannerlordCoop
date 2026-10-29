@@ -56,6 +56,7 @@ public class BattleResultReadyTests : MissionTestEnvironment
         AssertMapEventPresent(mapEventId);
     }
 
+    // A coop mission victory sets the client's BattleState without the managed-write error or a relayed state change.
     [Theory]
     [InlineData(BattleSideEnum.Attacker, BattleState.AttackerVictory)]
     [InlineData(BattleSideEnum.Defender, BattleState.DefenderVictory)]

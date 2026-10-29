@@ -5,8 +5,11 @@ using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using Serilog;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Extensions;
 
@@ -88,5 +91,75 @@ public static class MobilePartyExtensions
             !CallOriginalPolicy.IsOriginalAllowed() &&
             party.IsActive)
             GameThread.RunSafe(() => MessageBroker.Instance.Publish(party, new PartyBehaviorChangeAttempted(party)));
+    }
+
+    /// <summary>
+    /// Clears the computed path so the next tick computes a new one from the current position.
+    /// </summary>
+    public static void ResetPath(this MobileParty party)
+    {
+        party._pathMode = false;
+        party._aiPathNotFound = false;
+        party.PathLastFace = PathFaceRecord.NullFaceRecord;
+        party.PathBegin = 0;
+        party.NextTargetPosition = party.Position;
+        party._lastComputedPathNavigationType = MobileParty.NavigationType.None;
+    }
+
+    public static void ApplyForcedPosition(this MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
+    {
+        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
+        party.Position = position;
+
+        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+        {
+            party.ChangeIsCurrentlyAtSeaCheat();
+
+            // Settlement menu options like leave and set sail depend on the sea state
+            if (party == MobileParty.MainParty)
+                RefreshCurrentMenu();
+        }
+    }
+
+    // Skipped during a mission, where the menu context can have no handler; MapState.OnActivate refreshes it on return
+    private static void RefreshCurrentMenu()
+    {
+        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null) return;
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
+    }
+
+    /// <summary>
+    /// Applies a server forced position and moves the army's attached parties along with it.
+    /// </summary>
+    /// <returns>The attached parties that were moved, or null when the party has no army.</returns>
+    public static List<MobileParty> ApplyForcedPositionWithAttachedParties(
+        this MobileParty party,
+        CampaignVec2 position,
+        bool isCurrentlyAtSea)
+    {
+        party.ApplyForcedPosition(position, isCurrentlyAtSea);
+
+        if (party.Army == null)
+            return null;
+
+        List<MobileParty> attachedParties = null;
+        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
+        {
+            if (attachedParty == party)
+                continue;
+
+            attachedParty.Position = position;
+            attachedParties ??= new List<MobileParty>();
+            attachedParties.Add(attachedParty);
+        }
+
+        return attachedParties;
     }
 }

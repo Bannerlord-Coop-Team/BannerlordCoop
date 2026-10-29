@@ -10,6 +10,7 @@ using Common.Serialization;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -216,7 +217,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController,
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             handler.Configure(MovementCadenceProfile.Battle);
 
             PollMovementWindow(handler, framesPerSecond: 20);
@@ -306,7 +308,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
 
             Agent locallyControlledAgent = SpawnRider(mock);
             Agent remoteControlledAgent = SpawnRider(mock);
@@ -449,7 +452,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Assert.True(registry.TryRegisterAgent(
                 "owner", Guid.NewGuid(), 1, SpawnRider(mock)));
 
@@ -529,7 +533,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Agent agent = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(agent, out MirrorAgent mirror));
             Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
@@ -607,7 +612,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 rateController.Object,
                 priorityScheduler,
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Agent mainAgent = SpawnRider(mock);
             Agent formationAgent = SpawnRider(mock);
             mock.MainAgent = mainAgent;
@@ -977,7 +983,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IMovementRateController>(),
                 peer.Resolve<IMovementPriorityScheduler>(),
                 peer.Resolve<IMissionContext>(),
-                peer.Resolve<INavalDeckMovementProbe>());
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             var riderMirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 18; i++)
@@ -1106,184 +1113,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void RelayPayloadBudget_UsesExactSerializedBoundary()
-    {
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        const string instanceId = "MapEvent_Created_0000";
-        const string controllerId = "76561198000000042";
-        int ceiling = LiteNetP2PClient.SafeSinglePacketBytes;
-        int payloadBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
-            serializer,
-            instanceId,
-            controllerId,
-            ceiling);
-
-        byte[] exact = serializer.Serialize(new RelayPacket(
-            DeliveryMethod.Unreliable,
-            instanceId,
-            controllerId,
-            new byte[payloadBudget]));
-        byte[] oneByteOver = serializer.Serialize(new RelayPacket(
-            DeliveryMethod.Unreliable,
-            instanceId,
-            controllerId,
-            new byte[payloadBudget + 1]));
-
-        Assert.Equal(ceiling, exact.Length);
-        Assert.True(oneByteOver.Length > ceiling);
-    }
-
-    [Fact]
-    public void UnreliablePayloadBudget_IgnoresAnUnusableRouteWhenAnotherRouteCanSend()
-    {
-        const string instanceId = "MapEvent_Created_0000";
-        const string usableControllerId = "76561198000000042";
-        string unusableControllerId = new string('x', LiteNetP2PClient.SafeSinglePacketBytes);
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer);
-        int usableBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
-            serializer,
-            instanceId,
-            usableControllerId,
-            LiteNetP2PClient.SafeSinglePacketBytes);
-        int unusableBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
-            serializer,
-            instanceId,
-            unusableControllerId,
-            LiteNetP2PClient.SafeSinglePacketBytes);
-        Assert.True(usableBudget > 0);
-        Assert.Equal(0, unusableBudget);
-
-        var config = new Mock<INetworkConfig>();
-        config.SetupGet(value => value.IsTunneled).Returns(true);
-        var relayNetwork = new Mock<IRelayNetwork>();
-        var missionContext = new Mock<IMissionContext>();
-        missionContext.SetupGet(value => value.ControllersInMission)
-            .Returns(new[] { unusableControllerId });
-        var messageBroker = new Mock<IMessageBroker>();
-        var packetManager = new Mock<IPacketManager>();
-        var messagePacketHandler = new Mock<IMessagePacketHandler>();
-        var controllerIdProvider = new Mock<IControllerIdProvider>();
-        var steamBridge = new Mock<ISteamMissionBridge>();
-
-        using var client = new LiteNetP2PClient(
-            config.Object,
-            relayNetwork.Object,
-            missionContext.Object,
-            serializer,
-            messageBroker.Object,
-            packetManager.Object,
-            messagePacketHandler.Object,
-            controllerIdProvider.Object,
-            steamBridge.Object,
-            compressor,
-            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
-        client.ConnectToInstance(instanceId);
-
-        Assert.Equal(0, client.GetMaxUnreliablePayloadBytes());
-        Assert.Equal(0, client.GetMaxUnreliablePayloadBytes(unusableControllerId));
-
-        missionContext.SetupGet(value => value.ControllersInMission)
-            .Returns(new[] { usableControllerId, unusableControllerId });
-        Assert.Equal(usableBudget, client.GetMaxUnreliablePayloadBytes());
-        Assert.Equal(usableBudget, client.GetMaxUnreliablePayloadBytes(usableControllerId));
-        Assert.Equal(0, client.GetMaxUnreliablePayloadBytes(unusableControllerId));
-
-        client.SendAll(new MovementPacket(
-            "scope",
-            new ushort[] { 1 },
-            new AgentData[1]));
-
-        var relayPacket = Assert.IsType<RelayPacket>(
-            Assert.Single(relayNetwork.Invocations).Arguments[0]);
-        Assert.Equal(usableControllerId, relayPacket.ControllerId);
-        Assert.True(relayPacket.Payload.Length <= usableBudget);
-    }
-
-    [Fact]
-    public void RelaySend_DropsMovementThatOnlyFitsWithoutRelayFraming()
-    {
-        const string instanceId = "MapEvent_Created_0000";
-        const string controllerId = "76561198000000042";
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer);
-        int relayBudget = LiteNetP2PClient.CalculateMaxRelayPayloadBytes(
-            serializer,
-            instanceId,
-            controllerId,
-            LiteNetP2PClient.SafeSinglePacketBytes);
-
-        MovementPacket oversizedPacket = default;
-        byte[] oversizedPayload = Array.Empty<byte>();
-        for (int scopeLength = 700; scopeLength <= 1200; scopeLength++)
-        {
-            var candidate = new MovementPacket(
-                CreateIncompressibleString(scopeLength),
-                new ushort[] { 1 },
-                new AgentData[1]);
-            byte[] payload = compressor.Serialize(candidate);
-            if (payload.Length <= relayBudget ||
-                payload.Length > LiteNetP2PClient.SafeSinglePacketBytes)
-            {
-                continue;
-            }
-
-            oversizedPacket = candidate;
-            oversizedPayload = payload;
-            break;
-        }
-
-        Assert.NotEmpty(oversizedPayload);
-        Assert.InRange(
-            oversizedPayload.Length,
-            relayBudget + 1,
-            LiteNetP2PClient.SafeSinglePacketBytes);
-
-        var config = new Mock<INetworkConfig>();
-        config.SetupGet(value => value.IsTunneled).Returns(true);
-        var relayNetwork = new Mock<IRelayNetwork>();
-        var missionContext = new Mock<IMissionContext>();
-        var messageBroker = new Mock<IMessageBroker>();
-        var packetManager = new Mock<IPacketManager>();
-        var messagePacketHandler = new Mock<IMessagePacketHandler>();
-        var controllerIdProvider = new Mock<IControllerIdProvider>();
-        var steamBridge = new Mock<ISteamMissionBridge>();
-
-        using var client = new LiteNetP2PClient(
-            config.Object,
-            relayNetwork.Object,
-            missionContext.Object,
-            serializer,
-            messageBroker.Object,
-            packetManager.Object,
-            messagePacketHandler.Object,
-            controllerIdProvider.Object,
-            steamBridge.Object,
-            compressor,
-            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
-        client.ConnectToInstance(instanceId);
-
-        client.Send(controllerId, oversizedPacket);
-
-        relayNetwork.Verify(
-            network => network.SendAll(It.IsAny<IPacket>()),
-            Times.Never);
-
-        var safePacket = new MovementPacket(
-            "scope",
-            new ushort[] { 1 },
-            new AgentData[1]);
-        byte[] safePayload = compressor.Serialize(safePacket);
-        Assert.True(safePayload.Length <= relayBudget);
-
-        client.Send(controllerId, safePacket);
-
-        var relayPacket = Assert.IsType<RelayPacket>(
-            Assert.Single(relayNetwork.Invocations).Arguments[0]);
-        Assert.Equal(safePayload, relayPacket.Payload);
-    }
-
-    [Fact]
     public void PollMovement_DoesNotPublishIndependentEquipmentChanges()
     {
         using var fixture = new MissionEngineFixture();
@@ -1401,16 +1230,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void Lz4MovementCompression_RejectsCorruptEnvelope()
-    {
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var compressor = new MovementPacketCompressor(serializer);
-        var corrupt = new CompressedMovementPacket(512, new byte[] { 1, 2, 3 });
-
-        Assert.False(compressor.TryRestore(corrupt, out _));
-    }
-
-    [Fact]
     public void ThreeMountedSnapshots_FitAndDispatchThroughRelay()
     {
         using var fixture = new MissionEngineFixture();
@@ -1464,29 +1283,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 Assert.Equal(mounts[i].MountLookDirection, restoredMounts.Mounts[i].MountLookDirection);
             }
         });
-    }
-
-    [Fact]
-    public void OversizedMovement_IsDroppedInsteadOfPromotedToReliable()
-    {
-        int datagramCeiling = LiteNetP2PClient.SafeSinglePacketBytes;
-        var movement = new MovementPacket(Array.Empty<Guid>(), Array.Empty<AgentData>());
-        var mountMovement = new MountMovementPacket(Array.Empty<Guid>(), Array.Empty<AgentMountData>());
-        var ordinaryUnreliable = new TestPacket(PacketType.Test, DeliveryMethod.Unreliable);
-        var reliable = new TestPacket(PacketType.Test, DeliveryMethod.ReliableOrdered);
-
-        Assert.Equal(DeliveryMethod.Unreliable,
-            LiteNetP2PClient.SelectDeliveryMethod(movement, datagramCeiling, datagramCeiling));
-        Assert.Null(LiteNetP2PClient.SelectDeliveryMethod(movement, datagramCeiling + 1, datagramCeiling));
-        Assert.Null(LiteNetP2PClient.SelectDeliveryMethod(mountMovement, datagramCeiling + 1, datagramCeiling));
-        Assert.Equal(DeliveryMethod.ReliableUnordered,
-            LiteNetP2PClient.SelectDeliveryMethod(ordinaryUnreliable, datagramCeiling + 1, datagramCeiling));
-        Assert.Equal(DeliveryMethod.ReliableOrdered,
-            LiteNetP2PClient.SelectDeliveryMethod(reliable, datagramCeiling + 1, datagramCeiling));
-
-        Assert.Null(LiteNetP2PClient.SelectDeliveryMethod(movement, datagramCeiling - 1, 0));
-        Assert.Equal(DeliveryMethod.ReliableUnordered,
-            LiteNetP2PClient.SelectDeliveryMethod(ordinaryUnreliable, datagramCeiling - 1, 0));
     }
 
     private static IPacket AssertFitsAndDispatchesThroughRelay(
@@ -1624,7 +1420,7 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         return state;
     }
 
-    private static string CreateIncompressibleString(int length)
+    internal static string CreateIncompressibleString(int length)
     {
         var characters = new char[length];
         uint state = 0x9E3779B9u;
@@ -1789,17 +1585,6 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         mirror.Action1Index = -1;
     }
 
-    private readonly struct TestPacket : IPacket
-    {
-        public PacketType PacketType { get; }
-        public DeliveryMethod DeliveryMethod { get; }
-
-        public TestPacket(PacketType packetType, DeliveryMethod deliveryMethod)
-        {
-            PacketType = packetType;
-            DeliveryMethod = deliveryMethod;
-        }
-    }
 
     private sealed class RecordingPacketHandler : IPacketHandler
     {

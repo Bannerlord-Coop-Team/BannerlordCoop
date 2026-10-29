@@ -11,28 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SaddleComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public SaddleComponentSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void SaddleComponent_Serialize()
-        {
-            SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

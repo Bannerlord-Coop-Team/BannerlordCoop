@@ -5,6 +5,7 @@ using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Traits;
 using GameInterface.Services.Workshops;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -35,6 +36,7 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerHasMetHermit)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerItemsTradeData)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerRansomOfferData)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
@@ -64,5 +66,7 @@ internal static class CoopSessionMigrationRules
 
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerIsIllDays)));
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerSuccessions)));
+
+        ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
     }
 }

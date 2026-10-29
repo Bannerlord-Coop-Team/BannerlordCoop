@@ -494,6 +494,8 @@ public static class PlayerPartyInteractionDialogState
                 return GameTexts.FindText("str_coop_marriage_patrilineal_request").ToString();
             case PlayerPartyInteractionProposal.MatrilinealMarriage:
                 return GameTexts.FindText("str_coop_marriage_matrilineal_request").ToString();
+            case PlayerPartyInteractionProposal.MapTracking:
+                return GameTexts.FindText("str_coop_map_tracking_request").ToString();
             default:
                 return $"{OtherPlayerName} has made a proposal.";
         }

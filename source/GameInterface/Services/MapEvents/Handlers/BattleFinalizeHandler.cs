@@ -630,6 +630,16 @@ internal class BattleFinalizeHandler : IHandler
         {
             if (Campaign.Current == null) return;
 
+            var mainParty = MobileParty.MainParty;
+            // This reply has no event id; an old reply must not close or move a new active raider.
+            if (ModInformation.IsClient && mainParty?.MapEvent is MapEvent activeRaid &&
+                activeRaid.IsRaidHostileAction() && !activeRaid.IsFinalized)
+                return;
+
+            // A late reply cannot identify or close the new village encounter opened by a raid reset.
+            if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
+                return;
+
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate
             // (BattleModeEncounterOptionsPatch) no longer treats this event as claimed.
             BattleModeRegistry.End();
@@ -639,7 +649,6 @@ internal class BattleFinalizeHandler : IHandler
             // itself. Exiting menus here would close the capture screen.
             if (PlayerCaptivity.IsCaptive) return;
 
-            var mainParty = MobileParty.MainParty;
             MoveLocalRaidPartyToSettlementGate(mainParty, GetLocalRaidFinalizationSettlement(mainParty));
 
             if (PlayerEncounter.Current != null)

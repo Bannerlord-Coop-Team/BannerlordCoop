@@ -8,7 +8,6 @@ using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using LiteNetLib;
 using Missions.Messages;
@@ -238,16 +237,10 @@ public class SettlementMissionReconnectTests
         NetPeer peer,
         string controllerId)
     {
-        var player = new Player(
-            controllerId,
-            string.Empty,
-            string.Empty,
-            string.Empty,
-            string.Empty);
-        var mappedPlayer = player;
+        var mappedControllerId = controllerId;
         var mappedPeer = peer;
         playerManager
-            .Setup(manager => manager.TryGetPlayer(peer, out mappedPlayer))
+            .Setup(manager => manager.TryGetCurrentController(peer, out mappedControllerId))
             .Returns(true);
         playerManager
             .Setup(manager => manager.TryGetPeer(controllerId, out mappedPeer))

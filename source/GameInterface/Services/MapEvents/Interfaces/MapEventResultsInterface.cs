@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.Patches;
@@ -242,6 +243,8 @@ public class MapEventResultsInterface : IMapEventResultsInterface
 
         GameThread.RunSafe(() =>
         {
+            ApplyPlayerBattleTraitXp(mapEvent);
+
             if (mapEvent.BattleState == BattleState.AttackerVictory || mapEvent.BattleState == BattleState.DefenderVictory)
             {
                 MBList<MapEventParty> defeatedParties = mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties
@@ -280,6 +283,21 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         });
 
         networkPlayerLootData = PackPlayerLootData(playerLootData);
+    }
+
+    // Replaces PlayerEncounter.DoApplyMapEventResults raising OnPlayerBattleEnd before the results are committed
+    private void ApplyPlayerBattleTraitXp(MapEvent mapEvent)
+    {
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            var mobileParty = party.MobileParty;
+            if (mobileParty == null || !mobileParty.IsPlayerParty() || retreatedPartyTracker.IsRetreated(mapEvent, party)) continue;
+
+            using (new MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            {
+                TraitLevelingHelper.OnBattleWon(mapEvent, mapEvent.GetPlayerBattleContributionRate());
+            }
+        }
     }
 
     internal void SplitHideoutLoot(MapEvent mapEvent, PlayerLootData loot)

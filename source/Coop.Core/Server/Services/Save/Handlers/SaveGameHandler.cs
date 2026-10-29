@@ -121,7 +121,8 @@ internal class SaveGameHandler : IHandler
             current?.HeroMeetingData ?? empty.HeroMeetingData,
             current?.AgingPlayerData ?? empty.AgingPlayerData,
             current?.NavalPlayerData ?? empty.NavalPlayerData,
-            current?.ClanFinance ?? empty.ClanFinance);
+            current?.ClanFinance ?? empty.ClanFinance,
+            current?.PlayerTraitData ?? empty.PlayerTraitData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -147,7 +148,8 @@ internal class SaveGameHandler : IHandler
             loaded?.HeroMeetingData ?? empty.HeroMeetingData,
             loaded?.AgingPlayerData ?? empty.AgingPlayerData,
             loaded?.NavalPlayerData ?? empty.NavalPlayerData,
-            loaded?.ClanFinance ?? empty.ClanFinance);
+            loaded?.ClanFinance ?? empty.ClanFinance,
+            loaded?.PlayerTraitData ?? empty.PlayerTraitData);
 
         coopSessionProvider.CoopSession = savedSession;
     }

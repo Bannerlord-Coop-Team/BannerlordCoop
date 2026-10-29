@@ -9,6 +9,8 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Notifications.Messages;
+using Helpers;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -20,6 +22,7 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -278,7 +281,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 if (rewards.MapEvent != null || !rewards.ClaimedHeroes.Add(playerHero))
                     return ConsequenceResult.Rejected;
 
-                behavior.SetCleanHideoutRelations(settlement);
+                SetCleanHideoutRelations(playerHero, settlement);
                 return ConsequenceResult.AcceptedWithoutParity;
 
             default:
@@ -333,17 +336,13 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         rewards.Settlement.Hideout.IsSpotted = false;
         rewards.Settlement.IsVisible = false;
 
-        var behavior = Campaign.Current?.GetCampaignBehavior<HideoutCampaignBehavior>();
-        if (behavior == null)
-            return;
-
         foreach (var participant in rewards.Participants)
         {
             if (!rewards.ClaimedHeroes.Add(participant.Hero))
                 continue;
 
             using var playerContext = new BarterPlayerContext(participant.Hero, participant.Party);
-            behavior.SetCleanHideoutRelations(rewards.Settlement);
+            SetCleanHideoutRelations(participant.Hero, rewards.Settlement);
         }
     }
 
@@ -431,6 +430,41 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
     private static IEnumerable<MobileParty> GetDefenderParties(Settlement settlement) =>
         settlement.Parties.Where(party => party.IsBandit || party.IsBanditBossParty);
+
+    // Re-implementation of HideoutCampaignBehavior.SetCleanHideoutRelations to not use Hero.MainHero
+    private void SetCleanHideoutRelations(Hero participant, Settlement hideout)
+    {
+        List<Settlement> nearbySettlements = new();
+        float range = HideoutCampaignBehavior.IncreaseRelationWithVillageNotableMaximumDistanceAsDays * Campaign.Current.EstimatedAverageLordPartySpeed * CampaignTime.HoursInDay;
+        foreach (Village village in Campaign.Current.AllVillages)
+        {
+            if (village.Settlement.Position.DistanceSquared(hideout.Position) <= range * range)
+            {
+                nearbySettlements.Add(village.Settlement);
+            }
+        }
+        foreach (Settlement settlement in nearbySettlements)
+        {
+            if (settlement.Notables.Count > 0)
+            {
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(participant, settlement.Notables.GetRandomElement(), 2, false);
+            }
+        }
+        if (participant.GetPerkValue(DefaultPerks.Charm.EffortForThePeople))
+        {
+            Town town = SettlementHelper.FindNearestTownToSettlement(hideout, MobileParty.NavigationType.All, null);
+            Hero leader = town.OwnerClan.Leader;
+            if (leader == participant)
+            {
+                town.Loyalty += 1f;
+            }
+            else
+            {
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(participant, leader, (int)DefaultPerks.Charm.EffortForThePeople.PrimaryBonus, true);
+            }
+        }
+        messageBroker.Publish(this, new NotifyCleanHideoutRelations(participant, 2));
+    }
 
     private readonly struct ConsequenceResult
     {
