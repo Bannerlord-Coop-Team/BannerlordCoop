@@ -217,6 +217,7 @@ internal class BattleSimulationRunHandler : IHandler
             {
                 network.Send(requestingPeer, new NetworkBattleSimulationCancelled(mapEventId));
                 network.Send(requestingPeer, new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
             }
             else
                 network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -439,6 +440,10 @@ internal class BattleSimulationRunHandler : IHandler
                 if (observation != null) observation.SimulationAdvanceStage = "unsupported-hostile-action";
 #endif
                 CancelSimulationSession(mapEventId, sim);
+                lock (simLock)
+                {
+                    activeSimulations.Remove(mapEventId);
+                }
                 return;
             }
 
@@ -918,11 +923,16 @@ internal class BattleSimulationRunHandler : IHandler
                         CollectWinnerContributions(sim.MapEvent)));
                 }
 
-                if (sim.MapEvent.HasWinner)
+                bool completed = sim.MapEvent.HasWinner;
+                if (completed)
                     EndSimulationSession(sim, completed: true);
                 else
                     CancelSimulationSession(entry.Key, sim);
-                mapEventLogger.DebugMapEvent(sim.MapEvent, "Battle simulation client disconnected; finished server-side. BattleState={BattleState}", sim.MapEvent.BattleState);
+                mapEventLogger.DebugMapEvent(sim.MapEvent,
+                    completed
+                        ? "Battle simulation client disconnected; finished server-side. BattleState={BattleState}"
+                        : "Battle simulation client disconnected; cancelled unfinished session. BattleState={BattleState}",
+                    sim.MapEvent.BattleState);
 
                 // Tell the spectators the simulation is over, otherwise they stay stuck in the spectator window now
                 // that the pacing client (which would have driven it to completion) is gone.
