@@ -18,6 +18,9 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.Ar
 
 namespace E2E.Tests.Services.Issues;
 
+/// <summary>
+/// A quest war ending caused by crime rating is judged on the quest owner's rating, not the server main hero's (#3986).
+/// </summary>
 public class QuestWarCrimeRatingTests : IDisposable
 {
     private const string IssueId = "issue_army_needs_supplies";
