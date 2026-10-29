@@ -49,6 +49,7 @@ public sealed class NavalEdgeRetreatCoopCommand : INavalEdgeRetreatCoopCommand
         var ship = info.Hull as MissionShip;
         if (ship == null || ship.IsRemoved || ship.IsSinking || !ship.IsShipOrderActive || NavalForeignHulls.Contains(ship))
             return Failed("Select an active, afloat owned hull.");
+        if (ship.Formation == null) return Failed("Select a hull with an assigned formation.");
         if (ship.GetIsConnected()) return Failed("Disconnect ropes before staging a retreat.");
         var origin = ship.GlobalFrame.origin;
         if (!mission.IsPositionInsideBoundaries(origin.AsVec2)) return Failed("Hull must start inside the mission boundary.");
@@ -62,9 +63,11 @@ public sealed class NavalEdgeRetreatCoopCommand : INavalEdgeRetreatCoopCommand
         ships.TeleportShip(ship, frame, checkFreeArea: false);
         ship.GameEntity.SetAngularVelocity(Vec3.Zero);
         ship.GameEntity.SetLinearVelocity(Vec3.Zero);
+        // Formation behaviors otherwise replace Retreat with their next naval movement order.
+        ship.Formation.SetControlledByAI(false);
         ship.ShipOrder.SetShipRetreatOrder();
         ship.ShipOrder.SetCutLoose(enable: true);
-        return new CoopCommandResult(true, $"NAVAL_EDGE_RETREAT ship={id} authority={info.CurrentAuthority} order={ship.ShipOrder.MovementOrderEnum} inside=0.25; staged, vanilla removal pending on next five-second retreat check");
+        return new CoopCommandResult(true, $"NAVAL_EDGE_RETREAT ship={id} authority={info.CurrentAuthority} order={ship.ShipOrder.MovementOrderEnum} inside=0.25 formationAI={ship.Formation.IsAIControlled}; staged, vanilla removal pending on next five-second retreat check");
     }
 
     /// <summary>Reports a refused request before staging the hull.</summary>
