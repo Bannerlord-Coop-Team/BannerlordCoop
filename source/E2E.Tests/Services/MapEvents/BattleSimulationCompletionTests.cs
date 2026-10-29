@@ -130,6 +130,8 @@ public class BattleSimulationCompletionTests : MapEventTestBase
                 Assert.True(mapEvent.IsFinalized);
                 Assert.Same(mapEvent, Assert.Single(ended));
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationLoot>());
+                Assert.Equal((int)BattleStartMode.Unclaimed,
+                    Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>()).Mode);
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
                 Assert.False(ServerBattleModeArbiter.IsClaimed(context.MapEventId));
             }

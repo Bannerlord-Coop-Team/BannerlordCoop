@@ -532,6 +532,7 @@ internal class BattleSimulationRunHandler : IHandler
 
             mapEventLogger.DebugMapEvent(sim.MapEvent, "Server-side battle simulation finished. BattleState={BattleState}", sim.MapEvent.BattleState);
 
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
 #if DEBUG
             if (observation != null) observation.SimulationAdvanceStage = "completed";
