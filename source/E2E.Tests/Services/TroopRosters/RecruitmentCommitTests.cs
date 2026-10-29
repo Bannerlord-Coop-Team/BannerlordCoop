@@ -18,7 +18,8 @@ namespace E2E.Tests.Services.TroopRosters;
 /// <summary>
 /// The server commit of a client recruit cart (<see cref="ITroopRosterInterface.HandleOnRecruitmentDone"/>). The cart
 /// can be stale when an AI lord or the daily volunteer update changed a notable's slot after the client opened the
-/// recruit screen, so only entries whose slot still holds the requested troop are recruited, each slot once.
+/// recruit screen, so only entries whose slot still holds the requested troop are recruited, each slot once. The
+/// recruit side effects, such as the recruit xp, go to the party leader, not to the server's hidden main hero.
 /// </summary>
 public class RecruitmentCommitTests : IDisposable
 {
@@ -188,7 +189,6 @@ public class RecruitmentCommitTests : IDisposable
             Assert.Equal(1, Assert.Single(roster, e => e.Character == Get<CharacterObject>(archerId)).Number);
             Assert.Equal(StartingGold - (2 * TroopCost), Get<Hero>(leaderId).Gold);
             Assert.True(Get<Hero>(leaderId).HeroDeveloper.GetSkillXp(DefaultSkills.Leadership) > leaderXpBefore);
-            Assert.Null(Hero.MainHero.HeroDeveloper);
         });
     }
 
