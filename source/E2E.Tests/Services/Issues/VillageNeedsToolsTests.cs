@@ -675,6 +675,8 @@ public class VillageNeedsToolsTests : IDisposable
                 var issue = (Issue)notable.Issue;
 
                 Assert.True(issue.IsSolvingWithAlternative);
+                Assert.False(issue.IsSolvingWithQuest);
+                Assert.Null(issue.IssueQuest);
                 Assert.Equal(ServerPayment, issue._payment);
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
                 grainBefore[instance] = party.ItemRoster.GetItemNumber(DefaultItems.Grain);
