@@ -57,7 +57,8 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_VillageHostileActionAttempted(MessagePayload<VillageHostileActionAttempted> payload)
     {
         var message = payload.What;
-        playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current);
+        if (!playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current))
+            return;
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;

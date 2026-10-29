@@ -19,7 +19,7 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
-    public void TrackPendingHostileAction(PlayerEncounter playerEncounter);
+    public bool TrackPendingHostileAction(PlayerEncounter playerEncounter);
     public void ClearPendingHostileAction(PlayerEncounter playerEncounter);
     public void RecoverRejectedHostileAction();
 }
@@ -113,7 +113,14 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         }, context: nameof(RecoverRejectedHostileAction));
     }
 
-    public void TrackPendingHostileAction(PlayerEncounter playerEncounter) => pendingHostileActionEncounter = playerEncounter;
+    public bool TrackPendingHostileAction(PlayerEncounter playerEncounter)
+    {
+        if (pendingHostileActionEncounter != null)
+            return false;
+
+        pendingHostileActionEncounter = playerEncounter;
+        return true;
+    }
 
     public void ClearPendingHostileAction(PlayerEncounter playerEncounter)
     {
