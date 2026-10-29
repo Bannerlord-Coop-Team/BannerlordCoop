@@ -5,7 +5,6 @@ using Missions.Battles;
 using Missions.Messages;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions;
-using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
@@ -399,28 +398,15 @@ public class NavalShipEngine : INavalShipEngine
         {
             case HullRemovalPath.Assigned:
                 shipsLogic.RemoveShip(ship);
-                ExpireTeamShipQueries();
                 return;
             case HullRemovalPath.Unassigned:
                 RemoveUnassignedHull(shipsLogic, ship);
-                ExpireTeamShipQueries();
                 return;
             default:
                 // Vanilla removes whatever hull holds the origin's assignment, so that stranger must not go in this hull's place.
                 Logger.Error("[NavalSync] Hull {Index} was not removed: its ship origin is assigned to another hull", ship.Index);
                 return;
         }
-    }
-
-    // Every team's ship lists are cached 5 s and vanilla's removal expires none, so an order or tactic would read a removed
-    // hull's formation as still holding it until they do; a capture expires them in vanilla's swap already.
-    private static void ExpireTeamShipQueries()
-    {
-        var mission = Mission.Current;
-        if (mission == null) return;
-
-        foreach (var team in mission.Teams)
-            (team.TeamAI as TeamAINavalComponent)?.TeamNavalQuerySystem.ForceExpireAll();
     }
 
     /// <summary>
