@@ -177,11 +177,11 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
         builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().SingleInstance();
         builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
-        builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().InstancePerLifetimeScope();
+        builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().SingleInstance();
         builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
         builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
         builder.RegisterType<NavalBattleStaging>().As<INavalBattleStaging>().InstancePerDependency();
-        builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().InstancePerLifetimeScope();
+        builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().SingleInstance();
 #endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();

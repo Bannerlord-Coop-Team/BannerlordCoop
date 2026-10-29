@@ -21,7 +21,7 @@ public class CoopNavalModule : Module
 
         foreach (var type in GetConcreteTypes<IHandler>())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         foreach (var type in GetConcreteTypes<IGameAbstraction>())
@@ -36,13 +36,13 @@ public class CoopNavalModule : Module
                     $"from an interface that inherits from {nameof(IGameAbstraction)}");
             }
 
-            builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
+            builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
         }
 
         // RegistryModule skips this assembly so the registries are only registered with the services they need
         foreach (var type in GetConcreteTypes<object>().Where(IsAutoRegistry))
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         // Load coop commands within Coop.Naval
