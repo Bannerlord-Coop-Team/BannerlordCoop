@@ -157,16 +157,27 @@ public class RecruitmentCommitTests : IDisposable
         Server.Call(() => Assert.Same(Get<CharacterObject>(infantryId), Get<Hero>(notableId).VolunteerTypes[0]));
     }
 
-    [Fact]
-    public void ServerMainHeroDead_RecruitXpGoesToThePartyLeader()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RecruitSideEffects_XpGoesToThePartyLeaderNotTheServerMainHero(bool mainHeroDead)
     {
         float leaderXpBefore = 0;
+        float mainHeroXpBefore = 0;
         Server.Call(() =>
         {
-            // Birth and Aging can kill the dedicated server's hidden main hero, and death clears its HeroDeveloper
-            Hero.MainHero.OnDeath();
-            Assert.Null(Hero.MainHero.HeroDeveloper);
-            Assert.NotSame(Hero.MainHero, Get<Hero>(leaderId));
+            Assert.Same(Get<Hero>(leaderId), Get<MobileParty>(partyId).LeaderHero);
+            if (mainHeroDead)
+            {
+                // Birth and Aging can kill the dedicated server's hidden main hero, and death clears its HeroDeveloper
+                Hero.MainHero.ChangeState(Hero.CharacterStates.Dead);
+                Hero.MainHero.OnDeath();
+                Assert.Null(Hero.MainHero.HeroDeveloper);
+            }
+            else
+            {
+                mainHeroXpBefore = Hero.MainHero.HeroDeveloper.GetSkillXp(DefaultSkills.Leadership);
+            }
 
             // Recruit xp is count * tier * 2, so the troops need a tier above 0
             Get<CharacterObject>(infantryId).Level = 11;
@@ -189,6 +200,8 @@ public class RecruitmentCommitTests : IDisposable
             Assert.Equal(1, Assert.Single(roster, e => e.Character == Get<CharacterObject>(archerId)).Number);
             Assert.Equal(StartingGold - (2 * TroopCost), Get<Hero>(leaderId).Gold);
             Assert.True(Get<Hero>(leaderId).HeroDeveloper.GetSkillXp(DefaultSkills.Leadership) > leaderXpBefore);
+            if (!mainHeroDead)
+                Assert.Equal(mainHeroXpBefore, Hero.MainHero.HeroDeveloper.GetSkillXp(DefaultSkills.Leadership));
         });
     }
 
