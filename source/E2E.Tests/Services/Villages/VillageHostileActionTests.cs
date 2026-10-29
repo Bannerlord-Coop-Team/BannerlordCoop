@@ -366,7 +366,6 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() =>
         {
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
-            encounter.ForceRaid = true;
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer,

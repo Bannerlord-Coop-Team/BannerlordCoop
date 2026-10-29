@@ -97,8 +97,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         GameThread.RunSafe(() =>
         {
             var encounter = PlayerEncounter.Current;
-            if (encounter == null || encounter._mapEvent != null || encounter.BattleSimulation != null ||
-                (!encounter.ForceRaid && !encounter.ForceVolunteers && !encounter.ForceSupplies))
+            if (encounter == null || encounter._mapEvent != null || encounter.BattleSimulation != null)
                 return;
 
             encounter._stateHandled = true;
