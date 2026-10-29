@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
-using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -20,6 +19,7 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
+    public void RecoverRejectedHostileAction();
 }
 
 public class PlayerEncounterInterface : IPlayerEncounterInterface
@@ -90,6 +90,21 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                 }
             }
         });
+    }
+
+    public void RecoverRejectedHostileAction()
+    {
+        GameThread.RunSafe(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            if (encounter == null || encounter._mapEvent != null || encounter.BattleSimulation != null ||
+                (!encounter.ForceRaid && !encounter.ForceVolunteers && !encounter.ForceSupplies))
+                return;
+
+            encounter._stateHandled = true;
+            PlayerEncounter.LeaveEncounter = true;
+            PlayerEncounter.Finish(true);
+        }, context: nameof(RecoverRejectedHostileAction));
     }
 
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)

@@ -357,6 +357,26 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void ClientHostileActionDenied_ClearsPendingEncounter()
+    {
+        var client = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
+            encounter.ForceRaid = true;
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer,
+            new NetworkVillageHostileActionDenied(VillageHostileActionDeniedReason.AlreadyInMapEvent));
+
+        client.Call(() => Assert.Null(PlayerEncounter.Current),
+            MapEventDisabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))));
+    }
+
+    [Fact]
     public void ClientRequestRaid_WithPendingRaidApprovalForSameVillage_IsRejected()
     {
         var firstClient = Clients.First();

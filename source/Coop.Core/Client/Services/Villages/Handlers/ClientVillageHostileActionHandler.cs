@@ -2,6 +2,7 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
@@ -17,19 +18,22 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IPlayerEncounterInterface playerEncounterInterface;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IPlayerEncounterInterface playerEncounterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.playerEncounterInterface = playerEncounterInterface;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
@@ -68,6 +72,7 @@ internal class ClientVillageHostileActionHandler : IHandler
 
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
+        playerEncounterInterface.RecoverRejectedHostileAction();
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }
 
