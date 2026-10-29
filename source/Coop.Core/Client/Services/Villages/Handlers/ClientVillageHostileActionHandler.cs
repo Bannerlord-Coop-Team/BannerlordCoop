@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using TaleWorlds.CampaignSystem.Encounters;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -56,6 +57,7 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_VillageHostileActionAttempted(MessagePayload<VillageHostileActionAttempted> payload)
     {
         var message = payload.What;
+        playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current);
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
@@ -66,7 +68,11 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
         GameThread.RunSafe(
-            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
+            () =>
+            {
+                playerEncounterInterface.ClearPendingHostileAction(PlayerEncounter.Current);
+                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+            },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 

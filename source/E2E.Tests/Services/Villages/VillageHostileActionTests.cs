@@ -366,6 +366,7 @@ public class VillageHostileActionTests : MapEventTestBase
         client.Call(() =>
         {
             Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(mobilePartyId);
+            client.Resolve<IPlayerEncounterInterface>().TrackPendingHostileAction(encounter);
         }, MapEventDisabledMethods);
 
         client.SimulateMessage(Server.NetPeer,

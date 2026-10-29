@@ -19,6 +19,8 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
+    public void TrackPendingHostileAction(PlayerEncounter playerEncounter);
+    public void ClearPendingHostileAction(PlayerEncounter playerEncounter);
     public void RecoverRejectedHostileAction();
 }
 
@@ -28,6 +30,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IMessageBroker messageBroker;
+    private PlayerEncounter pendingHostileActionEncounter;
 
     public PlayerEncounterInterface() : this(null, null)
     {
@@ -94,16 +97,28 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     public void RecoverRejectedHostileAction()
     {
+        var expectedEncounter = pendingHostileActionEncounter;
         GameThread.RunSafe(() =>
         {
             var encounter = PlayerEncounter.Current;
-            if (encounter == null || encounter._mapEvent != null || encounter.BattleSimulation != null)
+            if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
+                !ReferenceEquals(pendingHostileActionEncounter, expectedEncounter) ||
+                encounter._mapEvent != null || encounter.BattleSimulation != null)
                 return;
 
+            pendingHostileActionEncounter = null;
             encounter._stateHandled = true;
             PlayerEncounter.LeaveEncounter = true;
             PlayerEncounter.Finish(true);
         }, context: nameof(RecoverRejectedHostileAction));
+    }
+
+    public void TrackPendingHostileAction(PlayerEncounter playerEncounter) => pendingHostileActionEncounter = playerEncounter;
+
+    public void ClearPendingHostileAction(PlayerEncounter playerEncounter)
+    {
+        if (ReferenceEquals(pendingHostileActionEncounter, playerEncounter))
+            pendingHostileActionEncounter = null;
     }
 
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)
