@@ -28,6 +28,7 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
         TestEnvironment.Dispose();
     }
 
+    // The girl case is the control, she uses the mother's template which has a base name
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -44,7 +45,8 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fatherId, out var father));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(motherId, out var mother));
 
-            // A player's character reaches the server without a base name, so a son's template has none
+            // _basicName isn't saved and InitializeCharactersAfterLoad only restores it on template copies,
+            // so a player's character has none after the server reloads its save
             father.CharacterObject._basicName = null;
             Campaign.Current.Models.PregnancyModel = new FixedPregnancyModel(isFemale);
 
@@ -62,6 +64,8 @@ public class PregnancyCampaignBehaviorInterfaceTests : IDisposable
             var child = Assert.Single(mother.Children);
             Assert.Same(father, child.Father);
             Assert.Equal(isFemale, child.IsFemale);
+            Assert.False(string.IsNullOrEmpty(child.Name?.ToString()));
+            Assert.False(string.IsNullOrEmpty(child.FirstName?.ToString()));
             Assert.Empty(behavior._heroPregnancies);
             Assert.False(mother.IsPregnant);
         });
