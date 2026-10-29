@@ -309,6 +309,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.CoopClansEnabled);
         Assert.False(options.EnableHeroExecutions);
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
+        Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, options.ClansAfterKingdomDestruction);
     }
 
     /// <summary>

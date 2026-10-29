@@ -84,6 +84,7 @@ namespace Coop.IntegrationTests.Serialization
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
+                ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.KeepClans,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -107,6 +108,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(ClansAfterKingdomDestructionMode.KeepClans, copy.ClansAfterKingdomDestruction);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -164,6 +166,7 @@ namespace Coop.IntegrationTests.Serialization
             CoopClansEnabled = false,
             VoiceEnabled = false,
             BlockAiWarDeclarationsOnOfflinePlayers = false,
+            ClansAfterKingdomDestruction = ClansAfterKingdomDestructionMode.Vanilla,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -194,6 +197,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.CoopClansEnabled);
             Assert.False(copy.VoiceEnabled);
             Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, copy.ClansAfterKingdomDestruction);
         }
 
         private static T RoundTrip<T>(T original)
