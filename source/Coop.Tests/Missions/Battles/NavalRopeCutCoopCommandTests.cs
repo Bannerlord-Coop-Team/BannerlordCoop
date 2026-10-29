@@ -1,6 +1,7 @@
 ﻿#if COOP_NAVAL
 using Common.Commands;
 using Missions.Naval;
+using Missions.Messages;
 using Moq;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
@@ -9,6 +10,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>Checks invalid cut requests cannot mutate a rope or another authority's hull.</summary>
+[Collection("Mission.Current")]
 public class NavalRopeCutCoopCommandTests
 {
     /// <summary>Rejects malformed station indices before reading mission state.</summary>
@@ -85,6 +87,39 @@ public class NavalRopeCutCoopCommandTests
         Assert.Equal("The station needs a live attached rope or plank to cut.", result.Output);
         Assert.Equal(state, rope.State);
     }
+    /// <summary>Releasing a held removal works after the rope itself has already disappeared.</summary>
+    [Fact]
+    public void ProcessCommand_ReleasesRemovalWithoutALiveAttachment()
+    {
+        var hull = ShipTestHulls.Uninitialized<MissionShip>();
+        var station = ShipTestHulls.Uninitialized<ShipAttachmentMachine>();
+        var hulls = new Mock<INavalDebugHulls>(MockBehavior.Strict);
+        hulls.Setup(value => value.TryGetOwnHull(out hull)).Returns((string)null!);
+        hulls.Setup(value => value.RopeStations(hull)).Returns(new[] { station });
+        var records = NavalRopes.records;
+        NavalRopes.Clear();
+        try
+        {
+            records[station] = new NavalRopes.RopeRecord { Generation = 1, Last = BattleRopeStateTests.Rope(1, BattleRopeState.RopesPulling) };
+            Assert.True(NavalRopes.HoldRemoval(station));
+            var args = new Mock<ICoopCommandArgs>();
+            args.SetupGet(value => value.Count).Returns(2);
+            args.SetupGet(value => value[0]).Returns("0");
+            args.SetupGet(value => value[1]).Returns("release_removal");
+
+            var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(args.Object);
+
+            Assert.True(result.Succeeded);
+            Assert.Equal("NAVAL_ROPE_REMOVAL_RELEASED sourceIndex=0", result.Output);
+            Assert.Null(records[station].HeldRemovalLiveState);
+            Assert.NotNull(records[station].RemovalHoldReleasedUtc);
+        }
+        finally
+        {
+            NavalRopes.Clear();
+        }
+    }
+
     /// <summary>Supplies command arguments without starting a game mission.</summary>
     private static ICoopCommandArgs Args(int count, string? index)
     {
