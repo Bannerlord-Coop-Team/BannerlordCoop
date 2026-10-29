@@ -51,6 +51,34 @@ public class ArmyDisbanderTests : MapEventTestBase
     }
 
     [Fact]
+    public void LoadedPlayerLedArmyDispersed_StillNotifiesThePlayerParty()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("loaded-player", heroId, mapEventContext.AttackerPartyId);
+        var notifications = new List<ArmyDispersed>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var playerLeader));
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), playerLeader, Army.ArmyTypes.Raider);
+            follower.Army = army;
+            follower.AttachedTo = playerLeader;
+
+            ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+            Server.Resolve<IMessageBroker>().Subscribe<ArmyDispersed>(payload => notifications.Add(payload.What));
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            // Clients still learn their army dispersed, the notification lists the player parties itself
+            var notification = Assert.Single(notifications);
+            Assert.Same(army, notification.Army);
+            Assert.Same(playerLeader, Assert.Single(notification.PlayerParties));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void AiArmyDispersed_ServerOpensNoMenuAndSendsNoPlayerNotification()
     {
         var dispersals = new List<bool>();
