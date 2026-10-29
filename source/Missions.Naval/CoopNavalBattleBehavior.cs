@@ -3,10 +3,12 @@ using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
 using NavalDLC.Missions;
+using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
 
@@ -147,17 +149,27 @@ public class CoopNavalBattleBehavior : MissionLogic
     }
 
     // Vanilla frees a removed hull's entity right after this event, or pools it during deployment, so no copy reference, rope
-    // record, rope AI preference or ballista target may outlive it, whichever path removed it (departure, replace, retreat).
+    // record, rope AI preference, ballista target or cached ship list may outlive it, whichever path removed it (departure,
+    // replace, retreat).
     private void OnShipRemoved(MissionShip ship)
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
         steeredCopies.Forget(ship);
         NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship);
         ballistaTargets.ForgetHull(shipsLogic.AllShips, ship);
+        ExpireShipQueries(Mission.Teams);
         if (shipsLogic.IsMissionEnding) return;
 
         Logger.Information("[NavalSync] Hull {Index} on {Team} formation {Formation} removed (copy {Copy}, pooled {Pooled})",
             ship.Index, ship.Team?.TeamSide, ship.Formation?.FormationIndex, wasCopy, shipsLogic.IsDeploymentMode);
+    }
+
+    // Every team caches its own and its enemies' ship lists for up to 5 s and vanilla's removal expires none of them, so they
+    // rebuild now from the assignments and AllShips, which no longer hold the hull.
+    internal static void ExpireShipQueries(IEnumerable<Team> teams)
+    {
+        foreach (var team in teams)
+            (team.TeamAI as TeamAINavalComponent)?.TeamNavalQuerySystem.ForceExpireAll();
     }
 
     // Whether the agent count fell by more in one tick than ordinary combat explains.
