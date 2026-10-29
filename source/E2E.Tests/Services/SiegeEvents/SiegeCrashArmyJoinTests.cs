@@ -7,7 +7,6 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -35,11 +34,12 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
     }
 
     [Fact]
-    public void ArmyLeaderCrashesMidSiege_MembersLeaveTheSiegeAndCanJoinANewArmy()
+    public void ArmyLeaderCrashesMidSiege_AiMembersLeaveTheSiegeAndCanJoinANewArmy()
     {
         var army = CreatePlayerLedSiegeArmy();
 
         DisconnectPlayer(Clients.First(), "SiegeArmyLeader");
+        Server.PumpGameThread();
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -47,30 +47,32 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(army.LeaderId, out var leader));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(army.FollowerId, out var follower));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(army.OutsideSiegeMemberId, out var outsideSiegeMember));
 
                 Assert.Null(leader.BesiegerCamp);
-                Assert.Same(leader, follower.AttachedTo);
-                // An attached party left in the camp its leader left can neither move nor join another army
                 Assert.Null(follower.BesiegerCamp);
+                Assert.Null(follower.Army);
+                Assert.Null(follower.AttachedTo);
+                Assert.Null(outsideSiegeMember.Army);
+                Assert.DoesNotContain(follower, leader.AttachedParties);
             });
         }
 
-        Server.Call(() =>
+        // Another player calls them to a new army, the model then only refuses them for their empty rosters
+        var recruiter = Clients.Last();
+        var recruiterPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        recruiter.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Army>(army.ArmyId, out var oldArmy));
-            DisbandArmyAction.ApplyByUnknownReason(oldArmy);
-        }, new[] { AccessTools.Method(typeof(PartyBase), nameof(PartyBase.UpdateVisibilityAndInspected)) });
+            Assert.True(recruiter.ObjectManager.TryGetObject<MobileParty>(recruiterPartyId, out var recruiterParty));
+            Campaign.Current.MainParty = recruiterParty;
+            var model = new DefaultArmyManagementCalculationModel();
 
-        Server.Call(() =>
-        {
-            // The state DefaultArmyManagementCalculationModel.CheckPartyEligibility refuses a party for
             foreach (var partyId in new[] { army.FollowerId, army.OutsideSiegeMemberId })
             {
-                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-                Assert.Null(party.Army);
-                Assert.Null(party.AttachedTo);
-                Assert.Null(party.MapEvent);
-                Assert.Null(party.SiegeEvent);
+                Assert.True(recruiter.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                model.CheckPartyEligibility(party, out var explanation);
+                // The size check comes after every army and fighting refusal
+                Assert.StartsWith("{=SVJlOYCB}", explanation.Value);
             }
         });
 
@@ -95,6 +97,7 @@ public class SiegeCrashArmyJoinTests : MapEventTestBase
                 Assert.Null(leader.BesiegerCamp);
                 Assert.Same(camp, playerMember.BesiegerCamp);
                 Assert.Contains(playerMember, camp._besiegerParties);
+                Assert.Same(leader.Army, playerMember.Army);
             });
         }
 

@@ -7,6 +7,8 @@ using Common.Util;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -323,11 +325,19 @@ internal class PlayerPartyVisibilityHandler : IHandler
             "Removing disconnected party {PartyId} from its siege camp before parking",
             party.StringId);
 
-        // AI army members leave with their parked leader, otherwise they stay in the camp attached to it; players keep their siege role
-        if (party.Army?.LeaderParty == party)
+        // AI army members leave the siege and the army of their parked leader, otherwise they stay stuck to it; players keep their siege role
+        var army = party.Army;
+        if (army?.LeaderParty == party)
         {
-            foreach (var member in party.AttachedParties.Where(member => member.BesiegerCamp != null && !playerManager.Contains(member)).ToArray())
-                siegeEventInterface.BreakSiegeForPartyOnly(member);
+            foreach (var member in army.Parties.Where(member => member != party && !playerManager.Contains(member)).ToArray())
+            {
+                if (member.BesiegerCamp != null)
+                    siegeEventInterface.BreakSiegeForPartyOnly(member);
+
+                // Same pair the army-removal network flow uses, the publish replicates it to clients
+                messageBroker.Publish(member, new MobilePartyInArmyRemoved(army, member, null));
+                ArmyPatches.RemoveMobilePartyInArmy(member, army, null);
+            }
         }
 
         siegeEventInterface.BreakSiegeForPartyOnly(party);
