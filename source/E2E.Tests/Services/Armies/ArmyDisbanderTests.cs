@@ -113,9 +113,10 @@ public class ArmyDisbanderTests : MapEventTestBase
 
         Server.Call(() =>
         {
-            // Vanilla's own check, only the server's own main party counts as the player's army
-            var leader = MobileParty.MainParty;
-            Assert.NotNull(leader);
+            // Vanilla's own check, only the server's own main party counts as the player's army.
+            // The E2E server has none, so this test gives it one
+            var leader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Campaign.Current.MainParty = leader;
             var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
             follower.Army = army;
