@@ -72,7 +72,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ClientModule>();
+        // Naval mission services stay on here, like the server's naval handlers and GameInterface's naval sync.
+        builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().SingleInstance();
 
         // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh
@@ -99,7 +100,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ServerModule>();
+        // Naval server handlers stay on here, like GameInterface's naval sync below.
+        builder.RegisterModule(new ServerModule(navalServicesEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -123,7 +125,8 @@ public class TestEnvironment
     {
         if (registerGameInterface)
         {
-            builder.RegisterModule<GameInterfaceModule>();
+            // GameInterface's naval sync is tested here with fakes, so it stays on without loading the optional naval assemblies.
+            builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
         }
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();

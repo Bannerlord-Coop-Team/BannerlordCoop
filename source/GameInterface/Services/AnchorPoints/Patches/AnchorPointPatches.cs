@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.AnchorPoints.Patches;
 
 [HarmonyPatch(typeof(AnchorPoint))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class AnchorPointPatches
 {
     [HarmonyPatch(nameof(AnchorPoint.SetPosition))]
@@ -123,6 +124,7 @@ internal class AnchorPointPatches
 }
 
 [HarmonyPatch(typeof(MenuContext), nameof(MenuContext.OnHourlyTick))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class AnchorPointMenuRefreshPatch
 {
     // Time keeps passing in co-op menus, so the call fleet tooltip's arrival estimate needs refreshing

@@ -63,7 +63,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ClientModule>();
+        // Naval mission services stay on here, like the server's naval handlers and GameInterface's naval sync.
+        builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientInstance>().AsSelf();
 
@@ -82,7 +83,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ServerModule>();
+        // Naval server handlers stay on here, like GameInterface's naval sync below.
+        builder.RegisterModule(new ServerModule(navalServicesEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -110,7 +112,8 @@ public class TestEnvironment
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        builder.RegisterModule<GameInterfaceModule>();
+        // GameInterface's naval sync is tested here too, without loading the optional naval assemblies.
+        builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
 
         builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();

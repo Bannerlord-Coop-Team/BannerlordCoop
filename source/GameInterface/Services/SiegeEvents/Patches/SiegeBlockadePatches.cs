@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace GameInterface.Services.SiegeEvents.Patches;
 
 [HarmonyPatch(typeof(SiegeEvent))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class SiegeBlockadePatches
 {
     [HarmonyPatch(nameof(SiegeEvent.ActivateBlockade))]
@@ -37,6 +38,7 @@ internal class SiegeBlockadePatches
 }
 
 [HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class MobilePartyBlockadeAnchorPatches
 {
     // Replace MobileParty.IsMainParty usage so a player joining a blockading siege can't use their anchor

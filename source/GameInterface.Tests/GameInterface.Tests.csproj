@@ -21,7 +21,8 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <!-- TESTER mirrors GameInterface.csproj so NavalFeatureFlagTests checks the flag against the same constant. -->
+    <DefineConstants>DEBUG;TRACE;TESTER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>

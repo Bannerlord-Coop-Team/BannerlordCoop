@@ -16,6 +16,7 @@ namespace GameInterface.Services.Rafts.Patches;
 /// after escaping captivity can be seen without being attacked or talked to.
 /// </summary>
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerRaftVisibilityPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerRaftVisibilityPatches>();

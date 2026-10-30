@@ -48,7 +48,20 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.MapEventComponents;
+using GameInterface.Services.AnchorPoints.Handlers;
+using GameInterface.Services.MapEventComponents.Handlers;
+using GameInterface.Services.Rafts.Commands;
+using GameInterface.Services.Rafts.Handlers;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Ships;
+using GameInterface.Services.Ships.Handlers;
+using GameInterface.Services.SiegeEvents.Handlers;
+using GameInterface.Services.Ships.Figureheads;
+using GameInterface.Services.Ships.ShipHulls;
+using GameInterface.Services.Ships.ShipSlots;
+using GameInterface.Services.Ships.ShipUpgradePieces;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
@@ -71,6 +84,7 @@ using GameInterface.Utils;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -85,7 +99,48 @@ public class GameInterfaceModule : Module
 
     internal const string CoopNavalAssemblyName = "Coop.Naval";
 
+    // GameInterface's War Sails types that the scanning registrations skip while NavalDLC co-op is off. Its naval patches
+    // carry GameInterface.HARMONY_NAVAL_CATEGORY instead, and its explicit naval registrations sit behind navalServicesEnabled.
+    internal static readonly Type[] NavalOnlyTypes =
+    {
+        typeof(ShipSync),
+        typeof(ShipRegistry),
+        typeof(ShipHullRegistry),
+        typeof(FigureheadRegistry),
+        typeof(ShipSlotRegistry),
+        typeof(ShipUpgradePieceRegistry),
+        typeof(BlockadeBattleMapEventRegistry),
+        typeof(LootShipHoldHandler),
+        typeof(LootShipsHandler),
+        typeof(ShipPiecesHandler),
+        typeof(PlayerRaftHandler),
+        typeof(AnchorPointHandler),
+        typeof(PlayerBlockadeHandler),
+        typeof(SiegeBlockadeHandler),
+        typeof(PlayerRaftFleetInterface),
+        typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
+#if DEBUG
+        typeof(NavalScenarioClientHandler),
+        typeof(NavalScenarioRejoinHandler),
+        typeof(NavalScenarioCoopCommand),
+        typeof(StartNavalCoopCommand),
+#endif
+    };
+
     private static readonly Harmony harmony = new Harmony(HarmonyId);
+
+    private readonly bool navalServicesEnabled;
+
+    // Turns GameInterface's naval patches and registrations on only while NavalDLC co-op is active.
+    public GameInterfaceModule() : this(ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets a test harness turn GameInterface's naval services on without loading the optional naval assemblies.
+    public GameInterfaceModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -107,7 +162,8 @@ public class GameInterfaceModule : Module
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
-                           typeof(ICoopCommand).IsAssignableFrom(type))
+                           typeof(ICoopCommand).IsAssignableFrom(type) &&
+                           ShouldRegister(type, navalServicesEnabled))
             .As(type => type.GetInterfaces()
                 .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
             .As<ICoopCommand>()
@@ -117,7 +173,9 @@ public class GameInterfaceModule : Module
             .SingleInstance()
             .AutoActivate();
 
-        builder.RegisterType<GameInterfacePatchInstaller>().As<IGameInterfacePatchInstaller>().InstancePerDependency();
+        builder.Register(context => new GameInterfacePatchInstaller(context.Resolve<IQuestFeatureFlag>(), navalServicesEnabled))
+            .As<IGameInterfacePatchInstaller>()
+            .InstancePerDependency();
         builder.RegisterType<QuestJournalOwnerResolver>().As<IQuestJournalOwnerResolver>().InstancePerDependency();
         builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
@@ -140,8 +198,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<UIOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
-        // Also in the server container, which never opens a naval battle; the patch itself refuses to install on a server.
-        builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
+        // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
+        // itself refuses to install on a server.
+        if (navalServicesEnabled)
+            builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<ChatFactionMembership>().As<IChatFactionMembership>().InstancePerDependency();
         builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();
@@ -165,8 +225,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
         builder.RegisterType<BattleHostRetentionPolicy>().As<IBattleHostRetentionPolicy>().InstancePerDependency();
-        builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().SingleInstance();
-        builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
+        if (navalServicesEnabled)
+        {
+            builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().SingleInstance();
+            builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
+        }
+        // Stays registered while naval is off: MapEventResultsInterface, shared with land battles, takes it.
         builder.RegisterType<LootShipHold>().As<ILootShipHold>().SingleInstance();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().SingleInstance();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
@@ -177,11 +241,14 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
         builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().SingleInstance();
         builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
-        builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().SingleInstance();
-        builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
-        builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
-        builder.RegisterType<NavalBattleStaging>().As<INavalBattleStaging>().InstancePerDependency();
-        builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().SingleInstance();
+        if (navalServicesEnabled)
+        {
+            builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().SingleInstance();
+            builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
+            builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
+            builder.RegisterType<NavalBattleStaging>().As<INavalBattleStaging>().InstancePerDependency();
+            builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().SingleInstance();
+        }
 #endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
@@ -244,10 +311,10 @@ public class GameInterfaceModule : Module
 #if DEBUG
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();
 #endif
-        builder.RegisterModule<ServiceModule>();
+        builder.RegisterModule(new ServiceModule(navalServicesEnabled));
         builder.RegisterModule<ObjectManagerModule>();
-        builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule<AutoSyncModule>();
+        builder.RegisterModule(new RegistryModule(navalServicesEnabled));
+        builder.RegisterModule(new AutoSyncModule(navalServicesEnabled));
 
         // Coop.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
         if (ModInformation.IsNavalDlcActive && TryLoadCoopNavalAssembly(out var coopNavalAssembly))
@@ -255,6 +322,10 @@ public class GameInterfaceModule : Module
 
         base.Load(builder);
     }
+
+    // Whether a scanned type is registered: everything, except NavalOnlyTypes while NavalDLC co-op is off.
+    internal static bool ShouldRegister(Type type, bool navalServicesEnabled) =>
+        navalServicesEnabled || !NavalOnlyTypes.Contains(type);
 
     // Loads Coop.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)

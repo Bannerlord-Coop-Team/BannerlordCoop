@@ -97,8 +97,9 @@ namespace Coop.Tests.Autofac
         public void Client_Container_WithNavalMissionModule_Build()
         {
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<ClientModule>();
-            builder.RegisterModule<GameInterfaceModule>();
+            // Missions.Naval only loads with NavalDLC co-op active, which also turns the client's naval services on.
+            builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
+            builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
             // MissionModule registers it only while NavalDLC is active, which a test process is not.
             builder.RegisterModule<NavalMissionModule>();
             using var container = builder.Build();

@@ -16,15 +16,20 @@ public class ModInformationTests
     }
 
     [Theory]
-    [InlineData(true, "Missions.Naval.dll,Coop.Naval.dll", true)]
-    [InlineData(true, "Coop.Naval.dll", false)]
-    [InlineData(true, "Missions.Naval.dll", false)]
-    [InlineData(true, "", false)]
-    [InlineData(false, "Missions.Naval.dll,Coop.Naval.dll", false)]
-    public void IsNavalSupported_NeedsTheModuleAndBothNavalAssemblies(bool navalModuleEnabled, string shippedFiles, bool expected)
+    [InlineData(true, true, "Missions.Naval.dll,Coop.Naval.dll", true)]
+    [InlineData(true, true, "Coop.Naval.dll", false)]
+    [InlineData(true, true, "Missions.Naval.dll", false)]
+    [InlineData(true, true, "", false)]
+    [InlineData(false, true, "Missions.Naval.dll,Coop.Naval.dll", false)]
+    [InlineData(true, false, "Missions.Naval.dll,Coop.Naval.dll", false)]
+    [InlineData(false, false, "Missions.Naval.dll,Coop.Naval.dll", false)]
+    [InlineData(true, false, "", false)]
+    public void IsNavalSupported_NeedsTheModuleTheFeatureFlagAndBothNavalAssemblies(
+        bool navalModuleEnabled, bool navalFeatureEnabled, string shippedFiles, bool expected)
     {
         var shipped = shippedFiles.Split(',');
 
-        Assert.Equal(expected, ModInformation.IsNavalSupported(navalModuleEnabled, file => System.Array.IndexOf(shipped, file) >= 0));
+        Assert.Equal(expected, ModInformation.IsNavalSupported(
+            navalModuleEnabled, navalFeatureEnabled, file => System.Array.IndexOf(shipped, file) >= 0));
     }
 }

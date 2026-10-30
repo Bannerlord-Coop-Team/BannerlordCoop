@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
@@ -34,16 +35,29 @@ namespace E2E.Tests.Services.Missions.Naval;
 /// station, damage and host traffic travels as real serialized messages through the real handlers. Time only moves
 /// through <see cref="NavalPeer.Tick"/>, one mission clock per client.
 /// </summary>
-public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
+public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisposable
 {
     /// <summary>The AI party the battle host fields hulls for; registered like a player so its map event party resolves.</summary>
     protected const string PirateId = "pirates";
 
     protected const float TickSeconds = 0.05f;
 
-    // An in-memory water clock per client, so no naval battle runs the native patch in the test process.
+    private readonly bool previousNavalDlcActive = ModInformation.IsNavalDlcActive;
+
+    // An in-memory water clock per client, so no naval battle runs the native patch in the test process. The battle runs
+    // as a NavalDLC co-op session, so code that checks the startup decision (the ship fate commit) takes the naval path.
     protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients,
-        builder => builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope()) { }
+        builder => builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope())
+    {
+        ModInformation.IsNavalDlcActive = true;
+    }
+
+    // Puts the startup decision back before the shared environment teardown, so it can't leak into a later test class.
+    void IDisposable.Dispose()
+    {
+        ModInformation.IsNavalDlcActive = previousNavalDlcActive;
+        Dispose();
+    }
 
     /// <summary>
     /// Stands up a naval battle with one client per player, in order; the first player is the battle host and the rest are

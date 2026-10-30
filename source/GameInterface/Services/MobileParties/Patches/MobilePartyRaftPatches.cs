@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class MobilePartyRaftPatches
 {
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsInRaftState), MethodType.Setter)]

@@ -37,11 +37,24 @@ namespace Coop.Core.Client;
 /// </summary>
 public class ClientModule : CommonModule
 {
+    private readonly bool navalServicesEnabled;
+
+    // Registers the naval mission services only while NavalDLC co-op is active.
+    public ClientModule() : this(global::Common.ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets a test harness keep the naval mission services on without loading the optional naval assemblies.
+    public ClientModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
 
-        builder.RegisterModule<MissionModule>();
+        builder.RegisterModule(new MissionModule(navalServicesEnabled));
         builder.RegisterType<SiegeCasualtyDecoder>().As<ISiegeCasualtyDecoder>().InstancePerDependency();
         builder.RegisterType<VoiceSceneSource>().As<IVoiceSceneSource>().InstancePerDependency();
         builder.RegisterType<VoiceGameInput>().As<IVoiceGameInput>().InstancePerDependency();

@@ -10,7 +10,8 @@ namespace GameInterface;
 public interface IGameInterfacePatchInstaller
 {
     /// <summary>
-    /// Installs the detour guard, the static fixes and every uncategorized patch onto <paramref name="harmony"/>.
+    /// Installs the detour guard, the static fixes, every uncategorized patch and the enabled quest and naval
+    /// categories onto <paramref name="harmony"/>.
     /// </summary>
     void Install(Harmony harmony);
 }
@@ -19,10 +20,13 @@ public interface IGameInterfacePatchInstaller
 internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
 {
     private readonly IQuestFeatureFlag questFeatureFlag;
+    private readonly bool navalPatchesEnabled;
 
-    public GameInterfacePatchInstaller(IQuestFeatureFlag questFeatureFlag)
+    // GameInterfaceModule passes whether NavalDLC co-op is active, so the naval category is applied only then.
+    public GameInterfacePatchInstaller(IQuestFeatureFlag questFeatureFlag, bool navalPatchesEnabled)
     {
         this.questFeatureFlag = questFeatureFlag;
+        this.navalPatchesEnabled = navalPatchesEnabled;
     }
 
     /// <inheritdoc/>
@@ -40,6 +44,11 @@ internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
         if (questFeatureFlag.IsEnabled)
         {
             harmony.PatchCategory(assembly, GameInterface.HARMONY_QUESTS_CATEGORY);
+        }
+
+        if (navalPatchesEnabled)
+        {
+            harmony.PatchCategory(assembly, GameInterface.HARMONY_NAVAL_CATEGORY);
         }
     }
 }

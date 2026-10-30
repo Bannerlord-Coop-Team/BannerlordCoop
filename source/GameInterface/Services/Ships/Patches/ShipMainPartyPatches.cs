@@ -12,6 +12,7 @@ namespace GameInterface.Services.Ships.Patches;
 /// Replaces vanilla's PartyBase.MainParty checks on ships and keeps clients from writing server-owned piece state.
 /// </summary>
 [HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipMainPartyPatches
 {
     /// <summary>

@@ -15,6 +15,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// Every machine checks IsPlayerParty instead, so the server and other clients move a player's party the way its owner does.
 /// </summary>
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerLandSeaTransitionPatches
 {
     private static readonly MethodInfo IsMainPartyGetter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsMainParty));
@@ -48,6 +49,7 @@ internal class PlayerLandSeaTransitionPatches
 }
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.FinishNavigationTransitionInternal))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class LandSeaTransitionFinishPatch
 {
     // Each side flips IsCurrentlyAtSea itself when its transition ends, and a client may not run the transition at all,
@@ -62,6 +64,7 @@ internal class LandSeaTransitionFinishPatch
 }
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.CommonTransitioningPartyTick))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerLandSeaTransitionCancelPatch
 {
     [HarmonyPrefix]
@@ -85,6 +88,7 @@ internal class PlayerLandSeaTransitionCancelPatch
 }
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.ComputePath))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerLandSeaPathPatch
 {
     private static readonly MethodInfo MainPartyGetter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.MainParty));

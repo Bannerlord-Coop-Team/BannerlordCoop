@@ -44,6 +44,7 @@ internal class PlayerLeaveSettlementPatch
 }
 
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerVillageLandSeaLeavePatch
 {
     [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_village_set_sail_leave_on_consequence))]
@@ -66,6 +67,7 @@ internal class PlayerVillageLandSeaLeavePatch
 }
 
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerNavalTownLeavePatch
 {
     [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_town_naval_outside_leave_on_consequence))]
