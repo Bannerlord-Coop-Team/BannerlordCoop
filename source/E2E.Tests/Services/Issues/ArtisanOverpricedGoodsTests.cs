@@ -821,7 +821,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             }
         });
         environment.FlushCoalescer();
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         ClientA.Call(() =>
         {
