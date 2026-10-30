@@ -8,7 +8,14 @@ namespace GameInterface.Services.Kingdoms
 {
     public interface IKingdomDecisionDataConverter : IGameAbstraction
     {
+        /// <summary>
+        /// True when <paramref name="kingdomDecision"/>'s exact type is vanilla or in
+        /// <see cref="KingdomDecisionTypeRegistry"/>. Other types are decided by the server AI instead of player
+        /// votes, so they never enter the indexed decision list.
+        /// </summary>
+        bool IsSupported(KingdomDecision kingdomDecision);
         KingdomDecisionData Convert(KingdomDecision kingdomDecision);
+        bool TryGetKingdomDecision(KingdomDecisionData data, out KingdomDecision kingdomDecision);
     }
     internal class KingdomDecisionDataConverter : IKingdomDecisionDataConverter
     {
@@ -34,11 +41,37 @@ namespace GameInterface.Services.Kingdoms
         }
         public KingdomDecisionData Convert(KingdomDecision kingdomDecision)
         {
-            if (!supportedConversions.TryGetValue(kingdomDecision.GetType(), out var conversionFunction))
+            Type type = kingdomDecision.GetType();
+            if (supportedConversions.TryGetValue(type, out var conversionFunction))
             {
-                throw new InvalidOperationException($"Type of kingdom decision: {kingdomDecision.GetType().Name} is not supported.");
+                return conversionFunction(kingdomDecision);
             }
-            return conversionFunction(kingdomDecision);
+            if (KingdomDecisionTypeRegistry.TryGetWriter(type, out var write))
+            {
+                return new RegisteredKingdomDecisionData(GetId(kingdomDecision.ProposerClan), GetId(kingdomDecision.Kingdom),
+                    kingdomDecision.TriggerTime._numTicks, kingdomDecision.IsEnforced, kingdomDecision.NotifyPlayer, kingdomDecision.PlayerExamined, type.FullName, write(kingdomDecision));
+            }
+            throw new InvalidOperationException($"Type of kingdom decision: {type.Name} is not supported.");
+        }
+        public bool IsSupported(KingdomDecision kingdomDecision)
+        {
+            return kingdomDecision != null &&
+                (supportedConversions.ContainsKey(kingdomDecision.GetType()) || KingdomDecisionTypeRegistry.TryGetWriter(kingdomDecision.GetType(), out _));
+        }
+        public bool TryGetKingdomDecision(KingdomDecisionData data, out KingdomDecision kingdomDecision)
+        {
+            if (data is not RegisteredKingdomDecisionData registeredData)
+            {
+                return data.TryGetKingdomDecision(objectManager, out kingdomDecision);
+            }
+
+            if (!KingdomDecisionTypeRegistry.TryGetReader(registeredData.TypeName, out var read))
+            {
+                kingdomDecision = null;
+                return false;
+            }
+
+            return registeredData.TryGetKingdomDecision(objectManager, read, out kingdomDecision);
         }
         private KingdomDecisionData ConvertDeclareWarDecision(KingdomDecision decision)
         {

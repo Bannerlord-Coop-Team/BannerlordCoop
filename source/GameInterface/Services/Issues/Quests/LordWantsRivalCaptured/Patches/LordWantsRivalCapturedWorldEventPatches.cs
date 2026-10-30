@@ -19,6 +19,7 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 /// The server runs the world event listeners the framework's QuestEventRelay does not cover as each owning player:
 /// kills, prisoner releases, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches
 {
@@ -68,6 +69,7 @@ internal class LordWantsRivalCapturedWorldEventPatches
 }
 
 // The owner's client leaves the listeners that end the quest or change the world to the server
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest))]
 internal class LordWantsRivalCapturedClientListenerPatches
 {
@@ -96,6 +98,7 @@ internal class LordWantsRivalCapturedClientListenerPatches
     private static bool OnPlayerBattleEventEndedPrefix() => ModInformation.IsServer;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest))]
 internal static class LordWantsRivalCapturedCaptureLifecyclePatches
 {
@@ -120,6 +123,7 @@ internal static class LordWantsRivalCapturedCaptureLifecyclePatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(MakeHeroFugitiveAction), nameof(MakeHeroFugitiveAction.Apply))]
 internal static class LordWantsRivalCapturedFugitivePatch
 {
@@ -133,6 +137,7 @@ internal static class LordWantsRivalCapturedFugitivePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class LordWantsRivalCapturedFinalizationCleanupPatch
 {
@@ -155,6 +160,7 @@ internal static class LordWantsRivalCapturedFinalizationCleanupPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.ReplacePlayer))]
 internal static class LordWantsRivalCapturedPlayerReplacementPatch
 {

@@ -53,9 +53,9 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(103, commandTypes.Length);
+        Assert.Equal(104, commandTypes.Length);
 #else
-        Assert.Equal(91, commandTypes.Length);
+        Assert.Equal(92, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -259,7 +259,7 @@ public class SystemDeveloperDirectCommandTests
         // Only the metadata is read here, so the server dependencies can stay empty.
         if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
             return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);
-        return (ICoopCommand)Activator.CreateInstance(type)!;
+        return CommandTestFactory.Create<ICoopCommand>(type);
     }
 
     private sealed class TestArgs : ICoopCommandArgs
