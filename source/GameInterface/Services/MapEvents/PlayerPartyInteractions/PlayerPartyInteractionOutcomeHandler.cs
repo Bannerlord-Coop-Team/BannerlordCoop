@@ -489,6 +489,11 @@ internal class PlayerPartyInteractionOutcomeHandler
             outcome.ResponderOfferedFiefs,
             outcome.ResponderOfferedPrisoners);
 
+        // Check marriages before applying anything, otherwise a hero offered as a troop has already moved party and fails the check.
+        var marriages = new List<(Hero Hero, Hero Spouse)>();
+        if (!TryAddMarriages(initiatorParty, responderParty, outcome.InitiatorOfferedMarriages, marriages) ||
+            !TryAddMarriages(responderParty, initiatorParty, outcome.ResponderOfferedMarriages, marriages)) return false;
+
         ApplyOffer(initiatorParty, responderParty, initiatorOffer);
         ApplyOffer(responderParty, initiatorParty, responderOffer);
 
@@ -497,29 +502,37 @@ internal class PlayerPartyInteractionOutcomeHandler
             ApplyPeace(initiatorParty, responderParty);
         }
 
-        ApplyMarriages(initiatorParty, responderParty, outcome.InitiatorOfferedMarriages);
-        ApplyMarriages(responderParty, initiatorParty, outcome.ResponderOfferedMarriages);
+        foreach (var (hero, spouse) in marriages)
+        {
+            MarriageAction.Apply(hero, spouse);
+        }
         return true;
     }
 
-    private void ApplyMarriages(PartyBase sourceParty, PartyBase targetParty, PlayerPartyMarriageOfferData[] offeredMarriages)
+    private bool TryAddMarriages(PartyBase sourceParty, PartyBase targetParty, PlayerPartyMarriageOfferData[] offeredMarriages, List<(Hero Hero, Hero Spouse)> marriages)
     {
         foreach (var offer in offeredMarriages)
         {
-            if (!objectManager.TryGetObjectWithLogging(offer.HeroId, out Hero hero)) continue;
-            if (!objectManager.TryGetObjectWithLogging(offer.SpouseId, out Hero spouse)) continue;
+            if (!objectManager.TryGetObjectWithLogging(offer.HeroId, out Hero hero)) return false;
+            if (!objectManager.TryGetObjectWithLogging(offer.SpouseId, out Hero spouse)) return false;
 
-            if (!PlayerPartyMarriageBarterable.CanOfferMarriage(sourceParty, targetParty, hero, spouse))
+            // Both players can offer a marriage for the same hero before either update arrives.
+            bool heroAlreadyMarrying = marriages.Any(marriage =>
+                marriage.Hero == hero || marriage.Spouse == hero || marriage.Hero == spouse || marriage.Spouse == spouse);
+
+            if (heroAlreadyMarrying || !PlayerPartyMarriageBarterable.CanOfferMarriage(sourceParty, targetParty, hero, spouse))
             {
                 Logger.Warning(
                     "Unable to apply player-party trade marriage: eligibility changed before acceptance. HeroId={HeroId}, SpouseId={SpouseId}",
                     offer.HeroId,
                     offer.SpouseId);
-                continue;
+                return false;
             }
 
-            MarriageAction.Apply(hero, spouse);
+            marriages.Add((hero, spouse));
         }
+
+        return true;
     }
 
     private static void ApplyPeace(PartyBase initiatorParty, PartyBase responderParty)
