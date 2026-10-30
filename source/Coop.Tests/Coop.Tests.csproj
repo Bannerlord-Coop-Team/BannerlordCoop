@@ -81,6 +81,8 @@
     <Reference Include="NavalDLC.GauntletUI"><HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.GauntletUI.dll</HintPath></Reference>
     <Reference Include="NavalDLC.ViewModelCollection"><HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.ViewModelCollection.dll</HintPath></Reference>
     <Reference Include="TaleWorlds.DotNet"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath></Reference>
+    <!-- NavalInitializationCampaignBehavior.OnCharacterCreationIsOver references StoryMode, which Harmony loads to patch it -->
+    <Reference Include="StoryMode"><HintPath>$(BannerlordDir)Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath></Reference>
     <Publicize Include="Missions.Naval" />
     <Publicize Include="Coop.Naval" />
     <Publicize Include="NavalDLC" />
