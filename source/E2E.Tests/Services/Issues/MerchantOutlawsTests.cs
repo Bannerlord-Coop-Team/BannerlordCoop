@@ -517,7 +517,9 @@ public class MerchantOutlawsTests : IDisposable
         ClientA.Call(() =>
         {
             Assert.True(ownerQuest.IsFinalized);
-            Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.Contains(archive.GetEntries(), log => log.CurrentProgress == 1);
         });
     }
 
