@@ -23,7 +23,7 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
 {
-    public HideoutResolvedMigrationTests(ITestOutputHelper output) : base(output) { }
+    public HideoutResolvedMigrationTests(ITestOutputHelper output) : base(output) => NpcReleaseMockPatches.Apply();
 
     [Fact]
     public void PromotedAfterADuelWin_LeavesTheSurrenderedBanditsIdle()
