@@ -55,15 +55,6 @@ internal class EncounterManagerPatches
         if (!attackerParty.IsControlledByThisInstance())
             return false;
 
-        // Client time keeps running under the encounter menu, so the map tick re-fires this for a besieged
-        // town the party stays outside of. The approval would be a no-op, so don't ask again.
-        if (attackerParty == MobileParty.MainParty && PlayerEncounter.EncounterSettlement == settlement)
-            return false;
-
-        // The map keeps ticking under an open encounter, so a party still engaging a settlement it didn't enter retries every tick
-        if (PlayerEncounter.Current != null)
-            return false;
-
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
         MessageBroker.Instance.Publish(attackerParty, message);
 
@@ -138,6 +129,11 @@ internal class EncounterManagerPatches
                 return false;
 
             if (mobileParty.ShortTermBehavior == AiBehavior.EngageParty && mobileParty.ShortTermTargetParty == null)
+                return false;
+
+            // Vanilla stops time under the encounter menu, co-op keeps the client map running, so the main party
+            // would otherwise re-interact every tick with the target it is already in an encounter with.
+            if (mobileParty.IsMainParty && PlayerEncounter.Current != null)
                 return false;
         }
 

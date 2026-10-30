@@ -437,16 +437,61 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.NotNull(encounter);
             Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
             Assert.Null(MobileParty.MainParty.CurrentSettlement);
+            EnsureEncounterModel();
+            EngageSettlement(MobileParty.MainParty, settlement, atSea: false);
 
             // Client time keeps running under the menu, so the map tick arrives here again.
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
 
             Assert.Same(encounter, PlayerEncounter.Current);
         }, SiegeCreationDisabledMethods);
 
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SettlementArrivalTick_WithEncounterOpen_DoesNotRequestEntryAgain(bool atSea, bool encounterOpen)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            EnsureEncounterModel();
+            EngageSettlement(MobileParty.MainParty, settlement, atSea);
+            PlayerEncounter? encounter = null;
+            if (encounterOpen)
+            {
+                // An outside menu such as the port menu of a blockaded town, the party never enters.
+                encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter.EncounterSettlementAux = settlement;
+            }
+            Campaign.Current.PlayerEncounter = encounter;
+
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+            EncounterManager.HandleEncounterForMobileParty(MobileParty.MainParty, 0f);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, WithoutNetworkDelivery());
+
+        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>();
+        if (encounterOpen)
+        {
+            Assert.Empty(requests);
+        }
+        else
+        {
+            var request = Assert.Single(requests);
+            Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+        }
     }
 
     [Theory]
@@ -962,6 +1007,31 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         settlement.Town.OwnerClan = ownerClan;
         siegeEvent.BesiegerCamp._besiegerParties.Add(siegeLeader);
         siegeEvent.BesiegerCamp._leaderParty = siegeLeader;
+    }
+
+    // The harness campaign has no game models, and the arrival distance check reads the encounter model.
+    private static void EnsureEncounterModel()
+    {
+        if (Campaign.Current.Models?.EncounterModel != null) return;
+
+        Campaign.Current._gameModels = new GameModels(new List<GameModel> { new DefaultEncounterModel() });
+    }
+
+    // Puts the party at the settlement's gate or port, engaging it the way the map AI leaves it on arrival.
+    private static void EngageSettlement(MobileParty party, Settlement settlement, bool atSea)
+    {
+        using (new AllowedThread())
+        {
+            if (atSea)
+                settlement.SetPortPosition(new CampaignVec2(new Vec2(22f, 32f), isOnLand: false));
+
+            party._isCurrentlyAtSea = atSea;
+            party.SetTargetSettlement(settlement, atSea);
+            party.Position = atSea ? settlement.PortPosition : settlement.GatePosition;
+            party.SetShortTermBehavior(AiBehavior.GoToSettlement, settlement.Party);
+        }
+
+        Assert.Same(settlement, party.ShortTermTargetSettlement);
     }
 
     private static CampaignVec2 Position(float x, float y) =>
