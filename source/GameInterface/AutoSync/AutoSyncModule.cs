@@ -61,7 +61,7 @@ internal class AutoSyncModule : Module
                         t.IsClass &&
                         t.IsGenericType == false &&
                         t.IsAbstract == false &&
-                        (navalServicesEnabled || !GameInterfaceModule.NavalOnlyTypes.Contains(t)));
+                        GameInterfaceModule.ShouldRegister(t, navalServicesEnabled));
         return types;
     }
 }

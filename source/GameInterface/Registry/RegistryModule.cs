@@ -42,7 +42,7 @@ internal class RegistryModule : Module
         return AppDomain.CurrentDomain.GetDomainTypes()
             .Where(t => t.IsConcrete() &&
                         t.Assembly.GetName().Name != GameInterfaceModule.CoopNavalAssemblyName &&
-                        (navalServicesEnabled || !GameInterfaceModule.NavalOnlyTypes.Contains(t)) &&
+                        GameInterfaceModule.ShouldRegister(t, navalServicesEnabled) &&
                         t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAutoRegistry<>)));
     }
-}
+}

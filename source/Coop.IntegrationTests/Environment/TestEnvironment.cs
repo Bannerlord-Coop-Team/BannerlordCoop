@@ -82,7 +82,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ServerModule>();
+        // Naval server handlers stay on here, like GameInterface's naval sync below.
+        builder.RegisterModule(new ServerModule(navalServicesEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 

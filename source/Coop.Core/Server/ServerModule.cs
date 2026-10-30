@@ -17,6 +17,7 @@ using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
@@ -33,6 +34,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server;
@@ -42,6 +44,25 @@ namespace Coop.Core.Server;
 /// </summary>
 public class ServerModule : CommonModule
 {
+    // Coop.Core's War Sails server handlers, left unregistered while NavalDLC co-op is off like GameInterface's naval types.
+    internal static readonly Type[] NavalOnlyTypes =
+    {
+        typeof(ServerBattleShipFateHandler),
+    };
+
+    private readonly bool navalServicesEnabled;
+
+    // Registers the naval handlers only while NavalDLC co-op is active.
+    public ServerModule() : this(global::Common.ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets a test harness keep the naval handlers on without loading the optional naval assemblies.
+    public ServerModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
@@ -152,7 +173,8 @@ public class ServerModule : CommonModule
 
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
-        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true,
+            navalServicesEnabled ? null : NavalOnlyTypes);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 

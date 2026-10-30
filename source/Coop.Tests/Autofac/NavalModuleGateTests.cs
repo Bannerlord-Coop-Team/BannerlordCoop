@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common;
 using Coop.Core.Client;
+using Coop.Core.Server;
+using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using System.Collections.Generic;
@@ -45,6 +47,39 @@ public sealed class NavalModuleGateTests : System.IDisposable
         Assert.True(container.IsRegistered<ICoopNavalBattleLauncher>());
     }
 #endif
+
+    // The game's server module reads the startup decision, so off leaves the naval-only server handler out.
+    [Fact]
+    public void DefaultServerModule_WithNavalInactive_LeavesTheShipFateHandlerOut()
+    {
+        ModInformation.IsNavalDlcActive = false;
+
+        using var container = BuildServerContainer(new ServerModule(), new GameInterfaceModule());
+
+        Assert.False(container.IsRegistered<ServerBattleShipFateHandler>());
+    }
+
+    // The explicit decision moves the server handler together with the GameInterface services it takes.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerModule_GatesTheShipFateHandlerWithItsServices(bool navalServicesEnabled)
+    {
+        using var container = BuildServerContainer(
+            new ServerModule(navalServicesEnabled), new GameInterfaceModule(navalServicesEnabled));
+
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<ServerBattleShipFateHandler>());
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<global::GameInterface.Services.Ships.IBattleShipFateLedger>());
+    }
+
+    // Builds a server container's registrations without activating anything.
+    private static IContainer BuildServerContainer(ServerModule serverModule, GameInterfaceModule gameInterfaceModule)
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(serverModule);
+        builder.RegisterModule(gameInterfaceModule);
+        return builder.Build(global::Autofac.Builder.ContainerBuildOptions.IgnoreStartableComponents);
+    }
 
     // Builds the client container the way the game does, which also loads MissionModule.
     private static IContainer BuildClientContainer()
