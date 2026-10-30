@@ -145,8 +145,13 @@ internal class QuestJournalMirrorHandler : IHandler
             {
                 var keyMatches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
                     SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
-                if (keyMatches.Length > 1) return false;
-                existing = keyMatches.FirstOrDefault();
+                if (keyMatches.Length > 1)
+                {
+                    var keyExact = keyMatches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
+                    if (keyExact.Length != 1) return false;
+                    existing = keyExact[0];
+                }
+                else existing = keyMatches.FirstOrDefault();
             }
             if (existing == null) ordered.Add(entry.ToJournalLog());
             else
