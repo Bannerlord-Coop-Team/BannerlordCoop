@@ -84,6 +84,7 @@ namespace Coop.IntegrationTests.Serialization
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
+                KingdomDecisionMissionHoldLimitMinutes = 15,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -107,6 +108,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(15, copy.KingdomDecisionMissionHoldLimitMinutes);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);

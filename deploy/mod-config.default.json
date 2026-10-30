@@ -160,6 +160,11 @@
     // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
     "playerKingdomClanTierRequired": 4,
 
+    // Set how long (real-time minutes) a player kingdom decision vote waits for players who are in a battle, town or tavern and haven't voted.
+    // 0 or lower: The vote waits until they leave, then gives them a fresh voting window.
+    // (Default) 10: Once a vote has waited 10 minutes, it resolves and players who haven't voted count as abstaining.
+    "kingdomDecisionMissionHoldLimitMinutes": 10,
+
     // Allows players to join another player's clan or propose a player marriage.
     // Disabling this does not dissolve existing coop clans.
     "coopClansEnabled": true,
