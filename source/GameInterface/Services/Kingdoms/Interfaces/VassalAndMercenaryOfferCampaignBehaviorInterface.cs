@@ -77,8 +77,7 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
                 if (playerHero.IsPrisoner || playerHero.PartyBelongedTo?.IsInRaftState != false) continue;
 
-                // DEBUG: always pass the offer chance rolls, restore to MBRandom.RandomFloat before committing
-                float randomFloat = 0f;
+                float randomFloat = MBRandom.RandomFloat;
                 if (randomFloat <= VassalAndMercenaryOfferCampaignBehavior.MercenaryOfferCreationChance && behavior.CanPlayerClanReceiveMercenaryOffer())
                 {
                     Kingdom kingdom = Kingdom.All.GetRandomElementWithPredicate(behavior.MercenaryKingdomSelectionConditionsHold);
@@ -251,9 +250,9 @@ public class VassalAndMercenaryOfferCampaignBehaviorInterface : IVassalAndMercen
 
     private void CancelMercenaryOfferIfInvalid(VassalAndMercenaryOfferCampaignBehavior behavior, string playerHeroId, VassalAndMercenaryOfferData playerData, bool expired = false)
     {
-        if (!objectManager.TryGetObjectWithLogging<Kingdom>(playerData.CurrentMercenaryOfferKingdomId, out var kingdom)) return;
-
-        if (expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom))
+        // Cancel on a failed lookup too, otherwise DailyTick never creates another offer for this player.
+        if (!objectManager.TryGetObjectWithLogging<Kingdom>(playerData.CurrentMercenaryOfferKingdomId, out var kingdom) ||
+            expired || !behavior.MercenaryKingdomSelectionConditionsHold(kingdom))
         {
             CancelOffer(playerHeroId, playerData, playerData.CurrentMercenaryOfferKingdomId);
         }
