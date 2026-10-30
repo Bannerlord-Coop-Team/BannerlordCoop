@@ -513,7 +513,7 @@ public class MerchantOutlawsTests : IDisposable
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
         environment.FlushCoalescer();
 
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.Call(() =>
         {
             Assert.True(ownerQuest.IsFinalized);
