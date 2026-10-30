@@ -504,10 +504,11 @@ public class MerchantOutlawsTests : IDisposable
     public void AuthoritativeEndingPreservesOwnerHuntProgress()
     {
         Accept();
+        var ownerQuest = Quest(ClientA);
         ClientA.SimulateMessage(Server.NetPeer, new NetworkMerchantOutlawsProgress(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, 1, 0,
             Array.Empty<string>(), Array.Empty<string>()));
-        ClientA.Call(() => Assert.Equal(1, Quest(ClientA)._questProgressLogTest.CurrentProgress));
+        ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
 
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
         environment.FlushCoalescer();
@@ -515,8 +516,8 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.Call(() =>
         {
-            Assert.True(Quest(ClientA).IsFinalized);
-            Assert.Equal(1, Quest(ClientA)._questProgressLogTest.CurrentProgress);
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress);
         });
     }
 
