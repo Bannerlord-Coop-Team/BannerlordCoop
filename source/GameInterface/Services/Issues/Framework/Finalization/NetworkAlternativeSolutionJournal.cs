@@ -8,7 +8,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkAlternativeSolutionJournal : IServerToClientCommand
+public readonly struct NetworkAlternativeSolutionJournal : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
