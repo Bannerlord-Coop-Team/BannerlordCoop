@@ -15,7 +15,6 @@ public class ShadowedAssemblyDetectorTests : IDisposable
     public ShadowedAssemblyDetectorTests()
     {
         Directory.CreateDirectory(appBaseDirectory);
-        File.WriteAllText(Path.Combine(appBaseDirectory, "TaleWorlds.Library.dll"), string.Empty);
         harmonyPath = Path.Combine(appBaseDirectory, "0Harmony.dll");
     }
 
@@ -42,6 +41,17 @@ public class ShadowedAssemblyDetectorTests : IDisposable
         var detector = new ShadowedAssemblyDetector(new Version(harmonyVersion.Major + 1, 0, 0, 0));
 
         var shadowingFiles = detector.FindShadowingFiles(appBaseDirectory);
+
+        Assert.Equal(harmonyPath, Assert.Single(shadowingFiles));
+    }
+
+    // Pins the default minimum to Coop's own 0Harmony reference, any old managed dll stands in for Harmony 2.2
+    [Fact]
+    public void FindsHarmonyOlderThanCoopsReference()
+    {
+        File.Copy(typeof(ShadowedAssemblyDetectorTests).Assembly.Location, harmonyPath);
+
+        var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(appBaseDirectory);
 
         Assert.Equal(harmonyPath, Assert.Single(shadowingFiles));
     }

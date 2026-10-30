@@ -61,7 +61,7 @@ public class ShadowedAssemblyDetector : IShadowedAssemblyDetector
         {
             return AssemblyName.GetAssemblyName(harmonyPath).Version < minimumHarmonyVersion;
         }
-        catch (Exception exception) when (exception is BadImageFormatException || exception is IOException)
+        catch (Exception exception) when (exception is BadImageFormatException || exception is IOException || exception is UnauthorizedAccessException)
         {
             // The runtime can't bind a file it can't read either, so Coop would still fail on it
             return true;
