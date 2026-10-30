@@ -37,7 +37,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         int banditsWage = 0;
         int caravanGuardsWage = 0;
         int mercenariesWage = 0;
-        bool hasAidCorps = mobileParty.HasPerk(DefaultPerks.Steward.AidCorps, out _);
+        bool hasAidCorps = mobileParty.HasPerk(DefaultPerks.Steward.AidCorps);
         for (int i = 0; i < troopRoster.Count; i++)
         {
             var elementCopyAtIndex = troopRoster.GetElementCopyAtIndex(i);
@@ -86,7 +86,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         {
             totalWage -= banditsWage;
             var banditBonus = new ExplainedNumber((float)banditsWage, false, null);
-            PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Roguery.DeepPockets, mobileParty.CurrentBattleEnvironment, mobileParty.LeaderHero.CharacterObject, false, ref banditBonus);
+            PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Roguery.DeepPockets, mobileParty.LeaderHero.CharacterObject, false, ref banditBonus, mobileParty.CurrentBattleEnvironment);
             totalWage += (int)banditBonus.ResultNumber;
         }
         if (eliteArchersWage > 0)
@@ -156,7 +156,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
 
     private void AddPerkFactor(MobileParty mobileParty, PerkObject perk, int numTroops, bool checkSecondaryBonus, ref ExplainedNumber result)
     {
-        if (mobileParty.HasPerk(perk, out _, checkSecondaryBonus))
+        if (mobileParty.HasPerk(perk, checkSecondaryBonus))
         {
             float factor = (float)numTroops / result.BaseNumber;
             if (factor > 0f)
@@ -181,7 +181,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         }
         if (mobileParty.EffectiveQuartermaster != null)
         {
-            PerkHelper.AddEpicPerkBonusForCharacter(DefaultPerks.Steward.PriceOfLoyalty, mobileParty.CurrentBattleEnvironment, mobileParty.EffectiveQuartermaster.CharacterObject, DefaultSkills.Steward, true, ref result, Campaign.Current.Models.CharacterDevelopmentModel.MaxSkillRequiredForEpicPerkBonus);
+            PerkHelper.AddEpicPerkBonusForCharacter(DefaultPerks.Steward.PriceOfLoyalty, mobileParty.EffectiveQuartermaster.CharacterObject, DefaultSkills.Steward, true, ref result, Campaign.Current.Models.CharacterDevelopmentModel.MaxSkillRequiredForEpicPerkBonus, -1, mobileParty.CurrentBattleEnvironment);
         }
         if (mobileParty.CurrentSettlement != null)
         {

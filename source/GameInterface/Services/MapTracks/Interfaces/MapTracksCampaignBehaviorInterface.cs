@@ -627,7 +627,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         float elapsedHoursUntilNow = track.CreationTime.ElapsedHoursUntilNow;
         float num = (track.Position.ToVec2() - playerParty.Position.ToVec2()).Length / trackSpottingDistance;
         float num2 = -75f + (elapsedHoursUntilNow / Campaign.Current.Models.MapTrackModel.MaxTrackLife * 100f) + (num * 100f) + (MathF.Max(0f, 100f - (float)size) * (CampaignTime.Now.IsNightTime ? 10f : 1f));
-        if (playerParty.HasPerk(DefaultPerks.Scouting.Ranger, out _, checkSecondaryRole: true))
+        if (playerParty.HasPerk(DefaultPerks.Scouting.Ranger, checkSecondaryRole: true))
         {
             num2 -= num2 * DefaultPerks.Scouting.Ranger.SecondaryBonus;
         }
@@ -642,7 +642,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         int partySize = party.MemberRoster.TotalManCount + party.PrisonRoster.TotalManCount;
         float lifeRatio = MathF.Min(1f, ((0.5f * MBRandom.RandomFloat) + 0.5f + ((float)partySize * 0.007f)) / 2f) * (isOnSnow ? 0.5f : 1f);
 
-        if (GetPlayerParties().Any(playerParty => playerParty.HasPerk(DefaultPerks.Scouting.Tracker, out _)))
+        if (GetPlayerParties().Any(playerParty => playerParty.HasPerk(DefaultPerks.Scouting.Tracker)))
         {
             lifeRatio = MathF.Min(1f, lifeRatio * (1f + DefaultPerks.Scouting.Tracker.PrimaryBonus));
         }

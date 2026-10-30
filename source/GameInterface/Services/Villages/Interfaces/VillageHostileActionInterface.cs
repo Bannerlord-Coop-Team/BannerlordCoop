@@ -504,7 +504,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var village = settlement.Village;
         var recruitCount = ComputeVolunteerCount(
             village.Hearth,
-            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight, out _),
+            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight),
             settlement.Notables.Count);
 
         var troop = settlement.Culture?.BasicTroop;
