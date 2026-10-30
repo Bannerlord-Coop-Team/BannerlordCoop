@@ -52,7 +52,13 @@ namespace Coop
 {
     internal class CoopMod : NoHarmonyLoader
     {
-        public static UpdateableList Updateables { get; } = new UpdateableList();
+        public static UpdateableList Updateables => UpdateablesHolder.List;
+
+        // Kept out of CoopMod's type initializer, which runs before the constructor's check for a foreign Common.dll
+        private static class UpdateablesHolder
+        {
+            public static readonly UpdateableList List = new UpdateableList();
+        }
 
         public static CoopartiveMultiplayerExperience Coop;
 
