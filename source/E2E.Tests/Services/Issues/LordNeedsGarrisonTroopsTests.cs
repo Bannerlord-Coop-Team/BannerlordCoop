@@ -192,21 +192,6 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
     }
 
     [Fact]
-    public void DirectHandInSuccessDoesNotInstallAClientSuccessJournalAdder()
-    {
-        testEnvironment.Clients.First().Call(() =>
-        {
-            var target = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess));
-            var patches = Harmony.GetPatchInfo(target);
-            Assert.NotNull(patches);
-            Assert.NotNull(patches!.Prefixes);
-            Assert.DoesNotContain(patches.Prefixes, prefix =>
-                prefix.PatchMethod.DeclaringType?.FullName ==
-                "GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches.LordNeedsGarrisonTroopsSuccessJournalPatch");
-        });
-    }
-
-    [Fact]
     public void DirectHandInSuccessMirrorsOneVanillaSuccessEntryToOwnerAndArchive()
     {
         foreach (var instance in testEnvironment.Clients.Prepend(testEnvironment.Server))

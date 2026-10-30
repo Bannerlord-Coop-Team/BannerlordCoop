@@ -275,11 +275,11 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, new PreviousJournalEntry { Text = text, TaskName = task });
         stream.Position = 0;
-        var received = Serializer.Deserialize<AlternativeSolutionJournalEntry>(stream);
+        var received = Serializer.Deserialize<IssueJournalEntry>(stream);
         var log = received.ToJournalLog();
 
-        Assert.Null(received.NativeText);
-        Assert.Null(received.NativeTaskName);
+        Assert.Null(received.Text);
+        Assert.Null(received.TaskName);
         Assert.Equal(text, log.LogText?.Value);
         Assert.Equal(task, log.TaskName?.Value);
     }
