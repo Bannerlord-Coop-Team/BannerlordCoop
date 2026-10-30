@@ -120,7 +120,8 @@ internal class MarriageOfferHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerClanHeroId, out var playerClanHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OtherClanHeroId, out var otherClanHero)) return;
 
-            // Sets the offer the popup reads and creates the offer notification
+            // Sets the offer the popup reads and creates the offer notification.
+            // On rejoin this arrives before the map view exists, but CampaignInformationManager keeps the notice so it still shows once the map loads.
             marriageOfferBehavior.CreateMarriageOffer(playerClanHero, otherClanHero);
         });
     }
@@ -135,7 +136,10 @@ internal class MarriageOfferHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerClanHeroId, out var playerClanHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OtherClanHeroId, out var otherClanHero)) return;
 
-            // Closes the offer notification and clears the local offer
+            // Clear the local offer first, otherwise the cancel prefix sends a decline back to the server
+            if (TryGetMarriageOfferBehavior(out var marriageOfferBehavior)) marriageOfferBehavior.FinalizeMarriageOffer();
+
+            // Closes the offer notification
             CampaignEventDispatcher.Instance.OnMarriageOfferCanceled(
                 playerClanHero.IsFemale ? otherClanHero : playerClanHero,
                 playerClanHero.IsFemale ? playerClanHero : otherClanHero);

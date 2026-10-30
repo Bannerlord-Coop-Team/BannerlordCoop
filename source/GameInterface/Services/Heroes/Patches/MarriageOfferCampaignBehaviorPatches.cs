@@ -169,4 +169,13 @@ internal class MarriageOfferCampaignBehaviorPatches
 
         return false;
     }
+
+    [HarmonyPatch(nameof(MarriageOfferCampaignBehavior.OnMarriageOfferCanceled))]
+    [HarmonyPrefix]
+    private static void OnMarriageOfferCanceledPrefix(MarriageOfferCampaignBehavior __instance)
+    {
+        // Dismissing the notification without opening it cancels the offer locally, so decline it on the server too
+        if (ModInformation.IsClient && __instance.IsThereActiveMarriageOffer)
+            MessageBroker.Instance.Publish(__instance, new MarriageOfferDeclined(Hero.MainHero, __instance._currentOfferedPlayerClanHero, __instance._currentOfferedOtherClanHero));
+    }
 }

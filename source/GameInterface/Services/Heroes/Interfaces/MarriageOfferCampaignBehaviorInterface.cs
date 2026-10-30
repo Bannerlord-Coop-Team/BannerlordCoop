@@ -121,7 +121,8 @@ public class MarriageOfferCampaignBehaviorInterface : IMarriageOfferCampaignBeha
             Hero playerClanHero = waitingOffer.Key;
             Hero otherClanHero = waitingOffer.Value;
 
-            // Vanilla never marries the couple here since being engaged fails the suitability check, so leave them out while checking
+            // Deliberate change from vanilla, which never marries a waiting couple because being engaged fails the suitability check, so they stay engaged forever.
+            // Leaving them out while checking lets the "marriage preparations started" accept finish once both heroes are available.
             waitingOffers.Remove(playerClanHero);
             bool canMarry = MarriageModel.IsCoupleSuitableForMarriage(playerClanHero, otherClanHero);
             waitingOffers[playerClanHero] = otherClanHero;
