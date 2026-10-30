@@ -92,7 +92,8 @@ namespace Coop
                 var message = "Coop can't start because these files in the game folder replace Coop's own copies. " +
                     "They come from another mod or an old install, move them out and start the game again:\n" +
                     string.Join("\n", shadowingFiles.Select(file => $"{file} ({FileVersionInfo.GetVersionInfo(file).FileVersion})"));
-                TaleWorlds.Library.Debug.ShowMessageBox(message, "Coop", 16u);
+                // Same type as the game's own module load error box (Module.HandleSubmoduleLoadError), 16 showed Retry and Cancel
+                TaleWorlds.Library.Debug.ShowMessageBox(message, "Coop", 256u);
                 throw new InvalidOperationException(message);
             }
 
