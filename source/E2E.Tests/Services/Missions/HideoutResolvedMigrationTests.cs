@@ -36,6 +36,15 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
         Assert.Equal(HideoutPhase.Resolved, hideout!.Native.Phase);
     }
 
+    // The Resolved snapshot and the promotion can land before the next tick hands the duel spectators their team back
+    [Fact]
+    public void PromotedAfterADuelWin_LeavesATeamlessSpectatorBanditIdle()
+    {
+        var (mirror, _, _) = AdoptDefender(HideoutPhase.Resolved, BattleSideEnum.Attacker, teamlessSpectator: true);
+
+        Assert.NotEqual(AgentControllerType.AI, mirror.Controller);
+    }
+
     [Fact]
     public void PromotedDuringALiveHideoutFight_ChargesTheAdoptedBandits()
     {
@@ -115,7 +124,7 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
 
     // The old host "A" ran a defender NPC that this client mirrors as an inert puppet; A leaves and this client adopts it
     private (MirrorAgent Mirror, MockFormation? Formation, CoopHideoutMissionLogic? Hideout) AdoptDefender(
-        HideoutPhase? phase, BattleSideEnum winner)
+        HideoutPhase? phase, BattleSideEnum winner, bool teamlessSpectator = false)
     {
         using var fixture = new MissionEngineFixture();
         var newHost = Clients.First();
@@ -138,8 +147,12 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
             }
 
             var defenders = new MockTeam(BattleSideEnum.Defender);
+            var spawnTeam = teamlessSpectator ? new MockTeam(BattleSideEnum.None) : defenders;
             var bandit = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
-                .Controller(AgentControllerType.None).Team(defenders.Shell));
+                .Controller(AgentControllerType.None).Team(spawnTeam.Shell));
+            if (teamlessSpectator)
+                ((Dictionary<Agent, Team>)AccessTools.Field(typeof(CoopHideoutMissionLogic), "spectatorTeams").GetValue(hideout)!)
+                    .Add(bandit, defenders.Shell);
             Assert.True(registry.TryRegisterAgent("A", Guid.NewGuid(), bandit));
 
             newHost.Resolve<IMessageBroker>().Publish(this, new BattleHostMigrated("mapEvent1", "A"));

@@ -829,8 +829,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // coop battle the host fights as a hero, not a general, so nothing would otherwise order it to engage.
     private void ConvertPuppetToHostAi(Agent agent, bool wakeAi)
     {
-        if (agent.Team?.Side == BattleSideEnum.Defender &&
-            Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.HoldsSurrenderedDefenders == true)
+        if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.IsSurrenderedDefender(agent) == true)
             return;
 
         agent.Controller = AgentControllerType.AI;
