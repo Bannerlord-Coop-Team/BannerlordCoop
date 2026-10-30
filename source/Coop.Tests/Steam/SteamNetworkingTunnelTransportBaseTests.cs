@@ -138,11 +138,19 @@ namespace Coop.Tests.Steam
             };
 
             var receive = Task.Run(() => transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
-            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
-            var close = Task.Run(() => transport.CloseConnection(connection));
-            // An ungated close finishes at once, while the pump tick is still inside Steam's receive
-            bool closedDuringReceive = close.Wait(TimeSpan.FromMilliseconds(200));
-            release.Set();
+            Task close;
+            bool closedDuringReceive;
+            try
+            {
+                Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+                close = Task.Run(() => transport.CloseConnection(connection));
+                // An ungated close finishes at once, while the pump tick is still inside Steam's receive
+                closedDuringReceive = close.Wait(TimeSpan.FromMilliseconds(200));
+            }
+            finally
+            {
+                release.Set();
+            }
 
             Assert.True(receive.Wait(TimeSpan.FromSeconds(5)));
             Assert.True(close.Wait(TimeSpan.FromSeconds(5)));
