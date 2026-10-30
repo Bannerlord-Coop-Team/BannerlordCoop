@@ -299,24 +299,31 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     public int ReceiveDatagram(uint connection, byte[] buffer)
     {
-        int count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
-        if (count <= 0) return 0;
-
-        try
+        // CloseConnection forgets the connection under this gate before the native close, so a pump tick
+        // never receives on a closed handle and two pumps never share the receivedMessage slot.
+        lock (gate)
         {
-            var message = SteamNetworkingMessage_t.FromIntPtr(receivedMessage[0]);
-            if (message.m_cbSize > buffer.Length)
+            if (!ownedConnections.Contains(connection)) return 0;
+
+            int count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
+            if (count <= 0) return 0;
+
+            try
             {
-                Logger.Warning("Dropping oversized tunnel datagram ({Size} bytes)", message.m_cbSize);
-                return 0;
-            }
+                var message = SteamNetworkingMessage_t.FromIntPtr(receivedMessage[0]);
+                if (message.m_cbSize > buffer.Length)
+                {
+                    Logger.Warning("Dropping oversized tunnel datagram ({Size} bytes)", message.m_cbSize);
+                    return 0;
+                }
 
-            Marshal.Copy(message.m_pData, buffer, 0, message.m_cbSize);
-            return message.m_cbSize;
-        }
-        finally
-        {
-            SteamNetworkingMessage_t.Release(receivedMessage[0]);
+                Marshal.Copy(message.m_pData, buffer, 0, message.m_cbSize);
+                return message.m_cbSize;
+            }
+            finally
+            {
+                SteamNetworkingMessage_t.Release(receivedMessage[0]);
+            }
         }
     }
 

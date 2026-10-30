@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Coop.Tests.Steam
@@ -83,6 +85,71 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
+        [Fact]
+        public void Receive_OnOpenConnection_ReachesSteam()
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            SeedOwnedConnection(transport, connection, 76561198000000042);
+
+            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+
+            Assert.Equal(connection, Assert.Single(transport.ReceivedConnections));
+        }
+
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Receive_AfterConnectionCloses_NeverReachesSteam(bool closedByPeer)
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            SeedOwnedConnection(transport, connection, 76561198000000042);
+            transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+
+            if (closedByPeer)
+            {
+                transport.DispatchConnectionState(
+                    connection,
+                    ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer);
+            }
+            else
+            {
+                transport.CloseConnection(connection);
+            }
+
+            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Assert.Single(transport.ReceivedConnections);
+            Assert.Single(transport.RawClosedConnections);
+        }
+
+        [Fact]
+        public void CloseDuringReceive_WaitsForTheReceiveToReturn()
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            SeedOwnedConnection(transport, connection, 76561198000000042);
+            using var entered = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            transport.DuringReceive = () =>
+            {
+                entered.Set();
+                release.Wait();
+            };
+
+            var receive = Task.Run(() => transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            var close = Task.Run(() => transport.CloseConnection(connection));
+            // An ungated close finishes at once, while the pump tick is still inside Steam's receive
+            bool closedDuringReceive = close.Wait(TimeSpan.FromMilliseconds(200));
+            release.Set();
+
+            Assert.True(receive.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(close.Wait(TimeSpan.FromSeconds(5)));
+            Assert.False(closedDuringReceive);
+            Assert.Equal(connection, Assert.Single(transport.RawClosedConnections));
+        }
+
         private static void SeedOwnedConnection(
             SteamNetworkingTunnelTransportBase transport,
             uint connection,
@@ -116,6 +183,8 @@ namespace Coop.Tests.Steam
             }
 
             public List<uint> RawClosedConnections { get; } = new List<uint>();
+            public List<uint> ReceivedConnections { get; } = new List<uint>();
+            public Action? DuringReceive { get; set; }
             public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
                 ConfiguredValues { get; } =
                     new List<(ESteamNetworkingConfigValue, ESteamNetworkingConfigScope, IntPtr, int)>();
@@ -234,7 +303,12 @@ namespace Coop.Tests.Steam
             protected override int ReceiveMessagesOnConnection(
                 HSteamNetConnection conn,
                 IntPtr[] messages,
-                int maxMessages) => 0;
+                int maxMessages)
+            {
+                ReceivedConnections.Add(conn.m_HSteamNetConnection);
+                DuringReceive?.Invoke();
+                return 0;
+            }
         }
     }
 }
