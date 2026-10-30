@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Clans;
 using GameInterface.Services.UI.PlayerList;
+using GameInterface.Services.UI.ServerInfo;
 using Autofac;
 using Common.Commands;
 using Common.Messaging;
@@ -148,6 +149,9 @@ internal abstract class TestComponentBase
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
         RegisterMock<IPlayerListService>(builder);
+        RegisterMock<IServerInfoService>(builder);
+        // ServerInfoMessageBuilder needs the link rules, which GameInterfaceModule registers and this container does not load.
+        RegisterMock<IServerInfoLinkRules>(builder);
         RegisterMock<IPlayerActivityReader>(builder);
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);

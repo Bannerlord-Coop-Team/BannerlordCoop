@@ -1,15 +1,7 @@
-﻿using GameInterface.Services.Chat;
-using SandBox.View.Map;
-using System;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.Core;
-using TaleWorlds.Engine;
+﻿using System;
 using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
-using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.PlayerList;
@@ -18,16 +10,16 @@ namespace GameInterface.Services.UI.PlayerList;
 internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
 {
     private readonly PlayerListVM viewModel;
-    private readonly IChatService chat;
+    private readonly IMapAvailability mapAvailability;
     private readonly Func<InputKey> toggleKey;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
-    // Receives presentation state and the chat focus guard.
-    public PlayerListOverlay(PlayerListVM viewModel, IChatService chat, Func<InputKey> toggleKey)
+    // Receives presentation state and the map and focus guard shared with the server info panel.
+    public PlayerListOverlay(PlayerListVM viewModel, IMapAvailability mapAvailability, Func<InputKey> toggleKey)
     {
         this.viewModel = viewModel;
-        this.chat = chat;
+        this.mapAvailability = mapAvailability;
         this.toggleKey = toggleKey;
     }
 
@@ -45,7 +37,7 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
-        if (!IsMapAvailable())
+        if (!mapAvailability.IsMapAvailable())
         {
             Close();
             return;
@@ -59,12 +51,6 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
         else if (viewModel.IsOpen && Input.IsKeyReleased(InputKey.Escape)) Close();
     }
 
-    // Requires the actual campaign map, not a map ticking behind a menu or mission.
-    private bool IsMapAvailable() => ScreenManager.TopScreen is MapScreen &&
-        GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
-        !LoadingWindow.IsLoadingWindowActive && !InformationManager.IsAnyInquiryActive() &&
-        Campaign.Current?.ConversationManager?.IsConversationInProgress != true;
-
     // Opens only when gameplay owns focus; never steals typing or another modal's input.
     public bool Toggle()
     {
@@ -73,11 +59,7 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
             Close();
             return true;
         }
-        if (!IsMapAvailable() || chat.IsTyping || Input.IsOnScreenKeyboardActive) return false;
-        var focused = ScreenManager.FocusedLayer;
-        if (focused is GauntletLayer gauntlet &&
-            gauntlet.UIContext.EventManager.FocusedWidget is EditableTextWidget) return false;
-        if (focused != null && focused != ((MapScreen)ScreenManager.TopScreen).SceneLayer) return false;
+        if (!mapAvailability.CanOpenOverlay()) return false;
         viewModel.IsOpen = true;
         layer.InputRestrictions.SetInputRestrictions();
         layer.IsFocusLayer = true;

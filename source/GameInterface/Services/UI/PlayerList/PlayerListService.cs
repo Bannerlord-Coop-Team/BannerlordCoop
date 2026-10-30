@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Chat;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
@@ -24,7 +23,7 @@ public interface IPlayerListService : IGameAbstraction
 /// <inheritdoc cref="IPlayerListService"/>
 public sealed class PlayerListService : IPlayerListService, IDisposable
 {
-    private readonly IChatService chat;
+    private readonly IMapAvailability mapAvailability;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
     private InputKey toggleKey;
@@ -35,10 +34,9 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
     private PlayerListEntry[] receivedEntries = Array.Empty<PlayerListEntry>();
 #endif
 
-    // Keeps chat focus separate from the player-list toggle.
-    public PlayerListService(IChatService chat, ICoopOptionsStore optionsStore, IMessageBroker messageBroker, IControllerIdProvider controllerIdProvider)
+    public PlayerListService(ICoopOptionsStore optionsStore, IMessageBroker messageBroker, IControllerIdProvider controllerIdProvider, IMapAvailability mapAvailability)
     {
-        this.chat = chat;
+        this.mapAvailability = mapAvailability;
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
         toggleKey = UIOptionsTabProvider.GetPlayerListKey(optionsStore.LoadOrDefault());
@@ -50,7 +48,7 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
     public void Initialize()
     {
         if (overlay != null) return;
-        overlay = new PlayerListOverlay(viewModel, chat, () => toggleKey);
+        overlay = new PlayerListOverlay(viewModel, mapAvailability, () => toggleKey);
         overlay.Initialize();
     }
 

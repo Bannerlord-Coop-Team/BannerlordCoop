@@ -414,6 +414,83 @@ public class ModConfigTests : IDisposable
         Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
     }
 
+    // The template ships the block live and empty, so every key has to name a schema property.
+    [Fact]
+    public void ShippedTemplate_ServerInfo_BindsAndIsEmpty()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+
+        var config = NewModConfig().Data;
+
+        Assert.True(config.ServerInfo.UnknownKeys == null || config.ServerInfo.UnknownKeys.Count == 0,
+            "every serverInfo key in the template must name a schema property, but these did not: " +
+            string.Join(", ", config.ServerInfo.UnknownKeys?.Keys ?? Array.Empty<string>()));
+        Assert.Empty(config.ServerInfo.Motd);
+        Assert.Empty(config.ServerInfo.Rules);
+        Assert.Empty(config.ServerInfo.Links);
+        Assert.Empty(config.ServerInfo.News);
+    }
+
+    [Fact]
+    public void ServerInfo_ReadsEveryKey()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""serverInfo"": {
+    ""motd"": [""Welcome to EU-1"", ""Restart 06:00 UTC""],
+    ""rules"": [""No griefing"", 5, null],
+    ""links"": [{ ""label"": ""Discord"", ""url"": ""https://discord.gg/example"", ""extra"": 1 }],
+    ""news"": [{ ""date"": ""28 Sep 2026"", ""title"": ""Siege weekend"", ""text"": ""Double renown."" }],
+    ""bogus"": true
+  },
+  ""modOptions"": { ""wandererLimit"": 40 }
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, config.ServerInfo.Motd);
+        Assert.Equal(new[] { "No griefing", "5", null }, config.ServerInfo.Rules);
+        var link = Assert.Single(config.ServerInfo.Links);
+        Assert.Equal(("Discord", "https://discord.gg/example"), (link.Label, link.Url));
+        var news = Assert.Single(config.ServerInfo.News);
+        Assert.Equal(("28 Sep 2026", "Siege weekend", "Double renown."), (news.Date, news.Title, news.Text));
+        Assert.True(config.ServerInfo.UnknownKeys.ContainsKey("bogus"));
+        Assert.Equal(40, config.ModOptions.WandererLimit);
+    }
+
+    // A key that is not an array is skipped like any other bad value, and the other keys still read.
+    [Fact]
+    public void ServerInfo_KeyThatIsNotAnArray_IsSkipped()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""serverInfo"": {
+    ""motd"": ""Welcome to EU-1"",
+    ""rules"": [""No griefing""]
+  },
+  ""modOptions"": { ""wandererLimit"": 40 }
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Null(config.ServerInfo.Motd);
+        Assert.Equal(new[] { "No griefing" }, config.ServerInfo.Rules);
+        Assert.Equal(40, config.ModOptions.WandererLimit);
+    }
+
+    // An object where a text belongs cannot be read past, so the file falls back to defaults like a syntax error.
+    [Fact]
+    public void ServerInfo_ObjectWhereTextBelongs_IsAMalformedFile()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""serverInfo"": { ""motd"": [""Welcome to EU-1"", { ""not"": ""text"" }] },
+  ""modOptions"": { ""wandererLimit"": 40 }
+}");
+
+        var config = NewModConfig().Data;
+
+        Assert.Null(config.ServerInfo.Motd);
+        Assert.Null(config.ModOptions.WandererLimit);
+    }
+
     [Fact]
     public void UnknownKeys_LandInOverflow_BothLevels()
     {

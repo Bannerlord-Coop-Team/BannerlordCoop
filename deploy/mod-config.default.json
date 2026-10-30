@@ -226,5 +226,21 @@
     // Set the time in seconds players have to vote on kingdom decisions.
     // Default is 60. Values of 0 or lower will default back to 60.
     "kingdomDecisionVoteTimeoutSeconds": 60
+  },
+
+  // Shown to each player in a Server Info panel once they reach the campaign map after joining.
+  // F3 on the campaign map opens it again. Every key is optional and an empty one hides its tab.
+  // See doc/ServerInfo.md for the limits and which links are kept.
+  "serverInfo": {
+    // One paragraph per entry.
+    "motd": [],
+    // One rule per entry, numbered in this order.
+    "rules": [],
+    // Absolute http or https addresses; the label is optional.
+    // { "label": "Discord", "url": "https://discord.gg/example" }
+    "links": [],
+    // Newest first; date, title and text are free text, and an entry needs a title or a text.
+    // { "date": "28 Sep 2026", "title": "Siege weekend", "text": "All castle sieges give double renown." }
+    "news": []
   }
 }
