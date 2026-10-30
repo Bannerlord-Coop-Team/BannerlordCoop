@@ -127,7 +127,7 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            ModInformation.IsNavalDlcActive = DetectNavalSupport(moduleInfoProvider);
+            ModInformation.IsNavalDlcActive = DetectNavalSupport(moduleInfoProvider, new NavalFeatureFlag());
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -231,17 +231,20 @@ namespace Coop
             }
         }
 
-        // Whether NavalDLC is enabled and this build shipped the coop naval assemblies next to Coop.dll.
-        private static bool DetectNavalSupport(IModuleInfoProvider moduleInfoProvider)
+        // Whether NavalDLC is enabled, this is a TESTER build and it shipped the coop naval assemblies next to Coop.dll.
+        private static bool DetectNavalSupport(IModuleInfoProvider moduleInfoProvider, INavalFeatureFlag navalFeatureFlag)
         {
             bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
                 .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
             string assemblyDirectory = System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location);
-            bool supported = ModInformation.IsNavalSupported(navalModuleEnabled,
+            bool supported = ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled,
                 file => File.Exists(System.IO.Path.Combine(assemblyDirectory, file)));
             if (supported || !navalModuleEnabled) return supported;
 
-            Logger.Warning("NavalDLC is enabled but this build has no naval code, so NavalDLC is treated as unsupported");
+            string reason = navalFeatureFlag.IsEnabled
+                ? "this build has no naval code"
+                : "War Sails co-op is only in tester builds";
+            Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", reason);
             return false;
         }
 

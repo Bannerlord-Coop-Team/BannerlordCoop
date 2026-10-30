@@ -24,15 +24,18 @@ public static class ModInformation
     private static readonly string[] NavalAssemblyFiles = { MissionsNavalAssemblyFile, CoopNavalAssemblyFile };
 
     /// <summary>
-    /// Whether this process supports NavalDLC: the module is enabled and the coop naval code shipped with this build.
+    /// Whether this process supports NavalDLC: the module is enabled, this is a TESTER build and the coop naval code shipped.
     /// Set once at startup from <see cref="IsNavalSupported"/>; the module validator, host warning and battle gate read it.
     /// </summary>
     public static bool IsNavalDlcActive { get; set; }
 
-    /// <summary>Whether NavalDLC is enabled and every coop naval assembly is shipped, as told by <paramref name="isShipped"/>.</summary>
-    public static bool IsNavalSupported(bool navalModuleEnabled, Func<string, bool> isShipped)
+    /// <summary>
+    /// Whether NavalDLC is enabled, the build turns War Sails co-op on and every coop naval assembly is shipped,
+    /// as told by <paramref name="isShipped"/>.
+    /// </summary>
+    public static bool IsNavalSupported(bool navalModuleEnabled, bool navalFeatureEnabled, Func<string, bool> isShipped)
     {
-        return navalModuleEnabled && NavalAssemblyFiles.All(isShipped);
+        return navalModuleEnabled && navalFeatureEnabled && NavalAssemblyFiles.All(isShipped);
     }
 
     /// <summary>
