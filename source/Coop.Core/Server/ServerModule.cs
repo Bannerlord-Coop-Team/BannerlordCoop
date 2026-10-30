@@ -80,7 +80,7 @@ public class ServerModule : CommonModule
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
         // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
         // server resolves IBattleNetwork, so no P2P socket is opened. See MissionModule for what activates.
-        builder.RegisterModule<MissionModule>();
+        builder.RegisterModule(new MissionModule(navalServicesEnabled));
 
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();

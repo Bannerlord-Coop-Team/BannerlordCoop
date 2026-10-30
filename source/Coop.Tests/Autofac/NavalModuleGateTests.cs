@@ -5,6 +5,10 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Utils;
+using Missions;
+using Missions.Agents.Handlers;
+using Missions.Battles;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -70,6 +74,55 @@ public sealed class NavalModuleGateTests : System.IDisposable
 
         Assert.Equal(navalServicesEnabled, container.IsRegistered<ServerBattleShipFateHandler>());
         Assert.Equal(navalServicesEnabled, container.IsRegistered<global::GameInterface.Services.Ships.IBattleShipFateLedger>());
+    }
+
+    // The game's client modules read the startup decision, so off leaves the water clock and naval battle factory out.
+    [Fact]
+    public void DefaultClientModules_WithNavalInactive_LeaveTheNavalMissionServicesOut()
+    {
+        ModInformation.IsNavalDlcActive = false;
+
+        using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule());
+
+        Assert.False(container.IsRegistered<IWaterClock>());
+        Assert.False(container.IsRegistered<INavalBattleServicesFactory>());
+    }
+
+    // The explicit decision moves both naval mission services; the ship registry and deck probe serve land battles too.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClientModules_GateTheNavalMissionServicesOnly(bool navalServicesEnabled)
+    {
+        using var container = BuildClientRegistrations(
+            new ClientModule(navalServicesEnabled), new GameInterfaceModule(navalServicesEnabled));
+
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<IWaterClock>());
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<INavalBattleServicesFactory>());
+        Assert.True(container.IsRegistered<INetworkShipRegistry>());
+        Assert.True(container.IsRegistered<INavalDeckMovementProbe>());
+    }
+
+    // The server builds MissionModule too, so its naval battle factory follows the same decision.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerModule_GatesTheNavalBattleFactory(bool navalServicesEnabled)
+    {
+        using var container = BuildServerContainer(
+            new ServerModule(navalServicesEnabled), new GameInterfaceModule(navalServicesEnabled));
+
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<INavalBattleServicesFactory>());
+        Assert.Equal(navalServicesEnabled, container.IsRegistered<IWaterClock>());
+    }
+
+    // Builds a client container's registrations without activating anything.
+    private static IContainer BuildClientRegistrations(ClientModule clientModule, GameInterfaceModule gameInterfaceModule)
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterModule(clientModule);
+        builder.RegisterModule(gameInterfaceModule);
+        return builder.Build(global::Autofac.Builder.ContainerBuildOptions.IgnoreStartableComponents);
     }
 
     // Builds a server container's registrations without activating anything.

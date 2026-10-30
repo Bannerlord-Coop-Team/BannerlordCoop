@@ -66,6 +66,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
         typeof(BattleShipFateLedger),
         typeof(BattleShipFateApplier),
+        typeof(global::GameInterface.Utils.WaterClock),
 #if DEBUG
         typeof(NavalScenarioClientHandler),
         typeof(NavalScenarioRejoinHandler),

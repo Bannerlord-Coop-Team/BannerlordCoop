@@ -198,8 +198,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<UIOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
-        // Also in the server container, which never opens a naval battle; the patch itself refuses to install on a server.
-        builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
+        // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
+        // itself refuses to install on a server.
+        if (navalServicesEnabled)
+            builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<ChatFactionMembership>().As<IChatFactionMembership>().InstancePerDependency();
         builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();

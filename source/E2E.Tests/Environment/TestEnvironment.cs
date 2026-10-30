@@ -72,7 +72,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ClientModule>();
+        // Naval mission services stay on here, like the server's naval handlers and GameInterface's naval sync.
+        builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().SingleInstance();
 
         // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh

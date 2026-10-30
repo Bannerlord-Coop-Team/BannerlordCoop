@@ -325,7 +325,7 @@ internal class MapEventPatches
         // Vanilla writes naval damage into the campaign ships live; coop holds the reported fates until now, so sunk ships are
         // destroyed and survivors carry their battle HP before the results and the ship loot read them. NB §3 lists every
         // apply point.
-        if (ContainerProvider.TryResolve<IBattleShipFateApplier>(out var fateApplier))
+        if (ModInformation.IsNavalDlcActive && ContainerProvider.TryResolve<IBattleShipFateApplier>(out var fateApplier))
             fateApplier.ApplyAll(__instance);
 
         // Vanilla calculates plunder from each defeated participant's Party reference.
