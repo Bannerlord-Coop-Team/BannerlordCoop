@@ -102,6 +102,8 @@ public class LoadingState : ConnectionStateBase
 
     internal bool IsAborted => CurrentPhase == JoinPhase.Aborted;
 
+    internal bool HasExhaustedBaselines => Volatile.Read(ref baselineLimitLogged) == 1;
+
     internal string JoinPhaseName => CurrentPhase.ToString();
 
     internal long JoinProgressVersion => Interlocked.Read(ref joinProgressVersion);
