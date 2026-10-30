@@ -45,7 +45,7 @@ public class ShadowedAssemblyDetector : IShadowedAssemblyDetector
             shadowingFiles.Add(commonPath);
         }
 
-        // The dedicated server package ships Coop's own 0Harmony.dll here, so only an older one is a problem
+        // A newer 0Harmony.dll (from BLSE or another tool) still has everything Coop calls, only an older one breaks it
         var harmonyPath = Path.Combine(appBaseDirectory, HarmonyFileName);
         if (File.Exists(harmonyPath) && IsOlderHarmony(harmonyPath))
         {

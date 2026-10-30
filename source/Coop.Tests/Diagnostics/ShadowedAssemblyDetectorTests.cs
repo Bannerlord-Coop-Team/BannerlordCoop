@@ -56,7 +56,6 @@ public class ShadowedAssemblyDetectorTests : IDisposable
         Assert.Equal(harmonyPath, Assert.Single(shadowingFiles));
     }
 
-    // The dedicated server package puts Coop's own 0Harmony.dll in its app base
     [Fact]
     public void KeepsHarmonyCoopReferences()
     {
