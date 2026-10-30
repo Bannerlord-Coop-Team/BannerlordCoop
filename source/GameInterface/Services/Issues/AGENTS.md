@@ -36,7 +36,11 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `QuestSuccess` for your descriptor.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
-   `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`.
+   `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`. A client sets or moves its mirror when it
+   applies the message and empties it when the replay runs, and it applies a giver's messages in the order they came
+   through `IIssueConversationGuard.RunInOrder`. So while a replay waits for the player's conversation with the giver
+   (rule 8), later quest, troops and lord solution accepts, owner changes and new issues for that giver wait behind it.
+   A refused troops accept is the exception and runs at once, see `AlternativeSolutionAcceptCoordinator`.
    `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside `IssueBase.CheckPreconditions` so
    vanilla's one-issue-per-type check counts only the player's own issues, so a stale mirror changes whether a player
    can accept.
@@ -53,13 +57,19 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 7. UI bookkeeping the server runs for players leaks into the save a joiner downloads. The server skips quest
    pop-ups and unread markers (`Services/UI/Notifications/Patches/ServerQuest*Patches.cs`). For a new server path,
    check what reacts to `AddLog`, `OnIssueUpdated` and `OnQuestCompleted`.
-8. A client never ends a registered quest on its own under `AllowedThread`. A quest listener still fires inside a
-   replay (a war, an army's removal), and `OutcomeDispatcher.BeforeQuestOutcome` drops that ending unless
-   `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
-   clan's kingdom change, still sends its ending to the server as a request.
-9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
+8. A client never ends a registered quest or issue on its own under `AllowedThread`. A listener still fires inside a
+   replay (a war, an army's removal, a settlement entry), and `OutcomeDispatcher.BeforeQuestOutcome` and
+   `BeforeIssueOutcome` drop that ending unless `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`).
+   A quest listener outside `AllowedThread`, like a clan's kingdom change, still sends its ending to the server as a
+   request. An issue ending there is dropped. The client's `Replay` waits while its player talks to the giver
+   (`Framework/Conversation/IssueConversationGuard.cs`), and so does cancelling the stray quest of a refused accept,
+   because the lines on screen read the issue or belong to its quest and the options point at them by index. That
+   covers an offer nobody took, a stray quest, and an issue another player holds, like vanilla's "About the task you
+   gave me..." line for troops someone else sent. Only the ending of the owner's running quest, a hand in for example,
+   replays at once unless work is already waiting for that giver, as vanilla ends quests mid dialog.
+9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal, a settlement owner change) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed` and `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
    listener names as strings because `Framework/` cannot name quest types.
