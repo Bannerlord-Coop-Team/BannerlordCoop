@@ -209,6 +209,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
     {
         if (ReferenceEquals(first, second)) return true;
         if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes == null) != (second.Attributes == null) ||
             (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
         if (first.Attributes == null) return true;
         foreach (var pair in first.Attributes)
