@@ -460,7 +460,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
         ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
 
-        Server.Call(() => QuestHere(Server).CompleteQuestWithCancel(), TextHelpers);
+        Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
         environment.FlushCoalescer();
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
