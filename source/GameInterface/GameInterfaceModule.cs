@@ -48,7 +48,13 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.MapEventComponents;
 using GameInterface.Services.Ships;
+using GameInterface.Services.Ships.Figureheads;
+using GameInterface.Services.Ships.ShipHulls;
+using GameInterface.Services.Ships.ShipSlots;
+using GameInterface.Services.Ships.ShipUpgradePieces;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
@@ -71,6 +77,7 @@ using GameInterface.Utils;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -85,7 +92,32 @@ public class GameInterfaceModule : Module
 
     internal const string CoopNavalAssemblyName = "Coop.Naval";
 
+    // GameInterface's own War Sails registrations; its naval patches carry GameInterface.HARMONY_NAVAL_CATEGORY instead.
+    internal static readonly Type[] NavalOnlyTypes =
+    {
+        typeof(ShipSync),
+        typeof(ShipRegistry),
+        typeof(ShipHullRegistry),
+        typeof(FigureheadRegistry),
+        typeof(ShipSlotRegistry),
+        typeof(ShipUpgradePieceRegistry),
+        typeof(BlockadeBattleMapEventRegistry),
+    };
+
     private static readonly Harmony harmony = new Harmony(HarmonyId);
+
+    private readonly bool navalServicesEnabled;
+
+    // Turns GameInterface's naval patches and registrations on only while NavalDLC co-op is active.
+    public GameInterfaceModule() : this(ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets a test harness turn GameInterface's naval services on without loading the optional naval assemblies.
+    public GameInterfaceModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -117,7 +149,9 @@ public class GameInterfaceModule : Module
             .SingleInstance()
             .AutoActivate();
 
-        builder.RegisterType<GameInterfacePatchInstaller>().As<IGameInterfacePatchInstaller>().InstancePerDependency();
+        builder.Register(context => new GameInterfacePatchInstaller(context.Resolve<IQuestFeatureFlag>(), navalServicesEnabled))
+            .As<IGameInterfacePatchInstaller>()
+            .InstancePerDependency();
         builder.RegisterType<QuestJournalOwnerResolver>().As<IQuestJournalOwnerResolver>().InstancePerDependency();
         builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
@@ -246,8 +280,8 @@ public class GameInterfaceModule : Module
 #endif
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
-        builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule<AutoSyncModule>();
+        builder.RegisterModule(new RegistryModule(navalServicesEnabled));
+        builder.RegisterModule(new AutoSyncModule(navalServicesEnabled));
 
         // Coop.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
         if (ModInformation.IsNavalDlcActive && TryLoadCoopNavalAssembly(out var coopNavalAssembly))

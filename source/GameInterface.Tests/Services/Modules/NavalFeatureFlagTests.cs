@@ -4,15 +4,15 @@ using Xunit;
 namespace GameInterface.Tests.Services.Modules;
 
 /// <summary>
-/// Pins which GameInterface builds turn War Sails co-op on: Debug defines TESTER, Release does not.
+/// Pins the flag to the TESTER constant, which this test project defines in the same configurations as GameInterface.
 /// </summary>
 public class NavalFeatureFlagTests
 {
-    // GameInterface.Tests builds against the GameInterface of the same configuration.
+    // A nightly-style build passes TESTER to every project, so both sides see the same constant.
     [Fact]
-    public void IsEnabled_OnlyInTesterBuilds()
+    public void IsEnabled_MatchesTheTesterConstant()
     {
-#if DEBUG
+#if TESTER
         Assert.True(new NavalFeatureFlag().IsEnabled);
 #else
         Assert.False(new NavalFeatureFlag().IsEnabled);

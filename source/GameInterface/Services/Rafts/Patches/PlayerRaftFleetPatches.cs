@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Rafts.Patches;
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.FinishNavigationTransitionInternal))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerRaftFleetPatches
 {
     [HarmonyPrefix]

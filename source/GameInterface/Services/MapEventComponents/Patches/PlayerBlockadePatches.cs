@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEventComponents.Patches;
 
 [HarmonyPatch(typeof(BlockadeBattleMapEvent))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerBlockadePatches
 {
     // Replace MobileParty.IsMainParty usage so an online player is asked instead of the blockade lifting on its own
@@ -46,6 +47,7 @@ internal class PlayerBlockadePatches
 }
 
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerBlockadeMenuPatches
 {
     // Vanilla only sets up the encounter fields, so the encounter adopts the server's blockade battle like PromptSiegeAssault

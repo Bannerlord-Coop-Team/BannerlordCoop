@@ -110,7 +110,8 @@ public class TestEnvironment
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        builder.RegisterModule<GameInterfaceModule>();
+        // GameInterface's naval sync is tested here too, without loading the optional naval assemblies.
+        builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
 
         builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();

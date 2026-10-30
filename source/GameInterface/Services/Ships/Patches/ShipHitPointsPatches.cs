@@ -9,6 +9,7 @@ namespace GameInterface.Services.Ships.Patches;
 
 /// <summary>[Client] Refreshes the open campaign menu when the main party's ship hit points change.</summary>
 [HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipHitPointsPatches
 {
     // Port menu options like repair ships read the main party's ship hit points. Skipped during a mission, and while the

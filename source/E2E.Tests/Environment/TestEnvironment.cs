@@ -123,7 +123,8 @@ public class TestEnvironment
     {
         if (registerGameInterface)
         {
-            builder.RegisterModule<GameInterfaceModule>();
+            // GameInterface's naval sync is tested here with fakes, so it stays on without loading the optional naval assemblies.
+            builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
         }
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();

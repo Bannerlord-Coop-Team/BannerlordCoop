@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Ships.Patches;
 
 [HarmonyPatch(typeof(PlayerEncounter))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerEncounterLootShipsPatches
 {
     [HarmonyPatch(nameof(PlayerEncounter.OnPlayerLootShipEnd))]

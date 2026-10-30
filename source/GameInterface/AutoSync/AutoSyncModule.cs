@@ -11,6 +11,14 @@ namespace GameInterface.AutoSync;
 /// </summary>
 internal class AutoSyncModule : Module
 {
+    private readonly bool navalServicesEnabled;
+
+    // Lets GameInterfaceModule pass whether naval AutoSync classes such as ShipSync are registered.
+    public AutoSyncModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
+
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().SingleInstance();
@@ -52,7 +60,8 @@ internal class AutoSyncModule : Module
             .Where(t => t.GetInterface(nameof(IAutoSync)) != null &&
                         t.IsClass &&
                         t.IsGenericType == false &&
-                        t.IsAbstract == false);
+                        t.IsAbstract == false &&
+                        (navalServicesEnabled || !GameInterfaceModule.NavalOnlyTypes.Contains(t)));
         return types;
     }
 }
