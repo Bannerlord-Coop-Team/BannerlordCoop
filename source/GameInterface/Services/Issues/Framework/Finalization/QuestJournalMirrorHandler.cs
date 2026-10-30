@@ -141,6 +141,13 @@ internal class QuestJournalMirrorHandler : IHandler
             // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
             if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1)) return false;
             var existing = exact.FirstOrDefault() ?? matches.FirstOrDefault();
+            if (existing == null)
+            {
+                var keyMatches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
+                    SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
+                if (keyMatches.Length > 1) return false;
+                existing = keyMatches.FirstOrDefault();
+            }
             if (existing == null) ordered.Add(entry.ToJournalLog());
             else
             {
@@ -179,4 +186,7 @@ internal class QuestJournalMirrorHandler : IHandler
         }
         return true;
     }
+
+    private static bool SameKey(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 }
