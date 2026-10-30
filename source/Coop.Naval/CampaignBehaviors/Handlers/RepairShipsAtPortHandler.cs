@@ -57,8 +57,8 @@ internal class RepairShipsAtPortHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyHandle, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementHandle, out var currentSettlement)) return;
 
-            // Reject repair if client no longer has enough gold
-            if (mainParty.Ships.Sum(ship => ship.HitPoints < ship.MaxHitPoints ? Campaign.Current.Models.ShipCostModel.GetShipRepairCost(ship, mainParty.Party) : 0f) > mainParty.LeaderHero?.Gold) return;
+            // Reject repair if client no longer has enough gold, summed as whole gold per ship like vanilla
+            if (mainParty.Ships.Sum(ship => ship.HitPoints < ship.MaxHitPoints ? (int)Campaign.Current.Models.ShipCostModel.GetShipRepairCost(ship, mainParty.Party) : 0) > mainParty.LeaderHero?.Gold) return;
 
             foreach (Ship ship in mainParty.Ships)
             {

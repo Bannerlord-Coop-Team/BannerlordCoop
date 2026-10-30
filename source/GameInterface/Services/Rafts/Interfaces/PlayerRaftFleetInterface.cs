@@ -74,7 +74,10 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
             var anchorPosition = party.Anchor.Position;
             var disembarkPosition = party.Anchor.GetLastUsedDisembarkPosition();
 
-            var ships = new List<CachedShipData>();
+            // Vanilla adds to the ships still cached from an earlier stranding instead of replacing them
+            var ships = PlayerCachedFleets.TryGetValue(playerHeroId, out var cachedFleet) && cachedFleet.Ships != null
+                ? new List<CachedShipData>(cachedFleet.Ships)
+                : new List<CachedShipData>();
             for (int i = party.Ships.Count - 1; i >= 0; i--)
             {
                 var ship = party.Ships[i];

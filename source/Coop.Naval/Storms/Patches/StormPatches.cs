@@ -15,12 +15,20 @@ internal class StormPatches
     // Set while StormCampaignBehavior.HourlyTick runs, it sends one snapshot per storm once it finishes
     internal static bool IsHourlyTickInProgress;
 
+    // Vanilla calls this every frame while storms overlap or one is out of bounds, so only the first call sends
+    [HarmonyPatch(nameof(Storm.ForceDeactivate))]
+    [HarmonyPrefix]
+    private static void ForceDeactivatePrefix(Storm __instance, out bool __state)
+    {
+        __state = __instance.IsInFinalizingState;
+    }
+
     // Collisions and the debug command deactivate outside the hourly tick, so send those straight away
     [HarmonyPatch(nameof(Storm.ForceDeactivate))]
     [HarmonyPostfix]
-    private static void ForceDeactivatePostfix(Storm __instance)
+    private static void ForceDeactivatePostfix(Storm __instance, bool __state)
     {
-        if (IsHourlyTickInProgress) return;
+        if (IsHourlyTickInProgress || __state) return;
 
         PublishStateChanged(__instance);
     }
