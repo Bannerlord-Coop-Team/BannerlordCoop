@@ -453,6 +453,25 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Fact]
+    public void AuthoritativeEndingPreservesOwnerDeliveryProgress()
+    {
+        Accept();
+        ClientA.SimulateMessage(Server.NetPeer,
+            new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
+        ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
+
+        Server.Call(() => QuestHere(Server).CompleteQuestWithCancel(), TextHelpers);
+        environment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.Call(() =>
+        {
+            Assert.True(QuestHere(ClientA).IsFinalized);
+            Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress);
+        });
+    }
+
+    [Fact]
     public void PartialThenFullDelivery_UpdatesOnlyTheOwnerAndPaysExactlyOnce()
     {
         Accept();

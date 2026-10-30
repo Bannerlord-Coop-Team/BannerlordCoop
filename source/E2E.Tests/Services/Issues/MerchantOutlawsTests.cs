@@ -501,6 +501,26 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AuthoritativeEndingPreservesOwnerHuntProgress()
+    {
+        Accept();
+        ClientA.SimulateMessage(Server.NetPeer, new NetworkMerchantOutlawsProgress(
+            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, 1, 0,
+            Array.Empty<string>(), Array.Empty<string>()));
+        ClientA.Call(() => Assert.Equal(1, Quest(ClientA)._questProgressLogTest.CurrentProgress));
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        environment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.Call(() =>
+        {
+            Assert.True(Quest(ClientA).IsFinalized);
+            Assert.Equal(1, Quest(ClientA)._questProgressLogTest.CurrentProgress);
+        });
+    }
+
+    [Fact]
     public void SuccessRequestWithoutEnoughServerProgressDoesNotPay()
     {
         Accept();

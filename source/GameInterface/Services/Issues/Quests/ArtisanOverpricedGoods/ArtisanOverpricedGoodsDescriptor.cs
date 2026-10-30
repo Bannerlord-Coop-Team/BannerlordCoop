@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 
-internal class ArtisanOverpricedGoodsDescriptor : IQuestTypeDescriptor
+internal class ArtisanOverpricedGoodsDescriptor : IQuestTypeDescriptor, ISpecializedEndingJournalDescriptor
 {
     public Type IssueType => typeof(Issue);
     public ICreationCaptureStrategy CreationCaptureStrategy { get; }
