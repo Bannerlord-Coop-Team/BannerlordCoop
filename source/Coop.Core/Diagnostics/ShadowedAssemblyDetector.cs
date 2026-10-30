@@ -1,5 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 
 namespace Coop.Core.Diagnostics;
 
@@ -14,21 +17,54 @@ public interface IShadowedAssemblyDetector
 /// </summary>
 public class ShadowedAssemblyDetector : IShadowedAssemblyDetector
 {
-    // Another mod's Common.dll or an older 0Harmony.dll left in bin\Win64_Shipping_Client crashes the first loading screen
-    private static readonly string[] OwnAssemblies = { "Common.dll", "0Harmony.dll" };
+    private const string CommonFileName = "Common.dll";
+    private const string HarmonyFileName = "0Harmony.dll";
+
+    private readonly Version minimumHarmonyVersion;
+
+    // Read from metadata so this doesn't load 0Harmony before the check
+    public ShadowedAssemblyDetector()
+        : this(typeof(ShadowedAssemblyDetector).Assembly.GetReferencedAssemblies()
+            .FirstOrDefault(reference => reference.Name == "0Harmony")?.Version)
+    {
+    }
+
+    public ShadowedAssemblyDetector(Version minimumHarmonyVersion)
+    {
+        this.minimumHarmonyVersion = minimumHarmonyVersion;
+    }
 
     public IReadOnlyList<string> FindShadowingFiles(string appBaseDirectory)
     {
         var shadowingFiles = new List<string>();
-        foreach (var assembly in OwnAssemblies)
+
+        // Another mod's Common.dll replaces Coop's whatever its version, the assembly names match
+        var commonPath = Path.Combine(appBaseDirectory, CommonFileName);
+        if (File.Exists(commonPath))
         {
-            var path = Path.Combine(appBaseDirectory, assembly);
-            if (File.Exists(path))
-            {
-                shadowingFiles.Add(path);
-            }
+            shadowingFiles.Add(commonPath);
+        }
+
+        // The dedicated server package ships Coop's own 0Harmony.dll here, so only an older one is a problem
+        var harmonyPath = Path.Combine(appBaseDirectory, HarmonyFileName);
+        if (File.Exists(harmonyPath) && IsOlderHarmony(harmonyPath))
+        {
+            shadowingFiles.Add(harmonyPath);
         }
 
         return shadowingFiles;
+    }
+
+    private bool IsOlderHarmony(string harmonyPath)
+    {
+        try
+        {
+            return AssemblyName.GetAssemblyName(harmonyPath).Version < minimumHarmonyVersion;
+        }
+        catch (Exception exception) when (exception is BadImageFormatException || exception is IOException)
+        {
+            // The runtime can't bind a file it can't read either, so Coop would still fail on it
+            return true;
+        }
     }
 }

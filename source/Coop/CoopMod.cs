@@ -84,7 +84,8 @@ namespace Coop
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
-            // Runs before Coop code uses Common or 0Harmony, the runtime binds same-named files in the game folder instead of ours
+            // Runs before Coop code uses Common or 0Harmony, the runtime binds same-named files in the game folder instead of ours.
+            // Created directly because the DI container doesn't exist yet.
             var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(AppDomain.CurrentDomain.BaseDirectory);
             if (shadowingFiles.Count > 0)
             {
