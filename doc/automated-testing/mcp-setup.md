@@ -2,17 +2,17 @@
 
 ## First-time setup
 
-Run **`runmefirst.cmd`**. It keeps the existing game-path workflow: launch Bannerlord when prompted, confirm its installation, create the `mb2` junction and user `COOP_LOG` setting, then acknowledge the pause. Only after that succeeds, it publishes the standalone `tools/CoopMcpServer` project and creates `.mcp-local/profiles.json` if missing. Script paths are anchored to this checkout, even when called from another directory. A rejected path or setup error returns nonzero and prevents the next step.
+Run **`runmefirst.cmd`**. It keeps the existing game-path workflow: launch Bannerlord when prompted, confirm its installation (it must contain `bin\Win64_Shipping_Client`), set the user `BANNERLORD_DIR` (plus a `BANNERLORD_DIR/p` entry in the user `WSLENV`) and `COOP_LOG` settings, then acknowledge the pause. Restart Visual Studio, terminals and WSL afterwards so they see `BANNERLORD_DIR`. Only after that succeeds, it publishes the standalone `tools/CoopMcpServer` project and creates `.mcp-local/profiles.json` if missing. Script paths are anchored to this checkout, even when called from another directory. A rejected path or setup error returns nonzero and prevents the next step.
 
-The game running during path discovery is expected. **MCP setup never closes it or touches the live module.** It does not build/deploy the mod, launch games, change saves/game configs, install Pi/Codex, edit global agent settings, or grant project trust. Only the original game-path step changes the user `COOP_LOG` environment variable. Publishing requires the Windows .NET 10 SDK (`dotnet.exe` on PATH); package restore may need network access. Windows PowerShell is also required.
+The game running during path discovery is expected. **MCP setup never closes it or touches the live module.** It does not build/deploy the mod, launch games, change saves/game configs, install Pi/Codex, edit global agent settings, or grant project trust. Only the original game-path step changes the user `BANNERLORD_DIR`, `WSLENV` and `COOP_LOG` environment variables. Publishing requires the Windows .NET 10 SDK (`dotnet.exe` on PATH); package restore may need network access. Windows PowerShell is also required.
 
-Existing developers with an `mb2` junction can refresh just MCP without the interactive game-path step:
+Existing developers with `BANNERLORD_DIR` set can refresh just MCP without the interactive game-path step:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\mcp\setup.ps1
 ```
 
-If no junction exists, pass `-GameDirectory` with the absolute Bannerlord installation directory. This explicit local override creates no junction and changes no environment variables. `-DotnetPath` accepts an existing SDK executable if not on PATH. `-RuntimeDirectory` is an optional isolated publish/profile destination for checks; normal agent launchers always use this checkout's `.mcp-local`, not that override.
+If `BANNERLORD_DIR` is unset, pass `-GameDirectory` with the absolute Bannerlord installation directory. This explicit local override changes no environment variables. `-DotnetPath` accepts an existing SDK executable if not on PATH. `-RuntimeDirectory` is an optional isolated publish/profile destination for checks; normal agent launchers always use this checkout's `.mcp-local`, not that override.
 
 Local layout (all gitignored):
 
@@ -20,7 +20,7 @@ Local layout (all gitignored):
 - `.mcp-local/profiles.json`: absolute game executable and artifact paths, profile `local`, default modules and four client platform IDs. Review module selection before live testing.
 - `.mcp-local/runs/`: artifacts created by later, explicitly authorized runs.
 
-Setup republishes the tool but **preserves existing profile bytes**, including manual edits, even if the junction has since changed. To change installations, edit the local profile. Do not republish while an MCP session is connected; explicitly stop its runs and exit the client first. Setup fails clearly if publishing fails; rerun the helper after fixing the SDK/path error. No local settings or machine paths belong in commits.
+Setup republishes the tool but **preserves existing profile bytes**, including manual edits, even if `BANNERLORD_DIR` has since changed. To change installations, edit the local profile. Do not republish while an MCP session is connected; explicitly stop its runs and exit the client first. Setup fails clearly if publishing fails; rerun the helper after fixing the SDK/path error. No local settings or machine paths belong in commits.
 
 ## Pi
 
@@ -60,7 +60,7 @@ Always call **`stop_run`**, confirm cleanup succeeded, and only then exit/reload
 dotnet test tools\CoopMcpServer.Tests\CoopMcpServer.Tests.csproj -c Release
 ```
 
-`McpSetupTests` copies scripts into temporary paths containing spaces. It stubs SDK publishing and the interactive game-path step, checks real temporary junction resolution, idempotence/profile preservation, failure propagation, wrappers' cwd/quoted arguments/status, and missing-setup stderr. It also uses the real official C# MCP SDK 1.4.1 through the shared launcher to initialize/list nineteen tools with **empty profiles**, then checks EOF/stdout cleanliness. It never invokes the real interactive `runmefirst` workflow or changes the user environment.
+`McpSetupTests` copies scripts into temporary paths containing spaces. It stubs SDK publishing and the interactive game-path step, checks `BANNERLORD_DIR` resolution, the `WSLENV` merge, idempotence/profile preservation, failure propagation, wrappers' cwd/quoted arguments/status, and missing-setup stderr. It also uses the real official C# MCP SDK 1.4.1 through the shared launcher to initialize/list nineteen tools with **empty profiles**, then checks EOF/stdout cleanliness. It never invokes the real interactive `runmefirst` workflow or changes the user environment.
 
 Static client config checks use an existing adapter installation (its TOML parser and Ajv) plus the downloaded [official Codex schema](https://developers.openai.com/codex/config-schema.json):
 
