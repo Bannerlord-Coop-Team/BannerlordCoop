@@ -456,9 +456,10 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     public void AuthoritativeEndingPreservesOwnerDeliveryProgress()
     {
         Accept();
+        var ownerQuest = QuestHere(ClientA);
         ClientA.SimulateMessage(Server.NetPeer,
             new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
-        ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
+        ClientA.Call(() => Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress));
 
         Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
         environment.FlushCoalescer();
@@ -466,8 +467,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.Call(() =>
         {
-            Assert.True(QuestHere(ClientA).IsFinalized);
-            Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress);
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress);
         });
     }
 

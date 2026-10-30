@@ -201,10 +201,6 @@ internal class FinalizationCoordinator : IHandler
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
 
-        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
-            out _, out _, out var descriptor) && descriptor is ISpecializedEndingJournalDescriptor)
-            return;
-
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
@@ -218,7 +214,7 @@ internal class FinalizationCoordinator : IHandler
         GameThread.RunSafe(() =>
         {
             if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
+                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor)) return;
 
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
@@ -230,9 +226,23 @@ internal class FinalizationCoordinator : IHandler
             {
                 if (quest != null)
                 {
-                    quest._journalEntries.Clear();
-                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
-                        quest._journalEntries.Add(log.ToJournalLog());
+                    var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    if (descriptor is ISpecializedEndingJournalDescriptor)
+                    {
+                        foreach (var log in logs)
+                        {
+                            if (quest.JournalEntries.Any(existing => existing.Type == log.Type &&
+                                existing.Range == log.Range && existing.LogText?.ToString() == log.Text?.ToString() &&
+                                existing.TaskName?.ToString() == log.TaskName?.ToString())) continue;
+                            quest._journalEntries.Add(log.ToJournalLog());
+                        }
+                    }
+                    else
+                    {
+                        quest._journalEntries.Clear();
+                        foreach (var log in logs)
+                            quest._journalEntries.Add(log.ToJournalLog());
+                    }
                     CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                 }
                 else
