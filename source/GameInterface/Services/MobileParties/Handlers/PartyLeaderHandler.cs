@@ -5,9 +5,9 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
@@ -72,7 +72,7 @@ internal class PartyLeaderHandler : IHandler
                 mobileParty.ChangePartyLeader(newLeader);
             }
 
-            var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+            var logic = PartyScreenRosterRefresher.GetOpenLogic(Game.Current?.GameStateManager);
             if (ReferenceEquals(logic?.RightOwnerParty?.MobileParty, mobileParty))
                 logic._initialData.RightPartyLeaderHero = newLeader;
             if (ReferenceEquals(logic?.LeftOwnerParty?.MobileParty, mobileParty))

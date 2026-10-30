@@ -45,7 +45,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     public const int MaxDelaySeconds = 3600;
     internal const string DisconnectReason = "ServerRestarting";
     internal static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(1);
-    internal static readonly TimeSpan JoinGateLead = TimeSpan.FromSeconds(120);
+    internal static readonly TimeSpan JoinCloseLead = TimeSpan.FromSeconds(120);
     internal static readonly TimeSpan DrainTimeout = TimeSpan.FromSeconds(15);
     internal static readonly TimeSpan SaveStartTimeout = TimeSpan.FromSeconds(10);
     internal static readonly TimeSpan SaveTimeout = TimeSpan.FromSeconds(120);
@@ -57,7 +57,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private readonly INetwork network;
     private readonly IConnectionCollection connections;
     private readonly IJoinPeerTerminator peerTerminator;
-    private readonly IServerAdmissionGate admissionGate;
+    private readonly IServerJoinAdmission joinAdmission;
     private readonly ISaveInterface saveInterface;
     private readonly IMissionManager missionManager;
     private readonly Func<DateTime> getUtcNow;
@@ -83,7 +83,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         INetwork network,
         IConnectionCollection connections,
         IJoinPeerTerminator peerTerminator,
-        IServerAdmissionGate admissionGate,
+        IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager)
         : this(
@@ -91,7 +91,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
             network,
             connections,
             peerTerminator,
-            admissionGate,
+            joinAdmission,
             saveInterface,
             missionManager,
             () => DateTime.UtcNow,
@@ -105,7 +105,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         INetwork network,
         IConnectionCollection connections,
         IJoinPeerTerminator peerTerminator,
-        IServerAdmissionGate admissionGate,
+        IServerJoinAdmission joinAdmission,
         ISaveInterface saveInterface,
         IMissionManager missionManager,
         Func<DateTime> getUtcNow,
@@ -116,7 +116,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         this.network = network;
         this.connections = connections;
         this.peerTerminator = peerTerminator;
-        this.admissionGate = admissionGate;
+        this.joinAdmission = joinAdmission;
         this.saveInterface = saveInterface;
         this.missionManager = missionManager;
         this.getUtcNow = getUtcNow;
@@ -200,7 +200,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         while (nextNotice < NoticeSeconds.Length && NoticeSeconds[nextNotice] >= seconds) nextNotice++;
 
         // A new countdown after Completed or Failed takes joins again until its own 120 s mark.
-        if (requestedDeadline - now > JoinGateLead) admissionGate.Open();
+        if (requestedDeadline - now > JoinCloseLead) joinAdmission.Open();
 
         Logger.Information("Server shutdown scheduled in {Seconds}s, saving {SaveName}", seconds, name);
         if (seconds > 0) Broadcast($"The server will restart in {FormatDelay(seconds)}.");
@@ -243,7 +243,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     public string DescribeStatus()
     {
         DateTime now = getUtcNow();
-        string joins = admissionGate.IsOpen ? "open" : "closed";
+        string joins = joinAdmission.IsOpen ? "open" : "closed";
         switch (Phase)
         {
             case ServerShutdownPhase.Countdown:
@@ -283,9 +283,9 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     private void TickCountdown(DateTime now, bool scheduling = false)
     {
         TimeSpan remaining = deadline - now;
-        if (remaining <= JoinGateLead && admissionGate.IsOpen)
+        if (remaining <= JoinCloseLead && joinAdmission.IsOpen)
         {
-            admissionGate.Close();
+            joinAdmission.Close();
             Logger.Information("Server shutdown: joins closed with {Seconds}s left", SecondsLeft(now));
         }
 
@@ -297,7 +297,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         }
 
         // Nobody to warn. While joins are open a player who dropped can still come back.
-        bool nobodyToWaitFor = !connections.Any() && (scheduling || remaining <= JoinGateLead);
+        bool nobodyToWaitFor = !connections.Any() && (scheduling || remaining <= JoinCloseLead);
         if (remaining <= TimeSpan.Zero || nobodyToWaitFor)
         {
             BeginDrain(now);
@@ -309,7 +309,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
 
     private void BeginDrain(DateTime now)
     {
-        admissionGate.Close();
+        joinAdmission.Close();
         Phase = ServerShutdownPhase.Draining;
         drainDeadline = now + DrainTimeout;
 
@@ -493,7 +493,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         StopTicker();
         failureReason = null;
         disconnectedPeers.Clear();
-        admissionGate.Open();
+        joinAdmission.Open();
     }
 
     private void StopTicker()

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
@@ -23,12 +24,15 @@ public class SettlementHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IEncounterMenuConditionRefresher encounterMenuConditionRefresher;
 
-    public SettlementHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public SettlementHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager,
+        IEncounterMenuConditionRefresher encounterMenuConditionRefresher)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.encounterMenuConditionRefresher = encounterMenuConditionRefresher;
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
@@ -117,13 +121,13 @@ public class SettlementHandler : IHandler
     private void HandleMilitia(MessagePayload<ChangeSettlementMilitia> payload)
     {
         var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        MilitiaSettlementPatch.RunMiltiaChange(settlement, obj.Militia);
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement))
+                return;
+            MilitiaSettlementPatch.RunMiltiaChange(settlement, obj.Militia);
+            encounterMenuConditionRefresher.RefreshForMapEvent(settlement.Party.MapEvent);
+        });
     }
 
     private void HandleCurrentSiegeState(MessagePayload<ChangeSettlementCurrentSiegeState> payload)
