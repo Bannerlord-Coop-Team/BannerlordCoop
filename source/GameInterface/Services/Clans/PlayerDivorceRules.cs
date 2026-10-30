@@ -70,7 +70,7 @@ public class PlayerDivorceRules : IPlayerDivorceRules
         if (leaveClan && !clanLeaveRules.TryApply(junior, isRemoval: junior != actor))
         {
             Logger.Warning("Divorced players but {Hero} could not leave the clan", junior.Name);
-        } 
+        }
 
         return actor.Spouse == null && spouse.Spouse == null;
     }

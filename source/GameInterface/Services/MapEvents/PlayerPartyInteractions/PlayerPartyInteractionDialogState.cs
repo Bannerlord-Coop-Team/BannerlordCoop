@@ -379,7 +379,7 @@ public static class PlayerPartyInteractionDialogState
     {
         if (!CanCancelWaiting) return;
 
-        MessageBroker.Instance.Publish(null, new PlayerPartyInteractionOptionSelected(SessionId, PartyId, PlayerPartyInteractionOption.Leave));
+        MessageBroker.Instance.Publish(null, new PlayerPartyInteractionOptionSelected(SessionId, PartyId, PlayerPartyInteractionOption.WithdrawProposal));
     }
 
     public static void ShowServiceOptions()

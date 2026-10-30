@@ -515,6 +515,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void HandleInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
         if (TryHandleInitiatorLeaveOption(session, option)) return;
+        if (TryHandleWithdrawProposalOption(session, option)) return;
         if (TryHandleStopMapTrackingOption(session, option)) return;
         if (TryHandleClanDepartureOption(session, option)) return;
         if (TryHandleDivorceOption(session, option)) return;
@@ -568,6 +569,17 @@ internal class PlayerPartyInteractionHandler : IHandler
             return true;
 
         EndSession(session, GetLeaveOutcome(session));
+        return true;
+    }
+
+    // Separate from Leave because leaving an open trade still counts as declining it.
+    private bool TryHandleWithdrawProposalOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.WithdrawProposal) return false;
+        if (session.Proposal == PlayerPartyInteractionProposal.None ||
+            session.Proposal == PlayerPartyInteractionProposal.HostileDemand) return true;
+
+        EndSession(session, PlayerPartyInteractionOutcomeType.ProposalWithdrawn);
         return true;
     }
 

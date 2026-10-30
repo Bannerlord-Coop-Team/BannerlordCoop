@@ -45,7 +45,8 @@ public enum PlayerPartyInteractionOption
     ProposeDivorce,
     DivorceStayInClan,
     DivorceLeaveClan,
-    CancelDivorce
+    CancelDivorce,
+    WithdrawProposal
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -108,7 +109,8 @@ public enum PlayerPartyInteractionOutcomeType
     MapTrackingDeclined,
     MapTrackingStopped,
     Divorced,
-    DivorcedAndLeftClan
+    DivorcedAndLeftClan,
+    ProposalWithdrawn
 }
 
 public enum PlayerPartyInteractionDeniedReason

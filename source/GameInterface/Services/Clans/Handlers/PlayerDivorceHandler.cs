@@ -37,6 +37,8 @@ internal class PlayerDivorceHandler : IHandler
 
     private void Handle(MessagePayload<PlayerDivorceRequested> obj)
     {
+        if (ModInformation.IsServer) return;
+
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.Actor, out var actorId)) return;
@@ -47,6 +49,8 @@ internal class PlayerDivorceHandler : IHandler
 
     private void Handle(MessagePayload<RequestPlayerDivorce> obj)
     {
+        if (ModInformation.IsClient) return;
+
         var data = obj.What;
 
         GameThread.RunSafe(() =>
