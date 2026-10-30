@@ -366,9 +366,10 @@ public class EndingJournalTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ReorderedStagesWithSharedTemplatesKeepTheirOwnProgress(bool identicalVariables)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ReorderedStagesWithSharedTemplatesKeepTheirOwnProgress(bool identicalVariables, bool identicalTicks)
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
@@ -376,7 +377,7 @@ public class EndingJournalTests : IDisposable
         JournalLog other = null!;
         scenario.Server.Call(() =>
         {
-            other = Stage(456L, identicalVariables ? "Danustica" : "Amitatys");
+            other = Stage(identicalTicks ? 123L : 456L, identicalVariables ? "Danustica" : "Amitatys");
             target = Stage(123L, "Danustica");
             serverQuest._journalEntries.Add(other);
             serverQuest._journalEntries.Add(target);
@@ -385,7 +386,7 @@ public class EndingJournalTests : IDisposable
         {
             var progress = Stage(123L, "Danustica");
             ownerQuest._journalEntries.Add(progress);
-            ownerQuest._journalEntries.Add(Stage(456L, identicalVariables ? "Danustica" : "Amitatys"));
+            ownerQuest._journalEntries.Add(Stage(identicalTicks ? 123L : 456L, identicalVariables ? "Danustica" : "Amitatys"));
             progress.UpdateCurrentProgress(4);
         });
         environment.FlushCoalescer();
