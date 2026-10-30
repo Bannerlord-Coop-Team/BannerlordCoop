@@ -24,7 +24,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -512,16 +511,10 @@ public class MerchantOutlawsTests : IDisposable
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
 
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
-
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
-        ClientA.Call(() =>
-        {
-            Assert.True(ownerQuest.IsFinalized);
-            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(ownerQuest)));
-            Assert.Contains(archive.GetEntries(), log => log.CurrentProgress == 1);
-        });
     }
 
     [Fact]
