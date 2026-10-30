@@ -1,7 +1,9 @@
-﻿using GameInterface.Services.Party;
+﻿using Common.Util;
+using GameInterface.Services.Party;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -244,6 +246,55 @@ public class PartyScreenRosterRefresherTests
         Assert.Empty(logic.CurrentData.RightItemRoster);
         Assert.Empty(logic._initialData.RightItemRoster);
         AssertRoster(visible, character, 5, 1);
+    }
+
+    /// <summary>
+    /// A talk started from the party screen is the active state on top of it. A prisoner the server
+    /// frees during the talk (a recruited lord's companion) must leave the screen data too, otherwise
+    /// the Done that vanilla runs on resume resets him back into the live prison roster.
+    /// </summary>
+    [Fact]
+    public void ServerRelease_DuringPartyScreenTalk_StaysOutAfterDoneReset()
+    {
+        var prisoner = new CharacterObject();
+        var logic = CreateLogic(new CharacterObject(), 5, 0, out _);
+        var prisoners = logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        prisoners.AddToCounts(prisoner, 1);
+        logic._initialData.RightPrisonerRoster.AddToCounts(prisoner, 1);
+
+        var gameStates = new GameStateManager(null, GameStateManager.GameStateManagerType.Game);
+        gameStates._gameStates.Add(new PartyState { PartyScreenLogic = logic });
+        gameStates._gameStates.Add(ObjectHelper.SkipConstructor<TaleWorlds.MountAndBlade.MissionState>());
+
+        // Same fallback as TroopRosterDeltaHandler when no open screen takes the change.
+        var openLogic = PartyScreenRosterRefresher.GetOpenLogic(gameStates);
+        if (!CreateRefresher().TryApply(openLogic, prisoners, prisoner, Release, () => { }))
+            Release(prisoners, prisoner);
+
+        logic.Reset(true);
+
+        Assert.Same(logic, openLogic);
+        Assert.Equal(-1, prisoners.FindIndexOfTroop(prisoner));
+        Assert.Equal(-1, logic._initialData.RightPrisonerRoster.FindIndexOfTroop(prisoner));
+    }
+
+    /// <summary>
+    /// With no party screen in the stack the change goes straight to the live roster.
+    /// </summary>
+    [Fact]
+    public void GetOpenLogic_NoPartyState_ReturnsNull()
+    {
+        var gameStates = new GameStateManager(null, GameStateManager.GameStateManagerType.Game);
+        gameStates._gameStates.Add(ObjectHelper.SkipConstructor<TaleWorlds.MountAndBlade.MissionState>());
+
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(gameStates));
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(null));
+    }
+
+    private static void Release(TroopRoster roster, CharacterObject troop)
+    {
+        roster.AddToCounts(troop, -roster.GetTroopCount(troop), false, 0, 0, true);
+        roster.InitializeCachedData();
     }
 
     private static PartyScreenLogic CreateLogic(

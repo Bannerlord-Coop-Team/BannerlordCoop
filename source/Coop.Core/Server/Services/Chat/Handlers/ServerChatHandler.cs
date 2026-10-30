@@ -13,10 +13,11 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Services.Chat.Handlers;
 
-/// <summary>Authenticates chat senders and routes global and direct messages.</summary>
+/// <summary>Authenticates chat senders and routes global, group, and direct messages.</summary>
 internal sealed class ServerChatHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerChatHandler>();
@@ -25,17 +26,20 @@ internal sealed class ServerChatHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IChatPlayerNameResolver playerNameResolver;
+    private readonly IChatFactionMembership factionMembership;
 
     public ServerChatHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IPlayerManager playerManager,
-        IChatPlayerNameResolver playerNameResolver)
+        IChatPlayerNameResolver playerNameResolver,
+        IChatFactionMembership factionMembership)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
+        this.factionMembership = factionMembership;
 
         messageBroker.Subscribe<NetworkSendChatMessage>(HandleChatMessage);
         messageBroker.Subscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
@@ -129,7 +133,25 @@ internal sealed class ServerChatHandler : IHandler
         switch (request.Channel)
         {
             case ChatChannel.Global:
-                RouteGlobal(sender, text);
+                RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
+                return;
+            case ChatChannel.Clan:
+                RouteToFactionGroup(
+                    senderPeer,
+                    sender,
+                    text,
+                    ChatChannel.Clan,
+                    factionMembership.GetClan,
+                    "You are not in a clan.");
+                return;
+            case ChatChannel.Kingdom:
+                RouteToFactionGroup(
+                    senderPeer,
+                    sender,
+                    text,
+                    ChatChannel.Kingdom,
+                    factionMembership.GetKingdom,
+                    "You are not in a kingdom.");
                 return;
             case ChatChannel.Direct:
                 RouteDirect(senderPeer, sender, request.RecipientControllerId, text);
@@ -140,10 +162,36 @@ internal sealed class ServerChatHandler : IHandler
         }
     }
 
-    private void RouteGlobal(Player sender, string text)
+    private void RouteToFactionGroup(
+        NetPeer senderPeer,
+        Player sender,
+        string text,
+        ChatChannel channel,
+        Func<Player, IFaction> getGroup,
+        string notMemberMessage)
+    {
+        var group = getGroup(sender);
+        if (group == null)
+        {
+            SendSystemMessage(senderPeer, string.Empty, notMemberMessage);
+            return;
+        }
+
+        RouteToMatchingPlayers(
+            channel,
+            sender,
+            text,
+            player => ReferenceEquals(getGroup(player), group));
+    }
+
+    private void RouteToMatchingPlayers(
+        ChatChannel channel,
+        Player sender,
+        string text,
+        Func<Player, bool> matches)
     {
         var message = new NetworkChatMessage(
-            ChatChannel.Global,
+            channel,
             sender.ControllerId,
             playerNameResolver.Resolve(sender),
             string.Empty,
@@ -153,6 +201,7 @@ internal sealed class ServerChatHandler : IHandler
         var sentPeers = new HashSet<NetPeer>();
         foreach (var player in playerManager.Players)
         {
+            if (!matches(player)) continue;
             if (playerManager.TryGetPeer(player.ControllerId, out var peer) && sentPeers.Add(peer))
                 network.SendImmediate(peer, message);
         }

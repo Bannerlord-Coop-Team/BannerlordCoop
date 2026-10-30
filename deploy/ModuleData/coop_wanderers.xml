@@ -502,7 +502,7 @@
     voice="earnest"
     age="23"
     default_group="Infantry"
-    is_template="true"
+    is_template="false"
     is_hero="false"
     is_female="false"
     culture="Culture.battania"

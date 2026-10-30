@@ -262,6 +262,17 @@ internal class MapEventCreationCoordinator : IHandler
             return joinedExistingBattle;
         }
 
+        if (IsFriendlySiegeAssault(attacker, defender))
+        {
+            Logger.Warning(
+                "Rejecting siege assault on a settlement the attacker is not at war with. RequestId={RequestId}, AttackerId={AttackerId}, DefenderId={DefenderId}",
+                request.RequestId,
+                request.AttackerId,
+                request.DefenderId);
+            SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
+            return false;
+        }
+
         if (!TryConsumeApprovedMapEventStart(request, attacker, defender))
         {
             SendCreatedReply(requestingPeer, request, MapEventCreationOutcome.Rejected, null);
@@ -271,6 +282,16 @@ internal class MapEventCreationCoordinator : IHandler
         var creationResult = CreateMapEvent(request, attacker, defender);
         SendCreatedReply(requestingPeer, request, creationResult.Outcome, creationResult.MapEventId);
         return false;
+    }
+
+    // Vanilla only assaults a besieged settlement at war with the attacker. A friendly one means the request still
+    // names the settlement where it should name the siege camp, and would put the player at the head of the besiegers.
+    private static bool IsFriendlySiegeAssault(PartyBase attacker, PartyBase defender)
+    {
+        var settlement = defender.Settlement;
+        var attackerFaction = attacker.MapFaction;
+        return settlement?.IsFortification == true && settlement.SiegeEvent != null &&
+            attackerFaction != null && !attackerFaction.IsAtWarWith(settlement.MapFaction);
     }
 
     private void SendCreatedReply(

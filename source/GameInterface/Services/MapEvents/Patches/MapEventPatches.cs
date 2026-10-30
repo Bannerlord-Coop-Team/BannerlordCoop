@@ -15,6 +15,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -204,6 +205,8 @@ internal class MapEventPatches
         return null;
     }
 
+    // A client skips an unchanged winner, and writes a coop mission victory straight to the field so the managed
+    // setter never reports it; the server and allowed writes run vanilla.
     [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
     [HarmonyPrefix]
     private static bool Prefix_SetOverrideWinner(MapEvent __instance, BattleSideEnum winner)
@@ -219,8 +222,23 @@ internal class MapEventPatches
         };
 
         // Skip unchanged client writes before the managed setter reports them.
-        return state != __instance.BattleState;
+        if (state == __instance.BattleState) return false;
+
+        // A coop mission's victory winds the local mission down (PlayerEncounter.SetPlayerVictoriousInternal); the server
+        // applies it after every member reports, so the client writes only the field (its OnBattleWon is skipped anyway).
+        if (IsCoopMissionVictory(state))
+        {
+            __instance._battleState = state;
+            return false;
+        }
+
+        return true;
     }
+
+    // A victory set inside a coop battle mission, which the server applies only after every member reports.
+    private static bool IsCoopMissionVictory(BattleState state) =>
+        (state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
+        && BattleConclusionGate.IsInCoopBattleMission;
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
@@ -262,8 +280,7 @@ internal class MapEventPatches
         // Coop mission victories use NetworkBattleResultReady so the server can wait for every member and
         // accepted joiner. The local set still runs so this mission winds down; the server applies the result
         // only after the completion barrier publishes the authoritative state change.
-        if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission)
+        if (IsCoopMissionVictory(value))
         {
             return true;
         }
@@ -552,6 +569,9 @@ internal class MapEventPatches
         if (__instance.IsRaidHostileAction())
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
+
+            if (ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
+                hostileActions.ResolveRaidDefenders(__instance);
 
             // Slow raids need campaign-map progress, but not while their battle mission is occupied.
             if (__instance.IsActiveSlowVillageRaid())

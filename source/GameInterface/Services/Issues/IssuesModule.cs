@@ -36,6 +36,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
+        builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsHourlyTick>().As<IMerchantOutlawsHourlyTick>().InstancePerDependency();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();

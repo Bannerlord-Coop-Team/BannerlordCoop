@@ -35,6 +35,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -44,7 +45,8 @@ internal class FinalizationCoordinator : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IControllerIdProvider controller,
-        IAlternativeSolutionCommitments commitments)
+        IAlternativeSolutionCommitments commitments,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,6 +56,7 @@ internal class FinalizationCoordinator : IHandler
         this.playerManager = playerManager;
         this.controller = controller;
         this.commitments = commitments;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -261,21 +264,47 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
-            var isOwner = hasOwner && owner == controller.ControllerId;
-            if (hasOwner) ownership.Remove(data.IssueOwnerId);
-
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+            // The owner's running quest ends mid dialog as in vanilla. Anything else waits, because the lines on screen read the issue or its quest
+            if (IsOwnersRunningQuest(data))
             {
-                return;
+                conversationGuard.RunInOrder(() => ReplayEnding(data), data.IssueOwnerId);
             }
-
-            using (new AllowedThread())
-            using (new QuestEndingReplay())
+            else
             {
-                Replay(issue, data.Outcome, isOwner);
+                conversationGuard.RunWhenNotTalkingTo(() => ReplayEnding(data), data.IssueOwnerId);
             }
         }, context: nameof(FinalizationCoordinator));
+    }
+
+    private void ReplayEnding(NetworkIssueFinalized data)
+    {
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
+        var isOwner = hasOwner && owner == controller.ControllerId;
+        if (hasOwner) ownership.Remove(data.IssueOwnerId);
+
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+        {
+            return;
+        }
+
+        using (new AllowedThread())
+        using (new QuestEndingReplay())
+        {
+            Replay(issue, data.Outcome, isOwner);
+        }
+    }
+
+    // The quest Replay drives, a hand in for example, rather than one it would only discard
+    private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
+    {
+        if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
+            !objectManager.TryGetObject<Hero>(data.IssueOwnerId, out var issueOwner) || issueOwner.Issue?.StringId != data.IssueId)
+        {
+            return false;
+        }
+
+        var quest = issueOwner.Issue.IssueQuest;
+        return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
