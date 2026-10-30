@@ -101,7 +101,10 @@ internal class AlternativeSolutionJournalHandler : IHandler
                     archive?.Update(issue.JournalEntries, data.Ending);
                 }
                 else
-                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Ending, Hero.MainHero);
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Ending,
+                        data.Ending == IssueBase.IssueUpdateDetails.IssueCancel && !issue.IsTriedToSolveBefore
+                            ? null
+                            : Hero.MainHero);
             }
         }, context: nameof(AlternativeSolutionJournalHandler));
     }
