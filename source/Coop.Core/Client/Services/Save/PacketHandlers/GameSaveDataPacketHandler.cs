@@ -14,6 +14,7 @@ using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -120,7 +121,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.NavalPlayerData,
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions,
-            completedTransfer.ClanFinance));
+            completedTransfer.ClanFinance,
+            completedTransfer.OrderOfBattlePlayerData));
     }
 
     private sealed class PendingTransfer
@@ -147,6 +149,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
             ClanFinance = firstChunk.ClanFinance;
+            OrderOfBattlePlayerData = firstChunk.OrderOfBattlePlayerData;
         }
 
         public int TransferId { get; }
@@ -166,6 +169,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
         public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+        public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {

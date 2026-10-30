@@ -10,6 +10,7 @@ using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -80,6 +81,8 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
 
     [ProtoMember(15)]
+    public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
+    [ProtoMember(16)]
     public readonly NavalPlayerData NavalPlayerData;
 
     public GameSaveDataPacket(
@@ -97,7 +100,8 @@ public readonly struct GameSaveDataPacket : IPacket
         NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -114,5 +118,6 @@ public readonly struct GameSaveDataPacket : IPacket
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
+        OrderOfBattlePlayerData = orderOfBattlePlayerData;
     }
 }

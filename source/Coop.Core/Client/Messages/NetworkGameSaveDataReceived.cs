@@ -12,6 +12,7 @@ using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
@@ -53,6 +54,8 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(14)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     [ProtoMember(15)]
+    public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    [ProtoMember(16)]
     public NavalPlayerData NavalPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
@@ -70,7 +73,8 @@ public record NetworkGameSaveDataReceived : IEvent
         NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -87,5 +91,6 @@ public record NetworkGameSaveDataReceived : IEvent
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
+        OrderOfBattlePlayerData = orderOfBattlePlayerData;
     }
 }

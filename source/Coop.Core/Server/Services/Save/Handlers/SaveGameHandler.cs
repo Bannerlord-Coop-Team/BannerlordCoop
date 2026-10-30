@@ -122,7 +122,8 @@ internal class SaveGameHandler : IHandler
             current?.AgingPlayerData ?? empty.AgingPlayerData,
             current?.NavalPlayerData ?? empty.NavalPlayerData,
             current?.ClanFinance ?? empty.ClanFinance,
-            current?.PlayerTraitData ?? empty.PlayerTraitData);
+            current?.PlayerTraitData ?? empty.PlayerTraitData,
+            current?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData);
 
         coopSessionProvider.CoopSession = session;
 
@@ -149,7 +150,8 @@ internal class SaveGameHandler : IHandler
             loaded?.AgingPlayerData ?? empty.AgingPlayerData,
             loaded?.NavalPlayerData ?? empty.NavalPlayerData,
             loaded?.ClanFinance ?? empty.ClanFinance,
-            loaded?.PlayerTraitData ?? empty.PlayerTraitData);
+            loaded?.PlayerTraitData ?? empty.PlayerTraitData,
+            loaded?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData);
 
         coopSessionProvider.CoopSession = savedSession;
     }
