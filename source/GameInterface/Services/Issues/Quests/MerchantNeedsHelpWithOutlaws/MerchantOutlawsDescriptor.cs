@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssue
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
-internal class MerchantOutlawsDescriptor : IQuestTypeDescriptor
+internal class MerchantOutlawsDescriptor : IQuestTypeDescriptor, ISpecializedEndingJournalDescriptor
 {
     public Type IssueType => typeof(Issue);
     public ICreationCaptureStrategy CreationCaptureStrategy { get; }
