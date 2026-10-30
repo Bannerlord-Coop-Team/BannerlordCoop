@@ -235,7 +235,7 @@ internal class PrisonBreakHandler : IHandler
             {
                 if (playerHero.IsPrisoner) return;
 
-                // Same capture as the sneak-in failure, the player's party waits outside with its troops.
+                // Same capture as the sneak-in failure, the player's party waits in the settlement with its troops.
                 playerHero.PartyBelongedTo?.Party.AddElementToMemberRoster(playerHero.CharacterObject, -1, true);
                 TakePrisonerAction.Apply(settlement.Party, playerHero);
                 return;
@@ -359,6 +359,8 @@ internal class PrisonBreakHandler : IHandler
     // Covers every way a prisoner leaves the prison mid-mission: ransom, peace, transfer, death.
     private void EndBreaksWithPrisonerGone()
     {
+        if (activeBreaks.Count == 0) return;
+
         foreach (var pair in activeBreaks.ToList())
         {
             var settlementId = pair.Key;

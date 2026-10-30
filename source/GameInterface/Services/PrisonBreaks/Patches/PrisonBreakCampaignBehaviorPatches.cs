@@ -1,12 +1,13 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.PrisonBreaks.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PrisonBreaks.Patches;
@@ -41,6 +42,18 @@ internal class PrisonBreakCampaignBehaviorPatches
     [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.LocationCharactersAreReadyToSpawn))]
     [HarmonyFinalizer]
     private static void LocationCharactersAreReadyToSpawnFinalizer(IDisposable __state) => __state?.Dispose();
+
+    // Guard loadouts are mission copies, not new campaign equipment.
+    [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.GetPrisonGuardAgentData))]
+    [HarmonyPrefix]
+    private static void GetPrisonGuardAgentDataPrefix(out IDisposable __state)
+    {
+        __state = ModInformation.IsClient ? new TransientEquipmentSyncScope() : null;
+    }
+
+    [HarmonyPatch(nameof(PrisonBreakCampaignBehavior.GetPrisonGuardAgentData))]
+    [HarmonyFinalizer]
+    private static void GetPrisonGuardAgentDataFinalizer(IDisposable __state) => __state?.Dispose();
 
     internal static bool IsListingPrisoners;
 
@@ -92,9 +105,8 @@ internal class PrisonBreakCampaignBehaviorPatches
     {
         if (ModInformation.IsServer) return true;
 
-        // Vanilla body without the XP and TakePrisonerAction, which the server applies.
-        PlayerEncounter.LeaveSettlement();
-        PlayerEncounter.Finish();
+        // Same as the sneak-in capture, the party stays in the settlement and the server imprisons the hero.
+        GameMenu.ExitToLast();
         PublishEnded(__instance, PrisonBreakOutcome.PlayerCaptured);
         return false;
     }
