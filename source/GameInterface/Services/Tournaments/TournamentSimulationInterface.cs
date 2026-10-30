@@ -1,4 +1,5 @@
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Tournaments.Data;
 using SandBox.Tournaments.MissionLogics;
 using System;
@@ -128,7 +129,10 @@ public sealed partial class TournamentGameInterface
         {
             Game.Current.PlayerTroop = hero.CharacterObject;
             behavior.CalculateBet();
-            quote = new TournamentBetQuote(behavior.GetMaximumBet(), behavior.BetOdd);
+            int maximumBet = TournamentBettingMath.ScaleMaximumBet(
+                behavior.GetMaximumBet(),
+                ModConfigProvider.ModOptions.TournamentMaximumBetMultiplier);
+            quote = new TournamentBetQuote(maximumBet, behavior.BetOdd);
             return true;
         }
         finally

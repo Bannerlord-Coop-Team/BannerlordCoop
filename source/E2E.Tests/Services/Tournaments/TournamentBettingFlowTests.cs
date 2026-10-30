@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -64,6 +65,29 @@ public class TournamentBettingFlowTests : SyncTestBase
         AssertGold(fixture, InitialGold - 100);
 
         Server.PumpGameThread();
+    }
+
+    [Fact]
+    public void BetMultiplier_LetsTheServerAcceptABetAboveTheVanillaMaximum()
+    {
+        var previousOptions = ModConfigProvider.ModOptions;
+        try
+        {
+            ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+            {
+                TournamentMaximumBetMultiplier = 2f,
+            });
+            TournamentFixture fixture = CreateFixture();
+
+            NetworkTournamentBetResult result = PlaceBet(fixture, 300, 1);
+
+            Assert.Equal(300, result.ThisRoundBettedDenars);
+            AssertGold(fixture, InitialGold - 300);
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
     }
 
     [Fact]

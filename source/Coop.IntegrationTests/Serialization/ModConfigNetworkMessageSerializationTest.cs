@@ -84,6 +84,7 @@ namespace Coop.IntegrationTests.Serialization
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
                 BlockAiWarDeclarationsOnOfflinePlayers = true,
+                TournamentMaximumBetMultiplier = 4f,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -107,6 +108,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(4f, copy.TournamentMaximumBetMultiplier);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -164,6 +166,7 @@ namespace Coop.IntegrationTests.Serialization
             CoopClansEnabled = false,
             VoiceEnabled = false,
             BlockAiWarDeclarationsOnOfflinePlayers = false,
+            TournamentMaximumBetMultiplier = 0f,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -194,6 +197,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.CoopClansEnabled);
             Assert.False(copy.VoiceEnabled);
             Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
+            Assert.Equal(0f, copy.TournamentMaximumBetMultiplier);
         }
 
         private static T RoundTrip<T>(T original)

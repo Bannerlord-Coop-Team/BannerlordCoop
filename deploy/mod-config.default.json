@@ -225,6 +225,12 @@
 
     // Set the time in seconds players have to vote on kingdom decisions.
     // Default is 60. Values of 0 or lower will default back to 60.
-    "kingdomDecisionVoteTimeoutSeconds": 60
+    "kingdomDecisionVoteTimeoutSeconds": 60,
+
+    // Set a multiplier for the most a player can bet on a tournament match.
+    // Vanilla allows 150 denars, or 300 with the Roguery perk Deep Pockets.
+    // The default is 1, which keeps the vanilla limit. 0 turns betting off.
+    // Negative values will default back to 1.0
+    "tournamentMaximumBetMultiplier": 1.0
   }
 }
