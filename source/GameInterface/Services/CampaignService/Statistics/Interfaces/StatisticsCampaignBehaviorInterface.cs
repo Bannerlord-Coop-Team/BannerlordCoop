@@ -36,7 +36,7 @@ public interface IStatisticsCampaignBehaviorInterface : IGameAbstraction
     void OnPrisonersTaken(Hero playerHero, int amount);
     void OnCraftingPartUnlocked(Hero playerHero);
     void OnNewItemCrafted(Hero playerHero, ItemObject itemObject, bool isCraftingOrderItem);
-    void OnNewCompanionAdded(Hero companion);
+    void OnCompanionHired(Clan clan);
     void OnHeroOrPartyTradedGold(Hero recipientHero, PartyBase recipientParty, int goldAmount);
     void OnMapEventEnded(MapEvent mapEvent);
     void OnClanDestroyed(Clan clan);
@@ -202,9 +202,9 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
         }
     }
 
-    public void OnNewCompanionAdded(Hero companion)
+    public void OnCompanionHired(Clan clan)
     {
-        if (!TryGetStatistics(companion.CompanionOf?.Leader, out var statistics)) return;
+        if (!TryGetStatistics(clan.Leader, out var statistics)) return;
 
         statistics.NumberOfCompanionsHired++;
     }

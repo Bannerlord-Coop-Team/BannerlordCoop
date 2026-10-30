@@ -67,14 +67,6 @@ internal class StatisticsCampaignBehaviorPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(StatisticsCampaignBehavior.OnNewCompanionAdded))]
-    [HarmonyPrefix]
-    public static bool OnNewCompanionAddedPrefix(Hero hero)
-    {
-        if (TryGetServerStatistics(out var statistics)) statistics.OnNewCompanionAdded(hero);
-        return false;
-    }
-
     [HarmonyPatch(nameof(StatisticsCampaignBehavior.OnHeroOrPartyTradedGold))]
     [HarmonyPrefix]
     public static bool OnHeroOrPartyTradedGoldPrefix((Hero, PartyBase) recipient, (int, string) goldAmount)
@@ -210,6 +202,11 @@ internal class StatisticsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnPlayerEarnedGoldFromAssetPrefix() => false;
 
+    // Players trading companions also fire this, so hires are counted from AddCompanionAction instead
+    [HarmonyPatch(nameof(StatisticsCampaignBehavior.OnNewCompanionAdded))]
+    [HarmonyPrefix]
+    public static bool OnNewCompanionAddedPrefix() => false;
+
     [HarmonyPatch(nameof(StatisticsCampaignBehavior.OnDefectionPersuasionSucess))]
     [HarmonyPrefix]
     public static bool OnDefectionPersuasionSucessPrefix() => false;
@@ -236,6 +233,22 @@ internal class StatisticsMissionEndedPatch
         if (!ContainerProvider.TryResolve<IStatisticsCampaignBehaviorInterface>(out var statistics)) return;
 
         statistics.SendMissionStatistics();
+    }
+}
+
+/// <summary>
+/// Replaces StatisticsCampaignBehavior.OnNewCompanionAdded
+/// </summary>
+[HarmonyPatch(typeof(AddCompanionAction), nameof(AddCompanionAction.ApplyInternal))]
+internal class StatisticsCompanionHiredPatch
+{
+    [HarmonyPostfix]
+    public static void Postfix(Clan clan)
+    {
+        if (ModInformation.IsClient) return;
+        if (!ContainerProvider.TryResolve<IStatisticsCampaignBehaviorInterface>(out var statistics)) return;
+
+        statistics.OnCompanionHired(clan);
     }
 }
 
