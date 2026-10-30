@@ -123,6 +123,25 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
+        // SteamTunnelHost.Stop closes the listener before its pump stops, and Steam closes the accepted connections with it
+        [Fact]
+        public void Receive_AfterListenerStops_NeverReachesSteam()
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            transport.ListenForClients(0);
+            transport.DispatchConnectionState(
+                connection,
+                ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting,
+                listenSocket: 43);
+            transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+
+            transport.StopListening();
+
+            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Assert.Single(transport.ReceivedConnections);
+        }
+
         [Fact]
         public void CloseDuringReceive_WaitsForTheReceiveToReturn()
         {
@@ -201,19 +220,24 @@ namespace Coop.Tests.Steam
             public SteamNetworkingConfigValue_t[] ListenOptions { get; private set; } =
                 Array.Empty<SteamNetworkingConfigValue_t>();
 
-            public void DispatchConnectionState(uint connection, ESteamNetworkingConnectionState state)
+            public void DispatchConnectionState(uint connection, ESteamNetworkingConnectionState state, uint listenSocket = 0)
             {
                 statusChangedHandler!(new SteamNetConnectionStatusChangedCallback_t
                 {
                     m_hConn = new HSteamNetConnection(connection),
-                    m_info = CreateConnectionInfo(state),
+                    m_info = CreateConnectionInfo(state, listenSocket),
                 });
             }
 
             private static SteamNetConnectionInfo_t CreateConnectionInfo(
-                ESteamNetworkingConnectionState state)
+                ESteamNetworkingConnectionState state,
+                uint listenSocket)
             {
-                object boxedInfo = new SteamNetConnectionInfo_t { m_eState = state };
+                object boxedInfo = new SteamNetConnectionInfo_t
+                {
+                    m_eState = state,
+                    m_hListenSocket = new HSteamListenSocket { m_HSteamListenSocket = listenSocket },
+                };
                 var endDebugField = typeof(SteamNetConnectionInfo_t).GetField(
                     "m_szEndDebug_",
                     BindingFlags.Instance | BindingFlags.NonPublic);

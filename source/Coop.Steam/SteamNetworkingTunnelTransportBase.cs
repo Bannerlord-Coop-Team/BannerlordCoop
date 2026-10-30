@@ -15,6 +15,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     private readonly object gate = new object();
     private readonly HashSet<uint> ownedConnections = new HashSet<uint>();
+    private readonly HashSet<uint> acceptedConnections = new HashSet<uint>();
     private readonly TunnelConnectionIdentityRegistry remoteIdentities = new TunnelConnectionIdentityRegistry();
     private readonly Callback<SteamNetConnectionStatusChangedCallback_t> statusChangedCallback;
     private readonly IntPtr[] receivedMessage = new IntPtr[1];
@@ -166,6 +167,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
         {
             if (listenSocket == HSteamListenSocket.Invalid) return;
 
+            // Closing the listen socket closes the connections it accepted inside Steam, so stop receiving on them first
+            ownedConnections.ExceptWith(acceptedConnections);
+            acceptedConnections.Clear();
             CloseListenSocket(listenSocket);
             listenSocket = HSteamListenSocket.Invalid;
         }
@@ -230,6 +234,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
         lock (gate)
         {
             owned = ownedConnections.Remove(connection);
+            acceptedConnections.Remove(connection);
             remoteIdentities.Remove(connection);
         }
 
@@ -341,6 +346,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
                 if (inbound)
                 {
                     ownedConnections.Add(connection);
+                    acceptedConnections.Add(connection);
                     remoteIdentities.Record(connection, change.m_info.m_identityRemote.GetSteamID64());
                 }
                 else if (!ownedConnections.Contains(connection))
