@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using HarmonyLib;
 using System.Xml;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.GauntletUI.PrefabSystem;
@@ -12,8 +13,8 @@ internal static class BarterPrefabPatches
     [HarmonyPrefix]
     public static void LoadMoviePrefix(string movieName, ref bool doNotUseGeneratedPrefabs)
     {
-        // Load XML so the barter item prefab edit below takes effect.
-        if (movieName == "BarterScreen") doNotUseGeneratedPrefabs = true;
+        // Load XML so the barter item prefab edit below takes effect, only for player trades because vanilla barter items dont have the spouse bindings.
+        if (movieName == "BarterScreen" && PlayerPartyTradeContext.IsActive) doNotUseGeneratedPrefabs = true;
     }
 
     [HarmonyPatch(typeof(WidgetTemplate), nameof(WidgetTemplate.LoadFrom))]
