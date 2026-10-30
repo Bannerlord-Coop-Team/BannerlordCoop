@@ -31,7 +31,7 @@ public class SentTroopsData
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct SentTroopData
+public class SentTroopData
 {
     [ProtoMember(1)]
     public readonly string CharacterId;
