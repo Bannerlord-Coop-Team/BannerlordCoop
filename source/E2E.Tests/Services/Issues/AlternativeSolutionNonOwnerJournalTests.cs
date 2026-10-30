@@ -45,6 +45,23 @@ public class AlternativeSolutionNonOwnerJournalTests : IDisposable
         });
     }
 
+    [Fact]
+    public void AClientDailyTick_LeavesForeignJournalProgressUnchanged()
+    {
+        AcceptedOn(scenario.ClientB, QuestScenario.ControllerA);
+
+        scenario.ClientB.Call(() =>
+        {
+            Assert.True(scenario.ClientB.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            var journalLog = Assert.Single(notable.Issue.JournalEntries);
+            Assert.True(journalLog.Range > 1);
+            Assert.Equal(0, journalLog.CurrentProgress);
+
+            Campaign.Current.IssueManager.DailyTick();
+            Assert.Equal(0, journalLog.CurrentProgress);
+        });
+    }
+
     private void AcceptedOn(EnvironmentInstance client, string ownerControllerId)
     {
         var state = new AlternativeSolutionVanillaState(
