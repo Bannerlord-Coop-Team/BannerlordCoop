@@ -4,7 +4,7 @@ namespace GameInterface.Services.OrderOfBattle.Data;
 
 /// <summary>
 /// One player's copy of the formation lists in OrderOfBattleCampaignBehavior
-/// Later NavalOrderOfBattleCampaignBehavior formation lists should also be saved here
+/// and NavalOrderOfBattleCampaignBehavior
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class OrderOfBattleData
@@ -20,4 +20,10 @@ public class OrderOfBattleData
 
     [ProtoMember(4)]
     public OrderOfBattleFormation[] SiegeArmyFormations { get; set; }
+
+    [ProtoMember(5)]
+    public NavalOrderOfBattleFormation[] NavalBattleFormations { get; set; }
+
+    [ProtoMember(6)]
+    public NavalOrderOfBattleFormation[] NavalBattleArmyFormations { get; set; }
 }
