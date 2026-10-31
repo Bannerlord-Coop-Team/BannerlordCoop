@@ -1,12 +1,17 @@
 ﻿using ProtoBuf;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Localization;
+
+using Common.Logging;
+using Serilog;
 
 namespace GameInterface.Surrogates;
 
 [ProtoContract]
 internal struct TextObjectSurrogate
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TextObjectSurrogate>();
     [ProtoMember(1)]
     public string Text { get; set; }
 
@@ -22,12 +27,26 @@ internal struct TextObjectSurrogate
     [ProtoMember(4)]
     public Dictionary<string, string> StringAttributes { get; set; }
 
+    [ProtoMember(5)]
+    public Dictionary<string, float> FloatAttributes { get; set; }
+
+    [ProtoMember(6)]
+    public string[] NullAttributes { get; set; }
+
+    [ProtoMember(7)]
+    public bool HasAttributes { get; set; }
+
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
+        HasAttributes = textObject?.Attributes != null;
         TextObjectAttributes = new();
         IntAttributes = new();
         StringAttributes = new();
+        FloatAttributes = new();
+        NullAttributes = textObject?.Attributes?.Where(attribute => attribute.Value == null)
+            .Select(attribute => attribute.Key)
+            .ToArray();
 
         if (textObject?.Attributes == null)
             return;
@@ -46,20 +65,35 @@ internal struct TextObjectSurrogate
             {
                 StringAttributes[attribute.Key] = stringVariable;
             }
+            else if (attribute.Value is float floatVariable)
+            {
+                FloatAttributes[attribute.Key] = floatVariable;
+            }
+            else
+            {
+                Logger.Warning("Dropping unsupported TextObject attribute {attribute} of type {type}",
+                    attribute.Key, attribute.Value?.GetType().FullName ?? "null");
+            }
         }
     }
 
     public static implicit operator TextObjectSurrogate(TextObject textObject)
     {
+        if ((object)textObject == null)
+            return default;
+
         return new TextObjectSurrogate(textObject);
     }
 
     public static implicit operator TextObject(TextObjectSurrogate surrogate)
     {
-        // Keep null attributes instead of initializing an empty dictionary
-        if (surrogate.TextObjectAttributes == null 
+        // Legacy payloads without attribute fields default to null; their null/empty distinction was not sent.
+        if (!surrogate.HasAttributes
+            && surrogate.TextObjectAttributes == null
             && surrogate.IntAttributes == null
-            && surrogate.StringAttributes == null)
+            && surrogate.StringAttributes == null
+            && surrogate.FloatAttributes == null
+            && surrogate.NullAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
@@ -83,6 +117,21 @@ internal struct TextObjectSurrogate
             foreach (var stringAttribute in surrogate.StringAttributes)
             {
                 attributes[stringAttribute.Key] = stringAttribute.Value;
+            }
+        }
+        if (surrogate.FloatAttributes != null)
+        {
+            foreach (var floatAttribute in surrogate.FloatAttributes)
+            {
+                attributes[floatAttribute.Key] = floatAttribute.Value;
+            }
+        }
+
+        if (surrogate.NullAttributes != null)
+        {
+            foreach (var nullAttribute in surrogate.NullAttributes)
+            {
+                attributes[nullAttribute] = null;
             }
         }
 
