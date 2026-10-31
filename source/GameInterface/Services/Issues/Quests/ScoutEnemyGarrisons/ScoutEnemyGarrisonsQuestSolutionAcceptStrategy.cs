@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
 using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
@@ -50,6 +51,14 @@ internal class ScoutEnemyGarrisonsQuestSolutionAcceptStrategy : IQuestSolutionAc
         if (ModInformation.IsServer && issue.IsSolvingWithQuest && quest._startQuestLog == null &&
             ownerResolver.TryResolveOwnerHero(issue, out var owner))
         {
+            var mirrored = quest.JournalEntries.ToArray().FirstOrDefault(log =>
+                log.LogText?.ToString() == quest.PlayerStartsQuestLogText?.ToString());
+            if (mirrored != null)
+            {
+                quest._startQuestLog = mirrored;
+                return;
+            }
+
             // World-event listeners read this progress log without starting the server's quest.
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
                 quest._startQuestLog = quest.AddDiscreteLog(quest.PlayerStartsQuestLogText,

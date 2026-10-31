@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
 
@@ -29,6 +30,8 @@ internal class ArtisanDeliveryProgressHandler : IHandler
             if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue.IssueQuest is Quest quest)) return;
 
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             quest._givenTradeGoods = data.Delivered;
             if (quest._playerStartsQuestLog != null)
             {

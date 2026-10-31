@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -61,7 +62,8 @@ internal class VillageNeedsToolsJournalHandler : IHandler
             || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)
             || !players.TryGetPeer(controllerId, out var peer)) return;
 
-        network.Send(peer, new NetworkVillageNeedsToolsJournal(giverId, issue.StringId, payload.What.Text));
+        network.Send(peer, new NetworkVillageNeedsToolsJournal(giverId, issue.StringId, payload.What.Text,
+            payload.What.Template, payload.What.TimeTicks));
     }
 
     private void Handle_Journal(MessagePayload<NetworkVillageNeedsToolsJournal> payload)
@@ -72,9 +74,15 @@ internal class VillageNeedsToolsJournalHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)
-                || !(issue.IssueQuest is Quest quest) || !quest.IsOngoing) return;
+                || !(issue.IssueQuest is Quest quest) || (!quest.IsOngoing && !quest.IsFinalized)) return;
 
-            quest.AddLog(new TextObject("{=!}" + data.Text));
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
+            var template = data.Template ?? (data.Text == null ? null : new TextObject(data.Text));
+            if (template == null) return;
+            if (!quest.JournalEntries.Any(log => log.LogTime.NumTicks == data.TimeTicks &&
+                log.LogText?.Equals(template) == true))
+                quest._journalEntries.Add(new JournalLog(new CampaignTime(data.TimeTicks), template));
         }, context: nameof(VillageNeedsToolsJournalHandler));
     }
 
@@ -159,11 +167,15 @@ public readonly struct VillageNeedsToolsJournalAdded : IEvent
 {
     public readonly Quest Quest;
     public readonly string Text;
+    public readonly TextObject Template;
+    public readonly long TimeTicks;
 
-    public VillageNeedsToolsJournalAdded(Quest quest, string text)
+    public VillageNeedsToolsJournalAdded(Quest quest, string text, TextObject template, long timeTicks)
     {
         Quest = quest;
         Text = text;
+        Template = template;
+        TimeTicks = timeTicks;
     }
 }
 
@@ -173,11 +185,16 @@ public readonly struct NetworkVillageNeedsToolsJournal : ICommand
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(4)] public readonly string Text;
+    [ProtoMember(5)] public readonly TextObject Template;
+    [ProtoMember(6)] public readonly long TimeTicks;
 
-    public NetworkVillageNeedsToolsJournal(string giverId, string issueId, string text)
+    public NetworkVillageNeedsToolsJournal(string giverId, string issueId, string text,
+        TextObject template = null, long timeTicks = 0)
     {
         GiverId = giverId;
         IssueId = issueId;
         Text = text;
+        Template = template;
+        TimeTicks = timeTicks;
     }
 }
