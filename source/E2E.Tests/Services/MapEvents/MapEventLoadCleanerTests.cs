@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Registry;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Players;
 using Serilog;
@@ -915,7 +916,8 @@ public class MapEventLoadCleanerTests : MapEventTestBase
                 Server.ObjectManager,
                 Server.Resolve<IArmyDisbander>(),
                 Server.Resolve<IStalledMapEventResolver>(),
-                new OrphanedMapEventFinder());
+                new OrphanedMapEventFinder(),
+                Server.Resolve<ILoadRepairRegistryReconciler>());
             var reportedParties = new List<PartyBase>();
 
             var releasedParties = cleaner.ReleaseEndedMapEventLinks(party =>

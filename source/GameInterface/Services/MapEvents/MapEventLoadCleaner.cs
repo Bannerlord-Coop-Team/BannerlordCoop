@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Registry.Auto;
+using GameInterface.Registry;
 using GameInterface.Services.Armies;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -44,6 +45,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IArmyDisbander armyDisbander;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
     private readonly IOrphanedMapEventFinder orphanedMapEventFinder;
+    private readonly ILoadRepairRegistryReconciler registryReconciler;
 
     public MapEventLoadCleaner(
         ILogger logger,
@@ -52,7 +54,8 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         IObjectManager objectManager,
         IArmyDisbander armyDisbander,
         IStalledMapEventResolver stalledMapEventResolver,
-        IOrphanedMapEventFinder orphanedMapEventFinder)
+        IOrphanedMapEventFinder orphanedMapEventFinder,
+        ILoadRepairRegistryReconciler registryReconciler)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
@@ -61,6 +64,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.armyDisbander = armyDisbander;
         this.stalledMapEventResolver = stalledMapEventResolver;
         this.orphanedMapEventFinder = orphanedMapEventFinder;
+        this.registryReconciler = registryReconciler;
     }
 
     public void CleanUpLoadedMapEvents()
@@ -68,7 +72,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var partiesBefore = Campaign.Current.CampaignObjectManager.MobileParties.ToArray();
+        var before = registryReconciler.Capture();
         try
         {
             foreach (var mapEvent in GetLoadedPlayerMapEvents())
@@ -82,7 +86,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
         finally
         {
-            PublishDestroyedParties(partiesBefore);
+            registryReconciler.UnregisterRemoved(before);
         }
     }
 
@@ -300,22 +304,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
             if (!side._battleParties.Any(entry => ReferenceEquals(entry?.Party, party)))
                 party._mapEventSide = null;
-        }
-    }
-
-    // The load cleanup runs before the server state that lets lifetime patches publish, so a party that
-    // vanilla destroyed during the pass (a participant or a cascade elsewhere) is never unregistered
-    // otherwise. This reconciles every party that left the campaign during the pass.
-    private void PublishDestroyedParties(IEnumerable<MobileParty> partiesBeforePass)
-    {
-        var campaignParties = new HashSet<MobileParty>(Campaign.Current.CampaignObjectManager.MobileParties);
-        foreach (var party in partiesBeforePass)
-        {
-            if (campaignParties.Contains(party) || !objectManager.Contains(party))
-                continue;
-
-            logger.Warning("Unregistering party {PartyId} removed from the campaign during a load repair pass", party.StringId);
-            messageBroker.Publish(party, new InstanceDestroyed<MobileParty>(party));
         }
     }
 

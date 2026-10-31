@@ -607,7 +607,7 @@ Each engine signature was read from the installed v1.5.6 assemblies (`taom-src`,
   the server a client's execution reaches `ApplyInternal` from `ExecuteTroopHandler` with that
   client's hero as the killer, never `Hero.MainHero`, so `OnHeroKilled` and `OnDeathMarkAdded`
   skipped the penalty and the client lost no honor or mercy. The replacement now calls
-  `ApplyExecutionTraitPenalty`: for an `Executed` or `ExecutionAfterMapEvent` death with a player
+  `ApplyExecutionTraitPenalty`: for an `Executed` death with a player
   killer and both clans set, it runs v1.5.6 `TraitLevelingHelper.OnBloodFeudStarted(victim)` (honor
   -1000 for an honorable victim, otherwise mercy -500, then mercy -500) inside
   `MainHeroSubstitutionScope(killer, ...)`, so `TraitLevelingHelperPatches` books it to that player.
@@ -649,6 +649,39 @@ Each engine signature was read from the installed v1.5.6 assemblies (`taom-src`,
   settlement. The port break out tests anchor the fleet at the settlement, because v1.5.6
   `AnchorPoint.IsAtSettlement` compares the anchor's settlement, which setting a position clears;
   `SiegeBreakOut.CanBreakOutFromPort` already matches the v1.5.6 menu condition.
+
+### Review fixes
+
+Two reviews of the merge (Codex and a data flow review) found these; each fix is one line here.
+
+- Load repairs and the registry (`LoadRepairRunner.cs`, `LoadRepairRegistryReconciler.cs`).
+  `InitialServerState` ran the three load repairs while the sync policy still allows originals, so
+  lifetime patches published nothing: a lord party `LeaderlessClanResolver` created for a successor
+  never got an id (the join baseline then failed with "party is not registered"), and the parties
+  and armies `EmptyLordPartyResetter` destroyed kept theirs. `ILoadRepairRunner` now runs the
+  three repairs, each caught and logged on its own, captures the campaign parties and armies before
+  them, unregisters those that left the campaign afterwards (the shared reconciler, which
+  `MapEventLoadCleaner` also uses in place of `PublishDestroyedParties`, now covering armies too),
+  then registers what they created through `IRegistryManager.RegisterNewGameObjects`, which runs
+  the registries again without a second `AllGameObjectsRegistered`. `EmptyLordPartyResetter` keeps
+  vanilla `DisbandArmyAction`: the reconciler covers its army in that window, and vanilla also
+  places the attached parties, which `ArmyDisbander` skips. Tested by `LoadRepairRunnerTests`
+  (E2E), which runs the repairs with originals allowed and failed before the fix.
+- `EmptyLordPartyResetterTests` resets in that window too and checks the campaign, not the
+  registry, since the reset alone publishes nothing there.
+- `coop.debug.hero.kill_npc` (`HeroDebugCommand.cs`) ran an execution inside
+  `MainHeroSubstitutionScope`, so vanilla `ExecutionCampaignBehavior` saw the acting player as
+  `Hero.MainHero` and charged the blood feud penalty a second time. An execution now runs outside
+  the scope, as `ExecuteTroopHandler` runs a player's.
+  `KillNpcCommandExecution_WithVanillaExecutionBehavior_CostsOnePenalty` got -2000 honor before
+  the fix and -1000 after.
+- Known gap, kept on purpose: N executions from one clan cost N penalties, where v1.5.6 vanilla
+  charges once per blood feud (per player feud state does not exist, #3819; v1.4.8 and
+  `development` charged each execution).
+- `ApplyExecutionTraitPenalty` no longer checks `ExecutionAfterMapEvent`: that detail comes only
+  from `ApplyByExecutionAfterMapEvent`, whose one v1.5.6 caller
+  (`HeroExecutionSceneNotificationData.PostponedAffirmativeAction`) `HeroExecutionScenePatch` skips
+  on the server, so the branch never ran.
 
 ### Checks
 

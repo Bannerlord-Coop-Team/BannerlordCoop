@@ -178,6 +178,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
+        builder.RegisterType<LoadRepairRegistryReconciler>().As<ILoadRepairRegistryReconciler>().InstancePerDependency();
+        builder.RegisterType<LoadRepairRunner>().As<ILoadRepairRunner>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenLockPreserver>().As<IPartyScreenLockPreserver>().InstancePerDependency();

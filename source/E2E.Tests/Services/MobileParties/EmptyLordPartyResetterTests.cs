@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem.Siege;
 using GameInterface.Services.MobileParties.Extensions;
 using Common.Util;
 using E2E.Tests.Environment;
+using GameInterface.Policies;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -32,17 +33,27 @@ public class EmptyLordPartyResetterTests : IDisposable
         environment.Server.Call(() =>
         {
             var hero = environment.Server.GetRegisteredObject<Hero>(heroId);
+            var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
 
-            Assert.Equal(1, environment.Server.Resolve<IEmptyLordPartyResetter>().ResetEmptyLordParties());
+            // Production resets at CampaignReady, while the sync policy still allows originals, so the
+            // destroy publishes nothing here. LoadRepairRunnerTests covers the registry afterwards.
+            var policy = (TestPolicy)environment.Server.Resolve<ISyncPolicy>();
+            var previous = policy.AllowOriginals;
+            policy.AllowOriginals = true;
+            try
+            {
+                Assert.Equal(1, environment.Server.Resolve<IEmptyLordPartyResetter>().ResetEmptyLordParties());
+            }
+            finally
+            {
+                policy.AllowOriginals = previous;
+            }
 
             Assert.Equal(Hero.CharacterStates.Fugitive, hero.HeroState);
             Assert.True(hero.IsAlive);
             Assert.Null(hero.PartyBelongedTo);
+            Assert.DoesNotContain(party, Campaign.Current.CampaignObjectManager.MobileParties);
         });
-
-        Assert.False(environment.Server.ObjectManager.TryGetObject<MobileParty>(partyId, out _));
-        foreach (var client in environment.Clients)
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out _));
     }
 
     [Fact]
