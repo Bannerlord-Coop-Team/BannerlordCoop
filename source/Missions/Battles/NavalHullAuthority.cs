@@ -260,7 +260,7 @@ public class NavalHullAuthority : INavalHullAuthority
         {
             if (removal.Agents == null)
             {
-                removal.Agents = removal.Hulls.SelectMany(hull => engine.ParkHullAgents(hull)).ToList();
+                ParkHulls(removal);
                 Logger.Information("[NavalSync] Departing hull(s) {ShipIds}: parked {Parked} of {Count} agent(s) aboard or crewing them",
                     removal.ShipIds, removal.Agents.Count(moved => moved.IsParked), removal.Agents.Count);
                 return;
@@ -281,6 +281,15 @@ public class NavalHullAuthority : INavalHullAuthority
         }
 
         UnparkTheRest(removal, withdrawn);
+    }
+
+    // Records each hull's parked agents as soon as it is done, so a later hull that throws leaves them for UnparkTheRest.
+    private void ParkHulls(HullRemoval removal)
+    {
+        var parked = new List<HullSwapAgent>();
+        removal.Agents = parked;
+        foreach (var hull in removal.Hulls)
+            parked.AddRange(engine.ParkHullAgents(hull));
     }
 
     // A departed owner's crew is deregistered first, so the despawn of its party later finds nothing left to withdraw.
@@ -406,7 +415,7 @@ public class NavalHullAuthority : INavalHullAuthority
         /// <summary>The controllers whose hulls these are, as queued.</summary>
         public IReadOnlyList<string> Owners { get; }
         public DepartingCrew Crew { get; }
-        /// <summary>Everyone the first step parked off the hulls; null before it ran.</summary>
+        /// <summary>Everyone the first step parked off the hulls, filled hull by hull; null before it ran.</summary>
         public IReadOnlyList<HullSwapAgent> Agents { get; set; }
     }
 
