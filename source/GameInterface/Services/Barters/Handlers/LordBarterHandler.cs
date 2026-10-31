@@ -6,6 +6,7 @@ using Common.Network.Coalescing;
 using Common.Network.Messages;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Barters.Patches;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Conversations;
@@ -43,6 +44,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly IBarterClientPresentation presentation;
     private readonly ISafePassagePartyResolver safePassagePartyResolver;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<NetPeer, LordBarterAuthorization> authorizations =
         new Dictionary<NetPeer, LordBarterAuthorization>();
@@ -60,6 +62,7 @@ internal sealed partial class LordBarterHandler : IHandler
         IBarterClientPresentation presentation,
         ISafePassagePartyResolver safePassagePartyResolver,
         ISiegeEventInterface siegeEventInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -72,6 +75,7 @@ internal sealed partial class LordBarterHandler : IHandler
         this.presentation = presentation;
         this.safePassagePartyResolver = safePassagePartyResolver;
         this.siegeEventInterface = siegeEventInterface;
+        this.statisticsInterface = statisticsInterface;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NetworkAuthorizeLordBarter>(HandleAuthorization);
         messageBroker.Subscribe<NetworkCancelLordBarterAuthorization>(HandleAuthorizationCanceled);
@@ -377,6 +381,7 @@ internal sealed partial class LordBarterHandler : IHandler
         }
 
         ApplyDefectionPersuasionXp(playerHero, targetHero, request.PersuasionOutcomes);
+        statisticsInterface.OnDefectionPersuasionSuccess(playerHero);
     }
 
     private void ProcessAuthorization(NetPeer peer, NetworkAuthorizeLordBarter authorization)

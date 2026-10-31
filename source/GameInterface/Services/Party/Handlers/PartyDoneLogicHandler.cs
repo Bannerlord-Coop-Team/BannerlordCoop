@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
@@ -47,6 +48,7 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
     private readonly IPlayerManager playerManager;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
@@ -57,7 +59,8 @@ internal class PartyDoneLogicHandler : IHandler
         IAlternativeSolutionPicker picker,
         IAlternativeSolutionCommitments commitments,
         IRecruitmentSideEffects recruitmentSideEffects,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IStatisticsCampaignBehaviorInterface statisticsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -68,6 +71,7 @@ internal class PartyDoneLogicHandler : IHandler
         this.commitments = commitments;
         this.recruitmentSideEffects = recruitmentSideEffects;
         this.playerManager = playerManager;
+        this.statisticsInterface = statisticsInterface;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -664,7 +668,7 @@ internal class PartyDoneLogicHandler : IHandler
             settlement);
     }
 
-    private static void ApplyReleasedAndTakenPrisonerActions(
+    private void ApplyReleasedAndTakenPrisonerActions(
         Hero mainHero,
         FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster)
@@ -695,6 +699,7 @@ internal class PartyDoneLogicHandler : IHandler
                 TakePrisonerAction.Apply(captorParty, hero);
         }
         CampaignEventDispatcher.Instance.OnPrisonerTaken(takenPrisonersRoster);
+        statisticsInterface.OnPrisonersTaken(mainHero, takenPrisonersRoster.Count());
     }
 
     private static void NotifyTakenPrisonersChanged(FlattenedTroopRoster takenPrisonersRoster)
@@ -741,6 +746,7 @@ internal class PartyDoneLogicHandler : IHandler
         {
             ApplyPrisonerRecruitmentEffect(mainHero, characterObject);
         }
+        statisticsInterface.OnPrisonersRecruited(mainHero, recruitedPrisonersRoster.Count());
     }
 
     private void ApplyPrisonerRecruitmentEffect(Hero mainHero, CharacterObject characterObject)

@@ -1,11 +1,14 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Smithing.Handlers;
 
@@ -18,19 +21,22 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
 
     public CraftingCampaignBehaviorResearchPointHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         IPlayerManager playerManager,
-        ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface)
+        ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.sessionCraftingPlayerDataInterface = sessionCraftingPlayerDataInterface;
+        this.statisticsInterface = statisticsInterface;
 
         messageBroker.Subscribe<UpdateResearchPoints>(Handle_UpdateResearchPoints);
         messageBroker.Subscribe<NetworkUpdateResearchPoints>(Handle_NetworkUpdateResearchPoints);
@@ -85,5 +91,13 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
             obj.What.PlayerHeroId,
             obj.What.CraftingTemplateId,
             obj.What.CraftingPieceId);
+
+        var playerHeroId = obj.What.PlayerHeroId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(playerHeroId, out var playerHero)) return;
+
+            statisticsInterface.OnCraftingPartUnlocked(playerHero);
+        });
     }
 }
