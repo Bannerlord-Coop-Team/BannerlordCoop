@@ -242,7 +242,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     // Vanilla's swap: the prize takes the captor hull's team, side and formation, the captor's crew crews the prize, and the
     // captor hull is left with none. Vanilla also points the old owner's crew record of the prize at the orphan
     // (NavalShipAgents.OnShipCaptured), so those agents stay tracked on the orphan while on another team.
-    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
+    public CaptureSwapResult ApplyCapture(MissionObject prize, MissionObject captorHull)
     {
         var fake = Of(prize);
         var captor = Of(captorHull);
@@ -261,6 +261,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         // NavalShipsLogic.OnShipCaptured points the captor formation's assignment at the prize, so the orphan holds none.
         fake.HoldsAssignment = true;
         Orphan(captor);
+        return CaptureSwapResult.Applied;
     }
 
     public void OrphanHull(MissionObject hull) => Orphan(Of(hull));

@@ -533,6 +533,40 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(Captor, prize.CaptorControllerId);
     }
 
+    // PR #4191 M5: a swap that fails part way here records nothing of the capture (registry, order, event, server report or
+    // announce) and a repeat of its confirm doesn't replay it on the half-swapped hulls; the authority stays with the captor.
+    [Theory]
+    [InlineData(CaptureSwapResult.Failed)]
+    [InlineData(CaptureSwapResult.Refused)]
+    public void Confirm_WhoseSwapDoesNotComplete_RecordsNothingAndIsNotReplayed(CaptureSwapResult result)
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var ownHull = harness.Register(Own, BattleSideEnum.Attacker);
+        harness.CaptureEngine.Setup(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>())).Returns(result);
+        harness.Engine.Setup(e => e.CampaignShipIdOf(prize.Hull)).Returns("Ship_7");
+        int captureEvents = 0;
+        harness.Applier.CaptureApplied += (_, _) => captureEvents++;
+        var confirm = Confirm(prize, Own, ownHull, Host);
+
+        harness.Applier.AcceptConfirm(confirm);
+        harness.Applier.AcceptConfirm(confirm);
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, ownHull.Hull), Times.Once);
+        Assert.Equal(Own, prize.CurrentAuthority);
+        Assert.Null(prize.CaptorControllerId);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(ownHull.IsOrphaned);
+        Assert.Equal(0, ownHull.CaptureSequence);
+        Assert.Equal(0, captureEvents);
+        Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
+        harness.Relay.Verify(r => r.SendAll(It.IsAny<IMessage>()), Times.Never);
+        var applied = (JObject)harness.Inspect()["applied"]!;
+        Assert.Equal(0L, (long)applied["capturesApplied"]!);
+        Assert.Equal(1L, (long)applied["swapsFailed"]!);
+        Assert.Equal("swap_failed", (string?)applied["lastDrop"]);
+    }
+
     // C5: the old host's confirm and the host change reach two clients in opposite orders; both end in the same state, since
     // the confirm is checked against the host of its own epoch, not against whoever simulates the hull when it arrives.
     [Fact]

@@ -12,11 +12,11 @@ public interface INavalShipCaptureEngine
     /// [Game thread] Replays vanilla's capture swap (NavalShipsLogic.OnShipCaptured): <paramref name="prize"/> takes the formation,
     /// team and controller of <paramref name="captorHull"/>, which is left with none. A copy keeps no local controller.
     /// </summary>
-    void ApplyCapture(MissionObject prize, MissionObject captorHull);
+    CaptureSwapResult ApplyCapture(MissionObject prize, MissionObject captorHull);
 
     /// <summary>
-    /// [Game thread] Why vanilla's swap can't run on the two hulls here (a short reason), or null when it can. Checked before
-    /// anything of a capture changes, so a capture is applied whole or not at all.
+    /// [Game thread] Why vanilla's swap can't run on the two hulls here (a short reason), or null when it can. It checks the known
+    /// prerequisites only: the swap isn't transactional, so it can still fail part way (<see cref="CaptureSwapResult.Failed"/>).
     /// </summary>
     string CheckCapture(MissionObject prize, MissionObject captorHull);
 
@@ -31,4 +31,17 @@ public interface INavalShipCaptureEngine
 
     /// <summary>Whether vanilla lets the hull be captured at all (storyline missions turn it off).</summary>
     bool CanBeTakenOver(MissionObject hull);
+}
+
+/// <summary>How a replay of vanilla's capture swap ended, so the capture's owner records only a swap that completed.</summary>
+public enum CaptureSwapResult
+{
+    /// <summary>The swap ran to the end.</summary>
+    Applied,
+
+    /// <summary>A prerequisite was missing, so nothing of the swap changed.</summary>
+    Refused,
+
+    /// <summary>The swap threw after it started changing the hulls, so they are left part way through it.</summary>
+    Failed,
 }
