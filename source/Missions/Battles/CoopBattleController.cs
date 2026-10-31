@@ -83,6 +83,7 @@ public class CoopBattleController : CoopMissionController
 #endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly ISiegeMachineAuthorityRegistry siegeAuthority;
     private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
@@ -121,6 +122,7 @@ public class CoopBattleController : CoopMissionController
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
         ISiegeGateHitApplier siegeGateHitApplier,
+        ISiegeMachineAuthorityRegistry siegeAuthority,
         MissionMapTimeView mapTimeView,
 #if DEBUG
         SiegeInteractionDebugBehavior siegeInteractionDebugBehavior,
@@ -210,11 +212,12 @@ public class CoopBattleController : CoopMissionController
         // — a superseded hosting generation is dropped consistently across both. The policy is a
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy, siegeAuthority);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy, siegeAuthority);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
+        this.siegeAuthority = siegeAuthority;
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
@@ -252,11 +255,9 @@ public class CoopBattleController : CoopMissionController
             {
                 if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
                     BattleSpawnGate.HeroAgentAuthorityProbe = null;
-                // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
+                // OnMissionTick sets the siege authority each frame; reset it here (its owner) so a stale authority
                 // never bleeds into the next siege before the first tick refreshes it.
-                SiegeMissionAuthorityGate.IsLocalAuthority = false;
-                SiegeMissionAuthorityGate.IsAuthorityKnown = false;
-                SiegeMissionAuthorityGate.ResetClaimedMachines();
+                siegeAuthority.Reset();
                 BattleConclusionGate.IsInCoopBattleMission = false;
             },
             base.DisposeMission);
@@ -295,11 +296,11 @@ public class CoopBattleController : CoopMissionController
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
         // host election can settle after the mission opens, so keep the patch-visible flags current
-        // instead of latching them once. Siege missions only, so field battles never touch the gate.
+        // instead of latching them once. Siege missions only, so field battles never touch the siege authority.
         if (Mission?.IsSiegeBattle == true)
         {
-            SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
-            SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
+            siegeAuthority.IsLocalAuthority = Session.IsLocalHost;
+            siegeAuthority.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
         }
 
         // Route coop mission victories through the server's result-ready completion barrier.

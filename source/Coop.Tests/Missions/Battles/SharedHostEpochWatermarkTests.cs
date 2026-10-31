@@ -31,6 +31,7 @@ public class SharedHostEpochWatermarkTests : IDisposable
     private readonly Mock<IBattleSession> session = new();
     private readonly Mock<INetworkAgentRegistry> agentRegistry = new();
     private readonly MissionCurrentScope missionScope = new();
+    private readonly SiegeMachineAuthorityRegistry authority = new();
 
     private SiegeEngineDeploymentReplicator engineReplicator;
     private SiegeMachineStateReplicator machineReplicator;
@@ -96,7 +97,7 @@ public class SharedHostEpochWatermarkTests : IDisposable
     private void Compose(IHostEpochPolicy enginePolicy, IHostEpochPolicy machinePolicy)
     {
         engineReplicator = new SiegeEngineDeploymentReplicator(network.Object, broker, session.Object, enginePolicy);
-        machineReplicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, machinePolicy);
+        machineReplicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object, agentRegistry.Object, machinePolicy, authority);
     }
 
     private static NetworkSiegeMachineState MachineState(int machineId, int hostEpoch)
@@ -129,6 +130,5 @@ public class SharedHostEpochWatermarkTests : IDisposable
         engineReplicator?.Dispose();
         machineReplicator?.Dispose();
         missionScope.Dispose();
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
     }
 }

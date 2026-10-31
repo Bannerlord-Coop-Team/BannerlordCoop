@@ -2629,6 +2629,14 @@ public class SiegeDebugCommand
     /// </summary>
     public sealed class DumpMachinesCoopCommand : ICoopCommand
     {
+        private readonly ISiegeMachineAuthorityRegistry authority;
+
+        /// <summary>Takes the siege authority the dump reports per machine.</summary>
+        public DumpMachinesCoopCommand(ISiegeMachineAuthorityRegistry authority)
+        {
+            this.authority = authority;
+        }
+
         public string Prefix => "coop.debug.siege";
 
         public string Name => "dump_machines";
@@ -2667,7 +2675,7 @@ public class SiegeDebugCommand
                     lines.Add($"machine {machine.Id.Id:D5} {machine.GetType().Name,-16}" +
                         $" disabled={(machine.IsDisabled ? 1 : 0)} visible={(machine.GameEntity.IsVisibleIncludeParents() ? 1 : 0)}" +
                         $" deactivated={(machine.IsDeactivated ? 1 : 0)} aiOff={(machine.IsDisabledForAI ? 1 : 0)}" +
-                        $" simLocal={(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id) ? 1 : 0)}" +
+                        $" simLocal={(authority.IsMachineSimulatedLocally(machine.Id.Id) ? 1 : 0)}" +
                         $" pts={machine.StandingPoints.Count} ptsOff={deactivatedPoints} ptsUsed={usedPoints}" +
                         DescribeMissionMachineState(machine));
                 }
@@ -2691,7 +2699,7 @@ public class SiegeDebugCommand
             }
 
             lines.Sort(StringComparer.Ordinal);
-            lines.Insert(0, $"siege={mission.IsSiegeBattle} authority={SiegeMissionAuthorityGate.IsLocalAuthority} known={SiegeMissionAuthorityGate.IsAuthorityKnown} entries={lines.Count}");
+            lines.Insert(0, $"siege={mission.IsSiegeBattle} authority={authority.IsLocalAuthority} known={authority.IsAuthorityKnown} entries={lines.Count}");
 
             var dump = string.Join(Environment.NewLine, lines);
             Logger.Information("[MachineDump]\n{Dump}", dump);

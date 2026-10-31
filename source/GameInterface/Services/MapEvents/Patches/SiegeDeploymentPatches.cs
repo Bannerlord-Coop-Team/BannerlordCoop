@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using System;
@@ -23,8 +24,9 @@ internal class SiegeDeploymentPatches
     private static bool DeployAllOfPlayerPrefix()
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
 
-        return SiegeMissionAuthorityGate.IsLocalAuthority;
+        return authority.IsLocalAuthority;
     }
 
     [HarmonyPatch(typeof(SiegeDeploymentHandler), nameof(SiegeDeploymentHandler.DeployAllSiegeWeaponsOfAi))]
@@ -32,8 +34,9 @@ internal class SiegeDeploymentPatches
     private static bool DeployAllOfAiPrefix()
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
 
-        return SiegeMissionAuthorityGate.IsLocalAuthority;
+        return authority.IsLocalAuthority;
     }
 
     // Only the deployer runs the Start Battle teardown natively: a non-deployer committing first would
@@ -44,9 +47,9 @@ internal class SiegeDeploymentPatches
     private static bool RemoveDeploymentPointsPrefix()
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (SiegeMissionAuthorityGate.SuppressCapture) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
 
-        return SiegeMissionAuthorityGate.IsLocalAuthority;
+        return authority.IsLocalAuthority;
     }
 
     // Empties the engine list of the deployment UI for non-deployers; their troop Order of Battle
@@ -56,8 +59,9 @@ internal class SiegeDeploymentPatches
     private static void GetMaxDeployableCountPostfix(ref int __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
 
-        if (!SiegeMissionAuthorityGate.IsLocalAuthority)
+        if (!authority.IsLocalAuthority)
         {
             __result = 0;
         }
@@ -70,8 +74,9 @@ internal class SiegeDeploymentPatches
     private static void GetDeployableCountPostfix(ref int __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
 
-        if (!SiegeMissionAuthorityGate.IsLocalAuthority)
+        if (!authority.IsLocalAuthority)
         {
             __result = 0;
         }
@@ -89,8 +94,9 @@ internal class SiegeDeploymentPatches
     private static void PublishPlacement(DeploymentPoint point)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
-        if (SiegeMissionAuthorityGate.SuppressCapture) return;
-        if (!SiegeMissionAuthorityGate.IsLocalAuthority) return;
+        if (AllowedThread.IsThisThreadAllowed()) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
+        if (!authority.IsLocalAuthority) return;
 
         string weaponTypeName = point.DeployedWeapon != null
             ? MissionSiegeWeaponsController.GetWeaponType(point.DeployedWeapon).Name

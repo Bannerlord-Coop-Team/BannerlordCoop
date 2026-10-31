@@ -51,14 +51,18 @@ public class ConnectionDirectCommandTests
         try
         {
             ModInformation.IsServer = false;
-            ContainerProvider.Clear();
             JoinDebugCommands.ConfigureClientSessionStarter(() =>
             {
                 started = true;
                 return true;
             });
 
-            string output = JoinDebugCommands.Reconnect(new System.Collections.Generic.List<string>());
+            // Holds the provider lock while empty, so it can't null a container another test is using.
+            string output;
+            using (ContainerProvider.UseContainerThreadSafe(null))
+            {
+                output = JoinDebugCommands.Reconnect(new System.Collections.Generic.List<string>());
+            }
 
             Assert.True(started);
             Assert.Equal("Client co-op session restarted after teardown.", output);
