@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Moq;
 using System;
@@ -63,6 +65,41 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
         Receive(new NetworkIssueOwnershipSnapshot(null));
 
         Assert.Empty(registry.GetAll());
+    }
+
+    [Fact]
+    public void ARemovedOwnerReplaysCancellationForAClientThatMissedIt()
+    {
+        NetworkIssueFinalized? finalized = null;
+        var broker = new MessageBroker();
+        broker.Subscribe<NetworkIssueFinalized>(payload => finalized = payload.What);
+        using var receiverWithObserver = new IssueOwnershipSnapshotReceiver(broker, registry,
+            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
+
+        GameThread.Run(() => receiverWithObserver.Handle_NetworkIssueOwnershipSnapshot(
+            new MessagePayload<NetworkIssueOwnershipSnapshot>(this, new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()))), blocking: true);
+
+        Assert.True(finalized.HasValue);
+        Assert.Equal("hero_1", finalized.Value.IssueOwnerId);
+        Assert.Equal("issue_1", finalized.Value.IssueId);
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Value.Outcome);
+    }
+
+    [Fact]
+    public void AChangedControllerDoesNotReplayCancellationForTheSameIssue()
+    {
+        var broker = new MessageBroker();
+        NetworkIssueFinalized? finalized = null;
+        broker.Subscribe<NetworkIssueFinalized>(payload => finalized = payload.What);
+        using var receiverWithObserver = new IssueOwnershipSnapshotReceiver(broker, registry,
+            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
+
+        GameThread.Run(() => receiverWithObserver.Handle_NetworkIssueOwnershipSnapshot(new MessagePayload<NetworkIssueOwnershipSnapshot>(this,
+            new NetworkIssueOwnershipSnapshot(new[] { new IssueOwnershipData("hero_1", "issue_1", "new-player") }))), blocking: true);
+
+        Assert.True(registry.TryGetOwner("hero_1", "issue_1", out var owner));
+        Assert.Equal("new-player", owner);
+        Assert.Null(finalized);
     }
 
     [Fact]

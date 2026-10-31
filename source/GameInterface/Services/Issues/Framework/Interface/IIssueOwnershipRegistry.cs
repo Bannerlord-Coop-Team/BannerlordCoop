@@ -11,5 +11,7 @@ public interface IIssueOwnershipRegistry
 
     void Remove(string issueOwnerId);
 
+    void Remove(string issueOwnerId, string issueId);
+
     IssueOwnershipData[] GetAll();
 }

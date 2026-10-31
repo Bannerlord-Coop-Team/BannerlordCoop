@@ -283,7 +283,7 @@ internal class FinalizationCoordinator : IHandler
     {
         var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner);
         var isOwner = hasOwner && owner == controller.ControllerId;
-        if (hasOwner) ownership.Remove(data.IssueOwnerId);
+        if (hasOwner) ownership.Remove(data.IssueOwnerId, data.IssueId);
 
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {

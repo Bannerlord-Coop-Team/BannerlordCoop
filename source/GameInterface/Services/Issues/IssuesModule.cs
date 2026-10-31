@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
@@ -35,6 +36,8 @@ internal class IssuesModule : Module
         builder.Register(context => context.Resolve<AlternativeSolutionPicker>()).As<IAlternativeSolutionPicker>();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
+        builder.RegisterType<CaravanAmbushStatePublisher>().As<ICaravanAmbushStatePublisher>().InstancePerLifetimeScope();
+        builder.RegisterType<CaravanAmbushEvents>().As<ICaravanAmbushEvents>().InstancePerLifetimeScope();
         builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
         builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
