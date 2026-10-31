@@ -39,7 +39,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new ConditionalWeakTable<IssueBase, object>();
     private readonly object announcedIssuesLock = new object();
-    private readonly ConditionalWeakTable<IssueBase, NetPeer> finalizedOwners = new ConditionalWeakTable<IssueBase, NetPeer>();
+    private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new ConditionalWeakTable<IssueBase, NetPeer>();
     private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
@@ -67,6 +67,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Subscribe<RequestQuestSolutionAccept>(RememberOwnerPeer);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -79,6 +80,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Unsubscribe<RequestQuestSolutionAccept>(RememberOwnerPeer);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -191,6 +193,21 @@ internal class FinalizationCoordinator : IHandler
         }, context: nameof(FinalizationCoordinator));
     }
 
+    private void RememberOwnerPeer(MessagePayload<RequestQuestSolutionAccept> payload)
+    {
+        if (ModInformation.IsClient || payload.Who is not NetPeer peer)
+            return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+                return;
+            ownerPeers.Remove(issue);
+            ownerPeers.Add(issue, peer);
+        }, context: nameof(FinalizationCoordinator));
+    }
+
     private void Handle_IssueJournalObserved(MessagePayload<IssueJournalObserved> payload)
     {
         if (ModInformation.IsClient) return;
@@ -211,11 +228,7 @@ internal class FinalizationCoordinator : IHandler
             playerManager.TryGetPeer(owner, out peer))
             return true;
 
-        var registeredPlayer = playerManager.Players.FirstOrDefault(player => player.HeroId == giverId);
-        if (registeredPlayer != null && playerManager.TryGetPeer(registeredPlayer.ControllerId, out peer))
-            return true;
-
-        return finalizedOwners.TryGetValue(issue, out peer);
+        return ownerPeers.TryGetValue(issue, out peer);
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -286,10 +299,6 @@ internal class FinalizationCoordinator : IHandler
 
             announcedIssues.Add(issue, new object());
         }
-
-        if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out var owner) &&
-            playerManager.TryGetPeer(owner, out var ownerPeer))
-            finalizedOwners.Add(issue, ownerPeer);
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
