@@ -621,6 +621,7 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
+            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -803,6 +804,7 @@ namespace Coop
             Exception ex = (Exception)e.ExceptionObject;
             Logger?.Fatal(ex, "Unhandled exception");
             Logger?.Fatal(ex.StackTrace);
+            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "crash");
             Serilog.Log.CloseAndFlush();
         }
 
