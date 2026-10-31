@@ -99,6 +99,7 @@
     <string id="str_coop_divorce_children_remove_warning" text="{=str_coop_divorce_children_remove_warning}Your children with {SPOUSE} will stay in {CLAN_NAME}. Once {SPOUSE} leaves, only you will be able to name them as heirs." />
     <string id="str_coop_divorce_confirm" text="{=str_coop_divorce_confirm}Divorce" />
     <string id="str_coop_divorce_completed" text="{=str_coop_divorce_completed}You are no longer married to {SPOUSE}." />
+    <string id="str_coop_divorce_leave_failed" text="{=str_coop_divorce_leave_failed}{HERO} could not leave the clan and remains a member." />
     <string id="str_coop_clan_divorce" text="{=str_coop_clan_divorce}Divorce" />
     <string id="str_coop_clan_divorce_description" text="{=str_coop_clan_divorce_description}End your marriage to {HERO}. They stay in the clan, and once divorced you can remove them from it." />
     <string id="str_coop_clan_divorce_confirm_description" text="{=str_coop_clan_divorce_confirm_description}You will both remain in {CLAN_NAME}. Once divorced, you can leave the clan or {SPOUSE} can remove you from it." />

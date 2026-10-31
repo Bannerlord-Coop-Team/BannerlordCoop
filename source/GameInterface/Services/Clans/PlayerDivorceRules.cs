@@ -8,6 +8,7 @@ using GameInterface.Services.Players;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Clans;
@@ -62,26 +63,34 @@ public class PlayerDivorceRules : IPlayerDivorceRules
         var clan = actor.Clan;
         var junior = GetJuniorPartner(actor, spouse);
         actor.Spouse = null;
+        // Vanilla keeps the couple's Marriage romance level apart from Spouse, so end it like a remarriage does.
+        ChangeRomanticStateAction.Apply(actor, spouse, Romance.RomanceLevelEnum.Ended);
         NotifyDivorce(actor, spouse);
         NotifyDivorce(spouse, actor);
         messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Members));
 
-        // CanLeaveClan already checked the departure, so this only fails on a lookup error and the divorce still stands.
+        // The divorce still stands, so tell both players the departure failed instead of reporting it as done.
         if (leaveClan && !clanLeaveRules.TryApply(junior, isRemoval: junior != actor))
         {
             Logger.Warning("Divorced players but {Hero} could not leave the clan", junior.Name);
+            var failure = GameTexts.FindText("str_coop_divorce_leave_failed").SetTextVariable("HERO", junior.Name).ToString();
+            Notify(actor, failure);
+            Notify(spouse, failure);
+            return false;
         }
 
         return actor.Spouse == null && spouse.Spouse == null;
     }
 
-    private void NotifyDivorce(Hero hero, Hero formerSpouse)
+    private void NotifyDivorce(Hero hero, Hero formerSpouse) => Notify(hero,
+        GameTexts.FindText("str_coop_divorce_completed").SetTextVariable("SPOUSE", formerSpouse.Name).ToString());
+
+    private void Notify(Hero hero, string message)
     {
         if (!PlayerManager.TryGetControlledObjectInfo(hero, out var controller) ||
             !playerManager.TryGetPeer(controller.ObjectControllerId, out var peer)) return;
 
-        network.Send(peer, new SendInformationMessage(GameTexts.FindText("str_coop_divorce_completed")
-            .SetTextVariable("SPOUSE", formerSpouse.Name).ToString()));
+        network.Send(peer, new SendInformationMessage(message));
     }
 
     // The partner who doesn't lead the shared clan is the one who leaves it.
