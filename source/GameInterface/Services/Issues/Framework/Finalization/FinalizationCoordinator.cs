@@ -200,7 +200,9 @@ internal class FinalizationCoordinator : IHandler
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
-
+        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
+            out _, out _, out var descriptor) && descriptor is ISuppressEndingJournalSnapshotDescriptor)
+            return;
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
