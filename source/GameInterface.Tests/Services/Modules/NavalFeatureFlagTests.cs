@@ -27,8 +27,22 @@ public class NavalFeatureFlagTests
     {
         bool builtWithNaval = typeof(NavalFeatureFlagTests).Assembly
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Any(attribute => attribute.Key == "CoopNavalDlc" && attribute.Value == "true");
+            .Any(attribute => attribute.Key == "CoopNavalDlc" && string.Equals(attribute.Value, "true", System.StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal(builtWithNaval, new NavalFeatureFlag().IsNavalCodeBuilt);
+    }
+
+    // MSBuild treats booleans case-insensitively, so -p:CoopNavalDlc=True must count as a naval build.
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("True", true)]
+    [InlineData("TRUE", true)]
+    [InlineData("false", false)]
+    [InlineData("False", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsTrueBuildProperty_IgnoresCase(string value, bool expected)
+    {
+        Assert.Equal(expected, NavalFeatureFlag.IsTrueBuildProperty(value));
     }
 }

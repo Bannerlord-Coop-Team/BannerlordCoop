@@ -23,7 +23,7 @@ public class NavalFeatureFlag : INavalFeatureFlag
     // GameInterface.csproj stamps the CoopNavalDlc build property as assembly metadata
     private static readonly bool NavalCodeBuilt = typeof(NavalFeatureFlag).Assembly
         .GetCustomAttributes<AssemblyMetadataAttribute>()
-        .Any(attribute => attribute.Key == "CoopNavalDlc" && attribute.Value == "true");
+        .Any(attribute => attribute.Key == "CoopNavalDlc" && IsTrueBuildProperty(attribute.Value));
 
 #if TESTER
     public bool IsEnabled => true;
@@ -32,4 +32,7 @@ public class NavalFeatureFlag : INavalFeatureFlag
 #endif
 
     public bool IsNavalCodeBuilt => NavalCodeBuilt;
+
+    // Reads a stamped MSBuild boolean, which MSBuild accepts in any case (-p:CoopNavalDlc=True)
+    internal static bool IsTrueBuildProperty(string value) => bool.TryParse(value, out var result) && result;
 }

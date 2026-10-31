@@ -80,6 +80,7 @@ public class NavalSupportDetectorTests
     // A feature flag pinned on or off, built with or without the naval code.
     private sealed class FixedFlag : INavalFeatureFlag
     {
+        // Pins both flag values for one test case.
         public FixedFlag(bool isEnabled, bool isNavalCodeBuilt = true)
         {
             IsEnabled = isEnabled;
