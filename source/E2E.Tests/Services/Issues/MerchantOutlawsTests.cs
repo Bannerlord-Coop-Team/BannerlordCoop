@@ -589,6 +589,43 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AuthoritativeEndingConsumesEachRepeatedHuntRowOnce()
+    {
+        Accept();
+        var serverQuest = Quest(Server);
+        var ownerQuest = Quest(ClientA);
+
+        Server.Call(() =>
+        {
+            using var allowed = new AllowedThread();
+            serverQuest._journalEntries.Clear();
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(100),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 3, 5, LogType.Discreate));
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(200),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 4, 5, LogType.Discreate));
+        });
+        ClientA.Call(() =>
+        {
+            using var allowed = new AllowedThread();
+            ownerQuest._journalEntries.Clear();
+            ownerQuest._journalEntries.Add(new JournalLog(new CampaignTime(101),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 0, 5, LogType.Discreate));
+            ownerQuest._journalEntries.Add(new JournalLog(new CampaignTime(201),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 0, 5, LogType.Discreate));
+        });
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        ClientA.Call(() => Assert.Equal(new[] { 3, 4 }, ownerQuest.JournalEntries
+            .Select(log => log.CurrentProgress).ToArray()));
+    }
+
+    [Fact]
     public void SuccessRequestWithoutEnoughServerProgressDoesNotPay()
     {
         Accept();
