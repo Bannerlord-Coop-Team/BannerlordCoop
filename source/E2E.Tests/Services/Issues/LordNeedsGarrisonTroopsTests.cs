@@ -248,11 +248,15 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             });
             scenario.ClientA.Call(() =>
             {
-                Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+                var ownerEntries = ownerQuest.JournalEntries.ToArray();
+                Assert.Single(ownerEntries);
+                Assert.Equal(expected, ownerEntries[0].LogText.ToString());
                 var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                     entry => entry.IsRelatedTo(ownerQuest)));
                 Assert.True(archive.IsEnded());
-                Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+                var archivedEntries = archive.GetEntries().ToArray();
+                Assert.Single(archivedEntries);
+                Assert.Equal(expected, archivedEntries[0].LogText.ToString());
             });
             scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId))));
