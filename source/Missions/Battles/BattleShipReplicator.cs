@@ -479,7 +479,11 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         foreach (var held in heldShips.All.Where(held => held.Record != null && !held.Record.FollowsBattleHost
             && held.Record.OwnerControllerId == controllerId).ToArray())
+        {
+            // A held hull leaves with its owner too, so a captor's record of it can still bring it back (C4).
+            leftWith[held.ShipId] = controllerId;
             Prune(held.ShipId);
+        }
     }
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
