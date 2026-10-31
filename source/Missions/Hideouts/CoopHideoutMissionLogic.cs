@@ -54,6 +54,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     public bool IsAuthority => battle?.Session.IsLocalHost == true;
     public bool HasPhaseSnapshot => initialized && ledger.Latest != null;
     public int InitialPopulation => defenderSource.SideTotalTroops;
+    public bool HasOtherPlayers => missionContext.ControllersInMission.Count > 0;
 
     public CoopHideoutMissionLogic(IBattleNetwork network, IMessageBroker broker, IMissionContext missionContext,
         CoopTroopSupplier defenderSource, CoopTroopSupplier attackerSource, bool direct)
@@ -422,8 +423,11 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     public void RestoreSpectators()
     {
+        // Native leaves the boss's guards teamless after a won duel, otherwise they block every nearby player's exit.
+        bool duelWon = Native.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Attacker;
         foreach (var pair in spectatorTeams)
-            if (pair.Key.IsActive()) pair.Key.SetTeam(pair.Value, true);
+            if (pair.Key.IsActive() && !(duelWon && pair.Value.Side == BattleSideEnum.Defender))
+                pair.Key.SetTeam(pair.Value, true);
         foreach (var pair in spectatorControllers)
             if (pair.Key.IsActive()) pair.Key.Controller = pair.Value;
         spectatorTeams.Clear();
