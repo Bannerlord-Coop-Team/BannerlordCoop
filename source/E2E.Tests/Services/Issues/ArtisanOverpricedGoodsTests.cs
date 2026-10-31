@@ -462,11 +462,12 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
         Accept();
         var ownerQuest = QuestHere(ClientA);
+        var serverQuest = QuestHere(Server);
         Stock(2);
         ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
         ClientA.Call(() => Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress));
 
-        Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
+        Server.Call(() => serverQuest.CompleteQuestWithCancel());
         environment.FlushCoalescer();
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
@@ -486,7 +487,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Server.Call(() =>
         {
             var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(QuestHere(Server))));
+                entry => entry.IsRelatedTo(serverQuest)));
             Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
 
             var definitions = new DefinitionContext();
@@ -502,7 +503,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             Assert.True(load.Load(driver.Load("artisan_journal"), loadAsLateInitialize: true));
             var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
             var loadedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(QuestHere(Server))));
+                entry => entry.IsRelatedTo(serverQuest)));
             Assert.Equal(2, Assert.Single(loadedArchive.GetEntries(), log => log.Range == Amount).CurrentProgress);
         });
     }
