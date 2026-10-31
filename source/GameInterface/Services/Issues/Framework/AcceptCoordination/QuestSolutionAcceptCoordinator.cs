@@ -143,24 +143,30 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
         acceptingQuests.Add(quest);
     }
 
-    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        if (Campaign.Current?.ConversationManager?.IsConversationInProgress == true) return;
+        FlushAcceptanceJournals();
+    }
 
-    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload) => FlushAcceptanceJournals();
+    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload) =>
+        FlushAcceptanceJournals(payload.What.Quest);
 
-    private void FlushAcceptanceJournals()
+    private void FlushAcceptanceJournals(QuestBase only = null)
     {
         if (ModInformation.IsServer || acceptingQuests.Count == 0) return;
 
-        var quests = acceptingQuests.ToArray();
-        acceptingQuests.Clear();
+        var quests = only == null ? acceptingQuests.ToArray() : new[] { only };
         foreach (var quest in quests)
         {
+            if (!acceptingQuests.Contains(quest)) continue;
             var issue = IssueManager.GetIssueOfQuest(quest);
             if (issue == null) continue;
 
             // The callback can update a discrete log after AddLog has announced it.
             for (var index = 0; index < quest.JournalEntries.Count; index++)
                 SendAcceptanceLog(issue, quest, index);
+            acceptingQuests.Remove(quest);
         }
     }
 
