@@ -34,6 +34,10 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
@@ -511,23 +515,54 @@ public class MerchantOutlawsTests : IDisposable
         Destroy(TargetIds().First(), scenario.PlayerA);
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
 
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            players.ClearPeer(ClientA.NetPeer);
+            serverQuest._destroyedPartyCount++;
+            Server.Resolve<IMerchantOutlawsProgress>().Send(serverQuest);
+            players.SetPeer(QuestScenario.ControllerA, ClientA.NetPeer);
+        });
+
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
         var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
-        ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
+        ClientA.Call(() => Assert.Equal(2, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
-        Server.Call(() => Assert.Equal(1, Assert.Single(serverQuest.JournalEntries,
+        Server.Call(() => Assert.Equal(2, Assert.Single(serverQuest.JournalEntries,
             log => log.Range == serverQuest._totalPartyCount).CurrentProgress));
-        LogEntry[] saveHistory = null!;
-        Server.Call(() => saveHistory = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray());
+
+        JournalLogEntry serverArchive = null!;
+        Server.Call(() =>
+        {
+            serverArchive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("merchant_journal", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("merchant_journal"), loadAsLateInitialize: true));
+            var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+            var savedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            Assert.NotSame(serverArchive, savedArchive);
+            Assert.Equal(2, Assert.Single(savedArchive.GetEntries(), log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+        });
+
         ClientA.Call(() =>
         {
-            Campaign.Current.LogEntryHistory._logs.Clear();
-            Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
             var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
-            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
         });
+        ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded())));
     }
 
     [Fact]
