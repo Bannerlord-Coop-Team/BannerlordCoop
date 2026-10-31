@@ -669,6 +669,15 @@ Two reviews of the merge (Codex and a data flow review) found these; each fix is
   (E2E), which runs the repairs with originals allowed and failed before the fix.
 - `EmptyLordPartyResetterTests` resets in that window too and checks the campaign, not the
   registry, since the reset alone publishes nothing there.
+- Second review round. A closed clan's wanderer companion is fired, and v1.5.6
+  `RemoveCompanionAction` then calls `Hero.ResetEquipments`, whose new clones need the
+  owner-derived ids the old equipment still held, so the second registration logged "Duplicate id"
+  and left the live equipment without one (item slot changes for that hero were never sent). The
+  reconciler now also captures each alive hero's three equipments and unregisters any that were
+  replaced, or whose hero died, before that registration.
+- The reconciler also unregisters a removed party's `MobilePartyAi`, as the live `RemoveParty`
+  postfix does, since `MobileParty.RemoveParty` keeps the Ai. Both are asserted in
+  `LoadRepairRunnerTests`, which failed before the change.
 - `coop.debug.hero.kill_npc` (`HeroDebugCommand.cs`) ran an execution inside
   `MainHeroSubstitutionScope`, so vanilla `ExecutionCampaignBehavior` saw the acting player as
   `Hero.MainHero` and charged the blood feud penalty a second time. An execution now runs outside

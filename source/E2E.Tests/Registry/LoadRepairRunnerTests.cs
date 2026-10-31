@@ -79,9 +79,11 @@ public class LoadRepairRunnerTests : IDisposable
     {
         var (heroId, partyId) = CreateStrandedLordParty();
         string armyId = null;
+        string aiId = null;
         environment.Server.Call(() =>
         {
             var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.True(environment.Server.ObjectManager.TryGetId(party.Ai, out aiId));
             // a saved army belongs to a campaign kingdom, the list ArmyRegistry registers armies from
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             Campaign.Current.CampaignObjectManager.AddKingdom(kingdom);
@@ -105,7 +107,69 @@ public class LoadRepairRunnerTests : IDisposable
 
         Assert.False(environment.Server.ObjectManager.TryGetObject<MobileParty>(partyId, out _));
         Assert.False(environment.Server.ObjectManager.TryGetObject<Army>(armyId, out _));
+        // the live RemoveParty postfix unregisters the party's Ai, and it publishes nothing in this window
+        Assert.False(environment.Server.ObjectManager.TryGetObject<MobilePartyAi>(aiId, out _));
     }
+
+    [Fact]
+    public void RunLoadRepairs_ClanClosedWithAWandererCompanion_RegistersTheCompanionsResetEquipment()
+    {
+        // #4166: a kingdom clan nobody can lead is closed, and firing its wanderer companion resets the companion's
+        // equipment to fresh template clones that need the owner-derived ids the old equipment still holds
+        var clanId = CreateKingdomClan();
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        environment.Server.Call(() =>
+        {
+            var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            var companion = environment.Server.GetRegisteredObject<Hero>(companionId);
+            companion._heroState = Hero.CharacterStates.Active;
+            companion.SetBirthDay(CampaignTime.YearsFromNow(-30));
+            companion.SetNewOccupation(Occupation.Wanderer);
+            companion.CompanionOf = clan;
+            Assert.Contains(companion, clan.Heroes);
+
+            // a loaded save registers hero equipment under owner-derived ids, not the generated ids a live
+            // constructor gives it, so register it the way the first registration does
+            foreach (var equipment in HeroEquipments(companion))
+                environment.Server.ObjectManager.Remove(equipment);
+            environment.Server.Resolve<IRegistryManager>().RegisterNewGameObjects();
+            Assert.True(environment.Server.ObjectManager.TryGetId(companion.BattleEquipment, out var savedId));
+            Assert.Equal($"Equipment_{companion.StringId}_BattleEquipment", savedId);
+        });
+
+        environment.Server.Call(() =>
+        {
+            var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            var companion = environment.Server.GetRegisteredObject<Hero>(companionId);
+            var before = HeroEquipments(companion);
+            Assert.NotEmpty(before);
+
+            RunLoadRepairsInBootWindow();
+
+            Assert.True(clan.IsEliminated);
+            Assert.True(companion.IsAlive);
+            Assert.Null(companion.CompanionOf);
+            var after = HeroEquipments(companion);
+            Assert.Equal(before.Length, after.Length);
+            foreach (var equipment in before)
+            {
+                Assert.DoesNotContain(equipment, after);
+                Assert.False(environment.Server.ObjectManager.Contains(equipment));
+            }
+
+            foreach (var equipment in after)
+            {
+                Assert.True(environment.Server.ObjectManager.TryGetId(equipment, out var id));
+                Assert.True(environment.Server.ObjectManager.TryGetObject<Equipment>(id, out var registered));
+                Assert.Same(equipment, registered);
+            }
+        }, DisabledMethods);
+    }
+
+    private static Equipment[] HeroEquipments(Hero hero) =>
+        new[] { hero.BattleEquipment, hero.CivilianEquipment, hero.StealthEquipment }
+            .Where(equipment => equipment != null)
+            .ToArray();
 
     private void RunLoadRepairsInBootWindow()
     {

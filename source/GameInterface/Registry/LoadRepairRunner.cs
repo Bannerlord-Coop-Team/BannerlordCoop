@@ -51,15 +51,16 @@ internal sealed class LoadRepairRunner : ILoadRepairRunner
     public void RunLoadRepairs()
     {
         LoadRepairSnapshot before = null;
-        RunStep("capture campaign parties and armies", () => before = registryReconciler.Capture());
+        RunStep("capture campaign parties, armies and hero equipment", () => before = registryReconciler.Capture());
 
         RunStep("clean up loaded map events", mapEventLoadCleaner.CleanUpLoadedMapEvents);
         RunStep("repair leaderless clans", () => leaderlessClanResolver.RepairLoadedClans());
         RunStep("reset empty lord parties", () => emptyLordPartyResetter.ResetEmptyLordParties());
 
-        // Unregister first, so a created object can never collide with the stale id of a destroyed one.
+        // Unregister first: a replacement can take the owner-derived id of what it replaced (a fired wanderer
+        // companion's reset equipment), and registration skips an id that is still held.
         if (before != null)
-            RunStep("unregister removed parties and armies", () => registryReconciler.UnregisterRemoved(before));
+            RunStep("unregister removed objects", () => registryReconciler.UnregisterRemoved(before));
         RunStep("register created objects", registryManager.RegisterNewGameObjects);
     }
 
