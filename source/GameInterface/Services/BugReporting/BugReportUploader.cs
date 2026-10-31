@@ -172,6 +172,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
                string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal);
     }
 
+    /// <summary>Packs the JSON metadata and every non-empty artifact into one multipart body.</summary>
     private static MultipartFormDataContent CreateMultipartContent(
         BugReportArchiveContents report,
         string json)
@@ -179,7 +180,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(json, Encoding.UTF8, "application/json"), "report");
 
-        if (report.ServerLog != null)
+        if (HasUploadableServerLog(report.ServerLog))
         {
             content.Add(
                 CreateBinaryContent(report.ServerLog.CompressedData, "application/gzip"),
@@ -239,12 +240,19 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             (total, log) => total + (log?.CompressedData?.LongLength ?? 0));
     }
 
+    /// <summary>Reports whether the server log has gzip bytes; the endpoint rejects empty log attachments.</summary>
+    private static bool HasUploadableServerLog(CollectedBugReportServerLog serverLog)
+    {
+        return serverLog?.CompressedData != null && serverLog.CompressedData.Length > 0;
+    }
+
+    /// <summary>Builds the JSON metadata, describing only the attachments the multipart body carries.</summary>
     private static BugReportJsonRequest CreateRequest(BugReportArchiveContents report)
     {
         var primarySubmission = report.Submissions.FirstOrDefault(submission =>
                                     submission.ReportingClientNetworkId == report.ReportingClientNetworkId) ??
                                 report.Submissions.FirstOrDefault();
-        var serverLog = report.ServerLog == null
+        var serverLog = !HasUploadableServerLog(report.ServerLog)
             ? null
             : new BugReportJsonLog(
                 "Coop_server.log",

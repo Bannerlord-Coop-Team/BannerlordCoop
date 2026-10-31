@@ -41,6 +41,21 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Fact]
+    public void GenericSuccessDoesNotSkipTheRegisteredProofBranch()
+    {
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestOutcomeRequested(quest, IssueOutcome.QuestSuccess)));
+
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.True(scenario.QuestOf(scenario.Server).IsOngoing);
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Assert.Equal(0, branches.CountFor(scenario.Server));
+    }
+
+    [Fact]
     public void AnOutcomeRequestFromTheOwnerEndsTheIssueEverywhere()
     {
         scenario.Accept(scenario.ClientA);

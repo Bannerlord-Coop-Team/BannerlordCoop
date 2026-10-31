@@ -29,6 +29,10 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
@@ -303,7 +307,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
                 issue.CompleteIssueWithCancel(text);
-                Server.Resolve<IOutcomeDispatcher>().After(issue, IssueOutcome.QuestCancel);
             }
             Assert.Equal(2, issue.JournalEntries.Count);
             Assert.Single(issue.JournalEntries, log => log.LogText.ToString() == expected);
@@ -479,6 +482,28 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 entry => entry.IsRelatedTo(ownerQuest)));
             Assert.True(archive.IsEnded());
             Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
+        });
+        Server.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(QuestHere(Server))));
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
+
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("artisan_journal", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("artisan_journal"), loadAsLateInitialize: true));
+            var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+            var loadedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(QuestHere(Server))));
+            Assert.Equal(2, Assert.Single(loadedArchive.GetEntries(), log => log.Range == Amount).CurrentProgress);
         });
     }
 

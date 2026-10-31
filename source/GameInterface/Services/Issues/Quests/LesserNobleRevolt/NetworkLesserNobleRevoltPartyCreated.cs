@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLesserNobleRevoltPartyCreated : IServerToClientCommand
+public readonly struct NetworkLesserNobleRevoltPartyCreated : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

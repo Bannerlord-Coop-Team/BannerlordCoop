@@ -22,9 +22,9 @@ internal class QuestAcceptanceJournalPatch
 
     [HarmonyPatch(typeof(ConversationSentence), nameof(ConversationSentence.RunConsequence))]
     [HarmonyPostfix]
-    private static void Postfix()
+    private static void Postfix(ConversationSentence __instance)
     {
         if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed())
-            MessageBroker.Instance.Publish(typeof(QuestAcceptanceJournalPatch), new QuestAcceptanceFinished(null));
+            MessageBroker.Instance.Publish(__instance, new QuestAcceptanceJournalFlushRequested());
     }
 }

@@ -1,11 +1,9 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem.Conversation;
-
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
-using TaleWorlds.CampaignSystem;
+using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.Conversation;
 
 namespace GameInterface.Services.Issues.Framework.Conversation;
 
@@ -13,17 +11,12 @@ namespace GameInterface.Services.Issues.Framework.Conversation;
 [HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.EndConversation))]
 internal static class IssueConversationEndedPatch
 {
-    [HarmonyPrefix]
-    private static void Prefix(out QuestBase __state)
-    {
-        __state = Hero.OneToOneConversationHero?.Issue?.IssueQuest;
-    }
-
     [HarmonyPostfix]
-    private static void Postfix(QuestBase __state)
+    private static void Postfix()
     {
-        if (ModInformation.IsClient && __state != null)
-            MessageBroker.Instance.Publish(typeof(IssueConversationEndedPatch), new QuestAcceptanceFinished(__state));
+        if (ModInformation.IsClient)
+            MessageBroker.Instance.Publish(typeof(IssueConversationEndedPatch), new QuestAcceptanceFinished());
+
         if (ContainerProvider.TryResolve<IIssueConversationGuard>(out var conversationGuard))
         {
             conversationGuard.OnConversationEnded();

@@ -7,7 +7,7 @@ namespace GameInterface.Services.BugReporting.Messages;
 /// Reports archive/upload completion to the client that requested the diagnostic report.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkBugReportResult : IServerToClientCommand
+internal readonly struct NetworkBugReportResult : ICommand
 {
     [ProtoMember(1)]
     public string RequestId { get; }

@@ -599,7 +599,9 @@ public class LordWantsRivalCapturedTests : IDisposable
     [Theory]
     [InlineData(nameof(CampaignEventDispatcher.OnWarDeclared))]
     [InlineData(nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    public void WarAndKingdomChange_AreLeftToTheFrameworkRelay(string dispatcherEvent)
+    [InlineData(nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [InlineData(nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    public void SharedWorldEvents_AreLeftToTheFrameworkRelay(string dispatcherEvent)
     {
         // The framework's QuestEventRelay already runs the quest's own listener, a quest postfix would run it twice
         var patches = Harmony.GetPatchInfo(AccessTools.Method(typeof(CampaignEventDispatcher), dispatcherEvent));

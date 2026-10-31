@@ -140,30 +140,14 @@ internal class QuestJournalMirrorHandler : IHandler
         {
             var matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
                 SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName)).ToArray();
-            var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
-            // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
-            if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1))
-            {
-                Logger.Warning("Ambiguous journal mirror row for {text}; rejecting snapshot", entry.Text?.ToString());
-                return false;
-            }
-            var existing = exact.FirstOrDefault() ?? matches.FirstOrDefault();
-            if (existing == null)
-            {
-                var keyMatches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
+            if (matches.Length == 0)
+                matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
                     SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
-                if (keyMatches.Length > 1)
-                {
-                    var keyExact = keyMatches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
-                    if (keyExact.Length != 1)
-                    {
-                        Logger.Warning("Ambiguous journal mirror key row for {text}; rejecting snapshot", entry.Text?.ToString());
-                        return false;
-                    }
-                    existing = keyExact[0];
-                }
-                else existing = keyMatches.FirstOrDefault();
-            }
+            var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
+            // Existing server-created stages may have a different tick; consume the first unmatched occurrence.
+            if (matches.Length > 1 && exact.Length == 0)
+                Logger.Warning("Ambiguous journal mirror row for {text}; using journal order", entry.Text?.ToString());
+            var existing = exact.FirstOrDefault() ?? matches.FirstOrDefault();
             if (existing == null) ordered.Add(entry.ToJournalLog());
             else
             {
@@ -204,5 +188,6 @@ internal class QuestJournalMirrorHandler : IHandler
     }
 
     private static bool SameKey(TextObject first, TextObject second) =>
-        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
+        ReferenceEquals(first, second) ||
+        (first != null && second != null && first.Value == second.Value);
 }

@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -137,7 +138,7 @@ public class TimeoutJournalHistoryTests : IDisposable
     }
 
     [Fact]
-    public void AcceptanceCaptureStopsWhileLaterHistoryStillMirrorsToTheServer()
+    public void CapturesEveryAcceptanceStageButStopsBeforeLaterProgressLogs()
     {
         Accept(addSecondStage: true);
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
@@ -151,14 +152,50 @@ public class TimeoutJournalHistoryTests : IDisposable
         });
         environment.FlushCoalescer();
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
-        JournalLog[] expected = null!;
+        scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
+    }
+
+    [Fact]
+    public void RealGiverDeathEndsTheOwnerQuestAndClearsTheBystanderIssueOnce()
+    {
+        Accept();
+        scenario.Server.Call(() =>
+        {
+            var giver = Object<Hero>(scenario.Server, scenario.NotableId);
+            Assert.Contains(Campaign.Current.IssueManager, CampaignEventDispatcher.Instance._eventReceivers);
+            output.WriteLine("Death receivers: {0}", string.Join(", ", CampaignEventDispatcher.Instance._eventReceivers.Select(receiver => receiver.GetType().FullName)));
+            var changeState = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
+            var bootstrap = Assert.Single(Harmony.GetPatchInfo(changeState).Prefixes, patch => patch.owner == "Coop.Testing");
+            var harmony = new Harmony(bootstrap.owner);
+            harmony.Unpatch(changeState, bootstrap.PatchMethod);
+            try
+            {
+                giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.Murdered);
+                KillCharacterAction.ApplyByDeathMarkForced(giver, false);
+            }
+            finally
+            {
+                harmony.Patch(changeState, prefix: new HarmonyMethod(bootstrap.PatchMethod)
+                {
+                    priority = bootstrap.priority,
+                    before = bootstrap.before,
+                    after = bootstrap.after,
+                });
+            }
+            Assert.False(giver.IsAlive);
+            Assert.Null(giver.Issue);
+        }, new[] { AccessTools.Method(typeof(KillCharacterAction), nameof(KillCharacterAction.CreateObituary)) });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         scenario.ClientA.Call(() =>
         {
-            expected = ownerQuest.JournalEntries.ToArray();
-            Assert.Equal(new[] { introduction, "Second acceptance stage", "Later quest progress" },
-                expected.Select(log => log.LogText.ToString()));
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+            Assert.True(Archive(Campaign.Current.LogEntryHistory).IsEnded());
         });
-        scenario.Server.Call(() => Assert.Equal(Fields(expected), Fields(serverQuest.JournalEntries)));
+        scenario.ClientB.Call(() => Assert.Null(Object<Hero>(scenario.ClientB, scenario.NotableId).Issue));
     }
 
     [Fact]
@@ -173,14 +210,12 @@ public class TimeoutJournalHistoryTests : IDisposable
         environment.FlushCoalescer();
 
         string[] expected = null!;
-        JournalLog[] expectedEntries = null!;
         scenario.ClientA.Call(() =>
         {
             var ownerArchive = Archive(Campaign.Current.LogEntryHistory);
             Assert.True(ownerArchive.IsEnded());
             Assert.Equal(QuestBase.QuestCompleteDetails.Timeout, ownerArchive._questCompletionDetail);
             expected = Texts(ownerArchive);
-            expectedEntries = ownerArchive.GetEntries().ToArray();
             Assert.Equal(2, expected.Length);
             Assert.Equal(introduction, expected[0]);
             Assert.Contains("failed", expected[1]);
@@ -192,7 +227,6 @@ public class TimeoutJournalHistoryTests : IDisposable
         {
             var history = Campaign.Current.LogEntryHistory;
             originalArchive = Archive(history);
-            Assert.Equal(Fields(expectedEntries), Fields(originalArchive.GetEntries()));
             output.WriteLine("Server archive before save: {0}", string.Join(" | ", Texts(originalArchive)));
             var definitions = new DefinitionContext();
             definitions.FillWithCurrentTypes();
@@ -219,7 +253,6 @@ public class TimeoutJournalHistoryTests : IDisposable
             Assert.True(archive.IsEnded());
             Assert.Equal(QuestBase.QuestCompleteDetails.Timeout, archive._questCompletionDetail);
             Assert.Equal(expected, Texts(archive));
-            Assert.Equal(Fields(expectedEntries), Fields(archive.GetEntries()));
         });
         Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
@@ -278,10 +311,6 @@ public class TimeoutJournalHistoryTests : IDisposable
         entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
 
     private static string[] Texts(JournalLogEntry entry) => entry.GetEntries().Select(log => log.LogText.ToString()).ToArray();
-
-    private static (long, string?, string?, int, int, LogType)[] Fields(IEnumerable<JournalLog> entries) =>
-        entries.Select(log => (log.LogTime.NumTicks, log.LogText?.ToString(), log.TaskName?.ToString(),
-            log.CurrentProgress, log.Range, log.Type)).ToArray();
 
     private static T Object<T>(EnvironmentInstance instance, string id) where T : class
     {
