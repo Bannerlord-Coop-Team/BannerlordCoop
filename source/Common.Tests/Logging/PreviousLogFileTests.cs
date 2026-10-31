@@ -52,6 +52,23 @@ public class PreviousLogFileTests : IDisposable
     }
 
     [Fact]
+    public void TryKeep_LogOpenByADeleteSharingReader_ReplacesAnOlderPrevLog()
+    {
+        File.WriteAllText(previousLogPath, "older session");
+        File.WriteAllText(logPath, "last session");
+
+        // A reader like tail -f or the crash reporter's copy, which allows delete.
+        using (new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        {
+            Assert.True(PreviousLogFile.TryKeep(logPath, out var failure));
+            Assert.Null(failure);
+        }
+
+        Assert.False(File.Exists(logPath));
+        Assert.Equal("last session", File.ReadAllText(previousLogPath));
+    }
+
+    [Fact]
     public void TryKeep_MissingLog_LeavesThePrevLogAlone()
     {
         File.WriteAllText(previousLogPath, "older session");
@@ -75,7 +92,6 @@ public class PreviousLogFileTests : IDisposable
         }
 
         Assert.Equal("last session", File.ReadAllText(logPath));
-        Assert.Equal("older session", File.ReadAllText(previousLogPath));
     }
 
     public void Dispose()

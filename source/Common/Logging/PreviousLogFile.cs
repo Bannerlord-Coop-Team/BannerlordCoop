@@ -21,11 +21,8 @@ public static class PreviousLogFile
 
             var previousLogPath = GetPath(logPath);
 
-            // File.Replace leaves the older .prev log in place when the current log can't be moved.
-            if (File.Exists(previousLogPath))
-                File.Replace(logPath, previousLogPath, null);
-            else
-                File.Move(logPath, previousLogPath);
+            File.Delete(previousLogPath);
+            File.Move(logPath, previousLogPath);
 
             return true;
         }
