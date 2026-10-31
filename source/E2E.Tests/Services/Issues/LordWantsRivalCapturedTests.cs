@@ -391,6 +391,21 @@ public class LordWantsRivalCapturedTests : IDisposable
     }
 
     [Fact]
+    public void GenericSuccessRequest_IsRefusedWithoutTheDeliveryProof()
+    {
+        Accept(ClientA, giverId);
+        var gold = GoldOnServer(playerA);
+
+        ClientA.Call(() => QuestOf(ClientA, giverId).CompleteQuestWithSuccess());
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(gold, GoldOnServer(playerA));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() => Assert.True(QuestOf(Server, giverId).IsOngoing));
+        ClientA.Call(() => Assert.Contains(QuestOf(ClientA, giverId), Campaign.Current.QuestManager.Quests));
+    }
+
+    [Fact]
     public void DeliveringToTheGiver_PaysTheOwnerAndHandsThePrisonerOver()
     {
         Accept(ClientA, giverId);

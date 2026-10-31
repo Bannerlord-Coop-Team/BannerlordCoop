@@ -93,13 +93,6 @@ internal class MerchantOutlawsEventPatches
     [HarmonyPostfix]
     private static void RaidedPostfix(Village village) => RunAsOwners(quest => quest.OnVillageRaided(village));
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void MapEventPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
-    }
-
     // Server mirrors never register events; the owning client's listeners leave world actions to the server.
     [HarmonyPatch(typeof(Quest), nameof(Quest.MobilePartyDestroyed))]
     [HarmonyPrefix]

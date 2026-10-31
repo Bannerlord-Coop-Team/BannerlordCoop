@@ -440,6 +440,18 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Fact]
+    public void ReceivedDeliveryProgressDoesNotSendTheServerItsOwnJournalBack()
+    {
+        Accept();
+        environment.FlushCoalescer();
+        var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        ClientA.SimulateMessage(Server.NetPeer,
+            new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
+        ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
+        Assert.Equal(before, ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
+    }
+
+    [Fact]
     public void PartialThenFullDelivery_UpdatesOnlyTheOwnerAndPaysExactlyOnce()
     {
         Accept();

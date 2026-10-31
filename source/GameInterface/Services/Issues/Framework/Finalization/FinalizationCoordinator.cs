@@ -13,10 +13,12 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
+using HeadmanHerdQuest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -36,6 +38,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly HashSet<IssueBase> announcedIssues = new HashSet<IssueBase>();
     private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
@@ -191,6 +194,8 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
+        if (issue.IssueQuest is HeadmanHerdQuest)
+            return;
         if (issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
@@ -199,7 +204,7 @@ internal class FinalizationCoordinator : IHandler
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
-            entries.Select(log => log.LogText).Where(text => text != null).ToArray()));
+            entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -214,22 +219,32 @@ internal class FinalizationCoordinator : IHandler
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
-            if (!data.IsQuestJournal && quest != null) return;
+            if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
-            var entries = quest?.JournalEntries ?? issue.JournalEntries;
-            var existing = entries.Where(log => log.LogText != null).GroupBy(log => log.LogText.ToString())
-                .ToDictionary(group => group.Key, group => group.Count());
-            foreach (var text in data.Logs ?? Array.Empty<TextObject>())
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
-                if (text == null) continue;
-                var key = text.ToString();
-                if (existing.TryGetValue(key, out var count) && count > 0)
+                if (quest != null)
                 {
-                    existing[key] = count - 1;
-                    continue;
+                    var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    if (IsOlderSnapshot(quest, logs)) return;
+                    quest._journalEntries.Clear();
+                    foreach (var log in logs)
+                        quest._journalEntries.Add(log.ToJournalLog());
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
                 }
-                if (quest != null) quest.AddLog(text);
-                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
+                else
+                {
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    {
+                        if (log.Text == null) continue;
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
+                    }
+                }
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -246,6 +261,13 @@ internal class FinalizationCoordinator : IHandler
 
         if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
         {
+            return;
+        }
+
+        if (!announcedIssues.Add(issue))
+        {
+            // An ending callback can run again while succession replays the native character-change event.
+            // Keep the first callback's cleanup and announcement, then ignore the replay.
             return;
         }
 
@@ -292,12 +314,13 @@ internal class FinalizationCoordinator : IHandler
 
         using (new AllowedThread())
         using (new QuestEndingReplay())
+        using (new QuestJournalReplay())
         {
             Replay(issue, data.Outcome, isOwner);
         }
     }
 
-    // The quest Replay drives, a hand in for example, rather than one it would only discard
+    // The quest Replay drives a hand-in, rather than one it would only discard
     private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
     {
         if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
@@ -308,6 +331,21 @@ internal class FinalizationCoordinator : IHandler
 
         var quest = issueOwner.Issue.IssueQuest;
         return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
+    }
+
+    private static bool IsOlderSnapshot(QuestBase quest, IssueJournalEntry[] entries)
+    {
+        var localLatest = quest.JournalEntries
+            .Where(log => log.LogText != null)
+            .Select(log => log.LogTime.NumTicks)
+            .DefaultIfEmpty(long.MinValue)
+            .Max();
+        var receivedLatest = entries
+            .Where(log => log.Text != null)
+            .Select(log => log.Time.NumTicks)
+            .DefaultIfEmpty(long.MinValue)
+            .Max();
+        return entries.Length < quest.JournalEntries.Count && receivedLatest <= localLatest;
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
