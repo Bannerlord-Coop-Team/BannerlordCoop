@@ -73,6 +73,7 @@ internal class HeadmanHerdJournalHandler : IHandler
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Subscribe<QuestSolutionAcceptTriggered>(TrackAccept);
         broker.Subscribe<QuestAcceptanceStarted>(ShowGrant);
+        broker.Subscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Subscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
         broker.Subscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
@@ -83,6 +84,7 @@ internal class HeadmanHerdJournalHandler : IHandler
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Unsubscribe<QuestSolutionAcceptTriggered>(TrackAccept);
         broker.Unsubscribe<QuestAcceptanceStarted>(ShowGrant);
+        broker.Unsubscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Unsubscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
         broker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
@@ -98,6 +100,23 @@ internal class HeadmanHerdJournalHandler : IHandler
 
     private void ShowGrant(MessagePayload<QuestAcceptanceStarted> payload) =>
         TrackAccept(IssueManager.GetIssueOfQuest(payload.What.Quest));
+
+    private void FinishAccept(MessagePayload<QuestAcceptanceFinished> payload)
+    {
+        if (ModInformation.IsServer)
+            return;
+
+        if (payload.What.Quest == null)
+        {
+            pendingAccepts.Clear();
+            return;
+        }
+
+        var issue = IssueManager.GetIssueOfQuest(payload.What.Quest);
+        if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
+            return;
+        pendingAccepts.TryRemove((giverId, issue.StringId), out _);
+    }
 
     private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
     {
@@ -141,7 +160,7 @@ internal class HeadmanHerdJournalHandler : IHandler
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
             if (data.Text == null || quest.JournalEntries.Any(log =>
-                    log.LogText?.GetID() == data.Text.GetID() || log.LogText?.ToString() == data.Text.ToString())) return;
+                    log.LogText?.ToString() == data.Text.ToString())) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())
                 quest.AddLog(data.Text);

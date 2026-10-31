@@ -143,6 +143,31 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void OwnerJournal_KeepsRepeatedTemplateLogsWithDifferentVariables()
+    {
+        Accept(ClientA);
+        var first = new TextObject("{=herd_shared}Herd stage {COUNT}");
+        first.SetTextVariable("COUNT", 1);
+        var second = new TextObject("{=herd_shared}Herd stage {COUNT}");
+        second.SetTextVariable("COUNT", 2);
+
+        ClientA.SimulateMessage(Server.NetPeer,
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId, first)));
+        ClientA.SimulateMessage(Server.NetPeer,
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId, second)));
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var stages = accepted[ClientA].JournalEntries
+                .Where(log => log.LogText?.ToString().StartsWith("Herd stage ") == true)
+                .Select(log => log.LogText.ToString())
+                .ToArray();
+            Assert.Equal(new[] { "Herd stage 1", "Herd stage 2" }, stages);
+        });
+    }
+
+    [Fact]
     public void IssueCreation_ReplicasUseTheServersIdentityDestinationRecipientAndAnimal()
     {
         Server.Call(() =>
