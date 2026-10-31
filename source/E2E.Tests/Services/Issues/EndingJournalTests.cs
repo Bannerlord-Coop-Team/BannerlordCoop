@@ -611,7 +611,7 @@ public class EndingJournalTests : IDisposable
             new RequestQuestJournal(scenario.NotableId, "previous_issue", new[] { invalidProgress }));
         scenario.Server.Call(() =>
         {
-            Assert.Equal(99, serverProgress.CurrentProgress);
+            Assert.Equal(4, serverProgress.CurrentProgress);
             serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(456L), serverProgress.LogText,
                 serverProgress.TaskName, 2, 5, LogType.Discreate));
         });
@@ -626,7 +626,7 @@ public class EndingJournalTests : IDisposable
         environment.FlushCoalescer();
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
             new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
-        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
+        scenario.Server.Call(() => Assert.Equal(99, serverProgress.CurrentProgress));
     }
 
     [Fact]
