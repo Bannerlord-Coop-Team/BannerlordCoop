@@ -102,6 +102,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementRateController movementRateController;
     private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly ILocationNpcAuthorityState locationAuthorityState;
     private readonly IRelayNetwork relayNetwork;
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
@@ -440,6 +441,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext,
+        ICoopBattleMissionRegistry missionRegistry,
         ILocationNpcAuthorityState locationAuthorityState,
         IRelayNetwork relayNetwork = null)
     {
@@ -461,6 +463,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        this.missionRegistry = missionRegistry;
         this.locationAuthorityState = locationAuthorityState;
         this.relayNetwork = relayNetwork;
         _interpolator = new AgentPositionInterpolator(agentRegistry, locationAuthorityState);
@@ -2147,7 +2150,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
-        if (BattleSpawnGate.IsCoopBattleActive) return;
+        if (missionRegistry.IsCoopBattleActive) return;
 
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
         // controller's player and companion agents; its host-owned NPC puppets survive for migration,

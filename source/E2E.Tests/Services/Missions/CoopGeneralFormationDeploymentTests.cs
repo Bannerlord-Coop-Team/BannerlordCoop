@@ -3,6 +3,7 @@ using Common.Util;
 using Moq;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Tests.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -33,6 +34,7 @@ public class CoopGeneralFormationDeploymentTests
     {
         var harmony = new Harmony("e2e.general-deployment");
         bool wasEnabled = BattleSpawnConfig.Enabled;
+        ActiveCoopBattleScope battleScope = null;
         try
         {
             mission = ObjectHelper.SkipConstructor<Mission>();
@@ -56,8 +58,7 @@ public class CoopGeneralFormationDeploymentTests
             deployment.Setup(value => value.GetFormationPlan(team, formation.FormationIndex, false)).Returns(plan.Object);
             mission._deploymentPlan = deployment.Object;
             BattleSpawnConfig.Enabled = true;
-            if (coop) BattleSpawnGate.BeginBattle("retained-general-deployment");
-            else BattleSpawnGate.EndBattle();
+            battleScope = new ActiveCoopBattleScope(coop ? "retained-general-deployment" : null);
 
             Patch(harmony, typeof(Formation), nameof(Formation.SetPositioning), nameof(SetPositioning));
             Patch(harmony, typeof(Agent), nameof(Agent.GetWorldPosition), nameof(GetWorldPosition));
@@ -81,7 +82,7 @@ public class CoopGeneralFormationDeploymentTests
         finally
         {
             harmony.UnpatchAll(harmony.Id);
-            BattleSpawnGate.EndBattle();
+            battleScope?.Dispose();
             BattleSpawnConfig.Enabled = wasEnabled;
         }
     }

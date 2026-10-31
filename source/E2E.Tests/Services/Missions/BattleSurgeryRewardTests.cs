@@ -51,7 +51,7 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
         var client = Clients.First();
         client.Call(() =>
         {
-            BattleSpawnGate.BeginBattle(mapEventId);
+            BeginCoopBattle(mapEventId, client);
             try
             {
                 SkillLevelingManager.OnSurgeryApplied(
@@ -59,7 +59,7 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                EndCoopBattle(client);
             }
         });
 

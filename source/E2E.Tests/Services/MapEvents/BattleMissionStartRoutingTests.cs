@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -37,20 +38,17 @@ public class BattleMissionStartRoutingTests
     }
 
     [Fact]
-    public void FailedMissionOpen_ReleasesSpawnGate()
+    public void FailedMissionOpen_ClosesBattleWindow()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
-        try
-        {
-            BattleMissionStartHandler.UnwindSpawnGateAfterFailedOpen(spawnGateEngaged: true);
+        var missionRegistry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
+        using var messageBroker = new MessageBroker();
+        using var handler = new BattleMissionStartHandler(
+            messageBroker, null!, null!, null!, null!, null!, null!, missionRegistry);
+        missionRegistry.BeginBattle("battle-1");
 
-            Assert.False(BattleSpawnGate.IsCoopBattleActive);
-        }
-        finally
-        {
-            // Keep the process-global gate isolated even if the assertion exposes a regression.
-            BattleSpawnGate.EndBattle();
-        }
+        handler.CloseBattleWindowAfterFailedOpen(battleWindowOpened: true);
+
+        Assert.False(missionRegistry.IsCoopBattleActive);
     }
 
     [Theory]

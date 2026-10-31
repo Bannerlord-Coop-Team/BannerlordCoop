@@ -1030,7 +1030,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         MirrorAgent formerHostMirror = null;
         MirrorAgent successorMirror = null;
 
-        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        formerHost.Call(() => RunInBattle(formerHost, mapEventId, () =>
         {
             formerHostContext = new BlockingSyncContext(fixture, formerHost);
             AssignBattleHost(formerHostContext, mapEventId, "A", new[] { "B" }, epoch: 1);
@@ -1051,7 +1051,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             formerHostContext.Network.NetworkSentPackets.Packets.Clear();
         }));
 
-        successor.Call(() => RunInBattle(mapEventId, () =>
+        successor.Call(() => RunInBattle(successor, mapEventId, () =>
         {
             successorContext = new BlockingSyncContext(fixture, successor);
             AssignBattleHost(successorContext, mapEventId, "A", new[] { "B" }, epoch: 1);
@@ -1072,7 +1072,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(successorAgentId, Assert.Single(packet.AgentIds));
         }));
 
-        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        formerHost.Call(() => RunInBattle(formerHost, mapEventId, () =>
         {
             AssignBattleHost(formerHostContext, mapEventId, "B", new[] { "A" }, epoch: 2);
             formerHostMirror.GuardMode = Agent.GuardMode.Left;
@@ -2625,16 +2625,16 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         return agent;
     }
 
-    private static void RunInBattle(string mapEventId, Action action)
+    private static void RunInBattle(EnvironmentInstance instance, string mapEventId, Action action)
     {
-        BattleSpawnGate.BeginBattle(mapEventId);
+        BeginCoopBattle(mapEventId, instance);
         try
         {
             action();
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(instance);
         }
     }
 
@@ -2659,6 +2659,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         SetControllerId(instance, controllerId);
 
         instance.Call(() => RunInBattle(
+            instance,
             mapEventId,
             () => action(new BlockingSyncContext(fixture, instance))));
     }

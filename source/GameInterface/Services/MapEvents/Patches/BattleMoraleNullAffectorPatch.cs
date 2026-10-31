@@ -19,7 +19,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <para>
 /// Live-mission morale is the host's authority in a coop battle, so a death with no local affector has no
 /// morale shock to attribute here. Skip the interaction in that case. Gated to coop battles
-/// (see <see cref="BattleSpawnGate"/>) so single-player and non-battle behaviour is untouched.
+/// (see <see cref="ICoopBattleMissionRegistry.IsCoopBattleActive"/>) so single-player and non-battle behaviour is
+/// untouched.
 /// </para>
 /// </summary>
 // OnAgentRemoved can be overloaded across the MissionBehavior hierarchy — pin the arg types so PatchAll
@@ -33,6 +34,9 @@ internal class BattleMoraleNullAffectorPatch
     {
         // No local affector during a coop battle means skip the morale interaction (and the unguarded
         // affectorAgent.Formation deref). True original otherwise.
-        return !(affectorAgent == null && BattleSpawnGate.IsCoopBattleActive);
+        if (affectorAgent != null) return true;
+
+        return !(ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+                 && missionRegistry.IsCoopBattleActive);
     }
 }

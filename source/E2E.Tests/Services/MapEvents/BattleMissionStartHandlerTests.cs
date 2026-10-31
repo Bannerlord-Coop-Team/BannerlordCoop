@@ -50,18 +50,30 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         var missionInitializerResolver = new RecordingMissionInitializerResolver();
         var battleLauncher = new Mock<ICoopFieldBattleLauncher>();
         var hideoutLauncher = new Mock<ICoopHideoutMissionLauncher>();
+        var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
         MissionInitializerRecord openedInitializer = default;
+        string? windowIdAtLaunch = null;
         battleLauncher.Setup(l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
-            .Callback<MissionInitializerRecord>(initializer => openedInitializer = initializer)
+            .Callback<MissionInitializerRecord>(initializer =>
+            {
+                openedInitializer = initializer;
+                windowIdAtLaunch = missionRegistry.ActiveMapEventId;
+            })
             .Returns((Mission)null!);
         hideoutLauncher.Setup(l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault))
-            .Callback<MissionInitializerRecord, bool>((initializer, _) => openedInitializer = initializer)
+            .Callback<MissionInitializerRecord, bool>((initializer, _) =>
+            {
+                openedInitializer = initializer;
+                windowIdAtLaunch = missionRegistry.ActiveMapEventId;
+            })
             .Returns((Mission)null!);
 
+        // Share the root registry with the launch scope, as production patches and the handler share one per client.
         using var launcherScope = client.Container.BeginLifetimeScope(builder =>
         {
             builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>();
             builder.RegisterInstance(hideoutLauncher.Object).As<ICoopHideoutMissionLauncher>();
+            builder.RegisterInstance(missionRegistry).As<ICoopBattleMissionRegistry>();
         });
 
         client.Call(() =>
@@ -94,7 +106,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 missionInitializerResolver,
-                null!);
+                null!,
+                missionRegistry);
 
             try
             {
@@ -144,11 +157,12 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 hideoutLauncher.Verify(
                     l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault),
                     isHideout ? Times.Once() : Times.Never());
-                Assert.False(BattleSpawnGate.IsCoopBattleActive);
+                Assert.Equal(mapEvent.MapEventId, windowIdAtLaunch);
+                Assert.False(missionRegistry.IsCoopBattleActive);
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = null;
                 ContainerProvider.SetContainer(client.Container);
@@ -168,10 +182,15 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var client = Clients.Last();
         var launcher = new Mock<ICoopSiegeBattleLauncher>();
+        var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
         bool opened = false;
 
+        // Share the root registry with the launch scope, as production patches and the handler share one per client.
         using var launcherScope = client.Container.BeginLifetimeScope(builder =>
-            builder.RegisterInstance(launcher.Object).As<ICoopSiegeBattleLauncher>());
+        {
+            builder.RegisterInstance(launcher.Object).As<ICoopSiegeBattleLauncher>();
+            builder.RegisterInstance(missionRegistry).As<ICoopBattleMissionRegistry>();
+        });
 
         client.Call(() =>
         {
@@ -217,6 +236,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                         Assert.Same(settlement, PlayerEncounter.Current.EncounterSettlementAux);
                         Assert.True(PlayerEncounter.Current.IsJoinedBattle);
                         if (hasCurrentEncounter) Assert.Same(existingEncounter, PlayerEncounter.Current);
+                        Assert.Equal(mapEvent.MapEventId, missionRegistry.ActiveMapEventId);
                         opened = true;
                         return null!;
                     });
@@ -224,7 +244,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 using var messageBroker = new MessageBroker();
                 using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
                     client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
-                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!);
+                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!,
+                    missionRegistry);
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
                     new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
@@ -234,11 +255,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 Assert.True(opened);
                 Assert.Same(battle, PlayerEncounter.Battle);
                 Assert.Equal(localSide == BattleSideEnum.Attacker, PlayerEncounter.PlayerIsAttacker);
-                Assert.False(BattleSpawnGate.IsCoopBattleActive);
+                Assert.False(missionRegistry.IsCoopBattleActive);
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
                 campaign.MainParty = previousMainParty;
                 campaign.PlayerEncounter = previousEncounter;
                 campaign.Models.LocationModel = previousLocationModel;
@@ -307,7 +328,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
                     missionInitializerResolver,
-                    null!);
+                    null!,
+                    client.Resolve<ICoopBattleMissionRegistry>());
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

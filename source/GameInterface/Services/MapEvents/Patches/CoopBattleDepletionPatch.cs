@@ -30,7 +30,9 @@ internal class CoopBattleDepletionPatch
     [HarmonyPrefix]
     private static bool Prefix(DefaultBattleMissionAgentSpawnLogic __instance, BattleSideEnum side, ref bool __result)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled) return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return true;
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return true;
 
         var mission = Mission.Current;
@@ -57,7 +59,7 @@ internal class CoopBattleDepletionPatch
             // or if the spawn handler deliberately crossed its reserve timeout for this exact side. The latter
             // is latched only after the full hold deadline; BattleEndLogic itself remains disabled until the
             // other side fields and deployment activates.
-            __result = had[(int)side] || BattleSpawnGate.IsMissingReserveSideAccepted(side);
+            __result = had[(int)side] || missionRegistry.IsMissingReserveSideAccepted(side);
         }
         return false; // skip the native count-based check
     }

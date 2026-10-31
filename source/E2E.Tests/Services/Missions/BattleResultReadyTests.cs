@@ -1,18 +1,22 @@
-﻿using Common.Logging;
+﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +27,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -43,17 +48,23 @@ public class BattleResultReadyTests : MissionTestEnvironment
         host.Call(() =>
         {
             Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            host.NetworkSentMessages.Clear();
-            bool wasInCoopBattleMission = BattleConclusionGate.IsInCoopBattleMission;
-            BattleConclusionGate.IsInCoopBattleMission = true;
+            var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+            var controller = host.Resolve<CoopBattleController>();
             try
             {
+                Assert.True(controller.Session.TryBegin(mapEventId));
+                controller.AfterStart();
+                Assert.True(missionRegistry.IsMissionActive);
+
+                host.NetworkSentMessages.Clear();
                 mapEvent.BattleState = BattleState.DefenderVictory;
             }
             finally
             {
-                BattleConclusionGate.IsInCoopBattleMission = wasInCoopBattleMission;
+                controller.Dispose();
             }
+
+            Assert.False(missionRegistry.IsMissionActive);
         }, VictoryConclusionDisabledMethods());
 
         Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
@@ -81,15 +92,15 @@ public class BattleResultReadyTests : MissionTestEnvironment
             {
                 Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
                 host.NetworkSentMessages.Clear();
-                bool wasInCoopBattleMission = BattleConclusionGate.IsInCoopBattleMission;
-                BattleConclusionGate.IsInCoopBattleMission = true;
+                var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+                missionRegistry.BeginMission(mapEventId);
                 try
                 {
                     mapEvent.SetOverrideWinner(winner);
                 }
                 finally
                 {
-                    BattleConclusionGate.IsInCoopBattleMission = wasInCoopBattleMission;
+                    missionRegistry.EndMission(mapEventId);
                 }
 
                 Assert.Equal(expected, mapEvent.BattleState);
@@ -103,6 +114,48 @@ public class BattleResultReadyTests : MissionTestEnvironment
         Assert.Empty(diagnostics);
         Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
         AssertMapEventPresent(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    // A throwing teardown step must not leave mission-less victories off the legacy state relay.
+    public void ControllerTeardownThrows_StillClosesMissionWindow()
+    {
+        using var fixture = new MissionEngineFixture();
+        var host = Clients.First();
+        SetControllerId(host, "host");
+        var broker = new Mock<IMessageBroker>();
+        broker.Setup(b => b.Publish(It.IsAny<object>(), It.IsAny<BattleMissionEnded>()))
+            .Throws(new InvalidOperationException("teardown failed"));
+
+        host.Call(() =>
+        {
+            var mock = fixture.CreateMission(host);
+            var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+            var agentAuthority = host.Resolve<IBattleAgentAuthorityRegistry>();
+            var controller = host.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(IMessageBroker), broker.Object));
+            try
+            {
+                controller.AfterStart();
+                Assert.True(missionRegistry.IsMissionActive);
+                var rider = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+                var puppetHorse = mock.SpawnMount(rider);
+                Assert.True(host.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), puppetHorse));
+                Assert.True(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+
+                Assert.Throws<InvalidOperationException>(() => controller.Dispose());
+
+                Assert.False(missionRegistry.IsMissionActive);
+                Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+                broker.Verify(b => b.Unsubscribe<NetworkMissionJoinInfo>(
+                    It.IsAny<Action<MessagePayload<NetworkMissionJoinInfo>>>()), Times.Once);
+            }
+            finally
+            {
+                controller.Dispose();
+            }
+        });
     }
 
     [Fact]

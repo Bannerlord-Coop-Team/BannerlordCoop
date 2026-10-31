@@ -34,15 +34,21 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
+    private readonly IRoutedBlowTracker routedBlowTracker;
 
     public CombatHitPresentationHandler(
         INetworkAgentRegistry agentRegistry,
         IBattleNetwork network,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        ICoopBattleMissionRegistry missionRegistry,
+        IRoutedBlowTracker routedBlowTracker)
     {
         this.agentRegistry = agentRegistry;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.missionRegistry = missionRegistry;
+        this.routedBlowTracker = routedBlowTracker;
 
         messageBroker.Subscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Subscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
@@ -66,7 +72,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
             return;
         }
 
-        string excludedController = BattleSpawnGate.RoutedBlowSourceControllerId;
+        string excludedController = routedBlowTracker.SourceControllerId;
         if (excludedController == null &&
             TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
             agentRegistry.TryGetAgentInfo(attackerId, out CoopAgentInfo attackerInfo))
@@ -247,9 +253,9 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
         }
     }
 
-    private static void PlayBodyImpact(Mission mission, NetworkMeleeHitPresentation presentation)
+    private void PlayBodyImpact(Mission mission, NetworkMeleeHitPresentation presentation)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive || presentation.SoundIndex < 0 ||
+        if (!missionRegistry.IsCoopBattleActive || presentation.SoundIndex < 0 ||
             !IsFinite(presentation.CollisionPosition) || !IsFinite(presentation.ArmorType))
         {
             return;

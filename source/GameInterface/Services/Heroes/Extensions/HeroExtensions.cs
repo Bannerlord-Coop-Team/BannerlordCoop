@@ -57,7 +57,7 @@ public static class HeroExtensions
 
     /// <summary>
     /// Determine Whether this client owns a hero's health.
-    /// Use BattleSpawnGate.HeroAgentAuthorityProbe to determine if client has authority.
+    /// The live battle's <see cref="IBattleAgentAuthorityRegistry"/> decides first when the hero has a battle agent.
     /// </summary>
     public static bool IsHealthControlledByThisInstance(this Hero hero)
     {
@@ -68,7 +68,7 @@ public static class HeroExtensions
         }
 
         // Determine if this client has control of the hero from the mission layer
-        var agentAuthority = BattleSpawnGate.HeroAgentAuthorityProbe?.Invoke(hero);
+        var agentAuthority = IsHeroAgentLocallyOwned(hero);
         if (agentAuthority.HasValue) return agentAuthority.Value;
 
         // Fallback: Hero is this player's character
@@ -84,6 +84,14 @@ public static class HeroExtensions
         if (PlayerEncounter.Current != null && PlayerEncounter.Current.IsSoloEncounter()) return true;
 
         return false;
+    }
+
+    // Asks the live battle whether this client owns the hero's agent; null when no battle agent answers.
+    private static bool? IsHeroAgentLocallyOwned(Hero hero)
+    {
+        if (!ContainerProvider.TryResolve<IBattleAgentAuthorityRegistry>(out var agentAuthority)) return null;
+
+        return agentAuthority.IsHeroAgentLocallyOwned(hero);
     }
 
     private static bool HasLocationEncounterHealthAuthority(bool hasLocationEncounter, bool belongsToMainParty)

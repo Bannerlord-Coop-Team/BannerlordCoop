@@ -41,6 +41,7 @@ public class GuardReactionHandler : IGuardReactionHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IGuardReactionActionResolver reactionActionResolver;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly Dictionary<Guid, PendingGuardReaction> pendingReactions =
         new Dictionary<Guid, PendingGuardReaction>();
     private readonly Dictionary<Guid, PendingRemoteGuardReaction>
@@ -119,7 +120,8 @@ public class GuardReactionHandler : IGuardReactionHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
-        IGuardReactionActionResolver reactionActionResolver)
+        IGuardReactionActionResolver reactionActionResolver,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -127,6 +129,7 @@ public class GuardReactionHandler : IGuardReactionHandler
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.reactionActionResolver = reactionActionResolver;
+        this.missionRegistry = missionRegistry;
 
         messageBroker.Subscribe<NetworkAgentGuardReaction>(
             Handle_NetworkAgentGuardReaction);
@@ -496,7 +499,7 @@ public class GuardReactionHandler : IGuardReactionHandler
                 : AuthorityValidationResult.Invalid;
         }
 
-        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        string mapEventId = missionRegistry.ActiveMapEventId;
         if (mapEventId == null
             || !battleHostRegistry.TryGet(
                 mapEventId,

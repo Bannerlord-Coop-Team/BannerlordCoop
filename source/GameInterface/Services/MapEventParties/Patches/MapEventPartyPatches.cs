@@ -28,7 +28,7 @@ internal class MapEventPartyPatches
         if (ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer)) return true;
 
         // Only apply on clients if not in active coop battle
-        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, BattleSpawnGate.IsCoopBattleActive)) return false;
+        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, IsCoopBattleActive())) return false;
 
         __instance._roster.OnTroopKilled(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
@@ -43,7 +43,7 @@ internal class MapEventPartyPatches
         if (ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer)) return true;
 
         // Only apply on clients if not in active coop battle
-        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, BattleSpawnGate.IsCoopBattleActive)) return false;
+        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, IsCoopBattleActive())) return false;
 
         __instance._roster.OnTroopWounded(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troopSeed.UniqueSeed));
@@ -71,7 +71,7 @@ internal class MapEventPartyPatches
 
         // Coop battle: score hits flow blow-applier→server through CoopAgentOrigin.OnScoreHit; suppress any
         // native call here so the hit isn't accounted twice (see OnTroopKilled).
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+        if (BattleSpawnConfig.Enabled && IsCoopBattleActive()) return false;
 
         // A teamkill contributes nothing (the original early-outs), so don't bother the server with it.
         if (isTeamKill) return false;
@@ -182,4 +182,9 @@ internal class MapEventPartyPatches
 
         return true;
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 }

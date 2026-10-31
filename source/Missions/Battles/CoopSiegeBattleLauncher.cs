@@ -39,17 +39,20 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
 
     public CoopSiegeBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.missionRegistry = missionRegistry;
     }
 
     public Mission OpenCoopSiegeBattle(MissionInitializerRecord rec, float[] wallHitPointRatios,
@@ -139,7 +142,7 @@ internal class CoopSiegeBattleLauncher : ICoopSiegeBattleLauncher
                 behaviors.Add(new SandBoxSallyOutMissionController(isSallyOutAmbush: true));
 
             behaviors.Add(new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                PartyBase.MainParty.Side, isSallyOut: isSallyOut));
+                missionRegistry, PartyBase.MainParty.Side, isSallyOut: isSallyOut));
             behaviors.Add(spawnLogic);
             behaviors.Add(new BattlePowerCalculationLogic());
             behaviors.Add(new BattleObserverMissionLogic());

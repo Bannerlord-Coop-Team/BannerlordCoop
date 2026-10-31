@@ -152,6 +152,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
+        builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>().SingleInstance();
+        builder.RegisterType<BattleAgentAuthorityRegistry>().As<IBattleAgentAuthorityRegistry>().SingleInstance();
+        builder.RegisterType<PuppetSpawnTracker>().As<IPuppetSpawnTracker>().SingleInstance();
+        builder.RegisterType<RoutedBlowTracker>().As<IRoutedBlowTracker>().SingleInstance();
+        builder.RegisterType<ReplicatedDeathTracker>().As<IReplicatedDeathTracker>().SingleInstance();
+        builder.RegisterType<RoutedPlayerHitNotificationTracker>().As<IRoutedPlayerHitNotificationTracker>().SingleInstance();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().SingleInstance();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();

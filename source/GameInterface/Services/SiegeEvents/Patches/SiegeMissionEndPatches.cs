@@ -33,11 +33,16 @@ internal class SiegeMissionEndPatches
     private static void SallyOutMissionEndedPostfix(SallyOutEndLogic __instance,
         ref MissionResult missionResult, bool __result)
     {
-        if (!__result || !BattleConclusionGate.IsInCoopBattleMission) return;
+        if (!__result || !IsCoopBattleMissionActive()) return;
         if (PlayerEncounter.Battle?.IsSiegeAmbush != true || __instance.Mission?.PlayerTeam == null) return;
 
         missionResult = CreateSiegeAmbushResult(__instance.Mission.PlayerTeam.Side);
     }
+
+    // Reports whether a coop battle mission is loaded here; no container means vanilla behavior.
+    private static bool IsCoopBattleMissionActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsMissionActive;
 
     // DefenderPullBack is the completion-barrier signal; it is never applied to the campaign MapEvent.
     internal static MissionResult CreateSiegeAmbushResult(BattleSideEnum playerSide)
@@ -52,7 +57,7 @@ internal class SiegeMissionEndPatches
     [HarmonyPrefix]
     private static bool SiegeAmbushOnMissionEndedPrefix()
     {
-        if (ModInformation.IsClient && BattleConclusionGate.IsInCoopBattleMission
+        if (ModInformation.IsClient && IsCoopBattleMissionActive()
             && PlayerEncounter.Battle?.IsSiegeAmbush == true)
         {
             PlayerEncounter.Current?.SetIsSallyOutAmbush(false);

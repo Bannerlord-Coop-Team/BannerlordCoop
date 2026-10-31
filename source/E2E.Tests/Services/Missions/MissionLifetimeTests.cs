@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Locations;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
 using Missions;
@@ -21,6 +22,27 @@ namespace E2E.Tests.Services.Missions;
 public class MissionLifetimeTests : MissionTestEnvironment
 {
     public MissionLifetimeTests(ITestOutputHelper output) : base(output, numClients: 1) { }
+
+    [Theory]
+    [InlineData(typeof(ICoopBattleMissionRegistry))]
+    [InlineData(typeof(IBattleAgentAuthorityRegistry))]
+    [InlineData(typeof(IPuppetSpawnTracker))]
+    [InlineData(typeof(IRoutedBlowTracker))]
+    [InlineData(typeof(IReplicatedDeathTracker))]
+    [InlineData(typeof(IRoutedPlayerHitNotificationTracker))]
+    public void BattlePatchStateIsSharedAcrossMissionScopes(Type serviceType)
+    {
+        var client = Clients.Single();
+        client.Call(() =>
+        {
+            var patchState = client.Container.Resolve(serviceType);
+            for (int i = 0; i < 2; i++)
+            {
+                using var mission = client.Container.BeginLifetimeScope(MissionLifetimeFactory.MissionTag);
+                Assert.Same(patchState, mission.Resolve(serviceType));
+            }
+        });
+    }
 
     [Theory]
     [InlineData(typeof(CoopBattleController), 0)]

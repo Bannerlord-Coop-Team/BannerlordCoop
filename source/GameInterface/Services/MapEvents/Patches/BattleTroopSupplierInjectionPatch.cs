@@ -14,8 +14,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// field battle. The campaign builds the native suppliers in <c>CampaignMission.OpenBattleMission</c> and
 /// passes the array to this constructor; replacing the array's entries here (before the constructor body
 /// reads them) means the native deployment/reinforcement logic drives our supplier instead, with no other
-/// changes. Only active in a coop battle (see <see cref="BattleSpawnGate"/>); ordinary battles keep their
-/// native suppliers.
+/// changes. Only active in a coop battle (see <see cref="ICoopBattleMissionRegistry.IsCoopBattleActive"/>);
+/// ordinary battles keep their native suppliers.
 /// </summary>
 [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), MethodType.Constructor,
     new Type[] { typeof(IMissionTroopSupplier[]), typeof(BattleSideEnum), typeof(Mission.BattleSizeType) })]
@@ -27,9 +27,9 @@ internal class BattleTroopSupplierInjectionPatch
     private static void Prefix(IMissionTroopSupplier[] suppliers)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)) return;
 
-        var mapEventId = BattleSpawnGate.ActiveMapEventId;
+        var mapEventId = missionRegistry.ActiveMapEventId;
         if (mapEventId == null || suppliers == null) return;
 
         // The coop field-battle launcher (CoopFieldBattleLauncher) now builds the spawn logic with our
@@ -37,8 +37,8 @@ internal class BattleTroopSupplierInjectionPatch
         // for any spawn logic the native path constructs while a coop battle is active.
         if (suppliers.Length > 0 && suppliers[0] is CoopTroopSupplier) return;
 
-        // No DI here (static patch), so resolve the object manager and BR-110 agent budget ONCE and hand them
-        // to the suppliers (they no longer hit the service locator per agent on the supply path).
+        // Resolve the object manager and BR-110 agent budget ONCE and hand them to the suppliers, so they
+        // don't hit the service locator per agent on the supply path.
         ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
         ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget);
 

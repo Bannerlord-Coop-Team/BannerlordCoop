@@ -93,7 +93,8 @@ public class FieldBattleOpenRefusedTests : MissionTestEnvironment
     private static CoopFieldBattleLauncher CreateLauncher(EnvironmentInstance client)
     {
         return new CoopFieldBattleLauncher(Mock.Of<IMessageBroker>(), client.ObjectManager,
-            Mock.Of<ICoopBattleBehaviorAttacher>(), Mock.Of<IBattleAgentBudget>(), client.Resolve<INetwork>());
+            Mock.Of<ICoopBattleBehaviorAttacher>(), Mock.Of<IBattleAgentBudget>(), client.Resolve<ICoopBattleMissionRegistry>(),
+            client.Resolve<INetwork>());
     }
 
     private static void WithMainParty(MobileParty party, Action action)

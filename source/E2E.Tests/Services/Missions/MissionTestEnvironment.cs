@@ -47,6 +47,20 @@ public class MissionTestEnvironment : E2ETestEnvironment
         };
     }
 
+    /// <summary>Opens the coop battle window on each instance, as BattleMissionEntryPatch does for an entering client.</summary>
+    protected static void BeginCoopBattle(string mapEventId, params EnvironmentInstance[] instances)
+    {
+        foreach (var instance in instances)
+            instance.Resolve<ICoopBattleMissionRegistry>().BeginBattle(mapEventId);
+    }
+
+    /// <summary>Closes the coop battle window on each instance, as the battle lifecycle does on leave.</summary>
+    protected static void EndCoopBattle(params EnvironmentInstance[] instances)
+    {
+        foreach (var instance in instances)
+            instance.Resolve<ICoopBattleMissionRegistry>().EndBattle();
+    }
+
     /// <summary>Sets a client's network identity — the value host election ranks by.</summary>
     protected void SetControllerId(EnvironmentInstance instance, string controllerId)
     {

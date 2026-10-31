@@ -21,12 +21,14 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class BattleAgentSpawnedPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(Agent __result)
+    internal static void Postfix(Agent __result)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         // A puppet being spawned from another owner's broadcast is NOT our troop — don't re-capture it.
-        if (BattleSpawnGate.SuppressCapture) return;
+        if (!ContainerProvider.TryResolve<IPuppetSpawnTracker>(out var puppetSpawnTracker)
+            || puppetSpawnTracker.IsSpawningPuppet) return;
         if (__result == null) return;
 
         if (__result.Origin is CoopAgentOrigin origin && origin.InitialHealth is float health &&

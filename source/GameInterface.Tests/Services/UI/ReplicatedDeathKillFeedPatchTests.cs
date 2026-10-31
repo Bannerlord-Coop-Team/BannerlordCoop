@@ -1,27 +1,24 @@
-﻿using System;
-using Common.Util;
+﻿using Common.Util;
+using GameInterface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Tests.Services.MapEvents;
 using GameInterface.Services.UI.Patches;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ViewModelCollection.HUD.KillFeed.Personal;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Regression coverage for replicated death kill-feed context.</summary>
 [Collection(nameof(MissionCurrentCollection))]
-public class ReplicatedDeathKillFeedPatchTests : IDisposable
+public class ReplicatedDeathKillFeedPatchTests
 {
-    public void Dispose()
-    {
-        BattleSpawnGate.EndBattle();
-    }
-
     [Fact]
     public void Prefix_RestoresAffectorAndKillingBlow_OnlyInsideMatchingDeathScope()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        using var battleScope = new ActiveCoopBattleScope("battle-1");
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         var otherAgent = ObjectHelper.SkipConstructor<Agent>();
         var affectorAgent = ObjectHelper.SkipConstructor<Agent>();
@@ -32,8 +29,9 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
             VictimBodyPart = BoneBodyPartType.Head,
         };
         var expectedKillingBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, 123, 0);
+        Assert.True(ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker));
 
-        BattleSpawnGate.RunWithReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, AgentState.Killed, () =>
+        using (replicatedDeathTracker.BeginReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, AgentState.Killed))
         {
             Agent actualAffector = null!;
             KillingBlow actualKillingBlow = default;
@@ -49,60 +47,31 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
             ReplicatedDeathKillFeedPatch.Prefix(otherAgent, ref actualAffector, ref actualKillingBlow);
             Assert.Null(actualAffector);
             Assert.False(actualKillingBlow.IsValid);
-        });
+        }
 
-        Assert.False(BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out _, out _));
+        Assert.False(replicatedDeathTracker.TryGetReplicatedDeath(affectedAgent, out _, out _));
     }
 
+    // The hit postfix hands the routed hit's notification to the tracker, so the victim's replicated death removes it.
     [Fact]
-    public void RemoveRoutedPlayerHitNotification_RemovesOnlyMatchingVictimNotification()
+    public void HitPostfix_TracksRoutedHitNotification_ForMatchingDeathToRemove()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
-        var firstAgent = ObjectHelper.SkipConstructor<Agent>();
-        var secondAgent = ObjectHelper.SkipConstructor<Agent>();
-        bool firstRemoved = false;
-        bool secondRemoved = false;
-
-        BattleSpawnGate.TrackRoutedPlayerHitNotification(firstAgent, 50, () => firstRemoved = true);
-        BattleSpawnGate.TrackRoutedPlayerHitNotification(secondAgent, 50, () => secondRemoved = true);
-
-        BattleSpawnGate.RemoveRoutedPlayerHitNotification(firstAgent, 50);
-
-        Assert.True(firstRemoved);
-        Assert.False(secondRemoved);
-    }
-
-    [Fact]
-    public void TrackRoutedPlayerHitNotification_RemovesNotification_WhenDeathArrivesFirst()
-    {
-        BattleSpawnGate.BeginBattle("battle-1");
+        using var battleScope = new ActiveCoopBattleScope("battle-1");
+        Assert.True(ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var tracker));
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
-        bool notificationRemoved = false;
+        var killFeed = new SPPersonalKillNotificationVM();
+        tracker.EnqueueCombatLogContext(affectedAgent, 50);
 
-        BattleSpawnGate.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
+        using (tracker.BeginCombatLog())
+        {
+            killFeed.OnPersonalMessage("routed victim");
+            RoutedPlayerHitNotificationPatch.Postfix(killFeed, 50, isMountDamage: false);
+        }
 
-        BattleSpawnGate.TrackRoutedPlayerHitNotification(affectedAgent, 50, () => notificationRemoved = true);
+        Assert.Single(killFeed.NotificationList);
 
-        Assert.True(notificationRemoved);
-    }
+        tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
 
-    [Fact]
-    public void CombatLogContext_PreservesUntrackedEntryBeforeRoutedHit()
-    {
-        BattleSpawnGate.BeginBattle("battle-1");
-        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
-
-        BattleSpawnGate.EnqueueCombatLogContext(null!, 50);
-        BattleSpawnGate.EnqueueCombatLogContext(affectedAgent, 50);
-
-        BattleSpawnGate.BeginCombatLog();
-        Assert.False(BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out _, out _));
-        BattleSpawnGate.EndCombatLog();
-
-        BattleSpawnGate.BeginCombatLog();
-        Assert.True(BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out var actualAgent, out int damage));
-        Assert.Same(affectedAgent, actualAgent);
-        Assert.Equal(50, damage);
-        BattleSpawnGate.EndCombatLog();
+        Assert.Empty(killFeed.NotificationList);
     }
 }

@@ -36,7 +36,7 @@ public class BattleSpawnMirrorTests : MissionTestEnvironment
             float? broadcastHealth = null;
             void Capture(MessagePayload<AgentSpawnedInBattle> payload) => broadcastHealth = payload.What.Agent.Health;
             broker.Subscribe<AgentSpawnedInBattle>(Capture);
-            BattleSpawnGate.BeginBattle("retreat-health-test");
+            BeginCoopBattle("retreat-health-test", client);
             try
             {
                 var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
@@ -46,7 +46,7 @@ public class BattleSpawnMirrorTests : MissionTestEnvironment
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                EndCoopBattle(client);
                 broker.Unsubscribe<AgentSpawnedInBattle>(Capture);
             }
         });

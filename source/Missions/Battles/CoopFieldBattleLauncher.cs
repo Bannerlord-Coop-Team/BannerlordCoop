@@ -47,6 +47,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly INetwork network;
 
     public CoopFieldBattleLauncher(
@@ -54,12 +55,14 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
+        ICoopBattleMissionRegistry missionRegistry,
         INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.missionRegistry = missionRegistry;
         this.network = network;
     }
 
@@ -140,7 +143,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
                 new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                    PartyBase.MainParty.Side),
+                    missionRegistry, PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),

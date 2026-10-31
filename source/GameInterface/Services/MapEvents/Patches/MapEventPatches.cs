@@ -238,7 +238,8 @@ internal class MapEventPatches
     // A victory set inside a coop battle mission, which the server applies only after every member reports.
     private static bool IsCoopMissionVictory(BattleState state) =>
         (state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
-        && BattleConclusionGate.IsInCoopBattleMission;
+        && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+        && missionRegistry.IsMissionActive;
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]

@@ -130,7 +130,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NotAi)));
         harmony.Patch(AccessTools.PropertySetter(typeof(RangedSiegeWeapon), nameof(RangedSiegeWeapon.State)),
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NativeState)));
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         harmony.CreateClassProcessor(patchType).Patch();
         harmony.CreateClassProcessor(typeof(MangonelAmmoConsumedPatch)).Patch();
@@ -140,13 +140,13 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("mangonel-former-simulator");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.SetClaimedMachines(localSimulator
             ? new HashSet<int> { replica.Machine.Id.Id } : new HashSet<int>(), new HashSet<int>());
         nativeBaseTicks = 0;
         nativePickupConsumes = 0;
+        var battleScope = new ActiveCoopBattleScope("mangonel-former-simulator");
         try
         {
             AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick").Invoke(replica.Machine, new object[] { 0.1f });
@@ -162,7 +162,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = oldEnabled;
             SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;

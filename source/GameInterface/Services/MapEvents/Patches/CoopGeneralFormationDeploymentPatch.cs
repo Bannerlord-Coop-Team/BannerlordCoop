@@ -10,9 +10,11 @@ internal class CoopGeneralFormationDeploymentPatch
     [HarmonyPostfix]
     private static void Postfix(Mission __instance, Formation formation)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive
+        if (!BattleSpawnConfig.Enabled
             || formation.FormationIndex != FormationClass.NumberOfRegularFormations
             || formation.OrderPositionIsValid) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         var general = formation.Team.GeneralAgent;
         if (general == null || !general.IsActive()

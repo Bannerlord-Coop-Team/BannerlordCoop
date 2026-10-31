@@ -1,11 +1,11 @@
-﻿using System.Collections;
-using System.Linq;
+﻿using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Common;
 using Common.Commands;
 using Common.Util;
 using GameInterface.Services.MapEvents;
+using GameInterface.Tests.Services.MapEvents;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Core;
@@ -37,11 +37,10 @@ public class CoopDeploymentPatchTests
         try
         {
             var patched = harmony.CreateClassProcessor(GetPatchType()).Patch() ?? new List<MethodInfo>();
-            Assert.Contains(patched, method => method.Name.Contains("IsPlanMade"));
-            Assert.Contains(patched, method => method.Name.Contains("MakeTeamPlans"));
-            var makePlans = AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans");
-            Assert.Contains(Harmony.GetPatchInfo(makePlans).Finalizers,
-                patch => patch.owner == harmony.Id && patch.PatchMethod.Name == "MakeTeamPlans_Finalizer");
+            var checkDeployment = AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment");
+            Assert.Contains("CheckDeployment", Assert.Single(patched).Name);
+            Assert.Contains(Harmony.GetPatchInfo(checkDeployment).Transpilers,
+                patch => patch.owner == harmony.Id && patch.PatchMethod.Name == "Transpiler");
         }
         finally
         {
@@ -51,25 +50,23 @@ public class CoopDeploymentPatchTests
 
     [Theory]
     [InlineData("existing_plan")]
-    [InlineData("making_plans")]
     [InlineData("disabled")]
     [InlineData("inactive_battle")]
     [InlineData("null_team")]
     [InlineData("no_mission")]
     [InlineData("player_team")]
-    public void IsPlanMade_PreservesResultWhenOverrideIsIneligible(string reason)
+    public void SpawnGateOverride_PreservesResultWhenOverrideIsIneligible(string reason)
     {
         using var state = new PatchState();
         var team = CreateForeignTeam();
         bool original = reason == "existing_plan";
-        if (reason == "making_plans") InvokePatch("MakeTeamPlans_Prefix");
         if (reason == "disabled") BattleSpawnConfig.Enabled = false;
         if (reason == "inactive_battle") SetBattleActive(false);
         if (reason == "null_team") team = null;
         if (reason == "no_mission") Mission._current = null;
         if (reason == "player_team") team = Mission.Current.PlayerTeam;
 
-        Assert.Equal(original, ApplyPlanPostfix(team, original));
+        Assert.Equal(original, ApplySpawnGateOverride(team, original));
 #if DEBUG
         var status = ReadStatus();
         Assert.Equal(0, status.Value<long>("overrideCalls"));
@@ -81,15 +78,15 @@ public class CoopDeploymentPatchTests
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    public void IsPlanMade_OverridesForeignTeamWithOrWithoutActiveAgents(int activeAgents)
+    public void SpawnGateOverride_OverridesForeignTeamWithOrWithoutActiveAgents(int activeAgents)
     {
         using var state = new PatchState();
         var team = CreateForeignTeam();
         for (int index = 0; index < activeAgents; index++)
             team._activeAgents.Add(CreateShell<Agent>());
 
-        Assert.True(ApplyPlanPostfix(team));
-        Assert.True(ApplyPlanPostfix(team));
+        Assert.True(ApplySpawnGateOverride(team));
+        Assert.True(ApplySpawnGateOverride(team));
 #if DEBUG
         var status = ReadStatus();
         Assert.Equal(1, status.Value<int>("totalObservedTeams"));
@@ -102,32 +99,6 @@ public class CoopDeploymentPatchTests
         Assert.Equal(activeAgents, status.Value<int>("lastOverrideActiveAgents"));
 #endif
         GC.KeepAlive(team);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MakeTeamPlans_FinalizerRestoresOverrideAfterNormalOrExceptionalExit(bool throws)
-    {
-        using var state = new PatchState();
-        var team = CreateForeignTeam();
-        var harmony = new Harmony("e2e.coopdeploy.finalizertest");
-        try
-        {
-            harmony.Patch(AccessTools.Method(typeof(CoopDeploymentPatchTests), nameof(SyntheticMakeTeamPlans)),
-                prefix: new HarmonyMethod(GetPatchMethod("MakeTeamPlans_Prefix")),
-                finalizer: new HarmonyMethod(GetPatchMethod("MakeTeamPlans_Finalizer")));
-            if (throws)
-                Assert.Throws<InvalidOperationException>(() => SyntheticMakeTeamPlans(team, true));
-            else
-                SyntheticMakeTeamPlans(team, false);
-
-            Assert.True(ApplyPlanPostfix(team));
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
     }
 
 #if DEBUG
@@ -172,7 +143,7 @@ public class CoopDeploymentPatchTests
     {
         using var state = new PatchState();
         var team = CreateForeignTeam();
-        Assert.True(ApplyPlanPostfix(team));
+        Assert.True(ApplySpawnGateOverride(team));
         if (!missionActive) Mission._current = null;
         SetBattleActive(battleActive);
         var before = ReadStatus();
@@ -281,7 +252,7 @@ public class CoopDeploymentPatchTests
         var owningMission = team.Mission;
         CreateForeignTeam();
 
-        Assert.True(ApplyPlanPostfix(team));
+        Assert.True(ApplySpawnGateOverride(team));
 
         var references = (List<WeakReference>)GetPatchType()
             .GetField("observedMissions", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
@@ -294,8 +265,8 @@ public class CoopDeploymentPatchTests
     private static (WeakReference Team, WeakReference Mission, string Output) ObserveAndRelease()
     {
         var team = CreateForeignTeam();
-        Assert.True(ApplyPlanPostfix(team));
-        Assert.True(ApplyPlanPostfix(team));
+        Assert.True(ApplySpawnGateOverride(team));
+        Assert.True(ApplySpawnGateOverride(team));
         var output = RunCommand("status");
         Assert.True(output.Succeeded);
         var observed = (new WeakReference(team), new WeakReference(team.Mission), output.Output);
@@ -309,7 +280,7 @@ public class CoopDeploymentPatchTests
     {
         var team = CreateForeignTeam();
         var mission = team.Mission;
-        Assert.True(ApplyPlanPostfix(team));
+        Assert.True(ApplySpawnGateOverride(team));
         ((List<Team>)mission.Teams).Clear();
         mission.Teams._playerTeam = null;
         SetTeamProperty(team, nameof(Team.Mission), null);
@@ -322,7 +293,7 @@ public class CoopDeploymentPatchTests
     {
         var type = GetPatchType().GetNestedType("DeploymentRetentionStateCoopCommand", BindingFlags.Public);
         Assert.NotNull(type);
-        return Assert.IsAssignableFrom<ICoopCommand>(Activator.CreateInstance(type!));
+        return Assert.IsAssignableFrom<ICoopCommand>(Activator.CreateInstance(type!, battleRegistry));
     }
 
     private static CoopCommandResult RunCommand(params string[] args) =>
@@ -336,13 +307,6 @@ public class CoopDeploymentPatchTests
         return JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
     }
 #endif
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void SyntheticMakeTeamPlans(Team team, bool throws)
-    {
-        Assert.False(ApplyPlanPostfix(team));
-        if (throws) throw new InvalidOperationException("synthetic plan failure");
-    }
 
     private static Team CreateForeignTeam()
     {
@@ -374,23 +338,20 @@ public class CoopDeploymentPatchTests
         AccessTools.Field(typeof(Team), $"<{property}>k__BackingField").SetValue(team, value);
     }
 
-    private static bool ApplyPlanPostfix(Team? team, bool original = false)
-    {
-        object?[] args = { team, original };
-        GetPatchMethod("IsPlanMade_Postfix").Invoke(null, args);
-        return (bool)args[1]!;
-    }
+    private static bool ApplySpawnGateOverride(Team? team, bool original = false) =>
+        (bool)GetPatchMethod("ApplySpawnGateOverride").Invoke(null, new object?[] { team, original })!;
 
-    private static Type GetPatchType() => typeof(BattleSpawnGate).Assembly
-        .GetType("GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch", throwOnError: true)!;
+    private static Type GetPatchType() => DeploymentPatchStaticsScope.PatchType;
 
     private static MethodInfo GetPatchMethod(string name) =>
         GetPatchType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Static)!;
 
-    private static void InvokePatch(string name) => GetPatchMethod(name).Invoke(null, null);
-
-    private static void SetBattleActive(bool active) =>
-        AccessTools.Field(typeof(BattleSpawnGate), "_activeMapEventId").SetValue(null, active ? "synthetic-deployment" : null);
+    // Opens or closes the coop battle window on the registry the current PatchState installed.
+    private static void SetBattleActive(bool active)
+    {
+        if (active) battleRegistry.BeginBattle("synthetic-deployment");
+        else battleRegistry.EndBattle();
+    }
 
     private static bool StoresMissionGraph(Type type, HashSet<Type> visited)
     {
@@ -406,32 +367,20 @@ public class CoopDeploymentPatchTests
             (type.BaseType != null && StoresMissionGraph(type.BaseType, visited));
     }
 
+    // The registry of the active PatchState's container, read by the static scenario helpers.
+    private static ICoopBattleMissionRegistry battleRegistry = null!;
+
     private sealed class PatchState : IDisposable
     {
         private readonly Mission previousMission = Mission._current;
         private readonly bool previousEnabled = BattleSpawnConfig.Enabled;
         private readonly bool previousServer = ModInformation.IsServer;
-        private readonly FieldInfo battleField = AccessTools.Field(typeof(BattleSpawnGate), "_activeMapEventId");
-        private readonly object? previousBattle;
-        private readonly List<(FieldInfo Field, object? Value)> previousFields = new();
+        private readonly ActiveCoopBattleScope battleScope = new(null);
+        private readonly DeploymentPatchStaticsScope patchStatics = new();
 
         public PatchState()
         {
-            previousBattle = battleField.GetValue(null);
-            foreach (var field in GetPatchType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
-            {
-                var value = field.GetValue(null);
-                if (value is IList list)
-                {
-                    previousFields.Add((field, list.Cast<object>().ToArray()));
-                    list.Clear();
-                }
-                else
-                {
-                    previousFields.Add((field, value));
-                    field.SetValue(null, field.FieldType.IsValueType ? Activator.CreateInstance(field.FieldType) : null);
-                }
-            }
+            battleRegistry = battleScope.Registry;
             Mission._current = null;
             BattleSpawnConfig.Enabled = true;
             SetBattleActive(false);
@@ -442,19 +391,9 @@ public class CoopDeploymentPatchTests
             Mission._current = previousMission;
             BattleSpawnConfig.Enabled = previousEnabled;
             ModInformation.IsServer = previousServer;
-            battleField.SetValue(null, previousBattle);
-            foreach (var entry in previousFields)
-            {
-                if (entry.Field.GetValue(null) is IList list)
-                {
-                    list.Clear();
-                    foreach (var value in (object[])entry.Value!) list.Add(value);
-                }
-                else
-                {
-                    entry.Field.SetValue(null, entry.Value);
-                }
-            }
+            battleScope.Dispose();
+            battleRegistry = null!;
+            patchStatics.Dispose();
         }
     }
 }

@@ -26,7 +26,7 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyPrefix]
     private static bool TickAuxPrefix(SiegeWeapon __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id);
     }
@@ -157,7 +157,7 @@ internal class SiegeMachineAuthorityPatches
     private static bool IsClientForMachine(UsableMachine machine)
     {
         if (GameNetwork.IsClientOrReplay) return true;
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return false;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return false;
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
 
         return !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
@@ -170,7 +170,7 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyPrefix]
     private static void HandleUserAimingPrefix(RangedSiegeWeapon __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return;
         if (!SiegeMissionAuthorityGate.TryGetRemoteAim(__instance.Id.Id, out var direction, out var releaseAngle)) return;
 
         __instance.TargetDirection = direction;
@@ -183,7 +183,7 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyPrefix]
     private static bool ShootPrefix(RangedSiegeWeapon __instance, ref bool __result)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
         if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id)) return true;
 
         __result = false;
@@ -218,10 +218,15 @@ internal class SiegeMachineAuthorityPatches
     // non-authority client's local toggles must not run; the replicated state applies under suppress.
     private static bool AllowGateToggle(CastleGate gate)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return initializingGate;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 }

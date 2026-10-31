@@ -63,7 +63,8 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
                 new[] { new TroopReserveEntry(1141, characterId, 0) }, isReceiverPlayerParty: true) }, 1, 1, 1000, 8);
             var enemySupplier = new CoopTroopSupplier(battleId, BattleSideEnum.Attacker,
                 returner.ObjectManager, new BattleAgentBudget());
-            var spawnHandler = new CoopBattleMissionSpawnHandler(supplier, enemySupplier, returner.Resolve<IMessageBroker>(), BattleSideEnum.Defender);
+            var spawnHandler = new CoopBattleMissionSpawnHandler(supplier, enemySupplier, returner.Resolve<IMessageBroker>(),
+                returner.Resolve<ICoopBattleMissionRegistry>(), BattleSideEnum.Defender);
             var controller = returner.Resolve<CoopBattleController>();
             Assert.True(controller.Session.TryBegin(battleId));
             returner.Resolve<IBattleHostRegistry>().Set(battleId,

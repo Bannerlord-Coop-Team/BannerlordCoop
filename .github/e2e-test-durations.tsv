@@ -171,7 +171,6 @@ E2E.Tests.Services.Missions.BattleRetreatCasualtyTests	0.85
 E2E.Tests.Services.Missions.BattleRoutMirrorTests	1.18
 E2E.Tests.Services.Missions.BattleSizeProviderTests	0.00
 E2E.Tests.Services.Missions.BattleSpawnAdmissionOrderingTests	0.04
-E2E.Tests.Services.Missions.BattleSpawnGateTests	0.00
 E2E.Tests.Services.Missions.BattleSpawnMirrorTests	1.17
 E2E.Tests.Services.Missions.BattleSpawnSendOrderingTests	0.07
 E2E.Tests.Services.Missions.BattleSurgeryRewardTests	0.93
