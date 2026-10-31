@@ -3,10 +3,10 @@ using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
-using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies;
 
@@ -32,10 +32,11 @@ internal sealed class ArmyDisbander : IArmyDisbander
             return;
 
         var parties = army.Parties.ToArray();
+        // Vanilla's own-army check, a co-op player's army would open a menu on the server that stops its AI
         CampaignEventDispatcher.Instance.OnArmyDispersed(
             army,
             reason,
-            parties.Any(party => party.IsPlayerParty()));
+            parties.Contains(MobileParty.MainParty));
         army._armyIsDispersing = true;
 
         try

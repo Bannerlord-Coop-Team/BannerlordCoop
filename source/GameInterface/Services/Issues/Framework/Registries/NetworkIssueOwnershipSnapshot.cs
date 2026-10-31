@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Framework.Registries;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkIssueOwnershipSnapshot : IServerToClientCommand
+public readonly struct NetworkIssueOwnershipSnapshot : ICommand
 {
     [ProtoMember(1)]
     public readonly IssueOwnershipData[] Owners;

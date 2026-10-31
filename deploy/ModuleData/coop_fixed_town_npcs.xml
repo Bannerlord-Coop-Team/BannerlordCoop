@@ -878,4 +878,29 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_8a480198"
+    name="{=!}Agalar"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.khuzait"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_K1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Selamın Aleyküm"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_khuzait" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
