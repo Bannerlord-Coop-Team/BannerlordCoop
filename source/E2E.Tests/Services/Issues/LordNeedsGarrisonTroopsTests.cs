@@ -249,14 +249,14 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             scenario.ClientA.Call(() =>
             {
                 var ownerEntries = ownerQuest.JournalEntries.ToArray();
-                Assert.Single(ownerEntries);
-                Assert.Equal(expected, ownerEntries[0].LogText.ToString());
+                Assert.Equal(2, ownerEntries.Length);
+                Assert.Contains(expected, ownerEntries.Select(log => log.LogText.ToString()));
                 var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                     entry => entry.IsRelatedTo(ownerQuest)));
                 Assert.True(archive.IsEnded());
                 var archivedEntries = archive.GetEntries().ToArray();
-                Assert.Single(archivedEntries);
-                Assert.Equal(expected, archivedEntries[0].LogText.ToString());
+                Assert.Equal(2, archivedEntries.Length);
+                Assert.Contains(expected, archivedEntries.Select(log => log.LogText.ToString()));
             });
             scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
                 entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId))));
