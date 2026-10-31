@@ -1,6 +1,7 @@
 using Common;
 using Common.Util;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
