@@ -24,8 +24,7 @@ internal class QuestAcceptanceJournalPatch
     [HarmonyPostfix]
     private static void Postfix()
     {
-        var quest = Hero.OneToOneConversationHero?.Issue?.IssueQuest;
-        if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed() && quest != null)
-            MessageBroker.Instance.Publish(typeof(QuestAcceptanceJournalPatch), new QuestAcceptanceFinished(quest));
+        if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed())
+            MessageBroker.Instance.Publish(typeof(QuestAcceptanceJournalPatch), new QuestAcceptanceFinished(null));
     }
 }
