@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEventComponents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPromptPlayerBlockadeAttacked : IServerToClientCommand
+internal readonly struct NetworkPromptPlayerBlockadeAttacked : ICommand
 {
     [ProtoMember(1)]
     public readonly string MapEventId;
