@@ -28,13 +28,14 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalTickFailureLog missionTickFailures;
     private readonly INavalLateHullDeployment lateHullDeployment;
     private readonly INavalBallistaTargets ballistaTargets;
+    private readonly INavalMissionTracker missionTracker;
     private int lastAgentCount = -1;
     private bool retreated;
 
     // Takes one failure log per tick kind, so a flood on one of them can't hide the first lines of the other.
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
-        INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets)
+        INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker)
     {
         Services = services;
         this.steeredCopies = steeredCopies;
@@ -44,6 +45,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.missionTickFailures = missionTickFailures;
         this.lateHullDeployment = lateHullDeployment;
         this.ballistaTargets = ballistaTargets;
+        this.missionTracker = missionTracker;
         shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
@@ -51,7 +53,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         // Also fires for every hull as NavalShipsLogic.OnEndMission removes them, after the final ropes went out.
         shipsLogic.BeforeShipRemovedEvent += OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent += OnShipRemoved;
-        CoopNavalMissionScope.IsActive = true;
+        missionTracker.IsActive = true;
     }
 
     /// <summary>The battle's naval services, which the debug commands read.</summary>
@@ -202,7 +204,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     // and vanilla's own mission end still run.
     public override void OnEndMissionInternal()
     {
-        CoopNavalMissionScope.IsActive = false;
+        missionTracker.IsActive = false;
         shipsLogic.MissionEndEvent -= OnMissionEnding;
         shipsLogic.BeforeShipRemovedEvent -= OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;

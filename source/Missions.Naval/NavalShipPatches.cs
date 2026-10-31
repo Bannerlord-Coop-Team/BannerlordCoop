@@ -206,7 +206,7 @@ internal class CoopOrderOfBattleShipLayoutPatch
 {
     // Skips the saved layout load in a coop naval mission.
     [HarmonyPrefix]
-    internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
+    internal static bool Prefix() => !NavalMissionTracker.IsActiveHere();
 }
 
 // Owners announce station use; the replicator ignores agents this client does not drive. An item pickup is no station
@@ -218,7 +218,7 @@ internal class AgentStationUsePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject usedObject)
     {
-        if (!CoopNavalMissionScope.IsActive || usedObject == null || usedObject is SpawnedItemEntity) return;
+        if (!NavalMissionTracker.IsActiveHere() || usedObject == null || usedObject is SpawnedItemEntity) return;
 
         MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, usedObject, inUse: true));
     }
@@ -235,7 +235,7 @@ internal partial class AgentStationReleasePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject __state)
     {
-        if (!CoopNavalMissionScope.IsActive || __state == null || __state is SpawnedItemEntity
+        if (!NavalMissionTracker.IsActiveHere() || __state == null || __state is SpawnedItemEntity
             || __instance.CurrentlyUsedGameObject == __state)
             return;
 
@@ -256,7 +256,7 @@ internal class ForeignHelmUsePatch
     [HarmonyPrefix]
     private static bool Prefix(Agent __instance, UsableMissionObject targetObject)
     {
-        if (!__instance.IsMainAgent || !CoopNavalMissionScope.IsActive) return true;
+        if (!__instance.IsMainAgent || !NavalMissionTracker.IsActiveHere()) return true;
 
         var hull = HelmHullOf(targetObject);
         if (hull == null) return true;
@@ -300,7 +300,7 @@ internal class CoopShipCapturePatch
     [HarmonyPrefix]
     private static bool Prefix(ShipControllerMachine __instance, Agent captorAgent)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         MessageBroker.Instance.Publish(__instance, new ShipCaptureTimerElapsed(__instance.AttachedShip, captorAgent));
         return false;
@@ -317,7 +317,7 @@ internal class CapturedFormationConnectionPatch
     [HarmonyPrefix]
     internal static bool Prefix(MissionShip ship1, MissionShip ship2, ref bool __result)
     {
-        if (!CoopNavalMissionScope.IsActive || (ship1 != null && ship2 != null)) return true;
+        if (!NavalMissionTracker.IsActiveHere() || (ship1 != null && ship2 != null)) return true;
 
         __result = false;
         return false;

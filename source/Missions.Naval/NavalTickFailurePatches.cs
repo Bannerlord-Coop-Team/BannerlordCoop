@@ -19,7 +19,7 @@ internal class NavalAgentTickFailurePatch
     [HarmonyFinalizer]
     internal static Exception Finalizer(Mission __instance, Exception __exception)
     {
-        if (__exception == null || !CoopNavalMissionScope.IsActive) return __exception;
+        if (__exception == null || !NavalMissionTracker.IsActiveHere()) return __exception;
 
         __instance.tickCompleted = true;
         Failures.Report(__exception, "Mission agent and team tick (finished the tick)", __instance);

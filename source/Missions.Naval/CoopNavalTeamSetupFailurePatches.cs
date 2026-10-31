@@ -26,7 +26,7 @@ internal class CoopNavalTeamSetupFailurePatches
     [HarmonyPrefix]
     private static bool AllocationPrefix(NavalTeamSideSpawnContext __instance)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         bool hasShip = __instance._shipsLogic.GetShipAssignment(TeamSideEnum.PlayerTeam, FormationClass.Infantry)?.HasMissionShip == true;
         bool hasPlayerOrigin = __instance._agentsLogic.FindTroopOrigin(__instance.TeamSide, origin => origin.Troop.IsPlayerCharacter) != null;
@@ -43,7 +43,7 @@ internal class CoopNavalTeamSetupFailurePatches
     [HarmonyFinalizer]
     private static Exception SetupTeamsFinalizer(DeploymentMissionController __instance, Exception __exception)
     {
-        if (__exception == null || !CoopNavalMissionScope.IsActive || __instance is not NavalDeploymentMissionController)
+        if (__exception == null || !NavalMissionTracker.IsActiveHere() || __instance is not NavalDeploymentMissionController)
             return __exception;
 
         if (__instance.Mission?.GetMissionBehavior<CoopNavalSetupGuard>()?.End(NavalSetupEndReason.TeamSetupFailed) == true)
@@ -56,7 +56,7 @@ internal class CoopNavalTeamSetupFailurePatches
     [HarmonyPrefix]
     private static bool OnMissionTickPrefix(DeploymentMissionController __instance)
     {
-        if (!CoopNavalMissionScope.IsActive || __instance is not NavalDeploymentMissionController) return true;
+        if (!NavalMissionTracker.IsActiveHere() || __instance is not NavalDeploymentMissionController) return true;
 
         return __instance.Mission?.GetMissionBehavior<CoopNavalSetupGuard>()?.SetupFailed != true;
     }

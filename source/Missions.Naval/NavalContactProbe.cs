@@ -33,7 +33,7 @@ internal static class NavalContactProbe
     /// <summary>[Physics thread] A hull contact callback of <paramref name="ship"/> against another hull, counted when a copy takes part.</summary>
     internal static void CountContact(MissionShip ship, WeakGameEntity otherEntity)
     {
-        if (!CoopNavalMissionScope.IsActive || !otherEntity.IsValid) return;
+        if (!NavalMissionTracker.IsActiveHere() || !otherEntity.IsValid) return;
         if (!(otherEntity.GetFirstScriptWithNameHash(MissionShip.MissionShipScriptNameHash) is MissionShip other)) return;
 
         bool shipIsCopy = NavalForeignHulls.Contains(ship);

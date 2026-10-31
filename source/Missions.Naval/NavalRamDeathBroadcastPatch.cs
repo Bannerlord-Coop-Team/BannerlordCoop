@@ -16,7 +16,7 @@ internal class NavalRamDeathBroadcastPatch
     [HarmonyPostfix]
     internal static void Postfix(IMessage message)
     {
-        if (!CoopNavalMissionScope.IsActive || message is not NetworkBattleAgentDied death) return;
+        if (!NavalMissionTracker.IsActiveHere() || message is not NetworkBattleAgentDied death) return;
         NavalContactProbe.RecordDeathBroadcast(death.AgentId);
     }
 }
@@ -30,7 +30,7 @@ internal class NavalRamDeathReceivePatch
     [HarmonyPostfix]
     internal static void Postfix(MessagePayload<NetworkBattleAgentDied> payload)
     {
-        if (!CoopNavalMissionScope.IsActive) return;
+        if (!NavalMissionTracker.IsActiveHere()) return;
         NavalContactProbe.RecordReceivedDeath(payload.What.AgentId);
     }
 }

@@ -130,17 +130,10 @@ public class NavalRopeRemovalTests
         var target = Hull();
         var removed = removedEnd == "source" ? source : removedEnd == "target" ? target : Hull();
         var rope = Rope(source, removedEnd == "flying" ? null : target);
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = coopBattle;
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = coopBattle;
 
-            Assert.Equal(expected, NavalRopeRemoval.BreaksOnRemoval(rope, removed));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        Assert.Equal(expected, NavalRopeRemoval.BreaksOnRemoval(rope, removed));
     }
 
     // A constructor-skipped rope from a station on the source hull, hooked to a point on the target hull when one is given.

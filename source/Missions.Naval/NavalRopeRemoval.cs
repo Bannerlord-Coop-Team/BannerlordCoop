@@ -56,7 +56,7 @@ internal static class NavalRopeRemoval
     /// on that hull breaks, because hulls leave mid-battle there and vanilla's removal would end every other boarding.
     /// </summary>
     internal static bool BreaksOnRemoval(Attachment rope, MissionShip removed) =>
-        !CoopNavalMissionScope.IsActive || rope.AttachmentSource?.OwnerShip == removed || rope.AttachmentTarget?.OwnerShip == removed;
+        !NavalMissionTracker.IsActiveHere() || rope.AttachmentSource?.OwnerShip == removed || rope.AttachmentTarget?.OwnerShip == removed;
 
     /// <summary>Whether a rope end has no hull: it left the mission, or never resolved to one (a joint built against a removed hull).</summary>
     internal static bool IsMissingOrRemoved(MissionShip hull) => hull == null || hull.IsRemoved;

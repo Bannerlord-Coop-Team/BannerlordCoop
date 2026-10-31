@@ -13,10 +13,16 @@ namespace Missions.Naval;
 public sealed class NavalRollCoopCommand : ICoopCommand
 {
     private readonly INavalRollProbe probe;
+    private readonly INavalMissionTracker missionTracker;
     internal const string Usage = "Usage: coop.debug.naval.roll start ship-id-prefix at-water-seconds [seconds], status or stop";
 
     /// <summary>Each command gets a transient sampler; the mission's copy probe owns it after a successful start.</summary>
-    public NavalRollCoopCommand(INavalRollProbe probe) => this.probe = probe;
+    public NavalRollCoopCommand(INavalRollProbe probe, INavalMissionTracker missionTracker)
+    {
+        this.probe = probe;
+        this.missionTracker = missionTracker;
+    }
+
     public string Prefix => "coop.debug.naval";
     public string Name => "roll";
     public string Description => "Logs paired owner/copy roll samples over a shared-clock interval. " + Usage;
@@ -35,7 +41,7 @@ public sealed class NavalRollCoopCommand : ICoopCommand
         var mission = Mission.Current;
         var copyProbe = mission?.GetMissionBehavior<NavalCopyProbeLogic>();
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (copyProbe == null || controller == null || !CoopNavalMissionScope.IsActive)
+        if (copyProbe == null || controller == null || !missionTracker.IsActive)
             return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
         if (values.Length == 1 && (values[0] == "status" || values[0] == "stop"))
         {

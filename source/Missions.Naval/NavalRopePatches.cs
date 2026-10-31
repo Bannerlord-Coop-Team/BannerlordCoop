@@ -199,7 +199,7 @@ internal class RopeForcePatch
     /// <summary>[Fixed-tick thread] Whether a joint force of this kind may reach the body, counting the write either way.</summary>
     internal static bool AllowForce(NavalPhysics physics, int kind)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         bool copy = NavalForeignHulls.TryGetCopy(physics, out _);
         Interlocked.Increment(ref (copy ? foreignForceFiltered : ownForceWrites)[kind]);

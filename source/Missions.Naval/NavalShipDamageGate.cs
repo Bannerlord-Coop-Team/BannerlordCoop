@@ -125,7 +125,7 @@ internal static class NavalShipDamageGate
     internal static bool KeepsContactCollision()
     {
         var rammer = contactShip;
-        if (!CoopNavalMissionScope.IsActive || rammer == null) return true;
+        if (!NavalMissionTracker.IsActiveHere() || rammer == null) return true;
         if (!NavalForeignHulls.Contains(rammer)) return true;
 
         Interlocked.Increment(ref droppedContactCollisions);
@@ -136,7 +136,7 @@ internal static class NavalShipDamageGate
     private static bool Allows(MissionShip ship, BattleShipHitOrigin origin, BattleShipDamageKind kind, float damage,
         float inflictedDamage, Vec3 worldPoint, Agent attacker, MissionShip hitter, bool isRamDamage, int sailIndex)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         var route = BattleShipDamageRoutes.Route(!NavalForeignHulls.Contains(ship), routedApplyDepth > 0, origin);
 #if DEBUG

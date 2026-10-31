@@ -17,17 +17,10 @@ public class NavalTickFailurePatchesTests
     public void Finalizer_InACoopNavalBattle_CompletesTheTickAndSwallowsTheThrow()
     {
         var mission = PendingMission();
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = true;
-        try
-        {
-            Assert.Null(NavalAgentTickFailurePatch.Finalizer(mission, new NullReferenceException()));
-            Assert.True(TickCompleted(mission));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        Assert.Null(NavalAgentTickFailurePatch.Finalizer(mission, new NullReferenceException()));
+        Assert.True(TickCompleted(mission));
     }
 
     // Any other mission keeps vanilla's behaviour: the throw goes on and the tick stays pending.
@@ -36,18 +29,11 @@ public class NavalTickFailurePatchesTests
     {
         var mission = PendingMission();
         var thrown = new NullReferenceException();
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = false;
-        try
-        {
-            Assert.Same(thrown, NavalAgentTickFailurePatch.Finalizer(mission, thrown));
-            Assert.False(TickCompleted(mission));
-            Assert.Null(NavalAgentTickFailurePatch.Finalizer(mission, null));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = false;
+        Assert.Same(thrown, NavalAgentTickFailurePatch.Finalizer(mission, thrown));
+        Assert.False(TickCompleted(mission));
+        Assert.Null(NavalAgentTickFailurePatch.Finalizer(mission, null));
     }
 
     // The count starts again in each mission.

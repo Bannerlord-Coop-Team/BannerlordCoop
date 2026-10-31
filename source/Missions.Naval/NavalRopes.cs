@@ -125,7 +125,7 @@ internal static class NavalRopes
     /// <summary>Opens a new generation when an owned station holds a rope its record hasn't seen.</summary>
     internal static void ObserveCreated(ShipAttachmentMachine machine)
     {
-        if (!CoopNavalMissionScope.IsActive || BypassReplicaGates || machine?.CurrentAttachment == null || IsReplicaMachine(machine)) return;
+        if (!NavalMissionTracker.IsActiveHere() || BypassReplicaGates || machine?.CurrentAttachment == null || IsReplicaMachine(machine)) return;
 
         if (!records.TryGetValue(machine, out var record)) records[machine] = record = new RopeRecord();
         if (ReferenceEquals(record.Attachment, machine.CurrentAttachment)) return;

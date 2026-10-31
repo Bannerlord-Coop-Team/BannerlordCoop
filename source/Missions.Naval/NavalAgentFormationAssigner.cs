@@ -16,11 +16,18 @@ public class NavalAgentFormationAssigner : AgentFormationAssigner
     private static readonly ILogger Logger = LogManager.GetLogger<NavalAgentFormationAssigner>();
 
     private readonly HashSet<Formation> refusedFormations = new HashSet<Formation>();
+    private readonly INavalMissionTracker missionTracker;
+
+    // Takes the tracker that says whether this client runs a coop naval battle.
+    public NavalAgentFormationAssigner(INavalMissionTracker missionTracker)
+    {
+        this.missionTracker = missionTracker;
+    }
 
     // Refuses a shipless formation of a coop naval mission, logging it once; any other mission keeps the base rule.
     protected override bool CanJoin(Formation formation)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!missionTracker.IsActive) return true;
         if (Mission.Current?.GetMissionBehavior<NavalShipsLogic>()?.IsAShipAssignedToFormation(formation) != false) return true;
 
         if (refusedFormations.Add(formation))

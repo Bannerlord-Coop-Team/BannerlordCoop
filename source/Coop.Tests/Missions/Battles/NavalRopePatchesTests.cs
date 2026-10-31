@@ -92,11 +92,11 @@ public class NavalRopePatchesTests
         hull._shipEventListeners = new MBList<IShipEventListener>();
 
         var harmony = new Harmony("coop.tests.naval.ropes.removal");
-        bool wasActive = CoopNavalMissionScope.IsActive;
+        using var naval = new NavalClientContainer();
         try
         {
             harmony.CreateClassProcessor(typeof(RopeShipRemovalPatch)).Patch();
-            CoopNavalMissionScope.IsActive = true;
+            naval.MissionTracker.IsActive = true;
 
             // The method's tail reaches the hull's actuators, which can't be built without the engine, after both rope loops.
             Assert.Throws<NullReferenceException>(() => hull.OnShipRemoved(NavalRopeRemovalTests.Hull()));
@@ -107,7 +107,6 @@ public class NavalRopePatchesTests
         }
         finally
         {
-            CoopNavalMissionScope.IsActive = wasActive;
             harmony.UnpatchAll(harmony.Id);
         }
     }
@@ -118,11 +117,11 @@ public class NavalRopePatchesTests
         var copyPhysics = ShipTestHulls.Uninitialized<NavalPhysics>();
         var copy = ShipTestHulls.Uninitialized<MissionShip>();
         copy._physics = copyPhysics;
-        bool wasActive = CoopNavalMissionScope.IsActive;
+        using var naval = new NavalClientContainer();
         NavalRopes.Clear();
         try
         {
-            CoopNavalMissionScope.IsActive = true;
+            naval.MissionTracker.IsActive = true;
             NavalForeignHulls.Add(copy, null);
 
             Assert.False(RopeForcePatch.AllowForce(copyPhysics, 1));
@@ -133,7 +132,6 @@ public class NavalRopePatchesTests
         finally
         {
             NavalForeignHulls.Remove(copy);
-            CoopNavalMissionScope.IsActive = wasActive;
             NavalRopes.Clear();
         }
     }

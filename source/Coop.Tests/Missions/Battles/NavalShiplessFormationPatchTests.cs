@@ -89,18 +89,11 @@ public class NavalShiplessFormationPatchTests
     [Fact]
     public void BehaviorWeightPrefix_OutsideACoopBattle_RunsVanilla()
     {
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = false;
-        try
-        {
-            float weight = 7f;
-            Assert.True(ShiplessFormationBehaviorWeightPatch.Prefix(null!, ref weight));
-            Assert.Equal(7f, weight);
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = false;
+        float weight = 7f;
+        Assert.True(ShiplessFormationBehaviorWeightPatch.Prefix(null!, ref weight));
+        Assert.Equal(7f, weight);
     }
 
     // R48 re-review: a behaviour whose cached hull is null (vanilla's refresh after a capture) weighs 0 in a co-op battle
@@ -110,18 +103,11 @@ public class NavalShiplessFormationPatchTests
     {
         var behavior = (BehaviorNavalRemoveConnection)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
             typeof(BehaviorNavalRemoveConnection));
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = true;
-        try
-        {
-            float weight = 5000f;
-            Assert.False(ShiplessFormationBehaviorWeightPatch.Prefix(behavior, ref weight));
-            Assert.Equal(0f, weight);
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        float weight = 5000f;
+        Assert.False(ShiplessFormationBehaviorWeightPatch.Prefix(behavior, ref weight));
+        Assert.Equal(0f, weight);
     }
 
     // R48 re-review: what one weight evaluation does, by what is known about the hulls involved.
@@ -142,18 +128,11 @@ public class NavalShiplessFormationPatchTests
     [Fact]
     public void SkirmishOrderPrefix_SkipsAMissingTargetOnlyInACoopBattle()
     {
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = true;
-            Assert.False(SkirmishOrderWithoutTargetPatch.Prefix(null!));
-            CoopNavalMissionScope.IsActive = false;
-            Assert.True(SkirmishOrderWithoutTargetPatch.Prefix(null!));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        Assert.False(SkirmishOrderWithoutTargetPatch.Prefix(null!));
+        naval.MissionTracker.IsActive = false;
+        Assert.True(SkirmishOrderWithoutTargetPatch.Prefix(null!));
     }
 
     // Ramming and skirmish skip their ship orders while their own cached hull is missing.
@@ -162,37 +141,23 @@ public class NavalShiplessFormationPatchTests
     {
         var ramming = (BehaviorNavalRamming)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
             typeof(BehaviorNavalRamming));
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = true;
-        try
-        {
-            Assert.False(ShiplessTargetShipOrdersPatch.Prefix(ramming));
-            Assert.Equal(2, ShiplessTargetShipOrdersPatch.TargetMethods().Count(method => method != null));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        Assert.False(ShiplessTargetShipOrdersPatch.Prefix(ramming));
+        Assert.Equal(2, ShiplessTargetShipOrdersPatch.TargetMethods().Count(method => method != null));
     }
 
     // R48 round 4 review: engage and follow orders at a missing hull are not given in a co-op battle; outside one vanilla runs.
     [Fact]
     public void EngageAndFollowOrderPrefixes_SkipAMissingTargetOnlyInACoopBattle()
     {
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = true;
-            Assert.False(EngageOrderWithoutTargetPatch.Prefix(null!));
-            Assert.False(FollowOrderWithoutTargetPatch.Prefix(null!));
-            CoopNavalMissionScope.IsActive = false;
-            Assert.True(EngageOrderWithoutTargetPatch.Prefix(null!));
-            Assert.True(FollowOrderWithoutTargetPatch.Prefix(null!));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        Assert.False(EngageOrderWithoutTargetPatch.Prefix(null!));
+        Assert.False(FollowOrderWithoutTargetPatch.Prefix(null!));
+        naval.MissionTracker.IsActive = false;
+        Assert.True(EngageOrderWithoutTargetPatch.Prefix(null!));
+        Assert.True(FollowOrderWithoutTargetPatch.Prefix(null!));
     }
 
     // The order setters run on the selected formations with a hull, and the full selection comes back in its order.
@@ -253,18 +218,11 @@ public class NavalShiplessFormationPatchTests
             typeof(NavalDLC.Missions.Objects.MissionShip));
         ramming._ignoredShip = target;
         ramming._isRammingActive = true;
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        CoopNavalMissionScope.IsActive = true;
-        try
-        {
-            Assert.False(RammingCancelWithoutAiControllerPatch.Prefix(ramming));
-            Assert.False(ramming._isRammingActive);
-            Assert.Same(target, ramming._ignoredShip);
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        Assert.False(RammingCancelWithoutAiControllerPatch.Prefix(ramming));
+        Assert.False(ramming._isRammingActive);
+        Assert.Same(target, ramming._ignoredShip);
     }
 }
 #endif

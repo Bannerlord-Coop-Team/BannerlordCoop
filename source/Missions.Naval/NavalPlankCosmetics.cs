@@ -13,7 +13,7 @@ internal static class NavalPlankCosmetics
     internal static Random PlankCosmeticRandom(Attachment attachment, string purpose)
     {
         var source = attachment?.AttachmentSource;
-        if (!CoopNavalMissionScope.IsActive || source?.OwnerShip == null) return null;
+        if (!NavalMissionTracker.IsActiveHere() || source?.OwnerShip == null) return null;
 
         var record = NavalRopes.RecordOf(source);
         if (purpose == "AddRopesToBridge" && !NavalRopes.IsReplica(attachment) && record != null)
