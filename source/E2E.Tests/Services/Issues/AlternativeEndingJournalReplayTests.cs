@@ -1,7 +1,6 @@
 ﻿using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;

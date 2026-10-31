@@ -67,7 +67,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
-        messageBroker.Subscribe<RequestQuestSolutionAccept>(RememberOwnerPeer);
+        messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerPeer);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -80,7 +80,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
-        messageBroker.Unsubscribe<RequestQuestSolutionAccept>(RememberOwnerPeer);
+        messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerPeer);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -193,15 +193,17 @@ internal class FinalizationCoordinator : IHandler
         }, context: nameof(FinalizationCoordinator));
     }
 
-    private void RememberOwnerPeer(MessagePayload<RequestQuestSolutionAccept> payload)
+    private void RememberOwnerPeer(MessagePayload<QuestSolutionAcceptedOnServer> payload)
     {
-        if (ModInformation.IsClient || payload.Who is not NetPeer peer)
+        if (ModInformation.IsClient)
             return;
 
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+                return;
+            if (!playerManager.TryGetPeer(data.ControllerId, out var peer))
                 return;
             ownerPeers.Remove(issue);
             ownerPeers.Add(issue, peer);

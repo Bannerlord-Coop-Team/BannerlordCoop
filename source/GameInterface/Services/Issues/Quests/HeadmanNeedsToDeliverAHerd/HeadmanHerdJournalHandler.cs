@@ -40,7 +40,7 @@ public readonly struct NetworkHeadmanHerdLog : ICommand
     {
         GiverId = giverId;
         IssueId = issueId;
-        Text = log.LogText;
+        Text = null;
         Entry = new IssueJournalEntry(log);
     }
 }

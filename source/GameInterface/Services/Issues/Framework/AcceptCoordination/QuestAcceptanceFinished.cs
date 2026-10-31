@@ -10,6 +10,20 @@ public readonly struct QuestAcceptanceFinished : IEvent
     public QuestAcceptanceFinished(QuestBase quest) => Quest = quest;
 }
 
+public readonly struct QuestSolutionAcceptedOnServer : IEvent
+{
+    public readonly string IssueOwnerId;
+    public readonly string IssueId;
+    public readonly string ControllerId;
+
+    public QuestSolutionAcceptedOnServer(string issueOwnerId, string issueId, string controllerId)
+    {
+        IssueOwnerId = issueOwnerId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+    }
+}
+
 public readonly struct QuestAcceptanceJournalFlushRequested : IEvent
 {
 }
