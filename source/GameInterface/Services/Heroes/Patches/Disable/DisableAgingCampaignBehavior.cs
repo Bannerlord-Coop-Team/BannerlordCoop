@@ -21,6 +21,9 @@ internal class AgingCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickHeroPrefix(AgingCampaignBehavior __instance, Hero hero)
     {
+        // Guard against Hero.MainHero ever dying. Hero.OnDeath sets multiple properties to null that can cause issues when handled incorrectly
+        if (hero == Hero.MainHero) return false;
+
         if (!ContainerProvider.TryResolve<IAgingCampaignBehaviorInterface>(out var agingBehaviorInterface)) return false;
 
         agingBehaviorInterface.DailyTickHero(__instance, hero);

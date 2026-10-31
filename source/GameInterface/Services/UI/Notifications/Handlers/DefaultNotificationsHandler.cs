@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -38,17 +39,20 @@ internal class DefaultNotificationsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IFactionInterface factionInterface;
 
     public DefaultNotificationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        ITroopRosterInterface troopRosterInterface,
+        IFactionInterface factionInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.factionInterface = factionInterface;
 
         messageBroker.Subscribe<NotifyAllianceStarted>(Handle_NotifyAllianceStarted);
         messageBroker.Subscribe<NetworkNotifyAllianceStarted>(Handle_NetworkNotifyAllianceStarted);
@@ -169,6 +173,12 @@ internal class DefaultNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyHeroTeleportation>(Handle_NotifyHeroTeleportation);
         messageBroker.Subscribe<NetworkNotifyHeroTeleportation>(Handle_NetworkNotifyHeroTeleportation);
+
+        messageBroker.Subscribe<LogArmyGathered>(Handle_LogArmyGathered);
+        messageBroker.Subscribe<NetworkLogArmyGathered>(Handle_NetworkLogArmyGathered);
+
+        messageBroker.Subscribe<LogSiegeAftermathApplied>(Handle_LogSiegeAftermathApplied);
+        messageBroker.Subscribe<NetworkLogSiegeAftermathApplied>(Handle_NetworkLogSiegeAftermathApplied);
     }
 
     public void Dispose()
@@ -292,6 +302,12 @@ internal class DefaultNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyHeroTeleportation>(Handle_NotifyHeroTeleportation);
         messageBroker.Unsubscribe<NetworkNotifyHeroTeleportation>(Handle_NetworkNotifyHeroTeleportation);
+
+        messageBroker.Unsubscribe<LogArmyGathered>(Handle_LogArmyGathered);
+        messageBroker.Unsubscribe<NetworkLogArmyGathered>(Handle_NetworkLogArmyGathered);
+
+        messageBroker.Unsubscribe<LogSiegeAftermathApplied>(Handle_LogSiegeAftermathApplied);
+        messageBroker.Unsubscribe<NetworkLogSiegeAftermathApplied>(Handle_NetworkLogSiegeAftermathApplied);
     }
 
     private void Handle_NotifyAllianceStarted(MessagePayload<NotifyAllianceStarted> obj)
@@ -314,6 +330,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom2Id, out var kingdom2)) return;
 
             notificationsBehavior.OnAllianceStarted(kingdom1, kingdom2);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnAllianceStartedEvent(kingdom1, kingdom2);
         });
     }
 
@@ -337,6 +356,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.Kingdom2Id, out var kingdom2)) return;
 
             notificationsBehavior.OnAllianceEnded(kingdom1, kingdom2);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnAllianceEndedEvent(kingdom1, kingdom2);
         });
     }
 
@@ -362,6 +384,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
 
             notificationsBehavior.OnCallToWarAgreementStarted(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnCallToWarAgreementStarted(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
         });
     }
 
@@ -387,6 +412,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomToCallToWarAgainstId, out var kingdomToCallToWarAgainst)) return;
 
             notificationsBehavior.OnCallToWarAgreementEnded(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnCallToWarAgreementEnded(callingKingdom, calledKingdom, kingdomToCallToWarAgainst);
         });
     }
 
@@ -533,6 +561,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
             notificationsBehavior.OnHeroBecameFugitive(hero, obj.What.ShowNotification);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnCharacterBecameFugitive(hero, obj.What.ShowNotification);
         });
     }
 
@@ -556,6 +587,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PrisonerId, out var prisoner)) return;
 
             notificationsBehavior.OnPrisonerTaken(capturer, prisoner);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnPrisonerTaken(capturer, prisoner);
         });
     }
 
@@ -586,9 +620,12 @@ internal class DefaultNotificationsHandler : IHandler
             if (obj.What.PartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out party)) return;
 
             IFaction capturerFaction = null;
-            if (obj.What.FactionId != null && !TryGetFaction(obj.What.FactionId, out capturerFaction)) return;
+            if (obj.What.FactionId != null && !factionInterface.TryGetFaction(obj.What.FactionId, out capturerFaction)) return;
 
             notificationsBehavior.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
         });
     }
 
@@ -614,6 +651,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var subject)) return;
 
             notificationsBehavior.OnBattleStarted(attackerParty, defenderParty, subject, obj.What.ShowNotification);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnBattleStarted(attackerParty, defenderParty, subject, obj.What.ShowNotification);
         });
     }
 
@@ -635,6 +675,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<SiegeEvent>(obj.What.SiegeEventId, out var siegeEvent)) return;
 
             notificationsBehavior.OnSiegeEventStarted(siegeEvent);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnSiegeEventStarted(siegeEvent);
         });
     }
 
@@ -1059,7 +1102,15 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
 
-            network.SendAll(new NetworkArmyDispersed(armyId, obj.What.Reason, obj.What.IsPlayersArmy));
+            var playerPartyIds = new List<string>();
+            foreach (var playerParty in obj.What.PlayerParties)
+            {
+                if (!objectManager.TryGetIdWithLogging(playerParty, out var playerPartyId)) continue;
+
+                playerPartyIds.Add(playerPartyId);
+            }
+
+            network.SendAll(new NetworkArmyDispersed(armyId, obj.What.Reason, playerPartyIds));
         });
     }
 
@@ -1070,7 +1121,13 @@ internal class DefaultNotificationsHandler : IHandler
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
 
-            notificationsBehavior.OnArmyDispersed(army, obj.What.Reason, obj.What.IsPlayersArmy);
+            var isPlayersArmy = objectManager.TryGetId(MobileParty.MainParty, out var mainPartyId)
+                && obj.What.PlayerPartyIds != null && obj.What.PlayerPartyIds.Contains(mainPartyId);
+
+            notificationsBehavior.OnArmyDispersed(army, obj.What.Reason, isPlayersArmy);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnArmyDispersed(army, obj.What.Reason, isPlayersArmy);
         });
     }
 
@@ -1095,16 +1152,20 @@ internal class DefaultNotificationsHandler : IHandler
             if (TryGetNotificationsBehavior(out var notificationsBehavior))
                 notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
 
-            var firstHeroHasCulture = TryRestoreSceneCharacterCulture(firstHero);
-            var secondHeroHasCulture = TryRestoreSceneCharacterCulture(secondHero);
-            if (firstHeroHasCulture && secondHeroHasCulture)
-                ShowMarriageSceneForMainHero(firstHero, secondHero);
+            ShowMarriageSceneForMainHero(firstHero, secondHero);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
         });
     }
 
     private static void ShowMarriageSceneForMainHero(Hero firstHero, Hero secondHero)
     {
         if (firstHero != Hero.MainHero && secondHero != Hero.MainHero) return;
+
+        var firstHeroHasCulture = TryRestoreSceneCharacterCulture(firstHero);
+        var secondHeroHasCulture = TryRestoreSceneCharacterCulture(secondHero);
+        if (!firstHeroHasCulture || !secondHeroHasCulture) return;
 
         var husband = firstHero.IsFemale ? secondHero : firstHero;
         MBInformationManager.ShowSceneNotification(
@@ -1316,6 +1377,9 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.OldOwnerClanId, out var oldOwnerClan)) return;
 
             notificationsBehavior.OnRebellionFinished(settlement, oldOwnerClan);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnRebellionFinished(settlement, oldOwnerClan);
         });
     }
 
@@ -1357,6 +1421,9 @@ internal class DefaultNotificationsHandler : IHandler
             }
 
             notificationsBehavior.OnTournamentFinished(winner, participants, town, prize);
+
+            if (TryGetLogsBehavior(out var logsBehavior))
+                logsBehavior.OnTournamentFinished(winner, participants, town, prize);
         });
     }
 
@@ -1426,22 +1493,79 @@ internal class DefaultNotificationsHandler : IHandler
         });
     }
 
-    private bool TryGetFaction(string id, out IFaction faction)
+    private void Handle_LogArmyGathered(MessagePayload<LogArmyGathered> obj)
     {
-        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        GameThread.RunSafe(() =>
         {
-            faction = kingdom;
-            return true;
-        }
-        if (objectManager.TryGetObject(id, out Clan clan))
-        {
-            faction = clan;
-            return true;
-        }
+            if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
 
-        Logger.Debug("Faction not found in DefaultNotificationsHandler with id: {id}", id);
-        faction = null;
-        return false;
+            string gatheringPointId = null;
+            if (obj.What.GatheringPoint != null && !objectManager.TryGetIdWithLogging(obj.What.GatheringPoint, out gatheringPointId)) return;
+
+            network.SendAll(new NetworkLogArmyGathered(armyId, gatheringPointId));
+        });
+    }
+
+    private void Handle_NetworkLogArmyGathered(MessagePayload<NetworkLogArmyGathered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetLogsBehavior(out var logsBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
+
+            IMapPoint gatheringPoint = null;
+            if (obj.What.GatheringPointId != null && !objectManager.TryGetObjectWithLogging(obj.What.GatheringPointId, out gatheringPoint)) return;
+
+            logsBehavior.OnArmyGathered(army, gatheringPoint);
+        });
+    }
+
+    private void Handle_LogSiegeAftermathApplied(MessagePayload<LogSiegeAftermathApplied> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.AttackerParty, out var attackerPartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Settlement, out var settlementId)) return;
+
+            string previousSettlementOwnerId = null;
+            if (obj.What.PreviousSettlementOwner != null && !objectManager.TryGetIdWithLogging(obj.What.PreviousSettlementOwner, out previousSettlementOwnerId)) return;
+
+            var partyContributionIds = new Dictionary<string, float>();
+            foreach (var partyContribution in obj.What.PartyContributions)
+            {
+                if (!objectManager.TryGetIdWithLogging(partyContribution.Key, out var partyId)) continue;
+
+                partyContributionIds[partyId] = partyContribution.Value;
+            }
+
+            network.SendAll(new NetworkLogSiegeAftermathApplied(attackerPartyId, settlementId, obj.What.AftermathType, previousSettlementOwnerId, partyContributionIds));
+        });
+    }
+
+    private void Handle_NetworkLogSiegeAftermathApplied(MessagePayload<NetworkLogSiegeAftermathApplied> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryGetLogsBehavior(out var logsBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.AttackerPartyId, out var attackerParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
+
+            Clan previousSettlementOwner = null;
+            if (obj.What.PreviousSettlementOwnerId != null && !objectManager.TryGetObjectWithLogging(obj.What.PreviousSettlementOwnerId, out previousSettlementOwner)) return;
+
+            var partyContributions = new Dictionary<MobileParty, float>();
+            if (obj.What.PartyContributionIds != null)
+            {
+                foreach (var partyContributionId in obj.What.PartyContributionIds)
+                {
+                    if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyContributionId.Key, out var party)) continue;
+
+                    partyContributions[party] = partyContributionId.Value;
+                }
+            }
+
+            logsBehavior.OnSiegeAftermathApplied(attackerParty, settlement, obj.What.AftermathType, previousSettlementOwner, partyContributions);
+        });
     }
 
     private bool TryGetNotificationsBehavior(out DefaultNotificationsCampaignBehavior campaignBehavior)
@@ -1450,6 +1574,15 @@ internal class DefaultNotificationsHandler : IHandler
         if (campaignBehavior != null) return true;
 
         Logger.Debug("Skipping notification because DefaultNotificationsCampaignBehavior is unavailable");
+        return false;
+    }
+
+    private bool TryGetLogsBehavior(out DefaultLogsCampaignBehavior logsBehavior)
+    {
+        logsBehavior = Campaign.Current?.GetCampaignBehavior<DefaultLogsCampaignBehavior>();
+        if (logsBehavior != null) return true;
+
+        Logger.Debug("Skipping log entry because DefaultLogsCampaignBehavior is unavailable");
         return false;
     }
 

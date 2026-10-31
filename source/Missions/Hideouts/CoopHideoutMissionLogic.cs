@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions.Battles;
 using Missions.Services.Network;
@@ -36,6 +37,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     private bool deployed;
     private bool hadAttackers;
     private bool hadDefenders;
+    private bool hadPlayerHeroes;
     private bool heroEntered;
     private bool duelSurrenderSent;
     private bool recoveringAuthority;
@@ -78,6 +80,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             if (agent.Origin != null) ledger.RecordSpawn(agent.Origin.UniqueSeed);
             hadAttackers |= agent.Team?.Side == BattleSideEnum.Attacker;
             hadDefenders |= agent.Team?.Side == BattleSideEnum.Defender;
+            hadPlayerHeroes |= agent.Team?.Side == BattleSideEnum.Attacker && IsPlayerHero(agent);
         }
     }
 
@@ -262,6 +265,10 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             return side == BattleSideEnum.Attacker
                 ? (Mission.Agents.FirstOrDefault(agent => agent.Origin?.UniqueSeed == speakerSeed) ?? Mission.MainAgent)?.IsActive() != true
                 : Native.Boss?.IsActive() != true;
+        // Native loses the first fight once its main agent falls, here only once every player's hero has.
+        if (side == BattleSideEnum.Attacker && Native.Phase == HideoutPhase.Camp && hadPlayerHeroes &&
+            !Mission.Agents.Any(agent => agent.IsActive() && agent.Team?.Side == BattleSideEnum.Attacker && IsPlayerHero(agent)))
+            return true;
         bool active = HasActive(side);
         if (active) return false;
         return side == BattleSideEnum.Attacker ? hadAttackers : hadDefenders || InitialPopulation > 0;
@@ -269,6 +276,9 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
 
     private bool HasActive(BattleSideEnum side)
         => Mission.Agents.Any(agent => agent.IsHuman && agent.IsActive() && agent.Team?.Side == side);
+
+    private static bool IsPlayerHero(Agent agent)
+        => (agent.Character as CharacterObject)?.HeroObject?.IsPlayerHero() == true;
 
     public bool ShouldResumeBossBattle(HideoutPhase phase)
     {

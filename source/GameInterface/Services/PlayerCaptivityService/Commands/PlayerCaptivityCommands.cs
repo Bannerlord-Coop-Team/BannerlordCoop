@@ -50,6 +50,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityRandomCapturePlayerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityRandomCapturePlayerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "random_capture_player";
@@ -60,7 +67,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -77,10 +84,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to capture hero: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to capture hero: " + error);
 
             if (!TryGetRandomCaptor(out var newCaptor, out error))
@@ -92,6 +96,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityCapturePlayerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityCapturePlayerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "capture_player";
@@ -102,8 +113,8 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
-            new ExpectedArgs("captor_party_id", "The registered captor mobile party id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_party_id", "Captor mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -123,14 +134,10 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(1, "mobilePartyId", out var captorPartyId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to capture hero: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
-                return Failed("Failed to capture hero: " + error);
-
-            if (!objectManager.TryGetObject(captorPartyId, out MobileParty newCaptor)
-                && !CommandHelpers.TryGetMobileParty(captorPartyId, out newCaptor, out error))
+            if (!resolver.TryResolveMobileParty(captorPartyId, out var newCaptor, out error))
                 return Failed("Failed to capture hero: " + error);
 
             return CaptureHero(hero, newCaptor);
@@ -139,6 +146,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityCapturePlayerFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityCapturePlayerFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "capture_player_fixture";
@@ -149,8 +163,8 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
-            new ExpectedArgs("captor_party_id", "The registered captor mobile party id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_party_id", "Captor mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -173,17 +187,19 @@ internal class PlayerCaptivityCommands
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                 return Failed("Failed to capture hero fixture: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to capture hero fixture: " + error);
 
-            if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty)
-                && !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            if (!resolver.TryResolveMobileParty(captorPartyId, out var captorParty, out error))
                 return Failed("Failed to capture hero fixture: " + error);
+
+            if (!objectManager.TryGetId(hero, out var registeredHeroId))
+                return Failed("Failed to capture hero fixture: hero is not registered.");
 
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
                 return Failed("Failed to capture hero fixture: could not resolve PlayerManager.");
 
-            var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == heroId);
+            var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == registeredHeroId);
             if (player == null)
                 return Failed($"Failed to capture hero fixture: hero '{GetHeroDisplayName(hero)}' is not a registered co-op player.");
 
@@ -236,6 +252,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityRestoreRosterFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityRestoreRosterFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "restore_roster_fixture";
@@ -246,7 +269,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -263,10 +286,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to restore roster fixture: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to restore roster fixture: " + error);
 
             var fixture = pendingRosterFixture;
@@ -326,6 +346,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityReleasePlayerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityReleasePlayerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "release_player";
@@ -336,7 +363,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -353,10 +380,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to release hero: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to release hero: " + error);
 
             if (!hero.IsPrisoner)
@@ -383,6 +407,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityPrepareVisualTestFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityPrepareVisualTestFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "prepare_visual_test_fixture";
@@ -393,8 +424,8 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
-            new ExpectedArgs("captor_party_id", "The registered captor mobile party id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_party_id", "Captor mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -415,14 +446,10 @@ internal class PlayerCaptivityCommands
                 !ctx.TryGetArg(1, "captorPartyId", out var captorPartyId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to prepare visual test fixture: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
-                return Failed("Failed to prepare visual test fixture: " + error);
-
-            if (!objectManager.TryGetObject(captorPartyId, out MobileParty captorParty) &&
-                !CommandHelpers.TryGetMobileParty(captorPartyId, out captorParty, out error))
+            if (!resolver.TryResolveMobileParty(captorPartyId, out var captorParty, out error))
                 return Failed("Failed to prepare visual test fixture: " + error);
 
             var playerParty = hero.PartyBelongedTo;
@@ -563,6 +590,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityLiberatePrisonerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityLiberatePrisonerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "liberate_prisoner";
@@ -573,7 +607,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -591,10 +625,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to liberate hero: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to liberate hero: " + error);
 
             if (!hero.IsPrisoner)
@@ -623,6 +654,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityStatusCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityStatusCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "status";
@@ -633,7 +671,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -648,10 +686,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to inspect hero: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to inspect hero: " + error);
 
             var captor = hero.PartyBelongedToAsPrisoner?.MobileParty?.StringId ?? "none";
@@ -663,6 +698,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityDiscardPlayerFromPartyScreenCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityDiscardPlayerFromPartyScreenCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "discard_player_from_party_screen";
@@ -673,8 +715,8 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
-            new ExpectedArgs("captor_party_id", "The registered captor mobile party id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_party_id", "Captor mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -696,11 +738,10 @@ internal class PlayerCaptivityCommands
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                 return Failed("Failed to discard player prisoner: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var prisoner, out error))
+            if (!resolver.TryResolveHero(heroId, out var prisoner, out error))
                 return Failed("Failed to discard player prisoner: " + error);
 
-            if (!objectManager.TryGetObject(captorPartyId, out MobileParty captor) &&
-                !CommandHelpers.TryGetMobileParty(captorPartyId, out captor, out error))
+            if (!resolver.TryResolveMobileParty(captorPartyId, out var captor, out error))
                 return Failed("Failed to discard player prisoner: " + error);
 
             if (!prisoner.IsPrisoner || prisoner.PartyBelongedToAsPrisoner?.MobileParty != captor)
@@ -784,6 +825,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityObservePlayerCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityObservePlayerCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "observe_player";
@@ -794,7 +842,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -809,7 +857,7 @@ internal class PlayerCaptivityCommands
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                 return Failed("Failed to observe player: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to observe player: " + error);
 
             if (!objectManager.TryGetId(hero, out var registeredHeroId))
@@ -855,6 +903,13 @@ internal class PlayerCaptivityCommands
 
         public sealed class PlayerCaptivityRansomPlayerAtSettlementCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityRansomPlayerAtSettlementCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "ransom_player_at_settlement";
@@ -865,7 +920,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -882,10 +937,7 @@ internal class PlayerCaptivityCommands
             if (!ctx.TryGetArg(0, "heroId", out var heroId, out error))
                 return Failed(error);
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to ransom hero: " + error);
-
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, heroId, out var hero, out error))
+            if (!resolver.TryResolveHero(heroId, out var hero, out error))
                 return Failed("Failed to ransom hero: " + error);
 
             if (!hero.IsPrisoner || hero.PartyBelongedToAsPrisoner == null)
@@ -935,6 +987,13 @@ internal class PlayerCaptivityCommands
 
     public sealed class PlayerCaptivityCaptivityStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityCaptivityStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "captivity_state";
@@ -945,7 +1004,7 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -954,13 +1013,16 @@ internal class PlayerCaptivityCommands
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
                 return Failed("Failed to inspect captivity: " + error);
 
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
+            if (!resolver.TryResolveHero(args[0], out var hero, out error))
                 return Failed("Failed to inspect captivity: " + error);
+
+            if (!objectManager.TryGetId(hero, out var registeredHeroId))
+                return Failed("Failed to inspect captivity: hero is not registered.");
 
             MobileParty playerParty = null;
             if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
             {
-                var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == args[0]);
+                var player = playerManager.Players.SingleOrDefault(candidate => candidate.HeroId == registeredHeroId);
                 if (player != null)
                     objectManager.TryGetObject(player.MobilePartyId, out playerParty);
             }
@@ -983,6 +1045,13 @@ internal class PlayerCaptivityCommands
 
     public sealed class PlayerCaptivityPartyFixtureStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityPartyFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "party_fixture_state";
@@ -993,16 +1062,13 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The registered mobile party id.", isRequired: true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error))
-                return Failed("Failed to inspect party: " + error);
-
-            if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
                 return Failed("Failed to inspect party: " + error);
 
             return Succeeded(GetPartyFixtureState(party));
@@ -1011,6 +1077,13 @@ internal class PlayerCaptivityCommands
 
     public sealed class PlayerCaptivityRestorePartyFixtureStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityRestorePartyFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "restore_party_fixture_state";
@@ -1021,8 +1094,8 @@ internal class PlayerCaptivityCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The registered mobile party id.", isRequired: true),
-            new ExpectedArgs("settlement_id_or_none", "The settlement id, or none.", isRequired: true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("settlement_id_or_none", "Settlement name or id, or none; quote names with spaces.", isRequired: true),
             new ExpectedArgs("x", "The map x coordinate.", isRequired: true),
             new ExpectedArgs("y", "The map y coordinate.", isRequired: true),
             new ExpectedArgs("is_on_land", "Whether the position is on land.", isRequired: true),
@@ -1037,7 +1110,7 @@ internal class PlayerCaptivityCommands
 
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                 return Failed("Failed to restore party: " + error);
-            if (!TryResolveMobileParty(objectManager, args[0], out var party, out error))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out error))
                 return Failed("Failed to restore party: " + error);
             if (!ContainerProvider.TryResolve<INetwork>(out var network))
                 return Failed("Failed to restore party: could not resolve Network.");
@@ -1058,9 +1131,8 @@ internal class PlayerCaptivityCommands
             }
             else
             {
-                var settlement = Settlement.Find(args[1]);
-                if (settlement == null)
-                    return Failed($"Failed to restore party: settlement '{args[1]}' not found.");
+                if (!resolver.TryResolveSettlement(args[1], out var settlement, out error))
+                    return Failed("Failed to restore party: " + error);
 
                 if (party.CurrentSettlement != settlement)
                 {
@@ -1127,21 +1199,6 @@ internal class PlayerCaptivityCommands
 
         error = "Could not find a valid captor party.";
         return false;
-    }
-
-    private static bool TryResolveMobileParty(
-        IObjectManager objectManager,
-        string partyId,
-        out MobileParty party,
-        out string error)
-    {
-        if (objectManager.TryGetObject(partyId, out party))
-        {
-            error = null;
-            return true;
-        }
-
-        return CommandHelpers.TryGetMobileParty(partyId, out party, out error);
     }
 
     private static string FormatCoordinate(float? coordinate) =>

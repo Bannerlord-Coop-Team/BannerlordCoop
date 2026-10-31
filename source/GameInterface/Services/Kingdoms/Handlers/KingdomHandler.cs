@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -35,6 +36,7 @@ public class KingdomHandler : IHandler
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IKingdomInterface kingdomInterface;
     private readonly IKingdomCreator kingdomCreator;
+    private readonly IKingdomDecisionDataConverter decisionDataConverter;
 
     public KingdomHandler(
         IMessageBroker messageBroker,
@@ -44,7 +46,8 @@ public class KingdomHandler : IHandler
         IKingdomDecisionVoteManager decisionVoteManager,
         IKingdomMembershipState kingdomMembershipState,
         IKingdomInterface kingdomInterface,
-        IKingdomCreator kingdomCreator)
+        IKingdomCreator kingdomCreator,
+        IKingdomDecisionDataConverter decisionDataConverter)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,6 +57,7 @@ public class KingdomHandler : IHandler
         this.kingdomMembershipState = kingdomMembershipState;
         this.kingdomInterface = kingdomInterface;
         this.kingdomCreator = kingdomCreator;
+        this.decisionDataConverter = decisionDataConverter;
         messageBroker.Subscribe<AddDecision>(HandleAddDecision);
         messageBroker.Subscribe<RemoveDecision>(HandleRemoveDecision);
         messageBroker.Subscribe<ChangeKingdomPolicy>(HandleChangeKingdomPolicy);
@@ -525,7 +529,7 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
+        if (!decisionDataConverter.TryGetKingdomDecision(payload.Data, out KingdomDecision kingdomDecision))
         {
             Logger.Warning("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
             return;
@@ -568,6 +572,11 @@ public class KingdomHandler : IHandler
                 {
                     Debug.FailedAssert("Deviation in peace states between ruling clan & kingdom in abdication", "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\KingdomManager.cs", "AbdicateTheThrone", 236);
                 }
+            }
+            // Player mercenary clans must leave first, otherwise DestroyKingdomAction destroys them and removes their heroes
+            foreach (Clan playerClan in kingdom.Clans.Where(clan => clan.IsPlayerClan()).ToList())
+            {
+                ChangeKingdomAction.ApplyByLeaveByKingdomDestruction(playerClan);
             }
             if (!kingdom.IsEliminated)
             {

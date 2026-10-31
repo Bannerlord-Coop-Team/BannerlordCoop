@@ -17,8 +17,7 @@ namespace GameInterface.Services.Heroes
             AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel)),
             AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
             AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver)),
-            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
-            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
+            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero))
         };
 
         public HeroSync(AutoSyncRegistry autoSyncBuilder)

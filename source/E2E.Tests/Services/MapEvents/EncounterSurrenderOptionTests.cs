@@ -2,6 +2,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -11,6 +12,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -107,6 +109,120 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
             {
                 BattleModeRegistry.End();
             }
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// The client's battle request timed out (slow host), so the encounter menu was opened without a battle:
+    /// the encounter has no map event and the main party is in none. Surrender is shown but refused. When the
+    /// server's battle lands late through the real battle party attach, the encounter menu is re-entered so
+    /// vanilla's init adopts the battle (instead of refreshing option conditions that dereference
+    /// PlayerEncounter.Battle and throw), and Surrender enables.
+    /// </summary>
+    [Fact]
+    public void WoundedPlayer_AfterBattleRequestTimeout_LateArrivalReentersMenuAndEnablesSurrender()
+    {
+        var ctx = CreateServerMapEvent();
+        var partyId = CreateServerParty();
+        var client = Clients.First();
+        var initializations = 0;
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Campaign.Current.MainParty = party;
+            Assert.Null(MobileParty.MainParty.MapEvent);
+        }, MapEventDisabledMethods);
+        EnsureClientMenuModels(client, effectiveMorale: 0f);
+        client.Call(() => Campaign.Current.Models.PartyMoraleModel = new FixedPartyMoraleModel(0f));
+        MakeMainPartyIncapacitated(client);
+        SetMockPlayerEncounter(client);
+        OpenTimedOutEncounterMenu(client, () => initializations++);
+
+        client.Call(() =>
+        {
+            var (shown, args) = InvokeSurrenderCondition();
+
+            Assert.True(shown);
+            Assert.False(args.IsEnabled, "surrender must wait for the server's battle");
+            Assert.Equal("Waiting for the server to set up the battle.", args.Tooltip?.ToString());
+        }, MapEventDisabledMethods);
+
+        JoinServerPartyToSide(ctx.MapEventId, partyId, BattleSideEnum.Defender);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
+
+            Assert.Equal(1, initializations);
+            Assert.Same(mapEvent, PlayerEncounter.Battle);
+
+            // The option that threw on the plain refresh now evaluates against the adopted battle.
+            InvokeEncounterCondition("game_menu_encounter_leave_your_soldiers_behind_on_condition");
+
+            var (shown, args) = InvokeSurrenderCondition();
+            Assert.True(shown);
+            Assert.True(args.IsEnabled, "surrender must enable once the late battle is adopted");
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// Opens the "encounter" menu the way a timed out battle request leaves it: no battle on the encounter. Its
+    /// init mirrors the branch of vanilla's <c>game_menu_encounter_on_init</c> that adopts a battle the main party
+    /// is already in (<c>PlayerEncounter.Init()</c>); the rest of that init needs live UI state the harness lacks.
+    /// </summary>
+    private static void OpenTimedOutEncounterMenu(EnvironmentInstance client, Action onInit)
+    {
+        client.Call(() =>
+        {
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            starter.AddGameMenu("encounter", "Encounter", _ =>
+            {
+                onInit();
+                if (PlayerEncounter.Battle == null && MobileParty.MainParty.MapEvent != null)
+                    PlayerEncounter.Init();
+            });
+            starter.AddGameMenuOption("encounter", "leave_soldiers_behind", "Leave soldiers behind",
+                _ => InvokeEncounterCondition("game_menu_encounter_leave_your_soldiers_behind_on_condition"),
+                _ => { });
+
+            var state = Game.Current.GameStateManager.CreateState<MapState>();
+            state._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            state._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+            Game.Current.GameStateManager._gameStates.Add(state);
+        });
+    }
+
+    private static bool InvokeEncounterCondition(string conditionName)
+    {
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), conditionName);
+        Assert.NotNull(method);
+        return (bool)method.Invoke(new EncounterGameMenuBehavior(), new object[] { new MenuCallbackArgs((MenuContext)null, null) });
+    }
+
+    /// <summary>
+    /// A map event that reached the client but is still initializing (barrier pending) refuses surrender the
+    /// same way, because the server cannot resolve a request for it yet.
+    /// </summary>
+    [Fact]
+    public void IncapacitatedDefender_WhileEncounterMapEventInitializing_SurrenderRefused()
+    {
+        var (_, client) = SetupIncapacitatedDefenderInBattle(withHealthyAllyOnSide: true);
+        SetMockPlayerEncounter(client);
+
+        client.Call(() =>
+        {
+            var pendingMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            var barrier = client.Resolve<IMapEventInitializationBarrier>();
+            barrier.Register(pendingMapEvent);
+            Assert.True(barrier.IsPending(pendingMapEvent));
+            PlayerEncounter.Current._mapEvent = pendingMapEvent;
+
+            var (shown, args) = InvokeSurrenderCondition();
+
+            Assert.True(shown);
+            Assert.False(args.IsEnabled, "surrender must wait until the map event finishes initializing");
         }, MapEventDisabledMethods);
     }
 

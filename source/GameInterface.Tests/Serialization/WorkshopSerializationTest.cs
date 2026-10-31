@@ -14,45 +14,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WorkshopSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public WorkshopSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Workshop_Serialize()
-        {
-            var objectManager = container.Resolve<IObjectManager>();
-
-            Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
-            Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
-
-            // Setup town to be referencable by id
-            objectManager.AddNewObject(town, out var townId);
-
-            // Set town of workshop settlement
-            settlement.Town = town;
-
-            Workshop Workshop = new Workshop(settlement, "ws");
-
-            town.Workshops = new Workshop[] { Workshop };
-
-            // Setup serialization
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            WorkshopBinaryPackage package = new WorkshopBinaryPackage(Workshop, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

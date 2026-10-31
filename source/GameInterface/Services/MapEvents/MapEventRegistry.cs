@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -77,8 +78,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
-        bool hasHideoutResults = obj.IsHideoutBattle && localPartyWasInvolved && PlayerEncounter.Current != null &&
-            MapEventInitializationBarrier.IsBattleResultEncounter(PlayerEncounter.Current);
+        bool hasStagedResults = localPartyWasInvolved &&
+            StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
         var preservedParty = localPartyWasInvolved &&
             (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
@@ -91,8 +92,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        // A player who already left the mission still needs to collect the server's staged loot.
-        if (!hasHideoutResults)
+        // A hideout or siege assault defender who already left the mission still needs to collect the
+        // server's staged loot, which StagedBattleResultUpdatePatch resumes on the next map tick.
+        if (!hasStagedResults)
             CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 

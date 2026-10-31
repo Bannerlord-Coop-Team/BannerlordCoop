@@ -118,12 +118,7 @@ internal class KillCharacterActionPatches
             ChangeGovernorAction.RemoveGovernorOf(victim);
         }
 
-        // TODO: Traits aren't synced
-        //if ((actionDetail == KillCharacterAction.KillCharacterActionDetail.Executed || actionDetail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) && killer == Hero.MainHero && victim.Clan != null && victim.GetTraitLevel(DefaultTraits.Honor) >= 0)
-        //{
-        //    TraitLevelingHelper.OnLordExecuted();
-        //}
-
+        // v1.5 dropped the execution trait penalty here; ExecutionCampaignBehavior's blood feud applies it instead.
         if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && !victim.Clan.IsPlayerClan())
         {
             if (victim.Clan.Leader == victim)

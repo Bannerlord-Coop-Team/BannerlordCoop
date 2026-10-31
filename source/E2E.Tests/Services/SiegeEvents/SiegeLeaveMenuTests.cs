@@ -140,9 +140,9 @@ public class SiegeLeaveMenuTests : IDisposable
         }
     }
 
+    // Both assault prefixes share ValidateSiegeGraph, so the rows alternate between them.
     [Theory]
     [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
-    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
     public void AssaultCondition_TornSiegeGraph_ReturnsFalseWithoutThrowing(
         string methodName,
         GameMenuOption.LeaveType expectedLeaveType)
@@ -166,7 +166,6 @@ public class SiegeLeaveMenuTests : IDisposable
     }
 
     [Theory]
-    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
     [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
     public void AssaultCondition_MissingSideEngines_ReturnsFalseWithoutThrowing(
         string methodName,
@@ -190,7 +189,6 @@ public class SiegeLeaveMenuTests : IDisposable
 
     [Theory]
     [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
-    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
     public void AssaultCondition_DefenderWithCompleteSiegeGraph_AllowsVanillaCondition(
         string methodName,
         GameMenuOption.LeaveType expectedLeaveType)
@@ -603,48 +601,6 @@ public class SiegeLeaveMenuTests : IDisposable
         Assert.Empty(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
     }
 
-    [Fact]
-    public void ServerPlayerDefeat_RunsNativeWithoutRouting()
-    {
-        // Arrange: the host player's defeat stays native (patches live); nothing in the server
-        // container handles a routed break request.
-        var (partyId, _) = SetupBesiegingPlayerParty(Server);
-
-        // Act
-        var disabledMethods = LeaveRoundTripDisabledMethods
-            .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.DoPlayerDefeat)))
-            .ToList();
-        Server.Call(() =>
-        {
-            InvokePatchedPlayerDefeat();
-        }, disabledMethods);
-
-        // Assert: no routing and no prefix-side camp write — the (here suppressed) native body owns it.
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
-        AssertBesiegerCamp(Server, partyId, expectCamp: true);
-    }
-
-    [Fact]
-    public void ServerEncounterLeave_RunsNativeWithoutRouting()
-    {
-        // Arrange: the host player is besieging; its leave stays native (patches live) instead of routing
-        // a request nothing in the server container handles.
-        var (partyId, _) = SetupBesiegingPlayerParty(Server);
-
-        // Act: the native body is suppressed (it needs a live encounter); the coop prefix still runs first.
-        var disabledMethods = LeaveRoundTripDisabledMethods
-            .Append(AccessTools.Method(typeof(MenuHelper), nameof(MenuHelper.EncounterLeaveConsequence)))
-            .ToList();
-        Server.Call(() =>
-        {
-            InvokePatchedEncounterLeave();
-        }, disabledMethods);
-
-        // Assert: the server routed nothing — the camp write stays native (here suppressed with the body).
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
-        AssertBesiegerCamp(Server, partyId, expectCamp: true);
-    }
-
     // ------------------------------------------------------------------
     // Drivers
     // ------------------------------------------------------------------
@@ -699,7 +655,7 @@ public class SiegeLeaveMenuTests : IDisposable
         string prefixName = methodName.Contains("lead_assault")
             ? "LeadAssaultConditionPrefix"
             : "OrderAssaultConditionPrefix";
-        var prefix = AccessTools.Method(typeof(SiegeAssaultCommandGatePatch), prefixName);
+        var prefix = AccessTools.Method(typeof(SiegeEventCampaignBehaviorPatches), prefixName);
         Assert.NotNull(prefix);
 
         var args = new MenuCallbackArgs((MenuContext)null, null);

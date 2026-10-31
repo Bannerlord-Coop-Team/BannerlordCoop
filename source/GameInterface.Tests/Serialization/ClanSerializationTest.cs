@@ -5,6 +5,8 @@ using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
@@ -14,31 +16,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ClanSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ClanSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Clan_Serialize()
-        {
-            Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
@@ -94,6 +77,59 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(heroes, newClan._supporterNotablesCache);
             Assert.Equal(heroes, newClan._companionsCache);
             Assert.Equal(heroes, newClan._deadLordsCache);
+        }
+
+        [Fact]
+        public void Clan_WarList_PackedAsIds()
+        {
+            var objectManager = container.Resolve<IObjectManager>();
+
+            // A new player clan starts at war with the bandit clans, which are at war with every kingdom
+            Clan banditClan = CreateClan("looters");
+            objectManager.AddExisting(banditClan.StringId, banditClan);
+
+            var kingdoms = new List<Kingdom>();
+            for (int i = 0; i < 64; i++)
+            {
+                Kingdom kingdom = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
+                kingdom.StringId = $"war_kingdom_{i}";
+                kingdom.InitializeCachedLists();
+                objectManager.AddExisting(kingdom.StringId, kingdom);
+                kingdoms.Add(kingdom);
+            }
+
+            foreach (var kingdom in kingdoms)
+            {
+                kingdom._factionsAtWarWith.Add(banditClan);
+                kingdom._factionsAtWarWith.AddRange(kingdoms.Where(other => other != kingdom));
+            }
+            banditClan._factionsAtWarWith.AddRange(kingdoms);
+
+            Clan playerClan = CreateClan("unregistered_clan");
+            playerClan._factionsAtWarWith.Add(banditClan);
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            ClanBinaryPackage package = new ClanBinaryPackage(playerClan, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            ClanBinaryPackage returnedPackage = BinaryPackageSerializer.Deserialize<ClanBinaryPackage>(bytes);
+
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Clan newClan = returnedPackage.Unpack<Clan>(deserializeFactory);
+
+            Assert.NotSame(playerClan, newClan);
+            Assert.Same(banditClan, Assert.Single(newClan._factionsAtWarWith));
+        }
+
+        private static Clan CreateClan(string stringId)
+        {
+            Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
+            clan.StringId = stringId;
+            clan.InitMembers();
+            return clan;
         }
 
         [Fact]

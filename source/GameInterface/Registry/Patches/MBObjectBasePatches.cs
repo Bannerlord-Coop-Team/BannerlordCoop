@@ -1,8 +1,11 @@
 ﻿using GameInterface.Policies;
 using HarmonyLib;
+using Common;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Registry.Patches;
@@ -16,6 +19,13 @@ internal class MBObjectBasePatches
     {
         // Call original if we allow this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        // Quest journals match by StringId, including after an issue detaches its quest.
+        // Keep the id vanilla gives every quest type on every machine, usually `<issue id>_quest` for an issue quest.
+        if (__instance is QuestBase) return true;
+
+        // IssueManager assigns issue identities on the authoritative server.
+        if (__instance is IssueBase && ModInformation.IsServer) return true;
 
         if (allowedTypes.Contains(__instance.GetType())) return true;
 

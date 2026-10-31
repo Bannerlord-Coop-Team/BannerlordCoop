@@ -28,7 +28,6 @@ internal class ServerVillageHandler : IHandler
         // This handles an internal message
         messageBroker.Subscribe<VillageStateChanged>(HandleVillageState);
         messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
-        messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
         messageBroker.Subscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
         messageBroker.Subscribe<VillageDemandTimeChanged>(HandleLastDemandSatisfiedTime);
     }
@@ -37,7 +36,6 @@ internal class ServerVillageHandler : IHandler
     {
         messageBroker.Unsubscribe<VillageStateChanged>(HandleVillageState);
         messageBroker.Unsubscribe<VillageTradeBoundChanged>(HandleTradeBound);
-        messageBroker.Unsubscribe<VillageHearthChanged>(HandleHearth);
         messageBroker.Unsubscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
         messageBroker.Unsubscribe<VillageDemandTimeChanged>(HandleLastDemandSatisfiedTime);
     }
@@ -64,19 +62,6 @@ internal class ServerVillageHandler : IHandler
         var networkMessage = new NetworkChangeVillageTradeTaxAccumulated(
             villageId,
             obj.TradeTaxAccumulated);
-
-        network.SendAll(networkMessage);
-    }
-
-    private void HandleHearth(MessagePayload<VillageHearthChanged> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetHandleWithLogging(obj.Village, out var villageId)) return;
-
-        var networkMessage = new NetworkChangeVillageHearth(
-            villageId,
-            obj.Hearth);
 
         network.SendAll(networkMessage);
     }

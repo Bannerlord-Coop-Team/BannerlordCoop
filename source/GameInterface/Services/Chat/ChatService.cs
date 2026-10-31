@@ -28,8 +28,8 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IPlayerManager playerManager;
     private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IChatFactionMembership factionMembership;
     private readonly IMessageBroker messageBroker;
-    private readonly IChatVanillaLogGate vanillaLogGate;
     private readonly IChatEventLog eventLog;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
@@ -39,9 +39,9 @@ public sealed class ChatService : IChatService, IDisposable
         IPlayerManager playerManager,
         IChatPlayerNameResolver playerNameResolver,
         IControllerIdProvider controllerIdProvider,
+        IChatFactionMembership factionMembership,
         ICoopOptionsStore optionsStore,
         IMessageBroker messageBroker,
-        IChatVanillaLogGate vanillaLogGate,
         IChatEventLog eventLog,
         IPlayerKillFeedColorService killFeedColorService)
     {
@@ -49,9 +49,9 @@ public sealed class ChatService : IChatService, IDisposable
         if (playerManager == null) throw new ArgumentNullException(nameof(playerManager));
         if (playerNameResolver == null) throw new ArgumentNullException(nameof(playerNameResolver));
         if (controllerIdProvider == null) throw new ArgumentNullException(nameof(controllerIdProvider));
+        if (factionMembership == null) throw new ArgumentNullException(nameof(factionMembership));
         if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
-        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
         if (eventLog == null) throw new ArgumentNullException(nameof(eventLog));
         if (killFeedColorService == null) throw new ArgumentNullException(nameof(killFeedColorService));
 
@@ -59,8 +59,8 @@ public sealed class ChatService : IChatService, IDisposable
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
+        this.factionMembership = factionMembership;
         this.messageBroker = messageBroker;
-        this.vanillaLogGate = vanillaLogGate;
         this.eventLog = eventLog;
 
         viewModel = new ChatVM(
@@ -68,11 +68,11 @@ public sealed class ChatService : IChatService, IDisposable
             () => controllerIdProvider.ControllerId,
             killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
-        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat, vanillaLogGate);
+        overlay = new ChatOverlay(viewModel, RefreshOnOpen, showChat);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
-    public bool IsTyping => viewModel.IsOpen;
+    public bool IsTyping => overlay.IsInputFocused;
 
     public void Initialize()
     {
@@ -82,6 +82,9 @@ public sealed class ChatService : IChatService, IDisposable
 
     public void Receive(NetworkChatMessage message)
     {
+        if (message.Channel == ChatChannel.Clan || message.Channel == ChatChannel.Kingdom)
+            RefreshGroupChannels();
+
         viewModel.Receive(message);
     }
 
@@ -109,7 +112,6 @@ public sealed class ChatService : IChatService, IDisposable
     {
         messageBroker.Unsubscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
         eventLog.Dispose();
-        vanillaLogGate.SetReplacementVisible(false);
         overlay.Dispose();
     }
 
@@ -118,6 +120,25 @@ public sealed class ChatService : IChatService, IDisposable
     internal void RequestParticipants()
     {
         network.SendAll(new NetworkRequestChatParticipants());
+    }
+
+    private void RefreshOnOpen()
+    {
+        RefreshGroupChannels();
+        RequestParticipants();
+    }
+
+    private void RefreshGroupChannels()
+    {
+        string clanId = null;
+        string kingdomId = null;
+        if (playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player))
+        {
+            clanId = factionMembership.GetClan(player)?.StringId;
+            kingdomId = factionMembership.GetKingdom(player)?.StringId;
+        }
+
+        viewModel.SetGroupChannelMembership(clanId, kingdomId);
     }
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)

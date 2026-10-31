@@ -31,6 +31,7 @@ public class ClientContext
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         IHeroInterface heroInterface,
         IRegistryManager registryManager,
         IPlayerManager playerManager,
@@ -47,6 +48,7 @@ public class ClientContext
         ControllerIdProvider = controllerIdProvider;
         CoopFinalizer = coopFinalizer;
         ModuleInfoProvider = moduleInfoProvider;
+        ModuleNameProvider = moduleNameProvider;
         HeroInterface = heroInterface;
         RegistryManager = registryManager;
         PlayerManager = playerManager;
@@ -64,6 +66,7 @@ public class ClientContext
     public IControllerIdProvider ControllerIdProvider { get; }
     public ICoopFinalizer CoopFinalizer { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
+    public IModuleNameProvider ModuleNameProvider { get; }
     public IHeroInterface HeroInterface { get; }
     public IRegistryManager RegistryManager { get; }
     public IPlayerManager PlayerManager { get; }

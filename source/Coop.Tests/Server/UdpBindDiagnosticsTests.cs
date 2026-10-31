@@ -14,42 +14,45 @@ public class UdpBindDiagnosticsTests
     private const string Closing = UdpBindDiagnostics.Closing;
     private const string CoopHint = ", a co-op server, probably one still running from an earlier session (its window may be hidden)";
 
+    /// <summary>A port that cannot be bound gets the generic text without a probe.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void Describe_InvalidPort_SkipsTheProbe(int port)
     {
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("reason unavailable", failure.Error);
         Assert.Equal(Closing, failure.Detail);
     }
 
+    /// <summary>A port another socket holds reports the real socket error.</summary>
     [Fact]
     public void Describe_HolderOnOneAddress_ReportsTheBindError()
     {
-        // Default options on a specific address; a default-option wildcard probe could share the port on Windows.
+        // Default options on the holder; the probe's exclusive bind still has to report the collision.
         using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         int port = ((IPEndPoint)holder.LocalEndPoint!).Port;
 
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("AddressAlreadyInUse, 10048", failure.Error);
         Assert.DoesNotContain("can be opened now", failure.Detail);
     }
 
+    /// <summary>A port that was released before the probe reads as a temporary failure.</summary>
     [Fact]
     public void Describe_FreedPort_ReadsAsTemporary()
     {
         int port;
         using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
         {
-            socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+            socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
             port = ((IPEndPoint)socket.LocalEndPoint!).Port;
         }
 
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("reason unavailable", failure.Error);
         Assert.StartsWith("the port can be opened now, so the failure was temporary", failure.Detail);
@@ -123,6 +126,128 @@ public class UdpBindDiagnosticsTests
         Assert.Equal(
             "opened by dotnet (Windows pid 1234).",
             UdpBindDiagnostics.FormatOwners(new[] { (1234, (string?)"dotnet") }, 99, "dotnet"));
+    }
+
+    [Fact]
+    public void FormatOwners_GenericHostRunningThisExecutable_IsALeftoverCoopServer()
+    {
+        // The dedicated server engine is a dotnet host, so a server left running holds the port as "dotnet" (#3889).
+        Assert.Equal(
+            "opened by dotnet (Windows pid 1234)" + CoopHint + "; dotnet (Windows pid 5678).",
+            UdpBindDiagnostics.FormatOwners(
+                new[] { (1234, (string?)"dotnet"), (5678, (string?)"dotnet") }, 99, "dotnet", new[] { 1234 }));
+    }
+
+    private const string EngineHost = @"C:\Games\DedicatedServer\engine\dotnet\dotnet.exe";
+    private const string EngineBin = @"C:\Games\DedicatedServer\bin\Win64_Shipping_Server";
+    private const string EngineApp = EngineBin + @"\TaleWorlds.Starter.DotNetCore.dll";
+    private const string EngineCommandLine =
+        @"""C:\Games\DedicatedServer\engine\dotnet\dotnet.exe"" TaleWorlds.Starter.DotNetCore.dll _MODULES_*Native*Coop*_MODULES_ /dedicatedcustomserver 7210 EU 0";
+
+    [Fact]
+    public void IsSameProgram_SameDotnetHost_OnlyTheSameHostedApplicationMatches()
+    {
+        // Two different assemblies run by one dotnet.exe: only the co-op engine is the same program (#3891).
+        string? current = UdpBindDiagnostics.HostedApplication(EngineCommandLine, EngineBin);
+        string? engine = UdpBindDiagnostics.HostedApplication(EngineCommandLine, EngineBin);
+        string? other = UdpBindDiagnostics.HostedApplication(@"dotnet.exe C:\Tools\SomeOtherTool.dll", EngineBin);
+
+        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, engine));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, other));
+    }
+
+    [Fact]
+    public void IsSameProgram_SameDllNameInAnotherFolder_DoesNotMatch()
+    {
+        // Same host, same file name, different assemblies: the folder tells them apart.
+        string? current = UdpBindDiagnostics.HostedApplication(@"dotnet.exe C:\Games\A\Server.dll", null);
+        string? absolute = UdpBindDiagnostics.HostedApplication(@"dotnet.exe D:\Tools\B\Server.dll", null);
+        string? relative = UdpBindDiagnostics.HostedApplication(@"dotnet.exe Server.dll", @"D:\Tools\B");
+
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, absolute));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, relative));
+        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, current,
+            EngineHost, UdpBindDiagnostics.HostedApplication(@"dotnet.exe Server.dll", @"C:\Games\A")));
+    }
+
+    [Fact]
+    public void IsSameProgram_RelativeDllWithoutWorkingDirectory_NeverMatches()
+    {
+        // Without the working directory a relative .dll could be any assembly with that name.
+        Assert.Null(UdpBindDiagnostics.HostedApplication(EngineCommandLine, null));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp,
+            EngineHost, UdpBindDiagnostics.HostedApplication(EngineCommandLine, null)));
+    }
+
+    [Fact]
+    public void IsSameProgram_UnknownHostedApplication_NeverMatches()
+    {
+        // A command line that could not be read must not turn an unrelated dotnet process into a co-op server.
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, null));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, null, EngineHost, null));
+    }
+
+    [Fact]
+    public void IsSameProgram_OtherExecutable_NeverMatches()
+    {
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, @"C:\Program Files\dotnet\dotnet.exe", EngineApp));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(null, EngineApp, EngineHost, EngineApp));
+    }
+
+    [Fact]
+    public void IsSameProgram_DedicatedExecutable_MatchesOnItsPath()
+    {
+        const string server = @"C:\Games\DedicatedServer\BannerlordCoopServer.exe";
+        Assert.True(UdpBindDiagnostics.IsSameProgram(server, null, server, null));
+    }
+
+    // Windows paths on purpose: the parsing must give the same result when the tests run on Linux or macOS.
+    [Theory]
+    [InlineData(EngineCommandLine, EngineBin, EngineApp)]
+    [InlineData(@"dotnet exec --runtimeconfig x.json ""C:\My Tools\Other Tool.dll"" --port 4200", null, @"C:\My Tools\Other Tool.dll")]
+    [InlineData(@"dotnet.exe ..\bin/./Server.dll", @"C:\Games\engine\", @"C:\Games\bin\Server.dll")]
+    [InlineData(@"dotnet.exe Server.dll", @"\\host\share\games", @"\\host\share\games\Server.dll")]
+    [InlineData(@"dotnet.exe ..\..\..\Server.dll", @"\\host\share\games", @"\\host\share\Server.dll")]
+    [InlineData(@"dotnet.exe C:Server.dll", @"C:\Games", null)]
+    [InlineData(@"dotnet.exe \Server.dll", @"C:\Games", null)]
+    [InlineData(@"dotnet.exe --version", @"C:\Games", null)]
+    [InlineData(@"", @"C:\Games", null)]
+    [InlineData(null, @"C:\Games", null)]
+    public void HostedApplication_IsTheFullPathOfTheFirstDll(string? commandLine, string? workingDirectory, string? expected)
+    {
+        Assert.Equal(expected, UdpBindDiagnostics.HostedApplication(commandLine, workingDirectory));
+    }
+
+    [Fact]
+    public void ReadWorkingDirectory_CurrentProcess_IsItsCurrentDirectory()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Assert.Null(UdpBindDiagnostics.ReadWorkingDirectory(Environment.ProcessId));
+            return;
+        }
+
+        string? directory = UdpBindDiagnostics.ReadWorkingDirectory(Environment.ProcessId);
+        Assert.NotNull(directory);
+        Assert.Equal(
+            Environment.CurrentDirectory.TrimEnd('\\'),
+            directory!.TrimEnd('\\'),
+            ignoreCase: true);
+    }
+
+    [Fact]
+    public void ReadCommandLine_CurrentProcess_ReturnsItsCommandLine()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Assert.Null(UdpBindDiagnostics.ReadCommandLine(Environment.ProcessId));
+            return;
+        }
+
+        using var current = System.Diagnostics.Process.GetCurrentProcess();
+        string? commandLine = UdpBindDiagnostics.ReadCommandLine(current.Id);
+        Assert.NotNull(commandLine);
+        Assert.Contains(current.ProcessName, commandLine, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
