@@ -15,6 +15,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     private readonly object gate = new object();
     private readonly HashSet<uint> ownedConnections = new HashSet<uint>();
+    private readonly HashSet<uint> acceptedConnections = new HashSet<uint>();
     private readonly TunnelConnectionIdentityRegistry remoteIdentities = new TunnelConnectionIdentityRegistry();
     private readonly Callback<SteamNetConnectionStatusChangedCallback_t> statusChangedCallback;
     private readonly IntPtr[] receivedMessage = new IntPtr[1];
@@ -166,6 +167,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
         {
             if (listenSocket == HSteamListenSocket.Invalid) return;
 
+            // Closing the listen socket closes the connections it accepted inside Steam, so stop receiving on them first
+            ownedConnections.ExceptWith(acceptedConnections);
+            acceptedConnections.Clear();
             CloseListenSocket(listenSocket);
             listenSocket = HSteamListenSocket.Invalid;
         }
@@ -230,6 +234,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
         lock (gate)
         {
             owned = ownedConnections.Remove(connection);
+            acceptedConnections.Remove(connection);
             remoteIdentities.Remove(connection);
         }
 
@@ -299,24 +304,31 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     public int ReceiveDatagram(uint connection, byte[] buffer)
     {
-        int count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
-        if (count <= 0) return 0;
-
-        try
+        // CloseConnection forgets the connection under this gate before the native close, so a pump tick
+        // never receives on a closed handle and two pumps never share the receivedMessage slot.
+        lock (gate)
         {
-            var message = SteamNetworkingMessage_t.FromIntPtr(receivedMessage[0]);
-            if (message.m_cbSize > buffer.Length)
+            if (!ownedConnections.Contains(connection)) return 0;
+
+            int count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
+            if (count <= 0) return 0;
+
+            try
             {
-                Logger.Warning("Dropping oversized tunnel datagram ({Size} bytes)", message.m_cbSize);
-                return 0;
-            }
+                var message = SteamNetworkingMessage_t.FromIntPtr(receivedMessage[0]);
+                if (message.m_cbSize > buffer.Length)
+                {
+                    Logger.Warning("Dropping oversized tunnel datagram ({Size} bytes)", message.m_cbSize);
+                    return 0;
+                }
 
-            Marshal.Copy(message.m_pData, buffer, 0, message.m_cbSize);
-            return message.m_cbSize;
-        }
-        finally
-        {
-            SteamNetworkingMessage_t.Release(receivedMessage[0]);
+                Marshal.Copy(message.m_pData, buffer, 0, message.m_cbSize);
+                return message.m_cbSize;
+            }
+            finally
+            {
+                SteamNetworkingMessage_t.Release(receivedMessage[0]);
+            }
         }
     }
 
@@ -334,6 +346,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
                 if (inbound)
                 {
                     ownedConnections.Add(connection);
+                    acceptedConnections.Add(connection);
                     remoteIdentities.Record(connection, change.m_info.m_identityRemote.GetSteamID64());
                 }
                 else if (!ownedConnections.Contains(connection))
