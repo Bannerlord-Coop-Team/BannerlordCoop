@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
+using System.Collections.Concurrent;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -55,8 +56,10 @@ internal class HeadmanHerdJournalHandler : IHandler
     private readonly IControllerIdProvider controllerId;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager players;
+    private readonly ConcurrentDictionary<(string GiverId, string IssueId), byte> pendingAccepts = new();
+    private readonly IIssueConversationGuard conversationGuard;
 
-    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership, IPlayerManager players)
+    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership, IPlayerManager players, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.network = network;
@@ -65,30 +68,57 @@ internal class HeadmanHerdJournalHandler : IHandler
         this.controllerId = controllerId;
         this.ownership = ownership;
         this.players = players;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Subscribe<NetworkQuestSolutionAccepted>(ShowGrant);
+        broker.Subscribe<QuestSolutionAcceptTriggered>(TrackAccept);
+        broker.Subscribe<QuestAcceptanceStarted>(ShowGrant);
+        broker.Subscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
+        broker.Subscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<HeadmanHerdLogAdded>(Send);
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Unsubscribe<NetworkQuestSolutionAccepted>(ShowGrant);
+        broker.Unsubscribe<QuestSolutionAcceptTriggered>(TrackAccept);
+        broker.Unsubscribe<QuestAcceptanceStarted>(ShowGrant);
+        broker.Unsubscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
+        broker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
 
-    private void ShowGrant(MessagePayload<NetworkQuestSolutionAccepted> payload)
+    private void TrackAccept(MessagePayload<QuestSolutionAcceptTriggered> payload) => TrackAccept(payload.What.Issue);
+
+    private void TrackAccept(IssueBase issue)
     {
-        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId) return;
-        var data = payload.What;
+        if (ModInformation.IsServer || issue?.IssueQuest is not Quest quest) return;
+        if (!objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
+        pendingAccepts.TryAdd((giverId, issue.StringId), 0);
+    }
+
+    private void ShowGrant(MessagePayload<QuestAcceptanceStarted> payload) =>
+        TrackAccept(IssueManager.GetIssueOfQuest(payload.What.Quest));
+
+    private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
+    {
+        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId ||
+            !pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _)) return;
+
         GameThread.RunSafe(() =>
         {
-            if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest)) return;
+            if (!issues.TryResolve(payload.What.IssueOwnerId, payload.What.IssueId, out _, out var issue, out _) ||
+                issue.IssueQuest is not Quest quest) return;
             var text = new TextObject("{=GgBtpOEm}{.%}{ANIMAL_COUNT} {?ANIMAL_COUNT > 1}{PLURAL(ANIMAL_TYPE)}{?}{ANIMAL_TYPE}{\\?}{.%} added to your party.");
             text.SetTextVariable("ANIMAL_COUNT", quest._animalCountToDeliver);
             text.SetTextVariable("ANIMAL_TYPE", quest._herdTypeToDeliver.Name);
             MBInformationManager.AddQuickInformation(text);
         }, context: nameof(HeadmanHerdJournalHandler));
+    }
+
+    private void HandleRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
+    {
+        if (ModInformation.IsServer) return;
+        pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _);
     }
 
     private void Send(MessagePayload<HeadmanHerdLogAdded> payload)
@@ -105,7 +135,7 @@ internal class HeadmanHerdJournalHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
@@ -115,7 +145,7 @@ internal class HeadmanHerdJournalHandler : IHandler
             using (new AllowedThread())
             using (new QuestJournalReplay())
                 quest.AddLog(data.Text);
-        }, context: nameof(HeadmanHerdJournalHandler));
+        }, data.GiverId), context: nameof(HeadmanHerdJournalHandler));
     }
 }
 
