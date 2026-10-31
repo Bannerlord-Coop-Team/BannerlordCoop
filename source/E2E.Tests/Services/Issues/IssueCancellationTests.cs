@@ -343,12 +343,33 @@ public class IssueCancellationTests : IDisposable
             scenario.Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
             Assert.False(scenario.Server.Resolve<IIssueCancellationCoordinator>().BeforeGiverDeath(Giver(), out var scope));
             Assert.Null(scope);
+            Assert.False(scenario.Server.Resolve<IIssueCancellationCoordinator>().IsPending(issue));
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
             Assert.Null(Giver().Issue);
             issue.CompleteIssueWithCancel();
         });
         AssertFinalizedEverywhere();
+    }
+
+    [Fact]
+    public void DetachedOngoingIssueDoesNotEnterCancellationRetryQueue()
+    {
+        scenario.Server.Call(() =>
+        {
+            var issue = Giver().Issue;
+            var replacement = new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(
+                Giver(), null);
+            replacement.StringId = "replacement_issue";
+            replacement._issueState = IssueBase.IssueState.Ongoing;
+            Campaign.Current.IssueManager._issues[Giver()] = replacement;
+            Giver().OnIssueCreatedForHero(replacement);
+
+            Assert.False(scenario.Server.Resolve<IIssueCancellationCoordinator>()
+                .BeforeCancellation(issue, new TaleWorlds.Localization.TextObject("cancel"), out var scope));
+            Assert.Null(scope);
+            Assert.False(scenario.Server.Resolve<IIssueCancellationCoordinator>().IsPending(issue));
+        });
     }
 
     [Fact]
