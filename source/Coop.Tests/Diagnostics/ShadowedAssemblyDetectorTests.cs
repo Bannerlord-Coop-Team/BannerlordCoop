@@ -2,6 +2,9 @@
 using HarmonyLib;
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Xunit;
 
 namespace Coop.Tests.Diagnostics;
@@ -64,6 +67,34 @@ public class ShadowedAssemblyDetectorTests : IDisposable
         var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(appBaseDirectory);
 
         Assert.Equal(harmonyPath, Assert.Single(shadowingFiles));
+    }
+
+    // File.Exists still sees a file the process may not read, so it reaches IsOlderHarmony and fails to load there
+    [Fact]
+    public void FindsReadDeniedHarmony()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return;
+
+        CopyRealHarmony();
+        var harmonyFile = new FileInfo(harmonyPath);
+        var originalSecurity = harmonyFile.GetAccessControl();
+        var deniedSecurity = new FileSecurity();
+        deniedSecurity.SetAccessRuleProtection(true, false);
+        deniedSecurity.AddAccessRule(new FileSystemAccessRule(WindowsIdentity.GetCurrent().User,
+            FileSystemRights.Delete | FileSystemRights.ChangePermissions, AccessControlType.Allow));
+        harmonyFile.SetAccessControl(deniedSecurity);
+
+        try
+        {
+            var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(appBaseDirectory);
+
+            Assert.Equal(harmonyPath, Assert.Single(shadowingFiles));
+        }
+        finally
+        {
+            harmonyFile.SetAccessControl(originalSecurity);
+        }
     }
 
     [Fact]
