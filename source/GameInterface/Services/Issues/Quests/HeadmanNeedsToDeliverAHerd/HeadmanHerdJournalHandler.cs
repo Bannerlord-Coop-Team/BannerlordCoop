@@ -20,7 +20,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBe
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanHerdLog : IServerToClientCommand
+public readonly struct NetworkHeadmanHerdLog : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
