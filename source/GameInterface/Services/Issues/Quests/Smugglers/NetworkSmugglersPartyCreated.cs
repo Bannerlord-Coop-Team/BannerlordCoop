@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.Smugglers;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkSmugglersPartyCreated : IServerToClientCommand
+public readonly struct NetworkSmugglersPartyCreated : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

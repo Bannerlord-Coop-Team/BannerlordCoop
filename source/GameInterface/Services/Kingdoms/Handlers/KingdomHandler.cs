@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -568,6 +569,11 @@ public class KingdomHandler : IHandler
                 {
                     Debug.FailedAssert("Deviation in peace states between ruling clan & kingdom in abdication", "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\KingdomManager.cs", "AbdicateTheThrone", 236);
                 }
+            }
+            // Player mercenary clans must leave first, otherwise DestroyKingdomAction destroys them and removes their heroes
+            foreach (Clan playerClan in kingdom.Clans.Where(clan => clan.IsPlayerClan()).ToList())
+            {
+                ChangeKingdomAction.ApplyByLeaveByKingdomDestruction(playerClan);
             }
             if (!kingdom.IsEliminated)
             {
