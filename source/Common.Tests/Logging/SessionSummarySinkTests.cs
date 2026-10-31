@@ -10,7 +10,7 @@ namespace Common.Tests.Logging;
 public class SessionSummarySinkTests
 {
     [Fact]
-    public void WriteSummary_CountsWarningErrorAndFatalPerSource()
+    public void WriteSummary_CountsLevelsAndErrorsPerSource()
     {
         var sink = new SessionSummarySink();
         sink.Emit(CreateEvent(LogEventLevel.Debug, "Coop.A"));
@@ -34,8 +34,27 @@ public class SessionSummarySinkTests
         {
             "[Session] summary reason=exit warnings=2 errors=3 fatal=1",
             "[Session] errors source=Coop.A n=2",
-            "[Session] errors source=Coop.B n=2",
+            "[Session] errors source=Coop.B n=1",
         }, lines);
+    }
+
+    [Fact]
+    public void WriteSummary_GenericSourceContextHasNoSpaces()
+    {
+        var sink = new SessionSummarySink();
+        using (var source = new LoggerConfiguration().WriteTo.Sink(sink).CreateLogger())
+        {
+            // A closed generic type's FullName carries assembly-qualified type arguments.
+            source.ForContext<List<int>>().Error("failed");
+        }
+        var capture = new CaptureSink();
+        using var logger = new LoggerConfiguration().WriteTo.Sink(capture).CreateLogger();
+
+        sink.WriteSummary(logger, "exit");
+
+        var line = capture.Events.Select(e => e.RenderMessage()).Last();
+        Assert.StartsWith("[Session] errors source=System.Collections.Generic.List`1[[System.Int32,", line);
+        Assert.Matches(@"^\[Session\] errors source=\S+ n=1$", line);
     }
 
     [Fact]

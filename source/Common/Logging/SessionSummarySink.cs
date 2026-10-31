@@ -16,7 +16,8 @@ public sealed class SessionSummarySink : ILogEventSink
 {
     private const string UnknownSource = "unknown";
 
-    // Emit runs on whatever thread logged; the totals are interlocked and only errors take the lock.
+    // Emit runs on whatever thread logged; warnings are interlocked, and errors and fatal take the
+    // lock so their totals always agree with the per-source counts.
     private readonly object gate = new object();
     private readonly Dictionary<string, int> errorsBySource = new Dictionary<string, int>(StringComparer.Ordinal);
     private int warnings;
@@ -32,12 +33,13 @@ public sealed class SessionSummarySink : ILogEventSink
                 Interlocked.Increment(ref warnings);
                 break;
             case LogEventLevel.Error:
-                Interlocked.Increment(ref errors);
-                CountSource(logEvent);
+                CountError(logEvent);
                 break;
             case LogEventLevel.Fatal:
-                Interlocked.Increment(ref fatal);
-                CountSource(logEvent);
+                lock (gate)
+                {
+                    fatal++;
+                }
                 break;
         }
     }
@@ -52,11 +54,13 @@ public sealed class SessionSummarySink : ILogEventSink
 
         // Snapshot before writing so the summary lines can never count themselves.
         int warningCount = Volatile.Read(ref warnings);
-        int errorCount = Volatile.Read(ref errors);
-        int fatalCount = Volatile.Read(ref fatal);
+        int errorCount;
+        int fatalCount;
         KeyValuePair<string, int>[] sources;
         lock (gate)
         {
+            errorCount = errors;
+            fatalCount = fatal;
             sources = errorsBySource
                 .OrderByDescending(entry => entry.Value)
                 .ThenBy(entry => entry.Key, StringComparer.Ordinal)
@@ -68,14 +72,14 @@ public sealed class SessionSummarySink : ILogEventSink
 
         foreach (var source in sources)
         {
-            logger.Information("[Session] errors source={Source:l} n={Count}", source.Key, source.Value);
+            // A closed generic type's name holds spaces, and summary values carry none.
+            logger.Information("[Session] errors source={Source:l} n={Count}", source.Key.Replace(' ', '_'), source.Value);
         }
 
         return true;
     }
 
-    // Fatal events count toward their source too, so a crash names where it came from.
-    private void CountSource(LogEvent logEvent)
+    private void CountError(LogEvent logEvent)
     {
         var source = logEvent.Properties.TryGetValue(Constants.SourceContextPropertyName, out var value)
             && value is ScalarValue { Value: string context }
@@ -84,6 +88,7 @@ public sealed class SessionSummarySink : ILogEventSink
 
         lock (gate)
         {
+            errors++;
             errorsBySource.TryGetValue(source, out var count);
             errorsBySource[source] = count + 1;
         }
