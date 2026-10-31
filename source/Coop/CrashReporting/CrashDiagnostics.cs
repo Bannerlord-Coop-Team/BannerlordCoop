@@ -37,7 +37,6 @@ namespace Coop.CrashReporting
 
         internal static void SetPhase(string value)
         {
-            PhaseChangeLog log;
             lock (SyncRoot)
             {
                 phase = value;
@@ -50,10 +49,8 @@ namespace Coop.CrashReporting
                     DateTime.UtcNow,
                     value));
                 Rebuild();
-                log = phaseLog;
+                phaseLog?.Report(value);
             }
-
-            log?.Report(value);
         }
 
         [CrashInformationCollector.CrashInformationProvider]
