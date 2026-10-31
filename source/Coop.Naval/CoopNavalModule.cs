@@ -2,6 +2,7 @@
 using Common.Commands;
 using Common.Messaging;
 using Common.Util;
+using Coop.Naval.PortScreen;
 using GameInterface;
 using GameInterface.Registry.Auto;
 using GameInterface.Services;
@@ -44,6 +45,8 @@ public class CoopNavalModule : Module
         {
             builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
+
+        builder.RegisterType<PortTransactionPricer>().As<IPortTransactionPricer>().InstancePerDependency();
 
         // Load coop commands within Coop.Naval
         foreach (var type in GetConcreteTypes<ICoopCommand>())
