@@ -621,6 +621,16 @@ Each engine signature was read from the installed v1.5.6 assemblies (`taom-src`,
   `development`'s client leave path (#3786) ran the simulation setup. `OnClientCreated` now calls
   `OnLoad`, as `FieldBattleEventComponentRegistry` calls `OnAfterLoad`. Found by
   `ClientLeavesForcedVillage_RequestsFinalizeAndReentryWithoutSimulating`.
+- Ransom offers (`RansomOfferCampaignBehaviorInterface.cs`). `development`'s prefix replaces
+  `RansomOfferCampaignBehavior.ConsiderRansomPrisoner` with a v1.4.8 copy. v1.5.6 vanilla asks the
+  new `CampaignEventDispatcher.CanHeroBeReleased` event before any offer or AI barter and skips a
+  player in `IsInNavalAutoTravel` (a raft or a ferry) instead of `IsInRaftState`. The copy now does
+  both, so a prisoner a listener holds gets no ransom offer and a player on a ferry gets none.
+- Mercenary and vassal offers (`VassalAndMercenaryOfferCampaignBehaviorInterface.cs`). The
+  `DailyTick` copy skipped a player on a raft only; v1.5.6 vanilla tests `IsInNavalAutoTravel`,
+  the only body change from v1.4.8, and the copy now does too. The other `IsInRaftState` uses
+  (`TeleportationCampaignBehaviorPatches`, `ArmyManagementCalculationPatches`) match v1.5.6
+  vanilla, which still tests `IsInRaftState` there.
 - Tests. 15 E2E test files and one GameInterface.Tests file written against v1.4.8 move to the
   1.5.x helpers: `_mapEventType = x` to `SetBattleType(x)`, `MapEventSettlement = s` to
   `SetMapEventSettlement(s)`, and the four argument `MapEvent.Initialize` to the three argument
@@ -650,5 +660,9 @@ deployed:
   (`ItemRosterSyncTests.Server_ItemRoster__count`), 0 failed. A first run had 4 failures, fixed
   above (the client map event sides, the raid component and the fleet anchor); the six test
   classes and namespaces they touch passed 292 of 292 on their own before the second full run.
-- Not done: a body diff from v1.4.8 to v1.5.6 of the engine methods `development` patches since the
-  split (the 1.5.x port did one for its own targets), a live co-op session, and CI.
+- Body diff from v1.4.8 to v1.5.6 of the Harmony targets `development` added or changed: two
+  replacements still ran v1.4.8 logic (the ransom and mercenary offers above), fixed after the
+  merge. After that fix: Release build `0 Error(s)`, GameInterface.dll `checked 6766 distinct
+  engine refs, 0 unresolved (0 new)`, unit tests 4,272 passed, 2 skipped, 0 failed,
+  VerificationHarness.Tests 86 passed, and the Kingdoms, Barters and prisoner E2E tests 193 of 193.
+- Not done: a live co-op session, and CI.
