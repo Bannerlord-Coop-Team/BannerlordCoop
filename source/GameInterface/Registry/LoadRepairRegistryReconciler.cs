@@ -92,11 +92,12 @@ public interface ILoadRepairRegistryReconciler
 /// ships, and the Hero.OnDeath and Hero.ResetEquipments prefixes for hero equipment.
 /// </summary>
 /// <remarks>
-/// Each type is held while the list its registry registers from still yields it, so the second registration pass
-/// cannot register an unregistered object again: a party while CampaignObjectManager lists it, an army while a kingdom
-/// lists it, a map event while MapEventManager lists it unfinalized (its Tick drops finalized events), a siege and its
-/// camp while SiegeEventManager lists the siege and it is not ReadyToBeRemoved, and a ship while a campaign party or
-/// settlement owns it (DestroyShipAction clears the owner).
+/// Each type is held while the campaign still keeps it: a party while CampaignObjectManager lists it, an army while a
+/// kingdom lists it, a map event while MapEventManager lists it unfinalized, a siege and its camp while
+/// SiegeEventManager lists the siege and it is not ReadyToBeRemoved, and a ship while a campaign party or settlement
+/// owns it (DestroyShipAction clears the owner). The second registration pass cannot register an unregistered object
+/// again: destroying a map event runs MapEventInitializationBarrier.DestroyGraph, which removes it from
+/// MapEventManager, the siege registries skip ReadyToBeRemoved sieges, and the other registries read the same lists.
 /// </remarks>
 internal sealed class LoadRepairRegistryReconciler : ILoadRepairRegistryReconciler
 {

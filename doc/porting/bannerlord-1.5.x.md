@@ -708,10 +708,12 @@ Two reviews of the merge (Codex and a data flow review) found these; each fix is
   `RemoveParty` cleared its camp, and the ships `RemoveParty` destroys. All four kept their ids, and
   the battle was never announced. The reconciler now applies one rule to every type it covers: it
   captures what the campaign holds before the repairs and, afterwards, unregisters through
-  `InstanceDestroyed<T>` each captured object that the list its registry registers from no longer
-  yields. That is `MapEventManager.MapEvents` without finalized events for battles (`Tick` drops
-  those), `SiegeEventManager.SiegeEvents` without `ReadyToBeRemoved` sieges for sieges and camps,
-  and the ships campaign parties and settlements own. A battle also gets its `MapEventFinalized`
+  `InstanceDestroyed<T>` each captured object that the campaign no longer holds. That is
+  `MapEventManager.MapEvents` without finalized events for battles,
+  `SiegeEventManager.SiegeEvents` without `ReadyToBeRemoved` sieges for sieges and camps, and the
+  ships campaign parties and settlements own. The second registration pass cannot register a
+  destroyed battle again, because its destroy runs `MapEventInitializationBarrier.DestroyGraph`,
+  which removes it from `MapEventManager`. A battle also gets its `MapEventFinalized`
   first, as from the `FinalizeEventAux` postfix; one that another path already announced was
   unregistered by that path too, so the reconciler skips it. `SiegeEventRegistry` and
   `BesiegerCampRegistry` now skip a `ReadyToBeRemoved` siege, which v1.5.6 keeps listed until the
