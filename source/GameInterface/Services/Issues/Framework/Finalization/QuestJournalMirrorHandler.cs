@@ -138,7 +138,8 @@ internal class QuestJournalMirrorHandler : IHandler
             var matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
                 SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName)).ToArray();
             if (matches.Length == 0)
-                matches = remaining.Where(log => log.LogText?.ToString() == entry.Text?.ToString()).ToArray();
+                matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
+                    SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
             var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
             // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
             if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1)) return false;
@@ -180,4 +181,8 @@ internal class QuestJournalMirrorHandler : IHandler
         }
         return true;
     }
+
+    private static bool SameKey(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) ||
+        (first != null && second != null && first.Value == second.Value);
 }
