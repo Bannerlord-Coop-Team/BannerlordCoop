@@ -757,6 +757,7 @@ public class ForceTransferTests
     {
         public bool Contains(object obj) { throw new NotImplementedException(); }
         public bool Contains(string id) { throw new NotImplementedException(); }
+        public int Count => throw new NotImplementedException();
         public bool TryGetId(object obj, out string id) { throw new NotImplementedException(); }
         public bool TryGetIdWithLogging<T>(T obj, out string id) { throw new NotImplementedException(); }
         public bool TryGetHandle(object obj, out uint handle) { throw new NotImplementedException(); }

@@ -701,30 +701,61 @@ Two reviews of the merge (Codex and a data flow review) found these; each fix is
   `StalledBattle_InALoadedSave_IsFinalizedOnLoad` now also run with originals allowed. Before the
   fix, four of those cleaner tests and the stalled one failed that way; the fifth, a half-finalized
   event, already published through `DetachFromFinalizedEvent`.
+- Fourth review round (`LoadRepairRegistryReconciler.cs`, `LoadRepairMapEventFinalizer.cs`). Four
+  more objects ended inside a repair without their lifetime patch publishing: a battle vanilla
+  finalized when `DestroyClanAction` took a closed clan's war party out of it
+  (`MapEventSide.RemovePartyInternal`), a siege and its besieger camp ended when that party's
+  `RemoveParty` cleared its camp, and the ships `RemoveParty` destroys. All four kept their ids, and
+  the battle was never announced. The reconciler now applies one rule to every type it covers: it
+  captures what the campaign holds before the repairs and, afterwards, unregisters through
+  `InstanceDestroyed<T>` each captured object that the list its registry registers from no longer
+  yields. That is `MapEventManager.MapEvents` without finalized events for battles (`Tick` drops
+  those), `SiegeEventManager.SiegeEvents` without `ReadyToBeRemoved` sieges for sieges and camps,
+  and the ships campaign parties and settlements own. A battle also gets its `MapEventFinalized`
+  first, as from the `FinalizeEventAux` postfix; one that another path already announced was
+  unregistered by that path too, so the reconciler skips it. `SiegeEventRegistry` and
+  `BesiegerCampRegistry` now skip a `ReadyToBeRemoved` siege, which v1.5.6 keeps listed until the
+  next `SiegeEventManager.Tick`; without that the second registration pass registered the ended
+  siege again under its settlement id. `LoadRepairMapEventFinalizer` now announces an event whether
+  or not it is registered (an unlisted event a saved player party points at never is) and gates only
+  the destroy on registration, so that player's party is parked. An unregistered event whose
+  finalize threw is announced twice, which every `MapEventFinalized` listener tolerates; the
+  orphan pass also still announces a battle again after releasing a party it missed, which
+  `PlayerPartyVisibilityHandler` needs to park that party. `RunLoadRepairs` ends with one
+  Information line, `[Check] id=coop.boot.load-repairs result=<pass|fail> stages_failed=<n>
+  unregistered_parties=<n> ... announced_map_events=<n> registered_new=<n>`, counted from the
+  destroy and `MapEventFinalized` messages the pass published and from the registry size around
+  the second registration; `result=fail` means a repair or reconcile step threw.
+  `LoadRepairLifetimeTests` (E2E, originals allowed through the sync policy) covers the four cases
+  and failed before the change; the siege case also fails with the registry filter removed.
+  `LoadRepairRunnerTests` (GameInterface.Tests) pins the line.
 
 ### Checks
 
-Run on 2026-10-30 against v1.5.6 (`Version.xml` says `Singleplayer Value="v1.5.6"`), with
+Run on 2026-10-31 against v1.5.6 (`Version.xml` says `Singleplayer Value="v1.5.6"`), with
 `-p:BannerlordDir` pointing at the `mb2` junction and `ModsRoot` at a missing folder, so nothing was
 deployed:
 
-- Release build (`dotnet build Coop.sln -c Release --no-incremental`): `1932 Warning(s)`,
+- Release build (`dotnet build Coop.sln -c Release --no-incremental`): `1938 Warning(s)`,
   `0 Error(s)`, all 20 projects.
 - Engine member audit (TAOM's `tools/check_engine_member_refs.ps1`, exit code 0, engine folders:
   the game bin and the Native, SandBox, SandBoxCore, StoryMode and CustomBattle module bins):
   Coop.dll `checked 94 distinct engine refs, 0 unresolved (0 new)`, Coop.Core.dll `checked 227`,
-  GameInterface.dll `checked 6766`, Missions.dll `checked 1496`, each `0 unresolved (0 new)`.
-- Unit tests (`dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore`, exit code 0):
+  GameInterface.dll `checked 6768`, Missions.dll `checked 1496`, each `0 unresolved (0 new)`.
+- Unit tests (`dotnet test CoopUnitTests.slnf -c Release --no-build`, exit code 0):
   Coop.CrashReporter.Tests 10 passed, Common.Tests 399 passed, Coop.Tests 1,432 passed,
-  Coop.IntegrationTests 160 passed and 2 skipped, GameInterface.Tests 2,271 passed; 4,272 passed,
+  Coop.IntegrationTests 160 passed and 2 skipped, GameInterface.Tests 2,273 passed; 4,274 passed,
   2 skipped, 0 failed. VerificationHarness.Tests: 86 passed, 0 failed.
-- E2E tests in 16 shards: 3,304 tests, 3,303 passed, 1 skipped
-  (`ItemRosterSyncTests.Server_ItemRoster__count`), 0 failed. A first run had 4 failures, fixed
-  above (the client map event sides, the raid component and the fleet anchor); the six test
-  classes and namespaces they touch passed 292 of 292 on their own before the second full run.
+- E2E tests touched by the fourth round, run on their own: `LoadRepairLifetimeTests`,
+  `LoadRepairRunnerTests`, `MapEventLoadCleanerTests`, `StalledMapEventTests`,
+  `EmptyLordPartyResetterTests`, `KillCharacterActionExecutionTests`, `MapEventLifetimeTests`,
+  `SiegeEventLifetimeTests`, `SiegeEntryRecoveryTests`, `BesiegerCampLifetimeTests`,
+  `BesiegerCampSyncTests`, `SiegeEventTickPatchesTests` and `ShipSyncTests`: 88 of 88 passed.
+- E2E tests in 16 shards (`run-e2e-shard.sh n 16`, n = 0 to 15): the last full run, at the third
+  round's commit, had 3,317 tests, 3,316 passed, 1 skipped
+  (`ItemRosterSyncTests.Server_ItemRoster__count`), 0 failed. The fourth round's four new tests
+  were not in it; its shard run is a separate step.
 - Body diff from v1.4.8 to v1.5.6 of the Harmony targets `development` added or changed: two
   replacements still ran v1.4.8 logic (the ransom and mercenary offers above), fixed after the
-  merge. After that fix: Release build `0 Error(s)`, GameInterface.dll `checked 6766 distinct
-  engine refs, 0 unresolved (0 new)`, unit tests 4,272 passed, 2 skipped, 0 failed,
-  VerificationHarness.Tests 86 passed, and the Kingdoms, Barters and prisoner E2E tests 193 of 193.
+  merge.
 - Not done: a live co-op session, and CI.
