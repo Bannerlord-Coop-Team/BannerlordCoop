@@ -1,34 +1,31 @@
 ﻿using Common;
-using Common.Util;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
+/// <summary>
+/// Removes the server's own main party, since the dedicated server plays no party on the map.
+/// </summary>
 internal interface IMainPartyInterface : IGameAbstraction
 {
     void RemoveMainParty();
 }
 
+/// <inheritdoc cref="IMainPartyInterface"/>
 internal class MainPartyInterface : IMainPartyInterface
 {
+    // Queues the removal on the game thread
     public void RemoveMainParty()
     {
         GameThread.Run(RemoveMainPartyInternal);
     }
 
+    // Removes the main party if it is still a live clan party, naval views handle its missing anchor
     private void RemoveMainPartyInternal()
     {
         if (MobileParty.MainParty?.ActualClan != null)
         {
             MobileParty.MainParty.RemoveParty();
-
-            // The server's naval map views still read MainParty.Anchor every frame after RemoveParty nulls it.
-            // The party is no longer registered, so the placeholder anchor stays local to the server.
-            using (new AllowedThread())
-            {
-                MobileParty.MainParty.SetAnchor(new AnchorPoint(MobileParty.MainParty));
-            }
         }
     }
 }
