@@ -802,7 +802,9 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Server.Call(() =>
         {
             Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
-            Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            Assert.True(Server.ObjectManager.Remove(giver));
+            Campaign.Current.IssueManager.OnHeroKilled(giver, null,
                 KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
         });
         environment.FlushCoalescer();

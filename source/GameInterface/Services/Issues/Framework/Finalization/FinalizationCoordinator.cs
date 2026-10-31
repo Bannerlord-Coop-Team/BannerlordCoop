@@ -194,7 +194,7 @@ internal class FinalizationCoordinator : IHandler
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithAlternative ||
-            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
+            !TryGetIssueOwnerId(issue, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
 
@@ -256,7 +256,7 @@ internal class FinalizationCoordinator : IHandler
 
         var issue = payload.What.Issue;
 
-        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
+        if (!TryGetIssueOwnerId(issue, out var issueOwnerId))
         {
             return;
         }
@@ -279,6 +279,24 @@ internal class FinalizationCoordinator : IHandler
         {
             announcedIssues.Remove(issue);
         }
+    }
+
+    private bool TryGetIssueOwnerId(IssueBase issue, out string issueOwnerId)
+    {
+        if (objectManager.TryGetId(issue.IssueOwner, out issueOwnerId)) return true;
+
+        // A giver can be removed from the server registry as part of its death before the outcome event is handled.
+        // Its stamped StringId still identifies the client-side hero.
+        if (!string.IsNullOrEmpty(issue.IssueOwner?.StringId))
+        {
+            issueOwnerId = $"Hero_{issue.IssueOwner.StringId}";
+            Logger.Warning("Using the stamped issue owner id {IssueOwnerId} after registry removal", issueOwnerId);
+            return true;
+        }
+
+        Logger.Error("Failed to get issue owner id for {Issue}", issue.StringId);
+        issueOwnerId = null;
+        return false;
     }
 
     // Client only.
