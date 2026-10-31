@@ -10,6 +10,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $BannerlordDir "bin\Win64_Shipping_C
 $AssembliesTempDir = Join-Path $PSScriptRoot "DockerAssembliesTemp"
 $MBBinDir = Join-Path $BannerlordDir "bin"
 $MBModulesDir = Join-Path $BannerlordDir "Modules"
+if (-not (Test-Path -LiteralPath (Join-Path $MBModulesDir "NavalDLC") -PathType Container)) {
+    throw "BANNERLORD_DIR ($BannerlordDir) has no Modules\NavalDLC folder. Install the War Sails DLC before preparing the Docker image."
+}
 
 # Recreate the temp assemblies folder
 Remove-Item ${AssembliesTempDir} -Recurse -ErrorAction Ignore
@@ -22,7 +25,7 @@ Copy-Item "${MBModulesDir}\SandBox" -Force -Filter "SandBox*.dll" -Destination "
 Copy-Item "${MBModulesDir}\NavalDLC" -Force -Filter "NavalDLC*.dll" -Destination "${AssembliesTempDir}\Modules\NavalDLC" -Recurse
 
 # Copy game UI and module data used by tests
-$Modules = @("Native", "SandBox")
+$Modules = @("Native", "SandBox", "NavalDLC")
 $Folders = @("GUI", "ModuleData")
 
 foreach ($Module in $Modules) {

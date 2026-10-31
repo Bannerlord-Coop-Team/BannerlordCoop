@@ -10,9 +10,6 @@ namespace GameInterface.Services.Companions.Patches.Disable
     
     internal class DisableCompanionRolesCampaignBehavior
     {
-        [HarmonyPatch(nameof(CompanionRolesCampaignBehavior.RegisterEvents))]
-        static bool RegisterEventsPrefix() => true;
-
         // Disable these methods on the client
         private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
         {

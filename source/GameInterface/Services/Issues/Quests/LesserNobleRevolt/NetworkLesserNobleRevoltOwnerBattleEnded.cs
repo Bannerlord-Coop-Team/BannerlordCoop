@@ -8,7 +8,7 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 /// vanilla's next talk reads from the client's own quest.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLesserNobleRevoltOwnerBattleEnded : IServerToClientCommand
+public readonly struct NetworkLesserNobleRevoltOwnerBattleEnded : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;
