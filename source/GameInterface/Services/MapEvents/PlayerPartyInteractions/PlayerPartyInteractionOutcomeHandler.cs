@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
@@ -37,6 +38,8 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly PlayerPartyMarriageOfferData[] InitiatorOfferedMarriages;
+    public readonly PlayerPartyMarriageOfferData[] ResponderOfferedMarriages;
     public readonly PlayerPartyInteractionProposal Proposal;
     public readonly bool IsHostile;
     public readonly string ActorPartyId;
@@ -64,6 +67,8 @@ internal readonly struct PlayerPartyInteractionOutcome
         ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        InitiatorOfferedMarriages = session.InitiatorOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
+        ResponderOfferedMarriages = session.ResponderOfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>();
         Proposal = session.Proposal;
         IsHostile = session.IsHostile;
         ActorPartyId = actorPartyId;
@@ -484,6 +489,11 @@ internal class PlayerPartyInteractionOutcomeHandler
             outcome.ResponderOfferedFiefs,
             outcome.ResponderOfferedPrisoners);
 
+        // Check marriages before applying anything, otherwise a hero offered as a troop has already moved party and fails the check.
+        var marriages = new List<(Hero Hero, Hero Spouse)>();
+        if (!TryAddMarriages(initiatorParty, responderParty, outcome.InitiatorOfferedMarriages, marriages) ||
+            !TryAddMarriages(responderParty, initiatorParty, outcome.ResponderOfferedMarriages, marriages)) return false;
+
         ApplyOffer(initiatorParty, responderParty, initiatorOffer);
         ApplyOffer(responderParty, initiatorParty, responderOffer);
 
@@ -491,6 +501,37 @@ internal class PlayerPartyInteractionOutcomeHandler
         {
             ApplyPeace(initiatorParty, responderParty);
         }
+
+        foreach (var (hero, spouse) in marriages)
+        {
+            MarriageAction.Apply(hero, spouse);
+        }
+        return true;
+    }
+
+    private bool TryAddMarriages(PartyBase sourceParty, PartyBase targetParty, PlayerPartyMarriageOfferData[] offeredMarriages, List<(Hero Hero, Hero Spouse)> marriages)
+    {
+        foreach (var offer in offeredMarriages)
+        {
+            if (!objectManager.TryGetObjectWithLogging(offer.HeroId, out Hero hero)) return false;
+            if (!objectManager.TryGetObjectWithLogging(offer.SpouseId, out Hero spouse)) return false;
+
+            // Both players can offer a marriage for the same hero before either update arrives.
+            bool heroAlreadyMarrying = marriages.Any(marriage =>
+                marriage.Hero == hero || marriage.Spouse == hero || marriage.Hero == spouse || marriage.Spouse == spouse);
+
+            if (heroAlreadyMarrying || !PlayerPartyMarriageBarterable.CanOfferMarriage(sourceParty, targetParty, hero, spouse))
+            {
+                Logger.Warning(
+                    "Unable to apply player-party trade marriage: eligibility changed before acceptance. HeroId={HeroId}, SpouseId={SpouseId}",
+                    offer.HeroId,
+                    offer.SpouseId);
+                return false;
+            }
+
+            marriages.Add((hero, spouse));
+        }
+
         return true;
     }
 
