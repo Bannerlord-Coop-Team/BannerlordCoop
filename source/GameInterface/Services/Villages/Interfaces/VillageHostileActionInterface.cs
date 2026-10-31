@@ -201,7 +201,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (!TryValidateHostileActionSettlement(settlement, out reason))
             return false;
 
-        if (!TryValidateHostileActionState(mobileParty, settlement, allowPendingApproval, out reason))
+        if (!TryValidateHostileActionState(mobileParty, settlement, action, allowPendingApproval, out reason))
             return false;
 
         var village = settlement.Village;
@@ -259,6 +259,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private bool TryValidateHostileActionState(
         MobileParty mobileParty,
         Settlement settlement,
+        VillageHostileAction action,
         bool allowPendingApproval,
         out VillageHostileActionDeniedReason reason)
     {
@@ -278,7 +279,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
         }
 
-        if (settlement.Village.VillageState != Village.VillageStates.Normal)
+        bool continuingRaid = action == VillageHostileAction.Raid &&
+            settlement.Village.VillageState == Village.VillageStates.BeingRaided &&
+            settlement.SettlementHitPoints > 0f;
+        if (settlement.Village.VillageState != Village.VillageStates.Normal && !continuingRaid)
         {
             reason = VillageHostileActionDeniedReason.InvalidVillageState;
             return false;

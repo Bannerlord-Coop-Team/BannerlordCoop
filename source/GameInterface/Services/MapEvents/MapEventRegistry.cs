@@ -282,6 +282,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerDestroyed(MapEvent obj, string id)
     {
+        ServerBattleModeArbiter.Release(id);
         initializationBarrier.DestroyGraph(obj);
     }
 }

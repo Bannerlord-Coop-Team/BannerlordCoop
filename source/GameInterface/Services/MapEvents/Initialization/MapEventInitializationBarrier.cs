@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -519,6 +520,10 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return false;
         }
 
+        // A winning simulation still needs the encounter references for the native loot-end continuation.
+        if (mapEvent.IsRaidHostileAction() && mapEvent.WinningSide == encounter.PlayerSide)
+            return false;
+
         if (PlayerCaptivity.IsCaptive)
         {
             PlayerEncounter.LeaveEncounter = true;
@@ -529,7 +534,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             return true;
         }
 
-        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        // Leave must not reuse battle references whose party sides were already removed.
+        encounter._mapEvent = null;
+        encounter.BattleSimulation = null;
         encounter.EncounterState = PlayerEncounterState.Begin;
         GameMenu.SwitchToMenu("encounter");
         return true;

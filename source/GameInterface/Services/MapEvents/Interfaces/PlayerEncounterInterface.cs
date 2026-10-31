@@ -1,6 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Villages.Data;
+using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
@@ -8,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Interfaces;
 
@@ -15,6 +19,9 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
+    public bool TrackPendingHostileAction(PlayerEncounter playerEncounter);
+    public void ClearPendingHostileAction();
+    public void RecoverRejectedHostileAction();
 }
 
 public class PlayerEncounterInterface : IPlayerEncounterInterface
@@ -22,14 +29,21 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
 
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IMessageBroker messageBroker;
+    private PlayerEncounter pendingHostileActionEncounter;
 
-    public PlayerEncounterInterface() : this(null)
+    public PlayerEncounterInterface() : this(null, null)
     {
     }
 
-    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface) : this(siegeEventInterface, null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface, IMessageBroker messageBroker)
     {
         this.siegeEventInterface = siegeEventInterface;
+        this.messageBroker = messageBroker;
     }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
@@ -81,6 +95,34 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         });
     }
 
+    public void RecoverRejectedHostileAction()
+    {
+        var expectedEncounter = pendingHostileActionEncounter;
+        pendingHostileActionEncounter = null;
+        GameThread.RunSafe(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            if (encounter == null || !ReferenceEquals(encounter, expectedEncounter) ||
+                encounter._mapEvent != null || encounter.BattleSimulation != null)
+                return;
+
+            encounter._stateHandled = true;
+            PlayerEncounter.LeaveEncounter = true;
+            PlayerEncounter.Finish(true);
+        }, context: nameof(RecoverRejectedHostileAction));
+    }
+
+    public bool TrackPendingHostileAction(PlayerEncounter playerEncounter)
+    {
+        if (pendingHostileActionEncounter != null)
+            return false;
+
+        pendingHostileActionEncounter = playerEncounter;
+        return true;
+    }
+
+    public void ClearPendingHostileAction() => pendingHostileActionEncounter = null;
+
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)
     {
         if (playerEncounter._capturedAlreadyPrisonerHeroes == null)
@@ -124,7 +166,19 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
     {
-        //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
+        var mapEvent = playerEncounter._mapEvent;
+        var continueRaid = playerEncounter.BattleSimulation != null &&
+            mapEvent?.IsRaidHostileAction() == true &&
+            mapEvent.WinningSide == BattleSideEnum.Attacker &&
+            playerEncounter.PlayerSide == BattleSideEnum.Attacker &&
+            playerEncounter._attackerParty == PartyBase.MainParty &&
+            mapEvent.AttackerSide?.LeaderParty == PartyBase.MainParty &&
+            (MobileParty.MainParty.Army == null ||
+             MobileParty.MainParty.Army.LeaderParty == MobileParty.MainParty) &&
+            mapEvent.MapEventSettlement?.IsVillage == true &&
+            mapEvent.MapEventSettlement.SettlementHitPoints > 0f;
+        var settlement = continueRaid ? mapEvent.MapEventSettlement : null;
+
         playerEncounter._stateHandled = true;
 
         // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd
@@ -133,5 +187,24 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
             return;
 
         PlayerEncounter.Finish(true);
+
+        if (!continueRaid || settlement == null)
+            return;
+        PartyBase.MainParty._mapEventSide = null;
+        settlement.Party._mapEventSide = null;
+        var broker = messageBroker;
+        if (broker == null && !ContainerProvider.TryResolve<IMessageBroker>(out broker))
+            broker = MessageBroker.Instance;
+
+        // The completed event is already finalized. Start a fresh encounter so the existing hostile-action
+        // approval creates the next raid through the authoritative server path.
+        PlayerEncounter.Start();
+        PlayerEncounter.Current.SetupFields(PartyBase.MainParty, settlement.Party);
+        PlayerEncounter.Current._mapEvent = null;
+        PlayerEncounter.Current.ForceRaid = true;
+        broker.Publish(this, new VillageHostileActionAttempted(
+            VillageHostileAction.Raid,
+            MobileParty.MainParty,
+            settlement));
     }
 }
