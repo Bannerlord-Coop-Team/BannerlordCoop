@@ -44,6 +44,9 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
             return;
         }
 
+        quest.JournalEntries.FirstOrDefault(log => log.Range == quest._totalPartyCount)
+            ?.UpdateCurrentProgress(quest._questPartyProgress);
+
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (issue == null || !ownerResolver.TryGetOwnerControllerId(issue, out var controllerId) ||
             !players.TryGetPeer(controllerId, out var peer) ||
@@ -51,9 +54,6 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
         {
             return;
         }
-
-        quest.JournalEntries.FirstOrDefault(log => log.Range == quest._totalPartyCount)
-            ?.UpdateCurrentProgress(quest._questPartyProgress);
 
         var ids = new List<string>();
         if (!final)
