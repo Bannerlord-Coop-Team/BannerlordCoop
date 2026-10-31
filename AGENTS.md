@@ -112,7 +112,7 @@ The live mod writes Serilog output next to the game executable, under the `mb2` 
 - `mb2/bin/Win64_Shipping_Client/Coop_server.log` — an in-game server/host run (launched with `/server`).
 - `mb2/bin/Win64_Shipping_Client/BootPatches.log` — early-boot fallback, written before Serilog is configured.
 
-On this machine the junction resolves to `C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\bin\Win64_Shipping_Client\`. Each log is **deleted and recreated on every startup** (`CoopMod.SetupLogging`), so it only ever holds the most recent run — copy it aside before relaunching if you need to compare. Client and server run as two separate processes; open the file for the side you're debugging. The standalone `ServerConsole` logs to the console only (no file), so file logs come from the in-game `/server` mode. DEBUG builds log at Debug level, Release at Information.
+On this machine the junction resolves to `C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\bin\Win64_Shipping_Client\`. Each log is **recreated on every startup** (`CoopMod.SetupLogging`), after the previous run's log is moved to `Coop_client.prev.log` / `Coop_server.prev.log` (replacing an older one), so the pair holds the two most recent runs. Copy a log aside before relaunching twice if you need it. Client and server run as two separate processes; open the file for the side you're debugging. The standalone `ServerConsole` logs to the console only (no file), so file logs come from the in-game `/server` mode. DEBUG builds log at Debug level, Release at Information.
 
 ### Reading Vanilla Game Code (Decompile Before You Theorize)
 

@@ -203,7 +203,7 @@ namespace Coop
         }
 
         // Keep only the newest few process-id-suffixed logs. Each dual-client run mints one under a fresh
-        // pid, so unlike the canonical Coop_{postfix}.log (deleted and recreated every startup) they would
+        // pid, so unlike the canonical Coop_{postfix}.log (recreated every startup) they would
         // otherwise pile up unbounded. The canonical file has no pid and isn't matched, so it's never touched.
         private static void PruneProcessSuffixedLogs(string filePostfix)
         {
@@ -249,6 +249,9 @@ namespace Coop
 
             PruneProcessSuffixedLogs(filePostfix);
 
+            // Keep the last session's log one more launch, otherwise a crashed session's log is gone on relaunch.
+            var previousLogKept = PreviousLogFile.TryKeep(filePath, out var previousLogFailure);
+
             try
             {
                 File.Delete(filePath);
@@ -273,6 +276,9 @@ namespace Coop
                 .MinimumLevel.Information();
 #endif
             Logger = LogManager.GetLogger<CoopMod>();
+
+            if (!previousLogKept)
+                Logger.Warning(previousLogFailure, "Previous log {Path} could not be kept", PreviousLogFile.GetPath(filePath));
         }
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
