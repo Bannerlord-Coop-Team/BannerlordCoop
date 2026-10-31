@@ -504,8 +504,7 @@ public class MerchantOutlawsTests : IDisposable
     [Fact]
     public void AuthoritativeEndingPreservesOwnerHuntProgress()
     {
-        foreach (var instance in Instances)
-            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
         Accept();
         var serverQuest = Quest(Server);
         var ownerQuest = Quest(ClientA);
@@ -517,20 +516,22 @@ public class MerchantOutlawsTests : IDisposable
         ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
-        Server.Call(() =>
+        Server.Call(() => Assert.Equal(1, Assert.Single(serverQuest.JournalEntries,
+            log => log.Range == serverQuest._totalPartyCount).CurrentProgress));
+        LogEntry[] saveHistory = null!;
+        Server.Call(() => saveHistory = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray());
+        ClientA.Call(() =>
         {
-            Assert.Equal(1, Assert.Single(serverQuest.JournalEntries, log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
             var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(serverQuest)));
-            Assert.True(archive.IsEnded());
-            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
         });
         ClientA.Call(() =>
         {
-            Assert.Equal(1, Assert.Single(ownerQuest.JournalEntries, log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
             var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(ownerQuest)));
-            Assert.True(archive.IsEnded());
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
             Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
         });
     }
