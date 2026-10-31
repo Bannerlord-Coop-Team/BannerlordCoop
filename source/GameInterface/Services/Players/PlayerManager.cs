@@ -72,6 +72,11 @@ public interface IPlayerManager
     bool TryGetPlayer(NetPeer peer, out Player player);
 
     /// <summary>
+    /// Resolves the controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
+    /// </summary>
+    bool TryGetCurrentController(NetPeer peer, out string controllerId);
+
+    /// <summary>
     /// Resolves the Player controlling the given hero.
     /// </summary>
     bool TryGetPlayer(Hero hero, out Player player);
@@ -81,6 +86,12 @@ public interface IPlayerManager
     /// when it isn't, so a handler can ignore a request made for another player's hero.
     /// </summary>
     bool IsSenderControllingHero(object sender, string heroId);
+
+    /// <summary>
+    /// Checks whether a message sender is the peer controlling the given party, logging a warning
+    /// when it isn't, so a handler can ignore a request made with a stale or wrong party id.
+    /// </summary>
+    bool IsSenderControllingParty(object sender, string mobilePartyId);
 
     /// <summary>
     /// Resolves the hero controlled by the peer that sent a message, so a handler can check what
@@ -390,6 +401,21 @@ public class PlayerManager : IPlayerManager
         return peerToPlayer.TryGetValue(peer, out player);
     }
 
+    public bool TryGetCurrentController(NetPeer peer, out string controllerId)
+    {
+        controllerId = null;
+        lock (registrySync)
+        {
+            if (!peerToPlayer.TryGetValue(peer, out var player) ||
+                !controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer))
+                return false;
+
+            controllerId = player.ControllerId;
+            return true;
+        }
+    }
+
     public bool TryGetPlayer(Hero hero, out Player player)
     {
         player = null;
@@ -402,6 +428,16 @@ public class PlayerManager : IPlayerManager
         if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
+        return false;
+    }
+
+    public bool IsSenderControllingParty(object sender, string mobilePartyId)
+    {
+        var peer = sender as NetPeer;
+        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && player.MobilePartyId == mobilePartyId) return true;
+
+        logger.Warning("Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it", mobilePartyId, peer?.Id);
         return false;
     }
 

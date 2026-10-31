@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Inventory.Handlers;
 using GameInterface.Services.Inventory.Interfaces;
+using Moq;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Inventory;
@@ -19,7 +20,7 @@ public class InventoryFoodUpkeepTests
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, initial);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
 
         Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[1], grain, change));
@@ -34,7 +35,7 @@ public class InventoryFoodUpkeepTests
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 10);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(grain, -3);
         logic._rosters[0].AddToCounts(grain, 3);
@@ -53,7 +54,7 @@ public class InventoryFoodUpkeepTests
         var sheep = new EquipmentElement(new ItemObject("sheep"));
         var meat = new EquipmentElement(new ItemObject("meat"));
         var logic = CreateLogic(sheep, 2);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(sheep, -1);
         logic._rosters[1].AddToCounts(meat, 2);
@@ -72,7 +73,7 @@ public class InventoryFoodUpkeepTests
         var logic = CreateLogic(grain, 5);
         logic._rosters[0].AddToCounts(grain, 10);
         logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(grain, -5);
         logic._rosters[0].AddToCounts(grain, 5);
@@ -182,7 +183,7 @@ public class InventoryFoodUpkeepTests
         var logic = CreateLogic(grain, 5);
         logic._rosters[0].AddToCounts(grain, 10);
         logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[0].AddToCounts(grain, -3);
         logic._rosters[1].AddToCounts(grain, 3);
@@ -196,16 +197,90 @@ public class InventoryFoodUpkeepTests
     }
 
     [Fact]
+    public void MarketUpdate_RefreshesOnlyTheChangedItemRow()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        var view = new Mock<IInventoryScreenViewInterface>();
+        var inventory = new InventoryScreenRosterRefresher(view.Object);
+        inventory.CaptureInventoryBaseline(logic);
+
+        Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 4));
+
+        view.Verify(v => v.RefreshItem(logic, InventoryLogic.InventorySide.OtherInventory, grain, 4), Times.Once);
+        view.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void FirstItemIntoAnEmptyMarket_ReachesTheLiveRosterAndBackups()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        // Vanilla SetCurrentStateAsInitial copies each roster, and a copy of an empty roster has no room to grow
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
+        var inventory = CreateRefresher();
+        inventory.CaptureInventoryBaseline(logic);
+
+        Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 3));
+
+        Assert.Equal(3, Count(logic._rosters[0], grain));
+        Assert.Equal(3, Count(logic._rostersBackup[0], grain));
+        inventory.RestoreInventoryBackup(logic);
+        Assert.Equal(3, Count(logic._rostersBackup[0], grain));
+    }
+
+    [Fact]
+    public void PartyUpdate_RefreshesThePlayerInventoryRow()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        var view = new Mock<IInventoryScreenViewInterface>();
+        var inventory = new InventoryScreenRosterRefresher(view.Object);
+        inventory.CaptureInventoryBaseline(logic);
+
+        Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[1], grain, -2));
+
+        view.Verify(v => v.RefreshItem(logic, InventoryLogic.InventorySide.PlayerInventory, grain, -2), Times.Once);
+        view.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void ManyMarketUpdates_RefreshOneRowEachAndKeepThePendingPurchase()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        logic._rosters[0].AddToCounts(grain, 10);
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
+        var view = new Mock<IInventoryScreenViewInterface>();
+        var inventory = new InventoryScreenRosterRefresher(view.Object);
+        inventory.CaptureInventoryBaseline(logic);
+        logic._rosters[0].AddToCounts(grain, -3);
+        logic._rosters[1].AddToCounts(grain, 3);
+
+        for (int i = 0; i < 200; i++)
+            Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 1));
+
+        view.Verify(v => v.RefreshItem(logic, InventoryLogic.InventorySide.OtherInventory, grain, 1), Times.Exactly(200));
+        view.VerifyNoOtherCalls();
+        Assert.Equal(207, Count(logic._rosters[0], grain));
+        Assert.Equal(8, Count(logic._rosters[1], grain));
+        Assert.Equal(210, Count(logic._rostersBackup[0], grain));
+    }
+
+    [Fact]
     public void UnrelatedRoster_IsNotAppliedByInventory()
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 5);
-        var inventory = new InventoryScreenRosterRefresher();
+        var inventory = CreateRefresher();
         inventory.CaptureInventoryBaseline(logic);
 
         Assert.False(inventory.TryApplyInventoryUpdate(logic, new ItemRoster(), grain, -1));
         Assert.Equal(5, Count(logic._rosters[1], grain));
     }
+
+    private static InventoryScreenRosterRefresher CreateRefresher()
+        => new InventoryScreenRosterRefresher(Mock.Of<IInventoryScreenViewInterface>());
 
     private static InventoryLogic CreateLogic(EquipmentElement item, int amount)
     {

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Banners.Extensions;
 using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
@@ -76,6 +77,15 @@ namespace GameInterface.Services.Banners.Handlers
         private void Handle(MessagePayload<NetworkUpdatePlayerBanner> obj)
         {
             var payload = obj.What;
+
+            // Deserialize clears the banner before parsing, so a code this side can't read (corrupt, or
+            // using a format it doesn't know) would leave the clan with no layers and break every load.
+            // The edit is dropped, so the sender keeps its own local banner until the next edit.
+            if (!payload.BannerCode.HasBannerLayers())
+            {
+                Logger.Warning("Ignoring a banner edit for clan {ClanId} because its banner code has no readable layers", payload.ClanId);
+                return;
+            }
 
             GameThread.RunSafe(() =>
             {
@@ -160,7 +170,12 @@ namespace GameInterface.Services.Banners.Handlers
 
         private bool CanSenderManageClan(object sender, Clan clan)
         {
-            if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
+            if (!playerManager.TryGetSenderHero(sender, out var hero))
+            {
+                Logger.Warning("Ignoring a banner edit for clan {ClanId} from a peer whose hero could not be found", clan?.StringId);
+                return false;
+            }
+            if (permissions.CanManageClan(hero, clan)) return true;
 
             Logger.Warning("Ignoring a banner edit for clan {ClanId} from a peer that does not lead it", clan?.StringId);
             return false;

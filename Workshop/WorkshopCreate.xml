@@ -1,8 +1,8 @@
 <Tasks>
     <CreateItem/>
     <UpdateItem>
-        <ModuleFolder Value="E:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
-        <!-- A direct path of your module -->
+        <ModuleFolder Value="%BANNERLORD_DIR%\Modules\Coop"/>
+        <!-- publish.bat replaces %BANNERLORD_DIR% with the game install path; the tool itself can't expand it -->
         <ItemDescription Value="Coop Pre-Alpha 0.1"/>
         <!-- A description that will be displayed on Steam Workshop, can be edited via the Steam UI -->
         <Tags> 

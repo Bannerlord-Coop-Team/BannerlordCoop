@@ -205,6 +205,113 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void TryGetCurrentController_CurrentPeer_ReturnsController()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.True(playerManager.TryGetCurrentController(peer, out var controllerId));
+        Assert.Equal(ControllerId, controllerId);
+    }
+
+    [Fact]
+    public void TryGetCurrentController_StalePeerAfterReconnect_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var network = new TestNetwork();
+        var stalePeer = network.CreatePeer();
+        var currentPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, stalePeer);
+        playerManager.SetPeer(ControllerId, currentPeer);
+
+        Assert.False(playerManager.TryGetCurrentController(stalePeer, out var controllerId));
+        Assert.Null(controllerId);
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_StalePeerAfterReconnect_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var network = new TestNetwork();
+        // Test peers share one endpoint, and peers compare by endpoint, so the old peer gets its own address.
+        var stalePeer = network.CreatePeer("10.0.0.8");
+        var currentPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, stalePeer);
+        playerManager.SetPeer(ControllerId, currentPeer);
+
+        Assert.False(playerManager.IsSenderControllingParty(stalePeer, PartyId));
+        Assert.True(playerManager.IsSenderControllingParty(currentPeer, PartyId));
+    }
+
+    [Fact]
+    public void TryGetCurrentController_UnregisteredPeer_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.TryGetCurrentController(new TestNetwork().CreatePeer(), out var controllerId));
+        Assert.Null(controllerId);
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_OwnParty_ReturnsTrue()
+    {
+        var logger = new Mock<ILogger>();
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.True(playerManager.IsSenderControllingParty(peer, PartyId));
+        logger.Verify(log => log.Warning(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>()), Times.Never());
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_AnotherParty_ReturnsFalseAndWarnsWithThePeer()
+    {
+        var logger = new Mock<ILogger>();
+        var playerManager = new PlayerManager(logger.Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, PartyId, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.False(playerManager.IsSenderControllingParty(peer, "PartyTwo"));
+        logger.Verify(log => log.Warning(
+            "Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it",
+            "PartyTwo", (int?)peer.Id), Times.Once());
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_UnregisteredPeerOrNoPeer_ReturnsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.IsSenderControllingParty(new TestNetwork().CreatePeer("10.0.0.8"), PartyId));
+        Assert.False(playerManager.IsSenderControllingParty(new object(), PartyId));
+    }
+
+    [Fact]
+    public void IsSenderControllingParty_EmptyPartyIdOnBothSides_ReturnsFalse()
+    {
+        var playerManager = new PlayerManager(new Mock<ILogger>().Object, new Mock<IObjectManager>().Object, new ControllerIdProvider());
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        Assert.False(playerManager.IsSenderControllingParty(peer, string.Empty));
+        Assert.False(playerManager.IsSenderControllingParty(peer, null));
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);
