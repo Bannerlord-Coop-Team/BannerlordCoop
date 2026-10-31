@@ -88,13 +88,38 @@ internal class LordNeedsGarrisonTroopsCreationCaptureStrategy : ICreationCapture
             return false;
         }
 
-        using (var stream = new MemoryStream(captured))
-        using (var reader = new BinaryReader(stream))
+        try
         {
-            var settlementId = reader.ReadString();
-            var troopId = reader.ReadString();
-            return objectManager.TryGetObjectWithLogging(settlementId, out settlement) &&
-                objectManager.TryGetObjectWithLogging(troopId, out troop);
+            using (var stream = new MemoryStream(captured))
+            using (var reader = new BinaryReader(stream))
+            {
+                if (stream.Position >= stream.Length)
+                {
+                    return false;
+                }
+
+                var settlementId = reader.ReadString();
+                if (stream.Position >= stream.Length)
+                {
+                    return false;
+                }
+
+                var troopId = reader.ReadString();
+                return objectManager.TryGetObjectWithLogging(settlementId, out settlement) &&
+                    objectManager.TryGetObjectWithLogging(troopId, out troop);
+            }
+        }
+        catch (EndOfStreamException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 
