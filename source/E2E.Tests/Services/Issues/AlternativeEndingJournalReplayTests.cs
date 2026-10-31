@@ -88,6 +88,9 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     [Fact]
     public void NativeAlternativeCancellationEndsTheOwnersJournalBeforeDetachment()
     {
+        foreach (var instance in environment.Clients.Prepend(environment.Server))
+            instance.Call(() => issues[instance].IsTriedToSolveBefore = true);
+
         var rosterId = environment.CreateRegisteredObject<TroopRoster>();
         var logTime = new CampaignTime(456L);
         var person = new TextObject("Companion {NAME}", new Dictionary<string, object> { ["NAME"] = "Suvys" });
