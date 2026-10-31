@@ -245,7 +245,7 @@ internal class FinalizationCoordinator : IHandler
                             if (existing == null && matches.Length == 1) existing = matches[0];
                             if (existing != null)
                             {
-                                existing.UpdateCurrentProgress(log.Progress);
+                                existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
                             }
                             else if (matches.Length == 0)
                             {
