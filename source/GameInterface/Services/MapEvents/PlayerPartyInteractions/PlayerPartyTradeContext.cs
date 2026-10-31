@@ -576,6 +576,8 @@ internal static class PlayerPartyTradeContext
                 return "Barter offer accepted.";
             case PlayerPartyInteractionOutcomeType.TradeDeclined:
                 return "Trade proposal declined.";
+            case PlayerPartyInteractionOutcomeType.ProposalWithdrawn:
+                return GameTexts.FindText("str_coop_player_interaction_withdrawn").ToString();
             case PlayerPartyInteractionOutcomeType.ClanJoinAccepted:
                 return "Clan service proposal accepted.";
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:

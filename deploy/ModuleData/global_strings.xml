@@ -10,6 +10,7 @@
     <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />
     <string id="str_coop_clan_player_leader" text="{=str_coop_clan_player_leader}Player · Clan leader" />
     <string id="str_coop_clan_player_self" text="{=str_coop_clan_player_self}{ROLE} (You)" />
+    <string id="str_coop_clan_player_spouse" text="{=str_coop_clan_player_spouse}{ROLE} · Your spouse" />
     <string id="str_coop_clan_party_leader_only" text="{=str_coop_clan_party_leader_only}Only the clan leader can manage clan parties." />
     <string id="str_coop_clan_party_roles_owner_only" text="{=str_coop_clan_party_roles_owner_only}Only this party's leader can assign its roles." />
     <string id="str_coop_clan_player_party_protected" text="{=str_coop_clan_player_party_protected}Player parties cannot be disbanded or have their leaders replaced." />
@@ -49,6 +50,8 @@
     <string id="str_coop_clan_remove_player_dialogue" text="{=str_coop_clan_remove_player_dialogue}You are no longer a member of this clan." />
     <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}{HERO} has left the clan." />
     <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}{HERO} has been removed from the clan." />
+    <string id="str_coop_player_interaction_waiting_cancel" text="{=str_coop_player_interaction_waiting_cancel}Awaiting response from {NAME}... (Esc to cancel)" />
+    <string id="str_coop_player_interaction_withdrawn" text="{=str_coop_player_interaction_withdrawn}The request was withdrawn." />
     <string id="str_coop_marriage_propose" text="{=str_coop_marriage_propose}I would like to propose marriage." />
     <string id="str_coop_marriage_choose" text="{=str_coop_marriage_choose}What kind of marriage do you propose?" />
     <string id="str_coop_marriage_patrilineal" text="{=str_coop_marriage_patrilineal}Patrilineal: the husband leads and the wife joins his clan." />
@@ -58,6 +61,18 @@
     <string id="str_coop_marriage_ineligible" text="{=str_coop_marriage_ineligible}These heroes are not currently eligible for marriage. Both must be unmarried, of marriageable age, of opposite sexes and not close relatives." />
     <string id="str_coop_marriage_hostile" text="{=str_coop_marriage_hostile}You cannot propose marriage while hostile." />
     <string id="str_coop_marriage_clan_unavailable" text="{=str_coop_marriage_clan_unavailable}The designated leader must already lead their clan, and the joining spouse must meet the clan-joining requirements. Both heroes must remain eligible for marriage." />
+    <string id="str_coop_marriage_missing_clan" text="{=str_coop_marriage_missing_clan}Both heroes must belong to a clan." />
+    <string id="str_coop_marriage_not_leader" text="{=str_coop_marriage_not_leader}You must lead your clan to bring a spouse into it." />
+    <string id="str_coop_marriage_spouse_not_leader" text="{=str_coop_marriage_spouse_not_leader}{SPOUSE} must lead their clan to bring you into it." />
+    <string id="str_coop_marriage_spouse_other_players" text="{=str_coop_marriage_spouse_other_players}{SPOUSE} cannot join your clan while other players belong to their clan." />
+    <string id="str_coop_marriage_spouse_rules_kingdom" text="{=str_coop_marriage_spouse_rules_kingdom}{SPOUSE} cannot join your clan while ruling a kingdom." />
+    <string id="str_coop_marriage_spouse_mercenary" text="{=str_coop_marriage_spouse_mercenary}{SPOUSE} must end their mercenary contract before joining your clan." />
+    <string id="str_coop_marriage_spouse_vassal" text="{=str_coop_marriage_spouse_vassal}{SPOUSE} must leave their kingdom before joining your clan." />
+    <string id="str_coop_marriage_spouse_owns_fiefs" text="{=str_coop_marriage_spouse_owns_fiefs}{SPOUSE} cannot join your clan while their clan owns any fiefs." />
+    <string id="str_coop_marriage_spouse_incompatible_wars" text="{=str_coop_marriage_spouse_incompatible_wars}{SPOUSE}'s clan is at war with a faction that your clan is not at war with. They must make peace first." />
+    <string id="str_coop_marriage_spouse_too_many_companions" text="{=str_coop_marriage_spouse_too_many_companions}{SPOUSE} joining would exceed your clan's companion limit. They must dismiss companions first." />
+    <string id="str_coop_marriage_spouse_too_many_workshops" text="{=str_coop_marriage_spouse_too_many_workshops}{SPOUSE} joining would exceed your clan's workshop limit. They must sell workshops first." />
+    <string id="str_coop_marriage_spouse_too_many_parties" text="{=str_coop_marriage_spouse_too_many_parties}{SPOUSE} joining would exceed your clan's party limit. They must disband clan parties first." />
     <string id="str_coop_marriage_send" text="{=str_coop_marriage_send}Propose" />
     <string id="str_coop_marriage_accept" text="{=str_coop_marriage_accept}Accept proposal" />
     <string id="str_coop_marriage_accepted" text="{=str_coop_marriage_accepted}Marriage proposal accepted." />
@@ -73,6 +88,21 @@
     <string id="str_coop_marriage_acceptance_description" text="{=str_coop_marriage_acceptance_description}If you accept {LEADER_NAME}'s marriage proposal, you will marry them and join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
     <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
     <string id="str_coop_marriage_forfeit_warning" text="{=str_coop_marriage_forfeit_warning}On joining the clan through marriage, you permanently give up ownership and control of the companions, assets and supporters listed above to the clan leader. You cannot leave the clan or be removed while married to another player." />
+    <string id="str_coop_divorce_propose" text="{=str_coop_divorce_propose}I wish to end our marriage." />
+    <string id="str_coop_divorce_choose" text="{=str_coop_divorce_choose}And what will become of our clan?" />
+    <string id="str_coop_divorce_stay_in_clan" text="{=str_coop_divorce_stay_in_clan}I will remain in the clan." />
+    <string id="str_coop_divorce_leave_clan" text="{=str_coop_divorce_leave_clan}I will leave the clan and return to my own." />
+    <string id="str_coop_divorce_keep_in_clan" text="{=str_coop_divorce_keep_in_clan}You may remain in the clan." />
+    <string id="str_coop_divorce_remove_from_clan" text="{=str_coop_divorce_remove_from_clan}You will leave the clan and return to your own." />
+    <string id="str_coop_divorce_confirm_title" text="{=str_coop_divorce_confirm_title}End your marriage to {SPOUSE}?" />
+    <string id="str_coop_divorce_children_leave_warning" text="{=str_coop_divorce_children_leave_warning}Your children with {SPOUSE} will stay in {CLAN_NAME}. Once you leave, only {SPOUSE} will be able to name them as heirs." />
+    <string id="str_coop_divorce_children_remove_warning" text="{=str_coop_divorce_children_remove_warning}Your children with {SPOUSE} will stay in {CLAN_NAME}. Once {SPOUSE} leaves, only you will be able to name them as heirs." />
+    <string id="str_coop_divorce_confirm" text="{=str_coop_divorce_confirm}Divorce" />
+    <string id="str_coop_divorce_completed" text="{=str_coop_divorce_completed}You are no longer married to {SPOUSE}." />
+    <string id="str_coop_divorce_leave_failed" text="{=str_coop_divorce_leave_failed}{HERO} could not leave the clan and remains a member." />
+    <string id="str_coop_clan_divorce" text="{=str_coop_clan_divorce}Divorce" />
+    <string id="str_coop_clan_divorce_description" text="{=str_coop_clan_divorce_description}End your marriage to {HERO}. They stay in the clan, and once divorced you can remove them from it." />
+    <string id="str_coop_clan_divorce_confirm_description" text="{=str_coop_clan_divorce_confirm_description}You will both remain in {CLAN_NAME}. Once divorced, you can leave the clan or {SPOUSE} can remove you from it." />
     <string id="str_coop_clan_daily_payment" text="{=str_coop_clan_daily_payment}Daily Payment" />
     <string id="str_coop_clan_set_daily_payment" text="{=str_coop_clan_set_daily_payment}Set Daily Payment" />
     <string id="str_coop_clan_send_tribute" text="{=str_coop_clan_send_tribute}Send Tribute" />
@@ -91,6 +121,7 @@
     <string id="str_coop_clan_kingdom_leader_only" text="{=str_coop_clan_kingdom_leader_only}Only the clan leader can manage kingdom affairs." />
     <string id="str_coop_clan_settlement_menu_in_use" text="{=str_coop_clan_settlement_menu_in_use}Another player is using this menu at this settlement." />
     <string id="str_coop_clan_member_cannot_leave" text="{=str_coop_clan_member_cannot_leave}The clan leader's family and players married to another player cannot leave or be removed from the clan." />
+    <string id="str_coop_clan_leave_expecting_child" text="{=str_coop_clan_leave_expecting_child}Neither parent can leave the clan or be removed from it until your child is born." />
     <string id="str_coop_succession_heir_title" text="{=str_coop_succession_heir_title}Select Your Heir" />
     <string id="str_coop_succession_appoint_title" text="{=str_coop_succession_appoint_title}Appoint a New Clan Leader" />
     <string id="str_coop_succession_appoint_button" text="{=str_coop_succession_appoint_button}Appoint Clan Leader" />

@@ -45,6 +45,10 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly int MercenaryAwardMultiplier;
     [ProtoMember(18)]
     public readonly ClanJoinUnavailableReason ClanJoinUnavailableReason;
+    [ProtoMember(19)]
+    public readonly ClanJoinUnavailableReason PatrilinealMarriageUnavailableReason;
+    [ProtoMember(20)]
+    public readonly ClanJoinUnavailableReason MatrilinealMarriageUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -64,7 +68,9 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         bool isHostile = false,
         PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None,
         PlayerPartyInteractionMercenaryUnavailableReason mercenaryUnavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None,
-        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None)
+        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None,
+        ClanJoinUnavailableReason patrilinealMarriageUnavailableReason = ClanJoinUnavailableReason.None,
+        ClanJoinUnavailableReason matrilinealMarriageUnavailableReason = ClanJoinUnavailableReason.None)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -84,5 +90,7 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         MercenaryUnavailableReason = mercenaryUnavailableReason;
         MercenaryAwardMultiplier = mercenaryAwardMultiplier;
         ClanJoinUnavailableReason = clanJoinUnavailableReason;
+        PatrilinealMarriageUnavailableReason = patrilinealMarriageUnavailableReason;
+        MatrilinealMarriageUnavailableReason = matrilinealMarriageUnavailableReason;
     }
 }

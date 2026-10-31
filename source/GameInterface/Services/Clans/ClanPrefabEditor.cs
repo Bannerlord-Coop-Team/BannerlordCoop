@@ -123,6 +123,16 @@ public class ClanPrefabEditor : IClanPrefabEditor
                         <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
                             Brush='Popup.Button.Text' Text='@ManagePlayerText' />
                     </Children>
+                </ButtonWidget>
+                <NavigationScopeTargeter ScopeID='ClanDivorceSpouseScope' ScopeParent='..\DivorceSpouseButton' ScopeMovements='Horizontal' />
+                <ButtonWidget Id='DivorceSpouseButton' DataSource='{..}' IsVisible='@CanDivorceSpouse'
+                    WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='250' SuggestedHeight='50'
+                    HorizontalAlignment='Center' Brush='Popup.Cancel.Button' Command.Click='ExecuteDivorceSpouse'
+                    DoNotPassEventsToChildren='true' GamepadNavigationIndex='0'>
+                    <Children>
+                        <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
+                            Brush='Popup.Button.Text' Text='@DivorceSpouseText' />
+                    </Children>
                 </ButtonWidget>";
             previous = root.SelectSingleNode(".//*[@Id='LastSeenLocationParent']");
         }

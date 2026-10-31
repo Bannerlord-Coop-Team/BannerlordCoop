@@ -21,6 +21,9 @@ public interface IClanLeaveRules : IGameAbstraction
 {
     bool CanLeave(Hero member);
     bool CanRemove(Hero actor, Hero member);
+    bool CanLeaveAfterDivorce(Hero member);
+    // The Can* checks leave this out so callers can show the option disabled; TryApply enforces it.
+    bool AreExpectingChild(Hero first, Hero second);
     bool TryApply(Hero member, bool isRemoval);
 }
 
@@ -61,27 +64,39 @@ public class ClanLeaveRules : IClanLeaveRules
         return CanLeave(member) && actor != null && actor.Clan == member.Clan && member.Clan.Leader == actor;
     }
 
+    // Divorce clears the spouse first, so only blood relation to the leader can still block the departure.
+    public bool CanLeaveAfterDivorce(Hero member)
+    {
+        var leader = member?.Clan?.Leader;
+        return leader != null && leader != member && member.Spouse == leader && member.IsAlive &&
+            playerManager.Contains(member) && !grouping.AreBloodRelated(member, leader) &&
+            TryGetOriginalClan(member, out _, out _, out _);
+    }
+
+    // Co-op delivers a player couple's child into the father's clan, so both parents stay in one clan until the birth.
+    public bool AreExpectingChild(Hero first, Hero second)
+    {
+        if (first == null || second == null || first.IsFemale == second.IsFemale) return false;
+
+        var mother = first.IsFemale ? first : second;
+        var father = mother == first ? second : first;
+        return mother.IsPregnant && (mother.Spouse == father || mother.ExSpouses.Contains(father));
+    }
+
     public bool TryApply(Hero member, bool isRemoval)
     {
-        if (!CanLeave(member)) return false;
-
-        if (!objectManager.TryGetIdWithLogging(member, out var heroId)) return false;
-        var player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
-        if (player == null) return false;
-
-        if (!objectManager.TryGetObjectWithLogging(player.OriginalClanId ?? player.ClanId, out Clan originalClan)) return false;
-
-        // Older saves may have replaced ClanId on reconnect before OriginalClanId was recorded.
-        if (originalClan == member.Clan)
-            originalClan = Clan.All.FirstOrDefault(clan => clan != member.Clan && clan.Leader == member);
-        if (originalClan == null) return false;
-        if (!objectManager.TryGetIdWithLogging(originalClan, out var originalClanId)) return false;
+        if (!CanLeave(member) || AreExpectingChild(member, member.Clan.Leader) ||
+            !TryGetOriginalClan(member, out var player, out var originalClan, out var originalClanId))
+            return false;
 
         var sourceClan = member.Clan;
+        var leader = sourceClan.Leader;
+        // Children shared with the leader after a divorce stay in the clan, so only the leader can name them heirs.
         var family = new HashSet<Hero>(sourceClan.AliveLords.Where(hero => hero != member &&
-            !playerManager.Contains(hero) && (hero == member.Spouse || hero.Father == member || hero.Mother == member ||
+            !playerManager.Contains(hero) && (hero == member.Spouse ||
+                ((hero.Father == member || hero.Mother == member) && hero.Father != leader && hero.Mother != leader) ||
                 (grouping.GetGroup(hero, member) == ClanMemberGroup.Family &&
-                 grouping.GetGroup(hero, sourceClan.Leader) != ClanMemberGroup.Family))));
+                 grouping.GetGroup(hero, leader) != ClanMemberGroup.Family))));
 
         if ((player.ClanId != originalClanId || player.OriginalClanId != originalClanId) &&
             !playerManager.ReplacePlayer(player, new Player(player.ControllerId, player.HeroId,
@@ -114,6 +129,23 @@ public class ClanLeaveRules : IClanLeaveRules
         messageBroker.Publish(this, new PlayerBannerChanged(originalClan));
         NotifyDeparture(member, sourceClan, isRemoval);
         return true;
+    }
+
+    private bool TryGetOriginalClan(Hero member, out Player player, out Clan originalClan, out string originalClanId)
+    {
+        player = null;
+        originalClan = null;
+        originalClanId = null;
+        if (!objectManager.TryGetIdWithLogging(member, out var heroId)) return false;
+        player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null) return false;
+
+        if (!objectManager.TryGetObjectWithLogging(player.OriginalClanId ?? player.ClanId, out originalClan)) return false;
+
+        // Older saves may have replaced ClanId on reconnect before OriginalClanId was recorded.
+        if (originalClan == member.Clan)
+            originalClan = Clan.All.FirstOrDefault(clan => clan != member.Clan && clan.Leader == member);
+        return originalClan != null && objectManager.TryGetIdWithLogging(originalClan, out originalClanId);
     }
 
     private void NotifyDeparture(Hero member, Clan clan, bool isRemoval)
