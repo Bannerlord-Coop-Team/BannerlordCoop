@@ -13,8 +13,8 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -37,7 +37,8 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
-    private readonly HashSet<IssueBase> announcedIssues = new HashSet<IssueBase>();
+    private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new ConditionalWeakTable<IssueBase, object>();
+    private readonly object announcedIssuesLock = new object();
     private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
@@ -261,26 +262,22 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        if (!announcedIssues.Add(issue))
+        lock (announcedIssuesLock)
         {
-            // An ending callback can run again while succession replays the native character-change event.
-            // Keep the first callback's cleanup and announcement, then ignore the replay.
-            return;
+            if (announcedIssues.TryGetValue(issue, out _))
+            {
+                // An ending callback can run again while succession replays the native character-change event.
+                // Keep the first announcement, and let the weak table release the issue when it is gone.
+                return;
+            }
+
+            announcedIssues.Add(issue, new object());
         }
 
-        try
-        {
-            commitments.ReturnForIssue(issueOwnerId, issue.StringId);
-            ownership.Remove(issueOwnerId);
+        commitments.ReturnForIssue(issueOwnerId, issue.StringId);
+        ownership.Remove(issueOwnerId);
 
-            network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
-        }
-        finally
-        {
-            // Keep the marker through the rest of this game-loop turn so a nested vanilla
-            // completion callback cannot announce the same issue twice, then release the issue.
-            GameThread.EnqueueSafe(() => announcedIssues.Remove(issue), nameof(FinalizationCoordinator));
-        }
+        network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
     }
 
     private bool TryGetIssueOwnerId(IssueBase issue, out string issueOwnerId)
