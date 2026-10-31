@@ -105,11 +105,13 @@ internal class HeroConversationDebugCommand
 
             var conversationHero = Hero.OneToOneConversationHero;
             if (conversationHero?.Issue != null &&
+                ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+                objectManager.TryGetId(conversationHero, out var issueOwnerId) &&
                 ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker) &&
                 ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) &&
-                !tracker.TryGet(conversationHero.StringId, controller.ControllerId, conversationHero.Issue.StringId))
+                !tracker.TryGet(issueOwnerId, controller.ControllerId, conversationHero.Issue.StringId))
             {
-                return Failed($"Server has not approved issue conversation for {conversationHero.StringId} ({conversationHero.Issue.StringId}).");
+                return Failed($"Server has not approved issue conversation for {issueOwnerId ?? conversationHero.StringId} ({conversationHero.Issue.StringId}).");
             }
 
             if (args.Count > 0)
