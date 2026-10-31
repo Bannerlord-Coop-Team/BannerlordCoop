@@ -20,12 +20,6 @@ internal class StartIssueWithAlternativeSolutionDispatchPatch
             return true;
         }
 
-        if (AlternativeSolutionSelectionScope.IsActive)
-        {
-            MessageBroker.Instance.Publish(__instance, new AlternativeSolutionAcceptRequested(__instance));
-            return false;
-        }
-
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             return true;
