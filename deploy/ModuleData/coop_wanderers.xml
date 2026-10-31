@@ -534,7 +534,7 @@
     voice="softspoken"
     age="27"
     default_group="Infantry"
-    is_template="true"
+    is_template="false"
     is_hero="false"
     is_female="true"
     culture="Culture.battania"

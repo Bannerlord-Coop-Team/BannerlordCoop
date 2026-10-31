@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// Sent to a client whose accept lost to another player's.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientCommand
+public readonly struct NetworkQuestSolutionAcceptRejected : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

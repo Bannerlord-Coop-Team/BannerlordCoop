@@ -38,6 +38,8 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
         builder.RegisterType<CaravanAmbushStatePublisher>().As<ICaravanAmbushStatePublisher>().InstancePerLifetimeScope();
         builder.RegisterType<CaravanAmbushEvents>().As<ICaravanAmbushEvents>().InstancePerLifetimeScope();
+        builder.RegisterType<IssueCancellationCoordinator>().As<IIssueCancellationCoordinator>().InstancePerLifetimeScope();
+        builder.Register(context => context.Resolve<ActiveIssueDismisser>()).As<IActiveIssueDismisser>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
         builder.RegisterType<IssueConversationGuard>().As<IIssueConversationGuard>().SingleInstance();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerLifetimeScope();

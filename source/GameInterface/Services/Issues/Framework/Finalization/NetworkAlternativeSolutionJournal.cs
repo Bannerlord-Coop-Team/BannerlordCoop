@@ -8,7 +8,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkAlternativeSolutionJournal : IServerToClientCommand
+public readonly struct NetworkAlternativeSolutionJournal : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -34,18 +34,23 @@ public readonly struct AlternativeSolutionJournalEntry
     [ProtoMember(4)] public readonly int Progress;
     [ProtoMember(5)] public readonly int Range;
     [ProtoMember(6)] public readonly LogType Type;
+    [ProtoMember(7)] public readonly TextObject NativeText;
+    [ProtoMember(8)] public readonly TextObject NativeTaskName;
 
     public AlternativeSolutionJournalEntry(JournalLog log)
     {
         LogTimeTicks = log.LogTime.NumTicks;
-        // Resolve companion variables while the server still runs as the owner.
+        // Keep rendered fields for peers using the previous journal payload.
         Text = log.LogText?.ToString();
         TaskName = log.TaskName?.ToString();
         Progress = log.CurrentProgress;
         Range = log.Range;
         Type = log.Type;
+        NativeText = log.LogText;
+        NativeTaskName = log.TaskName;
     }
 
     public JournalLog ToJournalLog() => new JournalLog(new CampaignTime(LogTimeTicks),
-        Text == null ? null : new TextObject(Text), TaskName == null ? null : new TextObject(TaskName), Progress, Range, Type);
+        NativeText ?? (Text == null ? null : new TextObject(Text)),
+        NativeTaskName ?? (TaskName == null ? null : new TextObject(TaskName)), Progress, Range, Type);
 }

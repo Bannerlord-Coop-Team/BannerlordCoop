@@ -69,7 +69,8 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    replays at once unless work is already waiting for that giver, as vanilla ends quests mid dialog.
 9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal, a settlement owner change) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed` and `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed`, `OnHeroKilled`, `OnMapEventStarted` and
+   `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
    listener names as strings because `Framework/` cannot name quest types.
@@ -103,6 +104,13 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 
 Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI'd framework service like
 `IOutcomeDispatcher`, so they can be tested without Harmony.
+
+`IssueCancellationCoordinator` handles registered giver deaths and issue cancellation as the owner. When the
+owner has no party or the sent troops cannot return, it retains the issue and retries hourly. Its pending set
+belongs to the session's DI scope and is never saved. A missing owner uses `ActiveIssueDismisser` to release
+the issue and any disabled companion. Clients only cancel when replaying `NetworkIssueFinalized`, and do not
+run the alternative troop return again. An ongoing quest announces its own cancellation, so the enclosing
+issue cancellation does not announce it a second time.
 
 ## Verification
 

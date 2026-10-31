@@ -4,7 +4,6 @@ using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest;
 
@@ -12,7 +11,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials.Pat
 
 /// <summary>
 /// The raid and coercion endings are decided by the server, which runs the quest's listeners as each owning
-/// player. The framework relays war and kingdom changes; these two events are specific to a village giver.
+/// player. The framework relays war, kingdom changes and coercion; raids remain specific to a village giver.
 /// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
@@ -23,19 +22,6 @@ internal class VillageNeedsCraftingMaterialsWorldEventPatches
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
         RunAsOwners(quest => quest.OnRaidCompleted(winnerSide, raidEvent));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        // Only forcing supplies or volunteers can be a coercion of the quest giver
-        if (!mapEvent.IsForcingSupplies && !mapEvent.IsForcingVolunteers)
-        {
-            return;
-        }
-
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnRaidCompleted))]
