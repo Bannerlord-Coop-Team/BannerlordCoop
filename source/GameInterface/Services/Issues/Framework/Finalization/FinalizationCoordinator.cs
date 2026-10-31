@@ -234,6 +234,10 @@ internal class FinalizationCoordinator : IHandler
                             var matches = quest.JournalEntries.Where(existing =>
                                 existing.Type == log.Type && existing.Range == log.Range &&
                                 SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
+                            if (matches.Length == 0)
+                                matches = quest.JournalEntries.Where(existing =>
+                                    existing.Type == log.Type && existing.Range == log.Range &&
+                                    SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
                             var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
                             if (existing == null && matches.Length == 1) existing = matches[0];
                             if (existing != null)
@@ -287,6 +291,9 @@ internal class FinalizationCoordinator : IHandler
         }
         return true;
     }
+
+    private static bool SameKey(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
