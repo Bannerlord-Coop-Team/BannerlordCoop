@@ -127,6 +127,8 @@ public class LoadRepairLifetimeTests : MapEventTestBase
 
             Assert.True(Server.ObjectManager.Contains(siegeEvent));
             Assert.True(Server.ObjectManager.Contains(siegeEvent.BesiegerCamp));
+            Assert.True(Server.ObjectManager.Contains(siegeEvent.BesiegerCamp.SiegeEngines));
+            Assert.True(Server.ObjectManager.Contains(settlement.SiegeEngines));
             Assert.Same(siegeEvent.BesiegerCamp, party.BesiegerCamp);
         }, SiegeDisabledMethods);
 
@@ -141,6 +143,9 @@ public class LoadRepairLifetimeTests : MapEventTestBase
             // the second registration pass runs last, so the ended siege must not have been registered again
             Assert.False(Server.ObjectManager.Contains(siegeEvent));
             Assert.False(Server.ObjectManager.Contains(camp));
+            // finalizing a siege leaves both engine containers referenced, so the pass must skip the ended siege
+            Assert.False(Server.ObjectManager.Contains(camp.SiegeEngines));
+            Assert.False(Server.ObjectManager.Contains(siegeEvent.BesiegedSettlement.SiegeEngines));
         }, SiegeDisabledMethods);
     }
 

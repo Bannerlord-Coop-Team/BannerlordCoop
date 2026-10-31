@@ -728,7 +728,14 @@ Two reviews of the merge (Codex and a data flow review) found these; each fix is
   the second registration; `result=fail` means a repair or reconcile step threw.
   `LoadRepairLifetimeTests` (E2E, originals allowed through the sync policy) covers the four cases
   and failed before the change; the siege case also fails with the registry filter removed.
-  `LoadRepairRunnerTests` (GameInterface.Tests) pins the line.
+  `LoadRepairRunnerTests` (GameInterface.Tests) pins the line. A follow-up closed the rest of the
+  siege case: destroying the siege released both engine containers and their engines, but
+  `SiegeEnginesContainerRegistry` and `SiegeEngineConstructionProgressRegistry` still registered
+  from every listed siege, and v1.5.6 leaves `BesiegerCamp.SiegeEngines` and
+  `Settlement.SiegeEngines` set after `FinalizeSiegeEvent`, so the second registration pass gave
+  them their ids back. Both now register from unended sieges only, like the siege and camp
+  registries. The siege case in `LoadRepairLifetimeTests` now also checks both containers, and that
+  check failed before the change.
 
 ### Checks
 
@@ -736,8 +743,8 @@ Run on 2026-10-31 against v1.5.6 (`Version.xml` says `Singleplayer Value="v1.5.6
 `-p:BannerlordDir` pointing at the `mb2` junction and `ModsRoot` at a missing folder, so nothing was
 deployed:
 
-- Release build (`dotnet build Coop.sln -c Release --no-incremental`): `1938 Warning(s)`,
-  `0 Error(s)`, all 20 projects.
+- Release build (`dotnet build Coop.sln -c Release --no-incremental`): `1974 Warning(s)`,
+  `0 Error(s)`.
 - Engine member audit (TAOM's `tools/check_engine_member_refs.ps1`, exit code 0, engine folders:
   the game bin and the Native, SandBox, SandBoxCore, StoryMode and CustomBattle module bins):
   Coop.dll `checked 94 distinct engine refs, 0 unresolved (0 new)`, Coop.Core.dll `checked 227`,
@@ -750,7 +757,10 @@ deployed:
   `LoadRepairRunnerTests`, `MapEventLoadCleanerTests`, `StalledMapEventTests`,
   `EmptyLordPartyResetterTests`, `KillCharacterActionExecutionTests`, `MapEventLifetimeTests`,
   `SiegeEventLifetimeTests`, `SiegeEntryRecoveryTests`, `BesiegerCampLifetimeTests`,
-  `BesiegerCampSyncTests`, `SiegeEventTickPatchesTests` and `ShipSyncTests`: 88 of 88 passed.
+  `BesiegerCampSyncTests`, `SiegeEventTickPatchesTests` and `ShipSyncTests`: 88 of 88 passed,
+  rerun after the siege container follow-up. Every class under `E2E.Tests.Registry`,
+  `Services.SiegeEvents`, `Services.BesiegerCamps` and `Services.SiegeStrategies`: 118 of 118
+  passed.
 - E2E tests in 16 shards (`run-e2e-shard.sh n 16`, n = 0 to 15): the last full run, at the third
   round's commit, had 3,317 tests, 3,316 passed, 1 skipped
   (`ItemRosterSyncTests.Server_ItemRoster__count`), 0 failed. The fourth round's four new tests
