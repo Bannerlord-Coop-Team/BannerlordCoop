@@ -136,7 +136,7 @@ public readonly struct VillageNeedsToolsAlternativeEnding : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageNeedsToolsAlternativeJournal : IServerToClientCommand
+public readonly struct NetworkVillageNeedsToolsAlternativeJournal : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -168,7 +168,7 @@ public readonly struct VillageNeedsToolsJournalAdded : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkVillageNeedsToolsJournal : IServerToClientCommand
+public readonly struct NetworkVillageNeedsToolsJournal : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;

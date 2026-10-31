@@ -25,6 +25,6 @@ internal class QuestAcceptanceJournalPatch
     private static void Postfix(ConversationSentence __instance)
     {
         if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed())
-            MessageBroker.Instance.Publish(__instance, new QuestAcceptanceFinished());
+            MessageBroker.Instance.Publish(__instance, new QuestAcceptanceJournalFlushRequested());
     }
 }

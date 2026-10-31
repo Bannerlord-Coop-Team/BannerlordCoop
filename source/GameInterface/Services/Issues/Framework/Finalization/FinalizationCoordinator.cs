@@ -98,7 +98,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        messageBroker.Publish(this, new QuestAcceptanceFinished());
+        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
         network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
     }
 
@@ -116,7 +116,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        messageBroker.Publish(this, new QuestAcceptanceFinished());
+        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
         network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
     }
 

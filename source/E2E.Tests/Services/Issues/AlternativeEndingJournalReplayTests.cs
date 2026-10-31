@@ -1,6 +1,8 @@
 ﻿using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using Common.Network;
+using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -11,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -156,6 +159,42 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     public void AlternativeCompletion_DoesNotCreateAnObserversArchive()
     {
         EndOnServer(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest);
+        AssertObserverHasNoArchive();
+    }
+
+    [Fact]
+    public void AlternativeCancellationArchivesTroopReturnOnceForTheOwnerOnly()
+    {
+        foreach (var instance in environment.Clients.Prepend(environment.Server))
+            instance.Call(() => issues[instance].IsTriedToSolveBefore = true);
+
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+            using (new AllowedThread()) owner.PartyBelongedTo = party;
+            issues[scenario.Server].CompleteIssueWithCancel();
+        });
+        environment.FlushCoalescer();
+
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, journal.Ending);
+        Assert.Single(journal.Entries, entry => entry.Text == "Your troops have returned from their mission.");
+
+        foreach (var instance in new[] { scenario.Server, scenario.ClientA })
+        {
+            instance.Call(() =>
+            {
+                var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry.IsRelatedTo(issues[instance])));
+                Assert.True(archive.IsEnded());
+                Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
+                Assert.Single(archive.GetEntries(), entry =>
+                    entry.LogText?.ToString() == "Your troops have returned from their mission.");
+            });
+        }
+
         AssertObserverHasNoArchive();
     }
 

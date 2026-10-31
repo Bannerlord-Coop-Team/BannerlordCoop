@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
@@ -34,6 +35,7 @@ public interface ICoopSession
     AgingPlayerData AgingPlayerData { get; }
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     PlayerTraitData PlayerTraitData { get; }
+    OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -49,7 +51,7 @@ public class CoopSession : ICoopSession
         new WorkshopPlayerData(new()),
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
-        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
         new HeroMeetingData(new()),
@@ -81,6 +83,8 @@ public class CoopSession : ICoopSession
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     [ProtoMember(13)]
     public PlayerTraitData PlayerTraitData { get; }
+    [ProtoMember(14)]
+    public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -95,7 +99,8 @@ public class CoopSession : ICoopSession
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
-        PlayerTraitData playerTraitData = null)
+        PlayerTraitData playerTraitData = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -110,5 +115,6 @@ public class CoopSession : ICoopSession
         AgingPlayerData = agingPlayerData;
         ClanFinance = clanFinance ?? new();
         PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
+        OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
     }
 }

@@ -76,6 +76,8 @@ public readonly struct ModOptions
     public readonly int SpawnRateWanderers { get; } = 1;
     [ProtoMember(27)]
     public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
+    [ProtoMember(28)]
+    public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -112,5 +114,6 @@ public readonly struct ModOptions
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
+        ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
     }
 }

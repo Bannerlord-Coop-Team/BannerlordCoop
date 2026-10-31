@@ -7,7 +7,7 @@ namespace GameInterface.Services.BugReporting.Messages;
 /// Asks a client to provide its current co-op log for a diagnostic bug report.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkRequestBugReportLogs : IServerToClientCommand
+internal readonly struct NetworkRequestBugReportLogs : ICommand
 {
     [ProtoMember(1)]
     public string RequestId { get; }

@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// Sent to a client whose alternative solution accept was turned down, its troops go back to its party.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkAlternativeSolutionAcceptRejected : IServerToClientCommand
+public readonly struct NetworkAlternativeSolutionAcceptRejected : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

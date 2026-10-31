@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -11,6 +12,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -21,7 +23,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
     private readonly IActiveIssueDismisser dismisser;
-    private readonly HashSet<IssueBase> pending = new HashSet<IssueBase>();
+    private readonly Dictionary<IssueBase, TextObject> pending = new Dictionary<IssueBase, TextObject>();
 
     public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser)
     {
@@ -30,10 +32,39 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         this.dismisser = dismisser;
     }
 
+    public bool IsPending(IssueBase issue) => issue != null && pending.ContainsKey(issue);
+
     public bool BeforeGiverDeath(Hero victim, out IDisposable owner)
     {
         owner = null;
-        return victim.Issue == null || PrepareCancellation(victim.Issue, out owner);
+        var issue = victim.Issue;
+        if (issue == null) return true;
+        if (!PrepareCancellation(issue, out owner))
+        {
+            if (ModInformation.IsServer && issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(issue.GetType()))
+                pending[issue] = BuildGiverDeathLog(issue);
+            return false;
+        }
+
+        return true;
+    }
+
+    public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
+    {
+        if (ModInformation.IsClient) return;
+
+        using (new MainHeroSubstitutionScope(oldHero, originalParty))
+        {
+            foreach (var issue in Campaign.Current.IssueManager.Issues.Values.ToList())
+            {
+                var quest = issue.IssueQuest;
+                if (!registry.IsRegistered(issue.GetType()) || quest == null || !quest.IsOngoing || quest.IsSpecialQuest ||
+                    !ownerResolver.TryGetOwnerControllerId(issue, out var owner) || owner != controllerId) continue;
+
+                try { CancelQuestAndIssue(issue, new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.")); }
+                catch (Exception e) { Logger.Error(e, "Cancelling quest {questId} during heir selection failed", quest.StringId); }
+            }
+        }
     }
 
     public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
@@ -55,12 +86,16 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
     public bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner)
     {
-        if (!PrepareCancellation(issue, out owner)) return false;
+        if (!PrepareCancellation(issue, out owner))
+        {
+            if (ModInformation.IsServer && log != null) pending[issue] = log;
+            return false;
+        }
 
         if (issue.IssueQuest != null && issue.IssueQuest.IsOngoing && registry.IsRegistered(issue.GetType()))
         {
             // OnQuestCompleted ends the issue; letting the enclosing issue method run would end it twice.
-            issue.IssueQuest.CompleteQuestWithCancel(log);
+            CancelQuestAndIssue(issue, log);
             return false;
         }
 
@@ -104,7 +139,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         if (ownerHero.PartyBelongedTo == null)
         {
-            pending.Add(issue);
+            if (!pending.ContainsKey(issue)) pending.Add(issue, null);
             return false;
         }
 
@@ -113,7 +148,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         {
             if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
             {
-                pending.Add(issue);
+                if (!pending.ContainsKey(issue)) pending.Add(issue, null);
                 return false;
             }
 
@@ -131,8 +166,9 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (ModInformation.IsClient) return;
 
-        foreach (var issue in pending.ToList())
+        foreach (var entry in pending.ToList())
         {
+            var issue = entry.Key;
             try
             {
                 if (issue.IssueOwner.Issue != issue)
@@ -141,12 +177,40 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
                     continue;
                 }
 
-                issue.CompleteIssueWithCancel();
+                issue.CompleteIssueWithCancel(entry.Value);
             }
             catch (Exception e)
             {
                 Logger.Error(e, "Retrying cancellation of {issue} failed", issue.StringId);
             }
+        }
+    }
+
+    private static TextObject BuildGiverDeathLog(IssueBase issue)
+    {
+        var text = new TextObject("{=rTvWdMXF}{DIED_HERO.LINK} died and your agreement with {?DIED_HERO.GENDER}her{?}him{\\?} canceled.");
+        try
+        {
+            StringHelpers.SetCharacterProperties("DIED_HERO", issue.IssueOwner.CharacterObject, text);
+        }
+        catch (NullReferenceException)
+        {
+            // Synthetic issue fixtures can omit the encyclopedia link used by vanilla text expansion.
+        }
+        return text;
+    }
+
+    private void CancelQuestAndIssue(IssueBase issue, TextObject log)
+    {
+        var quest = issue.IssueQuest;
+        if (quest != null && quest.IsOngoing)
+            quest.CompleteQuestWithCancel(log);
+
+        if (issue.IssueOwner?.Issue == issue)
+        {
+            issue.IssueFinalized();
+            if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+                dispatcher.After(issue, IssueOutcome.QuestCancel);
         }
     }
 }
