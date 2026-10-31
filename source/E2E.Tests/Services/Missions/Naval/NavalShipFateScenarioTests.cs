@@ -308,6 +308,7 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         battle.TickAll();
         a.Hull(prize).IsVacant = true;
         b.Engine.CaptureResult = CaptureSwapResult.Failed;
+        battle.ExpectLoggedFailure("the capture isn't recorded here");
 
         b.ElapseCaptureTimer(prize, captorHull);
         Assert.Equal(b.Id, b.Ship(prize).CurrentAuthority);
