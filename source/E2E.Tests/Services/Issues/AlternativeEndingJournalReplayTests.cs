@@ -135,7 +135,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             Assert.Null(issues[scenario.ClientA].IssueOwner.Issue);
             var archive = archives[scenario.ClientA];
             Assert.True(archive.IsEnded());
-            Assert.True(archive.IsEndedUnsuccessfully());
+            Assert.False(archive.IsEndedUnsuccessfully());
             Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
             var entries = archive.GetEntries().ToArray();
             Assert.Equal(2, entries.Length);

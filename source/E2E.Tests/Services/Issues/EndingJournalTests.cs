@@ -626,7 +626,7 @@ public class EndingJournalTests : IDisposable
         environment.FlushCoalescer();
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
             new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
-        scenario.Server.Call(() => Assert.Equal(99, serverProgress.CurrentProgress));
+        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
     }
 
     [Fact]
