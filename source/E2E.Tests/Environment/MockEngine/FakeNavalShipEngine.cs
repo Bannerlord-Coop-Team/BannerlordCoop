@@ -247,6 +247,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         var fake = Of(prize);
         var captor = Of(captorHull);
         Captures.Add((prize, captorHull));
+        if (CaptureResult != CaptureSwapResult.Applied) return CaptureResult;
 
         var oldCrew = crews.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList();
         foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, captor)).Select(entry => entry.Key).ToList())
@@ -263,6 +264,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         Orphan(captor);
         return CaptureSwapResult.Applied;
     }
+
+    /// <summary>What this client's next swaps end in, standing for vanilla's swap refusing or throwing part way; Applied runs it.</summary>
+    public CaptureSwapResult CaptureResult { get; set; } = CaptureSwapResult.Applied;
 
     public void OrphanHull(MissionObject hull) => Orphan(Of(hull));
 

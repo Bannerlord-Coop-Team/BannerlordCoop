@@ -314,6 +314,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
         int captorSequence = captorShip.CaptureSequence + 1;
         ships.TransferHull(prize, captor, inPlace: true);
+        Registry.TryCommitCaptor(prize.ShipId, captor);
         Logger.Debug("[NavalSync] Capture of hull {ShipId}: authority now {Captor}; vanilla's swap runs {RunSwap} (prize side {PrizeSide}, " +
             "captor side {CaptorSide})", prize.ShipId, captor, runSwap, prizeSide, captorSide);
         var swap = runSwap ? captureEngine.ApplyCapture(prize.Hull, captorShip.Hull) : CaptureSwapResult.Applied;
@@ -346,8 +347,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
         return true;
     }
 
-    // The authority already moved (every peer applies the decided capture), but nothing records a swap that didn't complete:
-    // no registry, order, departure or event, and the place is never replayed. This client no longer matches its peers.
+    // The authority and its committed captor already moved (every peer applies the decided capture), but nothing records a swap
+    // that didn't complete: no capture mark, order, departure or event, and the place is never replayed.
     private bool FailSwap(NetworkShipInfo prize, string captor, int prizeSequence, CaptureSwapResult swap)
     {
         swapsFailed++;
@@ -355,6 +356,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
         lastDrop = swap == CaptureSwapResult.Refused ? "swap_refused" : "swap_failed";
         Logger.Error("[NavalSync] Vanilla's swap for the capture of hull {ShipId} by {Captor} at sequence {Sequence} ended {Result}; " +
             "the capture isn't recorded here and this client no longer matches its peers", prize.ShipId, captor, prizeSequence, swap);
+        // The captor still reports the prize's fates, so the server needs the committed authority ahead of them.
+        if (session.IsOwn(captor)) ReportCaptureToServer(prize, prizeSequence);
         return false;
     }
 

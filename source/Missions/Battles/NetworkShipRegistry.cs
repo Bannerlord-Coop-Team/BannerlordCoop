@@ -25,6 +25,12 @@ public interface INetworkShipRegistry
     bool TryMarkCaptured(Guid shipId, HullCapture capture, Formation formation, int sequence);
 
     /// <summary>
+    /// Records the captor a decided capture gave the hull's authority to, even when vanilla's swap then failed here, so an AI
+    /// hull stops following the battle host.
+    /// </summary>
+    bool TryCommitCaptor(Guid shipId, string captor);
+
+    /// <summary>
     /// Records a hull a capture left without a formation or team, last on <paramref name="side"/>, at the hull's capture
     /// <paramref name="sequence"/>.
     /// </summary>
@@ -97,6 +103,9 @@ public class NetworkShipInfo
     /// <summary>The player whose capture made this hull its own, or null; a captured AI hull no longer follows the host.</summary>
     public string CaptorControllerId => Capture?.CaptorControllerId;
 
+    /// <summary>The player a decided capture gave this hull's authority to, whether or not vanilla's swap completed here; null before any.</summary>
+    public string CommittedCaptorId { get; private set; }
+
     /// <summary>How many captures this hull took part in, as prize or as the captor's hull; confirms apply in this order.</summary>
     public int CaptureSequence { get; private set; }
 
@@ -107,7 +116,7 @@ public class NetworkShipInfo
     public bool IsOrphaned => OrphanedSide != BattleSideEnum.None;
 
     /// <summary>An AI hull nobody captured: it moves with every battle host change, and its states follow the host epoch.</summary>
-    public bool FollowsBattleHost => IsNpcParty && Capture == null;
+    public bool FollowsBattleHost => IsNpcParty && CommittedCaptorId == null;
 
     public MissionObject Hull { get; private set; }
     public Formation Formation { get; private set; }
@@ -119,10 +128,14 @@ public class NetworkShipInfo
     internal void MarkCaptured(HullCapture capture, Formation formation, int sequence)
     {
         Capture = capture;
+        CommittedCaptorId = capture.CaptorControllerId;
         Formation = formation;
         OrphanedSide = BattleSideEnum.None;
         CaptureSequence = sequence;
     }
+
+    // A decided capture moved the hull's authority to its captor, whatever its swap did here.
+    internal void CommitCaptor(string captor) => CommittedCaptorId = captor;
 
     // The captor's own hull after its capture: vanilla leaves it with no formation and no team.
     internal void MarkOrphaned(BattleSideEnum side, int sequence)
@@ -196,6 +209,14 @@ public class NetworkShipRegistry : INetworkShipRegistry
         if (!ships.TryGetValue(shipId, out var ship)) return false;
 
         ship.MarkCaptured(capture, formation, sequence);
+        return true;
+    }
+
+    public bool TryCommitCaptor(Guid shipId, string captor)
+    {
+        if (string.IsNullOrEmpty(captor) || !ships.TryGetValue(shipId, out var ship)) return false;
+
+        ship.CommitCaptor(captor);
         return true;
     }
 
