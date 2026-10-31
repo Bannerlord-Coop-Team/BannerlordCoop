@@ -86,7 +86,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
     // A troop can wait here across a hull replacement or a full hull, so one a late replay brought in meanwhile is dropped.
     private void DropLateReplayed(BattleSideEnum side)
     {
-        int dropped = pending[(int)side].RemoveAll(reinforcementFielder.IsLateReplayed);
+        int dropped = reinforcementFielder.RemoveLateReplayed(pending[(int)side]);
         if (dropped == 0) return;
 
         Logger.Information("[NavalBattle] Dropped {Count} pending {Side} reserve troop(s); a late replay already brought them in",

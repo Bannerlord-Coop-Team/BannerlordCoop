@@ -167,8 +167,8 @@ public class NavalMigrationReserveFielderTests
                 return taken;
             });
             Reinforcements.Setup(r => r.TakeMigrationReserve(BattleSideEnum.Attacker)).Returns(Array.Empty<CoopAgentOrigin>());
-            Reinforcements.Setup(r => r.IsLateReplayed(It.IsAny<CoopAgentOrigin>()))
-                .Returns((CoopAgentOrigin origin) => LateReplayed.Contains(origin));
+            Reinforcements.Setup(r => r.RemoveLateReplayed(It.IsAny<List<CoopAgentOrigin>>()))
+                .Returns((List<CoopAgentOrigin> origins) => origins.RemoveAll(LateReplayed.Contains));
 
             var engine = new Mock<INavalShipEngine>();
             engine.Setup(e => e.SideOf(It.IsAny<MissionObject>())).Returns((MissionObject hull) =>

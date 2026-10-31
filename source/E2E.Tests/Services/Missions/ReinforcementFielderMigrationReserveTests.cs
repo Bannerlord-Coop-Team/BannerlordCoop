@@ -63,9 +63,9 @@ public class ReinforcementFielderMigrationReserveTests : MissionTestEnvironment
         });
     }
 
-    // M7: the naval queue rechecks a taken troop with the same party and seed rule, so a replay after the take is caught.
+    // M7: the naval queue rechecks taken troops with the same party and seed rule, so a replay after the take is caught.
     [Fact]
-    public void IsLateReplayed_MatchesOnlyALiveAgentWithTheOriginsPartyAndSeed()
+    public void RemoveLateReplayed_RemovesOnlyALiveAgentWithTheOriginsPartyAndSeed()
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
@@ -81,16 +81,19 @@ public class ReinforcementFielderMigrationReserveTests : MissionTestEnvironment
                 Mock.Of<IAgentFormationAssigner>(), casualties, new BattleAgentBudget());
             var character = (CharacterObject)Game.Current.PlayerTroop;
             var replayedOrigin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(2), "pirates");
-            Assert.False(fielder.IsLateReplayed(replayedOrigin));
+            var otherSeed = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(3), "pirates");
+            var otherParty = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(2), "raiders");
+            var waiting = new List<CoopAgentOrigin> { replayedOrigin };
+            Assert.Equal(0, fielder.RemoveLateReplayed(waiting));
 
             var replayed = Mission.Current.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
             var replayedId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("host", replayedId, replayed));
             casualties.Record(replayedId, "pirates", 2, "troop");
+            waiting = new List<CoopAgentOrigin> { replayedOrigin, otherSeed, otherParty };
 
-            Assert.True(fielder.IsLateReplayed(replayedOrigin));
-            Assert.False(fielder.IsLateReplayed(new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(3), "pirates")));
-            Assert.False(fielder.IsLateReplayed(new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(2), "raiders")));
+            Assert.Equal(1, fielder.RemoveLateReplayed(waiting));
+            Assert.Equal(new[] { otherSeed, otherParty }, waiting);
         });
     }
 
