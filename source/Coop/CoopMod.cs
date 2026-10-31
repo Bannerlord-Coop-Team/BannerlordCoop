@@ -52,7 +52,13 @@ namespace Coop
 {
     internal class CoopMod : NoHarmonyLoader
     {
-        public static UpdateableList Updateables { get; } = new UpdateableList();
+        public static UpdateableList Updateables => UpdateablesHolder.List;
+
+        // Kept out of CoopMod's type initializer, which runs before the constructor's check for a foreign Common.dll
+        private static class UpdateablesHolder
+        {
+            public static readonly UpdateableList List = new UpdateableList();
+        }
 
         public static CoopartiveMultiplayerExperience Coop;
 
@@ -83,6 +89,19 @@ namespace Coop
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+
+            // Runs before Coop code uses Common or 0Harmony, the runtime binds same-named files in the game folder instead of ours.
+            // Created directly because the DI container doesn't exist yet.
+            var shadowingFiles = new ShadowedAssemblyDetector().FindShadowingFiles(AppDomain.CurrentDomain.BaseDirectory);
+            if (shadowingFiles.Count > 0)
+            {
+                var message = "Coop can't start because these files in the game folder replace Coop's own copies. " +
+                    "They come from another mod or an old install, move them out and start the game again:\n" +
+                    string.Join("\n", shadowingFiles.Select(file => $"{file} ({FileVersionInfo.GetVersionInfo(file).FileVersion})"));
+                // Same type as the game's own module load error box (Module.HandleSubmoduleLoadError), 16 showed Retry and Cancel
+                TaleWorlds.Library.Debug.ShowMessageBox(message, "Coop", 256u);
+                throw new InvalidOperationException(message);
+            }
 
             // Must be called here (constructor), not in NoHarmonyLoad().
             // Module.LoadSubModules() calls all submodule constructors first, then all
