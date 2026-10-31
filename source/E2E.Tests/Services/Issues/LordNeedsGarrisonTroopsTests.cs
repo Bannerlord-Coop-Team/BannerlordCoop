@@ -140,6 +140,13 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             Assert.Same(expectedTroop, decodedTroop);
             // Invalid creation data is rejected instead of producing a partially populated issue.
             Assert.ThrowsAny<Exception>(() => strategy.CreateIssue(Hero.MainHero, Array.Empty<byte>()));
+                using var invalidStream = new MemoryStream();
+                using (var writer = new BinaryWriter(invalidStream, System.Text.Encoding.UTF8, leaveOpen: true))
+                {
+                    writer.Write("missing-settlement");
+                    writer.Write("missing-troop");
+                }
+                Assert.Throws<InvalidOperationException>(() => strategy.CreateIssue(Hero.MainHero, invalidStream.ToArray()));
             using (var stream = new MemoryStream(captured))
             using (var reader = new BinaryReader(stream))
             {
@@ -267,6 +274,28 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         {
             rewardPatch.UnpatchAll(rewardPatch.Id);
         }
+    }
+
+    [Fact]
+    public void ClientHandInSendsTheGarrisonBranchRequestWithoutRemovingOwnerTroops()
+    {
+        scenario.Accept(scenario.ClientA);
+        var ownerQuest = (Quest)scenario.QuestOf(scenario.ClientA);
+        var before = 0;
+        scenario.ClientA.Call(() =>
+        {
+            using var allowed = new AllowedThread();
+            ownerQuest._questState = QuestBase.QuestStates.Ongoing;
+            ownerQuest._requestedTroopAmount = 5;
+            ownerQuest._requestedTroopType = Get<CharacterObject>(scenario.ClientA, troopId);
+            var party = Get<MobileParty>(scenario.ClientA, scenario.OwnerPartyId);
+            before = party.MemberRoster.GetElementNumber(ownerQuest._requestedTroopType);
+            ownerQuest.PlayerTransferredTroopsToGarrisonCommander();
+            Assert.Equal(before, party.MemberRoster.GetElementNumber(ownerQuest._requestedTroopType));
+        });
+
+        var request = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal((byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered, request.Proof);
     }
 
     private static bool ReturnTestReward(ref int __result)
