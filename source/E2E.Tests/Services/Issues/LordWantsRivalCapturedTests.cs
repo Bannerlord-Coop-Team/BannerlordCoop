@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -245,6 +246,9 @@ public class LordWantsRivalCapturedTests : IDisposable
     public void AValidOwnerCannotCaptureAFreeTargetWithoutAnAllocatedCapture()
     {
         Accept(ClientA, giverId);
+        ClientA.SimulateMessage(this, new CampaignTick());
+        TestEnvironment.FlushCoalescer();
+        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
         var gold = GoldOnServer(playerA);
         string[] journal = null;
         MobileParty targetParty = null;
@@ -254,6 +258,7 @@ public class LordWantsRivalCapturedTests : IDisposable
             var target = Get<Hero>(Server, targetId);
             targetParty = target.PartyBelongedTo;
             journal = QuestOf(Server, giverId).JournalEntries.Select(log => log.LogText.ToString()).ToArray();
+            Assert.Single(journal);
         });
 
         ClientA.Call(() => QuestOf(ClientA, giverId).FirstCounterOfferFinished());
@@ -270,6 +275,7 @@ public class LordWantsRivalCapturedTests : IDisposable
             Assert.False(QuestOf(Server, giverId)._firstCounterOfferMade);
         });
 
+        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
@@ -593,7 +599,9 @@ public class LordWantsRivalCapturedTests : IDisposable
     [Theory]
     [InlineData(nameof(CampaignEventDispatcher.OnWarDeclared))]
     [InlineData(nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    public void WarAndKingdomChange_AreLeftToTheFrameworkRelay(string dispatcherEvent)
+    [InlineData(nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [InlineData(nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    public void SharedWorldEvents_AreLeftToTheFrameworkRelay(string dispatcherEvent)
     {
         // The framework's QuestEventRelay already runs the quest's own listener, a quest postfix would run it twice
         var patches = Harmony.GetPatchInfo(AccessTools.Method(typeof(CampaignEventDispatcher), dispatcherEvent));

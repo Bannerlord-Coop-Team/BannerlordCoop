@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -8,10 +9,12 @@ using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -28,21 +31,39 @@ public class AlternativeEndingJournalTests : IDisposable
 
     private readonly E2ETestEnvironment environment;
     private readonly QuestScenario scenario;
+    private readonly Dictionary<string, TextObject> textVariables;
 
     public AlternativeEndingJournalTests(ITestOutputHelper output)
     {
+        lock (GameInstance.@lock)
+            textVariables = new Dictionary<string, TextObject>(MBTextManager.TextContext._variables);
         environment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(environment);
     }
 
     public void Dispose()
     {
-        environment.Dispose();
+        try { environment.Dispose(); }
+        finally
+        {
+            lock (GameInstance.@lock)
+            {
+                MBTextManager.TextContext._variables.Clear();
+                foreach (var variable in textVariables)
+                    MBTextManager.TextContext._variables.Add(variable.Key, variable.Value);
+            }
+        }
     }
 
     [Fact]
-    public void FailedAlternativeImmediatelyArchivesTheFullJournalOnlyForItsOwner()
+    public void FailedAlternativeImmediatelyArchivesTheFullJournalOnlyForItsOwner() => AssertFailureHistory(false);
+
+    [Fact]
+    public void RealNamedFailureKeepsTheOwnersArchivedCompanionAfterGlobalChanges() => AssertFailureHistory(true);
+
+    private void AssertFailureHistory(bool named)
     {
+        var textLinks = named ? Array.Empty<MethodBase>() : JournalTextLinks;
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         var rosterId = environment.CreateRegisteredObject<TroopRoster>();
@@ -61,6 +82,12 @@ public class AlternativeEndingJournalTests : IDisposable
                     scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
                 using (new AllowedThread())
                 {
+                    if (named)
+                    {
+                        Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                        Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                        companion.SetName(new TextObject("Mission Companion"), new TextObject("Mission"));
+                    }
                     party.Party.MemberRoster = roster;
                     roster.OwnerParty = party.Party;
                     owner.PartyBelongedTo = party;
@@ -75,7 +102,7 @@ public class AlternativeEndingJournalTests : IDisposable
                     using (new MainHeroSubstitutionScope(owner, party))
                         giver.Issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("Troops sent to resolve the issue.")));
                 }
-            }, JournalTextLinks);
+            }, textLinks);
         }
 
         string[] expected = null!;
@@ -90,7 +117,8 @@ public class AlternativeEndingJournalTests : IDisposable
             expected = archive.GetEntries().Select(entry => entry.LogText.ToString()).ToArray();
             Assert.Equal(2, expected.Length);
             Assert.Contains("has failed to resolve the matter. 9 troops came back safe and sound.", expected[1]);
-        }, JournalTextLinks);
+            if (named) Assert.Contains("Mission Companion", expected[1]);
+        }, textLinks);
         environment.FlushCoalescer();
 
         var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
@@ -108,6 +136,23 @@ public class AlternativeEndingJournalTests : IDisposable
                 entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
             Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, archive._lastIssueStatus);
             Assert.Equal(expected, archive.GetEntries().Select(entry => entry.LogText.ToString()).ToArray());
+        });
+        if (!named) return;
+
+        scenario.Server.Call(() =>
+        {
+            var replacement = new TextObject("");
+            replacement.SetTextVariable("LINK", "A Different Companion");
+            MBTextManager.SetTextVariable("COMPANION", replacement);
+            Assert.Contains("A Different Companion", new TextObject("{COMPANION.LINK}").ToString());
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, archive._lastIssueStatus);
+            Assert.Equal(expected, archive.GetEntries().Select(entry => entry.LogText.ToString()).ToArray());
+            Assert.Contains("Mission Companion", archive.GetEntries().Last().LogText.ToString());
         });
     }
 }
