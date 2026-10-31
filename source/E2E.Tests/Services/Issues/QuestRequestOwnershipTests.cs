@@ -139,6 +139,59 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Fact]
+    public void ABranchWaitsForAcceptConfirmationAndTheOwnersJournal()
+    {
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.SetLatency(scenario.Server.NetPeer, scenario.ClientA.NetPeer, TimeSpan.FromSeconds(1));
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread()) quest.StartQuest();
+            quest.AddLog(new TaleWorlds.Localization.TextObject("early branch row"));
+            scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
+        });
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal(0, branches.CountFor(scenario.Server));
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        TestEnvironment.FlushCoalescer();
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Collection(scenario.ClientA.NetworkSentMessages.Where(message => message is RequestQuestJournal || message is RequestQuestBranch),
+            message => Assert.Equal("early branch row", Assert.Single(Assert.IsType<RequestQuestJournal>(message).Entries).Text.Value),
+            message => Assert.IsType<RequestQuestBranch>(message));
+        Assert.Equal(1, branches.CountFor(scenario.Server));
+        scenario.Server.Call(() => Assert.Equal("early branch row",
+            Assert.Single(scenario.QuestOf(scenario.Server).JournalEntries).LogText.Value));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARejectedAcceptDiscardsItsWaitingEnding(bool branch)
+    {
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.SetLatency(scenario.Server.NetPeer, scenario.ClientA.NetPeer, TimeSpan.FromSeconds(1));
+        scenario.Server.Call(() => Assert.True(scenario.Server.Resolve<IIssueOwnershipRegistry>()
+            .TrySetOwner(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerB)));
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            if (branch) scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
+            else scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestOutcomeRequested(quest, IssueOutcome.QuestCancel));
+        });
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        TestEnvironment.FlushCoalescer();
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+        Assert.Equal(0, branches.CountFor(scenario.Server));
+    }
+
+    [Fact]
     public void ABranchRequestFromAPlayerWhoDoesNotOwnTheIssueIsIgnored()
     {
         scenario.Accept(scenario.ClientA);

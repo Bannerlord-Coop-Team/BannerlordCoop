@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
@@ -16,6 +17,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -25,7 +27,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// The first player to accept an issue's quest solution gets it. The server arbitrates and keeps a
 /// quest object for the owner's outcomes to run on, other clients only learn that the issue is taken.
 /// </summary>
-internal class QuestSolutionAcceptCoordinator : IHandler
+internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCoordinator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<QuestSolutionAcceptCoordinator>();
 
@@ -41,6 +43,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IQuestJournalOwnerResolver journal;
     private readonly Dictionary<QuestBase, int> acceptingQuests = new();
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly ConditionalWeakTable<IssueBase, List<Action>> pendingAccepts = new();
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -92,6 +95,12 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         messageBroker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(Handle_NetworkQuestSolutionAcceptRejected);
     }
 
+    public void RunWhenAccepted(IssueBase issue, Action request)
+    {
+        if (pendingAccepts.TryGetValue(issue, out var waiting)) waiting.Add(request);
+        else request();
+    }
+
     private void Handle_QuestSolutionAcceptTriggered(MessagePayload<QuestSolutionAcceptTriggered> payload)
     {
         if (ModInformation.IsServer)
@@ -113,6 +122,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var captured = descriptor.QuestSolutionAcceptStrategy.Capture(issue);
 
+        pendingAccepts.GetOrCreateValue(issue);
         network.SendAll(new RequestQuestSolutionAccept(issueOwnerId, issue.StringId, issue._issueDifficultyMultiplier, captured));
 
         var quest = issue.IssueQuest;
@@ -333,7 +343,18 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
 
             // The accepting player already ran the accept locally
-            if (data.ControllerId != controllerIdProvider.ControllerId)
+            if (data.ControllerId == controllerIdProvider.ControllerId)
+            {
+                if (issue.IssueQuest != null)
+                    messageBroker.Publish(this, new QuestJournalChanged(issue.IssueQuest));
+                // Journal and ending requests share the reliable ordered channel.
+                if (pendingAccepts.TryGetValue(issue, out var waiting))
+                {
+                    pendingAccepts.Remove(issue);
+                    foreach (var request in waiting) request();
+                }
+            }
+            else
             {
                 // No quest object here, its dialogs would answer this player's conversations too
                 issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
@@ -374,6 +395,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         {
             return;
         }
+
+        acceptingQuests.Remove(strayQuest);
 
         // set to null first so cancelling the quest does not finalize the issue the winner owns
         issue.IssueQuest = null;

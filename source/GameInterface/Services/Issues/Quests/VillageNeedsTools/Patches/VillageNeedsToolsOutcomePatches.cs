@@ -4,6 +4,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -114,7 +115,10 @@ internal class VillageNeedsToolsOutcomePatches
     {
         if (ModInformation.IsServer && __instance is Quest quest && text != null)
         {
-            MessageBroker.Instance.Publish(quest, new VillageNeedsToolsJournalAdded(quest, text.ToString()));
+            var log = quest.JournalEntries.LastOrDefault(entry =>
+                ReferenceEquals(entry.LogText, text) || entry.LogText?.ToString() == text.ToString());
+            MessageBroker.Instance.Publish(quest, new VillageNeedsToolsJournalAdded(quest, text.ToString(),
+                log?.LogText ?? text, log?.LogTime.NumTicks ?? CampaignTime.Now.NumTicks));
         }
     }
 

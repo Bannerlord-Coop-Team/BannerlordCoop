@@ -29,6 +29,10 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
@@ -437,6 +441,70 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Accept();
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
         ClientA.Call(() => Assert.Null(Get<Hero>(ClientA, scenario.NotableId).Issue.IssueQuest));
+    }
+
+    [Fact]
+    public void ReceivedDeliveryProgressDoesNotSendTheServerItsOwnJournalBack()
+    {
+        Accept();
+        environment.FlushCoalescer();
+        var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        ClientA.SimulateMessage(Server.NetPeer,
+            new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
+        ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
+        Assert.Equal(before, ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count());
+    }
+
+    [Fact]
+    public void AuthoritativeEndingPreservesOwnerDeliveryProgress()
+    {
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+        Accept();
+        var ownerQuest = QuestHere(ClientA);
+        Stock(2);
+        ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
+        ClientA.Call(() => Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress));
+
+        Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
+        environment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress);
+        });
+        ClientA.Call(() =>
+        {
+            Assert.Equal(2, Assert.Single(ownerQuest.JournalEntries, log => log.Range == Amount).CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.True(archive.IsEnded());
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
+        });
+        Server.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(QuestHere(Server))));
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
+
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("artisan_journal", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("artisan_journal"), loadAsLateInitialize: true));
+            var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+            var loadedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(QuestHere(Server))));
+            Assert.Equal(2, Assert.Single(loadedArchive.GetEntries(), log => log.Range == Amount).CurrentProgress);
+        });
     }
 
     [Fact]
