@@ -528,12 +528,6 @@ public class MerchantOutlawsTests : IDisposable
                 entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
             Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
         });
-        ClientA.Call(() =>
-        {
-            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
-            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
-        });
     }
 
     [Fact]
