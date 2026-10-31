@@ -52,6 +52,9 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
             return;
         }
 
+        quest.JournalEntries.FirstOrDefault(log => log.Range == quest._totalPartyCount)
+            ?.UpdateCurrentProgress(quest._questPartyProgress);
+
         var ids = new List<string>();
         if (!final)
         {

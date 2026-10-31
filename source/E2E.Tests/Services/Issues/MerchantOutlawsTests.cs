@@ -517,6 +517,14 @@ public class MerchantOutlawsTests : IDisposable
         ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            Assert.Equal(1, Assert.Single(serverQuest.JournalEntries, log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(serverQuest)));
+            Assert.True(archive.IsEnded());
+            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+        });
         ClientA.Call(() =>
         {
             Assert.Equal(1, Assert.Single(ownerQuest.JournalEntries, log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
