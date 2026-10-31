@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkCaravanAmbushState : IServerToClientCommand
+public readonly struct NetworkCaravanAmbushState : IMessage
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -30,7 +30,7 @@ public readonly struct NetworkCaravanAmbushState : IServerToClientCommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkCaravanAmbushConversation : IServerToClientCommand
+public readonly struct NetworkCaravanAmbushConversation : IMessage
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
