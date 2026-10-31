@@ -233,6 +233,11 @@
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		    <_Parameter1>GameInterface.Tests</_Parameter1>
 	    </AssemblyAttribute>
+	    <!-- Stamps whether this build compiled the naval code, so naval DLLs left by an earlier deploy can't turn naval on. -->
+	    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+		    <_Parameter1>CoopNavalDlc</_Parameter1>
+		    <_Parameter2>$(CoopNavalDlc)</_Parameter2>
+	    </AssemblyAttribute>
     </ItemGroup>
 	<ItemGroup>
 		<EmbeddedResource Include="AutoSync\Templates\**\*.txt" />

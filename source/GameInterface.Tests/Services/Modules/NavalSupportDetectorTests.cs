@@ -16,21 +16,31 @@ public class NavalSupportDetectorTests
     private static readonly string[] BothAssemblies = { ModInformation.MissionsNavalAssemblyFile, ModInformation.CoopNavalAssemblyFile };
 
     [Theory]
-    [InlineData(true, true, true, true)]
-    [InlineData(true, false, true, false)]
-    [InlineData(false, true, true, false)]
-    [InlineData(true, true, false, false)]
-    [InlineData(false, false, false, false)]
-    public void Detect_NeedsTheModuleTheFlagAndTheAssemblies(bool moduleEnabled, bool flagOn, bool shipped, bool expected)
+    [InlineData(true, true, true, true, true)]
+    [InlineData(true, false, true, true, false)]
+    [InlineData(false, true, true, true, false)]
+    [InlineData(true, true, true, false, false)]
+    [InlineData(false, false, false, false, false)]
+    public void Detect_NeedsTheModuleTheFlagTheNavalBuildAndTheAssemblies(
+        bool moduleEnabled, bool flagOn, bool navalBuilt, bool shipped, bool expected)
     {
-        var detector = new NavalSupportDetector(Modules(moduleEnabled), new FixedFlag(flagOn), _ => shipped);
+        var detector = new NavalSupportDetector(Modules(moduleEnabled), new FixedFlag(flagOn, navalBuilt), _ => shipped);
 
         Assert.Equal(expected, detector.Detect());
     }
 
-    // The startup composition must take this build's TESTER flag, so it can't turn naval on where the flag is off.
+    // Naval assemblies left by an earlier naval deploy must not turn naval on in a build made with CoopNavalDlc=false.
     [Fact]
-    public void ForStartup_WithModuleAndAssemblies_FollowsThisBuildsFeatureFlag()
+    public void Detect_BuiltWithoutNavalCode_StaysOffEvenWithStaleNavalAssemblies()
+    {
+        var detector = new NavalSupportDetector(Modules(true), new FixedFlag(isEnabled: true, isNavalCodeBuilt: false), _ => true);
+
+        Assert.False(detector.Detect());
+    }
+
+    // The startup composition must take this build's TESTER and CoopNavalDlc flags, so it can't turn naval on where either is off.
+    [Fact]
+    public void ForStartup_WithModuleAndAssemblies_FollowsThisBuildsFlags()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"naval-detector-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -40,7 +50,8 @@ public class NavalSupportDetectorTests
 
             bool detected = NavalSupportDetector.ForStartup(Modules(true), directory).Detect();
 
-            Assert.Equal(new NavalFeatureFlag().IsEnabled, detected);
+            var flag = new NavalFeatureFlag();
+            Assert.Equal(flag.IsEnabled && flag.IsNavalCodeBuilt, detected);
         }
         finally
         {
@@ -66,11 +77,17 @@ public class NavalSupportDetectorTests
         public System.Collections.Generic.IEnumerable<ModuleInfo> GetModuleInfos() => modules.ToArray();
     }
 
-    // A feature flag pinned on or off.
+    // A feature flag pinned on or off, built with or without the naval code.
     private sealed class FixedFlag : INavalFeatureFlag
     {
-        public FixedFlag(bool isEnabled) => IsEnabled = isEnabled;
+        public FixedFlag(bool isEnabled, bool isNavalCodeBuilt = true)
+        {
+            IsEnabled = isEnabled;
+            IsNavalCodeBuilt = isNavalCodeBuilt;
+        }
 
         public bool IsEnabled { get; }
+
+        public bool IsNavalCodeBuilt { get; }
     }
 }

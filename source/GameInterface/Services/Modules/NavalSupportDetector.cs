@@ -12,7 +12,7 @@ namespace GameInterface.Services.Modules;
 /// </summary>
 public interface INavalSupportDetector
 {
-    /// <summary>Whether NavalDLC is enabled, the build's feature flag is on and both naval assemblies shipped.</summary>
+    /// <summary>Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies shipped.</summary>
     bool Detect();
 }
 
@@ -33,7 +33,7 @@ public class NavalSupportDetector : INavalSupportDetector
         this.isShipped = isShipped;
     }
 
-    // The startup composition: this build's TESTER flag and the naval assemblies next to assemblyDirectory.
+    // The startup composition: this build's TESTER and CoopNavalDlc flags and the naval assemblies next to assemblyDirectory.
     public static NavalSupportDetector ForStartup(IModuleInfoProvider moduleInfoProvider, string assemblyDirectory)
     {
         return new NavalSupportDetector(moduleInfoProvider, new NavalFeatureFlag(),
@@ -45,13 +45,19 @@ public class NavalSupportDetector : INavalSupportDetector
     {
         bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
             .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
-        bool supported = ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isShipped);
+        bool supported = navalFeatureFlag.IsNavalCodeBuilt
+            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isShipped);
         if (supported || !navalModuleEnabled) return supported;
 
-        string reason = navalFeatureFlag.IsEnabled
-            ? "this build has no naval code"
-            : "War Sails co-op is only in tester builds";
-        Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", reason);
+        Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", UnsupportedReason());
         return false;
+    }
+
+    // Names the first missing requirement; naval assemblies left by an earlier deploy don't count for a build without naval code.
+    private string UnsupportedReason()
+    {
+        if (!navalFeatureFlag.IsEnabled) return "War Sails co-op is only in tester builds";
+        if (!navalFeatureFlag.IsNavalCodeBuilt) return "this build was made without CoopNavalDlc";
+        return "this build has no naval code";
     }
 }
