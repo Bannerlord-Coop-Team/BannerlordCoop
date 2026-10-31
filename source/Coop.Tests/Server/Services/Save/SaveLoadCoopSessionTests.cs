@@ -6,7 +6,7 @@ using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
-using GameInterface.Services.Heroes;
+using GameInterface.Services.NavalDLC;
 using System.Collections.Generic;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -78,7 +78,8 @@ namespace Coop.Tests.Server.Services.Save
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
-                new AgingPlayerData(new()));
+                new AgingPlayerData(new()),
+                new NavalPlayerData(new(), new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -135,6 +136,10 @@ namespace Coop.Tests.Server.Services.Save
                 },
             };
 
+            var navalPlayerData = new NavalPlayerData(new(), new(), new(), new());
+            navalPlayerData.PlayerUnlockedFigureHeads["MyHero1"] = new() { "figurehead_1", "figurehead_2" };
+            navalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"] = 2702;
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -146,7 +151,8 @@ namespace Coop.Tests.Server.Services.Save
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(meetingTimes),
-                new AgingPlayerData(new()));
+                new AgingPlayerData(new()),
+                navalPlayerData);
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -179,6 +185,60 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.TradePlayerData.PlayerSettlementBribePaid[playerHeroId], savedSession.TradePlayerData.PlayerSettlementBribePaid[playerHeroId]);
             }
             Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
+            Assert.Equal(new[] { "figurehead_1", "figurehead_2" }, savedSession.NavalPlayerData.PlayerUnlockedFigureHeads["MyHero1"]);
+            Assert.Equal(2702, savedSession.NavalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"]);
+        }
+
+        // A fleet stranded with no anchor caches NaN positions, which JSON has no number for
+        [Fact]
+        public void SaveLoadSession_KeepsNavalSentTroopsAndCachedFleets()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            var session = NewSession(NewSaveName(), new Player("MyPlayer1", "MyHero1", "MyParty1", "MyClan1", "MyCharacter1"));
+            var navalPlayerData = session.NavalPlayerData;
+            navalPlayerData.PlayerSentTroops["MyHero1"] = new()
+            {
+                new SentTroopsData(new() { new SentTroopData("imperial_recruit", 12, 3, 450) }, 99999L, "Sea Wolf", "Garrison Run"),
+            };
+            var cachedShip = new CachedShipData(
+                "ship_hull_1",
+                "Sea Wolf",
+                40f,
+                30f,
+                "figurehead_1",
+                "sail_pattern_1",
+                7,
+                new() { ["slot1"] = "piece_1" },
+                new() { "piece_1", "piece_2" });
+            navalPlayerData.PlayerCachedFleets["MyHero1"] = new PlayerCachedFleetData(new() { cachedShip }, float.NaN, float.NaN, false, 31f, 41f, true);
+
+            string saveFile = SAVE_PATH + session.UniqueGameId;
+            try
+            {
+                saveManager.SaveCoopSession(saveFile, session);
+                var savedNavalData = saveManager.LoadCoopSession(saveFile).NavalPlayerData;
+
+                var sentTroops = Assert.Single(savedNavalData.PlayerSentTroops["MyHero1"]);
+                Assert.Equal(99999L, sentTroops.ReturnTimeTicks);
+                Assert.Equal("Sea Wolf", sentTroops.ShipName);
+                Assert.Equal("Garrison Run", sentTroops.PartyName);
+                var troop = Assert.Single(sentTroops.Troops);
+                Assert.Equal(("imperial_recruit", 12, 3, 450), (troop.CharacterId, troop.Number, troop.WoundedNumber, troop.Xp));
+
+                var fleet = savedNavalData.PlayerCachedFleets["MyHero1"];
+                Assert.True(float.IsNaN(fleet.AnchorX));
+                Assert.True(float.IsNaN(fleet.AnchorY));
+                Assert.Equal((31f, 41f, true), (fleet.DisembarkX, fleet.DisembarkY, fleet.DisembarkIsOnLand));
+                var ship = Assert.Single(fleet.Ships);
+                Assert.Equal(("ship_hull_1", "Sea Wolf", 40f, 30f), (ship.HullId, ship.Name, ship.HitPoints, ship.SailHitPoints));
+                Assert.Equal(("figurehead_1", "sail_pattern_1", 7), (ship.FigureheadId, ship.CustomSailPatternId, ship.RandomValue));
+                Assert.Equal("piece_1", ship.SlotPieceIds["slot1"]);
+                Assert.Equal(new[] { "piece_1", "piece_2" }, ship.UnlockedPieceIds);
+            }
+            finally
+            {
+                File.Delete(saveFile + saveManager.FileType);
+            }
         }
 
         [Fact]
@@ -393,7 +453,8 @@ namespace Coop.Tests.Server.Services.Save
                 empty.TradePlayerData,
                 empty.InventoryPlayerData,
                 empty.HeroMeetingData,
-                empty.AgingPlayerData);
+                empty.AgingPlayerData,
+                empty.NavalPlayerData);
         }
 
         private static string WriteSessionFile(ICoopSaveManager saveManager, string saveName, byte[] contents)

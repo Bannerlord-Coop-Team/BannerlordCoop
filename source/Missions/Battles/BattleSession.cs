@@ -32,6 +32,17 @@ public interface IBattleSession
     /// </summary>
     int HostEpoch { get; }
 
+    /// <summary>Whether this client's battle mission is a naval one; set once when its naval services open with it.</summary>
+    bool IsNaval { get; }
+
+#if DEBUG
+    /// <summary>Withholds this mission's result and departure announcements without stopping relay networking.</summary>
+    bool DebugWithholdCompletion { get; set; }
+#endif
+
+    /// <summary>Records that this client's battle mission is a naval one.</summary>
+    void MarkNaval();
+
     /// <summary>
     /// Record the battle instance on entry. Returns false (and changes nothing) when the session has already
     /// begun — OpenBattleMission can fire more than once around an encounter, and the battle must connect once.
@@ -75,6 +86,14 @@ public class BattleSession : IBattleSession
     public int HostEpoch => InstanceId != null && hostRegistry.TryGet(InstanceId, out var assignment)
         ? assignment.Epoch
         : 0;
+
+    public bool IsNaval { get; private set; }
+
+#if DEBUG
+    public bool DebugWithholdCompletion { get; set; }
+#endif
+
+    public void MarkNaval() => IsNaval = true;
 
     public bool TryBegin(string instanceId)
     {

@@ -33,17 +33,20 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     private readonly IMessageBroker messageBroker;
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleAgentFader fader;
     private readonly HashSet<Guid> pendingFleeing = new HashSet<Guid>();
     private readonly HashSet<Guid> pendingRouts = new HashSet<Guid>();
 
     public PuppetRoutApplier(
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IBattleAgentFader fader)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
+        this.fader = fader;
 
         messageBroker.Subscribe<NetworkBattleAgentFleeing>(Handle_NetworkBattleAgentFleeing);
         messageBroker.Subscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
@@ -139,7 +142,7 @@ public class PuppetRoutApplier : IPuppetRoutApplier
         if (agent != null && agent.IsActive() && agent.Health > 0)
         {
             bool hideMount = agent.HasMount && agent.MountAgent != null && agent.MountAgent.IsActive();
-            agent.FadeOut(true, hideMount);
+            fader.FadeOut(agent, hideInstantly: true, hideMount);
         }
 
         // Deregister AFTER the despawn, inside this game-thread action — same ordering rationale as

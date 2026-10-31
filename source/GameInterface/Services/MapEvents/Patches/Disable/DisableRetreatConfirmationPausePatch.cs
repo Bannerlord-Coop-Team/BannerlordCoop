@@ -5,6 +5,7 @@ using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 
 namespace GameInterface.Services.MapEvents.Patches.Disable;
 
+// A coop battle keeps running for everyone else, so the retreat confirmation shows without pausing the engine.
 [HarmonyPatch(typeof(BasicMissionHandler), nameof(BasicMissionHandler.CreateWarningWidgetForResult))]
 internal class DisableRetreatConfirmationPausePatch
 {

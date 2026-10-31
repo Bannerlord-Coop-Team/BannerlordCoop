@@ -75,6 +75,9 @@ internal class BattleBlowInterceptPatch
                 return true;
         }
 
+        // A puppet's self-blow (drowning) is environment damage its owner simulates on the real agent; routing it doubles it.
+        if (!RoutesPuppetBlow(__instance.Index, blow.OwnerId)) return false;
+
         var attacker = Mission.Current?.FindAgentWithIndex(blow.OwnerId);
         PlaySuppressedHitSound(__instance, attacker, blow, collisionData);
 
@@ -87,6 +90,9 @@ internal class BattleBlowInterceptPatch
         }
         return false;
     }
+
+    /// <summary>Whether a blow on a puppet goes to its owner: never one the puppet dealt itself, as vanilla's drowning blow is.</summary>
+    internal static bool RoutesPuppetBlow(int victimIndex, int blowOwnerId) => blowOwnerId != victimIndex;
 
     private static void PlaySuppressedHitSound(Agent victim, Agent attacker, Blow blow, AttackCollisionData collisionData)
     {

@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.OrderOfBattle.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Workshops.Messages;
@@ -53,6 +54,7 @@ internal class CoopSessionUpdateHandler : IHandler
         messageBroker.Publish(this, new InitializeClientInventoryData(session.InventoryPlayerData));
         messageBroker.Publish(this, new InitializeClientHeroMeetingData(session.HeroMeetingData));
         messageBroker.Publish(this, new InitializeClientAgingData(session.AgingPlayerData));
+        messageBroker.Publish(this, new InitializeClientNavalData(session.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(session.OrderOfBattlePlayerData));
     }
 }

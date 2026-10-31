@@ -1,0 +1,325 @@
+﻿using Common.Logging;
+using Common.Messaging;
+using HarmonyLib;
+using System.Collections.Generic;
+using System.Linq;
+using Missions.Messages;
+using NavalDLC.Missions;
+using NavalDLC.Missions.Deployment;
+using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
+using NavalDLC.Missions.Objects.UsableMachines;
+using NavalDLC.Missions.ShipControl;
+using NavalDLC.ViewModelCollection.OrderOfBattle;
+using Serilog;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
+using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
+
+namespace Missions.Naval;
+
+// Every NavalShipsLogic spawn funnels through the formation overload; announce it so the replicator can register own hulls.
+[HarmonyPatch(typeof(NavalShipsLogic), nameof(NavalShipsLogic.SpawnShip),
+    new[] { typeof(Formation), typeof(MatrixFrame), typeof(bool), typeof(bool) },
+    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class NavalShipSpawnPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(MissionShip __result, Formation formation)
+    {
+        if (__result == null) return;
+
+        MessageBroker.Instance.Publish(__result, new ShipSpawnedInBattle(__result, formation));
+    }
+}
+
+// Only the owner runs a hull's ship order; a foreign copy follows the owner's frames.
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.Tick))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignShipOrderTickPatch
+{
+    // Skips the ship order's tick on a copy.
+    [HarmonyPrefix]
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+}
+
+// ShipRetreatLogic removes a hull whose order is Retreat once it reaches the map edge; only the owner may retreat its hull.
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.SetShipRetreatOrder))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignShipRetreatOrderPatch
+{
+    // Refuses a retreat order on a copy.
+    [HarmonyPrefix]
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+}
+
+// Detachments move crew onto machines; on a foreign copy that is the owner's decision.
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.ManageShipDetachments))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignShipDetachmentsPatch
+{
+    // Skips the detachment management on a copy.
+    [HarmonyPrefix]
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+}
+
+// A copy has no controller: its owner steers it. Vanilla hands a hull one, with auto update re-armed, at init, at deployment end,
+// when it burns or sinks and in the capture swap; a copy keeps none. A captor's own prize is forgotten before the swap runs.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.SetController))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignHullControllerPatch
+{
+    // Turns any controller write on a copy into no controller without auto update.
+    [HarmonyPrefix]
+    private static void Prefix(MissionShip __instance, ref ShipControllerType controllerType, ref bool autoUpdateController)
+    {
+        if (!NavalForeignHulls.Contains(__instance)) return;
+
+        controllerType = ShipControllerType.None;
+        autoUpdateController = false;
+    }
+}
+
+// The native contact filter asks every script on both bodies. Nobody here simulates either of two copies, so their contact
+// is noise this client can't own; each owner resolves its own hull against the other's copy.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.CanPhysicsCollideBetweenTwoEntities))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CopyPairCollisionFilterPatch
+{
+    // Refuses the contact between two copies; anything else runs vanilla's filter.
+    [HarmonyPrefix]
+    private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
+    {
+        // The root scan only runs for a copy, since an own hull touches anything.
+        bool mineIsCopy = NavalForeignHulls.Contains(__instance);
+        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
+
+#if DEBUG
+        NavalContactProbe.CountFilteredCopyPair();
+#endif
+        __result = false;
+        return false;
+    }
+
+    /// <summary>Whether two hulls may touch on this client: not when both are copies of other owners' hulls.</summary>
+    internal static bool AllowsCollision(bool mineIsCopy, bool otherIsCopy) => !(mineIsCopy && otherIsCopy);
+}
+
+// Vanilla weighs a hull down with the agents standing on it. A copy's puppets stand and sit elsewhere than the owner's crew,
+// which heeled copies 2.5-4.2 degrees off (R45), so a copy takes the owner's crew load from its samples instead.
+[HarmonyPatch(typeof(NavalPhysicsScript), nameof(NavalPhysicsScript.ApplyAgentForces))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CopyCrewLoadPatch
+{
+    // The tolerance vanilla's ApplyAgentForces gives its point-in-hull check.
+    internal const float BoxEpsilon = 0.1f;
+
+    // [Fixed tick] Applies the owner's crew load on a copy that has one, none for an empty deck; an own hull, or a copy
+    // without a load yet, runs vanilla.
+    [HarmonyPrefix]
+    private static bool Prefix(NavalPhysicsScript __instance)
+    {
+        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy)) return true;
+
+        // One read of the volatile load, which the game thread replaces with each sample.
+        var ownerLoad = copy.CrewLoad;
+        if (ownerLoad == null) return true;
+        if (ownerLoad.IsEmpty) return false;
+
+        var localCentre = ownerLoad.LocalCentre;
+        if (!IsInsideHull(__instance.PhysicsBoundingBoxWithoutChildren, localCentre)) return false;
+
+        var force = WeightForce(ownerLoad.Mass, __instance.PhysicsParameters.StepAgentWeightMultiplier);
+        __instance.ApplyGlobalForceAtLocalPos(in localCentre, in force);
+        return false;
+    }
+
+    /// <summary>Vanilla's crew weight force: the mass times the hull's step weight multiplier times gravity.</summary>
+    internal static Vec3 WeightForce(float mass, float stepAgentWeightMultiplier) =>
+        mass * stepAgentWeightMultiplier * MBGlobals.GravitationalAcceleration;
+
+    /// <summary>
+    /// Vanilla's check that a point in the hull body's frame lies within its physics box: an agent outside it isn't weighed,
+    /// and a crew centre outside it applies no force.
+    /// </summary>
+    internal static bool IsInsideHull(BoundingBox box, Vec3 localCentre) => box.PointInsideBox(localCentre, BoxEpsilon);
+}
+
+// Marks the initial plan of a side so the plan patch below shifts only that plan, not later Order of Battle replans.
+[HarmonyPatch(typeof(DefaultNavalMissionLogic), nameof(DefaultNavalMissionLogic.MakeDeploymentPlansForSide))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class NavalSidePlanScopePatch
+{
+    // Records the side whose initial plan is being made.
+    [HarmonyPrefix]
+    private static void Prefix(DefaultNavalMissionLogic __instance) => NavalPlayerDeploymentSlot.PlanningSide = __instance;
+
+    // Ends the initial plan scope, also when the plan throws.
+    [HarmonyFinalizer]
+    private static void Finalizer() => NavalPlayerDeploymentSlot.PlanningSide = null;
+}
+
+// Replans keep the stored offset, so shifting the initial plan moves this client's fleet for the whole deployment.
+[HarmonyPatch(typeof(NavalMissionDeploymentPlanningLogic), nameof(NavalMissionDeploymentPlanningLogic.MakeDeploymentPlan))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class PlayerFleetDeploymentSlotPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerFleetDeploymentSlotPatch>();
+
+    // Moves the own PlayerTeam's initial plan to its player slot when the side has more than one player; other teams and
+    // replans keep vanilla's offset.
+    [HarmonyPrefix]
+    private static void Prefix(Team team, ref float spawnPathOffset)
+    {
+        var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
+        int rank = NavalPlayerDeploymentSlot.Rank;
+        int playerCount = NavalPlayerDeploymentSlot.PlayerCount;
+        var mission = Mission.Current;
+        if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
+
+        var spawnPath = mission.GetInitialSpawnPathData(team.Side);
+        float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
+            .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
+        float slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, playerCount, longestTeamRange, out float baseOffset,
+            out bool fits);
+        Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, side base " +
+            "{BaseOffset}, slot {Slot} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
+            baseOffset, slot, spawnPath.PivotOffset, spawnPath.PathLength);
+        if (!fits)
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for {PlayerCount} player fleets; " +
+                "fleet {Rank} at {Slot} (vanilla {VanillaOffset}, side base {BaseOffset}, pivot {PivotOffset}) can overlap " +
+                "another player's fleet", spawnPath.PathLength, playerCount, rank, slot, spawnPathOffset, baseOffset,
+                spawnPath.PivotOffset);
+        spawnPathOffset = slot;
+    }
+}
+
+// The order of battle restores its saved ship layout by Ship reference; a coop battle fields fresh snapshots that never
+// match, so it would empty every formation whose ship can move and remove all own hulls but the flagship at Ready.
+[HarmonyPatch(typeof(NavalOrderOfBattleVM), nameof(NavalOrderOfBattleVM.LoadConfigurationShips))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CoopOrderOfBattleShipLayoutPatch
+{
+    // Skips the saved layout load in a coop naval mission.
+    [HarmonyPrefix]
+    internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
+}
+
+// Owners announce station use; the replicator ignores agents this client does not drive. An item pickup is no station
+// (it has its own sync) and runs on a parallel tick worker, so it is never published.
+[HarmonyPatch(typeof(Agent), nameof(Agent.UseGameObject))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class AgentStationUsePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(Agent __instance, UsableMissionObject usedObject)
+    {
+        if (!CoopNavalMissionScope.IsActive || usedObject == null || usedObject is SpawnedItemEntity) return;
+
+        MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, usedObject, inUse: true));
+    }
+}
+
+// Every release path (death, order, AI, player) ends in StopUsingGameObjectAux.
+[HarmonyPatch(typeof(Agent), nameof(Agent.StopUsingGameObjectAux))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal partial class AgentStationReleasePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(Agent __instance, out UsableMissionObject __state) => __state = __instance.CurrentlyUsedGameObject;
+
+    [HarmonyPostfix]
+    private static void Postfix(Agent __instance, UsableMissionObject __state)
+    {
+        if (!CoopNavalMissionScope.IsActive || __state == null || __state is SpawnedItemEntity
+            || __instance.CurrentlyUsedGameObject == __state)
+            return;
+
+#if DEBUG
+        ObserveRelease(__instance, __state);
+#endif
+        MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, __state, inUse: false));
+    }
+}
+
+// A copy is steered by its owner, so the player takes another owner's helm only to capture an enemy hull; vanilla's helm
+// gates that further (AI-only until the formation empties, disabled until vacant) and its timer asks the hull's authority.
+[HarmonyPatch(typeof(Agent), nameof(Agent.HandleStartUsingAction))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignHelmUsePatch
+{
+    // Refuses the main agent's start at a helm it may not take in a co-op battle; any other use goes through.
+    [HarmonyPrefix]
+    private static bool Prefix(Agent __instance, UsableMissionObject targetObject)
+    {
+        if (!__instance.IsMainAgent || !CoopNavalMissionScope.IsActive) return true;
+
+        var hull = HelmHullOf(targetObject);
+        if (hull == null) return true;
+
+        return AllowsStart(NavalForeignHulls.Contains(hull), IsEnemyHull(hull, __instance));
+    }
+
+    /// <summary>
+    /// Whether the main agent may start at a hull's helm: any hull it simulates, where vanilla's own rules apply, and another
+    /// owner's copy only when that copy's team is an enemy, to capture it. A capture's orphan has no team, so others keep off it.
+    /// </summary>
+    internal static bool AllowsStart(bool isForeignHelm, bool isEnemyHull) => !isForeignHelm || isEnemyHull;
+
+    // The hull whose helm owns this standing point, or null when it is no helm.
+    private static MissionShip HelmHullOf(UsableMissionObject point)
+    {
+        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
+        if (point is not StandingPoint standingPoint || shipsLogic == null) return null;
+
+        foreach (var ship in shipsLogic.AllShips)
+        {
+            var helm = ship.ShipControllerMachine;
+            if (helm != null && (helm.PilotStandingPoint == standingPoint || helm.StandingPoints.Contains(standingPoint)))
+                return ship;
+        }
+
+        return null;
+    }
+
+    // A team that is an enemy of the agent's; an orphan's missing team is none, unlike vanilla's side test, which reads it as -1.
+    private static bool IsEnemyHull(MissionShip hull, Agent agent) => agent.Team != null && hull.Team != null && hull.Team.IsEnemyOf(agent.Team);
+}
+
+// Vanilla's capture swaps two hulls' formations, sides and controllers on this client alone. In a co-op battle the elapsed timer
+// goes to the capture replicator instead, and the hull's authority decides and broadcasts the capture every client replays.
+[HarmonyPatch(typeof(ShipControllerMachine), nameof(ShipControllerMachine.OnShipCapturedByAgent))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CoopShipCapturePatch
+{
+    // Skips NavalShipsLogic.OnShipCaptured in a co-op battle; the elapsed timer has already taken the captor off the helm.
+    [HarmonyPrefix]
+    private static bool Prefix(ShipControllerMachine __instance, Agent captorAgent)
+    {
+        if (!CoopNavalMissionScope.IsActive) return true;
+
+        MessageBroker.Instance.Publish(__instance, new ShipCaptureTimerElapsed(__instance.AttachedShip, captorAgent));
+        return false;
+    }
+}
+
+// A captured player's formation keeps its main agent but its assignment no longer has a hull, so the helm's capture checks in
+// ShipControllerMachine.OnTick ask whether a null hull is connected to the orphan every tick; vanilla never captures a player hull.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.AreShipsConnected))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CapturedFormationConnectionPatch
+{
+    // Answers "not connected" for a missing hull in a co-op battle instead of dereferencing it.
+    [HarmonyPrefix]
+    internal static bool Prefix(MissionShip ship1, MissionShip ship2, ref bool __result)
+    {
+        if (!CoopNavalMissionScope.IsActive || (ship1 != null && ship2 != null)) return true;
+
+        __result = false;
+        return false;
+    }
+}

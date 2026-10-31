@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
@@ -88,6 +89,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
 
     [ProtoMember(20)]
     public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
+    [ProtoMember(21)]
+    public readonly NavalPlayerData NavalPlayerData;
 
     public GameSaveDataChunkPacket(
         int transferId,
@@ -106,6 +109,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
@@ -127,6 +131,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

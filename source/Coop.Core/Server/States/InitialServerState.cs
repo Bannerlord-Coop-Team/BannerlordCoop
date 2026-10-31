@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
@@ -63,8 +64,8 @@ public class InitialServerState : ServerStateBase
 
     internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
-        // Coop does not support DLC. Warn the host if any is enabled before the server becomes
-        // joinable; clients with DLC enabled are rejected separately during module validation.
+        // Coop supports no DLC other than NavalDLC. Warn the host if another is enabled before the server
+        // becomes joinable; clients with one enabled are rejected separately during module validation.
         if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out var dlcError))
         {
             Logger.Error("Hosting with unsupported modules enabled. {error}", dlcError);
@@ -91,7 +92,12 @@ public class InitialServerState : ServerStateBase
     {
 #if DEBUG
         loadingInterface.ShowLoadingScreen();
-        gameStateInterface.LoadGame("MP");
+        // The MP dev save predates NavalDLC, so a NavalDLC server loads MP_Naval instead, or starts a new campaign on a machine
+        // that has no MP_Naval save.
+        if (ModInformation.IsNavalDlcActive)
+            gameStateInterface.LoadGameOrStartNew("MP_Naval");
+        else
+            gameStateInterface.LoadGame("MP");
 #endif
     }
 

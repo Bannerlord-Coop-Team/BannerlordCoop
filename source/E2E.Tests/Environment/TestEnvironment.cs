@@ -11,11 +11,14 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Tests.Services.Issues;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Services.Network;
+using System.Diagnostics;
 using Xunit.Abstractions;
 using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
@@ -38,14 +41,17 @@ public class TestEnvironment
     private readonly MeshNetworkRouter meshOrchestrator;
 
     private readonly bool registerGameInterface;
+    private readonly Action<ContainerBuilder>? configureDependencies;
 
     /// <summary>
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false,
+        Action<ContainerBuilder>? configureDependencies = null)
     {
         this.registerGameInterface = registerGameInterface;
+        this.configureDependencies = configureDependencies;
         meshOrchestrator = new MeshNetworkRouter(meshScheduler);
 
         Server = CreateServer(output);
@@ -66,7 +72,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ClientModule>();
+        // Naval mission services stay on here, like the server's naval handlers and GameInterface's naval sync.
+        builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().SingleInstance();
 
         // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh
@@ -78,6 +85,7 @@ public class TestEnvironment
 
         AddSharedDependencies(builder);
 
+        configureDependencies?.Invoke(builder);
         container = builder.Build();
 
         var instance = container.Resolve<ClientInstance>()!;
@@ -92,7 +100,8 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ServerModule>();
+        // Naval server handlers stay on here, like GameInterface's naval sync below.
+        builder.RegisterModule(new ServerModule(navalServicesEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -102,6 +111,7 @@ public class TestEnvironment
             .As<IBattlesFoughtUploader>()
             .SingleInstance();
 
+        configureDependencies?.Invoke(builder);
         container = builder.Build();
 
         var instance = container.Resolve<ServerInstance>()!;
@@ -115,7 +125,8 @@ public class TestEnvironment
     {
         if (registerGameInterface)
         {
-            builder.RegisterModule<GameInterfaceModule>();
+            // GameInterface's naval sync is tested here with fakes, so it stays on without loading the optional naval assemblies.
+            builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
         }
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
@@ -133,6 +144,20 @@ public class TestEnvironment
             .InstancePerDependency();
         builder.RegisterInstance(new FixedBattleSizeProvider(1000))
             .As<IBattleSizeProvider>();
+        // The wall-clock receiver-cap heartbeat sends from a timer thread into the single-threaded mesh scheduler, and
+        // deadlocks teardown: Dispose waits for that callback while holding the GameInstance lock it is blocked on.
+        builder.Register(context => new MovementRateController(
+                context.Resolve<IBattleNetwork>(),
+                context.Resolve<IMessageBroker>(),
+                context.Resolve<IControllerIdProvider>(),
+                context.Resolve<IMissionContext>(),
+                Stopwatch.GetTimestamp,
+                Stopwatch.Frequency,
+                MovementRateController.ReadFrameLimitHz,
+                enableHeartbeat: false,
+                context.Resolve<IMovementNetworkSettings>()))
+            .As<IMovementRateController>()
+            .InstancePerDependency();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().SingleInstance();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().SingleInstance();

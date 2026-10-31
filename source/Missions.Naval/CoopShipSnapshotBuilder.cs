@@ -1,0 +1,99 @@
+﻿using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
+using Missions.Messages;
+using System;
+using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
+
+namespace Missions.Naval;
+
+/// <summary>
+/// Builds the campaign <see cref="Ship"/> a coop naval mission spawns instead of a party's campaign ship.
+/// </summary>
+public interface ICoopShipSnapshotBuilder
+{
+    /// <summary>A detached copy of <paramref name="source"/>: same owner, hull, pieces and damage, outside the party's ships.</summary>
+    Ship Build(Ship source);
+
+    /// <summary>A detached ship rebuilt from another owner's hull record; null when its hull id is unknown here.</summary>
+    Ship Build(BattleShipSpawnData data, PartyBase owner);
+}
+
+/// <summary>
+/// Builds the detached <see cref="Ship"/> copies a coop naval mission damages; vanilla casts every <c>IShipOrigin</c> to Ship.
+/// </summary>
+public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
+{
+    private readonly IObjectManager objectManager;
+
+    // Takes the object manager that names an own snapshot's campaign ship.
+    public CoopShipSnapshotBuilder(IObjectManager objectManager)
+    {
+        this.objectManager = objectManager;
+    }
+
+    // Copies a party's campaign ship field by field; the copy carries the source's registry id for its fate report.
+    public Ship Build(Ship source)
+    {
+        // Snapshots stay unregistered, so building one must not reach the campaign ship sync patches.
+        using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+        {
+            var campaignShipId = objectManager.TryGetId(source, out var id) ? id : null;
+            var snapshot = Create(source.ShipHull, source.Owner, campaignShipId);
+            snapshot._name = source._name;
+            foreach (var piece in source._shipPieces)
+                snapshot._shipPieces[piece.Key] = piece.Value;
+            snapshot.Figurehead = source.Figurehead;
+            snapshot.RandomValue = source.RandomValue;
+            snapshot.CustomSailPatternId = source.CustomSailPatternId;
+            // Fields, not the setters: their campaign postfixes (the port menu refresh) are for the party's own ships.
+            snapshot._hitPoints = source._hitPoints;
+            snapshot._sailHitPoints = source._sailHitPoints;
+            return snapshot;
+        }
+    }
+
+    // Rebuilds another owner's ship from its hull record, the fields NavalShipEngine.Describe writes.
+    public Ship Build(BattleShipSpawnData data, PartyBase owner)
+    {
+        var hull = MBObjectManager.Instance.GetObject<ShipHull>(data.HullId);
+        if (hull == null) return null;
+
+        using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+        {
+            var snapshot = Create(hull, owner, data.CampaignShipId);
+            if (!string.IsNullOrEmpty(data.Name)) snapshot._name = new TextObject(data.Name);
+            var slots = data.PieceSlots ?? Array.Empty<string>();
+            var pieces = data.PieceIds ?? Array.Empty<string>();
+            for (int i = 0; i < slots.Length && i < pieces.Length; i++)
+            {
+                if (snapshot._shipPieces.ContainsKey(slots[i]))
+                    snapshot._shipPieces[slots[i]] = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(pieces[i]);
+            }
+            if (!string.IsNullOrEmpty(data.FigureheadId))
+                snapshot.Figurehead = MBObjectManager.Instance.GetObject<Figurehead>(data.FigureheadId);
+            snapshot.RandomValue = data.RandomValue;
+            snapshot.CustomSailPatternId = data.CustomSailPatternId ?? "";
+            snapshot._hitPoints = MathF.Clamp(data.HitPoints, 0f, snapshot.MaxHitPoints);
+            snapshot._sailHitPoints = MathF.Clamp(data.SailHitPoints, 0f, snapshot.MaxSailHitPoints);
+            return snapshot;
+        }
+    }
+
+    // Creates the bare ship with its owner and records it as a snapshot of the campaign ship it stands for.
+    private static Ship Create(ShipHull hull, PartyBase owner, string campaignShipId)
+    {
+        var snapshot = new Ship(hull);
+
+        // Field, not the Owner setter: the setter would add the copy to the owner's party ships.
+        snapshot._owner = owner;
+
+        // CoopShipSnapshotPatches keep its mission damage out of the campaign (destroy action, skill XP).
+        CoopShipSnapshots.Add(snapshot, campaignShipId);
+        return snapshot;
+    }
+}

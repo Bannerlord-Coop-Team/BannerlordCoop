@@ -5,6 +5,10 @@ namespace GameInterface.Services.MapEvents.Extensions;
 
 public static class MapEventExtensions
 {
+    /// <summary>Whether the battle's results were calculated or applied, after which no battle report may change what they read.</summary>
+    public static bool HasCalculatedResults(this MapEvent mapEvent)
+        => mapEvent._mapEventResultsCalculated || mapEvent._mapEventResultsApplied;
+
     /// <summary>
     /// Finds a party's MapEventParty on either side of the event, without going through PartiesOnSide(side) —
     /// safe to call even after the party's own MapEventSide has already been nulled elsewhere.

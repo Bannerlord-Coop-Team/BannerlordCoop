@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,8 +11,8 @@ public interface IModuleValidator
 {
     /// <summary>
     /// Compares two lists of <see cref="ModuleInfo"/>, regardless of the order or sorting of the two lists. The server list specifies what the client list must fulfil. <para/>
-    /// Checks that the game versions match (changeset aside), that the client has no DLC enabled, and that community modules match exactly in both
-    /// directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
+    /// Checks that the game versions match (changeset aside), that the client has no unsupported DLC enabled, and that community modules and DLC
+    /// match exactly in both directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
     /// </summary>
     /// <param name="serverModules">The server modules</param>
     /// <param name="clientModules">The client modules</param>
@@ -21,8 +21,8 @@ public interface IModuleValidator
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error, IReadOnlyDictionary<string, string> displayNames = null);
 
     /// <summary>
-    /// Ensures none of the given modules is official optional content (DLC). Coop does not support
-    /// DLC, so it must be disabled on both the server and all connecting clients.
+    /// Ensures none of the given modules is unsupported official optional content (DLC). NavalDLC is the
+    /// only supported DLC, and only by a build that shipped the naval code; any other must be disabled on both sides.
     /// </summary>
     /// <param name="modules">The modules to check.</param>
     /// <param name="error">Null if no DLC was enabled, otherwise a reason naming the enabled DLC.</param>
@@ -33,6 +33,19 @@ public interface IModuleValidator
 /// <inheritdoc href="IModuleValidator" />
 public class ModuleValidator : IModuleValidator
 {
+    private readonly Func<bool> isNavalSupported;
+
+    // Reads the startup naval-support flag on each validation.
+    public ModuleValidator() : this(() => Common.ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets tests pin whether this build supports NavalDLC.
+    internal ModuleValidator(Func<bool> isNavalSupported)
+    {
+        this.isNavalSupported = isNavalSupported;
+    }
+
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error, IReadOnlyDictionary<string, string> displayNames = null)
     {
         if (!ValidateGameVersion(serverModules, clientModules, out error))
@@ -59,7 +72,8 @@ public class ModuleValidator : IModuleValidator
             {
                 errors.Add($"To join the server the module {Describe(serverModule, displayNames)} with version '{serverModule.Version.ToString()}' is required.");
             }
-            else if (!serverModule.Version.IsSame(clientModule.Version, true))
+            // An official DLC's change set is the engine build, which differs between the dedicated server and the game.
+            else if (!serverModule.Version.IsSame(clientModule.Version, checkChangeSet: !serverModule.IsOfficial))
             {
                 errors.Add($"Wrong version of module {Describe(serverModule, displayNames)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }
@@ -116,9 +130,12 @@ public class ModuleValidator : IModuleValidator
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error) =>
         ValidateNoDlc(modules, null, out error);
 
-    private static bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, IReadOnlyDictionary<string, string> displayNames, out string error)
+    private bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, IReadOnlyDictionary<string, string> displayNames, out string error)
     {
-        var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>()).Where(module => module.IsDlc).ToList();
+        bool navalSupported = isNavalSupported();
+        var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>())
+            .Where(module => IsUnsupportedDlc(module, navalSupported))
+            .ToList();
 
         if (dlcModules.Any())
         {
@@ -129,6 +146,14 @@ public class ModuleValidator : IModuleValidator
 
         error = null;
         return true;
+    }
+
+    // A DLC is unsupported unless it is NavalDLC in a build that shipped the naval code.
+    private static bool IsUnsupportedDlc(ModuleInfo module, bool navalSupported)
+    {
+        if (!module.IsDlc) return false;
+
+        return !navalSupported || !Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc);
     }
 
     /// <summary>

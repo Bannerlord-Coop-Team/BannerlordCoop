@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Missions.Messages;

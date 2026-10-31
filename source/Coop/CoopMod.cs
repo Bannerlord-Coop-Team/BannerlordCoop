@@ -127,6 +127,8 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            ModInformation.IsNavalDlcActive = NavalSupportDetector.ForStartup(
+                moduleInfoProvider, System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location)).Detect();
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -154,7 +156,8 @@ namespace Coop
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
-                        "Unsupported module wwarning preference could not be saved"));
+                        "Unsupported module wwarning preference could not be saved"),
+                    ModInformation.IsNavalDlcActive);
             }
 
             if (ManagedServerConfig.IsManagedServer)

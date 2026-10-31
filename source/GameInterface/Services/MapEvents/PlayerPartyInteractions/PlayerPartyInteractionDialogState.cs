@@ -4,6 +4,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI.Missions;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -555,6 +556,14 @@ public static class PlayerPartyInteractionDialogState
         try
         {
             var handler = conversationManager.Handler;
+
+            // A conversation mission at sea refreshes its own view model, there is no map conversation dialog controller
+            if (handler is MissionGauntletConversationView missionConversationView)
+            {
+                missionConversationView._dataSource?.Refresh();
+                return;
+            }
+
             var mapConversationVm = GetMapConversationVm(handler);
             var dialogController = mapConversationVm?.GetType()
                 .GetProperty("DialogController", InstanceBindingFlags)?

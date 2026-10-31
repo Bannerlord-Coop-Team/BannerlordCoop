@@ -36,6 +36,8 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
         client.Call(() =>
         {
             fixture.CreateMission(client);
+            // AgentRoutReporter only reports a rout from a running battle.
+            Mission.Current.CurrentState = Mission.State.Continuing;
             var session = new BattleSession(client.Resolve<IControllerIdProvider>(), client.Resolve<IBattleHostRegistry>());
             Assert.True(session.TryBegin(mapEventId));
             var registry = client.Resolve<INetworkAgentRegistry>();

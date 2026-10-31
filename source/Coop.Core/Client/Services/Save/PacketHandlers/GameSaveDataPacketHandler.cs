@@ -12,6 +12,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
@@ -117,6 +118,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.InventoryPlayerData,
             completedTransfer.HeroMeetingData,
             completedTransfer.AgingPlayerData,
+            completedTransfer.NavalPlayerData,
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions,
             completedTransfer.ClanFinance,
@@ -143,6 +145,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             InventoryPlayerData = firstChunk.InventoryPlayerData;
             HeroMeetingData = firstChunk.HeroMeetingData;
             AgingPlayerData = firstChunk.AgingPlayerData;
+            NavalPlayerData = firstChunk.NavalPlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
             ClanFinance = firstChunk.ClanFinance;
@@ -162,6 +165,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public InventoryPlayerData InventoryPlayerData { get; }
         public HeroMeetingData HeroMeetingData { get; }
         public AgingPlayerData AgingPlayerData { get; }
+        public NavalPlayerData NavalPlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
         public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }

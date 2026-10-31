@@ -83,6 +83,9 @@ namespace Missions.Agents.Packets
             bool? mountAction0IsSyntheticTurn = null,
             long? mountAuthorityRevision = null)
         {
+            DeckShipIndex = 0;
+            DeckLocal = Vec3.Zero;
+            DeckShip = System.Guid.Empty;
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
@@ -185,9 +188,44 @@ namespace Missions.Agents.Packets
         public AgentMountData MountData { get; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
-        public float Speed { get; }
+        public float Speed { get; private set; }
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
         public uint MovementFlag { get; }
+        // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
+        [ProtoMember(11)]
+        public int DeckShipIndex { get; private set; }
+        [ProtoMember(12)]
+        public Vec3 DeckLocal { get; private set; }
+        public bool ShouldSerializeDeckLocal() => DeckShipIndex != 0;
+
+        /// <summary>The hull this deck pose is relative to, resolved from the packet's DeckShips on receive.</summary>
+        [ProtoIgnore]
+        public System.Guid DeckShip { get; private set; }
+
+        // Whether a received deck pose names a hull in its packet's table and carries a finite pose.
+        internal bool HasValidDeck => DeckShipIndex >= 1 && DeckShip != System.Guid.Empty && DeckLocal.IsValid
+            && Position.IsValid && LookDirection.IsValid && MovementDirection.IsValid
+            && !float.IsNaN(Speed) && !float.IsInfinity(Speed) && Speed >= 0f;
+
+        // Captured once per sample, so the send decision compares it; speed becomes deck-relative so the puppet throttle
+        // excludes hull motion.
+        internal void CaptureDeck(System.Guid deckShip, Vec3 deckLocal, float deckSpeed)
+        {
+            DeckShip = deckShip;
+            DeckLocal = deckLocal;
+            Speed = deckSpeed;
+        }
+
+        // The deck pose's 1-based index into the hull table of the packet that carries it.
+        internal void IndexDeck(int deckShipIndex) => DeckShipIndex = deckShipIndex;
+
+        // An index outside the table leaves DeckShip empty, so the pose is rejected rather than read as world.
+        internal void ResolveDeckShip(System.Guid[] deckShips)
+        {
+            DeckShip = DeckShipIndex >= 1 && deckShips != null && DeckShipIndex <= deckShips.Length
+                ? deckShips[DeckShipIndex - 1]
+                : System.Guid.Empty;
+        }
     }
 }

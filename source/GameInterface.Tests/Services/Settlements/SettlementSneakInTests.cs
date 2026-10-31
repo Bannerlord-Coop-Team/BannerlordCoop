@@ -9,7 +9,9 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Handlers;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.Settlements.Handlers;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Tests.Bootstrap;
@@ -121,11 +123,14 @@ public class SettlementSneakInTests
                 sessionInteractionsInterface.Object,
                 playerManager.Object);
 
+            using var conversationPartyTracker = new ConversationPartyTracker(objectManager.Object);
             using var captivityHandler = new PlayerCaptivityServerHandler(
                 objectManager.Object,
                 network.Object,
                 messageBroker,
-                playerManager.Object);
+                playerManager.Object,
+                new PlayerPartyLookup(objectManager.Object, playerManager.Object),
+                conversationPartyTracker);
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {

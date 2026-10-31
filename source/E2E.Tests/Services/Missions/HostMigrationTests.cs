@@ -1,7 +1,13 @@
+using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -15,6 +21,75 @@ namespace E2E.Tests.Services.Missions;
 public class HostMigrationTests : MissionTestEnvironment
 {
     public HostMigrationTests(ITestOutputHelper output) : base(output, numClients: 3) { }
+
+    [Fact]
+    public void HostDepartsAfterTheResultIsCommitted_KeepsTheNavalAssignmentWithoutPromoting()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        PlaceMapEvent(mapEventId, atSea: true);
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        EnterBattle(clients[2], mapEventId);
+        CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: true);
+
+        DepartBattle("ctrl-A", mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+        foreach (var client in Clients)
+        {
+            AssertHost(client, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+            AssertIsLocalHost(client, mapEventId, client == clients[0]);
+        }
+    }
+
+    [Fact]
+    public void HostDepartsAfterTheResultIsCommitted_PromotesOnLand()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        PlaceMapEvent(mapEventId, atSea: false);
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        EnterBattle(clients[2], mapEventId);
+        CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: true);
+
+        DepartBattle("ctrl-A", mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
+        foreach (var client in Clients)
+            AssertHost(client, mapEventId, "ctrl-B", "ctrl-C");
+    }
+
+    private void PlaceMapEvent(string mapEventId, bool atSea)
+    {
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId).Position =
+            new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
+    }
+
+    // At sea, where only an applied conclusion (or a reported result) keeps the host, so this checks the Applied filter.
+    [Fact]
+    public void HostDepartsAfterAnUnappliedConclusion_StillPromotes()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var clients = Clients.ToArray();
+        PlaceMapEvent(mapEventId, atSea: true);
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: false);
+
+        DepartBattle("ctrl-A", mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-B");
+        foreach (var client in Clients)
+            AssertHost(client, mapEventId, "ctrl-B");
+    }
+
+    private void CommitBattleState(string mapEventId, BattleState battleState, bool applied)
+    {
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+            new BattleStateChangeProcessed(mapEventId, battleState, applied)));
+    }
 
     [Fact]
     public void SuccessorDeparts_DropsFromLine_WithoutChangingHost()

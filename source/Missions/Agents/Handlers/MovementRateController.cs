@@ -980,7 +980,7 @@ public sealed class MovementRateController : IMovementRateController
         return Math.Min(desired, NormalizeRate(effectiveFrameLimitHz));
     }
 
-    private static int ReadFrameLimitHz()
+    internal static int ReadFrameLimitHz()
     {
         // Headless hosts do not initialize native graphics config, so they use the adaptive maximum.
         if (EngineApplicationInterface.IConfig == null)

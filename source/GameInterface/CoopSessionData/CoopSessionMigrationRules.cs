@@ -3,6 +3,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
@@ -42,6 +43,10 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerUnlockedFigureHeads)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerLastFigureheadLootTimes)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerSentTroops)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerCachedFleets)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(OrderOfBattlePlayerData), nameof(OrderOfBattlePlayerData.PlayerOrderOfBattles)));
 
         /// Define fields that should have their data cleared

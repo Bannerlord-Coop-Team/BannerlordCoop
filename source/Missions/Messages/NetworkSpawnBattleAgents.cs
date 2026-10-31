@@ -90,7 +90,7 @@ public class BattleAgentSpawnData
     [ProtoMember(2)]
     public readonly string CharacterId;
     [ProtoMember(4)]
-    public readonly Vec3 Position;
+    public Vec3 Position { get; private set; }
     [ProtoMember(5)]
     public readonly BattleSideEnum Side;
     [ProtoMember(6)]
@@ -148,6 +148,9 @@ public class BattleAgentSpawnData
     public readonly Guid SiegeEquipmentGrant;
     [ProtoMember(28)]
     public readonly long SiegeEquipmentGrantRevision;
+    // The naval hull this agent crews (Guid.Empty off ships); peers hold the puppet until that hull exists.
+    [ProtoMember(29)]
+    public readonly Guid ShipId;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -175,7 +178,8 @@ public class BattleAgentSpawnData
         long mountAuthorityRevision = 0,
         string mountOwnerControllerId = null,
         Guid siegeEquipmentGrant = default,
-        long siegeEquipmentGrantRevision = 0)
+        long siegeEquipmentGrantRevision = 0,
+        Guid shipId = default)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -205,5 +209,14 @@ public class BattleAgentSpawnData
         MountOwnerControllerId = mountOwnerControllerId ?? ownerControllerId;
         SiegeEquipmentGrant = siegeEquipmentGrant;
         SiegeEquipmentGrantRevision = siegeEquipmentGrantRevision;
+        ShipId = shipId;
+    }
+
+    /// <summary>This record with another spawn position and every other field kept.</summary>
+    public BattleAgentSpawnData WithPosition(Vec3 position)
+    {
+        var moved = (BattleAgentSpawnData)MemberwiseClone();
+        moved.Position = position;
+        return moved;
     }
 }

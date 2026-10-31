@@ -1,0 +1,486 @@
+﻿#if DEBUG
+using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Players.Messages;
+using GameInterface.Services.MapEvents.NavalScenarios;
+using Missions.Battles;
+using NavalDLC.GauntletUI.MissionViews;
+using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
+using NavalDLC.ViewModelCollection.OrderOfBattle;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+
+namespace Missions.Naval;
+
+/// <summary>
+/// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle, from Ready on the naval
+/// order of battle to placing, roping, steering, sinking, disconnecting or retreating, as the scenario says.
+/// </summary>
+public class NavalScenarioMissionLogic : MissionLogic
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalScenarioMissionLogic>();
+
+    internal const string DisconnectCommand = "coop.debug.connection.disconnect";
+    internal const string ReconnectCommand = "coop.debug.connection.reconnect";
+
+    private const float TargetWaitSeconds = 90f;
+    // A teleported hull settles on the water before its rope or helm step.
+    private const float SettleSeconds = 2f;
+    private const float RopeRetrySeconds = 0.5f;
+    private const float RopeGiveUpSeconds = 15f;
+    private const float ApproachLogSeconds = 5f;
+
+    private readonly INavalScenarioState state;
+    private readonly INavalDebugHulls hulls;
+    private readonly IBattleSession session;
+    private readonly INetworkShipRegistry registry;
+    private readonly IMessageBroker messageBroker;
+    private readonly string mapEventId;
+    // The scenario of this battle; adopted late when a returner's re-sent scenario arrives after it was pulled in.
+    private NavalScenarioConfig config;
+    private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
+        press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressReady"));
+    // The retreat confirmation's OK ends the mission, so its presses run off the mission tick as Ready's do.
+    private readonly INavalScenarioReadyPress retreatPress = new NavalScenarioReadyPress(
+        press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressRetreat"));
+
+    private float sinceDeployment;
+    private float sincePlacement;
+    private float sinceApproachLog;
+    private string loggedApproach;
+    // This client disconnected out of this mission; its scenario goes on in the mission it reconnects into.
+    private bool disconnectedHere;
+    private float ropeCooldown;
+    private MissionShip placedOwn;
+    private MissionShip placedTarget;
+
+    public NavalScenarioMissionLogic(INavalScenarioState state, INavalDebugHulls hulls, IBattleSession session,
+        INetworkShipRegistry registry, IMessageBroker messageBroker, string mapEventId)
+    {
+        this.state = state;
+        this.hulls = hulls;
+        this.session = session;
+        this.registry = registry;
+        this.messageBroker = messageBroker;
+        this.mapEventId = mapEventId;
+    }
+
+    // Runs this client's pending scenario steps for the battle's current phase.
+    public override void OnMissionTick(float dt)
+    {
+        if (!TryAdoptScenario() || state.Current != config || state.Phase == NavalScenarioPhase.Ended) return;
+
+        TickInBattleBookkeeping();
+
+        if (Mission.MissionEnded)
+        {
+            End();
+            return;
+        }
+
+        if (!Mission.IsDeploymentFinished)
+        {
+            state.Advance(NavalScenarioPhase.Deploying);
+            TickReady(dt);
+            return;
+        }
+
+        state.Advance(NavalScenarioPhase.Fighting);
+        Complete(NavalScenarioState.ReadyStep, true, readyPress.Presses > 0
+            ? $"Ready pressed {readyPress.Presses} time(s) on the naval order of battle"
+            : "deployment finished without the scenario pressing Ready");
+        if (IsRejoining)
+            Complete(NavalScenarioState.RejoinStep, true, $"reconnected into the battle and pressed Ready {readyPress.Presses} time(s)");
+
+        sinceDeployment += dt;
+        TickTimeline(dt);
+    }
+
+    // Takes this battle's scenario once it is current; a returner's re-sent scenario can arrive after it entered the battle.
+    private bool TryAdoptScenario()
+    {
+        if (config != null) return true;
+
+        var current = state.Current;
+        if (current == null || current.MapEventId != mapEventId) return false;
+
+        config = current;
+        Logger.Information("[NavalScenario] Running {Preset} {ScenarioId} in the battle of {MapEventId}", config.Preset,
+            config.ScenarioId, mapEventId);
+        return true;
+    }
+
+    // Fixes who disconnects while the first host is known, and settles a returner's re-entry when it is already in the battle.
+    private void TickInBattleBookkeeping()
+    {
+        state.ResolveDisconnectingControllerId(session.HostControllerId);
+
+        // Another player's mission start can pull a returner in before its re-sent scenario arrived (R41a-2 E).
+        Complete(NavalScenarioState.RejoinAttackStep, true, "already in the battle: a mission start pulled this client in");
+    }
+
+    // Ends this client's scenario steps with the mission.
+    public override void OnRemoveBehavior()
+    {
+        End();
+        base.OnRemoveBehavior();
+    }
+
+    // The mission a disconnected client reconnected into, before its deployment there is over.
+    private bool IsRejoining => !disconnectedHere && !state.IsPending(NavalScenarioState.DisconnectStep)
+        && state.IsPending(NavalScenarioState.RejoinStep);
+
+    private bool IsPressingReady => state.IsPending(NavalScenarioState.ReadyStep) || IsRejoining;
+
+    // Ready's FinishDeployment removes two behaviors, which breaks Mission.OnTick's reverse index over them, so the
+    // press runs after the tick returns, as a click on the order of battle's UI layer does.
+    private void TickReady(float dt)
+    {
+        if (!IsPressingReady) return;
+
+        readyPress.Tick(dt, () => ReadyOrderOfBattle() != null, PressReady);
+    }
+
+    // Presses the order of battle's Ready; a throw leaves vanilla's FinishDeployment half done, so the scenario stops there.
+    private void PressReady()
+    {
+        int press = readyPress.Presses + 1;
+        try
+        {
+            ReadyOrderOfBattle().ExecuteBeginMission();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalScenario] Ready press {Press} threw for {MapEventId}", press, config.MapEventId);
+            Abort(NavalScenarioState.ReadyStep, $"Ready press {press} threw {exception.GetType().Name}: deployment half-finished");
+            return;
+        }
+
+        Logger.Information("[NavalScenario] Pressed Ready ({Presses}) for {MapEventId}", press, config.MapEventId);
+    }
+
+    // The order of battle when its Ready button would accept; ExecuteBeginMission refuses while the assignment is
+    // dirty or a ship is unmanned. Null once this mission is gone, its deployment finished or the step completed.
+    private NavalOrderOfBattleVM ReadyOrderOfBattle()
+    {
+        var mission = Mission;
+        if (mission == null || Mission.Current != mission || mission.MissionEnded || mission.IsDeploymentFinished) return null;
+        if (state.Current != config || !IsPressingReady) return null;
+
+        var view = mission.GetMissionBehavior<MissionGauntletNavalOrderOfBattleView>();
+        var orderOfBattle = view?._dataSource;
+        if (orderOfBattle == null || !IsReadyEnabled(view._isActive, orderOfBattle.IsAssignmentDirty, orderOfBattle.CanStartMission))
+            return null;
+
+        return orderOfBattle;
+    }
+
+    /// <summary>Whether the order of battle's Ready button would accept a press.</summary>
+    internal static bool IsReadyEnabled(bool viewActive, bool assignmentDirty, bool canStartMission) =>
+        viewActive && !assignmentDirty && canStartMission;
+
+    // Runs the in-battle steps that are due, in their order, once deployment is over.
+    private void TickTimeline(float dt)
+    {
+        if (state.IsPending(NavalScenarioState.PlaceStep))
+        {
+            TryPlace();
+            return;
+        }
+
+        sincePlacement += dt;
+        if (config.Placement == NavalScenarioPlacement.Ramming) TickApproachLog(dt);
+        if (state.IsPending(NavalScenarioState.RopeStep)) TickRope(dt);
+        if (state.IsPending(NavalScenarioState.HelmStep) && sincePlacement >= SettleSeconds) DriveHelm();
+        if (state.IsPending(NavalScenarioState.SinkStep) && sinceDeployment >= config.DelaySeconds) HitWeakestAiHull();
+        if (state.IsPending(NavalScenarioState.DisconnectStep) && sinceDeployment >= config.DelaySeconds) Disconnect();
+        if (state.IsPending(NavalScenarioState.RetreatStep) && sinceDeployment >= config.DelaySeconds)
+            retreatPress.Tick(dt, () => RetreatHandler() != null, PressRetreat);
+    }
+
+    // Tab's scoreboard Retreat button (SPScoreboardVM.OnExitBattle) asks BasicMissionHandler for the confirmation; a later
+    // press clicks its OK, which runs OnBattleEnded and Mission.RetreatMission as the player's click does.
+    private void PressRetreat()
+    {
+        var handler = RetreatHandler();
+        if (!handler.IsWarningWidgetOpened)
+        {
+            Mission.GetMissionBehavior<MissionGauntletBattleScore>().DataSource.ExecuteQuitAction();
+            if (handler.IsWarningWidgetOpened)
+                Logger.Information("[NavalScenario] Pressed Retreat for {MapEventId}; the retreat confirmation is open", config.MapEventId);
+            else
+                Complete(NavalScenarioState.RetreatStep, false, "Tab's Retreat opened no retreat confirmation");
+            return;
+        }
+
+        Complete(NavalScenarioState.RetreatStep, true, $"Tab's Retreat opened vanilla's retreat confirmation {sinceDeployment:0} s " +
+            "after deploying; accepted it");
+        InformationManager.HideInquiry();
+        handler.OnEventAcceptSelectionWidget();
+    }
+
+    // The retreat handler while this mission runs, its scoreboard exists and the retreat step is pending; null otherwise.
+    private BasicMissionHandler RetreatHandler()
+    {
+        var mission = Mission;
+        if (mission == null || Mission.Current != mission || mission.MissionEnded) return null;
+        if (state.Current != config || !state.IsPending(NavalScenarioState.RetreatStep)) return null;
+        if (mission.GetMissionBehavior<MissionGauntletBattleScore>()?.DataSource == null) return null;
+
+        return mission.GetMissionBehavior<BasicMissionHandler>();
+    }
+
+    // Moves the own hull to the placement pose against one AI hull, or fails the placement once no target came in time.
+    private void TryPlace()
+    {
+        string error = hulls.TryGetOwnHull(out var own);
+        var targets = error == null ? AfloatAiHulls() : Array.Empty<MissionShip>();
+        var shipsLogic = Mission.GetMissionBehavior<NavalShipsLogic>();
+        if (error != null || targets.Length == 0 || shipsLogic == null)
+        {
+            if (sinceDeployment >= TargetWaitSeconds) FailPlacement(error ?? "no afloat AI hull was fielded");
+            return;
+        }
+
+        int rank = Math.Max(0, Array.IndexOf(config.ControllerIds, session.OwnControllerId));
+        var target = targets[rank % targets.Length];
+        bool starboard = (rank / targets.Length) % 2 == 0;
+        var targetFrame = target.GlobalFrame;
+        var pose = PlacementPose(config.Placement, targetFrame.origin.AsVec2, targetFrame.rotation.f.AsVec2,
+            own.MissionShipObject.DeploymentArea, target.MissionShipObject.DeploymentArea, config.Spacing, starboard);
+
+        // NavalShipsLogic.TeleportShip snaps the hull to the water and carries its crew, as ShipOrder's deployment move does.
+        var frame = MatrixFrame.Identity;
+        frame.rotation.f = pose.Direction.ToVec3().NormalizedCopy();
+        frame.rotation.OrthonormalizeAccordingToForwardAndKeepUpAsZAxis();
+        frame.origin = pose.Position.ToVec3();
+        shipsLogic.TeleportShip(own, frame, checkFreeArea: false);
+
+        placedOwn = own;
+        placedTarget = target;
+        sincePlacement = 0f;
+        Complete(NavalScenarioState.PlaceStep, true, $"own hull {hulls.ShipIdOf(own)} placed {config.Placement} " +
+            $"{config.Spacing:0.#} m from AI hull {hulls.ShipIdOf(target)}");
+    }
+
+    // The AI hulls still afloat, in a stable order every client shares.
+    private MissionShip[] AfloatAiHulls() => registry.Ships
+        .Where(ship => ship.IsNpcParty)
+        .OrderBy(ship => ship.ShipId)
+        .Select(ship => ship.Hull as MissionShip)
+        .Where(hull => hull != null && !hull.IsRemoved && !hull.IsSinking)
+        .ToArray();
+
+    // Fails the placement and the rope and helm steps that need it.
+    private void FailPlacement(string detail)
+    {
+        Complete(NavalScenarioState.PlaceStep, false, detail);
+        Complete(NavalScenarioState.RopeStep, false, "the hull was not placed");
+        Complete(NavalScenarioState.HelmStep, false, "the hull was not placed");
+    }
+
+    /// <summary>
+    /// The own hull's position and heading for a placement against a target hull, from both hulls' deployment areas
+    /// (x width, y length). Boarding lies parallel beside the target; ramming points the bow at the target's side.
+    /// </summary>
+    internal static (Vec2 Position, Vec2 Direction) PlacementPose(NavalScenarioPlacement placement, Vec2 targetPosition,
+        Vec2 targetForward, Vec2 ownArea, Vec2 targetArea, float spacing, bool starboard)
+    {
+        var forward = targetForward.Normalized();
+        var side = starboard ? forward.RightVec() : forward.LeftVec();
+        if (placement == NavalScenarioPlacement.Ramming)
+        {
+            float bowDistance = spacing + (ownArea.y / 2f) + (targetArea.x / 2f);
+            return (targetPosition + (side * bowDistance), -side);
+        }
+
+        float beamDistance = spacing + (ownArea.x / 2f) + (targetArea.x / 2f);
+        return (targetPosition + (side * beamDistance), forward);
+    }
+
+    // Each free rope station is tried in order through the rope_throw cheat's path until one reaches an aligned point.
+    private void TickRope(float dt)
+    {
+        ropeCooldown -= dt;
+        if (sincePlacement < SettleSeconds || ropeCooldown > 0f) return;
+        ropeCooldown = RopeRetrySeconds;
+
+        string last = "the own hull has no rope stations";
+        int stations = hulls.RopeStations(placedOwn).Length;
+        for (int index = 0; index < stations; index++)
+        {
+            var result = NavalRopeDebugCommands.Throw(hulls, placedOwn, placedTarget, index, targetIndex: null);
+            if (result.Succeeded)
+            {
+                Complete(NavalScenarioState.RopeStep, true, result.Output);
+                return;
+            }
+
+            last = result.Output;
+        }
+
+        if (sincePlacement >= RopeGiveUpSeconds) Complete(NavalScenarioState.RopeStep, false, last);
+    }
+
+    // Drives the own hull's helm full ahead through the helm cheat's path.
+    private void DriveHelm()
+    {
+        var request = new NavalHelmCoopCommand.HelmRequest(0f, 1f, 1, NavalHelmCoopCommand.MaxSeconds);
+        var result = NavalHelmCoopCommand.Drive(hulls, request);
+        Complete(NavalScenarioState.HelmStep, result.Succeeded, result.Output);
+    }
+
+    // The battle host owns the AI hulls, so its hit applies there and replicates as the hull's condition.
+    private void HitWeakestAiHull()
+    {
+        if (!session.IsLocalHost)
+        {
+            Complete(NavalScenarioState.SinkStep, true, "not the battle host, which hits the AI hull");
+            return;
+        }
+
+        var target = AfloatAiHulls().OrderBy(hull => hull.HitPoints / hull.ShipOrigin.MaxHitPoints).FirstOrDefault();
+        if (target == null)
+        {
+            Complete(NavalScenarioState.SinkStep, false, "no afloat AI hull was fielded");
+            return;
+        }
+
+        var result = NavalDamageCoopCommand.Hit(hulls.ShipIdOf(target).ToString(), hull => SinkingHitDamage(hull.ShipOrigin.MaxHitPoints),
+            "NAVAL_DAMAGE");
+        Complete(NavalScenarioState.SinkStep, result.Succeeded, result.Output);
+    }
+
+    /// <summary>The raw hull damage of the sinking preset's hit on a ship of <paramref name="maxHitPoints"/>.</summary>
+    internal static float SinkingHitDamage(float maxHitPoints) => maxHitPoints * NavalScenarioPresets.SinkingHitRatio;
+
+    // This client's disconnect, when the scenario picked it: a main-menu leave or a server drop now, a reconnect later.
+    private void Disconnect()
+    {
+        // The queued leave or drop completes the step once it ran.
+        if (disconnectedHere) return;
+
+        var disconnecting = state.ResolveDisconnectingControllerId(session.HostControllerId);
+        if (disconnecting == null || !session.IsOwn(disconnecting))
+        {
+            var detail = disconnecting == null ? "no player to disconnect" : $"{disconnecting} disconnects, so this client stays connected";
+            Complete(NavalScenarioState.DisconnectStep, true, detail);
+            Complete(NavalScenarioState.RejoinStep, true, detail);
+            return;
+        }
+
+        disconnectedHere = true;
+        string outcome = $"{(session.IsLocalHost ? "the battle host" : "a player that is not the host")} " +
+            $"{(config.GracefulDisconnect ? "left to the main menu" : "was dropped by the server")}; reconnects in " +
+            $"{config.ReconnectSeconds:0} s";
+        float reconnectSeconds = config.ReconnectSeconds;
+
+        // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
+        // this session's container.
+        if (config.GracefulDisconnect)
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RunConsoleCommand(DisconnectCommand), outcome, reconnectSeconds),
+                context: nameof(Disconnect));
+        else
+            GameThread.EnqueueSafe(() => CompleteDisconnect(RequestHardDrop(), outcome, reconnectSeconds), context: nameof(Disconnect));
+    }
+
+    // Records the disconnect step once its leave or drop ran and only then starts the reconnect timer; a missing leave
+    // command fails the step and the rejoin with it.
+    private void CompleteDisconnect(bool ran, string detail, float reconnectSeconds)
+    {
+        if (!ran)
+        {
+            Complete(NavalScenarioState.DisconnectStep, false, $"{DisconnectCommand} is not a console command");
+            Complete(NavalScenarioState.RejoinStep, false, "this client never disconnected");
+            return;
+        }
+
+        Complete(NavalScenarioState.DisconnectStep, true, detail);
+        Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
+            GameThread.RunSafe(Reconnect, context: nameof(CompleteDisconnect)));
+    }
+
+    // Runs the reconnect; a missing command fails the rejoin, since this client would never come back.
+    private void Reconnect()
+    {
+        if (!RunConsoleCommand(ReconnectCommand))
+            Complete(NavalScenarioState.RejoinStep, false, $"{ReconnectCommand} is not a console command");
+    }
+
+    // The server drops this client's connection at once, so the battle sees a real disconnect, not a mission leave, and no
+    // 60 s timeout passes first.
+    private bool RequestHardDrop()
+    {
+        messageBroker.Publish(this, new PlayerDisconnectRequested());
+        Logger.Information("[NavalScenario] Asked the server to drop this client's connection for {MapEventId}", config.MapEventId);
+        return true;
+    }
+
+    // Runs a console command as typed; false when no such command is registered.
+    private static bool RunConsoleCommand(string command)
+    {
+        string output = CommandLineFunctionality.CallFunction(command, new List<string>(), out bool found);
+        if (found) Logger.Information("[NavalScenario] {Command}: {Output}", command, output);
+        else Logger.Error("[NavalScenario] {Command} is not a console command; the scenario's disconnect can't run", command);
+        return found;
+    }
+
+    // R38 saw no contact at 40 m, so the ramming preset logs how close the hulls came and how the copies existed.
+    private void TickApproachLog(float dt)
+    {
+        sinceApproachLog += dt;
+        if (sinceApproachLog < ApproachLogSeconds) return;
+
+        sinceApproachLog = 0f;
+        LogClosestApproach();
+    }
+
+    // Logs the closest approach between hulls when it changed since the last line.
+    private void LogClosestApproach()
+    {
+        var closest = NavalContactProbe.DescribeClosest();
+        if (closest == null || closest == loggedApproach) return;
+
+        loggedApproach = closest;
+        Logger.Information("[NavalScenario] Ramming closest approach {Closest}", closest);
+    }
+
+    // Fails step and stops the scenario here: every other pending step fails and the mission tick runs no more steps.
+    private void Abort(string step, string detail)
+    {
+        Complete(step, false, detail);
+        state.Advance(NavalScenarioPhase.Ended);
+        foreach (var pending in state.Steps.Where(item => item.Status == NavalScenarioStepStatus.Pending).ToArray())
+            Complete(pending.Name, false, "the scenario stopped: " + detail);
+    }
+
+    // Ends the scenario here with the battle: every step still pending fails, unless this client disconnected out of it.
+    private void End()
+    {
+        if (config == null || state.Current != config || state.Phase == NavalScenarioPhase.Ended || disconnectedHere) return;
+
+        if (config.Placement == NavalScenarioPlacement.Ramming) LogClosestApproach();
+        state.Advance(NavalScenarioPhase.Ended);
+        foreach (var step in state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).ToArray())
+            Complete(step.Name, false, "the battle ended before this step ran");
+    }
+
+    // Records a pending step's outcome and logs it; does nothing for a step that already ran.
+    private void Complete(string step, bool succeeded, string detail)
+    {
+        if (!state.IsPending(step)) return;
+
+        state.Complete(step, succeeded, detail);
+        Logger.Information("[NavalScenario] Step {Step} {Outcome}: {Detail}", step, succeeded ? "done" : "failed", detail);
+    }
+}
+#endif

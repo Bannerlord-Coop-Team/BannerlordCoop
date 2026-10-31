@@ -66,6 +66,37 @@
       <Name>GameInterface</Name>
     </ProjectReference>
   </ItemGroup>
+  <!-- Naval tests build in Debug where War Sails is installed; their files are wrapped in #if COOP_NAVAL. -->
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' And '$(CoopNavalDlc)' == 'true' ">
+    <CoopNavalTests>true</CoopNavalTests>
+    <DefineConstants>$(DefineConstants);COOP_NAVAL</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition=" '$(CoopNavalTests)' == 'true' ">
+    <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj" />
+    <ProjectReference Include="..\Coop.Naval\Coop.Naval.csproj" />
+    <Reference Include="NavalDLC">
+      <HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.dll</HintPath>
+    </Reference>
+    <Reference Include="NavalDLC.View"><HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.View.dll</HintPath></Reference>
+    <Reference Include="NavalDLC.GauntletUI"><HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.GauntletUI.dll</HintPath></Reference>
+    <Reference Include="NavalDLC.ViewModelCollection"><HintPath>$(BannerlordDir)Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.ViewModelCollection.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.DotNet"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath></Reference>
+    <!-- NavalInitializationCampaignBehavior.OnCharacterCreationIsOver references StoryMode, which Harmony loads to patch it -->
+    <Reference Include="StoryMode"><HintPath>$(BannerlordDir)Modules\StoryMode\bin\Win64_Shipping_Client\StoryMode.dll</HintPath></Reference>
+    <Publicize Include="Missions.Naval" />
+    <Publicize Include="Coop.Naval" />
+    <Publicize Include="NavalDLC" />
+    <Publicize Include="NavalDLC.View" />
+    <Reference Include="TaleWorlds.ScreenSystem"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath></Reference>
+    <Publicize Include="TaleWorlds.ScreenSystem" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View" />
+    <Reference Include="TaleWorlds.GauntletUI.ExtraWidgets"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View"><HintPath>$(BannerlordDir)Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.GauntletUI"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.InputSystem"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath></Reference>
+    <Reference Include="TaleWorlds.TwoDimension"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath></Reference>
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="Steamworks.NET">
       <HintPath>..\libs\Steamworks.NET.20.1.0\Steamworks.NET.dll</HintPath>
@@ -86,6 +117,9 @@
     </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Localization">
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>

@@ -11,6 +11,9 @@ using Coop.Core.Common.Configuration;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace Coop.Core.Common;
@@ -68,11 +71,17 @@ public abstract class CommonModule : Module
     /// <typeparam name="TInterface">Type to collect if inherited from</typeparam>
     /// <param name="builder"><see cref="ContainerBuilder"/> for registering types</param>
     /// <param name="autoInstantiate">Flag to auto instantiate type when container is built</param>
-    protected void RegisterAllTypesWithInterface<TModule, TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
+    /// <param name="excludedTypes">Types to leave unregistered, such as naval handlers while NavalDLC co-op is off</param>
+    protected void RegisterAllTypesWithInterface<TModule, TInterface>(
+        ContainerBuilder builder, bool autoInstantiate = false, IEnumerable<Type> excludedTypes = null)
     {
+        var excluded = new HashSet<Type>(excludedTypes ?? Enumerable.Empty<Type>());
+
         // Namespace is needed to separate client and server handlers being registered with DI
         foreach (var handlerType in InterfaceCollector.GetInterfaces<TInterface>(typeof(TModule).Namespace))
         {
+            if (excluded.Contains(handlerType)) continue;
+
             var handlerBuilder = builder.RegisterType(handlerType).AsSelf().SingleInstance();
 
             if (autoInstantiate)

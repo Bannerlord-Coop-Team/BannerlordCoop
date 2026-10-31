@@ -14,6 +14,13 @@ using GameInterface;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Voice;
 using Missions;
+#if DEBUG
+using GameInterface.Services.MapEvents;
+using Missions.Battles;
+#endif
+#if COOP_NAVAL
+using Missions.Naval;
+#endif
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -68,7 +75,7 @@ namespace Coop.Tests.Autofac
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(41, missionCommands.Length);
+            Assert.Equal(45, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
@@ -84,6 +91,33 @@ namespace Coop.Tests.Autofac
             Assert.Equal(15, missionCommands.Length);
 #endif
         }
+
+#if COOP_NAVAL
+        [Fact]
+        public void Client_Container_WithNavalMissionModule_Build()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+            // Missions.Naval only loads with NavalDLC co-op active, which also turns the client's naval services on.
+            builder.RegisterModule(new ClientModule(navalServicesEnabled: true));
+            builder.RegisterModule(new GameInterfaceModule(navalServicesEnabled: true));
+            // MissionModule registers it only while NavalDLC is active, which a test process is not.
+            builder.RegisterModule<NavalMissionModule>();
+            using var container = builder.Build();
+
+            Assert.IsType<CoopNavalBattleLauncher>(container.Resolve<ICoopNavalBattleLauncher>());
+            Assert.IsType<NavalShipEngine>(container.Resolve<INavalShipEngine>());
+            Assert.IsType<NavalBattleServicesFactory>(container.Resolve<INavalBattleServicesFactory>());
+            Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
+            Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
+            Assert.IsType<NavalDebugHulls>(container.Resolve<INavalDebugHulls>());
+
+            ICoopCommand[] navalCommands = container.Resolve<IEnumerable<ICoopCommand>>()
+                .Where(command => command.GetType().Assembly == typeof(NavalMissionModule).Assembly)
+                .ToArray();
+            Assert.Contains(navalCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.naval.inspect");
+            Assert.Contains(navalCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.naval.rope_status");
+        }
+#endif
 
         [Fact]
         public void Server_Container_Build()

@@ -606,7 +606,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 client.Resolve<IBattleMissionInitializerResolver>(),
-                null!);
+                null!, Mock.Of<IBattleHostRetentionPolicy>());
 
             try
             {
@@ -876,7 +876,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 resolver,
-                null!);
+                null!, Mock.Of<IBattleHostRetentionPolicy>());
 
             try
             {

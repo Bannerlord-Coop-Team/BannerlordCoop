@@ -18,7 +18,7 @@ internal class EncounterGameMenuModelPatches
     [HarmonyPostfix]
     private static void Postfix(ref string __result)
     {
-        if (ModInformation.IsServer || __result != "join_encounter" || PlayerEncounter.Current != null)
+        if (ModInformation.IsServer || (__result != "join_encounter" && __result != "naval_town_outside") || PlayerEncounter.Current != null)
             return;
 
         var mainParty = MobileParty.MainParty;
@@ -32,7 +32,7 @@ internal class EncounterGameMenuModelPatches
             mainParty.StringId, settlement.StringId, settlement.Party?.MapEvent != null,
             mainParty.Party?.MapEvent != null, PlayerEncounter.Current != null);
 #endif
-        // Settlement state can arrive before the encounter that the join menu dereferences.
+        // Settlement state can arrive before the encounter that the join and port menus dereference.
         __result = null;
         MessageBroker.Instance.Publish(null, new StartSettlementEncounterAttempted(mainParty, settlement, isAutomaticRecovery: true));
     }

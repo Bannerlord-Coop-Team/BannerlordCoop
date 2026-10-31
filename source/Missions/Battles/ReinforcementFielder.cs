@@ -29,6 +29,12 @@ public interface IReinforcementFielder : IDisposable
 
     /// <summary>[Game thread] Field queued migration reserves as battle capacity becomes available.</summary>
     void Tick();
+
+    /// <summary>
+    /// [Game thread] Hands over a side's queued migration reserve to a mission that fields it itself, as a naval battle does
+    /// on its hulls; troops a late replay already brought in are left out.
+    /// </summary>
+    IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side);
 }
 
 /// <inheritdoc cref="IReinforcementFielder"/>
@@ -441,6 +447,29 @@ public class ReinforcementFielder : IReinforcementFielder
             }
         }
         return spawned;
+    }
+
+    public IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side)
+    {
+        if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return Array.Empty<CoopAgentOrigin>();
+
+        var parties = recoveryParties[(int)side];
+        var origins = new List<CoopAgentOrigin>();
+        foreach (var recovery in parties)
+        {
+            recoveryPartyIds.Remove(recovery.PartyId);
+            // As in FieldRecoverySide: a party that left this host's reserve scope (its owner came back) is not fielded here.
+            if (!recovery.Supplier.ContainsParty(recovery.PartyId)) continue;
+
+            foreach (var origin in recovery.Origins)
+            {
+                if (!HasLivePartySeed(recovery.PartyId, origin.UniqueSeed)) origins.Add(origin);
+            }
+        }
+
+        parties.Clear();
+        recoveryCursors[(int)side] = 0;
+        return origins;
     }
 
     // Only the first add records, right after it, so a count of 1 means the formation was empty before the

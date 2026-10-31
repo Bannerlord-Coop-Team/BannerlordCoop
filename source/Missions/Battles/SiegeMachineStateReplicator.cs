@@ -1915,29 +1915,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (peerWeaponState.TryGetValue(id, out var previous) && previous == weaponState) return;
         peerWeaponState[id] = weaponState;
 
-        var skeletons = rangedWeapon.SkeletonOwnerObjects;
-        if (skeletons == null) return;
-
-        switch ((RangedSiegeWeapon.WeaponState)weaponState)
-        {
-            case RangedSiegeWeapon.WeaponState.Reloading:
-            {
-                var animations = rangedWeapon.SetUpAnimations;
-                for (int i = 0; i < skeletons.Length; i++)
-                {
-                    if (skeletons[i] == null) continue;
-                    if (skeletons[i].GameEntity.IsSkeletonAnimationPaused())
-                        skeletons[i].ResumeSkeletonAnimationSynched();
-                    else if (animations != null && i < animations.Length && !string.IsNullOrEmpty(animations[i]))
-                        skeletons[i].SetAnimationAtChannelSynched(animations[i], 0);
-                }
-                break;
-            }
-            case RangedSiegeWeapon.WeaponState.ReloadingPaused:
-                foreach (var skeleton in skeletons)
-                    skeleton?.PauseSkeletonAnimationSynched();
-                break;
-        }
+        RangedSiegeWeaponPresentation.PlayWeaponStateAnimation(rangedWeapon, (RangedSiegeWeapon.WeaponState)weaponState);
     }
 
     public void CatchUpJoiner(string controllerId)

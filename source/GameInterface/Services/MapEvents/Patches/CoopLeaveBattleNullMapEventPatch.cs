@@ -92,3 +92,26 @@ internal class CoopEncounterAbandonArmyConditionNullMapEventPatch
         return false;
     }
 }
+
+/// <summary>
+/// Guards "Continue siege preparations" on a stale encounter menu whose main party the server already took off every side:
+/// vanilla asks <c>GetLeaderParty(MainParty.Side)</c> with <c>BattleSideEnum.None</c> and throws IndexOutOfRangeException.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.game_menu_town_besiege_continue_siege_on_condition))]
+internal class CoopContinueSiegeConditionNoSidePatch
+{
+    // A main party on no side can't lead one, so the option is hidden, which is what vanilla answers without the throw.
+    [HarmonyPrefix]
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
+    {
+        if (PartyBase.MainParty?.MapEventSide != null)
+            return true;
+
+        if (args != null)
+            args.optionLeaveType = GameMenuOption.LeaveType.Continue;
+
+        __result = false;
+        return false;
+    }
+}

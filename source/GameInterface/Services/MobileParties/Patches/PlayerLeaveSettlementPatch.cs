@@ -43,6 +43,45 @@ internal class PlayerLeaveSettlementPatch
     }
 }
 
+[HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
+internal class PlayerVillageLandSeaLeavePatch
+{
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_village_set_sail_leave_on_consequence))]
+    [HarmonyPrefix]
+    public static bool SetSailPrefix() => RequestLeave(SettlementLeaveType.SetSail);
+
+    // Anchoring the fleet at the village only works on the server, so the whole disembark goes through it
+    [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_village_disembark_on_consequence))]
+    [HarmonyPrefix]
+    public static bool DisembarkPrefix() => RequestLeave(SettlementLeaveType.Disembark);
+
+    private static bool RequestLeave(SettlementLeaveType leaveType)
+    {
+        var party = MobileParty.MainParty;
+
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, leaveType));
+
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
+internal class PlayerNavalTownLeavePatch
+{
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_town_naval_outside_leave_on_consequence))]
+    [HarmonyPrefix]
+    public static bool Prefix()
+    {
+        var party = MobileParty.MainParty;
+
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail));
+
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(RetirementCampaignBehavior))]
 internal class PlayerLeaveRetirementSettlementPatch
 {

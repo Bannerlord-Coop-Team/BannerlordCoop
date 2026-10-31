@@ -55,6 +55,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleAuthorityMigrator authorityMigrator;
+    private readonly IBattleTeamResolver teamResolver;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -85,7 +86,8 @@ public class PuppetSpawner : IPuppetSpawner
         IMissionWeaponDataMapper missionWeaponDataMapper,
         IPuppetRoutApplier puppetRoutApplier = null,
         IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
-        IBattleAuthorityMigrator authorityMigrator = null)
+        IBattleAuthorityMigrator authorityMigrator = null,
+        IBattleTeamResolver teamResolver = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -100,6 +102,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
         this.authorityMigrator = authorityMigrator;
+        this.teamResolver = teamResolver ?? new BattleTeamResolver();
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkBattleAgentFormations>(Handle_Formations);
@@ -159,15 +162,32 @@ public class PuppetSpawner : IPuppetSpawner
             var pending = pendingFormations[id];
             // A new owner's update can arrive before the authority handoff on the other connection.
             if (info.AuthorityRevision < pending.Data.AuthorityRevision) continue;
+            // Crew joining a hull whose copy has not spawned here yet waits for it, like its spawn record does.
+            bool resolved = TryResolveCrewFormation(pending.Data.ShipId, pending.Data.FormationIndex, out int formationIndex);
+            if (!resolved && !coopMissionComponent.ShipRegistry.IsGone(pending.Data.ShipId)) continue;
             pendingFormations.Remove(id);
-            if (info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
+            if (!resolved || info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
                 || session.IsOwn(info.CurrentAuthority) || info.Agent == null || !info.Agent.IsActive()) continue;
 
-            if (pending.Data.FormationIndex == -1)
+            if (formationIndex == -1)
                 info.Agent.Formation = null;
             else
-                formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
+                formationAssigner.Assign(info.Agent, formationIndex);
         }
+    }
+
+    /// <summary>
+    /// The local formation for an owner's crew update. Each client fields a hull into its first free formation, so a crew
+    /// member follows its hull's ship id; false while that hull is not registered here.
+    /// </summary>
+    private bool TryResolveCrewFormation(Guid shipId, int ownerFormationIndex, out int formationIndex)
+    {
+        formationIndex = ownerFormationIndex;
+        if (shipId == Guid.Empty || coopMissionComponent.ShipRegistry == null) return true;
+        if (!coopMissionComponent.ShipRegistry.TryGet(shipId, out var ship) || ship.Formation == null) return false;
+
+        formationIndex = (int)ship.Formation.FormationIndex;
+        return true;
     }
 
     // Refresh an existing remote puppet from a snapshot without changing local or newer-authority membership.
@@ -176,18 +196,22 @@ public class PuppetSpawner : IPuppetSpawner
         if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != data.OwnerControllerId
             || info.AuthorityRevision != data.AuthorityRevision || info.Agent == null || !info.Agent.IsActive()) return;
         if (data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) return;
+        if (!TryResolveCrewFormation(data.ShipId, data.FormationIndex, out int formationIndex)) return;
 
-        if (data.FormationIndex == -1)
+        if (formationIndex == -1)
             info.Agent.Formation = null;
         else
-            formationAssigner.Assign(info.Agent, data.FormationIndex);
+            formationAssigner.Assign(info.Agent, formationIndex);
     }
 
     private void RetainPendingFormation(Guid agentId, PendingAuthority authority)
     {
         if (pendingFormations.TryGetValue(agentId, out var pending)
             && pending.Controller == authority.ControllerId && pending.Data.AuthorityRevision == authority.Revision)
+        {
             authority.FormationIndex = pending.Data.FormationIndex;
+            authority.FormationShipId = pending.Data.ShipId;
+        }
     }
 
     private void DiscardPendingFormations(Guid agentId)
@@ -398,8 +422,19 @@ public class PuppetSpawner : IPuppetSpawner
         int slotsNeeded = agentBudget.SlotsForEquipment(data.SpawnEquipment);
         if (slotsNeeded > slotsAvailable) return false; // at capacity — buffer
 
-        var team = ResolvePuppetTeam(data);
+        var team = teamResolver.ResolveReplicatedTeam(data.Side, session.IsOwn(data.OwnerControllerId));
         if (team == null) return false;                                 // teams not created yet — buffer
+
+        // Crew of a hull waits for that hull and joins its local formation, which is the hull's ship assignment.
+        NetworkShipInfo crewShip = null;
+        if (data.ShipId != Guid.Empty && !coopMissionComponent.ShipRegistry.TryGet(data.ShipId, out crewShip))
+        {
+            if (!coopMissionComponent.ShipRegistry.IsGone(data.ShipId)) return false; // hull not spawned yet — buffer
+
+            // The ship replicator gave up on this hull or it left the mission, so its crew is dropped with it.
+            DiscardPendingFormations(data.AgentId);
+            return true;
+        }
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
@@ -473,11 +508,17 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        // Retained spawns carry the last accepted formation even after their authority migrates.
-        if (pendingAuthority?.FormationIndex == -1)
+        // Retained spawns carry the last accepted formation even after their authority migrates; otherwise crew
+        // join their hull's formation.
+        int? retainedFormation = null;
+        if (pendingAuthority?.FormationIndex is int retained
+            && TryResolveCrewFormation(pendingAuthority.FormationShipId, retained, out int retainedIndex))
+            retainedFormation = retainedIndex;
+        if (retainedFormation == -1)
             agent.Formation = null;
         else
-            formationAssigner.Assign(agent, pendingAuthority?.FormationIndex ?? data.FormationIndex);
+            formationAssigner.Assign(agent, retainedFormation
+                ?? (crewShip?.Formation != null ? (int)crewShip.Formation.FormationIndex : data.FormationIndex));
         if (retainedPlayerBootstrap)
         {
             // BuildAgent has established InitialPlayerAgent; native deployment still owns its activation.
@@ -680,6 +721,7 @@ public class PuppetSpawner : IPuppetSpawner
                 if (revision > authority.Revision)
                 {
                     authority.FormationIndex = null;
+                    authority.FormationShipId = Guid.Empty;
                     authority.ControllerId = controllerId;
                     authority.Revision = revision;
                 }
@@ -905,6 +947,8 @@ public class PuppetSpawner : IPuppetSpawner
         public string ControllerId;
         public long Revision;
         public int? FormationIndex;
+        /// <summary>The hull <see cref="FormationIndex"/> was the owner's formation of, or empty.</summary>
+        public Guid FormationShipId;
         public readonly string OriginalOwner;
         public readonly string MovementScopeId;
         public readonly ushort MovementId;
@@ -1025,31 +1069,6 @@ public class PuppetSpawner : IPuppetSpawner
             if (involved?.Party != null) return involved.Party;
         }
 
-        return null;
-    }
-
-    // Another owner's puppet must stay off PlayerTeam because every formation there is locally commandable.
-    // Use the side's non-player team; missing main or ally teams are buffered until initialization completes.
-    private Team ResolvePuppetTeam(BattleAgentSpawnData data)
-    {
-        var mainTeam = BattleTeams.Resolve(data.Side);
-        if (mainTeam == null) return null;
-
-        // Our OWN troop replicated back to us (e.g. our own-party deployment broadcast echoed over the mesh) belongs
-        // on our own team — it is the one puppet we DO control.
-        if (session.IsOwn(data.OwnerControllerId))
-            return mainTeam;
-
-        var playerTeam = Mission.Current.PlayerTeam;
-        if (mainTeam != playerTeam) return mainTeam;          // main team isn't ours (we're an ally) — safe to use
-
-        // The side's main team IS our PlayerTeam, so route to the side's ally team instead so we can't command it.
-        var allyTeam = data.Side == BattleSideEnum.Attacker
-            ? Mission.Current.AttackerAllyTeam
-            : Mission.Current.DefenderAllyTeam;
-        if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
-
-        // Never put another player's party on the local command team.
         return null;
     }
 

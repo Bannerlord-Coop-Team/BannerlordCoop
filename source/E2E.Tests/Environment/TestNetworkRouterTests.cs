@@ -700,6 +700,7 @@ public class TestNetworkRouterTests : E2ETestEnvironment
             null!,
             null!,
             null!,
+            null!,
             null!);
 
     [Fact]

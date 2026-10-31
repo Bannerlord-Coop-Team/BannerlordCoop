@@ -66,6 +66,7 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
                 HostControllerId,
                 1,
                 out It.Ref<BattleState>.IsAny,
+                It.IsAny<bool>(),
                 It.IsAny<bool>()))
             .Returns((
                 string _,
@@ -73,7 +74,8 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
                 string _,
                 int _,
                 out BattleState concludedState,
-                bool canConclude) =>
+                bool canConclude,
+                bool _) =>
             {
                 concludedState = BattleState.DefenderVictory;
                 return canConclude;

@@ -1,0 +1,162 @@
+﻿using Common.Commands;
+using Missions.Battles;
+using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
+using TaleWorlds.CampaignSystem.Naval;
+using Newtonsoft.Json;
+using System;
+using System.Linq;
+using TaleWorlds.Engine;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+
+namespace Missions.Naval;
+
+/// <summary>Reports the local coop naval battle: session, setup guard's reserve check and per-hull state.</summary>
+public sealed class NavalInspectCoopCommand : ICoopCommand
+{
+#if DEBUG
+    private readonly INavalRamInspect ramInspect;
+
+    /// <summary>Reads owner-side crew morale independently of the other inspect sections.</summary>
+    public NavalInspectCoopCommand(INavalRamInspect ramInspect) => this.ramInspect = ramInspect;
+#endif
+
+    public string Prefix => "coop.debug.naval";
+
+    public string Name => "inspect";
+
+    public string Description => "Reports the coop naval battle session and hull state on this client; summary prints one line per hull.";
+
+    public CoopCommandSide Side => CoopCommandSide.Client;
+
+    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+    {
+        new ExpectedArgs("mode", "summary (or brief) prints a header and one line per hull instead of the full JSON.", false),
+    };
+
+    // Reports the full JSON state, or with summary the compact per-hull lines.
+    public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+    {
+        if (!NavalInspectSummary.TryParseMode(args, out bool summary, out var error))
+            return new CoopCommandResult(false, error, "command_failed");
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var shipsLogic = mission?.GetMissionBehavior<NavalShipsLogic>();
+        if (controller == null || shipsLogic == null)
+            return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
+
+        if (summary) return new CoopCommandResult(true, NavalInspectSummary.Describe(mission, controller));
+
+        var state = new
+        {
+            instance = controller.Session.InstanceId,
+            ownController = controller.Session.OwnControllerId,
+            isHost = controller.Session.IsLocalHost,
+            deploymentCommitted = controller.Deployment.IsCommitted,
+            ownReservePresent = mission.GetMissionBehavior<CoopNavalSetupGuard>()?.ReservePresent,
+            shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipReplicator.Inspect(),
+            shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipCaptureReplicator.Inspect(),
+            shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipDamageRouter.Inspect(),
+            shipDamageGate = NavalShipDamageGate.Inspect(),
+#if DEBUG
+            // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
+            ramProbe = ramInspect.Inspect(mission, controller),
+            copyProbe = mission.GetMissionBehavior<NavalCopyProbeLogic>()?.Inspect(),
+#endif
+            shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipWeaponReplicator.Inspect(),
+            shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
+            hostEpoch = controller.Session.HostEpoch,
+            npcFleet = InspectNpcFleet(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
+            end = mission.GetMissionBehavior<CoopNavalBattleEndLogic>()?.Inspect(),
+            stationUse = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.StationUseReplicator.Inspect(),
+            agents = InspectAgents(mission, controller.MissionComponent, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
+            mainAgent = Agent.Main?.Character?.StringId,
+            mainAgentUsing = Agent.Main?.CurrentlyUsedGameObject is UsableMissionObject used ? used.GameEntity.Name : null,
+            ships = shipsLogic.AllShips.Select(ship => new
+            {
+                hull = ship.ShipOrigin.Hull?.StringId,
+                origin = ship.ShipOrigin.GetType().Name,
+                detachedFromParty = ship.ShipOrigin is Ship campaignShip ? (bool?)(campaignShip.Owner?.Ships.Contains(campaignShip) != true) : null,
+                team = ship.Team?.TeamSide.ToString(),
+                formation = ship.Formation?.FormationIndex.ToString(),
+                isPlayerShip = ship.IsPlayerShip,
+                hasPlayerStandingPoint = ship.HasPlayerStandingPointEntity,
+                captain = ship.Captain?.Character?.StringId,
+                helm = ship.ShipControllerMachine?.PilotAgent?.Character?.StringId,
+                captureTimer = ship.ShipControllerMachine?.CaptureTimer,
+                controller = ship.Controller?.ControllerType.ToString() ?? "None",
+                activeBody = ship.GameEntity.IsValid ? (bool?)ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() : null,
+                foreign = NavalForeignHulls.Contains(ship),
+                hitPoints = ship.HitPoints,
+                maxHitPoints = ship.ShipOrigin.MaxHitPoints,
+#if DEBUG
+                fatesSent = FatesSentOf(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>(), ship),
+#endif
+                position = ship.GlobalFrame.origin.ToString(),
+            }).ToArray(),
+        };
+
+        return new CoopCommandResult(true, "NAVAL_INSPECT " + JsonConvert.SerializeObject(state));
+    }
+
+#if DEBUG
+    // How many campaign ship fates this client sent for the hull; null for a hull the registry does not know.
+    private static int? FatesSentOf(CoopBattleController controller, CoopNavalBattleBehavior naval, MissionShip ship)
+    {
+        if (naval == null || !controller.MissionComponent.ShipRegistry.TryGetByHull(ship, out var info)) return null;
+
+        return naval.Services.FateReporter.FatesSentOf(info.ShipId);
+    }
+#endif
+
+    // AI hulls with their authority and how many have a pilot at the helm (the AI captain steers through it). A sinking or
+    // sunk hull has no controller and needs no pilot, so the afloat counts leave it out.
+    private static object InspectNpcFleet(CoopBattleController controller, CoopNavalBattleBehavior naval)
+    {
+        var hulls = controller.MissionComponent.ShipRegistry.Ships.Where(ship => ship.IsNpcParty).ToArray();
+        var afloat = hulls.Where(ship => (ship.Hull as MissionShip)?.IsSinking != true).ToArray();
+        return new
+        {
+            spawner = naval?.NpcFleetSpawner.Inspect(),
+            migrationReserve = naval?.Services.MigrationReserveFielder.Inspect(),
+            isLocalHost = controller.Session.IsLocalHost,
+            hulls = hulls.Length,
+            sinkingOrSunk = hulls.Length - afloat.Length,
+            ownedHere = afloat.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
+            helmPilotsSeated = afloat.Count(ship => (ship.Hull as MissionShip)?.ShipControllerMachine?.PilotAgent != null),
+            aiControllers = afloat.Count(ship => (ship.Hull as MissionShip)?.Controller?.ControllerType == NavalDLC.Missions.ShipControl.ShipControllerType.AI),
+        };
+    }
+
+    // Registered human agents with the hull whose formation they serve on, so a puppet's hull is visible.
+    // A sunk hull serves no crew, matching its owner, where vanilla takes swimming AI crew off its formation.
+    private static object[] InspectAgents(Mission mission, ICoopMissionComponent missionComponent, CoopNavalBattleBehavior naval) => mission.Agents
+        .Where(agent => agent.IsHuman && agent.IsActive())
+        .Select(agent =>
+        {
+            missionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info);
+            missionComponent.ShipRegistry.TryGetByFormation(agent.Formation, out var ship);
+            if ((ship?.Hull as MissionShip)?.IsSunk == true) ship = null;
+            Guid deckShip = Guid.Empty;
+            Vec3 deckLocal = Vec3.Zero;
+            bool onDeck = naval != null && naval.Services.DeckPoses.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
+            return (object)new
+            {
+                name = agent.Name,
+                agentId = info?.AgentId,
+                owner = info?.CurrentAuthority,
+                team = agent.Team?.TeamSide.ToString(),
+                formation = agent.Formation?.FormationIndex.ToString(),
+                shipId = ship?.ShipId,
+                shipOwner = ship?.CurrentAuthority,
+                deckShip = onDeck ? (Guid?)deckShip : null,
+                deckLocal = onDeck ? deckLocal.ToString() : null,
+                station = naval?.Services.StationUseReplicator.DescribeStation(agent),
+                seatLock = agent.MovementLockedState.ToString(),
+                ownSeat = info != null && naval != null && naval.Services.StationUseReplicator.IsOwnSeat(info.AgentId),
+            };
+        })
+        .ToArray();
+}

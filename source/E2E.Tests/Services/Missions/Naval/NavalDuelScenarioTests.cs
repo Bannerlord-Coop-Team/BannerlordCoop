@@ -1,0 +1,65 @@
+﻿using TaleWorlds.Core;
+using TaleWorlds.Library;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Missions.Naval;
+
+/// <summary>The <c>duel</c> preset: two players on opposite sides see each other's hull on the enemy team and hit it through its owner.</summary>
+public class NavalDuelScenarioTests : NavalBattleTestEnvironment
+{
+    public NavalDuelScenarioTests(ITestOutputHelper output) : base(output, numClients: 2) { }
+
+    [Fact]
+    public void Duel_EachSeesTheOthersHullOnTheEnemyTeam_AndDamageRoutesToItsOwner()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        battle.CommitAll();
+        battle.TickAll();
+
+        Assert.Same(a.Mission.DefenderTeam.Shell, a.Hull(hullB).Team);
+        Assert.Same(b.Mission.AttackerTeam.Shell, b.Hull(hullA).Team);
+        Assert.NotSame(a.Mission.PlayerTeam.Shell, a.Hull(hullB).Team);
+        Assert.NotSame(b.Mission.PlayerTeam.Shell, b.Hull(hullA).Team);
+        Assert.Equal("B", a.Ship(hullB).CurrentAuthority);
+        Assert.Equal("A", b.Ship(hullA).CurrentAuthority);
+
+        a.Hit(hullB, 25f);
+        b.Hit(hullA, 40f);
+        // Each owner applies the hit it was sent, and its new condition reaches the other client's copy a tick later.
+        battle.TickAll(2);
+
+        Assert.Single(b.Hull(hullB).AppliedDamage);
+        Assert.Single(a.Hull(hullA).AppliedDamage);
+        Assert.Empty(a.Hull(hullB).AppliedDamage);
+        Assert.Empty(b.Hull(hullA).AppliedDamage);
+        Assert.Equal(75f, a.Hull(hullB).HitPoints, 3);
+        Assert.Equal(60f, b.Hull(hullA).HitPoints, 3);
+    }
+
+    // Every spawn raises the spawn event, and only a hull on this client's PlayerTeam is its own: each player's hull registers
+    // once under its owner and party, and the copy of the other's hull is known only by its record's id.
+    [Fact]
+    public void Duel_OwnHullsRegisterFromTheSpawnEvent_AndTheCopiesAddNoOwnHull()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        Assert.Equal(new[] { hullA }, a.RegisteredShipIds());
+        Assert.Equal(new[] { hullB }, b.RegisteredShipIds());
+
+        battle.CommitAll();
+        battle.TickAll();
+
+        var both = new[] { hullA, hullB }.OrderBy(id => id).ToArray();
+        Assert.Equal(both, a.RegisteredShipIds());
+        Assert.Equal(both, b.RegisteredShipIds());
+        Assert.Equal(("B", battle.PartyIds["B"], false), (a.Ship(hullB).CurrentAuthority, a.Ship(hullB).MapEventPartyId,
+            a.Ship(hullB).IsNpcParty));
+    }
+}

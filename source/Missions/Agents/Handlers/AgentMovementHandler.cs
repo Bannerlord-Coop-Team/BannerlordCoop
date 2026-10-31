@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
@@ -36,6 +37,24 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     void Configure(MovementCadenceProfile profile);
 
     bool TrySetForcedBulkHz(int? hz, out string error);
+
+    /// <summary>
+    /// Owned agents the seam places on a hull send hull-local poses and received ones rebase on the resolved local hull; null
+    /// turns it off.
+    /// </summary>
+    void ConfigureShipDeck(IShipDeckSeam seam);
+
+    /// <summary>Owned agents seated at a ship station send no world movement; null turns it off.</summary>
+    void ConfigureStationSeats(IShipStationSeats seats);
+
+    /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
+    void ForgetMovementTarget(Agent agent);
+
+    /// <summary>[Game thread] The naval deck counters (diagnostics).</summary>
+    object InspectShipDecks();
+
+    /// <summary>Per-mission deck diagnostics and DEBUG receiver rejection control.</summary>
+    INavalDeckMovementProbe DeckMovementProbe { get; }
 
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 
@@ -70,7 +89,7 @@ internal interface IAgentMovementDebugControl
 }
 #endif
 
-public class AgentMovementHandler : IAgentMovementHandler
+public partial class AgentMovementHandler : IAgentMovementHandler
 #if DEBUG
     , IAgentMovementDebugControl
 #endif
@@ -440,6 +459,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext,
+        INavalDeckMovementProbe deckMovementProbe,
         ILocationNpcAuthorityState locationAuthorityState,
         IRelayNetwork relayNetwork = null)
     {
@@ -461,6 +481,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        DeckMovementProbe = deckMovementProbe;
         this.locationAuthorityState = locationAuthorityState;
         this.relayNetwork = relayNetwork;
         _interpolator = new AgentPositionInterpolator(agentRegistry, locationAuthorityState);
@@ -510,6 +531,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         resolvedMountIdentities.Clear();
         receivedMovementSequences.Clear();
         recipientMovementStates.Clear();
+        ConfigureShipDeck(null);
+        ConfigureStationSeats(null);
 
         movementBatchSender.Clear();
         movementRateController.Dispose();
@@ -795,6 +818,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                     turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
                     mountAction0IsSyntheticTurn: syntheticTurn,
                     mountAuthorityRevision: mountAuthorityRevision);
+                CaptureDeck(agentInfo, ref agentData);
 
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
@@ -1006,6 +1030,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
+            if (WithholdSeatedMovement(controllerId, recipient, captured)) continue;
             bool shouldSend = captured.IsMount
                 ? ShouldSendMovement(recipient, agentId, captured.MountData)
                 : ShouldSendMovement(recipient, agentId, captured.AgentData);
@@ -1077,7 +1102,13 @@ public class AgentMovementHandler : IAgentMovementHandler
             EnumerateAgentMovementBatches(priorityMovement, movement),
             firstLegacyBatch: null,
             CreateMovementPacket,
-            (agentId, data) => RecordSentMovement(recipient, agentId, data),
+            (agentId, data) =>
+            {
+                RecordSentMovement(recipient, agentId, data);
+                bool ai = data.DeckShip != Guid.Empty && agentRegistry.TryGetAgentInfo(agentId, out var info)
+                    && info.Agent.Controller == AgentControllerType.AI;
+                DeckMovementProbe.Record(controllerId, agentId, data, ai, totalSimulationTime);
+            },
             mountMovement.Compact.Values,
             mountMovement.Legacy,
             CreateMountMovementPacket,
@@ -1210,7 +1241,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private static bool HasMovementChanged(AgentData previous, AgentData current)
     {
-        return (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq ||
+        return HasPoseMoved(previous, current) ||
                (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
                (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
                (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
@@ -1624,9 +1655,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         Guid[] canonicalIds,
         AgentData[] data)
     {
+        Guid[] deckShips = IndexDecks(data);
         return identityScopeId == null
-            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence)
-            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence);
+            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips)
+            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips);
     }
 
     // Standalone mounts share the rider capture clock but retain per-agent receive ordering.
@@ -1658,12 +1690,14 @@ public class AgentMovementHandler : IAgentMovementHandler
         var snapshots = new ReceivedMovement[idCount];
         for (int i = 0; i < idCount; i++)
         {
+            AgentData data = movement.Agents[i];
+            data.ResolveDeckShip(movement.DeckShips);
             snapshots[i] = new ReceivedMovement(
                 movement.IdentityScopeId,
                 usesCompactIds ? movement.AgentIds[i] : (ushort)0,
                 usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
                 usesCompactIds,
-                movement.Agents[i],
+                data,
                 movement.AuthorityRevisions?[i] ?? 0,
                 movement.SampleSequence);
         }
@@ -1819,6 +1853,14 @@ public class AgentMovementHandler : IAgentMovementHandler
                         snapshot.CanonicalId,
                         snapshot.UsesCompactId,
                         snapshot.MountData);
+                    continue;
+                }
+
+                // The interpolator owns a deck pose and its rebased directions every tick.
+                if (data.DeckShipIndex != 0)
+                {
+                    RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+                    ApplyDeckMovement(agentInfo.AgentId, agent, data);
                     continue;
                 }
 
@@ -2132,6 +2174,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             if (_disposed) return;
             recipientMovementStates.Remove(controllerId);
+            DeckMovementProbe.RemoveRecipient(controllerId);
             movementBatchSender.RemoveRecipient(controllerId);
         });
     }

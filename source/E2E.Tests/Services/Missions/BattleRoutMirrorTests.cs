@@ -2,6 +2,7 @@
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -35,7 +36,8 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             using var applier = new PuppetRoutApplier(
                 broker,
                 peer.Resolve<ICoopMissionComponent>(),
-                new CasualtyAttributionMap());
+                new CasualtyAttributionMap(),
+                new BattleAgentFader());
 
             broker.Publish(this, new NetworkBattleAgentRouted(agentId));
             applier.DrainPendingRouts();
@@ -71,7 +73,8 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             using var applier = new PuppetRoutApplier(
                 broker,
                 peer.Resolve<ICoopMissionComponent>(),
-                new CasualtyAttributionMap());
+                new CasualtyAttributionMap(),
+                new BattleAgentFader());
 
             broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
             applier.DrainPendingRouts();
@@ -94,6 +97,43 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
 
         Assert.True(AgentMirror.TryGet(peerAgent, out var agentMirror));
         Assert.True(agentMirror.IsActive);
+        Assert.False(agentMirror.WasKilled);
+    }
+
+    [Fact]
+    public void RoutOfASeatedPuppet_ReleasesItsStationBeforeTheFade()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        var agentId = Guid.NewGuid();
+        Agent peerAgent = null!;
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            using var applier = new PuppetRoutApplier(
+                broker,
+                peer.Resolve<ICoopMissionComponent>(),
+                new CasualtyAttributionMap(),
+                new BattleAgentFader());
+
+            peerAgent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner", agentId, peerAgent));
+            peerAgent.UseGameObject(MissionTestObjects.CreateStandingPoint());
+            Assert.NotNull(peerAgent.CurrentlyUsedGameObject);
+
+            broker.Publish(this, new NetworkBattleAgentRouted(agentId));
+            applier.DrainPendingRouts();
+        });
+
+        Assert.True(AgentMirror.TryGet(peerAgent, out var agentMirror));
+        Assert.Null(agentMirror.CurrentlyUsedGameObject);
+        Assert.False(agentMirror.IsActive);
         Assert.False(agentMirror.WasKilled);
     }
 

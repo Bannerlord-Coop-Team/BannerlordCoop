@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Commands;
 using Common.Logging;
 using Common.Network.Session;
@@ -29,6 +30,8 @@ using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using Assembly = System.Reflection.Assembly;
 
 namespace Missions;
 
@@ -48,6 +51,19 @@ public class MissionModule : Module
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
     internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
+
+    private readonly bool navalServicesEnabled;
+
+    // Registers the naval battle services only while NavalDLC co-op is active.
+    public MissionModule() : this(ModInformation.IsNavalDlcActive)
+    {
+    }
+
+    // Lets ClientModule and ServerModule pass their naval decision down.
+    public MissionModule(bool navalServicesEnabled)
+    {
+        this.navalServicesEnabled = navalServicesEnabled;
+    }
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -139,6 +155,13 @@ public class MissionModule : Module
         // fresh CoopMissionController, which pulls a fresh ICoopMissionComponent and a fresh set of sync
         // handlers — so no agent/registry state from a previous mission leaks into the next.
         builder.RegisterType<CoopMissionComponent>().As<ICoopMissionComponent>().InstancePerDependency();
+        // Per mission component, so hull identities never leak into the next mission.
+        builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
+        builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
+        builder.RegisterType<BattlePlayerPartyResolver>().As<IBattlePlayerPartyResolver>().InstancePerDependency();
+        // Only the Missions.Naval launcher uses it; the ship registry and deck probe above and below are shared with land battles.
+        if (navalServicesEnabled)
+            builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()
             .InstancePerDependency();
@@ -244,6 +267,10 @@ public class MissionModule : Module
         // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
+#if DEBUG
+        builder.RegisterType<Diagnostics.MissionInspection>().As<Diagnostics.IMissionInspection>().InstancePerDependency();
+#endif
+        builder.RegisterType<BattleHostSuccession>().As<IBattleHostSuccession>().InstancePerDependency();
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
             .SingleInstance()
@@ -270,6 +297,7 @@ public class MissionModule : Module
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
+        builder.RegisterType<BattleAgentFader>().As<IBattleAgentFader>().InstancePerDependency();
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
             .InstancePerDependency();
@@ -283,6 +311,7 @@ public class MissionModule : Module
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<MissilePickupArbiter>().As<IMissilePickupArbiter>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
+        builder.RegisterType<NavalDeckMovementProbe>().As<INavalDeckMovementProbe>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
@@ -312,6 +341,18 @@ public class MissionModule : Module
             .InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
+
+        // Missions.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
+        if (ModInformation.IsNavalDlcActive && TryLoadNavalMissionsAssembly(out var navalAssembly))
+            builder.RegisterAssemblyModules(navalAssembly);
+    }
+
+    // Loads Missions.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
+    private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
+    {
+        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), ModInformation.MissionsNavalAssemblyFile);
+        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
+        return assembly != null;
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

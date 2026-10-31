@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
@@ -81,6 +82,8 @@ public readonly struct GameSaveDataPacket : IPacket
 
     [ProtoMember(15)]
     public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
+    [ProtoMember(16)]
+    public readonly NavalPlayerData NavalPlayerData;
 
     public GameSaveDataPacket(
         byte[] gameSaveData,
@@ -94,6 +97,7 @@ public readonly struct GameSaveDataPacket : IPacket
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
@@ -110,6 +114,7 @@ public readonly struct GameSaveDataPacket : IPacket
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

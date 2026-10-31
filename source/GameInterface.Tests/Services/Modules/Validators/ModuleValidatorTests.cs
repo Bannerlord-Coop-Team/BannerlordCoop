@@ -110,6 +110,74 @@ public class ModuleValidatorTests
     }
 
     [Fact]
+    public void Validate_AcceptsNavalDlc_WhenServerAndClientBothRunIt()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
+
+        var result = NavalBuildValidator().Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_AcceptsNavalDlc_WhenOnlyTheEngineChangeSetDiffers()
+    {
+        var dedicatedServerNaval = new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 8, 118999) };
+        var gameNaval = new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 8, 119303) };
+
+        var result = NavalBuildValidator().Validate(
+            new List<ModuleInfo> { Native(), dedicatedServerNaval },
+            new List<ModuleInfo> { Native(), gameNaval },
+            out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_RequiresNavalDlc_WhenOnlyTheServerRunsIt()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native() };
+
+        var result = NavalBuildValidator().Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("To join the server the module 'NavalDLC' with version 'v1.0.0.352' is required.", error);
+    }
+
+    [Fact]
+    public void Validate_RejectsNavalDlc_WhenTheBuildHasNoNavalCode()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
+
+        var result = new ModuleValidator(() => false).Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
+    }
+
+    [Fact]
+    public void ValidateNoDlc_RejectsNavalDlc_WhenTheBuildHasNoNavalCode()
+    {
+        bool result = new ModuleValidator(() => false).ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
+    }
+
+    private static ModuleValidator NavalBuildValidator() => new ModuleValidator(() => true);
+
+    private static ModuleInfo Native() =>
+        new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };
+
+    private static ModuleInfo NavalDlc() =>
+        new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };
+
+    [Fact]
     public void Validate_ReturnsErrorMessage_WhenClientHasDlcEnabled()
     {
         // Arrange
@@ -173,6 +241,24 @@ public class ModuleValidatorTests
         // Assert
         Assert.False(result);
         Assert.Equal("DLC is not supported. Please disable the following module(s): 'DlcOne', 'DlcTwo'.", error);
+    }
+
+    [Fact]
+    public void ValidateNoDlc_AllowsNavalDlc_AndRejectsAnyOtherDlc()
+    {
+        var validator = NavalBuildValidator();
+
+        bool navalOnly = validator.ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var navalOnlyError);
+        bool withOther = validator.ValidateNoDlc(new List<ModuleInfo>
+        {
+            NavalDlc(),
+            new ModuleInfo { Id = "DlcOne", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) },
+        }, out var withOtherError);
+
+        Assert.True(navalOnly);
+        Assert.Null(navalOnlyError);
+        Assert.False(withOther);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'DlcOne'.", withOtherError);
     }
 
     [Fact]

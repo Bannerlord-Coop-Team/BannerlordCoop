@@ -11,6 +11,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -440,6 +441,25 @@ internal class HeirSelectionHandler : IHandler
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
+        // Same as ChangePlayerCharacterAction.Apply, a fleet called by the old party stops travelling
+        if (originalParty?.Anchor != null && originalParty.Anchor.IsMovingToPoint)
+        {
+            originalParty.Anchor.ResetMoveTarget();
+        }
+
+        // Same as ChangePlayerCharacterAction.Apply, the player's fleet is transferred to their heir
+        if (objectManager.TryGetObjectWithLogging<MobileParty>(replacementPlayer.MobilePartyId, out var heirParty))
+        {
+            applyHeirSelectionActionInterface.TransferFleetToHeir(originalParty, heirParty);
+        }
+
+        // Same as ChangePlayerCharacterAction.Apply, which only runs on the owning client, so the other clients get the cancel too
+        if (originalParty != null && originalParty.IsTransitionInProgress)
+        {
+            originalParty.CancelNavigationTransition();
+            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(originalParty, forcePosition: true, isCurrentlyAtSea: originalParty.IsCurrentlyAtSea));
+        }
+
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
         messageBroker.Publish(this, new PlayerHeirSelectionCompleted(data.Heir));
@@ -541,6 +561,8 @@ internal class HeirSelectionHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.NewMainPartyId, out var newMainParty)) return;
 
             heirSelectionCampaignBehaviorInterface.OnPlayerCharacterChanged(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged);
+
+            messageBroker.Publish(this, new PlayerCharacterChangedOnServer(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged));
         });
     }
 }

@@ -15,6 +15,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -58,6 +59,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly HideoutRaidHandler hideoutRaids;
     private static long attackMissionStartSequence;
 
@@ -78,6 +80,7 @@ internal class BattleMissionStartHandler : IHandler
         IMapEventLogger mapEventLogger,
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
+        IBattleHostRetentionPolicy retentionPolicy,
         HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
@@ -87,6 +90,7 @@ internal class BattleMissionStartHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
         this.reserveBuilder = reserveBuilder;
+        this.retentionPolicy = retentionPolicy;
         this.hideoutRaids = hideoutRaids;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
@@ -154,6 +158,17 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                // A kept naval host stays at the encounter until the server concludes the result it reported (R41a).
+                operation = "validate kept naval host";
+                if (playerManager.TryGetPlayer(requester, out var requestingPlayer)
+                    && retentionPolicy.RefusesEntry(payload.What.MapEventId, requestingPlayer.ControllerId))
+                {
+                    Logger.Information("Rejecting attack mission start for map event {MapEventId}: host {ControllerId} already reported its naval result",
+                        payload.What.MapEventId, requestingPlayer.ControllerId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 HideoutRaidState hideoutRaid = null;
                 Hero hideoutPlayerHero = null;
                 if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
@@ -176,9 +191,9 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "validate naval battle";
-                if (mapEvent.IsNavalMapEvent)
+                if (!IsNavalBattleAdmitted(mapEvent.IsNavalMapEvent, ModInformation.IsNavalDlcActive))
                 {
-                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles are disabled", payload.What.MapEventId);
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles need NavalDLC and the coop naval code on the server", payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -202,6 +217,24 @@ internal class BattleMissionStartHandler : IHandler
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
+                // Naval village raids are single player until #4117, so only the first claim opens the battle and nobody else is sent into it
+                operation = "claim naval raid mission";
+                if (MapEventHelper.IsNavalRaid(mapEvent))
+                {
+                    if (!isNewMissionClaim)
+                    {
+                        Logger.Warning("Rejecting attack mission start for naval raid {MapEventId}: it is already claimed and naval village raids are single player", payload.What.MapEventId);
+                        network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                        return;
+                    }
+
+                    ApplyClientAttackHostileConsequences(mapEvent, attackerMobileParty.Party);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
+                    startAccepted = true;
+                    network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
                     return;
                 }
 
@@ -283,7 +316,7 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "snapshot mission participants";
-                var participants = GetMissionParticipants(mapEvent);
+                var participants = GetMissionParticipants(payload.What.MapEventId, mapEvent);
 
                 operation = "reserve mission participants";
                 ReserveMissionParticipants(payload.What.MapEventId, participants);
@@ -336,12 +369,14 @@ internal class BattleMissionStartHandler : IHandler
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
-    private IReadOnlyList<MissionParticipant> GetMissionParticipants(MapEvent mapEvent)
+    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead.
+    private IReadOnlyList<MissionParticipant> GetMissionParticipants(string mapEventId, MapEvent mapEvent)
     {
         var participants = new List<MissionParticipant>();
         foreach (var player in playerManager.Players)
         {
-            if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+            if (retentionPolicy.RefusesEntry(mapEventId, player.ControllerId) ||
+                !playerManager.TryGetPeer(player.ControllerId, out var peer) ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
                 mapEvent.FindMapEventParty(party.Party, out var side) is not MapEventParty mapEventParty ||
                 !objectManager.TryGetIdWithLogging(side, out var sideId) ||
@@ -788,9 +823,11 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            if (battle.IsNavalMapEvent)
+            ICoopNavalBattleLauncher navalLauncher = null;
+            if (battle.IsNavalMapEvent && !ContainerProvider.TryResolve(out navalLauncher))
             {
-                Logger.Warning("Received {Message} for naval map event {MapEventId}, but naval battles are disabled", nameof(NetworkStartAttackMission), mapEventId);
+                Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable (NavalDLC or the coop naval code missing); cannot open naval map event {MapEventId}", mapEventId);
+                LogAttackMissionLifecycle("naval launcher unavailable", sequence, mapEventId);
                 return;
             }
 
@@ -820,44 +857,54 @@ internal class BattleMissionStartHandler : IHandler
             // launcher lives in Missions and is resolved from the container. There is deliberately no native
             // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
             // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
+            Mission mission;
             if (isHideout)
             {
                 if (battle.EventType != MapEvent.BattleTypes.Hideout ||
                     battle.IsFinalized || battle.BattleState != BattleState.None ||
                     !ContainerProvider.TryResolve(out ICoopHideoutMissionLauncher hideoutLauncher))
                     return;
-                var mission = hideoutLauncher.OpenCoopHideoutMission(missionInitializer, isDirectAssault);
+                mission = hideoutLauncher.OpenCoopHideoutMission(missionInitializer, isDirectAssault);
                 if (mission != null)
                 {
                     spawnGateEngaged = false;
                     MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
                 }
+                return;
+            }
+
+            if (navalLauncher != null)
+            {
+                mission = navalLauncher.OpenCoopNavalBattle(missionInitializer);
             }
             else if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
-                var mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
-                if (mission != null)
-                {
-                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
-                    MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
-                    Logger.Information(
-                        "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
-                        sequence,
-                        mapEventId,
-                        mission.SceneName,
-                        MissionState.Current != null,
-                        Mission.Current != null);
-                }
-                else
-                {
-                    Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
-                    LogAttackMissionLifecycle("launcher returned no mission", sequence, mapEventId);
-                }
+                mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
             }
             else
             {
                 Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
                 LogAttackMissionLifecycle("launcher unavailable", sequence, mapEventId);
+                return;
+            }
+
+            if (mission != null)
+            {
+                spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
+                Logger.Information(
+                    "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} naval={IsNaval} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
+                    sequence,
+                    mapEventId,
+                    battle.IsNavalMapEvent,
+                    mission.SceneName,
+                    MissionState.Current != null,
+                    Mission.Current != null);
+            }
+            else
+            {
+                Logger.Error("[BattleSync] Coop battle launcher returned no mission");
+                LogAttackMissionLifecycle("launcher returned no mission", sequence, mapEventId);
             }
         }
         catch (Exception e)
@@ -915,6 +962,12 @@ internal class BattleMissionStartHandler : IHandler
     internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)
     {
         if (spawnGateEngaged) BattleSpawnGate.EndBattle();
+    }
+
+    // A naval battle opens only where NavalDLC is enabled and the coop naval code shipped (ModInformation.IsNavalDlcActive).
+    internal static bool IsNavalBattleAdmitted(bool isNavalMapEvent, bool navalDlcActive)
+    {
+        return !isNavalMapEvent || navalDlcActive;
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

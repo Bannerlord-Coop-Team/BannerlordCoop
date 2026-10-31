@@ -108,10 +108,31 @@ public static class MobilePartyExtensions
 
     public static void ApplyForcedPosition(this MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
     {
+        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+        {
             party.ChangeIsCurrentlyAtSeaCheat();
+
+            // Settlement menu options like leave and set sail depend on the sea state
+            if (party == MobileParty.MainParty)
+                RefreshCurrentMenu();
+        }
+    }
+
+    // Skipped during a mission, where the menu context can have no handler; MapState.OnActivate refreshes it on return
+    private static void RefreshCurrentMenu()
+    {
+        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null) return;
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
 
     /// <summary>

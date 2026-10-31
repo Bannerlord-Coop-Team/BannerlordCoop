@@ -1,0 +1,788 @@
+﻿using Autofac;
+using Common;
+using Common.Messaging;
+using Common.Network.Messages;
+using Common.Util;
+using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.Mock;
+using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
+using Missions;
+using Missions.Battles;
+using Missions.Messages;
+using Missions.Services.Network;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.Players;
+using GameInterface.Utils;
+using Moq;
+using Newtonsoft.Json.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Missions.Naval;
+
+/// <summary>
+/// Naval battle E2E base. Every client opens a headless mission on the mission mesh with its own
+/// <see cref="CoopBattleController"/> and the DLC-free ship services over a <see cref="FakeNavalShipEngine"/>, so hull,
+/// station, damage and host traffic travels as real serialized messages through the real handlers. Time only moves
+/// through <see cref="NavalPeer.Tick"/>, one mission clock per client.
+/// </summary>
+public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisposable
+{
+    /// <summary>The AI party the battle host fields hulls for; registered like a player so its map event party resolves.</summary>
+    protected const string PirateId = "pirates";
+
+    protected const float TickSeconds = 0.05f;
+
+    private readonly bool previousNavalDlcActive = ModInformation.IsNavalDlcActive;
+
+    // An in-memory water clock per client, so no naval battle runs the native patch in the test process. The battle runs
+    // as a NavalDLC co-op session, so code that checks the startup decision (the ship fate commit) takes the naval path.
+    protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients,
+        builder => builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope())
+    {
+        ModInformation.IsNavalDlcActive = true;
+    }
+
+    // Puts the startup decision back before the shared environment teardown, so it can't leak into a later test class.
+    void IDisposable.Dispose()
+    {
+        ModInformation.IsNavalDlcActive = previousNavalDlcActive;
+        Dispose();
+    }
+
+    /// <summary>
+    /// Stands up a naval battle with one client per player, in order; the first player is the battle host and the rest are
+    /// its successors. Players in <paramref name="lateJoiners"/> stay off the mesh until <see cref="NavalBattle.Join"/>.
+    /// </summary>
+    protected NavalBattle StartNavalBattle((string Id, BattleSideEnum Side)[] players, int hostEpoch = 1, params string[] lateJoiners)
+    {
+        var battleIds = players.Select(player => player.Id).ToList();
+        battleIds.Insert(1, PirateId);
+        var (mapEventId, partyIds) = SetupCoopBattle(battleIds.ToArray());
+
+        var clients = Clients.ToArray();
+        for (int i = 0; i < players.Length; i++)
+            SetControllerId(clients[i], players[i].Id);
+
+        var battle = new NavalBattle(this, mapEventId, players.Select(player => player.Id).ToArray(), hostEpoch);
+        clients[0].Call(() =>
+        {
+            battle.PirateMapEventPartyId = MapEventPartyIdOf(clients[0], partyIds[1]);
+            for (int i = 0; i < players.Length; i++)
+                battle.PartyIds[players[i].Id] = MapEventPartyIdOf(clients[0], partyIds[i == 0 ? 0 : i + 1]);
+        });
+
+        BattleSpawnGate.BeginBattle(mapEventId);
+        for (int i = 0; i < players.Length; i++)
+        {
+            battle.Players[players[i].Id] = (clients[i], players[i].Side);
+            if (!lateJoiners.Contains(players[i].Id)) battle.Join(players[i].Id);
+        }
+
+        return battle;
+    }
+
+    /// <summary>A two-player battle at sea or on land whose host the server elects from the mission-ready order, every member on the mesh.</summary>
+    protected NavalBattle StartServerBattle(bool atSea, out NavalPeer a, out NavalPeer b, out Func<int> concluded)
+    {
+        var battle = StartServerBattle(atSea, out concluded, "A", "B");
+        a = battle["A"];
+        b = battle["B"];
+        return battle;
+    }
+
+    /// <summary>A battle at sea or on land of <paramref name="playerIds"/> on one side, elected in that order, every member on the mesh.</summary>
+    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds)
+    {
+        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray());
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
+            new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
+
+        foreach (var peer in battle.Peers)
+        {
+            var member = peer;
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(member.Id, member.Instance.NetPeer));
+            EnterBattle(member.Instance, battle.MapEventId);
+            Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
+        }
+        AssertHost(Server, battle.MapEventId, playerIds[0], playerIds.Skip(1).ToArray());
+
+        int conclusions = 0;
+        Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
+        concluded = () => conclusions;
+        return battle;
+    }
+
+    /// <summary>The battle host's end logic resolving the battle: its committer reports the result and snapshots it to the peers.</summary>
+    protected void ResolveOnHost(NavalPeer host, BattleState state) => host.Call(() =>
+    {
+        host.Controller.ResultCommitter.AcceptResolvedState(state);
+        host.Controller.ResultCommitter.ReportAcceptedResult();
+    }, VictoryConclusionDisabledMethods());
+
+    /// <summary>
+    /// <paramref name="departed"/>'s connection drops: it leaves the mesh and the server's own disconnect path tells every
+    /// other member, which at sea is a leave (D4).
+    /// </summary>
+    protected void DropConnection(NavalPeer departed)
+    {
+        departed.Instance.Call(departed.Network.Stop);
+        Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
+            VictoryConclusionDisabledMethods());
+        Server.PumpGameThread();
+    }
+
+    protected void AssertMapEventRemoved(string mapEventId) =>
+        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
+
+    /// <summary>
+    /// A client's naval end tally for a side, through the <see cref="NavalSideTallyReader"/> <c>CoopNavalBattleEndLogic</c>
+    /// counts with; <paramref name="crew"/> holds the live crew per ship id and defaults to none.
+    /// </summary>
+    protected static NavalSideTally EndTally(NavalPeer peer, BattleSideEnum side, int liveHumans,
+        IReadOnlyDictionary<Guid, int>? crew = null)
+    {
+        NavalSideTally tally = null!;
+        peer.Call(() =>
+        {
+            var crewByHull = peer.Registry.Ships.Where(ship => ship.Hull != null).ToDictionary(ship => ship.Hull,
+                ship => crew != null && crew.TryGetValue(ship.ShipId, out int count) ? count : 0);
+            tally = new NavalSideTallyReader(peer.Engine, peer.Services.ConditionStream, peer.MigrationReserve)
+                .Count(side, liveHumans, crewByHull);
+        });
+        return tally;
+    }
+
+    private static string MapEventPartyIdOf(EnvironmentInstance instance, string partyId)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+        var mapEventParty = party.Party.MapEventSide.Parties.Single(candidate => candidate.Party == party.Party);
+        Assert.True(instance.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+        return mapEventPartyId;
+    }
+
+    /// <summary>A running naval battle: its clients, the current host assignment and the mission engine shims.</summary>
+    protected sealed class NavalBattle : IDisposable
+    {
+        private readonly NavalBattleTestEnvironment environment;
+        private readonly MissionEngineFixture fixture = new();
+        private readonly Dictionary<string, NavalPeer> peers = new();
+        private readonly NavalLoggedFailures failures = new();
+        private readonly IVirtualNetworkScheduler mesh;
+
+        // Mesh traffic takes one tick to arrive, so what a client sends in a round reaches the others in the next one.
+        public NavalBattle(NavalBattleTestEnvironment environment, string mapEventId, string[] successionOrder, int hostEpoch)
+        {
+            this.environment = environment;
+            MapEventId = mapEventId;
+            HostId = successionOrder[0];
+            Successors = successionOrder.Skip(1).ToArray();
+            HostEpoch = hostEpoch;
+            mesh = environment.Server.Resolve<IVirtualNetworkScheduler>();
+            mesh.DefaultLatency = TimeSpan.FromSeconds(TickSeconds);
+        }
+
+        public string MapEventId { get; }
+        public string HostId { get; private set; }
+        public string[] Successors { get; private set; }
+        public int HostEpoch { get; private set; }
+        public string PirateMapEventPartyId { get; set; } = null!;
+        public Dictionary<string, string> PartyIds { get; } = new();
+        public Dictionary<string, (EnvironmentInstance Instance, BattleSideEnum Side)> Players { get; } = new();
+
+        public NavalPeer this[string id] => peers[id];
+
+        /// <summary>Lets the logged errors containing <paramref name="fragment"/> pass, for a scenario that provokes them.</summary>
+        public void ExpectLoggedFailure(string fragment) => failures.Expect(fragment);
+
+        /// <summary>The clients on the mesh.</summary>
+        public IEnumerable<NavalPeer> Peers => peers.Values.Where(peer => peer.Network.IsStarted);
+
+        /// <summary>Opens the player's mission on the mesh with the battle's current host assignment.</summary>
+        public NavalPeer Join(string id)
+        {
+            // A rejoin drops the player's old client, so its removal invariant is checked one last time first.
+            if (peers.TryGetValue(id, out var replaced))
+                replaced.Call(replaced.Engine.AssertRemovalInvariant);
+
+            var (instance, side) = Players[id];
+            NavalPeer peer = null!;
+            instance.Call(() =>
+            {
+                var mission = CreateConnectedMission(fixture, instance, MapEventId);
+                mission.PlayerTeam = side == BattleSideEnum.Attacker ? mission.AttackerTeam : mission.DefenderTeam;
+                mission.AddTeam(BattleSideEnum.Attacker);
+                mission.AddTeam(BattleSideEnum.Attacker);
+                mission.AddTeam(BattleSideEnum.Defender);
+                mission.AddTeam(BattleSideEnum.Defender);
+
+                var controller = instance.Resolve<CoopBattleController>();
+                controller.Session.TryBegin(MapEventId);
+                instance.Resolve<IBattleHostRegistry>().Set(MapEventId, new BattleHostAssignment(HostId, Successors, HostEpoch));
+                var members = new NavalMissionMembers(instance.Resolve<IMessageBroker>(), Peers.Select(other => other.Id));
+                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(id), members, failures);
+            });
+
+            // The server introduces an entrant and every member to each other.
+            foreach (var other in Peers)
+                other.Members.Enter(id);
+            peer.SettleMesh = SettleArrivals;
+            peer.AdvanceMesh = AdvanceMesh;
+            peer.DeliverMesh = DeliverMesh;
+            peers[id] = peer;
+            return peer;
+        }
+
+        /// <summary>
+        /// <paramref name="departed"/> leaves the battle gracefully: what it sent arrives, its mission ends and the server tells
+        /// every other member, as after a retreat. Its last mesh traffic can still arrive later.
+        /// </summary>
+        public void Leave(NavalPeer departed)
+        {
+            DeliverMesh();
+            departed.Instance.Call(departed.Network.Stop);
+            foreach (var peer in Peers)
+                peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
+        }
+
+        /// <summary>Tells every other client on the mesh that <paramref name="entered"/> joined, as the mission lifecycle does.</summary>
+        public void AnnounceEntry(NavalPeer entered)
+        {
+            foreach (var peer in Peers.Where(peer => peer != entered))
+                peer.Instance.Call(() => peer.Broker.Publish(peer, new NetworkMissionPeerEntered(entered.Id, MapEventId)));
+        }
+
+        /// <summary>
+        /// <paramref name="departed"/> drops off the mesh without leaving once what it sent arrived, and the server tells every
+        /// other member it left, as it sends a naval disconnect (D4).
+        /// </summary>
+        public void Disconnect(NavalPeer departed)
+        {
+            DeliverMesh();
+            departed.Instance.Call(departed.Network.Stop);
+            foreach (var peer in Peers)
+                peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
+        }
+
+        /// <summary>
+        /// A disconnected player comes back into the running battle: its old mission is gone, it opens a fresh one on the mesh
+        /// and the server introduces it to every member.
+        /// </summary>
+        public NavalPeer Rejoin(NavalPeer departed)
+        {
+            departed.Instance.Call(() =>
+            {
+                departed.DisposeShipServices();
+                departed.Controller.Dispose();
+            });
+            var returned = Join(departed.Id);
+            AnnounceEntry(returned);
+            return returned;
+        }
+
+        /// <summary>
+        /// Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch;
+        /// without <paramref name="settle"/> the host change waits in each client's arrivals for its next tick.
+        /// </summary>
+        public void MigrateHost(NavalPeer departed, string newHost, bool settle = true)
+        {
+            Disconnect(departed);
+
+            HostId = newHost;
+            Successors = Successors.Where(id => id != newHost && id != departed.Id).ToArray();
+            HostEpoch++;
+            foreach (var peer in Peers)
+                peer.Instance.Call(() => peer.Broker.Publish(peer,
+                    new NetworkBattleHostAssigned(MapEventId, HostId, Successors, HostEpoch)));
+            // The AI hulls move from the tick, as every client applies hull traffic (R48 L6).
+            if (settle) SettleArrivals();
+        }
+
+        /// <summary>
+        /// Delivers the mesh traffic in flight, then applies every client's arrivals and runs the capture steps of its tick, three
+        /// rounds, so hull traffic and a capture's request, decision and confirm all land without advancing anything else.
+        /// </summary>
+        public void SettleArrivals()
+        {
+            for (int round = 0; round < 3; round++)
+            {
+                DeliverMesh();
+                foreach (var peer in Peers)
+                    peer.TickArrivals();
+            }
+        }
+
+        /// <summary>
+        /// Advances every client by <paramref name="ticks"/> mission ticks, each round's traffic arriving for the next; with
+        /// <paramref name="settle"/> the last round's traffic is applied too, as the clients' next tick starts.
+        /// </summary>
+        public void TickAll(int ticks = 1, float dt = TickSeconds, bool settle = true)
+        {
+            for (int tick = 0; tick < ticks; tick++)
+            {
+                foreach (var peer in Peers)
+                    peer.TickInRound(dt);
+                AdvanceMesh(dt);
+            }
+
+            if (settle) ApplyArrivals();
+        }
+
+        /// <summary>Moves mesh time on by <paramref name="dt"/>, delivering the traffic due by then.</summary>
+        public void AdvanceMesh(float dt) => mesh.AdvanceBy(TimeSpan.FromSeconds(dt));
+
+        /// <summary>Delivers every message still in flight on the mesh, however late it is due.</summary>
+        public void DeliverMesh() => mesh.RunUntilIdle();
+
+        /// <summary>Finishes every client's deployment, which announces its hulls at the next tick.</summary>
+        public void CommitAll()
+        {
+            foreach (var peer in Peers)
+                peer.Commit();
+        }
+
+        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null, int? formationIndex = null) =>
+            owner.FieldOwnHull(position, PartyIds[owner.Id], campaignShipId, formationIndex);
+
+        public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null,
+            string? campaignShipId = null) =>
+            FieldAndApply(() => host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex, campaignShipId));
+
+        // An AI hull's record goes out as it is fielded; peers apply it at once, as their next tick starts.
+        private Guid FieldAndApply(Func<Guid> field)
+        {
+            var shipId = field();
+            ApplyArrivals();
+            return shipId;
+        }
+
+        /// <summary>Delivers the mesh traffic in flight and applies every client's arrivals, as each client's next tick starts.</summary>
+        public void ApplyArrivals()
+        {
+            DeliverMesh();
+            foreach (var peer in Peers)
+                peer.Call(() => peer.ServicesInternals.Arrivals.ApplyAll());
+        }
+
+        /// <summary>
+        /// Tears the battle down, failing the scenario on a last removal invariant violation or logged failure (teardown's
+        /// included) unless a tick already failed it; a failure found here replaces an ordinary assert the test body threw.
+        /// </summary>
+        public void Dispose()
+        {
+            var violations = new List<Exception>();
+            bool alreadyFailed = failures.HasFailed || peers.Values.Any(peer => peer.Engine.HasFailedRemovalInvariant);
+            foreach (var peer in alreadyFailed ? Enumerable.Empty<NavalPeer>() : peers.Values)
+                Collect(violations, () => peer.Call(peer.Engine.AssertRemovalInvariant));
+
+            foreach (var peer in peers.Values)
+                peer.Instance.Call(peer.DisposeShipServices);
+            if (!alreadyFailed) Collect(violations, failures.AssertNone);
+            failures.Dispose();
+            mesh.DefaultLatency = TimeSpan.Zero;
+            BattleSpawnGate.EndBattle();
+            fixture.Dispose();
+            if (violations.Count > 0) throw new AggregateException(violations);
+        }
+
+        // Runs one teardown check, keeping its failure so the remaining checks and the teardown still run.
+        private static void Collect(List<Exception> violations, Action check)
+        {
+            try
+            {
+                check();
+            }
+            catch (Exception exception)
+            {
+                violations.Add(exception);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One client's server-announced mission membership, as <see cref="MissionContext"/> mirrors it: the members on the mesh
+    /// when it joined and later entrants, less departures. Kept apart from the instance's own mirror so seeding it publishes no
+    /// entry to the battle handlers.
+    /// </summary>
+    protected sealed class NavalMissionMembers : IMissionContext
+    {
+        private readonly IMessageBroker broker;
+        private readonly HashSet<string> members;
+
+        public NavalMissionMembers(IMessageBroker broker, IEnumerable<string> members)
+        {
+            this.broker = broker;
+            this.members = new HashSet<string>(members);
+            broker.Subscribe<NetworkMissionPeerEntered>(Handle_Entered);
+            broker.Subscribe<MissionPeerLeft>(Handle_Left);
+            broker.Subscribe<MissionPeerDisconnected>(Handle_Disconnected);
+        }
+
+        public IReadOnlyCollection<string> ControllersInMission => members.ToArray();
+
+        public void Enter(string controllerId) => members.Add(controllerId);
+
+        /// <summary>Takes a member out of this client's view without a departure, as before the server told a joiner of it.</summary>
+        public void Forget(string controllerId) => members.Remove(controllerId);
+
+        private void Handle_Entered(MessagePayload<NetworkMissionPeerEntered> payload) => members.Add(payload.What.ControllerId);
+
+        private void Handle_Left(MessagePayload<MissionPeerLeft> payload) => members.Remove(payload.What.ControllerId);
+
+        private void Handle_Disconnected(MessagePayload<MissionPeerDisconnected> payload) => members.Remove(payload.What.ControllerId);
+
+        public void MapPeer(string controllerId, LiteNetLib.NetPeer peer) { }
+
+        public void RemovePeer(LiteNetLib.NetPeer peer) { }
+
+        public bool TryGetPeer(string controllerId, out LiteNetLib.NetPeer netPeer)
+        {
+            netPeer = null!;
+            return false;
+        }
+
+        public void EndInstance() => members.Clear();
+
+        public void Dispose()
+        {
+            broker.Unsubscribe<NetworkMissionPeerEntered>(Handle_Entered);
+            broker.Unsubscribe<MissionPeerLeft>(Handle_Left);
+            broker.Unsubscribe<MissionPeerDisconnected>(Handle_Disconnected);
+        }
+    }
+
+    /// <summary>One client in a naval battle: its mission, controller, fake ship engine and the ship services under test.</summary>
+    protected sealed class NavalPeer
+    {
+        private readonly Dictionary<Agent, string> agentNames = new(ReferenceEqualityComparer.Instance);
+        private readonly NavalLoggedFailures failures;
+
+        public NavalPeer(string id, BattleSideEnum side, EnvironmentInstance instance, MockMission mission,
+            CoopBattleController controller, FakeNavalShipEngine engine, NavalMissionMembers members, NavalLoggedFailures failures)
+        {
+            this.failures = failures;
+            Members = members;
+            Id = id;
+            Side = side;
+            Instance = instance;
+            Mission = mission;
+            Controller = controller;
+            Engine = engine;
+            engine.AgentName = agent => agentNames.TryGetValue(agent, out var name) ? name : null;
+            engine.RegisteredShipId = hull => Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : null;
+            engine.Spawned = (hull, formation) => Broker.Publish(hull, new ShipSpawnedInBattle(hull, formation));
+            Network = instance.Resolve<MockBattleNetwork>();
+            Broker = instance.Resolve<IMessageBroker>();
+            var reinforcements = new Mock<IReinforcementFielder>();
+            reinforcements.Setup(fielder => fielder.TakeMigrationReserve(It.IsAny<BattleSideEnum>())).Returns(() =>
+            {
+                var recovered = RecoveredReserve.ToList();
+                RecoveredReserve.Clear();
+                return recovered;
+            });
+            Services = instance.Resolve<INavalBattleServicesFactory>().Create(
+                controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine,
+                engine, AsyncAgentTick);
+        }
+
+        /// <summary>The async agent tick the ship services read; idle unless a scenario sets it running.</summary>
+        public FakeAsyncAgentTick AsyncAgentTick { get; } = new();
+
+        /// <summary>The membership the ship services' gate reads.</summary>
+        public NavalMissionMembers Members { get; }
+
+        public string Id { get; }
+        public BattleSideEnum Side { get; }
+        public EnvironmentInstance Instance { get; }
+        public MockMission Mission { get; }
+        public CoopBattleController Controller { get; }
+        public FakeNavalShipEngine Engine { get; }
+        public MockBattleNetwork Network { get; }
+        public IMessageBroker Broker { get; }
+        /// <summary>The production naval services over the fake engine, with a reinforcement fielder that hands over <see cref="RecoveredReserve"/>.</summary>
+        public INavalBattleServices Services { get; }
+        public IBattleShipReplicator Ships => Services.ShipReplicator;
+        public IBattleShipCaptureReplicator Captures => Services.ShipCaptureReplicator;
+        /// <summary>The battle's capture settling, which <see cref="ElapseCaptureTimer"/> runs after the timer.</summary>
+        public Action? SettleMesh { get; set; }
+        public IAgentStationUseReplicator Stations => Services.StationUseReplicator;
+        public IBattleShipDamageRouter Damage => Services.ShipDamageRouter;
+        public IBattleShipWeaponReplicator Weapons => Services.ShipWeaponReplicator;
+        public INavalMigrationReserveFielder MigrationReserve => Services.MigrationReserveFielder;
+        /// <summary>The AI reserve the reinforcement fielder's roster recovery hands over at the next tick, as after a promotion.</summary>
+        public List<CoopAgentOrigin> RecoveredReserve { get; } = new();
+        public INetworkShipRegistry Registry => Controller.MissionComponent.ShipRegistry;
+        public INetworkAgentRegistry Agents => Controller.MissionComponent.AgentRegistry;
+
+        public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
+
+        /// <summary>The battle's mesh clock, which <see cref="Tick"/> moves on by its step so the traffic due by then arrives.</summary>
+        public Action<float>? AdvanceMesh { get; set; }
+
+        /// <summary>
+        /// This client's tick alone: mesh time moves on by <paramref name="dt"/>, delivering what is due, then
+        /// <see cref="TickInRound"/>.
+        /// </summary>
+        public void Tick(float dt = TickSeconds)
+        {
+            AdvanceMesh?.Invoke(dt);
+            TickInRound(dt);
+        }
+
+        /// <summary>
+        /// One naval services tick in the live order (no NPC fleet here), then the removal invariant and logged failure checks;
+        /// mesh time stays, as in a round of <see cref="NavalBattle.TickAll"/>.
+        /// </summary>
+        public void TickInRound(float dt = TickSeconds) => Call(() =>
+        {
+            Services.Tick(dt);
+            Engine.AssertRemovalInvariant();
+            failures.AssertNone();
+        });
+
+        /// <summary>
+        /// Delivers the mesh traffic in flight, then the arrivals, capture and station steps of the services tick alone, without
+        /// advancing clocks.
+        /// </summary>
+        public void TickArrivals()
+        {
+            DeliverMesh?.Invoke();
+            Call(ServicesInternals.ApplyTraffic);
+        }
+
+        /// <summary>The battle's delivery of every message in flight on the mesh.</summary>
+        public Action? DeliverMesh { get; set; }
+
+        /// <summary>The services past their interface, for the arrivals and traffic steps only the harness settles on their own.</summary>
+        internal NavalBattleServices ServicesInternals => (NavalBattleServices)Services;
+
+        public void Ticks(int count)
+        {
+            for (int tick = 0; tick < count; tick++)
+                Tick();
+        }
+
+        /// <summary>
+        /// The battle controller's tick, which drains buffered puppets. Kept short of its four-second team diagnostic,
+        /// which reads native team state the headless mission does not have.
+        /// </summary>
+        public void TickController() => Call(() => Controller.OnMissionTick(TickSeconds));
+
+        public void Commit() => Call(() => Controller.Deployment.OnLocalDeploymentFinished());
+
+        /// <summary>
+        /// A hull vanilla's team setup fielded for this client on <paramref name="formationIndex"/> (else the first free one) of
+        /// its player team, which the replicator registers from the spawn event; it stands for <paramref name="campaignShipId"/>.
+        /// </summary>
+        public Guid FieldOwnHull(Vec3 position, string mapEventPartyId, string? campaignShipId = null, int? formationIndex = null)
+        {
+            var shipId = Guid.Empty;
+            Call(() =>
+            {
+                var team = Mission.PlayerTeam.Shell;
+                // The replicator reads the own map event party off the main party, which is this client's player party live.
+                Assert.True(Instance.Resolve<IPlayerManager>().TryGetPlayer(Id, out var player));
+                Assert.True(Instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                var previousMainParty = Campaign.Current.MainParty;
+                Campaign.Current.MainParty = party;
+                FakeHull hull;
+                try
+                {
+                    hull = Engine.Field(Side, position, formationIndex ?? Engine.FirstFreeFormation(team), team);
+                }
+                finally
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                }
+
+                hull.CampaignShipId = campaignShipId;
+                Assert.True(Registry.TryGetByHull(hull.Hull, out var ship), $"{Id} registered no own hull from the spawn event");
+                Assert.Equal((Id, mapEventPartyId, false), (ship.CurrentAuthority, ship.MapEventPartyId, ship.IsNpcParty));
+                shipId = ship.ShipId;
+            });
+            return shipId;
+        }
+
+        /// <summary>
+        /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
+        /// <paramref name="formationIndex"/> it takes that formation of the side's main team, as the NPC fleet spawner does.
+        /// </summary>
+        public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null,
+            string? campaignShipId = null)
+        {
+            var shipId = Guid.Empty;
+            Call(() =>
+            {
+                var team = formationIndex == null ? null
+                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
+                var hull = Engine.Field(side, position, formationIndex ?? 0, team);
+                hull.CampaignShipId = campaignShipId;
+                shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
+            });
+            Assert.NotEqual(Guid.Empty, shipId);
+            return shipId;
+        }
+
+        public NetworkShipInfo Ship(Guid shipId)
+        {
+            NetworkShipInfo ship = null!;
+            Call(() => Assert.True(Registry.TryGet(shipId, out ship), $"{Id} has no hull {shipId}"));
+            return ship;
+        }
+
+        public bool Has(Guid shipId)
+        {
+            bool has = false;
+            Call(() => has = Registry.TryGet(shipId, out _));
+            return has;
+        }
+
+        /// <summary>The ship ids this client's registry holds, in a stable order.</summary>
+        public Guid[] RegisteredShipIds()
+        {
+            Guid[] ids = null!;
+            Call(() => ids = Registry.Ships.Select(ship => ship.ShipId).OrderBy(id => id).ToArray());
+            return ids;
+        }
+
+        /// <summary>This client's local hull for a ship id.</summary>
+        public FakeHull Hull(Guid shipId) => Engine.Of(Ship(shipId).Hull);
+
+        /// <summary>The replicator's diagnostics entry for a ship.</summary>
+        public JToken Stream(Guid shipId)
+        {
+            JToken entry = null!;
+            Call(() => entry = JObject.FromObject(Ships.Inspect())["ships"]!.Single(ship => (Guid)ship["shipId"]! == shipId));
+            return entry;
+        }
+
+        public JObject WeaponStats()
+        {
+            JObject stats = null!;
+            Call(() => stats = JObject.FromObject(Weapons.Inspect()));
+            return stats;
+        }
+
+        /// <summary>The projectile capture's event for a shot this client's simulated weapon on <paramref name="shipId"/> launched.</summary>
+        public void FireWeapon(Guid shipId, Agent? shooter, Vec3 position, Vec3 direction, string missileItemId) => Call(() =>
+        {
+            Assert.True(Registry.TryGet(shipId, out var ship));
+            var weapon = Engine.Of(ship.Hull).Weapon!;
+            var missile = (ItemObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ItemObject));
+            // The registry's StringId setter patch lets only allowed threads name an object.
+            using (new AllowedThread()) missile.StringId = missileItemId;
+            Broker.Publish(weapon, new SiegeWeaponFired(weapon, shooter!, position, direction, Mat3.Identity, 60f, 62f, missile));
+        });
+
+        public JObject StationStats()
+        {
+            JObject stats = null!;
+            Call(() => stats = JObject.FromObject(Stations.Inspect()));
+            return stats;
+        }
+
+        /// <summary>
+        /// A headless agent registered under <paramref name="authority"/>, as a replicated crew member or own troop; with a
+        /// <paramref name="team"/> it joins that team, as crew join their hull's team; with an <paramref name="origin"/> it is
+        /// that party's troop.
+        /// </summary>
+        public Agent RegisterAgent(Guid agentId, string authority, MockTeam? team = null, IAgentOriginBase? origin = null)
+        {
+            Agent agent = null!;
+            Call(() =>
+            {
+                var build = new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(authority == Id ? AgentControllerType.AI : AgentControllerType.None);
+                if (origin != null) build = build.TroopOrigin(origin);
+                agent = Mission.SpawnAgent(team == null ? build : build.Team(team.Shell));
+                Assert.True(Agents.TryRegisterAgent(authority, agentId, agent));
+                agentNames[agent] = $"agent {agentId} of {authority}";
+            });
+            return agent;
+        }
+
+        /// <summary>
+        /// A troop of <paramref name="owner"/>'s own party registered under the owner, as its supplier mints them, so it
+        /// withdraws with the party when the owner leaves.
+        /// </summary>
+        public Agent RegisterPartyTroop(Guid agentId, string owner)
+        {
+            CoopAgentOrigin origin = null!;
+            Call(() =>
+            {
+                Assert.True(Instance.Resolve<IPlayerManager>().TryGetPlayer(owner, out var player));
+                Assert.True(Instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                origin = new CoopAgentOrigin((CharacterObject)Game.Current.PlayerTroop, party.Party, 0, null!,
+                    new UniqueTroopDescriptor(agentId.GetHashCode()));
+            });
+            return RegisterAgent(agentId, owner, origin: origin);
+        }
+
+        /// <summary>
+        /// The use/release patch's event for an agent this client drives at a station of its local hull, published after
+        /// vanilla seated or released it.
+        /// </summary>
+        public void UseStation(Agent agent, UsableMissionObject point, bool inUse)
+        {
+            Call(() =>
+            {
+                if (inUse || Engine.IsSeated(agent, point)) Engine.ApplyStationUse(agent, point, inUse);
+                Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
+            });
+            // Peers keep the use pending for their next tick, which applies it.
+            SettleMesh?.Invoke();
+        }
+
+        /// <summary>
+        /// The capture patch's event: this client's main agent, crew of its hull <paramref name="ownHull"/>, held the helm of
+        /// <paramref name="prize"/> for vanilla's capture time.
+        /// </summary>
+        public void ElapseCaptureTimer(Guid prize, Guid ownHull)
+        {
+            var main = RegisterAgent(Guid.NewGuid(), Id);
+            var prizeHull = Ship(prize).Hull;
+            Engine.PlaceAgent(main, prizeHull, Ship(ownHull).Hull);
+            Call(() => Broker.Publish(this, new ShipCaptureTimerElapsed(prizeHull, main)));
+            SettleMesh?.Invoke();
+        }
+
+        /// <summary>The ship damage patch's event for a hit this client decided on its local hull.</summary>
+        public void Hit(Guid shipId, float damage) => Call(() =>
+        {
+            Assert.True(Registry.TryGet(shipId, out var ship));
+            Broker.Publish(this, new BattleShipHit(ship.Hull, BattleShipDamageKind.Hull, damage, 0f, Vec3.Zero, null!, null!,
+                false, -1));
+        });
+
+        /// <summary>
+        /// The ship damage patch's event for a ram hit of <paramref name="rammerId"/> on this client's hull <paramref name="shipId"/>;
+        /// it starts at the router, so the ram tick and collision patches that decide a hit never run here.
+        /// </summary>
+        public void Ram(Guid shipId, Guid rammerId, float damage) => Call(() =>
+        {
+            Assert.True(Registry.TryGet(shipId, out var ship));
+            Assert.True(Registry.TryGet(rammerId, out var rammer));
+            Broker.Publish(this, new BattleShipHit(ship.Hull, BattleShipDamageKind.Collision, damage, 0f, new Vec3(0f, 12f, 0f),
+                null!, rammer.Hull, true, -1));
+        });
+
+        /// <summary>The samples this client sent for a ship.</summary>
+        public IReadOnlyList<NetworkBattleShipSample> SentSamples(Guid shipId) =>
+            Network.NetworkSentMessages.GetMessages<NetworkBattleShipSample>().Where(sample => sample.ShipId == shipId).ToList();
+
+        internal void DisposeShipServices()
+        {
+            Services.Dispose();
+            Members.Dispose();
+        }
+    }
+}

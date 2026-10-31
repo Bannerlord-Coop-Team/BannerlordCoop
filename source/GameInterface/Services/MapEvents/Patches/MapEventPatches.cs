@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Ships;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
@@ -320,6 +321,12 @@ internal class MapEventPatches
         // Skip on client
         if (ModInformation.IsClient)
             return false;
+
+        // Vanilla writes naval damage into the campaign ships live; coop holds the reported fates until now, so sunk ships are
+        // destroyed and survivors carry their battle HP before the results and the ship loot read them. NB §3 lists every
+        // apply point.
+        if (ModInformation.IsNavalDlcActive && ContainerProvider.TryResolve<IBattleShipFateApplier>(out var fateApplier))
+            fateApplier.ApplyAll(__instance);
 
         // Vanilla calculates plunder from each defeated participant's Party reference.
         RemovePartiesWithoutParty(__instance);

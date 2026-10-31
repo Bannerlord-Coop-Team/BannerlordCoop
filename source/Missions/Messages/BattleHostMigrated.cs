@@ -11,15 +11,19 @@ public readonly struct BattleHostMigrated : IEvent
     public readonly string MapEventId;
     public readonly string PreviousHostControllerId;
     public readonly string NewHostControllerId;
+    /// <summary>The host epoch the change took the battle to; 0 when the publisher didn't say.</summary>
+    public readonly int Epoch;
 
     public BattleHostMigrated(
         string mapEventId,
         string previousHostControllerId,
-        string newHostControllerId)
+        string newHostControllerId,
+        int epoch = 0)
     {
         MapEventId = mapEventId;
         PreviousHostControllerId = previousHostControllerId;
         NewHostControllerId = newHostControllerId;
+        Epoch = epoch;
     }
 
     public BattleHostMigrated(string mapEventId, string previousHostControllerId)

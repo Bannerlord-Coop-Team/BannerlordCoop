@@ -48,6 +48,11 @@ internal class EncounterAttackConsequencePatch
             return false;
         }
 
+        // Naval village raids are single player for now, so vanilla opens its ship and troop selection and
+        // NavalRaidMissionPatches has the server claim the battle before the mission opens
+        if (MapEventHelper.IsNavalRaid(battle))
+            return true;
+
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             return true;
         if (!objectManager.TryGetId(battle, out var mapEventId))

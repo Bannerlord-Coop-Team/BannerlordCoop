@@ -78,7 +78,8 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
     private readonly HashSet<string> endedInteractionSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
-    private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
+    // Player party id to the map event its close named; a null id closes any hostile encounter start of that party.
+    private readonly Dictionary<string, string> closedHostileEncounterMapEventIds = new Dictionary<string, string>();
     private bool presentationTickRegistered;
 
     public PlayerPartyInteractionHandler(
@@ -216,8 +217,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (!TryGetControlledSessionParty(message, out var myPartyId, out _)) return;
 
-            closedHostileEncounterPartyIds.Remove(message.InitiatorPartyId);
-            closedHostileEncounterPartyIds.Remove(message.ResponderPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.InitiatorPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.ResponderPartyId);
 
             network.SendAll(new NetworkPlayerPartyInteractionShown(message.SessionId, myPartyId));
         }, context: "Confirm player-party interaction party");
@@ -381,7 +382,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         GameThread.RunSafe(() =>
         {
             foreach (var partyId in payload.What.PartyIds ?? Array.Empty<string>())
-                closedHostileEncounterPartyIds.Add(partyId);
+                closedHostileEncounterMapEventIds[partyId] = payload.What.MapEventId;
         }, context: "Record closed player-party hostile encounter");
     }
 
@@ -1321,8 +1322,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (IsHostileEncounterClosed(message))
         {
             CloseLocalPlayerPartyEncounter(localSide == BattleSideEnum.Attacker ? attacker.MobileParty : defender.MobileParty);
-            closedHostileEncounterPartyIds.Remove(message.AttackerPartyId);
-            closedHostileEncounterPartyIds.Remove(message.DefenderPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.AttackerPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.DefenderPartyId);
             return;
         }
 
@@ -1333,8 +1334,17 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     private bool IsHostileEncounterClosed(NetworkPlayerPartyHostileEncounterStarted message)
-        => closedHostileEncounterPartyIds.Contains(message.AttackerPartyId) ||
-           closedHostileEncounterPartyIds.Contains(message.DefenderPartyId);
+        => IsPartyEncounterClosed(message.AttackerPartyId, message.MapEventId) ||
+           IsPartyEncounterClosed(message.DefenderPartyId, message.MapEventId);
+
+    // A battle's close names its map event, so it must not close that party's hostile encounter in a later battle.
+    private bool IsPartyEncounterClosed(string partyId, string mapEventId)
+        => partyId != null &&
+           closedHostileEncounterMapEventIds.TryGetValue(partyId, out var closedMapEventId) &&
+           ClosesHostileEncounter(closedMapEventId, mapEventId);
+
+    internal static bool ClosesHostileEncounter(string closedMapEventId, string startedMapEventId)
+        => closedMapEventId == null || closedMapEventId == startedMapEventId;
 
     private bool TryResolveHostileEncounter(
         NetworkPlayerPartyHostileEncounterStarted message,
@@ -1396,10 +1406,23 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         using (new AllowedThread())
         {
+            var tracker = mapEvent.TroopUpgradeTracker;
             EncounterManager.RestartPlayerEncounter(attacker, defender);
+            RestoreTroopUpgradeTracker(mapEvent, tracker);
         }
 
         AssignLocalHostileEncounter(attacker, defender, mapEvent, localSide);
+    }
+
+    /// <summary>
+    /// [Client, under AllowedThread] Restarting finishes a joined encounter, and vanilla LeaveBattle then drops the main
+    /// party's tracker that the server keeps, so a later hero hit would find none. The party is re-attached right after.
+    /// </summary>
+    internal static void RestoreTroopUpgradeTracker(MapEvent mapEvent, TroopUpgradeTracker tracker)
+    {
+        if (tracker == null || mapEvent.IsFinalized || mapEvent.TroopUpgradeTracker != null) return;
+
+        mapEvent.TroopUpgradeTracker = tracker;
     }
 
     private static BattleSideEnum GetLocalHostileEncounterSide(PartyBase attacker, PartyBase defender)
@@ -1639,7 +1662,11 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         try
         {
-            conversationManager.OpenMapConversation(playerData, otherData);
+            if (myParty.MobileParty?.IsCurrentlyAtSea == true)
+                CampaignMission.OpenConversationMission(playerData, otherData);
+            else
+                conversationManager.OpenMapConversation(playerData, otherData);
+
             PlayerPartyInteractionDialogState.RefreshConversation();
             openedConversationSessionIds.Add(sessionId);
         }

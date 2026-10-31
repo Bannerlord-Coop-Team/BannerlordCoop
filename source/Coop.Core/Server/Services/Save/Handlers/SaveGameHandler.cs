@@ -120,6 +120,7 @@ internal class SaveGameHandler : IHandler
             current?.InventoryPlayerData ?? empty.InventoryPlayerData,
             current?.HeroMeetingData ?? empty.HeroMeetingData,
             current?.AgingPlayerData ?? empty.AgingPlayerData,
+            current?.NavalPlayerData ?? empty.NavalPlayerData,
             current?.ClanFinance ?? empty.ClanFinance,
             current?.PlayerTraitData ?? empty.PlayerTraitData,
             current?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData);
@@ -147,6 +148,7 @@ internal class SaveGameHandler : IHandler
             loaded?.InventoryPlayerData ?? empty.InventoryPlayerData,
             loaded?.HeroMeetingData ?? empty.HeroMeetingData,
             loaded?.AgingPlayerData ?? empty.AgingPlayerData,
+            loaded?.NavalPlayerData ?? empty.NavalPlayerData,
             loaded?.ClanFinance ?? empty.ClanFinance,
             loaded?.PlayerTraitData ?? empty.PlayerTraitData,
             loaded?.OrderOfBattlePlayerData ?? empty.OrderOfBattlePlayerData);
