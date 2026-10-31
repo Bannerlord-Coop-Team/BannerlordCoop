@@ -603,8 +603,18 @@ Each engine signature was read from the installed v1.5.6 assemblies (`taom-src`,
   `TraitLevelingHelper.OnLordExecuted` call in the `KillCharacterAction.ApplyInternal`
   replacement. v1.5.6 removed both the helper and that block; the honor and mercy loss now comes
   from `ExecutionCampaignBehavior` starting a blood feud (`OnBloodFeudStarted`), which is keyed on
-  the main hero and runs on the server only (gap #3819). The block is removed, so the replacement
-  matches v1.5.6.
+  the main hero and runs on the server only (gap #3819). The merge first removed the block, but on
+  the server a client's execution reaches `ApplyInternal` from `ExecuteTroopHandler` with that
+  client's hero as the killer, never `Hero.MainHero`, so `OnHeroKilled` and `OnDeathMarkAdded`
+  skipped the penalty and the client lost no honor or mercy. The replacement now calls
+  `ApplyExecutionTraitPenalty`: for an `Executed` or `ExecutionAfterMapEvent` death with a player
+  killer and both clans set, it runs v1.5.6 `TraitLevelingHelper.OnBloodFeudStarted(victim)` (honor
+  -1000 for an honorable victim, otherwise mercy -500, then mercy -500) inside
+  `MainHeroSubstitutionScope(killer, ...)`, so `TraitLevelingHelperPatches` books it to that player.
+  It starts no blood feud and does not copy vanilla's "no feud with the player yet" gate, because
+  `Clan.HasBloodFeudWithPlayer` is one flag per clan that means the server's player clan, so every
+  execution by a player costs the penalty, as on `development`. Tested by
+  `KillCharacterActionExecutionTests` (E2E), which fails without the call.
 - Player map tracking (`PlayerMapTracking.cs`). `RefreshTracker` used the SandBox
   `MapTrackerProvider` holder; it now calls `Campaign.Current.MapTrackerManager.Refresh(party)`,
   as `MapTrackerProviderRefreshHandler` already does on this branch. v1.5.6 `Refresh` adds the
