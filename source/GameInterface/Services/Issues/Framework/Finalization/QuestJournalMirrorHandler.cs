@@ -144,12 +144,9 @@ internal class QuestJournalMirrorHandler : IHandler
                 matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
                     SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
             var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
-            // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
-            if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1))
-            {
-                Logger.Warning("Ambiguous journal mirror row for {text}; rejecting snapshot", entry.Text?.ToString());
-                return false;
-            }
+            // Existing server-created stages may have a different tick; consume the first unmatched occurrence.
+            if (matches.Length > 1 && exact.Length == 0)
+                Logger.Warning("Ambiguous journal mirror row for {text}; using journal order", entry.Text?.ToString());
             var existing = exact.FirstOrDefault() ?? matches.FirstOrDefault();
             if (existing == null) ordered.Add(entry.ToJournalLog());
             else

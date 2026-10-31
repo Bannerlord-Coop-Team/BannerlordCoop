@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -13,6 +14,7 @@ using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
 
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -160,6 +162,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             return;
         }
 
+        AlternativeSolutionJournalEntry[] entries;
         try
         {
             troopValidator.Apply(issue, data.SentTroops);
@@ -170,6 +173,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
                 {
                     issue.AlternativeSolutionStartConsequence();
                     issue.StartIssueWithAlternativeSolution();
+                    entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
                 }
             }
         }
@@ -189,6 +193,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             CaptureState(issue),
             descriptor.AlternativeSolutionAcceptStrategy.Capture(issue),
             player.ControllerId));
+        network.Send(peer, new NetworkAlternativeSolutionJournal(data.IssueOwnerId, data.IssueId,
+            IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, entries));
     }
 
     private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero, string reason)
@@ -254,7 +260,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away
+        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away.
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
@@ -262,7 +268,10 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
                 return;
             }
 
-            troopValidator.ReturnToMainParty(issue);
+            using (new AllowedThread())
+            {
+                troopValidator.ReturnToMainParty(issue);
+            }
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 

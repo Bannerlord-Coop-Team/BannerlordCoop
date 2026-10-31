@@ -98,7 +98,10 @@ internal class FinalizationCoordinator : IHandler
         }
 
         acceptCoordinator.RunWhenAccepted(issue, () =>
-            network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log)));
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        });
     }
 
     // Client only.
@@ -116,7 +119,10 @@ internal class FinalizationCoordinator : IHandler
         }
 
         acceptCoordinator.RunWhenAccepted(issue, () =>
-            network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof)));
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        });
     }
 
     // Server only.

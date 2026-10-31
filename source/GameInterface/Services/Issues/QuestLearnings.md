@@ -26,7 +26,9 @@ it once the user agrees:
 
 - **Check how a world event reaches the quest.** The server's mirror quest is never started, so its own vanilla
   listeners never fire there. Check `QuestWorldEventRelayPatches` for the listener first. If it's missing, ask
-  before adding a framework relay. `LordWantsRivalCapturedWorldEventPatches` is the per-quest fallback. (#3810)
+  before adding a framework relay. Hero death and coercion map events are shared relays; only forcing supplies
+  or volunteers are relayed for `OnMapEventStarted`. A differently named listener, such as `OnPrisonerTaken`,
+  still needs a per-quest dispatch. (#3810)
 - **A patched caller can skip AutoSync.** A method Harmony compiles before the AutoSync writer is installed inlines
   the unpatched setter (`Hearth`, `AddPower`), so the write never syncs. Queue the caller's patch through
   `IAutoSyncPatchCollector` like `RaidEventComponentRegistry`, or put the writer in `HARMONY_STATIC_FIXES_CATEGORY`
@@ -34,6 +36,10 @@ it once the user agrees:
 
 ### Server authority
 
+- **Cancellation must keep the troop owner's context.** `IssueCancellationCoordinator` holds a blocked
+  cancellation until that owner has a party and the troops can return, then retries hourly. Do not let vanilla
+  queue those troops globally or persist the session's pending set. The generic cancel dispatch leaves an
+  ongoing quest to finalize its issue once through `OnQuestCompleted`.
 - **Ownership is not enough to accept an ending.** A request sent from a stale dialog or a double-click can arrive
   when the game state no longer allows it. Check the game state vanilla's condition checks on the server:
   `LordWantsRivalCapturedFinalizationProofStrategy` only accepts a capture it recorded as a `CaptureEntitlement`

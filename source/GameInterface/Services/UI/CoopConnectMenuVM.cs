@@ -69,7 +69,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public string PreviousPageButtonText => "Previous";
     public string NextPageButtonText => "Next";
     public string DiscordButtonText => "Discord";
-    public string PatreonButtonText => "Patreon";
+    public string RentServerButtonText => "Rent a Server";
     public string DonateButtonText => "Donate";
     public string CreditsButtonText => "Credits";
     public string MovieTextHeader => "Join Co-op Sandbox";
@@ -412,7 +412,8 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public void ActionDiscord() => CommunityLinks.OpenDiscord();
 
-    public void ActionPatreon() => CommunityLinks.OpenPatreon();
+    // Opens the Patreon checkout for the tier that includes a rented server.
+    public void ActionRentServer() => CommunityLinks.OpenRentServer();
 
     // Opens a popup listing the individual donation platforms above a close button.
     public void ActionDonate() => CommunityLinks.ShowDonatePopup();
