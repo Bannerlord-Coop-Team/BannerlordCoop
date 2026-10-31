@@ -1,4 +1,5 @@
-﻿using GameInterface.Registry.Auto;
+﻿using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -53,6 +54,11 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
         // Initialise the dictionary by creating it and dirtying the version number
         ReflectionUtils.SetPrivateField(typeof(Ship), nameof(Ship._shipPieces), obj, new Dictionary<string, ShipUpgradePiece>());
         obj.UpdateVersionNo();
+
+        using (new AllowedThread())
+        {
+            obj.IsTradeable = true;
+        }
     }
 
     public override void OnClientDestroyed(Ship obj, string id)
