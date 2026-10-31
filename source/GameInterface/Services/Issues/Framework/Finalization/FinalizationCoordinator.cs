@@ -261,13 +261,12 @@ internal class FinalizationCoordinator : IHandler
                 }
                 else
                 {
-                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
-                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null).ToList();
                     foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
                     {
                         if (log.Text == null) continue;
-                        var key = log.Text.ToString();
-                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        var index = existing.FindIndex(existingLog => SameEntry(existingLog, log));
+                        if (index >= 0) existing.RemoveAt(index);
                         else issue.AddLog(log.ToJournalLog());
                     }
                 }
@@ -395,6 +394,29 @@ internal class FinalizationCoordinator : IHandler
             .DefaultIfEmpty(long.MinValue)
             .Max();
         return entries.Length < quest.JournalEntries.Count && receivedLatest <= localLatest;
+    }
+
+    private static bool SameEntry(JournalLog log, IssueJournalEntry entry) =>
+        log.LogTime.NumTicks == entry.Time.NumTicks && log.Range == entry.Range &&
+        log.CurrentProgress == entry.Progress && log.Type == entry.Type &&
+        SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName);
+
+    private static bool SameText(TextObject first, TextObject second)
+    {
+        if (ReferenceEquals(first, second)) return true;
+        if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
+        if (first.Attributes == null) return true;
+        foreach (var pair in first.Attributes)
+        {
+            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
+            if (pair.Value is TextObject text)
+            {
+                if (!(value is TextObject other) || !SameText(text, other)) return false;
+            }
+            else if (!Equals(pair.Value, value)) return false;
+        }
+        return true;
     }
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
