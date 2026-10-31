@@ -161,7 +161,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
         {
             if (!acceptingQuests.Contains(quest)) continue;
             var issue = IssueManager.GetIssueOfQuest(quest);
-            if (issue == null) continue;
+            if (issue == null || quest.JournalEntries.Count == 0) continue;
 
             // The callback can update a discrete log after AddLog has announced it.
             for (var index = 0; index < quest.JournalEntries.Count; index++)
