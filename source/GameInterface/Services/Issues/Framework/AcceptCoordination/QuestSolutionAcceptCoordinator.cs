@@ -161,7 +161,12 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
         {
             if (!acceptingQuests.Contains(quest)) continue;
             var issue = IssueManager.GetIssueOfQuest(quest);
-            if (issue == null || quest.JournalEntries.Count == 0) continue;
+            if (issue == null || !quest.IsOngoing)
+            {
+                acceptingQuests.Remove(quest);
+                continue;
+            }
+            if (quest.JournalEntries.Count == 0) continue;
 
             // The callback can update a discrete log after AddLog has announced it.
             for (var index = 0; index < quest.JournalEntries.Count; index++)
@@ -191,7 +196,13 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
 
             var quest = issue.IssueQuest;
             // An accept strategy may already have written this stage; repeated packets must not duplicate it.
-            if (data.Index < quest.JournalEntries.Count) return;
+            if (data.Index < quest.JournalEntries.Count)
+            {
+                var indexed = quest.JournalEntries[data.Index];
+                if (SameText(indexed.LogText, data.Text) && SameText(indexed.TaskName, data.TaskName) &&
+                    indexed.CurrentProgress == data.Progress && indexed.Range == data.Range && indexed.Type == data.Type)
+                    return;
+            }
             if (quest.JournalEntries.Any(log =>
                     SameText(log.LogText, data.Text) &&
                     SameText(log.TaskName, data.TaskName) &&

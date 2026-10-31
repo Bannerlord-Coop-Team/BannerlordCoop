@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Logging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
@@ -16,6 +17,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
+using Serilog;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -38,6 +40,7 @@ public readonly struct QuestJournalChanged : IEvent
 /// <summary>Keeps owner-created history and progress in the unstarted authoritative mirror.</summary>
 internal class QuestJournalMirrorHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<QuestJournalMirrorHandler>();
     private readonly IMessageBroker broker;
     private readonly INetwork network;
     private readonly IObjectManager objects;
@@ -139,7 +142,11 @@ internal class QuestJournalMirrorHandler : IHandler
                 SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName)).ToArray();
             var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
             // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
-            if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1)) return false;
+            if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1))
+            {
+                Logger.Warning("Ambiguous journal mirror row for {text}; rejecting snapshot", entry.Text?.ToString());
+                return false;
+            }
             var existing = exact.FirstOrDefault() ?? matches.FirstOrDefault();
             if (existing == null)
             {
@@ -148,7 +155,11 @@ internal class QuestJournalMirrorHandler : IHandler
                 if (keyMatches.Length > 1)
                 {
                     var keyExact = keyMatches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
-                    if (keyExact.Length != 1) return false;
+                    if (keyExact.Length != 1)
+                    {
+                        Logger.Warning("Ambiguous journal mirror key row for {text}; rejecting snapshot", entry.Text?.ToString());
+                        return false;
+                    }
                     existing = keyExact[0];
                 }
                 else existing = keyMatches.FirstOrDefault();
