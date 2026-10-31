@@ -455,10 +455,12 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     [Fact]
     public void AuthoritativeEndingPreservesOwnerDeliveryProgress()
     {
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
         Accept();
         var ownerQuest = QuestHere(ClientA);
-        ClientA.SimulateMessage(Server.NetPeer,
-            new NetworkArtisanDeliveryProgress(scenario.NotableId, QuestScenario.IssueId, 2));
+        Stock(2);
+        ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
         ClientA.Call(() => Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress));
 
         Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
@@ -469,6 +471,14 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         {
             Assert.True(ownerQuest.IsFinalized);
             Assert.Equal(2, ownerQuest._playerStartsQuestLog.CurrentProgress);
+        });
+        ClientA.Call(() =>
+        {
+            Assert.Equal(2, Assert.Single(ownerQuest.JournalEntries, log => log.Range == Amount).CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.True(archive.IsEnded());
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == Amount).CurrentProgress);
         });
     }
 

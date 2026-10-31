@@ -24,6 +24,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -503,11 +504,12 @@ public class MerchantOutlawsTests : IDisposable
     [Fact]
     public void AuthoritativeEndingPreservesOwnerHuntProgress()
     {
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
         Accept();
+        var serverQuest = Quest(Server);
         var ownerQuest = Quest(ClientA);
-        ClientA.SimulateMessage(Server.NetPeer, new NetworkMerchantOutlawsProgress(
-            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, 1, 0,
-            Array.Empty<string>(), Array.Empty<string>()));
+        Destroy(TargetIds().First(), scenario.PlayerA);
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
 
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
@@ -515,6 +517,14 @@ public class MerchantOutlawsTests : IDisposable
         ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
         ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
+        ClientA.Call(() =>
+        {
+            Assert.Equal(1, Assert.Single(ownerQuest.JournalEntries, log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.True(archive.IsEnded());
+            Assert.Equal(1, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+        });
     }
 
     [Fact]
