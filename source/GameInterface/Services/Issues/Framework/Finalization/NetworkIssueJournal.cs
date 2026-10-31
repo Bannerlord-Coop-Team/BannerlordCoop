@@ -6,7 +6,7 @@ namespace GameInterface.Services.Issues.Framework.Finalization;
 
 /// <summary>The server's journal, sent to the owning peer before the outcome broadcast.</summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkIssueJournal : IServerToClientCommand
+public readonly struct NetworkIssueJournal : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

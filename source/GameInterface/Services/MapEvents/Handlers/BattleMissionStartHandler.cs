@@ -67,9 +67,8 @@ internal class BattleMissionStartHandler : IHandler
         new ConcurrentDictionary<string, MissionInitializerRecord>();
     private readonly Random terrainSeedRandom = new Random();
 
-    // Server-side: the siege mission inputs (wall level, wall HPs, engine lists) snapshotted once per map event,
-    // so a joiner entering mid-assault loads the same scene as the first entrant even though the campaign-side
-    // container keeps syncing. Evicted with the terrain seed when the event finalizes.
+    // Server-side: the siege mission inputs, rebuilt on each new mission claim and shared by joiners while that
+    // mission is open so they load the same scene. Evicted with the terrain seed when the event finalizes.
     private readonly ConcurrentDictionary<string, NetworkStartSiegeMission> siegeMissionSnapshots = new ConcurrentDictionary<string, NetworkStartSiegeMission>();
 
     public BattleMissionStartHandler(
@@ -256,7 +255,11 @@ internal class BattleMissionStartHandler : IHandler
                           (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)))
                 {
                     operation = "build siege mission snapshot";
-                    var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
+                    // A new claim means no mission is open, so re-read the engine and wall damage the last one wrote
+                    // back, keeping the siege kind it opened with.
+                    var snapshot = isNewMissionClaim
+                        ? siegeMissionSnapshots[payload.What.MapEventId] = BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent)
+                        : siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
                     // Wounded non-initiators were removed above; the client-side eligibility check remains a fallback.
                     missionStartMessage = new NetworkStartSiegeMission(
                         snapshot.MapEventId,

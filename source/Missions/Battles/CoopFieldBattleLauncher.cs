@@ -1,11 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Helpers;
+using Missions.Messages;
 using SandBox.Missions.MissionLogics;
 using Serilog;
 using System.Collections.Generic;
@@ -46,19 +48,22 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
     private readonly ICoopBattleMissionRegistry missionRegistry;
+    private readonly INetwork network;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
-        ICoopBattleMissionRegistry missionRegistry)
+        ICoopBattleMissionRegistry missionRegistry,
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
         this.missionRegistry = missionRegistry;
+        this.network = network;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -67,6 +72,20 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId))
         {
             Logger.Error("[BattleSync] Cannot open coop field battle: no resolvable map event");
+            return null;
+        }
+
+        // MissionCombatantsLogic.EarlyStart throws on a side with no combatant, and the loading screen then retries
+        // forever. Refusing turns that into a logged failure and tells the server, so the join it reserved for this
+        // client does not hold the battle's conclusion until it expires. Reopening later is left to the caller.
+        var sideWithoutCombatant = FindSideWithoutCombatant(mapEvent);
+        if (sideWithoutCombatant != BattleSideEnum.None)
+        {
+            Logger.Error("[BattleSync] Cannot open coop field battle for {MapEventId}: no party on the {Side} side on this client " +
+                "(local side {LocalSide}, defender parties {DefenderParties}, attacker parties {AttackerParties})",
+                mapEventId, sideWithoutCombatant, PartyBase.MainParty?.Side,
+                mapEvent.DefenderSide.Parties.Count, mapEvent.AttackerSide.Parties.Count);
+            network.SendAll(new NetworkFieldBattleOpenRefused(mapEventId));
             return null;
         }
 
@@ -175,6 +194,17 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         Logger.Information("[BattleSync] Opened coop field battle for {MapEventId} (player side {Side})",
             mapEventId, PartyBase.MainParty.Side);
         return mission;
+    }
+
+    // The first side with no involved party, matched by IBattleCombatant.Side as EarlyStart does; None when both have one.
+    internal static BattleSideEnum FindSideWithoutCombatant(MapEvent mapEvent)
+    {
+        var combatants = (IEnumerable<IBattleCombatant>)mapEvent.InvolvedParties;
+        foreach (var side in new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker })
+            if (!combatants.Any(combatant => combatant.Side == side))
+                return side;
+
+        return BattleSideEnum.None;
     }
 
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest

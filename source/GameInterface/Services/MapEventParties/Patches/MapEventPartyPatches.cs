@@ -62,7 +62,7 @@ internal class MapEventPartyPatches
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopScoreHit))]
     [HarmonyPrefix]
-    private static bool PrefixOnTroopScoreHit(MapEventParty __instance, ref UniqueTroopDescriptor attackerTroopDesc, CharacterObject attackedTroop, int damage, bool isFatal, bool isTeamKill, bool isSimulatedHit)
+    private static bool PrefixOnTroopScoreHit(MapEventParty __instance, ref UniqueTroopDescriptor attackerTroopDesc, CharacterObject attackedTroop, int damage, bool isFatal, bool isTeamKill, WeaponComponentData attackerWeapon, bool isSimulatedHit)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -80,7 +80,7 @@ internal class MapEventPartyPatches
             return false;
 
         MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(
-            __instance, attackerElement.Troop, attackedTroop, damage, isFatal, isSimulatedHit));
+            __instance, attackerElement.Troop, attackedTroop, damage, isFatal, isSimulatedHit, attackerWeapon));
 
         return false;
     }

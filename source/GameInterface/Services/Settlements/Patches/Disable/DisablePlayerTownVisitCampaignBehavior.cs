@@ -15,16 +15,6 @@ namespace GameInterface.Services.Settlements.Patches.Disable;
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
 internal class DisablePlayerTownVisitCampaignBehavior
 {
-    /// <summary>
-    /// Disables entering the jail from the castle menu
-    /// </summary>
-    [HarmonyPrefix]
-    [HarmonyPatch("game_menu_castle_dungeon_on_consequence")]
-    private static bool DisableCastleDungeon()
-    {
-        return false;
-    }
-
     [HarmonyPatch(nameof(PlayerTownVisitCampaignBehavior.game_menu_manage_garrison_on_consequence))]
     [HarmonyPrefix]
     private static bool ManageGarrisonPrefix(PlayerTownVisitCampaignBehavior __instance)
