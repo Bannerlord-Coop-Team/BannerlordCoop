@@ -126,6 +126,23 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void RejectedSpeculativeAccept_DoesNotShowTheHerdGrant()
+    {
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(Server.NetPeer, ClientB.NetPeer);
+
+        Accept(ClientA);
+        Accept(ClientB);
+
+        router.ResumeLink(Server.NetPeer, ClientB.NetPeer);
+        environment.FlushCoalescer();
+
+        Assert.Equal(1, notices.CountFor(ClientA));
+        Assert.Equal(0, notices.CountFor(ClientB));
+    }
+
+    [Fact]
     public void IssueCreation_ReplicasUseTheServersIdentityDestinationRecipientAndAnimal()
     {
         Server.Call(() =>
