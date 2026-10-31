@@ -132,7 +132,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             (JournalLogEntry entry) => entry.IsRelatedTo(issues[scenario.ClientB]))));
         scenario.ClientA.Call(() =>
         {
-            Assert.Same(issues[scenario.ClientA], issues[scenario.ClientA].IssueOwner.Issue);
+            Assert.Null(issues[scenario.ClientA].IssueOwner.Issue);
             var archive = archives[scenario.ClientA];
             Assert.True(archive.IsEnded());
             Assert.True(archive.IsEndedUnsuccessfully());
