@@ -234,10 +234,19 @@ internal class FinalizationCoordinator : IHandler
                     {
                         foreach (var log in logs)
                         {
-                            if (quest.JournalEntries.Any(existing => existing.Type == log.Type &&
-                                existing.Range == log.Range && existing.LogText?.ToString() == log.Text?.ToString() &&
-                                existing.TaskName?.ToString() == log.TaskName?.ToString())) continue;
-                            quest._journalEntries.Add(log.ToJournalLog());
+                            var matches = quest.JournalEntries.Where(existing =>
+                                existing.Type == log.Type && existing.Range == log.Range &&
+                                SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
+                            var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
+                            if (existing == null && matches.Length == 1) existing = matches[0];
+                            if (existing != null)
+                            {
+                                existing.UpdateCurrentProgress(log.Progress);
+                            }
+                            else if (matches.Length == 0)
+                            {
+                                quest._journalEntries.Add(log.ToJournalLog());
+                            }
                         }
                     }
                     else
@@ -262,6 +271,24 @@ internal class FinalizationCoordinator : IHandler
                 }
             }
         }, context: nameof(FinalizationCoordinator));
+    }
+
+    private static bool SameText(TextObject first, TextObject second)
+    {
+        if (ReferenceEquals(first, second)) return true;
+        if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
+        if (first.Attributes == null) return true;
+        foreach (var pair in first.Attributes)
+        {
+            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
+            if (pair.Value is TextObject text)
+            {
+                if (!(value is TextObject other) || !SameText(text, other)) return false;
+            }
+            else if (!Equals(pair.Value, value)) return false;
+        }
+        return true;
     }
 
     // Server only.
