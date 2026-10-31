@@ -229,13 +229,14 @@ internal class FinalizationCoordinator : IHandler
                     var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
                     if (descriptor is ISpecializedEndingJournalDescriptor)
                     {
+                        var remaining = quest.JournalEntries.ToList();
                         foreach (var log in logs)
                         {
-                            var matches = quest.JournalEntries.Where(existing =>
+                            var matches = remaining.Where(existing =>
                                 existing.Type == log.Type && existing.Range == log.Range &&
                                 SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
                             if (matches.Length == 0)
-                                matches = quest.JournalEntries.Where(existing =>
+                                matches = remaining.Where(existing =>
                                     existing.Type == log.Type && existing.Range == log.Range &&
                                     SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
                             var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
@@ -248,6 +249,7 @@ internal class FinalizationCoordinator : IHandler
                             if (existing != null)
                             {
                                 existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
+                                remaining.Remove(existing);
                             }
                             else if (matches.Length == 0)
                             {
