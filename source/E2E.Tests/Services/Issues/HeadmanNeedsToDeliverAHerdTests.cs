@@ -848,6 +848,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
             MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
         });
+        Server.PumpGameThread();
         environment.FlushCoalescer();
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
