@@ -835,6 +835,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         environment.FlushCoalescer();
 
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var journal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Contains("canceled", journal.Logs.Select(log => log.Text?.ToString() ?? string.Empty));
         ClientA.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
 

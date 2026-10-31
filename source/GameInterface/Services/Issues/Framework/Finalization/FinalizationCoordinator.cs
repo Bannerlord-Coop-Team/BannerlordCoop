@@ -39,6 +39,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new ConditionalWeakTable<IssueBase, object>();
     private readonly object announcedIssuesLock = new object();
+    private readonly ConditionalWeakTable<IssueBase, NetPeer> finalizedOwners = new ConditionalWeakTable<IssueBase, NetPeer>();
     private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
@@ -196,13 +197,21 @@ internal class FinalizationCoordinator : IHandler
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithAlternative ||
             !TryGetIssueOwnerId(issue, out var giverId) ||
-            !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
-            !playerManager.TryGetPeer(owner, out var peer)) return;
+            !TryGetFinalizedOwnerPeer(issue, giverId, out var peer)) return;
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
             entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
+    }
+
+    private bool TryGetFinalizedOwnerPeer(IssueBase issue, string giverId, out NetPeer peer)
+    {
+        if (ownership.TryGetOwner(giverId, issue.StringId, out var owner) &&
+            playerManager.TryGetPeer(owner, out peer))
+            return true;
+
+        return finalizedOwners.TryGetValue(issue, out peer);
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -273,6 +282,10 @@ internal class FinalizationCoordinator : IHandler
 
             announcedIssues.Add(issue, new object());
         }
+
+        if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out var owner) &&
+            playerManager.TryGetPeer(owner, out var ownerPeer))
+            finalizedOwners.Add(issue, ownerPeer);
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);

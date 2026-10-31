@@ -26,24 +26,34 @@ public readonly struct NetworkHeadmanHerdLog : ICommand
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly TextObject Text;
+    [ProtoMember(4)] public readonly IssueJournalEntry Entry;
 
     public NetworkHeadmanHerdLog(string giverId, string issueId, TextObject text)
     {
         GiverId = giverId;
         IssueId = issueId;
         Text = text;
+        Entry = default;
+    }
+
+    public NetworkHeadmanHerdLog(string giverId, string issueId, JournalLog log)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        Text = log.LogText;
+        Entry = new IssueJournalEntry(log);
     }
 }
 
 public readonly struct HeadmanHerdLogAdded : IEvent
 {
     internal readonly Quest Quest;
-    internal readonly TextObject Text;
+    internal readonly JournalLog Log;
 
-    internal HeadmanHerdLogAdded(Quest quest, TextObject text)
+    internal HeadmanHerdLogAdded(Quest quest, JournalLog log)
     {
         Quest = quest;
-        Text = text;
+        Log = log;
     }
 }
 
@@ -72,8 +82,6 @@ internal class HeadmanHerdJournalHandler : IHandler
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Subscribe<QuestSolutionAcceptTriggered>(TrackAccept);
-        broker.Subscribe<QuestAcceptanceStarted>(ShowGrant);
-        broker.Subscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Subscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
         broker.Subscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
@@ -83,8 +91,6 @@ internal class HeadmanHerdJournalHandler : IHandler
         broker.Unsubscribe<HeadmanHerdLogAdded>(Send);
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Unsubscribe<QuestSolutionAcceptTriggered>(TrackAccept);
-        broker.Unsubscribe<QuestAcceptanceStarted>(ShowGrant);
-        broker.Unsubscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Unsubscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
         broker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
@@ -96,26 +102,6 @@ internal class HeadmanHerdJournalHandler : IHandler
         if (ModInformation.IsServer || issue?.IssueQuest is not Quest quest) return;
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         pendingAccepts.TryAdd((giverId, issue.StringId), 0);
-    }
-
-    private void ShowGrant(MessagePayload<QuestAcceptanceStarted> payload) =>
-        TrackAccept(IssueManager.GetIssueOfQuest(payload.What.Quest));
-
-    private void FinishAccept(MessagePayload<QuestAcceptanceFinished> payload)
-    {
-        if (ModInformation.IsServer)
-            return;
-
-        if (payload.What.Quest == null)
-        {
-            pendingAccepts.Clear();
-            return;
-        }
-
-        var issue = IssueManager.GetIssueOfQuest(payload.What.Quest);
-        if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
-            return;
-        pendingAccepts.TryRemove((giverId, issue.StringId), out _);
     }
 
     private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -147,7 +133,7 @@ internal class HeadmanHerdJournalHandler : IHandler
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         if (!ownership.TryGetOwner(giverId, issue.StringId, out var owner)) return;
         if (!players.TryGetPeer(owner, out var peer)) return;
-        network.Send(peer, new NetworkHeadmanHerdLog(giverId, issue.StringId, payload.What.Text));
+        network.Send(peer, new NetworkHeadmanHerdLog(giverId, issue.StringId, payload.What.Log));
     }
 
     private void Receive(MessagePayload<NetworkHeadmanHerdLog> payload)
@@ -159,13 +145,26 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
-            if (data.Text == null || quest.JournalEntries.Any(log =>
-                    log.LogText?.ToString() == data.Text.ToString())) return;
+            var log = data.Entry.Text != null ? data.Entry.ToJournalLog() :
+                data.Text == null ? null : new JournalLog(CampaignTime.Now, data.Text);
+            if (log == null) return;
+            if (data.Entry.Text != null)
+            {
+                if (quest.JournalEntries.Any(existing => SameLog(existing, log))) return;
+            }
+            else if (data.Text == null || quest.JournalEntries.Any(existing =>
+                         existing.LogText?.ToString() == data.Text.ToString())) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())
-                quest.AddLog(data.Text);
+                quest._journalEntries.Add(log);
         }, data.GiverId), context: nameof(HeadmanHerdJournalHandler));
     }
+
+    private static bool SameLog(JournalLog first, JournalLog second) =>
+        first.LogTime.NumTicks == second.LogTime.NumTicks && first.Range == second.Range &&
+        first.CurrentProgress == second.CurrentProgress && first.Type == second.Type &&
+        first.LogText?.ToString() == second.LogText?.ToString() &&
+        first.TaskName?.ToString() == second.TaskName?.ToString();
 }
 
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
@@ -173,9 +172,9 @@ internal class HeadmanHerdJournalHandler : IHandler
 internal class HeadmanHerdJournalPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(QuestBase __instance, TextObject text)
+    private static void Postfix(QuestBase __instance, TextObject text, JournalLog __result)
     {
         if (ModInformation.IsServer && __instance is Quest quest)
-            MessageBroker.Instance.Publish(quest, new HeadmanHerdLogAdded(quest, text));
+            MessageBroker.Instance.Publish(quest, new HeadmanHerdLogAdded(quest, __result));
     }
 }
