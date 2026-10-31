@@ -47,7 +47,7 @@ public class ClientLogic : IClientLogic
         }
         set
         {
-            Logger.Debug("Client is changing to {state} State", value.GetType().Name);
+            Logger.Information("Client is changing to {state} State", value.GetType().Name);
 
             _state?.Dispose();
             _state = value;
