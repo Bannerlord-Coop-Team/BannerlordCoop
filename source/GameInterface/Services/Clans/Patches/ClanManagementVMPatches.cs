@@ -24,8 +24,8 @@ internal static class ClanManagementVMPatches
     [HarmonyPrefix]
     public static bool CreateDataSourcePrefix(GauntletClanScreen __instance, ref ClanManagementVM __result)
     {
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
-        ContainerProvider.TryResolve<IMessageBroker>(out var messages);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return true;
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messages)) return true;
 
         __result = new CoopClanManagementVM(__instance.CloseClanScreen, __instance.ShowHeroOnMap,
             __instance.OpenPartyScreenForNewClanParty, __instance.OpenBannerEditorWithPlayerClan, finance, messages);
@@ -45,7 +45,7 @@ internal static class ClanManagementVMPatches
     public static void MapGoldTooltipPrefix(string itemId, ref TooltipTriggerVM tooltipTrigger)
     {
         if (itemId != "gold") return;
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return;
 
         // Choose at hover time so an existing map tooltip follows clan joins and departures.
         ExplainedNumber GetGoldChange(bool details) => finance.IsNonLeaderMember(Hero.MainHero)
@@ -69,7 +69,9 @@ internal static class ClanManagementVMPatches
     [HarmonyPostfix]
     public static void RefreshValuesPostfix(ClanManagementVM __instance)
     {
-        bool canManage = CoopClanPermissions.CanManageClan(__instance._clan);
+        if (!ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions)) return;
+
+        bool canManage = permissions.CanManageClan(Hero.MainHero, __instance._clan);
         var disabledReason = GameTexts.FindText("str_coop_clan_identity_leader_only");
         __instance.CanChooseBanner = canManage;
         __instance.ClanBannerHint = new HintViewModel(canManage
@@ -105,27 +107,37 @@ internal static class ClanManagementVMPatches
     [HarmonyPrefix]
     public static bool ExecuteOpenBannerEditorPrefix(ClanManagementVM __instance)
     {
-        return CoopClanPermissions.CanManageClan(__instance._clan);
+        return CanManageClanIdentity(__instance._clan);
     }
 
     [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.ExecuteChangeClanName))]
     [HarmonyPrefix]
     public static bool ExecuteChangeClanNamePrefix(ClanManagementVM __instance)
     {
-        return CoopClanPermissions.CanManageClan(__instance._clan);
+        return CanManageClanIdentity(__instance._clan);
     }
 
     [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.OnChangeClanNameDone))]
     [HarmonyPrefix]
     public static bool OnChangeClanNameDonePrefix(ClanManagementVM __instance)
     {
-        return CoopClanPermissions.CanManageClan(__instance._clan);
+        return CanManageClanIdentity(__instance._clan);
     }
 
     [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OpenBannerEditorScreen))]
     [HarmonyPrefix]
     public static bool OpenBannerEditorScreenPrefix()
     {
-        return CoopClanPermissions.CanManageClan(Hero.MainHero.Clan);
+        return CanManageClanIdentity(Hero.MainHero.Clan);
+    }
+
+    /// <summary>
+    /// Limits clan banner and name edits to the clan leader, allowing them as vanilla does outside a coop session.
+    /// </summary>
+    private static bool CanManageClanIdentity(Clan clan)
+    {
+        if (!ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions)) return true;
+
+        return permissions.CanManageClan(Hero.MainHero, clan);
     }
 }

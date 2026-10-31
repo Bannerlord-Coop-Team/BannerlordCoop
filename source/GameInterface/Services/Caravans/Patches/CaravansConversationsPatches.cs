@@ -153,7 +153,7 @@ internal class CaravansConversationsPatches
     public static bool ConversationCaravanSurrenderLeaveOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        if (!ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface)) return true;
         itemRosterInterface.OpenPartyLootScreen(MobileParty.ConversationParty, out var caravanHasItems, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
@@ -171,13 +171,14 @@ internal class CaravansConversationsPatches
     [HarmonyPrefix]
     public static bool ConversationCaravanTookPrisonerOnConsequencePrefix(ref CaravansCampaignBehavior __instance)
     {
+        if (!ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface)) return true;
+
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
         // Locally set player interaction, and then save in CoopSession on server
         __instance.SetPlayerInteraction(encounteredMobileParty, CaravansCampaignBehavior.PlayerInteraction.Hostile);
 
         // Call helper function to implement vanilla open loot screen logic
-        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
         itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var caravanHasItems, out var itemRosterElements);
 
         // Open prisoner transfer screen
