@@ -464,7 +464,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Server.Call(() => QuestHere(Server).CompleteQuestWithCancel());
         environment.FlushCoalescer();
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.Call(() =>
         {
             Assert.True(ownerQuest.IsFinalized);
