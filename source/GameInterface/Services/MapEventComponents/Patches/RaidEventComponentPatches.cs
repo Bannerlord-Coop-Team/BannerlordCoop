@@ -2,7 +2,6 @@ using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventComponents.Messages;
-using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -10,12 +9,16 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventComponents.Patches;
 
-[HarmonyPatch(typeof(RaidEventComponent))]
-internal class RaidEventComponentPatches
+/// <summary>
+/// Publishes raid loot and reward progress made by <see cref="RaidEventComponent.Update"/>.
+/// Applied by <see cref="RaidEventComponentRegistry"/>, not by attribute.
+/// </summary>
+internal static class RaidEventComponentPatches
 {
-    [HarmonyPatch(nameof(RaidEventComponent.Update))]
-    [HarmonyPrefix]
-    private static void UpdatePrefix(RaidEventComponent __instance, out RaidUpdateState __state)
+    /// <summary>
+    /// Captures loot and reward state before the raid update runs.
+    /// </summary>
+    internal static void UpdatePrefix(RaidEventComponent __instance, out RaidUpdateState __state)
     {
         __state = new RaidUpdateState(
             __instance._lootedItemCount,
@@ -23,9 +26,10 @@ internal class RaidEventComponentPatches
             CaptureItems(__instance.AttackerSide?.LeaderParty?.ItemRoster));
     }
 
-    [HarmonyPatch(nameof(RaidEventComponent.Update))]
-    [HarmonyPostfix]
-    private static void UpdatePostfix(RaidEventComponent __instance, RaidUpdateState __state)
+    /// <summary>
+    /// Publishes loot and reward changes the raid update made.
+    /// </summary>
+    internal static void UpdatePostfix(RaidEventComponent __instance, RaidUpdateState __state)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (ModInformation.IsClient) return;
@@ -110,7 +114,7 @@ internal class RaidEventComponentPatches
         return false;
     }
 
-    private sealed class RaidUpdateState
+    internal sealed class RaidUpdateState
     {
         public int LootedItemCount { get; }
         public Dictionary<ItemObject, float> RaidProductionRewards { get; }

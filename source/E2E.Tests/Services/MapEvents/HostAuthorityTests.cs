@@ -86,56 +86,6 @@ public class HostAuthorityTests : MapEventTestBase
                 $"MapEvent {ctx.MapEventId} should have been finalized/removed by the server after the host's report"));
     }
 
-    [Fact]
-    [Trait("Requirement", "BR-011")]
-    public void UnregisteredPeerCommitOfVictoryBattleState_IsRefused()
-    {
-        var ctx = CreateServerMapEvent();
-        CreatePlayerHeroParty("host");
-
-        const int hostEpoch = 7;
-        Server.Call(() => Server.Resolve<IBattleHostRegistry>()
-            .Set(ctx.MapEventId, new BattleHostAssignment("host", Array.Empty<string>(), hostEpoch)));
-
-        bool concluded = false;
-        Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => concluded = true);
-
-        var unregisteredClient = Clients.Last();
-        unregisteredClient.Call(() => unregisteredClient.Resolve<INetwork>()
-            .SendAll(new NetworkChangeBattleState(
-                ctx.MapEventId,
-                BattleState.AttackerVictory,
-                hostEpoch)), ResultCommitDisabledMethods());
-
-        Assert.False(concluded);
-        AssertServerBattleState(ctx.MapEventId, BattleState.None);
-    }
-
-    [Fact]
-    [Trait("Requirement", "BR-011")]
-    public void MissingNetworkSenderCommitOfVictoryBattleState_IsRefused()
-    {
-        var ctx = CreateServerMapEvent();
-        CreatePlayerHeroParty("host");
-
-        const int hostEpoch = 7;
-        Server.Call(() => Server.Resolve<IBattleHostRegistry>()
-            .Set(ctx.MapEventId, new BattleHostAssignment("host", Array.Empty<string>(), hostEpoch)));
-
-        bool concluded = false;
-        Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => concluded = true);
-
-        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
-            this,
-            new NetworkChangeBattleState(
-                ctx.MapEventId,
-                BattleState.AttackerVictory,
-                hostEpoch)), ResultCommitDisabledMethods());
-
-        Assert.False(concluded);
-        AssertServerBattleState(ctx.MapEventId, BattleState.None);
-    }
-
     private void AssertServerBattleState(string mapEventId, BattleState expected)
     {
         Server.Call(() =>

@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using GameInterface.Services.MapEvents.Handlers;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -13,6 +14,8 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -136,6 +139,16 @@ internal class MapEventPatches
         if (__instance.IsFinalized)
             return false;
 
+        // A receive callback's AllowedThread does not authorize ending a server-owned raid.
+        if (ModInformation.IsClient && __instance.IsRaidHostileAction() &&
+            AllowedThread.IsThisThreadAllowed() &&
+            !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+        {
+            Logger.Debug("Ignored received raid finalization for {MapEventId}. {StackTrace}",
+                __instance.StringId, System.Environment.StackTrace);
+            return false;
+        }
+
         if (ModInformation.IsServer)
             MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
@@ -166,6 +179,34 @@ internal class MapEventPatches
         MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
     }
 
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyFinalizer]
+    private static Exception Finalizer_FinalizeEventAux(MapEvent __instance, Exception __exception)
+    {
+        // Vanilla sets WaitingRemoval before running listeners and detaching parties, so a throw past that point
+        // leaves every party linked to a battle the map event manager drops next tick (#3129).
+        if (__exception == null || ModInformation.IsClient || !__instance.IsFinalized)
+            return __exception;
+
+        Logger.Error(__exception, "Map event {MapEventId} failed while finalizing, releasing its parties", __instance.StringId);
+
+        if (!ContainerProvider.TryResolve<IMapEventLoadCleaner>(out var loadCleaner))
+            return __exception;
+
+        try
+        {
+            loadCleaner.ReleaseFailedFinalization(__instance);
+        }
+        catch (Exception releaseException)
+        {
+            Logger.Error(releaseException, "Could not release the parties of map event {MapEventId}", __instance.StringId);
+        }
+
+        return null;
+    }
+
+    // A client skips an unchanged winner, and writes a coop mission victory straight to the field so the managed
+    // setter never reports it; the server and allowed writes run vanilla.
     [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
     [HarmonyPrefix]
     private static bool Prefix_SetOverrideWinner(MapEvent __instance, BattleSideEnum winner)
@@ -181,8 +222,23 @@ internal class MapEventPatches
         };
 
         // Skip unchanged client writes before the managed setter reports them.
-        return state != __instance.BattleState;
+        if (state == __instance.BattleState) return false;
+
+        // A coop mission's victory winds the local mission down (PlayerEncounter.SetPlayerVictoriousInternal); the server
+        // applies it after every member reports, so the client writes only the field (its OnBattleWon is skipped anyway).
+        if (IsCoopMissionVictory(state))
+        {
+            __instance._battleState = state;
+            return false;
+        }
+
+        return true;
     }
+
+    // A victory set inside a coop battle mission, which the server applies only after every member reports.
+    private static bool IsCoopMissionVictory(BattleState state) =>
+        (state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
+        && BattleConclusionGate.IsInCoopBattleMission;
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
@@ -224,8 +280,7 @@ internal class MapEventPatches
         // Coop mission victories use NetworkBattleResultReady so the server can wait for every member and
         // accepted joiner. The local set still runs so this mission winds down; the server applies the result
         // only after the completion barrier publishes the authoritative state change.
-        if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission)
+        if (IsCoopMissionVictory(value))
         {
             return true;
         }
@@ -493,8 +548,15 @@ internal class MapEventPatches
         bool hasPlayerParty = __instance.InvolvedParties.Any(
             x => x != null && x.IsMobile && !x.MobileParty.IsControlledByThisInstance());
 
+        // Only a connected player's mission resolves a player battle. Once every player in it has been offline
+        // for the grace period it resolves like an AI battle, otherwise nothing ever ends it (#3864).
+        // An offline player's battle can still be finishing its mission or a server simulation, which must stay the
+        // only thing resolving it.
+        bool waitsForPlayers = hasPlayerParty &&
+            (WaitsForPlayers(__instance) || IsBattleModeBusy(__instance));
+
         // Siege map events must not enter native campaign resolution, even on an allowed-thread setup path.
-        if (hasPlayerParty && !__instance.IsRaidHostileAction())
+        if (waitsForPlayers && !__instance.IsRaidHostileAction())
             return false;
 
         // Receive path / setup: let the original run when patches are standing down.
@@ -508,12 +570,15 @@ internal class MapEventPatches
         {
             RaidAiInterventionSuppression.SuppressJoinedDefenders(__instance);
 
+            if (ContainerProvider.TryResolve<IVillageHostileActionInterface>(out var hostileActions))
+                hostileActions.ResolveRaidDefenders(__instance);
+
             // Slow raids need campaign-map progress, but not while their battle mission is occupied.
             if (__instance.IsActiveSlowVillageRaid())
                 return !HasOccupiedBattleMission(__instance);
         }
 
-        if (hasPlayerParty)
+        if (waitsForPlayers)
             return false;
 
         // A settlement PartyBase is a complete participant even though it has no MobileParty.
@@ -521,6 +586,18 @@ internal class MapEventPatches
             return false;
 
         return true;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.Update))]
+    [HarmonyPostfix]
+    private static void PostfixUpdate(MapEvent __instance, bool __runOriginal)
+    {
+        // Only battles the gate above checked and handed to vanilla, not its setup or receive fast path.
+        if (!__runOriginal || __instance.IsFinalized || CallOriginalPolicy.IsOriginalAllowed())
+            return;
+
+        if (ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver))
+            resolver.TryResolve(__instance);
     }
 
     private static bool RepairLeaderParties(MapEvent mapEvent)
@@ -568,16 +645,55 @@ internal class MapEventPatches
         return true;
     }
 
-    private static bool HasOccupiedBattleMission(MapEvent mapEvent)
-    {
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
-            !ContainerProvider.TryResolve<IMissionMembershipRegistry>(out var membershipRegistry))
-            return false;
+    // When each player battle was first seen with every player in it offline
+    private static readonly ConditionalWeakTable<MapEvent, StrongBox<DateTime>> allPlayersOfflineSince = new();
 
-        return ServerBattleModeArbiter.IsMissionClaimed(mapEventId) &&
-               membershipRegistry.IsInstanceOccupied(mapEventId);
+    /// <summary>
+    /// The server only resolves a battle with a player party through that player's mission. Once every such
+    /// player is offline nothing would resolve it (#3864), so after a grace period the battle is simulated like
+    /// an AI battle. The grace period lets a player who crashed or dropped rejoin and still fight it, and starts
+    /// over whenever one of them is back. Hideout battles always wait.
+    /// </summary>
+    private static bool WaitsForPlayers(MapEvent mapEvent)
+    {
+        if (mapEvent.IsHideoutBattle) return true;
+
+        if (HasConnectedPlayerParty(mapEvent))
+        {
+            allPlayersOfflineSince.Remove(mapEvent);
+            return true;
+        }
+
+        var offlineSince = allPlayersOfflineSince.GetValue(mapEvent, _ =>
+        {
+            Logger.Information("Every player in map event {MapEventId} is offline, resolving it in {GracePeriod} unless one rejoins",
+                mapEvent.StringId, MapEventConfig.OfflinePlayerGracePeriod);
+            return new StrongBox<DateTime>(DateTime.UtcNow);
+        });
+
+        return DateTime.UtcNow - offlineSince.Value < MapEventConfig.OfflinePlayerGracePeriod;
     }
+
+    // lets tests start a battle's grace period in the past instead of waiting it out
+    internal static void SetAllPlayersOfflineSince(MapEvent mapEvent, DateTime since)
+    {
+        allPlayersOfflineSince.Remove(mapEvent);
+        allPlayersOfflineSince.Add(mapEvent, new StrongBox<DateTime>(since));
+    }
+
+    /// <summary>A player party with no registered owner counts as connected, which keeps the battle waiting.</summary>
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent) =>
+        // without the resolver, keep waiting like before
+        !ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) ||
+        resolver.HasConnectedPlayerParty(mapEvent);
+
+    private static bool IsBattleModeBusy(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.IsBattleModeBusy(mapEvent);
+
+    private static bool HasOccupiedBattleMission(MapEvent mapEvent) =>
+        ContainerProvider.TryResolve<IStalledMapEventResolver>(out var resolver) &&
+        resolver.HasOccupiedBattleMission(mapEvent);
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MapEvent.Initialize))]

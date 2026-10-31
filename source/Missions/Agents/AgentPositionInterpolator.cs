@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Locations;
 using Missions.Agents.Packets;
 using Serilog;
 using System;
@@ -72,16 +73,21 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly Dictionary<Agent, long> _mountedGuardProcessedSequences =
         new Dictionary<Agent, long>();
     private readonly INetworkAgentRegistry agentRegistry;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
     // Reused scratch list so eviction doesn't allocate every tick.
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
 
-    public AgentPositionInterpolator() : this(null) { }
+    public AgentPositionInterpolator(ILocationNpcAuthorityState locationAuthorityState)
+        : this(null, locationAuthorityState) { }
 
-    internal AgentPositionInterpolator(INetworkAgentRegistry agentRegistry)
+    internal AgentPositionInterpolator(
+        INetworkAgentRegistry agentRegistry,
+        ILocationNpcAuthorityState locationAuthorityState)
     {
         this.agentRegistry = agentRegistry;
+        this.locationAuthorityState = locationAuthorityState;
     }
 
     public void SetRiderTarget(Agent agent, AgentData data)
@@ -236,7 +242,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
             // A point-owned puppet's facing belongs to the point it is using — a look write per
             // native cycle is exactly the churn that spun seated NPCs.
-            if (LocationPoseLock.IsPointOwned(agent))
+            if (LocationPoseLock.IsPointOwned(locationAuthorityState, agent))
                 continue;
 
             TargetFrame target = pair.Value;
@@ -305,7 +311,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             // client exactly as on the host, because the puppet uses the SAME local point
             // (replicated semantically via NetworkNpcPointUse). Driving movement here would only
             // fight it. When the use ends, the point plays its leave action and this seek resumes.
-            if (LocationPoseLock.IsPointOwned(agent))
+            if (LocationPoseLock.IsPointOwned(locationAuthorityState, agent))
                 continue;
 
             // A mount tolerates more slack before we snap; an on-foot rider is held tighter.

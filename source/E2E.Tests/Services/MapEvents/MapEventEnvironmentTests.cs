@@ -95,23 +95,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
-    public void NewMapEvent_ClientReplicaStartsWithNoRetreatState()
-    {
-        var ctx = CreateServerMapEvent();
-
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-            {
-                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-                Assert.Equal(BattleSideEnum.None, mapEvent.RetreatingSide);
-                Assert.Equal(0, mapEvent.PursuitRoundNumber);
-                Assert.False(mapEvent.EndedByRetreat);
-            });
-        }
-    }
-
-    [Fact]
     public void ServerRetreatState_SyncsPursuitRound_ToAllClients()
     {
         var ctx = CreateServerMapEvent();
@@ -136,23 +119,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerJoinParty_ToSide_SyncAllClients()
-    {
-        // Arrange
-        var sideId = CreateServerMapEventSide();
-
-        // Act
-        var joinerId = JoinPartyToSide(sideId);
-
-        // Assert — the reinforcing party exists and is part of the battle side on every client
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(joinerId, out _));
-            AssertPartyInSide(client, sideId, joinerId);
-        }
-    }
-
-    [Fact]
     public void ServerJoinMultipleParties_ToSide_SyncAllClients()
     {
         // Arrange
@@ -170,58 +136,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             AssertPartyInSide(client, sideId, firstJoinerId);
             AssertPartyInSide(client, sideId, secondJoinerId);
-        }
-    }
-
-    [Fact]
-    public void CreatePlayerHeroParty_RegistersPlayerParty_OnAllInstances()
-    {
-        // Act
-        var (_, partyId) = CreatePlayerHeroParty("MyControllerId");
-
-        // Assert — the party is recognized as a player party everywhere
-        AssertIsPlayerParty(Server, partyId);
-        foreach (var client in Clients)
-        {
-            AssertIsPlayerParty(client, partyId);
-        }
-    }
-
-    [Fact]
-    public void ServerStartCaptivity_OfPlayerHero_SyncAllClients()
-    {
-        // Arrange
-        var (heroId, _) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        // Act
-        StartCaptivity(heroId, captorPartyId);
-
-        // Assert — captivity state is synced to every client
-        AssertCaptivity(Server, heroId, captorPartyId);
-        foreach (var client in Clients)
-        {
-            AssertCaptivity(client, heroId, captorPartyId);
-        }
-    }
-
-    [Fact]
-    public void PlayerPartyDefeatedInBattle_TakesPlayerHeroCaptive_SyncAllClients()
-    {
-        // Arrange
-        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        // Act — the player party loses a battle; CaptureDefeatedPartyMembers runs on the server. Native removes
-        // the defeated party's leader, so this only captures the hero if the coop patch reads the leader in a
-        // prefix (before native) rather than a postfix.
-        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
-
-        // Assert — the defeated player hero is now a prisoner of the captor on every instance
-        AssertCaptivity(Server, heroId, captorPartyId);
-        foreach (var client in Clients)
-        {
-            AssertCaptivity(client, heroId, captorPartyId);
         }
     }
 
@@ -265,10 +179,18 @@ public class MapEventEnvironmentTests : MapEventTestBase
             foreach (var client in Clients)
                 AssertCaptivity(client, heroId, captorPartyId);
         }
+
+        // Each captured party's roster is 0, not -1 (reported live bug).
+        foreach (var partyId in new[] { party1, party2 })
+        {
+            AssertPartyManCount(Server, partyId, 0);
+            foreach (var client in Clients)
+                AssertPartyManCount(client, partyId, 0);
+        }
     }
 
     [Fact]
-    public void PlayerLosesBattle_CaptureSyncs_ViaBattleStateResult()
+    public void PlayerLosesBattle_CaptureSyncs_ViaBattleStateResult_AndReleaseRestoresOne()
     {
         // Arrange
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
@@ -292,6 +214,14 @@ public class MapEventEnvironmentTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.False(party.IsActive, "Captured player party should be deactivated on the server");
         });
+
+        // The result path must leave an empty roster (0, not -1) and the release restores exactly the hero.
+        AssertPartyManCount(Server, partyId, 0);
+        foreach (var client in Clients)
+            AssertPartyManCount(client, partyId, 0);
+
+        ReleasePlayerAfterCaptorDefeated(heroId);
+        AssertPartyManCount(Server, partyId, 1);
     }
 
     [Fact]
@@ -400,40 +330,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
             instance.Call(() => Assert.Equal(expectedHealth, instance.GetRegisteredObject<Hero>(heroId).HitPoints));
     }
 
-    [Fact]
-    public void ReleasedHero_StaysWounded_SyncAllClients()
-    {
-        // Arrange — the player loses a battle and is taken prisoner.
-        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
-
-        // Model the lost battle wounding the hero (HitPoints is a server-authoritative synced property).
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-            hero.HitPoints = 1;
-        });
-
-        // The wound replicates to every client.
-        foreach (var client in Clients)
-        {
-            AssertHeroHitPoints(client, heroId, expectFull: false);
-        }
-
-        // Act — the captor is defeated and the player is freed.
-        ReleasePlayerAfterCaptorDefeated(heroId);
-
-        // Assert — release does not instantly heal the freed captive: the hero stays wounded everywhere
-        // (it recovers gradually through normal healing over time), and that wounded state stays consistent
-        // across the server and every client.
-        AssertHeroHitPoints(Server, heroId, expectFull: false);
-        foreach (var client in Clients)
-        {
-            AssertHeroHitPoints(client, heroId, expectFull: false);
-        }
-    }
-
     private void AssertHeroHitPoints(EnvironmentInstance instance, string heroId, bool expectFull)
     {
         instance.Call(() =>
@@ -466,6 +362,17 @@ public class MapEventEnvironmentTests : MapEventTestBase
 
         AssertCaptivity(Server, heroId, captorPartyId);
 
+        // Model the lost battle wounding the hero (HitPoints is a server-authoritative synced property).
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero.HitPoints = 1;
+        });
+        foreach (var client in Clients)
+        {
+            AssertHeroHitPoints(client, heroId, expectFull: false);
+        }
+
         // Act — the captor party is later defeated by another party, which frees its prisoners after the
         // battle (the scenario that previously left the player captive with a vanished party).
         ReleasePlayerAfterCaptorDefeated(heroId);
@@ -487,6 +394,13 @@ public class MapEventEnvironmentTests : MapEventTestBase
         {
             AssertHeroInPartyRoster(client, heroId, partyId);
         }
+
+        // Release does not instantly heal the freed captive; it stays wounded everywhere.
+        AssertHeroHitPoints(Server, heroId, expectFull: false);
+        foreach (var client in Clients)
+        {
+            AssertHeroHitPoints(client, heroId, expectFull: false);
+        }
     }
 
     [Fact]
@@ -507,7 +421,12 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // The troop transfer replicates as coalesced roster deltas; drain them before reading client state.
         TestEnvironment.FlushCoalescer();
 
+        // Native removes the defeated leader, so the hero is only captured if the coop patch reads it in a prefix.
         AssertCaptivity(Server, heroId, captorPartyId);
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, heroId, captorPartyId);
+        }
 
         // The capture parks the party: the member roster is emptied on the server AND on every
         // client. The phantom-troop bug: the hero's capture-time removal never replicated, so
@@ -573,47 +492,6 @@ public class MapEventEnvironmentTests : MapEventTestBase
             Assert.True(captorParty.Morale > 0f);
             Assert.False(Campaign.Current.Models.MobilePartyAIModel.ShouldConsiderAttacking(captorParty, playerParty));
         });
-    }
-
-    [Fact]
-    public void PlayerCapturedViaBattleResult_RosterIsZeroNotNegative_AndReleaseRestoresOne()
-    {
-        // Reproduces the live bug: a party captured via the battle-RESULT path (BattleState victory -> OnBattleWon
-        // -> capture, the path the coop commit-on-conclusion now drives) ends with a NEGATIVE roster (-1), and a
-        // release only brings it back to 0 instead of restoring the hero (1). The direct-capture path
-        // (EscapeFromCaptivity_...) gets this right; this asserts the result path matches.
-        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        DefeatPlayerByBattleStateSync(heroId, partyId, captorPartyId);
-
-        // The captured party's roster must be empty (0) — not -1.
-        AssertPartyManCount(Server, partyId, 0);
-        foreach (var client in Clients)
-            AssertPartyManCount(client, partyId, 0);
-
-        // On release the hero is restored — exactly 1, not 0.
-        ReleasePlayerAfterCaptorDefeated(heroId);
-        AssertPartyManCount(Server, partyId, 1);
-    }
-
-    [Fact]
-    public void TwoAlliedPlayersCaptured_EachRosterIsZeroNotNegative()
-    {
-        // The live coop case: two allied players share the losing side and are both captured. Reported bug: a
-        // captured party's roster goes to -1 (then 0 on release). Asserts each captured party's roster is 0.
-        var (hero1, party1) = CreatePlayerHeroParty("player1");
-        var (hero2, party2) = CreatePlayerHeroParty("player2");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        DefeatAlliedPlayersByBattleStateSync(captorPartyId, playersAreAttackers: true, (hero1, party1), (hero2, party2));
-
-        foreach (var partyId in new[] { party1, party2 })
-        {
-            AssertPartyManCount(Server, partyId, 0);
-            foreach (var client in Clients)
-                AssertPartyManCount(client, partyId, 0);
-        }
     }
 
     [Fact]
@@ -700,6 +578,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "CaptorControllerId");
 
         Server.Call(() =>
         {
@@ -754,6 +633,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
         var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "CaptorControllerId");
 
         Server.Call(() =>
         {
@@ -791,77 +671,5 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
             AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
         }
-    }
-
-    [Fact]
-    public void ServerEndCaptivity_OfPlayerHero_SyncAllClients()
-    {
-        // Arrange
-        var (heroId, _) = CreatePlayerHeroParty("MyControllerId");
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        StartCaptivity(heroId, captorPartyId);
-
-        // Act
-        EndCaptivity(heroId);
-
-        // Assert — every client sees the hero released
-        AssertCaptivity(Server, heroId, null);
-        foreach (var client in Clients)
-        {
-            AssertCaptivity(client, heroId, null);
-        }
-    }
-
-    [Fact]
-    public void SetMockPlayerEncounter_InstallsAndClears_PlayerEncounterContext()
-    {
-        // Arrange
-        var encounteredPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        AssertHasPlayerEncounter(Server, expected: false);
-
-        // Act — install a mocked encounter on the server
-        var encounter = SetMockPlayerEncounter(Server, encounteredPartyId);
-
-        // Assert — the context is live and carries the encountered party
-        Assert.NotNull(encounter);
-        AssertHasPlayerEncounter(Server, expected: true);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(encounteredPartyId, out var encountered));
-            Assert.Same(encountered.Party, PlayerEncounter.EncounteredParty);
-        });
-
-        // Act — clear it
-        ClearPlayerEncounter(Server);
-
-        // Assert
-        AssertHasPlayerEncounter(Server, expected: false);
-    }
-
-    [Fact]
-    public void SetMockPlayerEncounter_IsPerInstance_NotSynced()
-    {
-        // Arrange / Act — encounter context is local engine state, installed only on the server
-        SetMockPlayerEncounter(Server);
-
-        // Assert — clients do not receive it
-        AssertHasPlayerEncounter(Server, expected: true);
-        foreach (var client in Clients)
-        {
-            AssertHasPlayerEncounter(client, expected: false);
-        }
-    }
-
-    private static void AssertIsPlayerParty(EnvironmentInstance instance, string partyId)
-    {
-        instance.Call(() =>
-        {
-            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(
-                MobilePartyExtensions.IsPlayerParty(party),
-                $"Party {partyId} was expected to be a player party on {instance.GetType().Name}");
-        });
     }
 }

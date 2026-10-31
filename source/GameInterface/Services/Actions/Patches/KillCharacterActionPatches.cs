@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -118,11 +120,7 @@ internal class KillCharacterActionPatches
             ChangeGovernorAction.RemoveGovernorOf(victim);
         }
 
-        // TODO: Traits aren't synced
-        //if ((actionDetail == KillCharacterAction.KillCharacterActionDetail.Executed || actionDetail == KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent) && killer == Hero.MainHero && victim.Clan != null && victim.GetTraitLevel(DefaultTraits.Honor) >= 0)
-        //{
-        //    TraitLevelingHelper.OnLordExecuted();
-        //}
+        ApplyExecutionTraitPenalty(victim, killer, actionDetail);
 
         if (victim.Clan != null && !victim.Clan.IsEliminated && !victim.Clan.IsBanditFaction && !victim.Clan.IsPlayerClan())
         {
@@ -166,6 +164,29 @@ internal class KillCharacterActionPatches
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// v1.5 moved the execution trait penalty out of this action into ExecutionCampaignBehavior, which
+    /// applies <see cref="TraitLevelingHelper.OnBloodFeudStarted"/> only when the killer is Hero.MainHero.
+    /// On the server a client's execution arrives with that client's hero as the killer, so the penalty
+    /// is applied to that player here. Blood feuds are not multiplayer-aware (#3819): no feud is started,
+    /// and vanilla's "no feud with the player yet" gate is not copied, because Clan.HasBloodFeudWithPlayer
+    /// would describe the server's player clan, not the executing player's.
+    /// Known gap: N executions from one clan cost N penalties, where v1.5.6 vanilla charges once per feud.
+    /// Only Executed is checked: ExecutionAfterMapEvent comes only from ApplyByExecutionAfterMapEvent, whose one
+    /// v1.5.6 caller (HeroExecutionSceneNotificationData) HeroExecutionScenePatch skips on the server.
+    /// </summary>
+    internal static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
+    {
+        if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;
+        if (victim.Clan == null || killer?.Clan == null) return;
+        if (!killer.IsPlayerHero()) return;
+
+        using (new MainHeroSubstitutionScope(killer, killer.PartyBelongedTo))
+        {
+            TraitLevelingHelper.OnBloodFeudStarted(victim);
+        }
     }
 
     public static void HandleKingdomLeaderDeath(Hero victim)

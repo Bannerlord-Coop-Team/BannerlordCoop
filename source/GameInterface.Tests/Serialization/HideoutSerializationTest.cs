@@ -15,16 +15,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     [Collection(nameof(CampaignCurrentCollection))]
     public class HideoutSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public HideoutSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

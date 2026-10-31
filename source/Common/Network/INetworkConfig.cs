@@ -26,6 +26,10 @@ public interface INetworkConfig
     int LanPort { get; }
     IPAddress WanAddress { get; }
     int WanPort { get; }
+    /// <summary>Local IPv4 address the co-op UDP sockets bind; all interfaces in a real session.</summary>
+    IPAddress BindAddressIPv4 { get; }
+    /// <summary>Local IPv6 address the co-op UDP sockets bind; all interfaces in a real session.</summary>
+    IPAddress BindAddressIPv6 { get; }
     TimeSpan PingInterval { get; }
     TimeSpan ReconnectDelay { get; }
     TimeSpan DisconnectTimeout { get; }

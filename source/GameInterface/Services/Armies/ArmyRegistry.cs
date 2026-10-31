@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Armies.Patches;
 using HarmonyLib;
 using SandBox.GauntletUI;
 using Serilog;
@@ -73,6 +74,7 @@ internal class ArmyRegistry : AutoRegistryBase<Army>
                 {
                     return;
                 }
+                ArmyPatches.ReleaseHalfRemovedParties(obj);
                 CampaignEventDispatcher.Instance.OnArmyDispersed(obj, Army.ArmyDispersionReason.Unknown, obj.Parties.Contains(MobileParty.MainParty));
                 obj._armyIsDispersing = true;
                 foreach (var party in obj._parties)

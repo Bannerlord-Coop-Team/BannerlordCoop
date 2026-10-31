@@ -2,7 +2,6 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.Interfaces;
@@ -20,7 +19,7 @@ public class ServerContext
         IMessageBroker messageBroker,
         INetwork network,
         IRegistryManager registryManager,
-        IMapEventLoadCleaner mapEventLoadCleaner,
+        ILoadRepairRunner loadRepairRunner,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IGameStateInterface gameStateInterface,
@@ -29,7 +28,7 @@ public class ServerContext
         MessageBroker = messageBroker;
         Network = network;
         RegistryManager = registryManager;
-        MapEventLoadCleaner = mapEventLoadCleaner;
+        LoadRepairRunner = loadRepairRunner;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         GameStateInterface = gameStateInterface;
@@ -39,7 +38,7 @@ public class ServerContext
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IRegistryManager RegistryManager { get; }
-    public IMapEventLoadCleaner MapEventLoadCleaner { get; }
+    public ILoadRepairRunner LoadRepairRunner { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IGameStateInterface GameStateInterface { get; }

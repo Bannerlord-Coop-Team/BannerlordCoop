@@ -431,9 +431,9 @@ runtime once that server ships.
     repaired damaged save is still unchecked.
   - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
     unsaved state, so that finalize can throw; the orphan pass then releases the event only if
-    vanilla had already set `WaitingRemoval`. A successful `FinalizeEvent` in the player pass
-    publishes neither `MapEventFinalized` nor `InstanceDestroyed<MapEvent>`, because the sync policy
-    still allows originals at that point.
+    vanilla had already set `WaitingRemoval`. (The missing `MapEventFinalized` and
+    `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed; see the
+    merge's review fixes.)
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).
@@ -521,3 +521,253 @@ clients.
 - Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
   still carries v1.4.8 game assemblies. The dedicated server has booted and served clients on v1.5.5
   (see "Porting the dedicated server").
+
+## Merge of development (2026-10-30)
+
+`merge/development-into-1.5.x` merges `development` at `c8233b09b` into `bannerlord-1.5.x` at
+`42befd142`. That `development` commit is the `v0.1.7` release plus 42 commits, and it already sets
+the mod version to 0.1.8. Since the two lines split at `5f4d63cc0`, `development` has 1,437 commits
+(1,058 without merge commits) changing 1,531 files, and this branch has 37.
+
+### Version pins
+
+- `source/Coop/Coop.csproj` `GameVersion`: v1.5.4 became v1.5.6.
+- `README.md`: the supported game version is v1.5.6.
+- `GameInterface.Tests` `TestApplicationVersionPatch.FallbackVersion` (new on `development`, used
+  when the game folder has no Native `SubModule.xml`): v1.4.8 became v1.5.6, the version the
+  referenced assemblies come from.
+- The Workshop tags still name v1.4.8, as `1f79bc389` left them. The docs under
+  `doc/automated-testing` and `doc/verification` that name v1.4.8 record what was inspected for
+  those ports and were not changed.
+
+### Conflicts
+
+Git reported 10 conflicting files. Each keeps both sides:
+
+- `MapEventLoadCleaner.cs` and `InitialServerState.cs`. Both lines grew a repair for parties left in
+  ended battles on load. The merge keeps `development`'s API and flow (`CleanUpLoadedMapEvents`,
+  then the stalled battle resolver, then `ReleaseEndedMapEventLinks`, which `coop.unstuck` also
+  calls, plus `ReleaseFailedFinalization` for the `FinalizeEventAux` finalizer) and its later load
+  passes (`LeaderlessClanResolver`, `EmptyLordPartyResetter`). Into it go the 1.5.x pieces:
+  each stage of a player battle is caught and logged on its own (link repair, finalize, army
+  disband and party release); every ended battle is released in its own try/catch; parties the
+  pass removed from the campaign are unregistered at the end (`PublishDestroyedParties`); an
+  unlisted event gets its v1.5 unsaved state back before `HandleMapEventEnd`
+  (`RestoreUnsavedState`); links without a side entry are cleared first
+  (`ClearLinksWithoutEntry`); the grouping uses `OrphanedMapEventFinder`; and the release log names
+  the component, battle state and party ids. One behavior differed: 1.5.x left a live event the
+  manager no longer lists in place, and `development` ends it. The merge follows `development`.
+  That settles half of the open follow-up in "Known gaps" (the orphan pass released an event
+  only once vanilla had set `WaitingRemoval`); the player pass still finalizes an unlisted live
+  event without restoring its unsaved state first.
+- `MapEventLoadCleanerTests.cs`. The 11 tests both sides share keep `development`'s names. The
+  other 1.5.x tests take the `CleanUpLoadedMapEvents_` prefix and call `CleanUpLoadedMapEvents`
+  where they called `FinalizePlayerMapEvents` or `RepairOrphanedMapEvents`. Two 1.5.x tests were removed:
+  `RepairOrphanedMapEvents_UnlistedLiveEvent_IsLeftInPlace`, which asserts the behavior replaced
+  above (`CleanUpLoadedMapEvents_AiPartiesInUnregisteredEvent_ReleasesParties` asserts the new
+  one), and `RepairOrphanedMapEvents_LiveAiEvent_RemainsActive`, the same arrange, act and asserts as
+  `CleanUpLoadedMapEvents_AiEvent_RemainsActive`. The file has 23 tests (1.5.x had 22,
+  `development` 14). `InitialStateTests.cs` merged without a conflict into a test expecting both
+  APIs; it takes `development`'s version.
+- `GameInterfaceModule.cs`: both registration blocks are kept; the three registrations
+  `development` made `SingleInstance` keep that scope, and `MapTrackerProviderHolder` stays removed
+  (v1.5 has no SandBox `MapTrackerProvider`).
+- `PlayerEncounterPatches.cs`: `development`'s surrender helpers are kept; the
+  `CheckNearbyPartiesToJoinPlayerMapEvent` prefix stays removed, since v1.5.6 `PlayerEncounter`
+  has no such method (co-op skips the v1.5 `AddNearbyPartiesToPlayerMapEvent` instead).
+- `HeroInterface.cs`: both `using` lines.
+- `HideoutMissionRuntimeTests.cs`: `development` moved two tests unchanged into the new
+  `HideoutMissionLogicTests` class; the 1.5.x hideout loading test stays.
+- `SiegeInteractionBattleTests.cs`: `development`'s military power model restore with the 1.5.x
+  `SetMapEventSettlement` call.
+- `SiegeEntryValidationFlowTests.cs`: `development` moved the block into `CreatePresentedTownSiege`;
+  its new lines are ported below.
+- `VillageHostileActionTests.cs`: `SlowRaidMapEvent_WithPlayerParty_ServerUpdateIsAllowed` stays
+  deleted, as `development` pruned it in `37854b374`.
+
+### v1.5.6 fixes to code from development
+
+Each engine signature was read from the installed v1.5.6 assemblies (`taom-src`, ilspycmd).
+
+- Ships (`ShipMainPartyPatches.cs`, `ShipPiecesPatches.cs`). v1.5 removed
+  `Ship.ResetUnlockedUpgradePieces`. The unlocked piece list is now built or cleared by the
+  `Ship.CanHaveUnlockedPieces` setter, which `ChangeShipOwnerAction.ApplyInternal` calls with the
+  answer of the new `CanHaveUnlockedUpgradePiece` campaign event; War Sails answers it with
+  `ship.Owner == PartyBase.MainParty` (`ShipUpgradeCampaignBehavior`), and v1.5.6
+  `EquipUpgradePiece` checks `CanHaveUnlockedPieces` instead of the main party. The client skip
+  moved to a prefix on the setter, the pieces broadcast to a postfix on it, and the main party
+  check to a postfix on `CampaignEventDispatcher.CanHaveUnlockedUpgradePiece` that answers yes for
+  every player's party. `development`'s `EquipUpgradePiece` re-implementation is gone, because
+  vanilla no longer reads the main party there.
+- Executions (`KillCharacterActionPatches.cs`). `development` re-enabled the v1.4.8
+  `TraitLevelingHelper.OnLordExecuted` call in the `KillCharacterAction.ApplyInternal`
+  replacement. v1.5.6 removed both the helper and that block; the honor and mercy loss now comes
+  from `ExecutionCampaignBehavior` starting a blood feud (`OnBloodFeudStarted`), which is keyed on
+  the main hero and runs on the server only (gap #3819). The merge first removed the block, but on
+  the server a client's execution reaches `ApplyInternal` from `ExecuteTroopHandler` with that
+  client's hero as the killer, never `Hero.MainHero`, so `OnHeroKilled` and `OnDeathMarkAdded`
+  skipped the penalty and the client lost no honor or mercy. The replacement now calls
+  `ApplyExecutionTraitPenalty`: for an `Executed` death with a player
+  killer and both clans set, it runs v1.5.6 `TraitLevelingHelper.OnBloodFeudStarted(victim)` (honor
+  -1000 for an honorable victim, otherwise mercy -500, then mercy -500) inside
+  `MainHeroSubstitutionScope(killer, ...)`, so `TraitLevelingHelperPatches` books it to that player.
+  It starts no blood feud and does not copy vanilla's "no feud with the player yet" gate, because
+  `Clan.HasBloodFeudWithPlayer` is one flag per clan that means the server's player clan, so every
+  execution by a player costs the penalty, as on `development`. Tested by
+  `KillCharacterActionExecutionTests` (E2E), which fails without the call.
+- Player map tracking (`PlayerMapTracking.cs`). `RefreshTracker` used the SandBox
+  `MapTrackerProvider` holder; it now calls `Campaign.Current.MapTrackerManager.Refresh(party)`,
+  as `MapTrackerProviderRefreshHandler` already does on this branch. v1.5.6 `Refresh` adds the
+  tracker when the party is eligible and removes it otherwise, and the gauntlet handler skips a
+  tracker it already has, the same result as v1.4.8's remove then add.
+- Saved menus (`SavedMenuLoadPatch.cs`). The patch read its outside menus from the
+  `encounter_menu_ui_castle_on_init` handler attributes. v1.5.6 moved `castle_outside` to its own
+  `castle_outside_on_init`, which also reads `Settlement.CurrentSettlement` without a null check,
+  so the patch now reads both handlers. The unit test
+  `NeedsSettlement_OutsideMenu_IsTrue("castle_outside")` failed before this.
+- Client map event sides (`MapEventSideRegistry.cs`). v1.5 added `SimulationShipList` and the
+  ship siege engine list to `MapEventSide`, created by field initializers and `OnLoad`. A client
+  replica skips the constructor, so `MakeReadyForSimulation` threw in `AllocateShips` when
+  `development`'s client leave path (#3786) ran the simulation setup. `OnClientCreated` now calls
+  `OnLoad`, as `FieldBattleEventComponentRegistry` calls `OnAfterLoad`. Found by
+  `ClientLeavesForcedVillage_RequestsFinalizeAndReentryWithoutSimulating`.
+- Ransom offers (`RansomOfferCampaignBehaviorInterface.cs`). `development`'s prefix replaces
+  `RansomOfferCampaignBehavior.ConsiderRansomPrisoner` with a v1.4.8 copy. v1.5.6 vanilla asks the
+  new `CampaignEventDispatcher.CanHeroBeReleased` event before any offer or AI barter and skips a
+  player in `IsInNavalAutoTravel` (a raft or a ferry) instead of `IsInRaftState`. The copy now does
+  both, so a prisoner a listener holds gets no ransom offer and a player on a ferry gets none.
+- Mercenary and vassal offers (`VassalAndMercenaryOfferCampaignBehaviorInterface.cs`). The
+  `DailyTick` copy skipped a player on a raft only; v1.5.6 vanilla tests `IsInNavalAutoTravel`,
+  the only body change from v1.4.8, and the copy now does too. The other `IsInRaftState` uses
+  (`TeleportationCampaignBehaviorPatches`, `ArmyManagementCalculationPatches`) match v1.5.6
+  vanilla, which still tests `IsInRaftState` there.
+- Tests. 15 E2E test files and one GameInterface.Tests file written against v1.4.8 move to the
+  1.5.x helpers: `_mapEventType = x` to `SetBattleType(x)`, `MapEventSettlement = s` to
+  `SetMapEventSettlement(s)`, and the four argument `MapEvent.Initialize` to the three argument
+  one. The raid completed tests in `VillageNeedsToolsTests` and `VillageNeedsCraftingMaterialsTests`
+  pass the map event's own raid component, because the v1.5.6 listeners read the component's
+  settlement. The port break out tests anchor the fleet at the settlement, because v1.5.6
+  `AnchorPoint.IsAtSettlement` compares the anchor's settlement, which setting a position clears;
+  `SiegeBreakOut.CanBreakOutFromPort` already matches the v1.5.6 menu condition.
+
+### Review fixes
+
+Two reviews of the merge (Codex and a data flow review) found these; each fix is one line here.
+
+- Load repairs and the registry (`LoadRepairRunner.cs`, `LoadRepairRegistryReconciler.cs`).
+  `InitialServerState` ran the three load repairs while the sync policy still allows originals, so
+  lifetime patches published nothing: a lord party `LeaderlessClanResolver` created for a successor
+  never got an id (the join baseline then failed with "party is not registered"), and the parties
+  and armies `EmptyLordPartyResetter` destroyed kept theirs. `ILoadRepairRunner` now runs the
+  three repairs, each caught and logged on its own, captures the campaign parties and armies before
+  them, unregisters those that left the campaign afterwards (the shared reconciler, which
+  `MapEventLoadCleaner` also uses in place of `PublishDestroyedParties`, now covering armies too),
+  then registers what they created through `IRegistryManager.RegisterNewGameObjects`, which runs
+  the registries again without a second `AllGameObjectsRegistered`. `EmptyLordPartyResetter` keeps
+  vanilla `DisbandArmyAction`: the reconciler covers its army in that window, and vanilla also
+  places the attached parties, which `ArmyDisbander` skips. Tested by `LoadRepairRunnerTests`
+  (E2E), which runs the repairs with originals allowed and failed before the fix.
+- `EmptyLordPartyResetterTests` resets in that window too and checks the campaign, not the
+  registry, since the reset alone publishes nothing there.
+- Second review round. A closed clan's wanderer companion is fired, and v1.5.6
+  `RemoveCompanionAction` then calls `Hero.ResetEquipments`, whose new clones need the
+  owner-derived ids the old equipment still held, so the second registration logged "Duplicate id"
+  and left the live equipment without one (item slot changes for that hero were never sent). The
+  reconciler now also captures each alive hero's three equipments and unregisters any that were
+  replaced, or whose hero died, before that registration.
+- The reconciler also unregisters a removed party's `MobilePartyAi`, as the live `RemoveParty`
+  postfix does, since `MobileParty.RemoveParty` keeps the Ai. Both are asserted in
+  `LoadRepairRunnerTests`, which failed before the change.
+- `coop.debug.hero.kill_npc` (`HeroDebugCommand.cs`) ran an execution inside
+  `MainHeroSubstitutionScope`, so vanilla `ExecutionCampaignBehavior` saw the acting player as
+  `Hero.MainHero` and charged the blood feud penalty a second time. An execution now runs outside
+  the scope, as `ExecuteTroopHandler` runs a player's.
+  `KillNpcCommandExecution_WithVanillaExecutionBehavior_CostsOnePenalty` got -2000 honor before
+  the fix and -1000 after.
+- Known gap, kept on purpose: N executions from one clan cost N penalties, where v1.5.6 vanilla
+  charges once per blood feud (per player feud state does not exist, #3819; v1.4.8 and
+  `development` charged each execution).
+- `ApplyExecutionTraitPenalty` no longer checks `ExecutionAfterMapEvent`: that detail comes only
+  from `ApplyByExecutionAfterMapEvent`, whose one v1.5.6 caller
+  (`HeroExecutionSceneNotificationData.PostponedAffirmativeAction`) `HeroExecutionScenePatch` skips
+  on the server, so the branch never ran.
+- Third review round (`LoadRepairMapEventFinalizer.cs`). A battle that `MapEventLoadCleaner` or
+  `StalledMapEventResolver` finalized at boot published neither `MapEventFinalized` nor
+  `InstanceDestroyed<MapEvent>`, since the `FinalizeEventAux` postfix stays silent while originals
+  are allowed. An offline player's party, whose parking `PlayerPartyVisibilityHandler` defers until
+  its battle ends, stayed active and visible until that player reconnected, and the event's graph
+  kept its ids. Both now finalize through `LoadRepairMapEventFinalizer`, which publishes the pair
+  when the postfix will not and the event is still registered. Five `MapEventLoadCleanerTests` and
+  `StalledBattle_InALoadedSave_IsFinalizedOnLoad` now also run with originals allowed. Before the
+  fix, four of those cleaner tests and the stalled one failed that way; the fifth, a half-finalized
+  event, already published through `DetachFromFinalizedEvent`.
+- Fourth review round (`LoadRepairRegistryReconciler.cs`, `LoadRepairMapEventFinalizer.cs`). Four
+  more objects ended inside a repair without their lifetime patch publishing: a battle vanilla
+  finalized when `DestroyClanAction` took a closed clan's war party out of it
+  (`MapEventSide.RemovePartyInternal`), a siege and its besieger camp ended when that party's
+  `RemoveParty` cleared its camp, and the ships `RemoveParty` destroys. All four kept their ids, and
+  the battle was never announced. The reconciler now applies one rule to every type it covers: it
+  captures what the campaign holds before the repairs and, afterwards, unregisters through
+  `InstanceDestroyed<T>` each captured object that the campaign no longer holds. That is
+  `MapEventManager.MapEvents` without finalized events for battles,
+  `SiegeEventManager.SiegeEvents` without `ReadyToBeRemoved` sieges for sieges and camps, and the
+  ships campaign parties and settlements own. The second registration pass cannot register a
+  destroyed battle again, because its destroy runs `MapEventInitializationBarrier.DestroyGraph`,
+  which removes it from `MapEventManager`. A battle also gets its `MapEventFinalized`
+  first, as from the `FinalizeEventAux` postfix; one that another path already announced was
+  unregistered by that path too, so the reconciler skips it. `SiegeEventRegistry` and
+  `BesiegerCampRegistry` now skip a `ReadyToBeRemoved` siege, which v1.5.6 keeps listed until the
+  next `SiegeEventManager.Tick`; without that the second registration pass registered the ended
+  siege again under its settlement id. `LoadRepairMapEventFinalizer` now announces an event whether
+  or not it is registered (an unlisted event a saved player party points at never is) and gates only
+  the destroy on registration, so that player's party is parked. An unregistered event whose
+  finalize threw is announced twice, which every `MapEventFinalized` listener tolerates; the
+  orphan pass also still announces a battle again after releasing a party it missed, which
+  `PlayerPartyVisibilityHandler` needs to park that party. `RunLoadRepairs` ends with one
+  Information line, `[Check] id=coop.boot.load-repairs result=<pass|fail> stages_failed=<n>
+  unregistered_parties=<n> ... announced_map_events=<n> registered_new=<n>`, counted from the
+  destroy and `MapEventFinalized` messages the pass published and from the registry size around
+  the second registration; `result=fail` means a repair or reconcile step threw.
+  `LoadRepairLifetimeTests` (E2E, originals allowed through the sync policy) covers the four cases
+  and failed before the change; the siege case also fails with the registry filter removed.
+  `LoadRepairRunnerTests` (GameInterface.Tests) pins the line. A follow-up closed the rest of the
+  siege case: destroying the siege released both engine containers and their engines, but
+  `SiegeEnginesContainerRegistry` and `SiegeEngineConstructionProgressRegistry` still registered
+  from every listed siege, and v1.5.6 leaves `BesiegerCamp.SiegeEngines` and
+  `Settlement.SiegeEngines` set after `FinalizeSiegeEvent`, so the second registration pass gave
+  them their ids back. Both now register from unended sieges only, like the siege and camp
+  registries. The siege case in `LoadRepairLifetimeTests` now also checks both containers, and that
+  check failed before the change.
+
+### Checks
+
+Run on 2026-10-31 against v1.5.6 (`Version.xml` says `Singleplayer Value="v1.5.6"`), with
+`-p:BannerlordDir` pointing at the `mb2` junction and `ModsRoot` at a missing folder, so nothing was
+deployed:
+
+- Release build (`dotnet build Coop.sln -c Release --no-incremental`): `1974 Warning(s)`,
+  `0 Error(s)`.
+- Engine member audit (TAOM's `tools/check_engine_member_refs.ps1`, exit code 0, engine folders:
+  the game bin and the Native, SandBox, SandBoxCore, StoryMode and CustomBattle module bins):
+  Coop.dll `checked 94 distinct engine refs, 0 unresolved (0 new)`, Coop.Core.dll `checked 227`,
+  GameInterface.dll `checked 6768`, Missions.dll `checked 1496`, each `0 unresolved (0 new)`.
+- Unit tests (`dotnet test CoopUnitTests.slnf -c Release --no-build`, exit code 0):
+  Coop.CrashReporter.Tests 10 passed, Common.Tests 399 passed, Coop.Tests 1,432 passed,
+  Coop.IntegrationTests 160 passed and 2 skipped, GameInterface.Tests 2,273 passed; 4,274 passed,
+  2 skipped, 0 failed. VerificationHarness.Tests: 86 passed, 0 failed.
+- E2E tests touched by the fourth round, run on their own: `LoadRepairLifetimeTests`,
+  `LoadRepairRunnerTests`, `MapEventLoadCleanerTests`, `StalledMapEventTests`,
+  `EmptyLordPartyResetterTests`, `KillCharacterActionExecutionTests`, `MapEventLifetimeTests`,
+  `SiegeEventLifetimeTests`, `SiegeEntryRecoveryTests`, `BesiegerCampLifetimeTests`,
+  `BesiegerCampSyncTests`, `SiegeEventTickPatchesTests` and `ShipSyncTests`: 88 of 88 passed,
+  rerun after the siege container follow-up. Every class under `E2E.Tests.Registry`,
+  `Services.SiegeEvents`, `Services.BesiegerCamps` and `Services.SiegeStrategies`: 118 of 118
+  passed.
+- E2E tests in 16 shards (`run-e2e-shard.sh n 16`, n = 0 to 15): the last full run, at the third
+  round's commit, had 3,317 tests, 3,316 passed, 1 skipped
+  (`ItemRosterSyncTests.Server_ItemRoster__count`), 0 failed. The fourth round's four new tests
+  were not in it; its shard run is a separate step.
+- Body diff from v1.4.8 to v1.5.6 of the Harmony targets `development` added or changed: two
+  replacements still ran v1.4.8 logic (the ransom and mercenary offers above), fixed after the
+  merge.
+- Not done: a live co-op session, and CI.

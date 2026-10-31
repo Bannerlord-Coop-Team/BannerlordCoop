@@ -25,6 +25,7 @@ on:
 permissions:
   actions: read
   contents: read
+  packages: read
 
 concurrency:
   group: manual-build-${{ inputs.build_id }}
@@ -35,7 +36,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+    env:
+      BANNERLORD_DIR: /home/mb2
 
     steps:
       - name: Validate request
@@ -69,9 +76,6 @@ jobs:
           set -eu
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           test "$(git rev-parse HEAD)" = "$REQUESTED_SHA"
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Restore .NET Framework build inputs
         run: |

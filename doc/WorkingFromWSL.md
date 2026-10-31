@@ -1,0 +1,7 @@
+# Working From WSL
+
+The agent runs in WSL but the toolchain is Windows and is **not on the WSL PATH** (bare `dotnet`/`MSBuild` give "command not found"). Use the full paths, and don't reinstall, they are already there: dotnet at `/mnt/c/Program Files/dotnet/dotnet.exe`, MSBuild at `/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe`.
+
+Git and builds over the `/mnt/c` mount are slow: a multi-commit `merge`/`fetch`/`push`, a codex review, or a Docker test run routinely blows past the 2-minute Bash default and gets SIGTERM'd (exit 143), and foreground Bash is hard-capped at 10 minutes. Run those with `run_in_background: true` (or a long `timeout`) from the start.
+
+Every checkout, including a fresh worktree, finds the game through the `BANNERLORD_DIR` Windows user environment variable that `runmefirst.cmd` sets, so **don't create an `mb2` junction or symlink** in a worktree (worktree cleanup deletes through it into the game install). The user `WSLENV` contains `BANNERLORD_DIR/p`, so WSL sees the variable as a `/mnt/c/...` path, and the `/p` flag converts it back to a Windows path when WSL launches a Windows exe such as MSBuild. If `echo $BANNERLORD_DIR` is empty in WSL, check that the Windows `WSLENV` includes `BANNERLORD_DIR/p`, then restart the Windows terminal that launches WSL (or run `wsl.exe --shutdown`), because WSL copies the variable from the Windows process that started it. Without the variable, game-dependent projects fail with a clear error; `-p:BannerlordDir=...` overrides it for one build.

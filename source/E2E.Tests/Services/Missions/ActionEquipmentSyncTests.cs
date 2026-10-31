@@ -434,17 +434,13 @@ public partial class ActionEquipmentSyncTests : MissionTestEnvironment
             new[] { sequence }, epoch);
     }
 
+    // Pairwise subset; every flag still runs both ways.
     [Theory]
     [InlineData(false, false, false, false)]
-    [InlineData(false, true, false, false)]
-    [InlineData(true, false, false, false)]
     [InlineData(true, true, false, false)]
-    [InlineData(false, false, true, false)]
     [InlineData(false, true, true, false)]
-    [InlineData(false, false, false, true)]
-    [InlineData(false, true, false, true)]
     [InlineData(false, false, true, true)]
-    [InlineData(false, true, true, true)]
+    [InlineData(false, true, false, true)]
     public void FormerHost_PendingOrdinaryActionReplaysWhenEquipmentArrives(
         bool regainAuthority, bool latestIsReference, bool delayRegistration, bool delayAssignment)
     {

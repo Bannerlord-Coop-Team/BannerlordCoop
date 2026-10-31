@@ -7,18 +7,19 @@ namespace GameInterface.Services.Heroes.Data;
 [ProtoContract(SkipConstructor = true)]
 public record HeroChangeNameData
 {
+    [ProtoMember(1)]
+    public readonly string HeroStringId;
+
+    [ProtoMember(2)]
+    public readonly TextObject FullName;
+
+    [ProtoMember(3)]
+    public readonly TextObject FirstName;
+
     public HeroChangeNameData(Hero instance, TextObject name, TextObject firstName)
     {
-        // TODO use object manager or autosync
         HeroStringId = instance.StringId;
-        FullName = name.ToString();
-        FirstName = firstName.ToString();
+        FullName = name;
+        FirstName = firstName;
     }
-
-    [ProtoMember(1)]
-    public string HeroStringId { get; }
-    [ProtoMember(2)]
-    public string FullName { get; }
-    [ProtoMember(3)]
-    public string FirstName { get; }
 }

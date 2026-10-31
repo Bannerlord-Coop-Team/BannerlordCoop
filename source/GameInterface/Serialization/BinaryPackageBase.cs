@@ -91,17 +91,7 @@ namespace GameInterface.Serialization
 
             foreach (string fieldName in StoredFields.Keys)
             {
-                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
-
-                // Cross-runtime field skew: the sender's runtime can carry private fields this
-                // runtime's type doesn't have (net472 List<T> has _syncRoot, net6 doesn't; the
-                // dedicated server runs net6 against net472 clients). Skip them — SetValue on
-                // the null FieldInfo took down the join-time hero transfer on the server.
-                if (field == null)
-                {
-                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
-                    continue;
-                }
+                if (!FieldSkewLog.TryGetField(Logger, type, fields, fieldName, out var field)) continue;
 
                 if (type.IsValueType)
                 {

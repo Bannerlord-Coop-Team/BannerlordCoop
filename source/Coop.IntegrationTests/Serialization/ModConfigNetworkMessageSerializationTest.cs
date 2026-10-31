@@ -69,8 +69,10 @@ namespace Coop.IntegrationTests.Serialization
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                KingdomDecisionVoteTimeoutSeconds = 600,
                 EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
+                SpawnRateWanderers = 2,
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
@@ -91,8 +93,10 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(600, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
+            Assert.Equal(2, copy.SpawnRateWanderers);
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
@@ -141,9 +145,11 @@ namespace Coop.IntegrationTests.Serialization
             GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Disabled,
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
+            KingdomDecisionVoteTimeoutSeconds = 0,
             SpeedLimitWhilePlayersInBattle = false,
             EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
+            SpawnRateWanderers = 0,
             WandererLimitScalesWithPlayers = false,
             PlayerKingdomClanTierRequired = 0,
             SmithingStaminaRecoveryOutsideSettlements = false,
@@ -169,9 +175,11 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Disabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(0, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);
+            Assert.Equal(0, copy.SpawnRateWanderers);
             Assert.False(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);

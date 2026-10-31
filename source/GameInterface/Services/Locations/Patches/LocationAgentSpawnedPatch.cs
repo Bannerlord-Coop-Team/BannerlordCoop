@@ -14,12 +14,12 @@ namespace GameInterface.Services.Locations.Patches;
 
 /// <summary>
 /// [Host] Captures every non-player agent spawned in the active settlement location mission (SR-021)
-/// so the location replicator can register + replicate it. Gated on the location gate's CONFIRMED
-/// local host — before the assignment arrives nothing spawns natively anyway
+/// so the location replicator can register + replicate it. Requires the CONFIRMED local host in
+/// <see cref="ILocationNpcAuthorityState"/> — before the assignment arrives nothing spawns natively anyway
 /// (<see cref="LocationNativeSpawnSuppressionPatches"/>), and puppet application brackets itself with
-/// <see cref="LocationNpcGate.SuppressCapture"/>. Coexists with the battle capture patch on the same
-/// method: its <c>IsCoopBattleActive</c> gate is false in a settlement, and this gate is false in a
-/// battle.
+/// <see cref="ILocationNpcAuthorityState.SuppressCapture"/> scope. Coexists with the battle capture patch on the
+/// same method: its <c>IsCoopBattleActive</c> check is false in a settlement, and no location mission is
+/// active in a battle.
 /// </summary>
 [HarmonyPatch(typeof(Mission), nameof(Mission.SpawnAgent), new[] { typeof(AgentBuildData), typeof(bool), typeof(Equipment), typeof(ItemObject) })]
 internal class LocationAgentSpawnedPatch
@@ -27,10 +27,8 @@ internal class LocationAgentSpawnedPatch
     [HarmonyPostfix]
     private static void Postfix(Agent __result)
     {
-        if (!LocationNpcGate.IsCoopLocationMissionActive) return;
-        if (!LocationNpcGate.IsLocalHostConfirmed) return;
-        if (LocationNpcGate.SuppressCapture) return;
         if (__result == null) return;
+        if (!IsCapturingHost()) return;
 
         // The player's own agent and accompanying companions go through Mission.SpawnAgent too. The owning
         // client replicates the whole party through mission join info; capturing a companion here would also
@@ -49,6 +47,16 @@ internal class LocationAgentSpawnedPatch
 
     internal static bool ShouldCaptureAsAmbientNpc(bool isLocalPlayerPartyAgent)
         => !isLocalPlayerPartyAgent;
+
+    /// <summary>True when this client is the confirmed NPC host of the active location mission and the
+    /// current spawn is not bracketed by a capture suppression.</summary>
+    internal static bool IsCapturingHost()
+    {
+        if (!ContainerProvider.TryResolve<ILocationNpcAuthorityState>(out var authorityState)) return false;
+        if (!authorityState.IsLocalHostConfirmed) return false;
+
+        return !authorityState.IsCaptureSuppressed;
+    }
 }
 
 /// <summary>
@@ -68,10 +76,8 @@ internal class LocationMonsterSpawnedPatch
     [HarmonyPostfix]
     private static void Postfix(Agent __result, EquipmentElement equipmentElement, EquipmentElement harnessRosterElement)
     {
-        if (!LocationNpcGate.IsCoopLocationMissionActive) return;
-        if (!LocationNpcGate.IsLocalHostConfirmed) return;
-        if (LocationNpcGate.SuppressCapture) return;
         if (__result == null) return;
+        if (!LocationAgentSpawnedPatch.IsCapturingHost()) return;
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
 

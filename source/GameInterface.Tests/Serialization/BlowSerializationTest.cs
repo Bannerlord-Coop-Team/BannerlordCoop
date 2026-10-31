@@ -13,29 +13,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     /// </summary>
     public class BlowSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BlowSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Blow_Serialize()
-        {
-            Blow blow = new Blow();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BlowBinaryPackage package = new BlowBinaryPackage(blow, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

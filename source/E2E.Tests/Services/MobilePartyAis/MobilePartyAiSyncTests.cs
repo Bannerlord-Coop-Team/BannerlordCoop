@@ -25,13 +25,5 @@ namespace E2E.Tests.Services.MobilePartyAis
             //TestEnvironment.AssertReferenceField<MobilePartyAi, MobileParty>(nameof(MobilePartyAi._mobileParty), referenceStringId: _secondPartyId, defaultValue: mobilePartyAi._mobileParty);
             TestEnvironment.AssertField<MobilePartyAi, bool>(nameof(MobilePartyAi._isDisabled), true);
         }
-
-        [Fact]
-        public void Server_MobilePartyAi_Properties()
-        {
-            //TestEnvironment.AssertProperty<MobilePartyAi, AiBehavior>(nameof(MobilePartyAi.DefaultBehavior), AiBehavior.BesiegeSettlement);
-            //TestEnvironment.AssertProperty<MobilePartyAi, MoveModeType>(nameof(MobilePartyAi.PartyMoveMode), MoveModeType.Escort);
-            //TestEnvironment.AssertReferenceProperty<MobilePartyAi, MobileParty>(nameof(MobilePartyAi.MoveTargetParty));
-        }
     }
 }

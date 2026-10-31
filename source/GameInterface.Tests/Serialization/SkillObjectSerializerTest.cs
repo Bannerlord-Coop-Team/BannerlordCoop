@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SkillObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public SkillObjectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void SkillObject_Serialize()
-        {
-            SkillObject testSkillObject = new SkillObject("Test");
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            SkillObjectBinaryPackage package = new SkillObjectBinaryPackage(testSkillObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
