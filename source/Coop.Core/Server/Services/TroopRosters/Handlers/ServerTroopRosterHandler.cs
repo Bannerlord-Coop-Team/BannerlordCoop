@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 
@@ -13,13 +14,15 @@ internal class ServerTroopRosterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
     private readonly ITroopRosterInterface troopRosterInterface;
 
-    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ITroopRosterInterface troopRosterInterface)
+    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IPlayerManager playerManager, ITroopRosterInterface troopRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
         this.troopRosterInterface = troopRosterInterface;
 
         messageBroker.Subscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
@@ -37,6 +40,9 @@ internal class ServerTroopRosterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // A stale or wrong party id must not recruit into, or charge, another player's party.
+            if (!playerManager.IsSenderControllingParty(payload.Who, data.MobilePartyId)) return;
+
             int skipped = troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
 
             // The client closed its recruit screen on Done, so tell it why its party did not get the whole cart

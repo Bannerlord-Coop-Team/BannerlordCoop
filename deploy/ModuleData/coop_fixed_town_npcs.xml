@@ -597,7 +597,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Go away"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
@@ -627,7 +627,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Hurry up and get on with it."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_sturgia" />
     </face>
