@@ -39,6 +39,9 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
     private void ConfirmTrade(PortScreenChanges changes)
     {
+        // GiveGoldAction caps a payment at the payer's gold, so a trade the hero can't afford would hand ships over for less
+        var shipCostModel = Campaign.Current.Models.ShipCostModel;
+        int totalCost = 0;
         foreach (Ship ship in changes.ShipsToBuy)
         {
             if (!changes.LeftOwner.Ships.Contains(ship))
@@ -47,7 +50,7 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
                 continue;
             }
 
-            ChangeShipOwnerAction.ApplyByTrade(changes.RightOwner, ship);
+            totalCost += (int)shipCostModel.GetShipTradeValue(ship, changes.LeftOwner, changes.RightOwner);
         }
         foreach (Ship ship in changes.ShipsToSell)
         {
@@ -57,7 +60,37 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
                 continue;
             }
 
+            totalCost -= (int)shipCostModel.GetShipTradeValue(ship, changes.RightOwner, changes.LeftOwner);
+        }
+        foreach (Ship ship in changes.ShipsToRepair)
+        {
+            if (ship.Owner == changes.RightOwner) totalCost += (int)shipCostModel.GetShipRepairCost(ship, changes.RightOwner);
+        }
+        foreach (ShipUpgradePieceInfo shipUpgradePieceInfo in changes.SelectedShipPieces)
+        {
+            if (shipUpgradePieceInfo.Ship.Owner == changes.RightOwner && shipUpgradePieceInfo.Piece != null)
+            {
+                totalCost += GetUpgradeCostOfShip(shipUpgradePieceInfo.Ship, shipUpgradePieceInfo.Piece, true, changes.RightOwner, changes.LeftOwner);
+            }
+        }
+        if (totalCost > changes.MainHero.Gold)
+        {
+            playerMessageInterface.SendInformationMessageToHero(changes.MainHero, "The trade was cancelled because you do not have enough gold.");
+            return;
+        }
+
+        // Sell before buying so the sale gold is there to pay for the bought ships, unlike vanilla
+        foreach (Ship ship in changes.ShipsToSell)
+        {
+            if (!changes.RightOwner.Ships.Contains(ship)) continue;
+
             ChangeShipOwnerAction.ApplyByTrade(changes.LeftOwner, ship);
+        }
+        foreach (Ship ship in changes.ShipsToBuy)
+        {
+            if (!changes.LeftOwner.Ships.Contains(ship)) continue;
+
+            ChangeShipOwnerAction.ApplyByTrade(changes.RightOwner, ship);
         }
         foreach (Ship ship in changes.ShipsToRepair)
         {
