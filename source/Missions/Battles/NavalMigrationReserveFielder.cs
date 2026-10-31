@@ -70,6 +70,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
                     taken.Count, side);
             }
 
+            DropLateReplayed(side);
             FieldPending(side, hulls.Where(ship => !hullAuthority.IsReplacing(ship.ShipId)).ToList());
         }
     }
@@ -80,6 +81,16 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
 
         var waiting = pending[(int)side];
         return waiting.Count > 0 && AfloatHostHulls(side).Count > 0 ? waiting.Count : 0;
+    }
+
+    // A troop can wait here across a hull replacement or a full hull, so one a late replay brought in meanwhile is dropped.
+    private void DropLateReplayed(BattleSideEnum side)
+    {
+        int dropped = pending[(int)side].RemoveAll(reinforcementFielder.IsLateReplayed);
+        if (dropped == 0) return;
+
+        Logger.Information("[NavalBattle] Dropped {Count} pending {Side} reserve troop(s); a late replay already brought them in",
+            dropped, side);
     }
 
     // Each hull takes its own party's troops first, then any party's, so one party's hulls do not fill up on another's.

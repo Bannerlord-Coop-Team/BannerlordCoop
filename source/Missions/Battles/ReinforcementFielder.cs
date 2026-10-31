@@ -35,6 +35,12 @@ public interface IReinforcementFielder : IDisposable
     /// on its hulls; troops a late replay already brought in are left out.
     /// </summary>
     IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread] Whether a late replay brought in this recovered troop after it was taken, so a mission still holding it
+    /// drops it instead of fielding it twice.
+    /// </summary>
+    bool IsLateReplayed(CoopAgentOrigin origin);
 }
 
 /// <inheritdoc cref="IReinforcementFielder"/>
@@ -471,6 +477,8 @@ public class ReinforcementFielder : IReinforcementFielder
         recoveryCursors[(int)side] = 0;
         return origins;
     }
+
+    public bool IsLateReplayed(CoopAgentOrigin origin) => HasLivePartySeed(origin.MapEventPartyId, origin.UniqueSeed);
 
     // Only the first add records, right after it, so a count of 1 means the formation was empty before the
     // batch. The host's own hero counts as a unit.

@@ -63,6 +63,37 @@ public class ReinforcementFielderMigrationReserveTests : MissionTestEnvironment
         });
     }
 
+    // M7: the naval queue rechecks a taken troop with the same party and seed rule, so a replay after the take is caught.
+    [Fact]
+    public void IsLateReplayed_MatchesOnlyALiveAgentWithTheOriginsPartyAndSeed()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            var component = new Mock<ICoopMissionComponent>();
+            component.SetupGet(value => value.AgentRegistry).Returns(registry);
+            var casualties = new CasualtyAttributionMap();
+            using var fielder = new ReinforcementFielder(client.Resolve<Common.Messaging.IMessageBroker>(), client.ObjectManager,
+                component.Object, Mock.Of<IBattleSession>(), Mock.Of<IBattleDeploymentCoordinator>(),
+                Mock.Of<IAgentFormationAssigner>(), casualties, new BattleAgentBudget());
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var replayedOrigin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(2), "pirates");
+            Assert.False(fielder.IsLateReplayed(replayedOrigin));
+
+            var replayed = Mission.Current.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
+            var replayedId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("host", replayedId, replayed));
+            casualties.Record(replayedId, "pirates", 2, "troop");
+
+            Assert.True(fielder.IsLateReplayed(replayedOrigin));
+            Assert.False(fielder.IsLateReplayed(new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(3), "pirates")));
+            Assert.False(fielder.IsLateReplayed(new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(2), "raiders")));
+        });
+    }
+
     // The queue TryQueueMigrationReserves builds from the roster once both reserve replies arrived.
     private static void QueueRecovery(ReinforcementFielder fielder, CoopTroopSupplier supplier, BattleSideEnum side, string partyId,
         IEnumerable<CoopAgentOrigin> origins)
