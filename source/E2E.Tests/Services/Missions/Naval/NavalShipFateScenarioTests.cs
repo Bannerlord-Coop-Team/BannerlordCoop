@@ -295,6 +295,37 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         });
     }
 
+    // PR #4191 M5: the captor's swap failed, but the capture was decided and it still simulates the prize, so it still tells
+    // the server; its later fate of the AI hull is accepted and its departure writes it.
+    [Fact]
+    public void CapturedAiHull_WhoseSwapFailedAtTheCaptor_TheCaptorsLaterFateStillApplies()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        var shipId = GiveShip(AddAiParty(battle));
+        var prize = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);
+        var captorHull = battle.FieldPlayerHull(b, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        battle.CommitAll();
+        battle.TickAll();
+        a.Hull(prize).IsVacant = true;
+        b.Engine.CaptureResult = CaptureSwapResult.Failed;
+        battle.ExpectLoggedFailure("the capture isn't recorded here");
+
+        b.ElapseCaptureTimer(prize, captorHull);
+        Assert.Equal(b.Id, b.Ship(prize).CurrentAuthority);
+        Assert.Null(b.Ship(prize).CaptorControllerId);
+        b.Hull(prize).HitPoints = 520f;
+        b.Hull(prize).SailHitPoints = 130f;
+        b.Tick(BattleShipFateReporterInterval);
+        LeaveMission(battle, b);
+
+        Assert.Equal(0, concluded());
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(520f, ship.HitPoints, 2);
+            Assert.Equal(130f, ship.SailHitPoints, 2);
+        });
+    }
+
     // C4: a PvP victim can leave right after confirming, before its captor's report reaches the server; the capture is still
     // recorded, so the captor's fates of the ship count and its departure writes them.
     [Fact]

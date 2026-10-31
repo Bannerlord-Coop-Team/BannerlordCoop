@@ -242,11 +242,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     // Vanilla's swap: the prize takes the captor hull's team, side and formation, the captor's crew crews the prize, and the
     // captor hull is left with none. Vanilla also points the old owner's crew record of the prize at the orphan
     // (NavalShipAgents.OnShipCaptured), so those agents stay tracked on the orphan while on another team.
-    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
+    public CaptureSwapResult ApplyCapture(MissionObject prize, MissionObject captorHull)
     {
         var fake = Of(prize);
         var captor = Of(captorHull);
         Captures.Add((prize, captorHull));
+        if (CaptureResult != CaptureSwapResult.Applied) return CaptureResult;
 
         var oldCrew = crews.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList();
         foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, captor)).Select(entry => entry.Key).ToList())
@@ -261,7 +262,11 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         // NavalShipsLogic.OnShipCaptured points the captor formation's assignment at the prize, so the orphan holds none.
         fake.HoldsAssignment = true;
         Orphan(captor);
+        return CaptureSwapResult.Applied;
     }
+
+    /// <summary>What this client's next swaps end in, standing for vanilla's swap refusing or throwing part way; Applied runs it.</summary>
+    public CaptureSwapResult CaptureResult { get; set; } = CaptureSwapResult.Applied;
 
     public void OrphanHull(MissionObject hull) => Orphan(Of(hull));
 

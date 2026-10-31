@@ -69,8 +69,10 @@ public class ShipCaptureApplier : IShipCaptureApplier
     // run, and the captor's hull, whose orphan record waits for it.
     private readonly Dictionary<(Guid ShipId, int Sequence), (float Since, Guid CaptorShipId)> blockedSwaps =
         new Dictionary<(Guid, int), (float, Guid)>();
+    // [Game thread] Places in a prize's order whose swap failed here part way: never replayed, since the hulls are half swapped.
+    private readonly HashSet<(Guid ShipId, int Sequence)> failedSwaps = new HashSet<(Guid, int)>();
     private long capturesApplied, recordsApplied, confirmsDropped, duplicateConfirms, captureConflicts;
-    private long swapsBlocked, swapsGivenUp, capturesWithoutSwap;
+    private long swapsBlocked, swapsGivenUp, capturesWithoutSwap, swapsFailed;
     private float elapsed;
     private string lastDrop;
     private bool disposed;
@@ -108,6 +110,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         heldConfirms.Clear();
         heldRecords.Clear();
         blockedSwaps.Clear();
+        failedSwaps.Clear();
     }
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
@@ -175,6 +178,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         var order = OrderOf(prize.CaptureSequence, captorShip.CaptureSequence, confirm.PrizeSequence, confirm.CaptorSequence);
         if (order == CaptureOrder.Ahead) return ConfirmOutcome.Hold;
         if (order == CaptureOrder.Behind) return Stale(prize, confirm);
+        if (failedSwaps.Contains((prize.ShipId, confirm.PrizeSequence + 1))) return Drop(confirm, "swap_failed");
 
         var rejection = ValidateSender(prize, confirm.PreviousAuthority);
         if (rejection != null) return Drop(confirm, rejection);
@@ -298,9 +302,9 @@ public class ShipCaptureApplier : IShipCaptureApplier
         return ConfirmOutcome.Done;
     }
 
-    // [Game thread] One capture on this client, in order: the authority moves in place, vanilla's swap runs on the local hulls,
-    // the registry follows it and the prize counts as gone from its old side. The captor tells the server and its peers.
-    private void Apply(NetworkShipInfo prize, NetworkShipInfo captorShip, string captor, int prizeSequence, bool runSwap = true)
+    // [Game thread] One capture here: the authority moves in place, vanilla's swap runs, the registry follows it and the prize counts
+    // as gone from its old side; the captor tells the server and its peers. False when the swap didn't complete.
+    private bool Apply(NetworkShipInfo prize, NetworkShipInfo captorShip, string captor, int prizeSequence, bool runSwap = true)
     {
         blockedSwaps.Remove((prize.ShipId, prizeSequence));
         var prizeSide = engine.SideOf(prize.Hull);
@@ -310,9 +314,12 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
         int captorSequence = captorShip.CaptureSequence + 1;
         ships.TransferHull(prize, captor, inPlace: true);
+        Registry.TryCommitCaptor(prize.ShipId, captor);
         Logger.Debug("[NavalSync] Capture of hull {ShipId}: authority now {Captor}; vanilla's swap runs {RunSwap} (prize side {PrizeSide}, " +
             "captor side {CaptorSide})", prize.ShipId, captor, runSwap, prizeSide, captorSide);
-        if (runSwap) captureEngine.ApplyCapture(prize.Hull, captorShip.Hull);
+        var swap = runSwap ? captureEngine.ApplyCapture(prize.Hull, captorShip.Hull) : CaptureSwapResult.Applied;
+        if (swap != CaptureSwapResult.Applied) return FailSwap(prize, captor, prizeSequence, swap);
+
         Registry.TryMarkCaptured(prize.ShipId, new HullCapture(captor, captorShip.ShipId, prizeSide), captorFormation, prizeSequence);
         Registry.TryMarkOrphaned(captorShip.ShipId, captorSide, captorSequence);
         var applied = new AppliedCapture(prize.ShipId, captorShip.ShipId, captor);
@@ -331,12 +338,27 @@ public class ShipCaptureApplier : IShipCaptureApplier
                 prize.ShipId, captor);
 
         CaptureApplied?.Invoke(prize.ShipId, captor);
-        if (!session.IsOwn(captor)) return;
+        if (!session.IsOwn(captor)) return true;
 
         Logger.Debug("[NavalSync] Capture of hull {ShipId}: reporting it to the server and announcing both hulls", prize.ShipId);
         ReportCaptureToServer(prize, prizeSequence);
         // A peer that took the prize out with its departed old authority before the confirm arrived spawns it from these.
         ships.AnnounceHulls(new[] { prize, captorShip });
+        return true;
+    }
+
+    // The authority and its committed captor already moved (every peer applies the decided capture), but nothing records a swap
+    // that didn't complete: no capture mark, order, departure or event, and the place is never replayed.
+    private bool FailSwap(NetworkShipInfo prize, string captor, int prizeSequence, CaptureSwapResult swap)
+    {
+        swapsFailed++;
+        failedSwaps.Add((prize.ShipId, prizeSequence));
+        lastDrop = swap == CaptureSwapResult.Refused ? "swap_refused" : "swap_failed";
+        Logger.Error("[NavalSync] Vanilla's swap for the capture of hull {ShipId} by {Captor} at sequence {Sequence} ended {Result}; " +
+            "the capture isn't recorded here and this client no longer matches its peers", prize.ShipId, captor, prizeSequence, swap);
+        // The captor still reports the prize's fates, so the server needs the committed authority ahead of them.
+        if (session.IsOwn(captor)) ReportCaptureToServer(prize, prizeSequence);
+        return false;
     }
 
     // On the relay channel this client's fates use, so the server knows the captor before the prize's first fate from it.
@@ -419,14 +441,14 @@ public class ShipCaptureApplier : IShipCaptureApplier
         }
 
         if (hullAuthority.IsReplacing(prize.ShipId) || hullAuthority.IsReplacing(captorShip.ShipId)) return ConfirmOutcome.Hold;
+        if (failedSwaps.Contains((prize.ShipId, record.CaptureSequence))) return ConfirmOutcome.Done;
 
         var blocker = captureEngine.CheckCapture(prize.Hull, captorShip.Hull);
         if (blocker != null) return WaitForSwap(prize, captorShip, record.CaptorControllerId, record.CaptureSequence, blocker);
 
         Logger.Information("[NavalSync] Record of hull {ShipId} shows a capture by {Captor} this client missed; applying it",
             prize.ShipId, record.CaptorControllerId);
-        Apply(prize, captorShip, record.CaptorControllerId, record.CaptureSequence);
-        recordsApplied++;
+        if (Apply(prize, captorShip, record.CaptorControllerId, record.CaptureSequence)) recordsApplied++;
         return ConfirmOutcome.Done;
     }
 
@@ -478,6 +500,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         swapsBlocked,
         swapsGivenUp,
         capturesWithoutSwap,
+        swapsFailed,
         lastDrop,
         heldConfirms = heldConfirms.Select(confirm => confirm.ShipId).ToArray(),
         heldRecords = heldRecords.Select(record => record.ShipId).ToArray(),

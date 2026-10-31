@@ -533,6 +533,64 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(Captor, prize.CaptorControllerId);
     }
 
+    // PR #4191 M5: a swap that fails part way here records nothing of the capture (registry, order, event or announce) and a
+    // repeat of its confirm doesn't replay it; the authority stays with the captor, which still tells the server once.
+    [Theory]
+    [InlineData(CaptureSwapResult.Failed)]
+    [InlineData(CaptureSwapResult.Refused)]
+    public void Confirm_WhoseSwapDoesNotComplete_RecordsNothingAndIsNotReplayed(CaptureSwapResult result)
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var ownHull = harness.Register(Own, BattleSideEnum.Attacker);
+        harness.CaptureEngine.Setup(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>())).Returns(result);
+        harness.Engine.Setup(e => e.CampaignShipIdOf(prize.Hull)).Returns("Ship_7");
+        int captureEvents = 0;
+        harness.Applier.CaptureApplied += (_, _) => captureEvents++;
+        var confirm = Confirm(prize, Own, ownHull, Host);
+
+        harness.Applier.AcceptConfirm(confirm);
+        harness.Applier.AcceptConfirm(confirm);
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, ownHull.Hull), Times.Once);
+        Assert.Equal(Own, prize.CurrentAuthority);
+        Assert.Null(prize.CaptorControllerId);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(ownHull.IsOrphaned);
+        Assert.Equal(0, ownHull.CaptureSequence);
+        Assert.Equal(0, captureEvents);
+        Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
+        Assert.False(prize.FollowsBattleHost);
+        harness.Relay.Verify(r => r.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipCaptured
+            && ((NetworkBattleShipCaptured)m).CampaignShipId == "Ship_7" && ((NetworkBattleShipCaptured)m).InstanceId == "MapEvent_1"
+            && ((NetworkBattleShipCaptured)m).CaptureSequence == 1)), Times.Once);
+        harness.Relay.VerifyNoOtherCalls();
+        var applied = (JObject)harness.Inspect()["applied"]!;
+        Assert.Equal(0L, (long)applied["capturesApplied"]!);
+        Assert.Equal(1L, (long)applied["swapsFailed"]!);
+        Assert.Equal("swap_failed", (string?)applied["lastDrop"]);
+    }
+
+    // PR #4191 M5: an AI hull whose capture this client couldn't swap still belongs to its captor, so a later host change
+    // leaves it with the captor here as on the peers that applied the capture.
+    [Fact]
+    public void FailedSwapOfAnAiHull_ThenAHostMigration_LeavesTheHullWithItsCaptor()
+    {
+        var harness = new Harness(host: Host);
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        harness.CaptureEngine.Setup(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()))
+            .Returns(CaptureSwapResult.Failed);
+
+        harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Host));
+        harness.MigrateTo(Successor, epoch: 2);
+
+        Assert.Equal(Captor, prize.CurrentAuthority);
+        Assert.Equal(Captor, prize.CommittedCaptorId);
+        Assert.Null(prize.CaptorControllerId);
+        Assert.False(prize.FollowsBattleHost);
+    }
+
     // C5: the old host's confirm and the host change reach two clients in opposite orders; both end in the same state, since
     // the confirm is checked against the host of its own epoch, not against whoever simulates the hull when it arrives.
     [Fact]
