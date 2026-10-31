@@ -24,7 +24,7 @@ internal readonly struct NetworkRequestPrisonBreakStart : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPrisonBreakStartResolved : IServerToClientCommand
+internal readonly struct NetworkPrisonBreakStartResolved : ICommand
 {
     [ProtoMember(1)]
     public readonly string SettlementId;
@@ -56,7 +56,7 @@ internal readonly struct NetworkRequestPrisonBreakEnd : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPrisonBreakCooldownChanged : IServerToClientCommand
+internal readonly struct NetworkPrisonBreakCooldownChanged : ICommand
 {
     [ProtoMember(1)]
     public readonly string SettlementId;
@@ -72,7 +72,7 @@ internal readonly struct NetworkPrisonBreakCooldownChanged : IServerToClientComm
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPrisonBreakActiveChanged : IServerToClientCommand
+internal readonly struct NetworkPrisonBreakActiveChanged : ICommand
 {
     [ProtoMember(1)]
     public readonly string SettlementId;
@@ -88,7 +88,7 @@ internal readonly struct NetworkPrisonBreakActiveChanged : IServerToClientComman
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPrisonBreakPrisonerLost : IServerToClientCommand
+internal readonly struct NetworkPrisonBreakPrisonerLost : ICommand
 {
     [ProtoMember(1)]
     public readonly string PrisonerId;

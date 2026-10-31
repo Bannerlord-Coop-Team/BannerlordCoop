@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -199,6 +200,27 @@ public class PrisonBreakSyncTests : IDisposable
                 Assert.False(client.Resolve<IPrisonBreakCampaignBehaviorInterface>().IsPrisonBreakActive(settlement));
             });
         }
+    }
+
+    [Fact]
+    public void PlayerJoiningDuringBreak_ReceivesActiveBreak()
+    {
+        var fixture = CreateFixture();
+        SendStart(fixture);
+        var lateClient = Clients.Last();
+
+        // Stands in for a client that joined after the start broadcast.
+        lateClient.Call(() => lateClient.Resolve<IPrisonBreakCampaignBehaviorInterface>().SetPrisonBreakActive(Resolve(lateClient, fixture).Settlement, false));
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerConnectionStateChanged()));
+        Server.PumpGameThread();
+        testEnvironment.FlushCoalescer();
+
+        lateClient.Call(() =>
+        {
+            var (_, settlement, _) = Resolve(lateClient, fixture);
+            Assert.True(lateClient.Resolve<IPrisonBreakCampaignBehaviorInterface>().IsPrisonBreakActive(settlement));
+        });
     }
 
     private Fixture CreateFixture(int gold = StartingGold)

@@ -68,6 +68,7 @@ internal class PrisonBreakHandler : IHandler
         messageBroker.Subscribe<NetworkPrisonBreakActiveChanged>(Handle_NetworkPrisonBreakActiveChanged);
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<NetworkPrisonBreakPrisonerLost>(Handle_NetworkPrisonBreakPrisonerLost);
         messageBroker.Subscribe<PrisonBreakMissionEnded>(Handle_PrisonBreakMissionEnded);
@@ -88,6 +89,7 @@ internal class PrisonBreakHandler : IHandler
         messageBroker.Unsubscribe<NetworkPrisonBreakActiveChanged>(Handle_NetworkPrisonBreakActiveChanged);
 
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Unsubscribe<NetworkPrisonBreakPrisonerLost>(Handle_NetworkPrisonBreakPrisonerLost);
         messageBroker.Unsubscribe<PrisonBreakMissionEnded>(Handle_PrisonBreakMissionEnded);
@@ -141,6 +143,13 @@ internal class PrisonBreakHandler : IHandler
         int bribeCost;
         using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
         {
+            // The world keeps running while the rescuer sits in the bribe menu, so a capture or war can end the vanilla menu checks.
+            if (!Campaign.Current.Models.PrisonBreakModel.CanPlayerStagePrisonBreak(settlement) ||
+                FactionManager.IsAtWarAgainstFaction(playerHero.MapFaction, prisoner.MapFaction))
+            {
+                return PrisonBreakStartResult.PrisonerUnavailable;
+            }
+
             bribeCost = Campaign.Current.Models.PrisonBreakModel.GetPrisonBreakStartCost(prisoner);
         }
 
@@ -225,6 +234,7 @@ internal class PrisonBreakHandler : IHandler
                 playerHeroId, prisonerId, settlementId, data.Outcome);
 
             var model = Campaign.Current.Models.PrisonBreakModel;
+            // The mission only runs on the rescuer's client, so its outcome is trusted like other client-run missions.
             bool succeeded = data.Outcome == PrisonBreakOutcome.Succeeded || data.Outcome == PrisonBreakOutcome.SucceededJoinedParty;
 
             // Vanilla SkillLevelingManager.OnPrisonBreakEnd, keyed off the player's hero instead of Hero.MainHero.
@@ -315,6 +325,20 @@ internal class PrisonBreakHandler : IHandler
         GameThread.RunSafe(() =>
         {
             EndActiveBreaks(peer);
+        });
+    }
+
+    private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> obj)
+    {
+        if (ModInformation.IsClient) return;
+
+        GameThread.RunSafe(() =>
+        {
+            // Joining clients missed the start broadcasts, so the running breaks are sent again.
+            foreach (var settlementId in activeBreaks.Keys)
+            {
+                network.SendAll(new NetworkPrisonBreakActiveChanged(settlementId, true));
+            }
         });
     }
 
