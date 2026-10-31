@@ -211,6 +211,10 @@ internal class FinalizationCoordinator : IHandler
             playerManager.TryGetPeer(owner, out peer))
             return true;
 
+        var registeredPlayer = playerManager.Players.FirstOrDefault(player => player.HeroId == giverId);
+        if (registeredPlayer != null && playerManager.TryGetPeer(registeredPlayer.ControllerId, out peer))
+            return true;
+
         return finalizedOwners.TryGetValue(issue, out peer);
     }
 
