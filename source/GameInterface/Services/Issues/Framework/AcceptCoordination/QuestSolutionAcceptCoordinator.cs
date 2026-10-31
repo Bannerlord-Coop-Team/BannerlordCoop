@@ -27,7 +27,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// The first player to accept an issue's quest solution gets it. The server arbitrates and keeps a
 /// quest object for the owner's outcomes to run on, other clients only learn that the issue is taken.
 /// </summary>
-internal class QuestSolutionAcceptCoordinator : IHandler
+internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCoordinator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<QuestSolutionAcceptCoordinator>();
 
