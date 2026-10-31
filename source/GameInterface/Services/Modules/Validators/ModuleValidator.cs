@@ -72,7 +72,8 @@ public class ModuleValidator : IModuleValidator
             {
                 errors.Add($"To join the server the module {Describe(serverModule, displayNames)} with version '{serverModule.Version.ToString()}' is required.");
             }
-            else if (!serverModule.Version.IsSame(clientModule.Version, true))
+            // An official DLC's change set is the engine build, which differs between the dedicated server and the game.
+            else if (!serverModule.Version.IsSame(clientModule.Version, checkChangeSet: !serverModule.IsOfficial))
             {
                 errors.Add($"Wrong version of module {Describe(serverModule, displayNames)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }

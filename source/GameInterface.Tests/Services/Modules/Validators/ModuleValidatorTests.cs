@@ -122,6 +122,21 @@ public class ModuleValidatorTests
     }
 
     [Fact]
+    public void Validate_AcceptsNavalDlc_WhenOnlyTheEngineChangeSetDiffers()
+    {
+        var dedicatedServerNaval = new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 8, 118999) };
+        var gameNaval = new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 8, 119303) };
+
+        var result = NavalBuildValidator().Validate(
+            new List<ModuleInfo> { Native(), dedicatedServerNaval },
+            new List<ModuleInfo> { Native(), gameNaval },
+            out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
     public void Validate_RequiresNavalDlc_WhenOnlyTheServerRunsIt()
     {
         var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
