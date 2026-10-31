@@ -845,8 +845,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Server.Call(() =>
         {
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
-            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue));
-            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue));
+            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
+            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
         });
         environment.FlushCoalescer();
 
