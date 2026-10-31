@@ -102,6 +102,9 @@ public class LoadingState : ConnectionStateBase
 
     internal bool IsAborted => CurrentPhase == JoinPhase.Aborted;
 
+    // Set when a baseline request is denied at the cap, the join watchdog ends the join on it
+    internal bool HasExhaustedBaselines => Volatile.Read(ref baselineLimitLogged) == 1;
+
     internal string JoinPhaseName => CurrentPhase.ToString();
 
     internal long JoinProgressVersion => Interlocked.Read(ref joinProgressVersion);

@@ -34,6 +34,7 @@ public class DisconnectHandlerTests
 
     [Theory]
     [InlineData("JoinReplayAppliedTimeout", "Joining the campaign timed out while synchronizing.\nThe server stopped this join to keep the campaign responsive. Please try again.")]
+    [InlineData("JoinBaselineLimit", "Joining the campaign failed because it could not be synchronized after repeated attempts.\nMake sure your mods and save match the server's, then try again.")]
     [InlineData("JoinReplayQueueLimit", "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\nPlease try again.")]
     [InlineData("JoinCampaignEntryTimeout", "Joining the campaign timed out while loading the transferred save.\nThe server stopped this join to keep the campaign responsive. Please try again.")]
     [InlineData("ServerRestarting", "The server is restarting. Try again in a few minutes.")]
