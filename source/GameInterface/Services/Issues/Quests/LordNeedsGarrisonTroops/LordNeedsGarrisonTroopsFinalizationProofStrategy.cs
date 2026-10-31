@@ -33,7 +33,6 @@ internal class LordNeedsGarrisonTroopsFinalizationProofStrategy : IFinalizationP
     {
         var party = MobileParty.MainParty;
         return quest.IsOngoing && party != null &&
-            quest._settlement.Town?.GarrisonParty != null &&
             party.MemberRoster.GetTroopCount(quest._requestedTroopType) >= quest._requestedTroopAmount;
     }
 }
