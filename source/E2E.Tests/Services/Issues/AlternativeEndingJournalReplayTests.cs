@@ -71,7 +71,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
                 (JournalLogEntry entry) => entry.IsRelatedTo(issues[scenario.ClientA]));
             Assert.Same(archives[scenario.ClientA], archive);
-            Assert.False(archive.IsEnded());
+            Assert.True(archive.IsEnded());
             Assert.Equal(ending, archive._lastIssueStatus);
             Assert.Equal(ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, archive.IsEndedUnsuccessfully());
             Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == EndingText(ending).ToString());
