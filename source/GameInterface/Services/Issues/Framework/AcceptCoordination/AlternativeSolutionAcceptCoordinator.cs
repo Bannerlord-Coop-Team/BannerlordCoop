@@ -260,8 +260,19 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        // The server has already returned the committed troops. The client must wait for
-        // the authoritative roster update instead of mutating its managed roster again.
+        // Runs at once, not behind waiting work, because a held replay would clear the sent companions first or the issue would already have moved away.
+        GameThread.RunSafe(() =>
+        {
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
+            {
+                return;
+            }
+
+            using (new AllowedThread())
+            {
+                troopValidator.ReturnToMainParty(issue);
+            }
+        }, context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 
     // Vanilla's daily tick reads the first log entry, which only the starting machine has

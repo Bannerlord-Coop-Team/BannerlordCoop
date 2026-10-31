@@ -150,8 +150,8 @@ public class AlternativeSolutionRejectTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
 
-            Assert.Equal(SentTroops + 1, clientIssue.AlternativeSolutionSentTroops.TotalManCount);
-            Assert.True(party.MemberRoster.FindIndexOfTroop(companion.CharacterObject) < 0);
+            Assert.Equal(0, clientIssue.AlternativeSolutionSentTroops.TotalManCount);
+            Assert.Equal(1, party.MemberRoster.GetElementNumber(party.MemberRoster.FindIndexOfTroop(companion.CharacterObject)));
             Assert.Equal(KeptTroops + SentTroops, party.MemberRoster.GetElementNumber(party.MemberRoster.FindIndexOfTroop(troop)));
         });
     }
