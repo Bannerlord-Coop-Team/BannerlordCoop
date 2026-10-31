@@ -21,7 +21,8 @@ internal static class BarterPrefabPatches
     [HarmonyPrefix]
     public static void LoadTemplatePrefix(XmlNode node)
     {
-        if (node.Name == "BarterItemVisualBrushWidget" && ContainerProvider.TryResolve<IBarterPrefabEditor>(out var editor))
+        // Other barter screens can also load XML when generated prefabs are unavailable, so only edit for player trades.
+        if (node.Name == "BarterItemVisualBrushWidget" && PlayerPartyTradeContext.IsActive && ContainerProvider.TryResolve<IBarterPrefabEditor>(out var editor))
             editor.AddSpousePortrait(node);
     }
 }
