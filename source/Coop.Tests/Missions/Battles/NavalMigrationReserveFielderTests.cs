@@ -71,6 +71,31 @@ public class NavalMigrationReserveFielderTests
         Assert.Equal(2, harness.Queued[hull].Count);
     }
 
+    // M7: a troop a late replay brings in while it waits on a replacing hull is neither offered to the hull nor counted.
+    [Fact]
+    public void Tick_DropsAPendingTroopALateReplayBroughtInWhileItWaited()
+    {
+        var harness = new Harness(isHost: true);
+        var hull = harness.AddAiHull(Pirates);
+        var shipId = harness.Registry.Ships.Single().ShipId;
+        harness.Replacing.Add(shipId);
+        var replayed = Origin(Pirates);
+        var waiting = Origin(Pirates);
+        harness.Recover(replayed, waiting);
+        harness.Fielder.Tick();
+
+        harness.LateReplayed.Add(replayed);
+        harness.Fielder.Tick();
+
+        Assert.Equal(1, harness.Fielder.PendingReserve(BattleSideEnum.Defender));
+
+        harness.Replacing.Remove(shipId);
+        harness.Fielder.Tick();
+
+        Assert.Equal(new[] { waiting }, harness.Queued[hull]);
+        Assert.Equal(0, harness.Fielder.PendingReserve(BattleSideEnum.Defender));
+    }
+
     [Fact]
     public void PendingReserve_StopsCountingOnceNoAfloatAiHullCanTakeIt()
     {
@@ -142,6 +167,8 @@ public class NavalMigrationReserveFielderTests
                 return taken;
             });
             Reinforcements.Setup(r => r.TakeMigrationReserve(BattleSideEnum.Attacker)).Returns(Array.Empty<CoopAgentOrigin>());
+            Reinforcements.Setup(r => r.RemoveLateReplayed(It.IsAny<List<CoopAgentOrigin>>()))
+                .Returns((List<CoopAgentOrigin> origins) => origins.RemoveAll(LateReplayed.Contains));
 
             var engine = new Mock<INavalShipEngine>();
             engine.Setup(e => e.SideOf(It.IsAny<MissionObject>())).Returns((MissionObject hull) =>
@@ -167,6 +194,7 @@ public class NavalMigrationReserveFielderTests
         public Dictionary<MissionObject, int> Capacity { get; } = new();
         public HashSet<MissionObject> Sinking { get; } = new();
         public HashSet<Guid> Replacing { get; } = new();
+        public HashSet<CoopAgentOrigin> LateReplayed { get; } = new();
         public NavalMigrationReserveFielder Fielder { get; }
 
         /// <summary>A Defender AI hull this host simulates.</summary>
