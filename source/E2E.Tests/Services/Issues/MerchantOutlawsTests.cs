@@ -566,6 +566,29 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AuthoritativeEndingKeepsHigherOwnerHuntProgress()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        Accept();
+        var ownerQuest = Quest(ClientA);
+        Destroy(TargetIds().First(), scenario.PlayerA);
+        ClientA.Call(() => ownerQuest._questProgressLogTest.UpdateCurrentProgress(2));
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.Equal(2, ownerQuest._questProgressLogTest.CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+        });
+    }
+
+    [Fact]
     public void SuccessRequestWithoutEnoughServerProgressDoesNotPay()
     {
         Accept();

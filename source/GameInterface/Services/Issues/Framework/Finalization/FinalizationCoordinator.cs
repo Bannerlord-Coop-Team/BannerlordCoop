@@ -240,6 +240,11 @@ internal class FinalizationCoordinator : IHandler
                                     SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
                             var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
                             if (existing == null && matches.Length == 1) existing = matches[0];
+                            if (existing == null && matches.Length > 0)
+                            {
+                                Logger.Warning("Ambiguous specialized journal row for {issue}; using journal order", data.IssueId);
+                                existing = matches[0];
+                            }
                             if (existing != null)
                             {
                                 existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
@@ -278,6 +283,7 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ReferenceEquals(first, second)) return true;
         if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes == null) != (second.Attributes == null) ||
             (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
         if (first.Attributes == null) return true;
         foreach (var pair in first.Attributes)
