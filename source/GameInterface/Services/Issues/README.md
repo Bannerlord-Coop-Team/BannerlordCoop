@@ -33,6 +33,10 @@ Use a server and a client. All commands are `coop.debug.issues.*`.
   replayed, not that a success pays out.
 - `army_needs_supplies.setup <controller_id>` (server) gets a player ready to take Army Needs Supplies from
   Rhagaea, and `army_needs_supplies.stock` (server) tops up the owner's party with what the quest asks for.
+- `company_of_trouble.setup <controller_id>` (server) gets a player ready to take Company of Trouble from
+  Rhagaea. `company_of_trouble.choose <accept|sell|leave|fight|steal|persuade1|persuade2|persuade3>` (owner's
+  client) picks one of the quest's dialog choices, and `company_of_trouble.unrest` (server) cuts the owner's
+  other troops so the mercenaries ask to leave on the next hour.
 - `the_conquest_of_settlement.setup <controller_id>` (server) puts a player in a ruler's kingdom, gives the ruler
   The Conquest of Settlement and counts the player as having talked to them. `the_conquest_of_settlement.accept
   <ruler id>` (that player's client) then accepts it like the dialog does, and `the_conquest_of_settlement.state

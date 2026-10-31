@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
+using GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
@@ -48,6 +49,9 @@ internal class IssuesModule : Module
         builder.RegisterType<LesserNobleRevoltWorldEventService>()
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
+        builder.RegisterType<LandLordCompanyOfTroubleService>()
+            .As<ILandLordCompanyOfTroubleService>()
+            .InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
