@@ -34,11 +34,12 @@ internal class FactionDiscontinuationCampaignBehaviorPatches
     }
     [HarmonyPatch(nameof(FactionDiscontinuationCampaignBehavior.OnClanChangedKingdom))]
     [HarmonyPrefix]
-    private static bool OnClanChangedKingdomPrefix(FactionDiscontinuationCampaignBehavior __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
+    internal static bool OnClanChangedKingdomPrefix(FactionDiscontinuationCampaignBehavior __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
     {
         if (newKingdom == null)
         {
-            if (__instance.CanClanBeDiscontinued(clan))
+            bool keepClan = detail == ChangeKingdomAction.ChangeKingdomActionDetail.LeaveByKingdomDestruction && ModConfigProvider.ModOptions.ClansAfterKingdomDestruction == ClansAfterKingdomDestructionMode.KeepClans;
+            if (!keepClan && __instance.CanClanBeDiscontinued(clan))
             {
                 __instance.AddIndependentClan(clan);
             }
@@ -57,17 +58,7 @@ internal class FactionDiscontinuationCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool CanClanBeDiscontinuedPrefix(Clan clan, ref bool __result)
     {
-        __result = ModConfigProvider.ModOptions.ClansAfterKingdomDestruction == ClansAfterKingdomDestructionMode.Vanilla && clan.Kingdom == null && !clan.IsRebelClan && !clan.IsBanditFaction && !clan.IsMinorFaction && !clan.IsPlayerClan() && clan.Settlements.IsEmpty<Settlement>();
-        return false;
-    }
-    [HarmonyPatch(nameof(FactionDiscontinuationCampaignBehavior.DiscontinueClan))]
-    [HarmonyPrefix]
-    private static bool DiscontinueClanPrefix(FactionDiscontinuationCampaignBehavior __instance, Clan clan)
-    {
-        if (ModConfigProvider.ModOptions.ClansAfterKingdomDestruction == ClansAfterKingdomDestructionMode.Vanilla) return true;
-
-        // Saves can still hold timers started before KeepClans was turned on
-        __instance._independentClans.Remove(clan);
+        __result = clan.Kingdom == null && !clan.IsRebelClan && !clan.IsBanditFaction && !clan.IsMinorFaction && !clan.IsPlayerClan() && clan.Settlements.IsEmpty<Settlement>();
         return false;
     }
 }
