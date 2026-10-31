@@ -92,7 +92,7 @@ internal class HeadmanHerdJournalHandler : IHandler
     private void TrackAccept(IssueBase issue)
     {
         if (ModInformation.IsServer || issue?.IssueQuest is not Quest quest) return;
-        if (!objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
+        if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         pendingAccepts.TryAdd((giverId, issue.StringId), 0);
     }
 
@@ -140,7 +140,7 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
-            if (data.Text != null && quest.JournalEntries.Any(log =>
+            if (data.Text == null || quest.JournalEntries.Any(log =>
                     log.LogText?.GetID() == data.Text.GetID() || log.LogText?.ToString() == data.Text.ToString())) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())

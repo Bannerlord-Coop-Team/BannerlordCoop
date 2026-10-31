@@ -813,6 +813,21 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         ClientA.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
 
+    [Fact]
+    public void DuplicateOutcomeObservation_AnnouncesOnlyOnce()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue));
+            MessageBroker.Instance.Publish(this, new IssueOutcomeObserved(issue));
+        });
+        environment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
     internal (string CompanionId, string TroopId) StartCompanions()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();

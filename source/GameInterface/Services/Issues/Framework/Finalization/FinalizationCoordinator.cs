@@ -277,7 +277,9 @@ internal class FinalizationCoordinator : IHandler
         }
         finally
         {
-            announcedIssues.Remove(issue);
+            // Keep the marker through the rest of this game-loop turn so a nested vanilla
+            // completion callback cannot announce the same issue twice, then release the issue.
+            GameThread.EnqueueSafe(() => announcedIssues.Remove(issue), nameof(FinalizationCoordinator));
         }
     }
 
