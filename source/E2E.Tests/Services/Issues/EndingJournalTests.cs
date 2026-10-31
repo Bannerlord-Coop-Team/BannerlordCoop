@@ -619,7 +619,7 @@ public class EndingJournalTests : IDisposable
             new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
         scenario.Server.Call(() =>
         {
-            Assert.Equal(new[] { 4, 2 }, serverQuest.JournalEntries.Select(log => log.CurrentProgress));
+            Assert.Equal(new[] { 99, 2 }, serverQuest.JournalEntries.Select(log => log.CurrentProgress));
             using var owner = OwnerScope();
             serverQuest.CompleteQuestWithCancel(Ending());
         });

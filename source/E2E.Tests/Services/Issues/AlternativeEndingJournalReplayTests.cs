@@ -126,7 +126,8 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         environment.FlushCoalescer();
 
         // This standalone transport test has no giver-death finalization dependency.
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         scenario.ClientB.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
             (JournalLogEntry entry) => entry.IsRelatedTo(issues[scenario.ClientB]))));
         scenario.ClientA.Call(() =>

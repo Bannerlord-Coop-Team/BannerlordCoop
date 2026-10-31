@@ -284,7 +284,6 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         var before = 0;
         scenario.ClientA.Call(() =>
         {
-            using var allowed = new AllowedThread();
             ownerQuest._questState = QuestBase.QuestStates.Ongoing;
             ownerQuest._requestedTroopAmount = 5;
             ownerQuest._requestedTroopType = Get<CharacterObject>(scenario.ClientA, troopId);
