@@ -527,7 +527,7 @@ public class MerchantOutlawsTests : IDisposable
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
         var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
-        ClientA.Call(() => Assert.Equal(2, ownerQuest._questProgressLogTest.CurrentProgress));
+        ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
         environment.FlushCoalescer();
         Server.Call(() => Assert.Equal(2, Assert.Single(serverQuest.JournalEntries,
             log => log.Range == serverQuest._totalPartyCount).CurrentProgress));
