@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents.Handlers;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -39,6 +40,7 @@ public interface IStalledMapEventResolver
 internal sealed class StalledMapEventResolver : IStalledMapEventResolver
 {
     private readonly ILogger logger;
+    private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IMissionMembershipRegistry missionMembership;
@@ -46,11 +48,13 @@ internal sealed class StalledMapEventResolver : IStalledMapEventResolver
     // Missions are server only, so the client container has no membership registry.
     public StalledMapEventResolver(
         ILogger logger,
+        IMessageBroker messageBroker,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IMissionMembershipRegistry missionMembership = null)
     {
         this.logger = logger;
+        this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.missionMembership = missionMembership;
@@ -85,9 +89,10 @@ internal sealed class StalledMapEventResolver : IStalledMapEventResolver
             mapEvent.AttackerSide.RecalculateMemberCountOfSide(),
             mapEvent.DefenderSide.RecalculateMemberCountOfSide());
 
-        // The same pair PlayerEncounter uses after a siege mission. The finalize postfix tells the clients.
+        // The same pair PlayerEncounter uses after a siege mission. The finalize postfix tells the clients,
+        // except during the load repairs, which run while originals are allowed.
         mapEvent.CheckIfOneSideHasLost();
-        mapEvent.FinalizeEvent();
+        LoadRepairMapEventFinalizer.FinalizeEvent(mapEvent, messageBroker, objectManager);
         return true;
     }
 

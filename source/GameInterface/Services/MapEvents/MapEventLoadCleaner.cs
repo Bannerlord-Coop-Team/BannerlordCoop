@@ -439,7 +439,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
                 mapEvent.StringId,
                 mapEvent.InvolvedParties.Count());
-            mapEvent.FinalizeEvent();
+            LoadRepairMapEventFinalizer.FinalizeEvent(mapEvent, messageBroker, objectManager);
             return;
         }
 

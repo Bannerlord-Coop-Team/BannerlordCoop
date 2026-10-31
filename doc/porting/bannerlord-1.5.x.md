@@ -431,9 +431,9 @@ runtime once that server ships.
     repaired damaged save is still unchecked.
   - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
     unsaved state, so that finalize can throw; the orphan pass then releases the event only if
-    vanilla had already set `WaitingRemoval`. A successful `FinalizeEvent` in the player pass
-    publishes neither `MapEventFinalized` nor `InstanceDestroyed<MapEvent>`, because the sync policy
-    still allows originals at that point.
+    vanilla had already set `WaitingRemoval`. (The missing `MapEventFinalized` and
+    `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed; see the
+    merge's review fixes.)
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).
@@ -691,6 +691,16 @@ Two reviews of the merge (Codex and a data flow review) found these; each fix is
   from `ApplyByExecutionAfterMapEvent`, whose one v1.5.6 caller
   (`HeroExecutionSceneNotificationData.PostponedAffirmativeAction`) `HeroExecutionScenePatch` skips
   on the server, so the branch never ran.
+- Third review round (`LoadRepairMapEventFinalizer.cs`). A battle that `MapEventLoadCleaner` or
+  `StalledMapEventResolver` finalized at boot published neither `MapEventFinalized` nor
+  `InstanceDestroyed<MapEvent>`, since the `FinalizeEventAux` postfix stays silent while originals
+  are allowed. An offline player's party, whose parking `PlayerPartyVisibilityHandler` defers until
+  its battle ends, stayed active and visible until that player reconnected, and the event's graph
+  kept its ids. Both now finalize through `LoadRepairMapEventFinalizer`, which publishes the pair
+  when the postfix will not and the event is still registered. Five `MapEventLoadCleanerTests` and
+  `StalledBattle_InALoadedSave_IsFinalizedOnLoad` now also run with originals allowed. Before the
+  fix, four of those cleaner tests and the stalled one failed that way; the fifth, a half-finalized
+  event, already published through `DetachFromFinalizedEvent`.
 
 ### Checks
 

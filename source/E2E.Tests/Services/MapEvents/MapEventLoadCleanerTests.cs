@@ -52,8 +52,10 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         component._validLocalPositionsForDefenderSide = null!;
     }
 
-    [Fact]
-    public void CleanUpLoadedMapEvents_OrphanPlayerEvent_ReleasesAndParksOfflineParty()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanUpLoadedMapEvents_OrphanPlayerEvent_ReleasesAndParksOfflineParty(bool originalsAllowed)
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -76,7 +78,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(playerParty.IsVisible);
             Assert.Same(mapEvent, playerParty.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+            RunRepair(originalsAllowed);
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(playerParty.Party.MapEventSide);
@@ -195,8 +197,10 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Fact]
-    public void CleanUpLoadedMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanUpLoadedMapEvents_UnregisteredPlayerPartyInCampaignObjectManager_FinalizesEvent(bool originalsAllowed)
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -215,17 +219,20 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(Server.ObjectManager.Remove(playerParty));
             Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out _));
 
-            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+            RunRepair(originalsAllowed);
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(playerParty.Party.MapEventSide);
             Assert.False(playerParty.IsActive);
             Assert.False(playerParty.IsVisible);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }, MapEventDisabledMethods);
     }
 
-    [Fact]
-    public void CleanUpLoadedMapEvents_HalfFinalizedOrphan_DetachesAndParksOfflineParty()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanUpLoadedMapEvents_HalfFinalizedOrphan_DetachesAndParksOfflineParty(bool originalsAllowed)
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -247,7 +254,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Same(mapEvent, playerParty.MapEvent);
             Assert.Same(mapEvent, aiParty.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+            RunRepair(originalsAllowed);
 
             Assert.Null(playerParty.Party.MapEventSide);
             Assert.Null(aiParty.Party.MapEventSide);
@@ -260,8 +267,10 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Fact]
-    public void CleanUpLoadedMapEvents_SharedOrphanPlayerEvent_FinalizesOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanUpLoadedMapEvents_SharedOrphanPlayerEvent_FinalizesOnce(bool originalsAllowed)
     {
         var mapEventContext = CreateServerMapEvent(commit: false);
         RegisterAsPlayerParty(
@@ -288,7 +297,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             messageBroker.Subscribe<MapEventFinalized>(CountFinalization);
             try
             {
-                Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+                RunRepair(originalsAllowed);
             }
             finally
             {
@@ -297,11 +306,14 @@ public class MapEventLoadCleanerTests : MapEventTestBase
 
             Assert.Equal(1, finalizedCount);
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }, MapEventDisabledMethods);
     }
 
-    [Fact]
-    public void CleanUpLoadedMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanUpLoadedMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent(bool originalsAllowed)
     {
         var mapEventContext = CreateServerMapEvent();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -336,7 +348,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Same(mapEvent, follower.MapEvent);
             Assert.Null(gatheringFollower.MapEvent);
 
-            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+            RunRepair(originalsAllowed);
             TestEnvironment.FlushCoalescer();
 
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
@@ -354,10 +366,15 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.False(Server.ObjectManager.TryGetObject<Army>(armyId, out _));
         }, MapEventDisabledMethods);
 
+        // Production runs the repair before any client joins. With originals allowed the released parties'
+        // new Ai targets are not sent to these clients, only the destroy messages; the join baseline carries the rest.
         foreach (var client in Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
             Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
+            if (originalsAllowed)
+                continue;
+
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(followerId, out var follower));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(gatheringFollowerId, out var gatheringFollower));
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(destinationId, out var destination));
