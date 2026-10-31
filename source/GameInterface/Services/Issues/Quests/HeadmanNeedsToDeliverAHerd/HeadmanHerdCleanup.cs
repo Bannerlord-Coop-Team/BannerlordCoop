@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
+    void Forget(IssueBase issue);
     bool HasRememberedParty(IssueBase issue);
     bool ReturnAlternativeTroops(IssueBase issue);
     void RemoveRemaining(Quest quest);
@@ -35,6 +36,14 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     }
 
     public bool HasRememberedParty(IssueBase issue) => !string.IsNullOrEmpty(issue.StringId) && parties.ContainsKey(issue.StringId);
+
+    public void Forget(IssueBase issue)
+    {
+        if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
+            questIssueIds.Remove(issue.IssueQuest.StringId);
+        if (!string.IsNullOrEmpty(issue.StringId))
+            parties.Remove(issue.StringId);
+    }
 
     public bool ReturnAlternativeTroops(IssueBase issue)
     {

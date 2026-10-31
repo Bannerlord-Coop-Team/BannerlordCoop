@@ -152,9 +152,11 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         second.SetTextVariable("COUNT", 2);
 
         ClientA.SimulateMessage(Server.NetPeer,
-            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId, first)));
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId,
+                new JournalLog(new CampaignTime(1), first))));
         ClientA.SimulateMessage(Server.NetPeer,
-            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId, second)));
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId,
+                new JournalLog(new CampaignTime(2), second))));
         environment.FlushCoalescer();
 
         ClientA.Call(() =>

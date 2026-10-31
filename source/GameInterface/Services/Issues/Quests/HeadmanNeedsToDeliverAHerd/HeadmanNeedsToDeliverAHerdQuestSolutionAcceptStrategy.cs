@@ -28,8 +28,16 @@ internal class HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy : IQuestSol
 
         using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
         {
-            quest.AddHerdAndShepherdsToMainParty();
             cleanup.Remember(issue, owner.PartyBelongedTo);
+            try
+            {
+                quest.AddHerdAndShepherdsToMainParty();
+            }
+            catch
+            {
+                cleanup.Forget(issue);
+                throw;
+            }
         }
     }
 }
