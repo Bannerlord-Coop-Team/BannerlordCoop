@@ -19,26 +19,21 @@ public readonly struct NetworkMissionStatistics : ICommand
     public readonly int TroopsKnockedOrKilledAsParty;
 
     [ProtoMember(4)]
-    public readonly int HeroesKilledInBattle;
-
-    [ProtoMember(5)]
     public readonly string[] CompanionIds;
 
-    [ProtoMember(6)]
+    [ProtoMember(5)]
     public readonly int[] CompanionKills;
 
     public NetworkMissionStatistics(
         string playerHeroId,
         int troopsKnockedOrKilledByPlayer,
         int troopsKnockedOrKilledAsParty,
-        int heroesKilledInBattle,
         string[] companionIds,
         int[] companionKills)
     {
         PlayerHeroId = playerHeroId;
         TroopsKnockedOrKilledByPlayer = troopsKnockedOrKilledByPlayer;
         TroopsKnockedOrKilledAsParty = troopsKnockedOrKilledAsParty;
-        HeroesKilledInBattle = heroesKilledInBattle;
         CompanionIds = companionIds;
         CompanionKills = companionKills;
     }

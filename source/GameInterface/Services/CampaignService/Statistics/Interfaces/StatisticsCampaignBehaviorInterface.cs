@@ -84,7 +84,6 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
     // Client: kills counted since the last mission statistics were sent
     private int missionTroopsKnockedOrKilledByPlayer;
     private int missionTroopsKnockedOrKilledAsParty;
-    private int missionHeroesKilledInBattle;
     private readonly Dictionary<string, int> missionCompanionKills = new();
 
     public StatisticsCampaignBehaviorInterface(
@@ -372,7 +371,6 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
 
         statistics.NumberOfTroopsKnockedOrKilledByPlayer += missionStatistics.TroopsKnockedOrKilledByPlayer;
         statistics.NumberOfTroopsKnockedOrKilledAsParty += missionStatistics.TroopsKnockedOrKilledAsParty;
-        statistics.NumberOfHeroesKilledInBattle += missionStatistics.HeroesKilledInBattle;
 
         var companionIds = missionStatistics.CompanionIds ?? Array.Empty<string>();
         var companionKills = missionStatistics.CompanionKills ?? Array.Empty<int>();
@@ -437,17 +435,13 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
             }
         }
 
-        if (affectedAgent.IsHero && affectedAgent.State == AgentState.Killed)
-        {
-            missionHeroesKilledInBattle++;
-        }
+        // Hero deaths are counted once by OnHeroKilled on the server, since every client in the mission sees the same death
     }
 
     public void SendMissionStatistics()
     {
         if (missionTroopsKnockedOrKilledByPlayer == 0 &&
             missionTroopsKnockedOrKilledAsParty == 0 &&
-            missionHeroesKilledInBattle == 0 &&
             missionCompanionKills.Count == 0) return;
 
         if (objectManager.TryGetIdWithLogging(Hero.MainHero, out var playerHeroId))
@@ -456,14 +450,12 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
                 playerHeroId,
                 missionTroopsKnockedOrKilledByPlayer,
                 missionTroopsKnockedOrKilledAsParty,
-                missionHeroesKilledInBattle,
                 missionCompanionKills.Keys.ToArray(),
                 missionCompanionKills.Values.ToArray()));
         }
 
         missionTroopsKnockedOrKilledByPlayer = 0;
         missionTroopsKnockedOrKilledAsParty = 0;
-        missionHeroesKilledInBattle = 0;
         missionCompanionKills.Clear();
     }
 

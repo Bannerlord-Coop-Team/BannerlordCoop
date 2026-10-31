@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
@@ -12,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
+using SandBox.CampaignBehaviors;
 using Serilog;
 using System;
 using System.Linq;
@@ -37,6 +39,7 @@ internal class PlayerDeletionHandler : IHandler
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ICoopSessionProvider sessionProvider;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
 
     public PlayerDeletionHandler(
         IMessageBroker messageBroker,
@@ -45,7 +48,8 @@ internal class PlayerDeletionHandler : IHandler
         IPlayerManager playerManager,
         ISiegeEventInterface siegeEventInterface,
         ICoopSessionProvider sessionProvider,
-        IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface)
+        IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,6 +58,7 @@ internal class PlayerDeletionHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         this.sessionProvider = sessionProvider;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
+        this.statisticsInterface = statisticsInterface;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Subscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
@@ -175,6 +180,9 @@ internal class PlayerDeletionHandler : IHandler
             TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
         }
 
+        // Read while the player is still registered, so the play time up to now is included
+        var statistics = statisticsInterface.GetStatistics(hero);
+
         if (!playerManager.RemovePlayer(player))
         {
             Logger.Warning("Could not remove player registration for {ControllerId} during retirement", player.ControllerId);
@@ -182,7 +190,8 @@ internal class PlayerDeletionHandler : IHandler
         }
         sessionProvider.CoopSession.StatisticsPlayerData.PlayerStatistics.Remove(player.HeroId);
 
-        network.SendAll(new NetworkPlayerRetired(player.ControllerId, player.HeroId));
+        network.Send(peer, new NetworkPlayerRetired(player.ControllerId, player.HeroId, statistics));
+        network.SendAllBut(peer, new NetworkPlayerRetired(player.ControllerId, player.HeroId));
 
         TryStep("hero retirement", () => applyHeirSelectionActionInterface.ApplyByRetirementWithoutHeir(hero));
 
@@ -387,6 +396,12 @@ internal class PlayerDeletionHandler : IHandler
             else
             {
                 Logger.Debug("Retired player {ControllerId} was not registered on this client", data.ControllerId);
+            }
+
+            if (hero == Hero.MainHero)
+            {
+                statisticsInterface.LoadStatistics(data.Statistics);
+                Campaign.Current.GetCampaignBehavior<RetirementCampaignBehavior>()?.ShowGameStatistics();
             }
         }, blocking: true, context: nameof(PlayerDeletionHandler));
     }

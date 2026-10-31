@@ -17,6 +17,9 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using Xunit;
 
 namespace GameInterface.Tests.Services.CampaignService.Statistics;
@@ -79,16 +82,36 @@ public class StatisticsCampaignBehaviorInterfaceTests : IDisposable
         PlayerStatistics["firstHero"].CompanionData["companion"] = new CompanionStatisticsData { IssuesSolved = 2, Kills = 1 };
 
         ModInformation.IsServer = true;
-        statisticsInterface.OnMissionStatisticsReceived(hero, new NetworkMissionStatistics("firstHero", 4, 6, 1, new[] { "companion" }, new[] { 3 }));
+        statisticsInterface.OnMissionStatisticsReceived(hero, new NetworkMissionStatistics("firstHero", 4, 6, new[] { "companion" }, new[] { 3 }));
         // A mission without companion kills arrives with null arrays
-        statisticsInterface.OnMissionStatisticsReceived(hero, Serializer.DeepClone(new NetworkMissionStatistics("firstHero", 1, 0, 0, Array.Empty<string>(), Array.Empty<int>())));
+        statisticsInterface.OnMissionStatisticsReceived(hero, Serializer.DeepClone(new NetworkMissionStatistics("firstHero", 1, 0, Array.Empty<string>(), Array.Empty<int>())));
 
         var statistics = PlayerStatistics["firstHero"];
         Assert.Equal(5, statistics.NumberOfTroopsKnockedOrKilledByPlayer);
         Assert.Equal(6, statistics.NumberOfTroopsKnockedOrKilledAsParty);
-        Assert.Equal(1, statistics.NumberOfHeroesKilledInBattle);
         Assert.Equal(2, statistics.CompanionData["companion"].IssuesSolved);
         Assert.Equal(4, statistics.CompanionData["companion"].Kills);
+    }
+
+    [Fact]
+    public void OnHeroKilled_TwoPlayersInOneBattle_CountsTheHeroDeathOnceForTheKiller()
+    {
+        var firstHero = AddPlayer("first", "firstHero");
+        var secondHero = AddPlayer("second", "secondHero");
+        var partyComponent = ObjectHelper.SkipConstructor<LordPartyComponent>();
+        partyComponent._leader = firstHero;
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        party._partyComponent = partyComponent;
+        firstHero._partyBelongedTo = party;
+
+        ModInformation.IsServer = true;
+        statisticsInterface.OnHeroKilled(firstHero, KillCharacterAction.KillCharacterActionDetail.DiedInBattle);
+        // Both players report their mission kills after the battle
+        statisticsInterface.OnMissionStatisticsReceived(firstHero, new NetworkMissionStatistics("firstHero", 1, 0, null, null));
+        statisticsInterface.OnMissionStatisticsReceived(secondHero, new NetworkMissionStatistics("secondHero", 1, 0, null, null));
+
+        Assert.Equal(1, PlayerStatistics["firstHero"].NumberOfHeroesKilledInBattle);
+        Assert.Equal(0, PlayerStatistics["secondHero"].NumberOfHeroesKilledInBattle);
     }
 
     [Fact]
