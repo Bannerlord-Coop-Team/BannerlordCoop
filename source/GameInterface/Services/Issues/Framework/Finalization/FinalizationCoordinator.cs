@@ -145,6 +145,11 @@ internal class FinalizationCoordinator : IHandler
             {
                 return;
             }
+            if (playerHero.PartyBelongedTo == null)
+            {
+                Logger.Warning("Cannot run outcome {Outcome} for {IssueId}: the owner has no party", data.Outcome, data.IssueId);
+                return;
+            }
 
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
@@ -172,6 +177,11 @@ internal class FinalizationCoordinator : IHandler
         {
             if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
+                return;
+            }
+            if (playerHero.PartyBelongedTo == null)
+            {
+                Logger.Warning("Cannot run branch {Proof} for {IssueId}: the owner has no party", data.Proof, data.IssueId);
                 return;
             }
 
@@ -231,11 +241,11 @@ internal class FinalizationCoordinator : IHandler
     private bool TryGetFinalizedOwnerPeer(IssueBase issue, string giverId, out NetPeer peer)
     {
         if (ownership.TryGetOwner(giverId, issue.StringId, out var owner) &&
-            playerManager.TryGetPeer(owner, out peer))
+            playerManager.TryGetPeer(owner, out peer) && peer.ConnectionState == ConnectionState.Connected)
             return true;
 
         lock (ownerPeersLock)
-            return ownerPeers.TryGetValue(issue, out peer);
+            return ownerPeers.TryGetValue(issue, out peer) && peer.ConnectionState == ConnectionState.Connected;
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)

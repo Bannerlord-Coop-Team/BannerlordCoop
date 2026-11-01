@@ -131,7 +131,7 @@ internal class HeadmanHerdJournalHandler : IHandler
                 if (quest.JournalEntries.Any(existing => SameLog(existing, log))) return;
             }
             else if (data.Text == null || quest.JournalEntries.Any(existing =>
-                         existing.LogText?.ToString() == data.Text.ToString())) return;
+                         existing.LogText?.Value == data.Text.Value)) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())
                 quest._journalEntries.Add(log);

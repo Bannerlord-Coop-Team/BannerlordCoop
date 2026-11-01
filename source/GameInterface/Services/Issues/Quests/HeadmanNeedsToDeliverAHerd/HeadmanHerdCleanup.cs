@@ -74,6 +74,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     {
         // Completion and cancellation establish the current owner's scope, including after heir replacement.
         var party = MobileParty.MainParty;
+        if (party == null) return true;
 
         foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
         {

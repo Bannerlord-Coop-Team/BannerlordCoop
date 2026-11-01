@@ -75,14 +75,17 @@ internal class AlternativeSolutionJournalHandler : IHandler
     {
         if (ModInformation.IsClient) return;
         var data = payload.What;
-        if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-            !players.TryGetPeer(data.ControllerId, out var peer)) return;
-
-        lock (ownerPeersLock)
+        GameThread.RunSafe(() =>
         {
-            ownerPeers.Remove(issue);
-            ownerPeers.Add(issue, peer);
-        }
+            if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+                !players.TryGetPeer(data.ControllerId, out var peer)) return;
+
+            lock (ownerPeersLock)
+            {
+                ownerPeers.Remove(issue);
+                ownerPeers.Add(issue, peer);
+            }
+        }, context: nameof(AlternativeSolutionJournalHandler));
     }
 
     private void HandleObserved(MessagePayload<AlternativeSolutionEndingObserved> payload)
@@ -111,10 +114,10 @@ internal class AlternativeSolutionJournalHandler : IHandler
     private bool TryGetOwnerPeer(IssueBase issue, out NetPeer peer)
     {
         if (owners.TryGetOwnerControllerId(issue, out var owner) && players.TryGetPeer(owner, out peer))
-            return true;
+            return peer.ConnectionState == ConnectionState.Connected;
 
         lock (ownerPeersLock)
-            return ownerPeers.TryGetValue(issue, out peer);
+            return ownerPeers.TryGetValue(issue, out peer) && peer.ConnectionState == ConnectionState.Connected;
     }
 
     private void HandleJournal(MessagePayload<NetworkAlternativeSolutionJournal> payload)
