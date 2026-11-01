@@ -26,7 +26,7 @@ public interface IBattlesFoughtUploader
 public class ServerTelemetryUploader : IServerTelemetryUploader, IBattlesFoughtUploader, IDisposable
 {
     public const string Endpoint =
-        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics";
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_presence";
     public const string BattlesFoughtEndpoint =
         "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/increment_battles_fought";
     internal const string PublishableKey = "sb_publishable_tseZMeJ-RYeSHI0KwU2p0g_PE4GVtN6";

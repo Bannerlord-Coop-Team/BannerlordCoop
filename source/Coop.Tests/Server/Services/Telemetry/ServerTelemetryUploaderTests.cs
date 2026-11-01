@@ -42,9 +42,10 @@ public class ServerTelemetryUploaderTests
         using var json = JsonDocument.Parse(handler.Body ?? string.Empty);
         var root = json.RootElement;
         Assert.Equal(
-            new[] { "p_session_id", "p_mod_version", "p_commit_hash", "p_started_at", "p_player_count" },
+            new[] { "p_session_id", "p_server_id", "p_mod_version", "p_commit_hash", "p_started_at", "p_player_count" },
             root.EnumerateObject().Select(property => property.Name).ToArray());
         Assert.Equal("41fa0000000000000000000000000000", root.GetProperty("p_session_id").GetString());
+        Assert.Equal("41fa0000000000000000000000000000", root.GetProperty("p_server_id").GetString());
         Assert.Equal("0.1.4", root.GetProperty("p_mod_version").GetString());
         Assert.Equal("abc123", root.GetProperty("p_commit_hash").GetString());
         Assert.Equal("2026-08-29T22:15:00Z", root.GetProperty("p_started_at").GetString());
@@ -93,7 +94,7 @@ public class ServerTelemetryUploaderTests
         Assert.True(result.EndpointConfigured);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(
-            "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_statistics",
+            "https://wfvqnijwuyqjibhlcrhz.supabase.co/rest/v1/rpc/report_server_presence",
             ServerTelemetryUploader.Endpoint);
         Assert.Equal(ServerTelemetryUploader.Endpoint, handler.RequestUri?.ToString());
         Assert.Equal(

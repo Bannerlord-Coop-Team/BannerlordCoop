@@ -18,6 +18,21 @@ An older `mod-config.json` directly in `Documents\Mount and Blade II Bannerlord`
 
 The log shows the file in use: `mod-config.json loaded (<path>)`, after `created <path> from <template>` when the server had to create it. On a dedicated server, check this line to see which file your build reads.
 
+## Public telemetry identity
+
+Release servers keep a small `telemetry-server-id-<port>.txt` file in the first
+directory that applies:
+
+1. `COOP_DATA_DIR`.
+2. `BANNERLORD_USER_DIR`.
+3. `server-data` next to the server program.
+
+The file contains a generated installation id and is reused after restarts, so
+one server keeps one public presence row while its session id changes. Keep the
+file with the server's persistent data when moving a headless server. If the
+file cannot be read or written, telemetry uses a temporary process id and the
+server continues to start.
+
 ## Saves and session files
 
 `<save>.sav` holds the world. `<save>.json`, with the same name, holds each player's character and co-op progress. The server writes the `.json`:

@@ -122,6 +122,9 @@ public class ServerModule : CommonModule
             .As<IServerTelemetryUploader>()
             .As<IBattlesFoughtUploader>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<ServerTelemetryIdentity>()
+            .As<IServerTelemetryIdentity>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<ServerTelemetryReporter>()
             .As<IServerTelemetryReporter>()
             .InstancePerLifetimeScope()
