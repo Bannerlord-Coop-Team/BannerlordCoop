@@ -303,6 +303,13 @@ internal class FinalizationCoordinator : IHandler
             announcedIssues.Add(issue, new object());
         }
 
+        if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out var owner) &&
+            playerManager.TryGetPeer(owner, out var ownerPeer))
+        {
+            ownerPeers.Remove(issue);
+            ownerPeers.Add(issue, ownerPeer);
+        }
+
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
