@@ -185,8 +185,8 @@ public class HeadmanHerdAlternativeProgressTests
             message => message.Ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest);
         Assert.Equal(otherGiver, report.IssueOwnerId);
         Assert.Equal(2, report.Entries.Length);
-        Assert.Contains("Phestos", report.Entries[1].Text);
-        Assert.DoesNotContain("Shulun", report.Entries[1].Text);
+        Assert.Contains("Phestos", report.Entries[1].Text.ToString());
+        Assert.DoesNotContain("Shulun", report.Entries[1].Text.ToString());
         JournalLog[] afterA = null!;
         JournalLog[] failureB = null!;
         scenario.Server.Call(() =>
