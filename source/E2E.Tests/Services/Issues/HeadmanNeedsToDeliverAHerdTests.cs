@@ -900,7 +900,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         {
             Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
             var giver = Object<Hero>(Server, scenario.NotableId);
-            Assert.True(Server.ObjectManager.Remove(giver));
             Campaign.Current.IssueManager.OnHeroKilled(giver, null,
                 KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
         });

@@ -94,12 +94,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (!IsEnding(payload.What.Ending) || !issue.IsSolvingWithAlternative ||
             !registry.IsRegistered(issue.GetType())) return;
-        if (!objects.TryGetId(issue.IssueOwner, out var giverId))
-        {
-            if (string.IsNullOrEmpty(issue.IssueOwner?.StringId)) return;
-            giverId = $"Hero_{issue.IssueOwner.StringId}";
-            Logger.Warning("Using the stamped issue owner id {IssueOwnerId} after registry removal", giverId);
-        }
+        if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         var report = issue.JournalEntries.LastOrDefault()?.LogText;
         // Vanilla failure binds the companion globally instead of saving it on the report.
         if (payload.What.Ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest &&

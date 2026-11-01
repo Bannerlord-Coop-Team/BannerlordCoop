@@ -355,18 +355,7 @@ internal class FinalizationCoordinator : IHandler
 
     private bool TryGetIssueOwnerId(IssueBase issue, out string issueOwnerId)
     {
-        if (objectManager.TryGetId(issue.IssueOwner, out issueOwnerId)) return true;
-
-        // A giver can be removed from the server registry as part of its death before the outcome event is handled.
-        // Its stamped StringId still identifies the client-side hero.
-        if (!string.IsNullOrEmpty(issue.IssueOwner?.StringId))
-        {
-            issueOwnerId = $"Hero_{issue.IssueOwner.StringId}";
-            Logger.Warning("Using the stamped issue owner id {IssueOwnerId} after registry removal", issueOwnerId);
-            return true;
-        }
-
-        Logger.Error("Failed to get issue owner id for {Issue}", issue.StringId);
+        if (objectManager.TryGetIdWithLogging(issue.IssueOwner, out issueOwnerId)) return true;
         issueOwnerId = null;
         return false;
     }

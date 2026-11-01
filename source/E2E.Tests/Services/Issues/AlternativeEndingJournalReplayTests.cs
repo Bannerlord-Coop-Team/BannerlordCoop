@@ -211,7 +211,6 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             MessageBroker.Instance.Publish(this, new AlternativeSolutionAcceptedOnServer(
                 scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
             scenario.Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
-            Assert.True(scenario.Server.ObjectManager.Remove(issues[scenario.Server].IssueOwner));
             issues[scenario.Server].CompleteIssueWithCancel();
         });
         environment.FlushCoalescer();
