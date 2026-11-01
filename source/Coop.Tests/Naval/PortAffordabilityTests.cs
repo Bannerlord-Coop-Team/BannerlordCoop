@@ -80,6 +80,7 @@ public class PortAffordabilityTests
         network.Verify(net => net.Send(It.IsAny<NetPeer>(), It.Is<IMessage>(message => message is NetworkRepairShipsAtPortReply)), Times.Once);
     }
 
+    // A trade that buys one ship and upgrades it in the same confirm.
     private PortScreenChanges TradeChanges(Hero hero, Ship bought, ShipUpgradePieceInfo upgrade) => new PortScreenChanges(
         player,
         port,
@@ -94,6 +95,7 @@ public class PortAffordabilityTests
         new MBReadOnlyList<ShipFigureheadInfo>(),
         new MBReadOnlyList<Ship>());
 
+    // A bare mobile party whose component reports the given leader.
     private static MobileParty CreateMobileParty(PartyBase party, Hero leader)
     {
         var component = new Mock<PartyComponent>();

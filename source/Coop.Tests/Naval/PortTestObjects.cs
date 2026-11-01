@@ -61,10 +61,13 @@ internal sealed class FakeShipCostInterface : IShipCostInterface
     public readonly Dictionary<Ship, int> RepairCosts = new();
     public readonly Dictionary<(Ship, ShipUpgradePiece), int> UpgradeCosts = new();
 
+    // The configured value for this ship and buyer, or 0.
     public int GetTradeValue(Ship ship, PartyBase seller, PartyBase buyer) => TradeValues.TryGetValue((ship, buyer), out var value) ? value : 0;
 
+    // The configured repair cost for this ship, or 0.
     public int GetRepairCost(Ship ship, PartyBase owner) => RepairCosts.TryGetValue(ship, out var value) ? value : 0;
 
+    // The configured cost for this ship and piece, or 0.
     public int GetUpgradeCost(Ship ship, ShipUpgradePiece piece, PartyBase owner) => UpgradeCosts.TryGetValue((ship, piece), out var value) ? value : 0;
 }
 
@@ -75,8 +78,10 @@ internal sealed class FakePortTransactionPricer : IPortTransactionPricer
 {
     public int RepairCost;
 
+    // Every trade is free.
     public int GetTradeCost(PortScreenChanges changes) => 0;
 
+    // The configured repair cost for any owner.
     public int GetRepairCost(PartyBase owner) => RepairCost;
 }
 #endif

@@ -22,11 +22,13 @@ public class PortTransactionPricerTests
     private readonly PartyBase port = CreateParty();
     private readonly PortTransactionPricer pricer;
 
+    // Builds the pricer over the fake ship costs.
     public PortTransactionPricerTests()
     {
         pricer = new PortTransactionPricer(shipCosts);
     }
 
+    // A sale's value is subtracted from the purchase it funds.
     [Fact]
     public void SaleProceeds_PayForThePurchase()
     {
@@ -95,6 +97,7 @@ public class PortTransactionPricerTests
         Assert.Equal(0, pricer.GetTradeCost(Changes(pieces: new() { new ShipUpgradePieceInfo(owned, "sail", null) })));
     }
 
+    // Ships at full hit points add nothing to the repair bill.
     [Fact]
     public void Repair_PricesOnlyDamagedShips()
     {
@@ -106,6 +109,7 @@ public class PortTransactionPricerTests
         Assert.Equal(120, pricer.GetRepairCost(player));
     }
 
+    // Port changes between the player and the port, empty except for the given lists.
     private PortScreenChanges Changes(
         MBReadOnlyList<Ship> buy = null,
         MBReadOnlyList<Ship> sell = null,

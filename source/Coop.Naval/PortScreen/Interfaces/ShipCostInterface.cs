@@ -26,12 +26,15 @@ internal interface IShipCostInterface : IGameAbstraction
 /// </summary>
 internal class ShipCostInterface : IShipCostInterface
 {
+    // Trade value of the ship for this seller and buyer, from the campaign model.
     public int GetTradeValue(Ship ship, PartyBase seller, PartyBase buyer) =>
         (int)Campaign.Current.Models.ShipCostModel.GetShipTradeValue(ship, seller, buyer);
 
+    // Repair cost of the ship for its owner, from the campaign model.
     public int GetRepairCost(Ship ship, PartyBase owner) =>
         (int)Campaign.Current.Models.ShipCostModel.GetShipRepairCost(ship, owner);
 
+    // Cost of fitting the piece on the ship, from the campaign model.
     public int GetUpgradeCost(Ship ship, ShipUpgradePiece piece, PartyBase owner) =>
         Campaign.Current.Models.ShipCostModel.GetShipUpgradePieceCost(ship, piece, owner);
 }

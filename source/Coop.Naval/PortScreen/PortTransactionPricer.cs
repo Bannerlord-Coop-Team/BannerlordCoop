@@ -26,11 +26,13 @@ internal class PortTransactionPricer : IPortTransactionPricer
 {
     private readonly IShipCostInterface shipCostInterface;
 
+    // Takes the ship price source the pricer sums over.
     public PortTransactionPricer(IShipCostInterface shipCostInterface)
     {
         this.shipCostInterface = shipCostInterface;
     }
 
+    // Net gold the trade costs the right owner: purchases minus sales, plus repairs and upgrades on ships it ends up holding.
     public int GetTradeCost(PortScreenChanges changes)
     {
         var sold = changes.ShipsToSell.Where(ship => changes.RightOwner.Ships.Contains(ship)).ToList();
@@ -48,6 +50,7 @@ internal class PortTransactionPricer : IPortTransactionPricer
         return cost;
     }
 
+    // Gold to repair every damaged ship the owner holds.
     public int GetRepairCost(PartyBase owner) => owner.Ships
         .Where(ship => ship.HitPoints < ship.MaxHitPoints)
         .Sum(ship => shipCostInterface.GetRepairCost(ship, owner));
