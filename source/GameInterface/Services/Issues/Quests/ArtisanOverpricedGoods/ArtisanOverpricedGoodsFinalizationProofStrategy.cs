@@ -5,8 +5,10 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
+using System.Linq;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
 using Serilog;
 
@@ -57,12 +59,13 @@ internal class ArtisanOverpricedGoodsFinalizationProofStrategy : IFinalizationPr
             return true;
         }
 
-        // The server's quest never starts, but vanilla's delivery methods still need a journal stage.
-        if (quest._playerStartsQuestLog == null)
-        {
-            quest._playerStartsQuestLog = new JournalLog(CampaignTime.Now, TextObject.GetEmpty(), null,
+        // Bind vanilla's progress log to the mirrored row so the server archive sees delivery progress.
+        quest._playerStartsQuestLog = quest.JournalEntries.FirstOrDefault(log =>
+            log.Range == quest._requestedTradeGoodAmount) ??
+            new JournalLog(CampaignTime.Now, TextObject.GetEmpty(), null,
                 quest._givenTradeGoods, quest._requestedTradeGoodAmount);
-        }
+        if (!quest.JournalEntries.Contains(quest._playerStartsQuestLog))
+            quest._journalEntries.Add(quest._playerStartsQuestLog);
 
         if (branch == ArtisanOverpricedGoodsBranch.PartialDelivery)
         {
