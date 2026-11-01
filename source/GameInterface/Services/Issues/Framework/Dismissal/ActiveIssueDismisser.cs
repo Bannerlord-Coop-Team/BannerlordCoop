@@ -12,6 +12,8 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
@@ -165,6 +167,10 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
     {
         Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
 
+        if (!issue.JournalEntries.Any(log => log.LogText?.ToString() == "Your troops have returned from their mission."))
+            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("{=V5Za6d4h}Your troops have returned from their mission.")));
+        messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(
+            issue, IssueBase.IssueUpdateDetails.IssueCancel));
         issueDismisser.Dismiss(issue);
 
         if (announce)

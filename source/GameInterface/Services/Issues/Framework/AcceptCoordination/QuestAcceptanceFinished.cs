@@ -24,6 +24,20 @@ public readonly struct QuestSolutionAcceptedOnServer : IEvent
     }
 }
 
+public readonly struct AlternativeSolutionAcceptedOnServer : IEvent
+{
+    public readonly string IssueOwnerId;
+    public readonly string IssueId;
+    public readonly string ControllerId;
+
+    public AlternativeSolutionAcceptedOnServer(string issueOwnerId, string issueId, string controllerId)
+    {
+        IssueOwnerId = issueOwnerId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+    }
+}
+
 public readonly struct QuestAcceptanceJournalFlushRequested : IEvent
 {
 }

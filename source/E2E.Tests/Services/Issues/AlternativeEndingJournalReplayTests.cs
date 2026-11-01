@@ -1,8 +1,10 @@
 ﻿using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
@@ -195,6 +197,38 @@ public class AlternativeEndingJournalReplayTests : IDisposable
         }
 
         AssertObserverHasNoArchive();
+    }
+
+    [Fact]
+    public void AlternativeCancellationAfterOwnerAndGiverRemovalStillArchivesForTheOwner()
+    {
+        foreach (var instance in environment.Clients.Prepend(environment.Server))
+            instance.Call(() => issues[instance].IsTriedToSolveBefore = true);
+
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPeer(QuestScenario.ControllerA, out _));
+            MessageBroker.Instance.Publish(this, new AlternativeSolutionAcceptedOnServer(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+            scenario.Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            Assert.True(scenario.Server.ObjectManager.Remove(issues[scenario.Server].IssueOwner));
+            issues[scenario.Server].CompleteIssueWithCancel();
+        });
+        environment.FlushCoalescer();
+
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, journal.Ending);
+        Assert.Single(journal.Entries, entry => entry.Text == "Your troops have returned from their mission.");
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertObserverHasNoArchive();
+        scenario.ClientA.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issues[scenario.ClientA]) && entry.IsEnded()));
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, archive._lastIssueStatus);
+            Assert.Single(archive.GetEntries(), entry =>
+                entry.LogText?.ToString() == "Your troops have returned from their mission.");
+        });
     }
 
     [Fact]
