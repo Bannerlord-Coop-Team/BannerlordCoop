@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using E2E.Tests.Environment;
 using Common.Messaging;
 using Common.Network.Messages;
@@ -166,6 +167,34 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 .Select(log => log.LogText.ToString())
                 .ToArray();
             Assert.Equal(new[] { "Herd stage 1", "Herd stage 2" }, stages);
+        });
+    }
+
+    [Fact]
+    public void OwnerJournal_KeepsSameRenderedTextWhenAttributesDiffer()
+    {
+        Accept(ClientA);
+        var first = new TextObject("{=herd_attribute_only}Herd stage");
+        first.SetTextVariable("DETAIL", new TextObject("first"));
+        var second = new TextObject("{=herd_attribute_only}Herd stage");
+        second.SetTextVariable("DETAIL", new TextObject("second"));
+
+        ClientA.SimulateMessage(Server.NetPeer,
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId,
+                new JournalLog(new CampaignTime(1), first))));
+        ClientA.SimulateMessage(Server.NetPeer,
+            ClientA.SerializeForWire(new NetworkHeadmanHerdLog(scenario.NotableId, QuestScenario.IssueId,
+                new JournalLog(new CampaignTime(2), second))));
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var stages = accepted[ClientA].JournalEntries
+                .Where(log => log.LogText?.ToString() == "Herd stage")
+                .ToArray();
+            Assert.Equal(2, stages.Length);
+            Assert.Equal("first", Assert.IsType<TextObject>(stages[0].LogText.Attributes["DETAIL"]).ToString());
+            Assert.Equal("second", Assert.IsType<TextObject>(stages[1].LogText.Attributes["DETAIL"]).ToString());
         });
     }
 
@@ -803,18 +832,43 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
-    public void FailedGrantCleanup_ForgetsTheRememberedParty()
+    public void FailedGrantCleanup_RemovesPartialGrantAndAllowsTheIssueAgain()
     {
-        Accept(ClientA);
+        var harmony = new Harmony($"{nameof(FailedGrantCleanup_RemovesPartialGrantAndAllowsTheIssueAgain)}.{Guid.NewGuid():N}");
+        harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.AddHerdAndShepherdsToMainParty)),
+            postfix: new HarmonyMethod(typeof(HeadmanNeedsToDeliverAHerdTests), nameof(ThrowAfterServerGrant)));
+        try
+        {
+            ClientA.Call(() =>
+            {
+                using (OwnerScope(ClientA, QuestScenario.ControllerA))
+                {
+                    var issue = Object<Hero>(ClientA, scenario.NotableId).Issue;
+                    issue.StartIssueWithQuest();
+                    ((Quest)issue.IssueQuest).QuestAcceptedConsequences();
+                }
+            });
+            environment.FlushCoalescer();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
         Server.Call(() =>
         {
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
-            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
-            cleanup.Remember(issue, Party(Server, QuestScenario.ControllerA));
-            Assert.True(cleanup.HasRememberedParty(issue));
-            cleanup.Forget(issue);
-            Assert.False(cleanup.HasRememberedParty(issue));
+            Assert.True(issue.IsOngoingWithoutQuest);
+            Assert.Equal(0, Party(Server, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
         });
+
+        Accept(ClientA);
+    }
+
+    private static void ThrowAfterServerGrant()
+    {
+        if (ModInformation.IsServer)
+            throw new InvalidOperationException("Stubbed herd grant failure after mutation");
     }
 
     [Fact]

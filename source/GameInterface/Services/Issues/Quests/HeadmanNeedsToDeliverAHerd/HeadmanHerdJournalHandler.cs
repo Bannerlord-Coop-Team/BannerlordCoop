@@ -108,8 +108,14 @@ internal class HeadmanHerdJournalHandler : IHandler
 
     private void FinishAccept(MessagePayload<QuestAcceptanceFinished> payload)
     {
-        if (ModInformation.IsServer || payload.What.Quest == null)
+        if (ModInformation.IsServer)
             return;
+
+        if (payload.What.Quest == null)
+        {
+            pendingAccepts.Clear();
+            return;
+        }
 
         var issue = IssueManager.GetIssueOfQuest(payload.What.Quest);
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))

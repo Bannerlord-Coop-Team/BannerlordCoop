@@ -618,6 +618,31 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
+    public void LordJournalSnapshotWithClockSkewUpdatesExistingProgressStage()
+    {
+        PrepareLordSolution();
+        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+        var text = issue.LordSolutionCounterOfferAcceptLog;
+        var task = new TextObject("Counter offer");
+        var first = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, false,
+            new[] { new IssueJournalEntry(new JournalLog(new CampaignTime(10), text, task, 1, 5)) });
+        var second = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, false,
+            new[] { new IssueJournalEntry(new JournalLog(new CampaignTime(20), text, task, 3, 5)) });
+
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(first));
+        scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(second));
+
+        scenario.ClientA.Call(() =>
+        {
+            var entry = Assert.Single(issue.JournalEntries, log => log.TaskName?.ToString() == "Counter offer");
+            Assert.Equal(3, entry.CurrentProgress);
+            Assert.Equal(5, entry.Range);
+        });
+    }
+
+    [Fact]
     public void ADelayedLordAcceptanceChecksTheAlreadyOpenMenu()
     {
         PrepareLordSolution();

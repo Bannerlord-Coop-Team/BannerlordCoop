@@ -266,10 +266,21 @@ internal class FinalizationCoordinator : IHandler
                     {
                         if (log.Text == null) continue;
                         var index = existing.FindIndex(existingLog => SameEntry(existingLog, log));
-                        if (index < 0)
-                            index = existing.FindIndex(existingLog => SameEntryContent(existingLog, log));
-                        if (index >= 0) existing.RemoveAt(index);
-                        else issue.AddLog(log.ToJournalLog());
+                        if (index >= 0)
+                        {
+                            existing.RemoveAt(index);
+                            continue;
+                        }
+
+                        index = existing.FindIndex(existingLog => SameEntryStage(existingLog, log));
+                        if (index >= 0)
+                        {
+                            existing[index].UpdateCurrentProgress(log.Progress);
+                            existing.RemoveAt(index);
+                            continue;
+                        }
+
+                        issue.AddLog(log.ToJournalLog());
                     }
                 }
             }
@@ -411,6 +422,10 @@ internal class FinalizationCoordinator : IHandler
     private static bool SameEntryContent(JournalLog log, IssueJournalEntry entry) =>
         log.Range == entry.Range &&
         log.CurrentProgress == entry.Progress && log.Type == entry.Type &&
+        SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName);
+
+    private static bool SameEntryStage(JournalLog log, IssueJournalEntry entry) =>
+        log.Range == entry.Range && log.Type == entry.Type &&
         SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName);
 
     private static bool SameText(TextObject first, TextObject second)
