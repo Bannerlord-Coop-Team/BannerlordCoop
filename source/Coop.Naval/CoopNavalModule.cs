@@ -3,6 +3,7 @@ using Common.Commands;
 using Common.Messaging;
 using Common.Util;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using GameInterface.Services;
 using System;
@@ -41,6 +42,12 @@ public class CoopNavalModule : Module
 
         // RegistryModule skips this assembly so the registries are only registered with the services they need
         foreach (var type in GetConcreteTypes<object>().Where(IsAutoRegistry))
+        {
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
+        }
+
+        // AutoSyncModule only scans GameInterface, and these must activate before AutoSyncPatcher builds
+        foreach (var type in GetConcreteTypes<IAutoSync>())
         {
             builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
