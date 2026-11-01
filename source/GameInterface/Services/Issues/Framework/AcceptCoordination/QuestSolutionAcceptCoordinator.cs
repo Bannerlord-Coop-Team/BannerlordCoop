@@ -357,6 +357,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
             else
             {
                 // No quest object here, its dialogs would answer this player's conversations too
+                pendingAccepts.Remove(issue);
                 issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
                 issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
                 issue.IssueDueTime = CampaignTime.Never;
@@ -389,6 +390,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
         {
             return;
         }
+
+        pendingAccepts.Remove(issue);
 
         var strayQuest = issue.IssueQuest;
         if (strayQuest == null)
