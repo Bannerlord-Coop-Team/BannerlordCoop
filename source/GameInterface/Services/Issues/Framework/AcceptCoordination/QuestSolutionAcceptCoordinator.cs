@@ -337,7 +337,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
-                if (issue != null)
+                if (issue?.StringId == data.IssueId)
                     pendingAccepts.Remove(issue);
                 return;
             }
@@ -390,7 +390,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
     {
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
-            if (issue != null)
+            if (issue?.StringId == data.IssueId)
                 pendingAccepts.Remove(issue);
             return;
         }
