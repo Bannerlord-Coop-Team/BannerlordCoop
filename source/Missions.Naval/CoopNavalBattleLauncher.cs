@@ -62,6 +62,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalRopeRegistry ropes;
     private readonly INavalShipDamageGate damageGate;
     private readonly INavalPlayerDeploymentSlotTracker deploymentSlot;
+    private readonly INavalLateDeploymentPlanTracker latePlans;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -89,7 +90,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalForeignHullRegistry foreignHulls,
         INavalRopeRegistry ropes,
         INavalShipDamageGate damageGate,
-        INavalPlayerDeploymentSlotTracker deploymentSlot
+        INavalPlayerDeploymentSlotTracker deploymentSlot,
+        INavalLateDeploymentPlanTracker latePlans
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -112,6 +114,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.ropes = ropes;
         this.damageGate = damageGate;
         this.deploymentSlot = deploymentSlot;
+        this.latePlans = latePlans;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
@@ -271,7 +274,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
-            shipSnapshotBuilder, objectManager, playerManager, enemySide
+            shipSnapshotBuilder, objectManager, playerManager, latePlans, enemySide
 #if DEBUG
             // Read at the eligible attempt, since the scenario can arrive after the mission opens or the host is elected.
             , () => scenarioState.Current?.MapEventId == context.Session.InstanceId && scenarioState.Current.FailNpcFleet

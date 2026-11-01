@@ -118,7 +118,8 @@ public class NavalNpcFleetSpawnerTests
     [Fact]
     public void LatePlanNotificationPatch_BindsAndOnlySilencesTheLatePlan()
     {
-        Assert.False(NavalLateDeploymentPlan.IsMaking);
+        using var naval = new NavalClientContainer();
+        Assert.False(naval.Resolve<INavalLateDeploymentPlanTracker>().IsMaking);
         Assert.True(LateDeploymentPlanNotificationPatch.Prefix());
 
         var harmony = new Harmony("coop.tests.naval.late_plan");
@@ -215,7 +216,8 @@ public class NavalNpcFleetSpawnerTests
             session.SetupGet(s => s.InstanceId).Returns("MapEvent_1");
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
             Spawner = new NavalNpcFleetSpawner(Network.Object, Broker, session.Object, Mock.Of<IBattleShipReplicator>(),
-                Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(), enemySide
+                Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
+                Mock.Of<INavalLateDeploymentPlanTracker>(), enemySide
 #if DEBUG
                 , scenarioFailsSpawn
 #endif

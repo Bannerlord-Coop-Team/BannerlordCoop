@@ -154,6 +154,17 @@ public class NavalClientStateScopeTests
         Assert.Equal(0, second.Resolve<INavalPlayerDeploymentSlotTracker>().PlayerCount);
     }
 
+    // A late deployment plan silences only the notifications of the client making it.
+    [Fact]
+    public void LateDeploymentPlanTracker_IsOnePerClientContainer()
+    {
+        using var first = BuildClient();
+        using var second = BuildClient();
+
+        Assert.NotSame(first.Resolve<INavalLateDeploymentPlanTracker>(), second.Resolve<INavalLateDeploymentPlanTracker>());
+        Assert.Same(first.Resolve<INavalLateDeploymentPlanTracker>(), first.BeginLifetimeScope().Resolve<INavalLateDeploymentPlanTracker>());
+    }
+
     // A client container with the naval registrations.
     private static IContainer BuildClient()
     {
