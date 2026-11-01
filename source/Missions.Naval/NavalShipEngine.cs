@@ -90,7 +90,8 @@ public class NavalShipEngine : INavalShipEngine
             identity.IsOrphaned,
             identity.CaptureSequence,
             identity.Capture?.CaptorShipId ?? Guid.Empty,
-            identity.Capture?.FromSide ?? BattleSideEnum.None);
+            identity.Capture?.FromSide ?? BattleSideEnum.None,
+            identity.CommittedCaptorId);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)

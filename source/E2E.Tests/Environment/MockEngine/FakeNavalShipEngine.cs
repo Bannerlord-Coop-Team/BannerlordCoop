@@ -117,7 +117,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
             identity.IsOrphaned ? identity.OrphanedSide : fake.Side, fake.FormationIndex,
             NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null, fake.HitPoints, fake.SailHitPoints, 1, "",
             identity.OriginalOwner, fake.CampaignShipId, identity.CaptorControllerId, identity.IsOrphaned, identity.CaptureSequence,
-            identity.Capture?.CaptorShipId ?? Guid.Empty, identity.Capture?.FromSide ?? BattleSideEnum.None);
+            identity.Capture?.CaptorShipId ?? Guid.Empty, identity.Capture?.FromSide ?? BattleSideEnum.None,
+            identity.CommittedCaptorId);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)

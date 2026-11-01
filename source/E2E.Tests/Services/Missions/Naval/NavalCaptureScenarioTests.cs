@@ -465,6 +465,40 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal("H", joiner.Ship(pirates[1]).CurrentAuthority);
     }
 
+    // PR #4191 M5: the captor's swap failed, so its record carries no capture, only the decided captor; a joiner leaves the AI
+    // hull with that captor instead of handing it to the battle host, then and after a host change.
+    [Fact]
+    public void LateJoinerAfterACaptureWhoseSwapFailedAtTheCaptor_KeepsTheHullWithItsCaptor_ThroughAHostMigration()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out _, out var pirates, out var captorHull, out _,
+            lateJoiner: "O");
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        c.Engine.CaptureResult = global::Missions.Battles.CaptureSwapResult.Failed;
+        battle.ExpectLoggedFailure("the capture isn't recorded here");
+        c.ElapseCaptureTimer(prize, captorHull);
+        Assert.Null(c.Ship(prize).CaptorControllerId);
+
+        var joiner = battle.Join("O");
+        joiner.Commit();
+        battle.AnnounceEntry(joiner);
+        battle.TickAll(2);
+
+        Assert.Equal("C", joiner.Ship(prize).CurrentAuthority);
+        Assert.Equal("C", joiner.Ship(prize).CommittedCaptorId);
+        Assert.False(joiner.Ship(prize).FollowsBattleHost);
+
+        battle.MigrateHost(h, "O");
+        battle.TickAll(3);
+
+        foreach (var peer in new[] { c, joiner })
+        {
+            Assert.Equal("C", peer.Ship(prize).CurrentAuthority);
+            Assert.False(peer.Ship(prize).FollowsBattleHost);
+        }
+        Assert.Equal("O", joiner.Ship(pirates[1]).CurrentAuthority);
+    }
+
     // (g, C3) A joiner still deploying holds the old authority's record of the prize when the capture arrives: it applies the
     // capture once the copy spawned, however long the deployment took.
     [Fact]
