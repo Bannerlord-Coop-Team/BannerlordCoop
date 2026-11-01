@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface;
+using HarmonyLib;
 using Missions.Messages;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
@@ -21,12 +22,14 @@ internal class ShipHitScopePatch
 {
     // Opens the attack scope of the hit.
     [HarmonyPrefix]
-    private static void Prefix(Agent attackerAgent, Vec3 impactPosition, out NavalShipDamageGate.HitScope __state) =>
-        __state = NavalShipDamageGate.EnterHit(attackerAgent, impactPosition);
+    private static void Prefix(Agent attackerAgent, Vec3 impactPosition, out NavalShipDamageGate.Scope __state) =>
+        __state = ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate)
+            ? gate.EnterHit(attackerAgent, impactPosition)
+            : default;
 
     // Closes the attack scope, also when vanilla throws.
     [HarmonyFinalizer]
-    private static void Finalizer(NavalShipDamageGate.HitScope __state) => NavalShipDamageGate.ExitHit(__state);
+    private static void Finalizer(NavalShipDamageGate.Scope __state) => __state.Dispose();
 }
 
 // Fire missiles passing through a sail damage it here, outside OnHit.
@@ -36,12 +39,12 @@ internal class ShipSailHitScopePatch
 {
     // Opens the attack scope of the sail hit.
     [HarmonyPrefix]
-    private static void Prefix(Agent attackerAgent, out NavalShipDamageGate.HitScope __state) =>
-        __state = NavalShipDamageGate.EnterHit(attackerAgent, Vec3.Invalid);
+    private static void Prefix(Agent attackerAgent, out NavalShipDamageGate.Scope __state) =>
+        __state = ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate) ? gate.EnterHit(attackerAgent, Vec3.Invalid) : default;
 
     // Closes the attack scope, also when vanilla throws.
     [HarmonyFinalizer]
-    private static void Finalizer(NavalShipDamageGate.HitScope __state) => NavalShipDamageGate.ExitHit(__state);
+    private static void Finalizer(NavalShipDamageGate.Scope __state) => __state.Dispose();
 }
 
 // Hull HP: ship siege missiles through OnHit, and the capsize and burn ticks, which only the owner's hull counts.
@@ -54,7 +57,8 @@ internal class ShipHullDamagePatch
     private static bool Prefix(MissionShip __instance, float rawDamage, ref float __result, ref int inflictedDamage,
         ref int modifiedDamage, ref DamageTypes damageType, ref bool isFatalDamage)
     {
-        if (NavalShipDamageGate.AllowsHit(__instance, BattleShipDamageKind.Hull, rawDamage, 0f, null, -1)) return true;
+        if (!ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate)
+            || gate.AllowsHit(__instance, BattleShipDamageKind.Hull, rawDamage, 0f, null, -1)) return true;
 
         __result = 0f;
         inflictedDamage = 0;
@@ -72,15 +76,19 @@ internal class ShipCollisionDamagePatch
 {
     // Opens the collision scope and runs vanilla only when the gate allows the impact.
     [HarmonyPrefix]
-    private static bool Prefix(MissionShip __instance, MissionShip hitterShip, bool isRamDamage, Vec3 point, float damage, out bool __state)
+    private static bool Prefix(MissionShip __instance, MissionShip hitterShip, bool isRamDamage, Vec3 point, float damage,
+        out NavalShipDamageGate.Scope __state)
     {
-        __state = NavalShipDamageGate.EnterCollision(isRamDamage);
-        return NavalShipDamageGate.AllowsCollision(__instance, hitterShip, isRamDamage, point, damage);
+        __state = default;
+        if (!ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate)) return true;
+
+        __state = gate.EnterCollision(isRamDamage);
+        return gate.AllowsCollision(__instance, hitterShip, isRamDamage, point, damage);
     }
 
     // Closes the collision scope, also when vanilla throws.
     [HarmonyFinalizer]
-    private static void Finalizer(bool __state) => NavalShipDamageGate.ExitCollision(__state);
+    private static void Finalizer(NavalShipDamageGate.Scope __state) => __state.Dispose();
 }
 
 // Vanilla's ram morale reaches only the rammer team's AI-controlled agents, so each client gives its own agents theirs from
@@ -91,7 +99,7 @@ internal class RoutedRamMoralePatch
 {
     // Skips vanilla's ram morale inside a routed ram apply.
     [HarmonyPrefix]
-    private static bool Prefix() => NavalShipDamageGate.AllowsRamMorale();
+    private static bool Prefix() => !ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate) || gate.AllowsRamMorale();
 }
 
 // Sail HP from weapons and fire missiles; a hit on another owner's sail goes to that owner.
@@ -104,7 +112,8 @@ internal class ShipSailDamagePatch
     private static bool Prefix(MissionShip __instance, Agent attackerAgent, float rawDamage, float inflictedDamage,
         MissionSail sailHit, ref float __result)
     {
-        if (NavalShipDamageGate.AllowsHit(__instance, BattleShipDamageKind.Sails, rawDamage, inflictedDamage, attackerAgent,
+        if (!ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate)
+            || gate.AllowsHit(__instance, BattleShipDamageKind.Sails, rawDamage, inflictedDamage, attackerAgent,
                 NavalShipDamageGate.SailIndexOf(__instance, sailHit)))
             return true;
 
@@ -122,7 +131,8 @@ internal class ShipFireDamagePatch
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, float fireDamage, ref float __result)
     {
-        if (NavalShipDamageGate.AllowsHit(__instance, BattleShipDamageKind.Fire, fireDamage, 0f, null, -1)) return true;
+        if (!ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate)
+            || gate.AllowsHit(__instance, BattleShipDamageKind.Fire, fireDamage, 0f, null, -1)) return true;
 
         __result = 0f;
         return false;
@@ -136,9 +146,9 @@ internal class ShipContactScopePatch
 {
     // Opens the contact scope of the callback's hull.
     [HarmonyPrefix]
-    private static void Prefix(MissionShip __instance, WeakGameEntity entity1, out MissionShip __state)
+    private static void Prefix(MissionShip __instance, WeakGameEntity entity1, out NavalShipDamageGate.Scope __state)
     {
-        __state = NavalShipDamageGate.EnterContact(__instance);
+        __state = ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate) ? gate.EnterContact(__instance) : default;
 #if DEBUG
         NavalContactProbe.CountContact(__instance, entity1);
 #endif
@@ -146,7 +156,7 @@ internal class ShipContactScopePatch
 
     // Closes the contact scope, also when vanilla throws.
     [HarmonyFinalizer]
-    private static void Finalizer(MissionShip __state) => NavalShipDamageGate.ExitContact(__state);
+    private static void Finalizer(NavalShipDamageGate.Scope __state) => __state.Dispose();
 }
 
 // The rammer queues the impact on the rammed hull and 0.2 of it on itself; only the rammer's owner keeps either.
@@ -156,7 +166,7 @@ internal class ShipContactCollisionQueuePatch
 {
     // Queues the impact only for an own rammer.
     [HarmonyPrefix]
-    private static bool Prefix() => NavalShipDamageGate.KeepsContactCollision();
+    private static bool Prefix() => !ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate) || gate.KeepsContactCollision();
 }
 
 // Every entry left in the queue came from this client's rammer, so its owner decides both hulls' damage.
@@ -166,11 +176,12 @@ internal class ShipQueuedCollisionScopePatch
 {
     // Opens the queued contact scope.
     [HarmonyPrefix]
-    private static void Prefix() => NavalShipDamageGate.EnterQueuedContact();
+    private static void Prefix(out NavalShipDamageGate.Scope __state) =>
+        __state = ContainerProvider.TryResolve<INavalShipDamageGate>(out var gate) ? gate.EnterQueuedContact() : default;
 
     // Closes the queued contact scope, also when vanilla throws.
     [HarmonyFinalizer]
-    private static void Finalizer() => NavalShipDamageGate.ExitQueuedContact();
+    private static void Finalizer(NavalShipDamageGate.Scope __state) => __state.Dispose();
 }
 
 // Vanilla's ram tick runs on every client: ShipCollisionDamagePatch drops a copy rammer's hit, deck parts break locally, and

@@ -60,6 +60,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalMissionTracker missionTracker;
     private readonly INavalForeignHullRegistry foreignHulls;
     private readonly INavalRopeRegistry ropes;
+    private readonly INavalShipDamageGate damageGate;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -85,7 +86,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalBallistaTargets ballistaTargets,
         INavalMissionTracker missionTracker,
         INavalForeignHullRegistry foreignHulls,
-        INavalRopeRegistry ropes
+        INavalRopeRegistry ropes,
+        INavalShipDamageGate damageGate
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -106,6 +108,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.missionTracker = missionTracker;
         this.foreignHulls = foreignHulls;
         this.ropes = ropes;
+        this.damageGate = damageGate;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
@@ -273,7 +276,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             );
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
-            ballistaTargets, missionTracker, foreignHulls, ropes));
+            ballistaTargets, missionTracker, foreignHulls, ropes, damageGate));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.HullLedger, tallyReader,
@@ -287,7 +290,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     {
         var controller = mission.GetMissionBehavior<CoopBattleController>();
         mission.AddMissionBehavior(new NavalScenarioMissionLogic(scenarioState, debugHulls, controller.Session,
-            controller.MissionComponent.ShipRegistry, messageBroker, mapEventId));
+            controller.MissionComponent.ShipRegistry, messageBroker, mapEventId, damageGate));
     }
 #endif
 

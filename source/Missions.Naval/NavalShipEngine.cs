@@ -41,10 +41,11 @@ public class NavalShipEngine : INavalShipEngine
     private readonly INavalForeignHullRegistry foreignHulls;
     private readonly INavalRopeRegistry ropeRegistry;
     private readonly ICoopShipSnapshotRegistry snapshots;
+    private readonly INavalShipDamageGate damageGate;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
         INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
-        ICoopShipSnapshotRegistry snapshots)
+        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
@@ -53,6 +54,7 @@ public class NavalShipEngine : INavalShipEngine
         this.foreignHulls = foreignHulls;
         this.ropeRegistry = ropeRegistry;
         this.snapshots = snapshots;
+        this.damageGate = damageGate;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -758,7 +760,7 @@ public class NavalShipEngine : INavalShipEngine
         if (!ship.GameEntity.IsValid || ship.IsDisabled) return;
 
         var point = ship.GlobalFrame.TransformToParent(damage.LocalPoint);
-        using (NavalShipDamageGate.RoutedApply())
+        using (damageGate.RoutedApply())
         {
             switch (damage.Kind)
             {
@@ -852,7 +854,7 @@ public class NavalShipEngine : INavalShipEngine
         if (condition == null || !ship.GameEntity.IsValid) return;
 
         bool isCopy = foreignHulls.Contains(ship);
-        using (NavalShipDamageGate.RoutedApply())
+        using (damageGate.RoutedApply())
         {
             if (ship.ShipOrigin is Ship origin)
             {

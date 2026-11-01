@@ -16,18 +16,20 @@ namespace Missions.Naval;
 public sealed class NavalInspectCoopCommand : ICoopCommand
 {
     private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalShipDamageGate damageGate;
 #if DEBUG
     private readonly INavalRamInspect ramInspect;
 #endif
 
-    /// <summary>Tells copies apart, and in DEBUG reads owner-side crew morale independently of the other inspect sections.</summary>
-    public NavalInspectCoopCommand(INavalForeignHullRegistry foreignHulls
+    /// <summary>Tells copies apart, reads the damage gate, and in DEBUG reads owner-side crew morale independently of the other inspect sections.</summary>
+    public NavalInspectCoopCommand(INavalForeignHullRegistry foreignHulls, INavalShipDamageGate damageGate
 #if DEBUG
         , INavalRamInspect ramInspect
 #endif
         )
     {
         this.foreignHulls = foreignHulls;
+        this.damageGate = damageGate;
 #if DEBUG
         this.ramInspect = ramInspect;
 #endif
@@ -70,7 +72,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipReplicator.Inspect(),
             shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipCaptureReplicator.Inspect(),
             shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipDamageRouter.Inspect(),
-            shipDamageGate = NavalShipDamageGate.Inspect(),
+            shipDamageGate = damageGate.Inspect(),
 #if DEBUG
             // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
             ramProbe = ramInspect.Inspect(mission, controller),
