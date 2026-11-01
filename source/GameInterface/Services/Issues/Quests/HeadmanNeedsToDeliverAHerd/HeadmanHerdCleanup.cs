@@ -6,6 +6,8 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using Behavior = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
@@ -14,6 +16,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
+    void RollbackGrant(IssueBase issue, Quest quest);
     void Forget(IssueBase issue);
     bool HasRememberedParty(IssueBase issue);
     bool ReturnAlternativeTroops(IssueBase issue);
@@ -26,13 +29,32 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 {
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
     private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
+    private readonly Dictionary<string, (int HerdCount, int GrainCount)> grantSnapshots = new();
 
     public void Remember(IssueBase issue, MobileParty party)
     {
         if (string.IsNullOrEmpty(issue.StringId)) return;
         parties[issue.StringId] = party;
+        if (issue.IssueQuest is Quest quest)
+        {
+            grantSnapshots[issue.StringId] = (
+                party.ItemRoster.GetItemNumber(quest._herdTypeToDeliver),
+                party.ItemRoster.GetItemNumber(DefaultItems.Grain));
+        }
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds[issue.IssueQuest.StringId] = issue.StringId;
+    }
+
+    public void RollbackGrant(IssueBase issue, Quest quest)
+    {
+        if (!string.IsNullOrEmpty(issue.StringId) && parties.TryGetValue(issue.StringId, out var party) &&
+            grantSnapshots.TryGetValue(issue.StringId, out var snapshot))
+        {
+            RemoveAdded(party.ItemRoster, quest._herdTypeToDeliver, snapshot.HerdCount);
+            RemoveAdded(party.ItemRoster, DefaultItems.Grain, snapshot.GrainCount);
+        }
+
+        Forget(issue);
     }
 
     public bool HasRememberedParty(IssueBase issue) => !string.IsNullOrEmpty(issue.StringId) && parties.ContainsKey(issue.StringId);
@@ -42,7 +64,10 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds.Remove(issue.IssueQuest.StringId);
         if (!string.IsNullOrEmpty(issue.StringId))
+        {
             parties.Remove(issue.StringId);
+            grantSnapshots.Remove(issue.StringId);
+        }
     }
 
     public bool ReturnAlternativeTroops(IssueBase issue)
@@ -68,7 +93,10 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds.Remove(issue.IssueQuest.StringId);
         if (!string.IsNullOrEmpty(issue.StringId))
+        {
             parties.Remove(issue.StringId);
+            grantSnapshots.Remove(issue.StringId);
+        }
     }
 
     public void RemoveRemaining(Quest quest)
@@ -91,12 +119,20 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         }
     }
 
+    private static void RemoveAdded(ItemRoster roster, ItemObject item, int before)
+    {
+        var current = roster.GetItemNumber(item);
+        var added = current - before;
+        if (added > 0) roster.AddToCounts(item, -added);
+    }
+
     public void SyncData(IDataStore dataStore)
     {
         dataStore.SyncData("coop_herd_cleanup_parties", ref parties);
         dataStore.SyncData("coop_herd_cleanup_quest_issue_ids", ref questIssueIds);
         if (parties == null || ModInformation.IsClient) parties = new Dictionary<string, MobileParty>();
         if (questIssueIds == null || ModInformation.IsClient) questIssueIds = new Dictionary<string, string>();
+        grantSnapshots.Clear();
     }
 }
 

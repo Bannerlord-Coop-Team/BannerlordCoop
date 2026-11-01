@@ -860,6 +860,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
             Assert.True(issue.IsOngoingWithoutQuest);
             Assert.Equal(0, Party(Server, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
+            Assert.Equal(0, Party(Server, QuestScenario.ControllerA).ItemRoster.GetItemNumber(DefaultItems.Grain));
         });
 
         Accept(ClientA);

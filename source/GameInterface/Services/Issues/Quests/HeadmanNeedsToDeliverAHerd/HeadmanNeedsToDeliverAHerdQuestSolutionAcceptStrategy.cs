@@ -38,8 +38,7 @@ internal class HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy : IQuestSol
                 // The grant can add livestock before native code reports a failure. Remove that
                 // partial grant while the quest is still linked to the issue, then discard the
                 // mapping so the coordinator can safely offer the issue again.
-                cleanup.RemoveRemaining(quest);
-                cleanup.Forget(issue);
+                cleanup.RollbackGrant(issue, quest);
                 throw;
             }
         }

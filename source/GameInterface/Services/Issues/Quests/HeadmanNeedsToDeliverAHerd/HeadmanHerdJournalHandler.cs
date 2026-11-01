@@ -125,8 +125,9 @@ internal class HeadmanHerdJournalHandler : IHandler
 
     private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
     {
-        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId ||
-            !pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _)) return;
+        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId) return;
+
+        pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _);
 
         GameThread.RunSafe(() =>
         {
