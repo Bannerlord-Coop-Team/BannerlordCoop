@@ -25,6 +25,8 @@ internal class HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy : IQuestSol
         if (ModInformation.IsClient || !(issue.IssueQuest is Quest quest)) return;
         if (!owners.TryResolveOwnerHero(issue, out var owner))
             throw new InvalidOperationException("The accepted herd has no owning player");
+        if (owner.PartyBelongedTo == null)
+            throw new InvalidOperationException("The accepted herd has no owning party");
 
         using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
         {

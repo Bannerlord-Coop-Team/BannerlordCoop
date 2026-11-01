@@ -39,6 +39,14 @@ internal class HeadmanHerdWorldEventPatches
     [HarmonyPrefix]
     private static bool HeroKilledPrefix() => ModInformation.IsServer;
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
+    [HarmonyPrefix]
+    private static bool WarDeclaredPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static bool ClanChangedKingdomPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
     private static bool MapEventStartedPrefix() => ModInformation.IsServer;

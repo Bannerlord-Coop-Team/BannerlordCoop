@@ -33,7 +33,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 
     public void Remember(IssueBase issue, MobileParty party)
     {
-        if (string.IsNullOrEmpty(issue.StringId)) return;
+        if (string.IsNullOrEmpty(issue.StringId) || party == null) return;
         parties[issue.StringId] = party;
         if (issue.IssueQuest is Quest quest)
         {
@@ -107,7 +107,10 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         if (issueId == null && !string.IsNullOrEmpty(quest.StringId))
             questIssueIds.TryGetValue(quest.StringId, out issueId);
 
-        if (parties.TryGetValue(issueId ?? string.Empty, out var party) && party != null)
+        if (!parties.TryGetValue(issueId ?? string.Empty, out var party) || party == null)
+            party = MobileParty.MainParty;
+
+        if (party != null)
         {
             var remaining = quest._animalCountToDeliver;
             foreach (var element in party.ItemRoster.ToArray())
