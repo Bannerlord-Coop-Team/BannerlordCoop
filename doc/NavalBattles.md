@@ -48,7 +48,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   last load. Own hulls run vanilla. One rule decides a copy's mode at
   every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
   simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` and the mission-end
-  reset are the only writers of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing
+  reset are the only writers of `INavalForeignHullRegistry`, the per-client copy set the patches resolve; spawning, releasing, replacing
   and removing a hull all go through `Track`/`Forget`. `Track` also leaves the hull without a controller, and
   `ForeignHullControllerPatch` (a prefix on `MissionShip.SetController`) turns every later controller write on a copy into
   none without auto update: vanilla hands a hull a controller at init, at deployment end, when it burns or sinks and in

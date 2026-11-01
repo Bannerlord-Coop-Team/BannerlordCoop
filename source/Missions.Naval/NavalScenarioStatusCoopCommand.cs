@@ -20,11 +20,14 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
 {
     private readonly INavalScenarioState state;
     private readonly IObjectManager objectManager;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
-    public NavalScenarioStatusCoopCommand(INavalScenarioState state, IObjectManager objectManager)
+    // Takes the scenario state, the object ids and the registry that tells this client's copies apart.
+    public NavalScenarioStatusCoopCommand(INavalScenarioState state, IObjectManager objectManager, INavalForeignHullRegistry foreignHulls)
     {
         this.state = state;
         this.objectManager = objectManager;
+        this.foreignHulls = foreignHulls;
     }
 
     public string Prefix => "coop.debug.naval";
@@ -100,7 +103,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
     }
 
     // The counters coop.debug.naval.inspect reports, for this client's copy of the scenario's battle.
-    private static object InspectBattle(NavalScenarioConfig config)
+    private object InspectBattle(NavalScenarioConfig config)
     {
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
@@ -131,7 +134,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 hasRam = (ship.Hull as MissionShip)?._ram != null,
             }).ToArray(),
             // How the copies exist here and how close every hull pair came, for the ramming preset above all.
-            copyModes = ships.Where(ship => ship.Hull is MissionShip hull && NavalForeignHulls.Contains(hull))
+            copyModes = ships.Where(ship => ship.Hull is MissionShip hull && foreignHulls.Contains(hull))
                 .Select(ship => NavalContactProbe.Short(ship.ShipId) + "=" + NavalSteeredCopies.ModeName((MissionShip)ship.Hull)).ToArray(),
             closestApproach = NavalContactProbe.InspectApproaches(),
             result = mission.MissionEnded ? CoopNavalBattleEndLogic.DescribeResult(mission.MissionResult) : "running",

@@ -15,12 +15,23 @@ namespace Missions.Naval;
 /// <summary>Reports the local coop naval battle: session, setup guard's reserve check and per-hull state.</summary>
 public sealed class NavalInspectCoopCommand : ICoopCommand
 {
+    private readonly INavalForeignHullRegistry foreignHulls;
 #if DEBUG
     private readonly INavalRamInspect ramInspect;
-
-    /// <summary>Reads owner-side crew morale independently of the other inspect sections.</summary>
-    public NavalInspectCoopCommand(INavalRamInspect ramInspect) => this.ramInspect = ramInspect;
 #endif
+
+    /// <summary>Tells copies apart, and in DEBUG reads owner-side crew morale independently of the other inspect sections.</summary>
+    public NavalInspectCoopCommand(INavalForeignHullRegistry foreignHulls
+#if DEBUG
+        , INavalRamInspect ramInspect
+#endif
+        )
+    {
+        this.foreignHulls = foreignHulls;
+#if DEBUG
+        this.ramInspect = ramInspect;
+#endif
+    }
 
     public string Prefix => "coop.debug.naval";
 
@@ -88,7 +99,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 captureTimer = ship.ShipControllerMachine?.CaptureTimer,
                 controller = ship.Controller?.ControllerType.ToString() ?? "None",
                 activeBody = ship.GameEntity.IsValid ? (bool?)ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() : null,
-                foreign = NavalForeignHulls.Contains(ship),
+                foreign = foreignHulls.Contains(ship),
                 hitPoints = ship.HitPoints,
                 maxHitPoints = ship.ShipOrigin.MaxHitPoints,
 #if DEBUG

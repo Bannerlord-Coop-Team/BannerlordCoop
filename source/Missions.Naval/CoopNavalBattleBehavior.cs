@@ -29,13 +29,15 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalLateHullDeployment lateHullDeployment;
     private readonly INavalBallistaTargets ballistaTargets;
     private readonly INavalMissionTracker missionTracker;
+    private readonly INavalForeignHullRegistry foreignHulls;
     private int lastAgentCount = -1;
     private bool retreated;
 
     // Takes one failure log per tick kind, so a flood on one of them can't hide the first lines of the other.
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
-        INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker)
+        INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker,
+        INavalForeignHullRegistry foreignHulls)
     {
         Services = services;
         this.steeredCopies = steeredCopies;
@@ -46,6 +48,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.lateHullDeployment = lateHullDeployment;
         this.ballistaTargets = ballistaTargets;
         this.missionTracker = missionTracker;
+        this.foreignHulls = foreignHulls;
         shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
@@ -122,10 +125,10 @@ public class CoopNavalBattleBehavior : MissionLogic
         base.OnAfterDeploymentFinished();
         var hulls = shipsLogic.AllShips.Select(ship =>
             $"{ship.Index}:{ship.Team?.TeamSide}/{ship.Formation?.FormationIndex}" +
-            $"{(NavalForeignHulls.Contains(ship) ? ":copy" : "")}:{ship.Controller?.ControllerType}" +
+            $"{(foreignHulls.Contains(ship) ? ":copy" : "")}:{ship.Controller?.ControllerType}" +
             $"{(ship.IsRemoved || !ship.GameEntity.IsValid ? ":removed" : "")}");
         Logger.Information("[NavalSync] Deployment finished with {Count} hull(s) [{Hulls}], {Copies} copy(ies), {Agents} agent(s)",
-            shipsLogic.AllShips.Count, string.Join(", ", hulls), NavalForeignHulls.All.Count(), Mission.Agents.Count);
+            shipsLogic.AllShips.Count, string.Join(", ", hulls), foreignHulls.All.Count(), Mission.Agents.Count);
     }
 
     // Vanilla's Tab and Retreat runs OnRetreatMission on every logic before it ends the mission and removes the hulls.
@@ -155,7 +158,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     // replace, retreat).
     private void OnShipRemoved(MissionShip ship)
     {
-        bool wasCopy = NavalForeignHulls.Contains(ship);
+        bool wasCopy = foreignHulls.Contains(ship);
         steeredCopies.Forget(ship);
         NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship);
         ballistaTargets.ForgetHull(shipsLogic.AllShips, ship);
@@ -200,7 +203,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         }
     }
 
-    // Disposes the services and resets the naval statics. A throwing service is logged, so the resets, the later behaviours
+    // Disposes the services and resets the per-client naval state. A throwing service is logged, so the resets, the later behaviours
     // and vanilla's own mission end still run.
     public override void OnEndMissionInternal()
     {
@@ -215,7 +218,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "[NavalSync] Disposing the naval services threw; the naval statics are reset anyway");
+            Logger.Error(exception, "[NavalSync] Disposing the naval services threw; the naval state is reset anyway");
         }
 
         NpcFleetSpawner.Dispose();
@@ -226,8 +229,8 @@ public class CoopNavalBattleBehavior : MissionLogic
         NavalContactProbe.Clear();
         NavalImmortalCoopCommand.ClearArmed();
 #endif
-        // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
-        NavalForeignHulls.Clear();
+        // The registry outlives the mission, so a copy the engine never forgot is dropped here.
+        foreignHulls.Clear();
         NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();

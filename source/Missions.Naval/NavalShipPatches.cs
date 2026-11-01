@@ -44,7 +44,7 @@ internal class ForeignShipOrderTickPatch
 {
     // Skips the ship order's tick on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // ShipRetreatLogic removes a hull whose order is Retreat once it reaches the map edge; only the owner may retreat its hull.
@@ -54,7 +54,7 @@ internal class ForeignShipRetreatOrderPatch
 {
     // Refuses a retreat order on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // Detachments move crew onto machines; on a foreign copy that is the owner's decision.
@@ -64,7 +64,7 @@ internal class ForeignShipDetachmentsPatch
 {
     // Skips the detachment management on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // A copy has no controller: its owner steers it. Vanilla hands a hull one, with auto update re-armed, at init, at deployment end,
@@ -77,7 +77,7 @@ internal class ForeignHullControllerPatch
     [HarmonyPrefix]
     private static void Prefix(MissionShip __instance, ref ShipControllerType controllerType, ref bool autoUpdateController)
     {
-        if (!NavalForeignHulls.Contains(__instance)) return;
+        if (!NavalForeignHullRegistry.IsCopyHere(__instance)) return;
 
         controllerType = ShipControllerType.None;
         autoUpdateController = false;
@@ -95,8 +95,8 @@ internal class CopyPairCollisionFilterPatch
     private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
     {
         // The root scan only runs for a copy, since an own hull touches anything.
-        bool mineIsCopy = NavalForeignHulls.Contains(__instance);
-        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
+        bool mineIsCopy = NavalForeignHullRegistry.IsCopyHere(__instance);
+        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHullRegistry.ContainsRootOfHere(otherEntity))) return true;
 
 #if DEBUG
         NavalContactProbe.CountFilteredCopyPair();
@@ -123,7 +123,7 @@ internal class CopyCrewLoadPatch
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
-        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy)) return true;
+        if (!NavalForeignHullRegistry.TryGetCopyHere(__instance, out var copy)) return true;
 
         // One read of the volatile load, which the game thread replaces with each sample.
         var ownerLoad = copy.CrewLoad;
@@ -261,7 +261,7 @@ internal class ForeignHelmUsePatch
         var hull = HelmHullOf(targetObject);
         if (hull == null) return true;
 
-        return AllowsStart(NavalForeignHulls.Contains(hull), IsEnemyHull(hull, __instance));
+        return AllowsStart(NavalForeignHullRegistry.IsCopyHere(hull), IsEnemyHull(hull, __instance));
     }
 
     /// <summary>

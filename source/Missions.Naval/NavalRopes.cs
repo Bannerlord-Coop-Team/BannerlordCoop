@@ -103,7 +103,7 @@ internal static class NavalRopes
         machine != null && records.TryGetValue(machine, out var record) ? record : null;
 
     /// <summary>Whether the station sits on another owner's copy here.</summary>
-    internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
+    internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHullRegistry.IsCopyHere(machine.OwnerShip);
 
     /// <summary>Whether the rope is a replica of another owner's rope.</summary>
     internal static bool IsReplica(Attachment attachment) => IsReplicaMachine(attachment?.AttachmentSource);
@@ -543,7 +543,7 @@ internal static class NavalRopes
     internal static bool AllowOwnerDecision(Attachment attachment) => !IsReplica(attachment);
 
     // Retargeting a copy's ropes is its owner's decision.
-    internal static bool AllowConnectionRetarget(MissionShip hull) => !NavalForeignHulls.Contains(hull);
+    internal static bool AllowConnectionRetarget(MissionShip hull) => !NavalForeignHullRegistry.IsCopyHere(hull);
 
     // The owner's plank flight clock arrives with each sample; a replica never runs its own completion clock.
     internal static bool TickPlankFlight(Attachment attachment)
@@ -616,7 +616,7 @@ internal static class NavalRopes
         hulls = hulls.Select(hull => new
         {
             shipId = shipIdOf(hull),
-            role = NavalForeignHulls.Contains(hull) ? "copy" : "owner",
+            role = NavalForeignHullRegistry.IsCopyHere(hull) ? "copy" : "owner",
             sources = hull.AttachmentMachines.Select(source => InspectSource(hull, source, shipIdOf))
                 .Where(source => source != null).ToArray(),
         }).ToArray(),

@@ -1,6 +1,8 @@
 ﻿#if COOP_NAVAL
 using Autofac;
 using Missions.Naval;
+using NavalDLC.Missions.NavalPhysics;
+using NavalDLC.Missions.Objects;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -9,6 +11,7 @@ namespace Coop.Tests.Missions.Battles;
 /// PR #4191 M1: the naval mission state patches read belongs to one client container, so E2E clients sharing a process
 /// and a later mission dont see another client's values.
 /// </summary>
+[Collection("Mission.Current")]
 public class NavalClientStateScopeTests
 {
     // Each client container gets its own tracker, and a mission child scope shares its client's.
@@ -44,6 +47,49 @@ public class NavalClientStateScopeTests
         finally
         {
             global::GameInterface.ContainerProvider.Clear();
+        }
+    }
+
+    // Each client container keeps its own copy set, so one client's copies stay unknown to another.
+    [Fact]
+    public void ForeignHullRegistry_IsOnePerClientContainer()
+    {
+        using var first = BuildClient();
+        using var second = BuildClient();
+        var copy = ShipTestHulls.Uninitialized<MissionShip>();
+        copy._physics = ShipTestHulls.Uninitialized<NavalPhysics>();
+
+        first.Resolve<INavalForeignHullRegistry>().Add(copy, null);
+
+        Assert.False(second.Resolve<INavalForeignHullRegistry>().Contains(copy));
+        Assert.Same(first.Resolve<INavalForeignHullRegistry>(), first.BeginLifetimeScope().Resolve<INavalForeignHullRegistry>());
+    }
+
+    // A patch filters a joint force only on a hull that is a copy in the active client container.
+    [Fact]
+    public void Patch_ReadsTheActiveClientsCopies()
+    {
+        using var owner = BuildClient();
+        using var copier = BuildClient();
+        var physics = ShipTestHulls.Uninitialized<NavalPhysics>();
+        var hull = ShipTestHulls.Uninitialized<MissionShip>();
+        hull._physics = physics;
+        owner.Resolve<INavalMissionTracker>().IsActive = true;
+        copier.Resolve<INavalMissionTracker>().IsActive = true;
+        copier.Resolve<INavalForeignHullRegistry>().Add(hull, null);
+
+        try
+        {
+            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(owner))
+                Assert.True(RopeForcePatch.AllowForce(physics, 0));
+
+            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(copier))
+                Assert.False(RopeForcePatch.AllowForce(physics, 0));
+        }
+        finally
+        {
+            global::GameInterface.ContainerProvider.Clear();
+            NavalRopes.Clear();
         }
     }
 

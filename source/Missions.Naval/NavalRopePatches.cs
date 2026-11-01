@@ -201,7 +201,7 @@ internal class RopeForcePatch
     {
         if (!NavalMissionTracker.IsActiveHere()) return true;
 
-        bool copy = NavalForeignHulls.TryGetCopy(physics, out _);
+        bool copy = NavalForeignHullRegistry.TryGetCopyHere(physics, out _);
         Interlocked.Increment(ref (copy ? foreignForceFiltered : ownForceWrites)[kind]);
         return !copy;
     }

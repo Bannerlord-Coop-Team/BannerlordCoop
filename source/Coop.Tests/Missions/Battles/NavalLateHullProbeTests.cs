@@ -23,7 +23,7 @@ public class NavalLateHullProbeTests
         var id = Guid.NewGuid();
         var hulls = new Mock<INavalDebugHulls>(MockBehavior.Strict);
         hulls.Setup(value => value.ShipIdOf(hull)).Returns(id);
-        var probe = new NavalLateHullProbe(hulls.Object);
+        var probe = new NavalLateHullProbe(hulls.Object, new NavalForeignHullRegistry());
 
         Assert.Equal(id, Assert.Single(probe.TargetHullIds(new ITargetable[] { first, second })));
         Assert.Equal(id, probe.TargetHullId(first));
@@ -33,7 +33,7 @@ public class NavalLateHullProbeTests
     [Fact]
     public void TargetHullIds_DistinguishesUninitializedAndEmptyCaches()
     {
-        var probe = new NavalLateHullProbe(Mock.Of<INavalDebugHulls>());
+        var probe = new NavalLateHullProbe(Mock.Of<INavalDebugHulls>(), new NavalForeignHullRegistry());
 
         Assert.Null(probe.TargetHullIds(null!));
         Assert.Empty(probe.TargetHullIds(Array.Empty<ITargetable>()));

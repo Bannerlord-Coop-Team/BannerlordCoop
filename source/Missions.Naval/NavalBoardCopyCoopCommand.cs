@@ -23,11 +23,13 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
     internal const string Usage = "Usage: coop.debug.naval.board_copy [shipId-prefix | status]";
 
     private readonly INavalShipEngine engine;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
-    // The engine finds the hull the main agent stands on.
-    public NavalBoardCopyCoopCommand(INavalShipEngine engine)
+    // The engine finds the hull the main agent stands on; the registry tells the copies apart.
+    public NavalBoardCopyCoopCommand(INavalShipEngine engine, INavalForeignHullRegistry foreignHulls)
     {
         this.engine = engine;
+        this.foreignHulls = foreignHulls;
     }
 
     public string Prefix => "coop.debug.naval";
@@ -70,12 +72,12 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
     }
 
     // The copy named by the id prefix, or the afloat registered copy nearest to position; why there is none, or null.
-    private static string TryResolveCopy(INetworkShipRegistry registry, string prefix, Vec3 position, out MissionShip hull,
+    private string TryResolveCopy(INetworkShipRegistry registry, string prefix, Vec3 position, out MissionShip hull,
         out NetworkShipInfo ship)
     {
         hull = null;
         ship = null;
-        var copies = registry.Ships.Where(info => info.Hull is MissionShip copy && NavalForeignHulls.Contains(copy)
+        var copies = registry.Ships.Where(info => info.Hull is MissionShip copy && foreignHulls.Contains(copy)
             && !copy.IsRemoved && !copy.IsSinking).ToArray();
         if (copies.Length == 0) return "This client has no afloat copy of another owner's hull.";
 
@@ -138,7 +140,7 @@ public sealed class NavalBoardCopyCoopCommand : ICoopCommand
         var local = support.GlobalFrame.TransformToLocalNonOrthogonal(main.Position);
         return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
             "NAVAL_BOARD_STATUS supportShip={0} owner={1} copy={2} local=({3:0.00}, {4:0.00}, {5:0.00})",
-            ship.ShipId, ship.CurrentAuthority, NavalForeignHulls.Contains(support), local.x, local.y, local.z));
+            ship.ShipId, ship.CurrentAuthority, foreignHulls.Contains(support), local.x, local.y, local.z));
     }
 
     // A failed command result with output.

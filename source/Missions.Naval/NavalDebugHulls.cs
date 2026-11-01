@@ -32,6 +32,14 @@ public interface INavalDebugHulls
 /// <inheritdoc cref="INavalDebugHulls"/>
 public class NavalDebugHulls : INavalDebugHulls
 {
+    private readonly INavalForeignHullRegistry foreignHulls;
+
+    // Takes the registry that tells this client's copies from its own hulls.
+    public NavalDebugHulls(INavalForeignHullRegistry foreignHulls)
+    {
+        this.foreignHulls = foreignHulls;
+    }
+
     private static CoopBattleController Controller => Mission.Current?.GetMissionBehavior<CoopBattleController>();
 
     public string TryGetOwnHull(out MissionShip hull)
@@ -44,7 +52,7 @@ public class NavalDebugHulls : INavalDebugHulls
         var own = controller.MissionComponent.ShipRegistry.Ships
             .Where(ship => ship.CurrentAuthority == controller.Session.OwnControllerId)
             .Select(ship => ship.Hull as MissionShip)
-            .Where(ship => ship != null && !NavalForeignHulls.Contains(ship))
+            .Where(ship => ship != null && !foreignHulls.Contains(ship))
             .ToArray();
         if (own.Length == 0) return "This client owns no registered hull.";
 
@@ -52,7 +60,7 @@ public class NavalDebugHulls : INavalDebugHulls
         return hull == null ? "This client owns several hulls and none is its player ship." : null;
     }
 
-    public MissionShip NearestForeignHull(MissionShip own) => NavalForeignHulls.All
+    public MissionShip NearestForeignHull(MissionShip own) => foreignHulls.All
         .Where(ship => ShipIdOf(ship) != Guid.Empty)
         .OrderBy(ship => ship.GlobalFrame.origin.DistanceSquared(own.GlobalFrame.origin))
         .FirstOrDefault();

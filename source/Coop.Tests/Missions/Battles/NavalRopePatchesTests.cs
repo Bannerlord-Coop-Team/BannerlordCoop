@@ -122,7 +122,7 @@ public class NavalRopePatchesTests
         try
         {
             naval.MissionTracker.IsActive = true;
-            NavalForeignHulls.Add(copy, null);
+            naval.Resolve<INavalForeignHullRegistry>().Add(copy, null);
 
             Assert.False(RopeForcePatch.AllowForce(copyPhysics, 1));
             Assert.True(RopeForcePatch.AllowForce(ShipTestHulls.Uninitialized<NavalPhysics>(), 0));
@@ -131,7 +131,6 @@ public class NavalRopePatchesTests
         }
         finally
         {
-            NavalForeignHulls.Remove(copy);
             NavalRopes.Clear();
         }
     }

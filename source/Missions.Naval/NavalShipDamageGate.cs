@@ -100,7 +100,7 @@ internal static class NavalShipDamageGate
     /// </summary>
     internal static bool AllowsCollision(MissionShip ship, MissionShip hitter, bool isRamDamage, Vec3 point, float damage)
     {
-        var origin = BattleShipDamageRoutes.CollisionOrigin(queuedContactDepth > 0, hitter == null || !NavalForeignHulls.Contains(hitter));
+        var origin = BattleShipDamageRoutes.CollisionOrigin(queuedContactDepth > 0, hitter == null || !NavalForeignHullRegistry.IsCopyHere(hitter));
         if (Allows(ship, origin, BattleShipDamageKind.Collision, damage, 0f, point, null, hitter, isRamDamage, -1)) return true;
 
         if (isRamDamage) ship._moraleInteractionLogic?.OnShipRammed(hitter, ship);
@@ -126,7 +126,7 @@ internal static class NavalShipDamageGate
     {
         var rammer = contactShip;
         if (!NavalMissionTracker.IsActiveHere() || rammer == null) return true;
-        if (!NavalForeignHulls.Contains(rammer)) return true;
+        if (!NavalForeignHullRegistry.IsCopyHere(rammer)) return true;
 
         Interlocked.Increment(ref droppedContactCollisions);
         return false;
@@ -138,7 +138,7 @@ internal static class NavalShipDamageGate
     {
         if (!NavalMissionTracker.IsActiveHere()) return true;
 
-        var route = BattleShipDamageRoutes.Route(!NavalForeignHulls.Contains(ship), routedApplyDepth > 0, origin);
+        var route = BattleShipDamageRoutes.Route(!NavalForeignHullRegistry.IsCopyHere(ship), routedApplyDepth > 0, origin);
 #if DEBUG
         if (kind == BattleShipDamageKind.Collision) NavalContactProbe.CountCollisionRoute(route, isRamDamage);
 #endif

@@ -38,14 +38,16 @@ public class NavalShipEngine : INavalShipEngine
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
     private readonly INavalCopyWeaponStates copyWeaponStates;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
-        INavalCopyWeaponStates copyWeaponStates)
+        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         SteeredCopies = steeredCopies;
         this.copyWeaponStates = copyWeaponStates;
+        this.foreignHulls = foreignHulls;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -788,7 +790,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || foreignHulls.Contains(ship)) return 0;
 
         int active = agentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
         return Math.Max(0, agentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
@@ -800,7 +802,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || foreignHulls.Contains(ship)) return 0;
 
         // A taken-over hull never had its crew target set; vanilla's unbalanced AutoComputeDesiredTroopCountsPerShip uses the capacity.
         agentsLogic.SetDesiredTroopCountOfShip(ship, ship.TotalCrewCapacity);
@@ -844,7 +846,7 @@ public class NavalShipEngine : INavalShipEngine
         var ship = (MissionShip)hull;
         if (condition == null || !ship.GameEntity.IsValid) return;
 
-        bool isCopy = NavalForeignHulls.Contains(ship);
+        bool isCopy = foreignHulls.Contains(ship);
         using (NavalShipDamageGate.RoutedApply())
         {
             if (ship.ShipOrigin is Ship origin)
