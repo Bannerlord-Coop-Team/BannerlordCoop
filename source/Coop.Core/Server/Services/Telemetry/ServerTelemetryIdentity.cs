@@ -100,7 +100,23 @@ public sealed class ServerTelemetryIdentity : IServerTelemetryIdentity
         if (!Guid.TryParseExact(created, "N", out _))
             throw new InvalidDataException("The generated telemetry identity is not a GUID.");
 
-        File.WriteAllText(path, created + Environment.NewLine);
+        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporaryPath, created + Environment.NewLine);
+            try
+            {
+                File.Replace(temporaryPath, path, null);
+            }
+            catch (FileNotFoundException)
+            {
+                File.Move(temporaryPath, path);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
         return created;
     }
 

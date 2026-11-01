@@ -69,6 +69,6 @@ See [Steam bans](SteamBans.md) for the file format and which ids are loaded.
 - An empty variable counts as unset. Leave a variable unset rather than setting it to spaces.
 - On Windows, set them as User variables of the account that runs the server, or as System variables. On Linux the names are case-sensitive.
 - The server uses the values it was started with. Restart it after a change. When you host from the game, fully exit the game and Steam, then start them again.
-- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` for `COOP_DATA_DIR`, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, nobody is banned, or returning players go to character creation.
+- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` for `COOP_DATA_DIR`, `telemetry-server-id-<port>.txt` for each server, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, gets a new public presence identity, nobody is banned, or returning players go to character creation.
 - The server creates the folders for `mod-config.json` and the session `.json` when they are missing, and needs write access to them.
 - In a container, point the variables at a mounted volume. Files in the container's own filesystem are lost when it is recreated.

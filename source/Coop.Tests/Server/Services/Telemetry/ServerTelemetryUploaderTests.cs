@@ -1,5 +1,6 @@
 ﻿using Coop.Core.Server.Services.Telemetry;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -75,6 +76,32 @@ public class ServerTelemetryUploaderTests
     }
 
     [Fact]
+    public async Task UploadAsync_FallsBackToLegacyRpcOnNotFoundWithoutServerId()
+    {
+        var handler = new RecordingHttpHandler(HttpStatusCode.NotFound, HttpStatusCode.OK);
+        using var httpClient = new HttpClient(handler);
+        using var uploader = new ServerTelemetryUploader(httpClient);
+        var status = new ServerTelemetryStatus(
+            "stable-server",
+            "session",
+            "0.1.4",
+            "abc123",
+            new DateTime(2026, 8, 29, 22, 15, 0, DateTimeKind.Utc),
+            5);
+
+        var result = await uploader.UploadAsync(status, CancellationToken.None);
+
+        Assert.True(result.Uploaded);
+        Assert.Equal(HttpStatusCode.OK, result.StatusCode);
+        Assert.Equal(2, handler.RequestCount);
+        Assert.Equal(ServerTelemetryUploader.Endpoint, handler.RequestUris[0]?.ToString());
+        Assert.Equal(ServerTelemetryUploader.LegacyEndpoint, handler.RequestUris[1]?.ToString());
+        using var json = JsonDocument.Parse(handler.Bodies[1]);
+        Assert.False(json.RootElement.TryGetProperty("p_server_id", out _));
+        Assert.Equal("session", json.RootElement.GetProperty("p_session_id").GetString());
+    }
+
+    [Fact]
     public async Task DefaultConfigurationUsesPublicRpcEndpoints()
     {
         var handler = new RecordingHttpHandler();
@@ -107,6 +134,8 @@ public class ServerTelemetryUploaderTests
 
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
+        private readonly Queue<HttpStatusCode> responseStatuses;
+
         public int RequestCount { get; private set; }
         public HttpMethod? Method { get; private set; }
         public Uri? RequestUri { get; private set; }
@@ -114,6 +143,13 @@ public class ServerTelemetryUploaderTests
         public string? Authorization { get; private set; }
         public string? ApiKey { get; private set; }
         public string? Body { get; private set; }
+        public List<Uri?> RequestUris { get; } = new List<Uri?>();
+        public List<string> Bodies { get; } = new List<string>();
+
+        public RecordingHttpHandler(params HttpStatusCode[] responseStatuses)
+        {
+            this.responseStatuses = new Queue<HttpStatusCode>(responseStatuses);
+        }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -130,8 +166,13 @@ public class ServerTelemetryUploaderTests
             Body = request.Content == null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync();
+            RequestUris.Add(RequestUri);
+            Bodies.Add(Body);
 
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            var statusCode = responseStatuses.Count == 0
+                ? HttpStatusCode.OK
+                : responseStatuses.Dequeue();
+            return new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent("accepted"),
             };
