@@ -348,6 +348,48 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         });
     }
 
+    [Fact]
+    public void DeliveryProofRejectsAnOwnerWhoLeftTheQuestSettlement()
+    {
+        using var tracking = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.PlayerTransferredTroopsToGarrisonCommander)));
+        var wrongSettlementId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var wrongTownId = testEnvironment.CreateRegisteredObject<Town>();
+
+        testEnvironment.Server.Call(() =>
+        {
+            var party = Get<MobileParty>(testEnvironment.Server, scenario.OwnerPartyId);
+            var targetSettlement = Get<Settlement>(testEnvironment.Server, settlementId);
+            var wrongSettlement = Get<Settlement>(testEnvironment.Server, wrongSettlementId);
+            var wrongTown = Get<Town>(testEnvironment.Server, wrongTownId);
+            var troop = Get<CharacterObject>(testEnvironment.Server, troopId);
+
+            wrongSettlement.SetSettlementComponent(wrongTown);
+            party.CurrentSettlement = wrongSettlement;
+            party.MemberRoster.AddToCounts(troop, 5);
+
+            var quest = Uninitialized<Quest>();
+            quest._questState = QuestBase.QuestStates.Ongoing;
+            quest._settlement = targetSettlement;
+            quest._requestedTroopType = troop;
+            quest._requestedTroopAmount = 5;
+            quest.QuestGiver = Hero.MainHero;
+            quest.QuestDueTime = CampaignTime.DaysFromNow(1f);
+
+            var previousMainParty = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = party;
+            try
+            {
+                Assert.True(Descriptor(testEnvironment.Server).FinalizationProofStrategy.TryRunBranch(
+                    quest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
+                Assert.Equal(0, tracking.CountFor(testEnvironment.Server));
+            }
+            finally
+            {
+                Campaign.Current.MainParty = previousMainParty;
+            }
+        });
+    }
+
     private static IQuestTypeDescriptor Descriptor(EnvironmentInstance instance)
     {
         IQuestTypeDescriptor descriptor = null!;
