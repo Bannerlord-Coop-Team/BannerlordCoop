@@ -107,6 +107,32 @@ public class NavalClientStateScopeTests
         Assert.Null(second.Resolve<INavalRopeRegistry>().RecordOf(station));
     }
 
+    // A ship snapshot belongs to the client that built it, so another client's campaign gates treat that ship as a campaign ship.
+    [Fact]
+    public void SnapshotPatch_ReadsTheActiveClientsSnapshots()
+    {
+        using var builder = BuildClient();
+        using var other = BuildClient();
+        var ship = ShipTestHulls.Uninitialized<TaleWorlds.CampaignSystem.Naval.Ship>();
+        builder.Resolve<ICoopShipSnapshotRegistry>().Add(ship, "Ship_3");
+
+        try
+        {
+            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(other))
+                Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
+
+            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(builder))
+                Assert.False(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
+        }
+        finally
+        {
+            global::GameInterface.ContainerProvider.Clear();
+        }
+
+        Assert.Equal(30f, builder.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));
+        Assert.Equal(0f, other.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));
+    }
+
     // A client container with the naval registrations.
     private static IContainer BuildClient()
     {

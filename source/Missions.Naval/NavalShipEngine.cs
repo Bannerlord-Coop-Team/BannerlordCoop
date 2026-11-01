@@ -40,9 +40,11 @@ public class NavalShipEngine : INavalShipEngine
     private readonly INavalCopyWeaponStates copyWeaponStates;
     private readonly INavalForeignHullRegistry foreignHulls;
     private readonly INavalRopeRegistry ropeRegistry;
+    private readonly ICoopShipSnapshotRegistry snapshots;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
-        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry)
+        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
+        ICoopShipSnapshotRegistry snapshots)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
@@ -50,6 +52,7 @@ public class NavalShipEngine : INavalShipEngine
         this.copyWeaponStates = copyWeaponStates;
         this.foreignHulls = foreignHulls;
         this.ropeRegistry = ropeRegistry;
+        this.snapshots = snapshots;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -826,9 +829,9 @@ public class NavalShipEngine : INavalShipEngine
         return added;
     }
 
-    public string CampaignShipIdOf(MissionObject hull) => CoopShipSnapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
+    public string CampaignShipIdOf(MissionObject hull) => snapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
-    public float ReadMitigatedDamage(MissionObject hull) => CoopShipSnapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
+    public float ReadMitigatedDamage(MissionObject hull) => snapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
 
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
     public void WithdrawAgent(Agent agent)

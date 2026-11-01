@@ -21,7 +21,8 @@ public class CoopShipSnapshotPatchesTests
     [Fact]
     public void DamageXp_SumsASnapshotsMitigatedDamage_AndLetsACampaignShipThrough()
     {
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
+        using var naval = new NavalClientContainer();
+        var snapshot = Snapshot(naval);
         var ship = CreateOwnedShip();
 
         Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 100f, finalDamage: 70f));
@@ -29,14 +30,16 @@ public class CoopShipSnapshotPatchesTests
         Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 20f, finalDamage: 15f));
         Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
 
-        Assert.Equal(35f, CoopShipSnapshots.MitigatedDamageOf(snapshot));
-        Assert.Equal(0f, CoopShipSnapshots.MitigatedDamageOf(ship));
+        var snapshots = naval.Resolve<ICoopShipSnapshotRegistry>();
+        Assert.Equal(35f, snapshots.MitigatedDamageOf(snapshot));
+        Assert.Equal(0f, snapshots.MitigatedDamageOf(ship));
     }
 
     [Fact]
     public void SnapshotHitPointWrites_RunTheDefaultPrioritySyncPrefixInsideTheScope()
     {
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
+        using var naval = new NavalClientContainer();
+        var snapshot = Snapshot(naval);
 
         var recorded = RecordSyncPrefixScope(() =>
         {
@@ -68,7 +71,8 @@ public class CoopShipSnapshotPatchesTests
     [Fact]
     public void SnapshotHitPointWriteThatThrows_StillClosesTheScope()
     {
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(CreateOwnedShip());
+        using var naval = new NavalClientContainer();
+        var snapshot = Snapshot(naval);
 
         RecordSyncPrefixScope(() =>
         {
@@ -78,6 +82,10 @@ public class CoopShipSnapshotPatchesTests
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
     }
+
+    // A snapshot built into the registry of the client container the patches resolve from.
+    private static Ship Snapshot(NavalClientContainer naval) =>
+        new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), naval.Resolve<ICoopShipSnapshotRegistry>()).Build(CreateOwnedShip());
 
     // The probe stands in for the generated AutoSync setter prefix, which declares no priority. It is patched before
     // the scope patch, so only the priority can put the scope first.
