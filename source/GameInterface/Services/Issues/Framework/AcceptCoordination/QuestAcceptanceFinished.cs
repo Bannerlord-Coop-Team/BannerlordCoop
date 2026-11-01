@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
@@ -20,6 +21,18 @@ public readonly struct QuestSolutionAcceptedOnServer : IEvent
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
+        ControllerId = controllerId;
+    }
+}
+
+public readonly struct QuestSolutionAcceptedOnClient : IEvent
+{
+    public readonly IssueBase Issue;
+    public readonly string ControllerId;
+
+    public QuestSolutionAcceptedOnClient(IssueBase issue, string controllerId)
+    {
+        Issue = issue;
         ControllerId = controllerId;
     }
 }

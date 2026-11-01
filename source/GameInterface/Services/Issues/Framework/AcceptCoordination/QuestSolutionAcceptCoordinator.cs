@@ -346,6 +346,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
             if (data.HasQuestDueTime && issue.IssueQuest != null)
                 issue.IssueQuest.ChangeQuestDueTime(new CampaignTime(data.QuestDueTimeTicks));
+
+            messageBroker.Publish(this, new QuestSolutionAcceptedOnClient(issue, data.ControllerId));
         }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 

@@ -69,29 +69,25 @@ internal class HeadmanHerdJournalHandler : IHandler
         this.conversationGuard = conversationGuard;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Subscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
+        broker.Subscribe<QuestSolutionAcceptedOnClient>(HandleAccepted);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<HeadmanHerdLogAdded>(Send);
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Unsubscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
+        broker.Unsubscribe<QuestSolutionAcceptedOnClient>(HandleAccepted);
     }
 
-    private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
+    private void HandleAccepted(MessagePayload<QuestSolutionAcceptedOnClient> payload)
     {
-        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId) return;
+        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId ||
+            payload.What.Issue.IssueQuest is not Quest quest) return;
 
-        GameThread.RunSafe(() =>
-        {
-            if (!issues.TryResolve(payload.What.IssueOwnerId, payload.What.IssueId, out _, out var issue, out _) ||
-                issue.IssueQuest is not Quest quest) return;
-            var text = new TextObject("{=GgBtpOEm}{.%}{ANIMAL_COUNT} {?ANIMAL_COUNT > 1}{PLURAL(ANIMAL_TYPE)}{?}{ANIMAL_TYPE}{\\?}{.%} added to your party.");
-            text.SetTextVariable("ANIMAL_COUNT", quest._animalCountToDeliver);
-            text.SetTextVariable("ANIMAL_TYPE", quest._herdTypeToDeliver.Name);
-            MBInformationManager.AddQuickInformation(text);
-        }, context: nameof(HeadmanHerdJournalHandler));
+        var text = new TextObject("{=GgBtpOEm}{.%}{ANIMAL_COUNT} {?ANIMAL_COUNT > 1}{PLURAL(ANIMAL_TYPE)}{?}{ANIMAL_TYPE}{\\?}{.%} added to your party.");
+        text.SetTextVariable("ANIMAL_COUNT", quest._animalCountToDeliver);
+        text.SetTextVariable("ANIMAL_TYPE", quest._herdTypeToDeliver.Name);
+        MBInformationManager.AddQuickInformation(text);
     }
 
     private void Send(MessagePayload<HeadmanHerdLogAdded> payload)
