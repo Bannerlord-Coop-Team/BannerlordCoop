@@ -276,10 +276,14 @@ public class NavigationCacheDeserializePatchTests
             {
                 Assert.Equal(bytes, first.ReadBytes(bytes.Length));
                 Assert.Equal(bytes, second.ReadBytes(bytes.Length));
-                Assert.Throws<IOException>(() =>
+                // Unix only emulates FileShare with advisory locks, so a sharing writer isn't refused there
+                if (OperatingSystem.IsWindows())
                 {
-                    using var writer = File.Open(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
-                });
+                    Assert.Throws<IOException>(() =>
+                    {
+                        using var writer = File.Open(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+                    });
+                }
             }
             using var exclusiveWriter = File.Open(path, FileMode.Open, FileAccess.Write, FileShare.None);
             Assert.True(exclusiveWriter.CanWrite);
