@@ -803,6 +803,21 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void FailedGrantCleanup_ForgetsTheRememberedParty()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
+            cleanup.Remember(issue, Party(Server, QuestScenario.ControllerA));
+            Assert.True(cleanup.HasRememberedParty(issue));
+            cleanup.Forget(issue);
+            Assert.False(cleanup.HasRememberedParty(issue));
+        });
+    }
+
+    [Fact]
     public void GiverDeathAction_CancelsPersonalQuestOnOwnerClient()
     {
         Accept(ClientA);
