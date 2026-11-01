@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +16,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
+    bool RememberOwnerParty(IssueBase issue);
     void Remember(IssueBase issue, MobileParty party);
     void RollbackGrant(IssueBase issue, Quest quest);
     void Forget(IssueBase issue);
@@ -27,9 +29,21 @@ internal interface IHeadmanHerdCleanup : IGameAbstraction
 
 internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 {
+    private readonly IIssueOwnerResolver owners;
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
     private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
     private readonly Dictionary<string, (int HerdCount, int GrainCount)> grantSnapshots = new();
+
+    public HeadmanHerdCleanup(IIssueOwnerResolver owners) => this.owners = owners;
+
+    public bool RememberOwnerParty(IssueBase issue)
+    {
+        if (!owners.TryResolveOwnerHero(issue, out var owner) || owner.PartyBelongedTo == null)
+            return false;
+
+        Remember(issue, owner.PartyBelongedTo);
+        return true;
+    }
 
     public void Remember(IssueBase issue, MobileParty party)
     {

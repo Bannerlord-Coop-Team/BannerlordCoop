@@ -16,12 +16,10 @@ internal class HeadmanHerdWorldEventPatches
     private static void AlternativeSolutionStartedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsClient || !(__instance is Issue) ||
-            !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
-            !owners.TryResolveOwnerHero(__instance, out var owner) || owner.PartyBelongedTo == null ||
             !ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
             return;
 
-        cleanup.Remember(__instance, owner.PartyBelongedTo);
+        cleanup.RememberOwnerParty(__instance);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
