@@ -200,7 +200,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     }
 
     [Fact]
-    public void AlternativeCancellationAfterOwnerAndGiverRemovalStillArchivesForTheOwner()
+    public void AlternativeCancellationAfterOwnerRemovalStillArchivesForTheOwner()
     {
         foreach (var instance in environment.Clients.Prepend(environment.Server))
             instance.Call(() => issues[instance].IsTriedToSolveBefore = true);

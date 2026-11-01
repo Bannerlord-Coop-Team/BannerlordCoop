@@ -24,22 +24,12 @@ public readonly struct NetworkHeadmanHerdLog : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly TextObject Text;
-    [ProtoMember(4)] public readonly IssueJournalEntry Entry;
-
-    public NetworkHeadmanHerdLog(string giverId, string issueId, TextObject text)
-    {
-        GiverId = giverId;
-        IssueId = issueId;
-        Text = text;
-        Entry = default;
-    }
+    [ProtoMember(3)] public readonly IssueJournalEntry Entry;
 
     public NetworkHeadmanHerdLog(string giverId, string issueId, JournalLog log)
     {
         GiverId = giverId;
         IssueId = issueId;
-        Text = null;
         Entry = new IssueJournalEntry(log);
     }
 }
@@ -123,15 +113,9 @@ internal class HeadmanHerdJournalHandler : IHandler
             if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
                 !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
-            var log = data.Entry.Text != null ? data.Entry.ToJournalLog() :
-                data.Text == null ? null : new JournalLog(CampaignTime.Now, data.Text);
-            if (log == null) return;
-            if (data.Entry.Text != null)
-            {
-                if (quest.JournalEntries.Any(existing => SameLog(existing, log))) return;
-            }
-            else if (data.Text == null || quest.JournalEntries.Any(existing =>
-                         existing.LogText?.Value == data.Text.Value)) return;
+            if (data.Entry.Text == null) return;
+            var log = data.Entry.ToJournalLog();
+            if (quest.JournalEntries.Any(existing => SameLog(existing, log))) return;
             using (new AllowedThread())
             using (new QuestJournalReplay())
                 quest._journalEntries.Add(log);
