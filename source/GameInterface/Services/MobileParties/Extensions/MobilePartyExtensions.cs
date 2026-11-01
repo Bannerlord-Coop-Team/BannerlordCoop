@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.GameMenus;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using Serilog;
@@ -124,15 +125,12 @@ public static class MobilePartyExtensions
         }
     }
 
-    // Skipped during a mission, where the menu context can have no handler; MapState.OnActivate refreshes it on return
+    // Refreshes the open menu through the shared refresher, which skips unbound menus
     private static void RefreshCurrentMenu()
     {
-        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+        if (!ContainerProvider.TryResolve<IMenuOptionsRefresher>(out var refresher)) return;
 
-        var menuContext = Campaign.Current?.CurrentMenuContext;
-        if (menuContext == null) return;
-
-        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
+        refresher.RefreshMenuOptions(Campaign.Current?.CurrentMenuContext);
     }
 
     /// <summary>
