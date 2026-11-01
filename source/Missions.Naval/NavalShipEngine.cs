@@ -39,15 +39,17 @@ public class NavalShipEngine : INavalShipEngine
     private readonly IObjectManager objectManager;
     private readonly INavalCopyWeaponStates copyWeaponStates;
     private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalRopeRegistry ropeRegistry;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
-        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls)
+        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         SteeredCopies = steeredCopies;
         this.copyWeaponStates = copyWeaponStates;
         this.foreignHulls = foreignHulls;
+        this.ropeRegistry = ropeRegistry;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -219,7 +221,7 @@ public class NavalShipEngine : INavalShipEngine
         int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State, copyWeaponStates.Take(weapon));
 
         // Breaks the old hull's ropes before vanilla's removal, as in RemoveHull.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 
@@ -395,7 +397,7 @@ public class NavalShipEngine : INavalShipEngine
 
         // The one targeted break of the leaving hull's ropes, as Quest5's RemoveShipInternal does; vanilla's removal then breaks
         // only ropes on this hull (RopeShipRemovalPatch). A copy stays a copy until the ShipRemovedEvent handler drops it.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         switch (RemovalPathOf(shipsLogic, ship))
         {
             case HullRemovalPath.Assigned:
@@ -739,13 +741,13 @@ public class NavalShipEngine : INavalShipEngine
     }
 
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Capture((MissionShip)hull, shipIdOf);
+        ropeRegistry.Capture((MissionShip)hull, shipIdOf);
 
     public void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final) =>
-        NavalRopes.Apply((MissionShip)hull, ropes, hullOf, final);
+        ropeRegistry.Apply((MissionShip)hull, ropes, hullOf, final);
 
     public object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
+        ropeRegistry.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
 
     public void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter)
     {

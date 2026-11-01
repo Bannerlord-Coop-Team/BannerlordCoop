@@ -118,7 +118,7 @@ public class NavalRopePatchesTests
         var copy = ShipTestHulls.Uninitialized<MissionShip>();
         copy._physics = copyPhysics;
         using var naval = new NavalClientContainer();
-        NavalRopes.Clear();
+        RopeForcePatch.ClearCounters();
         try
         {
             naval.MissionTracker.IsActive = true;
@@ -131,7 +131,7 @@ public class NavalRopePatchesTests
         }
         finally
         {
-            NavalRopes.Clear();
+            RopeForcePatch.ClearCounters();
         }
     }
 

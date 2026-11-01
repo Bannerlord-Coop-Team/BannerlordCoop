@@ -89,8 +89,22 @@ public class NavalClientStateScopeTests
         finally
         {
             global::GameInterface.ContainerProvider.Clear();
-            NavalRopes.Clear();
+            RopeForcePatch.ClearCounters();
         }
+    }
+
+    // Each client container keeps its own rope records, so a rope one client observed is unknown to another.
+    [Fact]
+    public void RopeRegistry_IsOnePerClientContainer()
+    {
+        using var first = BuildClient();
+        using var second = BuildClient();
+        var station = ShipTestHulls.Uninitialized<NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine>();
+
+        ((NavalRopeRegistry)first.Resolve<INavalRopeRegistry>()).records[station] = new NavalRopeRegistry.RopeRecord { Generation = 1 };
+
+        Assert.NotNull(first.Resolve<INavalRopeRegistry>().RecordOf(station));
+        Assert.Null(second.Resolve<INavalRopeRegistry>().RecordOf(station));
     }
 
     // A client container with the naval registrations.

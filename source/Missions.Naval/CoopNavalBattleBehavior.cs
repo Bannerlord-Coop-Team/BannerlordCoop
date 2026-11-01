@@ -30,6 +30,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalBallistaTargets ballistaTargets;
     private readonly INavalMissionTracker missionTracker;
     private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalRopeRegistry ropes;
     private int lastAgentCount = -1;
     private bool retreated;
 
@@ -37,7 +38,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
         INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker,
-        INavalForeignHullRegistry foreignHulls)
+        INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropes)
     {
         Services = services;
         this.steeredCopies = steeredCopies;
@@ -49,6 +50,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.ballistaTargets = ballistaTargets;
         this.missionTracker = missionTracker;
         this.foreignHulls = foreignHulls;
+        this.ropes = ropes;
         shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
@@ -160,7 +162,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         bool wasCopy = foreignHulls.Contains(ship);
         steeredCopies.Forget(ship);
-        NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship);
+        NavalRopeRemoval.ForgetRemovedHull(shipsLogic.AllShips, ship, ropes);
         ballistaTargets.ForgetHull(shipsLogic.AllShips, ship);
         ExpireShipQueries(Mission.Teams);
         if (shipsLogic.IsMissionEnding) return;
@@ -223,7 +225,7 @@ public class CoopNavalBattleBehavior : MissionLogic
 
         NpcFleetSpawner.Dispose();
 
-        NavalRopes.Clear();
+        ropes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();
         NavalContactProbe.Clear();

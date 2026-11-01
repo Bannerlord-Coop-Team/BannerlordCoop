@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface;
+using HarmonyLib;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
@@ -24,11 +25,14 @@ internal class RopeConnectPatch
     // Refuses a replica's own connect and any rope to a removed hull.
     [HarmonyPrefix]
     private static bool Prefix(ShipAttachmentMachine __instance, ShipAttachmentPointMachine attachmentPointMachine) =>
-        NavalRopes.AllowConnection(__instance, attachmentPointMachine);
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowConnection(__instance, attachmentPointMachine);
 
     // Opens the station's next generation on the owner.
     [HarmonyPostfix]
-    private static void Postfix(ShipAttachmentMachine __instance) => NavalRopes.ObserveCreated(__instance);
+    private static void Postfix(ShipAttachmentMachine __instance)
+    {
+        if (ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes)) ropes.ObserveCreated(__instance);
+    }
 }
 
 // A replica disconnects only as its owner's state applies.
@@ -38,7 +42,8 @@ internal class RopeDisconnectPatch
 {
     // Skips a replica's own disconnect.
     [HarmonyPrefix]
-    private static bool Prefix(ShipAttachmentMachine __instance) => NavalRopes.AllowDisconnect(__instance);
+    private static bool Prefix(ShipAttachmentMachine __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowDisconnect(__instance);
 }
 
 // A replica's state changes only as its owner's state applies.
@@ -48,7 +53,8 @@ internal class RopeStatePatch
 {
     // Skips a replica's own state change.
     [HarmonyPrefix]
-    private static bool Prefix(Attachment __instance) => NavalRopes.AllowState(__instance);
+    private static bool Prefix(Attachment __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowState(__instance);
 }
 
 // Whether a rope becomes a plank is the owner's decision.
@@ -58,7 +64,8 @@ internal class RopePlankEligibilityPatch
 {
     // Skips the plank check on a replica.
     [HarmonyPrefix]
-    private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
+    private static bool Prefix(Attachment __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowOwnerDecision(__instance);
 }
 
 // Whether a rope breaks is the owner's decision.
@@ -68,7 +75,8 @@ internal class RopeBreakCheckPatch
 {
     // Skips the break check on a replica.
     [HarmonyPrefix]
-    private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
+    private static bool Prefix(Attachment __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowOwnerDecision(__instance);
 }
 
 // A replica plank flies on its owner's clock.
@@ -78,7 +86,8 @@ internal class RopeReplicaPlankFlightPatch
 {
     // Lays a replica plank out instead of running its flight clock.
     [HarmonyPrefix]
-    private static bool Prefix(Attachment __instance) => NavalRopes.TickPlankFlight(__instance);
+    private static bool Prefix(Attachment __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.TickPlankFlight(__instance);
 }
 
 // A replica rope is drawn from its owner's state, and a rope whose end left breaks.
@@ -88,7 +97,8 @@ internal class RopeReplicaTickPatch
 {
     // Runs vanilla's rope tick only for an owned rope with both ends.
     [HarmonyPrefix]
-    private static bool Prefix(Attachment __instance) => NavalRopes.TickRope(__instance);
+    private static bool Prefix(Attachment __instance) =>
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.TickRope(__instance);
 }
 
 // A joint hooked to a hull that left has no hull to push; its force step is skipped until the rope tick breaks it.
@@ -159,7 +169,7 @@ internal class RopeRetargetPatch
     // Skips the retarget logic on a copy.
     [HarmonyPrefix]
     private static bool Prefix(ShipAttachmentMachineConnectionLogic __instance) =>
-        NavalRopes.AllowConnectionRetarget(__instance._ownerShip);
+        !ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) || ropes.AllowConnectionRetarget(__instance._ownerShip);
 }
 
 // The owner's throw curve rides its samples, so a replica draws the same flight.
@@ -169,8 +179,10 @@ internal class RopeThrowCurvePatch
 {
     // Keeps the curve vanilla just drew.
     [HarmonyPostfix]
-    private static void Postfix(Attachment __instance, in Vec3 targetGlobalPosition, float throwingAngleDegree) =>
-        NavalRopes.ObserveCurve(__instance, targetGlobalPosition, throwingAngleDegree);
+    private static void Postfix(Attachment __instance, in Vec3 targetGlobalPosition, float throwingAngleDegree)
+    {
+        if (ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes)) ropes.ObserveCurve(__instance, targetGlobalPosition, throwingAngleDegree);
+    }
 }
 
 // A rope joint writes force only to a hull this client simulates; a copy follows its owner's frames. Binds the joint's

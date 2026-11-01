@@ -20,13 +20,16 @@ public class NavalMissionModule : Module
 
         builder.RegisterInstance(new HarmonyPatchCategoryRegistration(typeof(NavalMissionModule).Assembly, PatchCategory));
 
-        // The per-client naval mission state the patches read (the battle flag and the copy set). One per client container rather than per lifetime scope, so a
+        // The per-client naval mission state the patches read (the battle flag, the copy set and the rope records). One per client container rather than per lifetime scope, so a
         // mission child scope resolves the same instance the patches get from ContainerProvider; the behaviour resets it per battle.
         builder.RegisterType<NavalMissionTracker>()
             .As<INavalMissionTracker>()
             .SingleInstance();
         builder.RegisterType<NavalForeignHullRegistry>()
             .As<INavalForeignHullRegistry>()
+            .SingleInstance();
+        builder.RegisterType<NavalRopeRegistry>()
+            .As<INavalRopeRegistry>()
             .SingleInstance();
 
         builder.RegisterType<CoopNavalBattleLauncher>()

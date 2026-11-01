@@ -59,6 +59,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalBallistaTargets ballistaTargets;
     private readonly INavalMissionTracker missionTracker;
     private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalRopeRegistry ropes;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -83,7 +84,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalLateHullDeployment lateHullDeployment,
         INavalBallistaTargets ballistaTargets,
         INavalMissionTracker missionTracker,
-        INavalForeignHullRegistry foreignHulls
+        INavalForeignHullRegistry foreignHulls,
+        INavalRopeRegistry ropes
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -103,6 +105,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.ballistaTargets = ballistaTargets;
         this.missionTracker = missionTracker;
         this.foreignHulls = foreignHulls;
+        this.ropes = ropes;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
@@ -270,7 +273,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             );
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
-            ballistaTargets, missionTracker, foreignHulls));
+            ballistaTargets, missionTracker, foreignHulls, ropes));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.HullLedger, tallyReader,
