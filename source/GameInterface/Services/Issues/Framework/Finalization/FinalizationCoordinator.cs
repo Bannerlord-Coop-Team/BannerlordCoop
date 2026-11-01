@@ -39,6 +39,10 @@ internal class FinalizationCoordinator : IHandler
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new();
     private readonly object announcedIssuesLock = new();
+    private readonly ConditionalWeakTable<IssueBase, OwnerIdentity> ownerIdentities = new();
+    private readonly object ownerIdentitiesLock = new();
+    private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new();
+    private readonly object ownerPeersLock = new();
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
 
@@ -69,6 +73,8 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Subscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -81,6 +87,8 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Unsubscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -217,10 +225,18 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithAlternative ||
-            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
-            !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
-            !playerManager.TryGetPeer(owner, out var peer)) return;
+        if (issue.IsSolvingWithAlternative) return;
+        var giverId = TryGetRememberedOwnerId(issue);
+        if (string.IsNullOrEmpty(giverId) && !objectManager.TryGetIdWithLogging(issue.IssueOwner, out giverId)) return;
+        NetPeer peer;
+        if (ownership.TryGetOwner(giverId, issue.StringId, out var owner) && playerManager.TryGetPeer(owner, out peer))
+        {
+        }
+        else
+        {
+            lock (ownerPeersLock)
+                if (!ownerPeers.TryGetValue(issue, out peer) || peer.ConnectionState != ConnectionState.Connected) return;
+        }
         if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
             out _, out _, out var descriptor) && descriptor is ISuppressEndingJournalSnapshotDescriptor)
             return;
@@ -337,7 +353,17 @@ internal class FinalizationCoordinator : IHandler
 
         var issue = payload.What.Issue;
 
-        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
+        var issueOwnerId = payload.What.IssueOwnerId;
+        if (string.IsNullOrEmpty(issueOwnerId) && !objectManager.TryGetId(issue.IssueOwner, out issueOwnerId))
+        {
+            ownership.TryGetIssueOwnerId(issue.StringId, out issueOwnerId);
+        }
+        if (string.IsNullOrEmpty(issueOwnerId))
+        {
+            lock (ownerIdentitiesLock)
+                if (ownerIdentities.TryGetValue(issue, out var identity)) issueOwnerId = identity.IssueOwnerId;
+        }
+        if (string.IsNullOrEmpty(issueOwnerId))
         {
             return;
         }
@@ -352,6 +378,51 @@ internal class FinalizationCoordinator : IHandler
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
+    }
+
+    private void RememberOwnerIdentity(MessagePayload<QuestSolutionAcceptedOnServer> payload)
+    {
+        if (ModInformation.IsClient) return;
+        RememberOwnerIdentity(payload.What.IssueOwnerId, payload.What.IssueId, payload.What.ControllerId);
+    }
+
+    private void RememberOwnerIdentity(MessagePayload<AlternativeSolutionAcceptedOnServer> payload)
+    {
+        if (ModInformation.IsClient) return;
+        RememberOwnerIdentity(payload.What.IssueOwnerId, payload.What.IssueId, payload.What.ControllerId);
+    }
+
+    private void RememberOwnerIdentity(string issueOwnerId, string issueId, string controllerId)
+    {
+        if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _))
+        {
+            issue = Campaign.Current?.IssueManager?.Issues.Values.FirstOrDefault(candidate => candidate.StringId == issueId);
+            if (issue == null) return;
+        }
+        lock (ownerIdentitiesLock)
+        {
+            ownerIdentities.Remove(issue);
+            ownerIdentities.Add(issue, new OwnerIdentity(issueOwnerId));
+        }
+        if (playerManager.TryGetPeer(controllerId, out var peer))
+            lock (ownerPeersLock)
+            {
+                ownerPeers.Remove(issue);
+                ownerPeers.Add(issue, peer);
+            }
+    }
+
+    private string TryGetRememberedOwnerId(IssueBase issue)
+    {
+        lock (ownerIdentitiesLock)
+            return ownerIdentities.TryGetValue(issue, out var identity) ? identity.IssueOwnerId : null;
+    }
+
+    private sealed class OwnerIdentity
+    {
+        public readonly string IssueOwnerId;
+
+        public OwnerIdentity(string issueOwnerId) => IssueOwnerId = issueOwnerId;
     }
 
     // Client only.

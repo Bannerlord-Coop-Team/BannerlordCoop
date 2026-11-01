@@ -147,21 +147,23 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
     private void DismissQuest(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
 
         issueDismisser.Dismiss(issue);
 
         if (announce)
         {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
+            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel, issueOwnerId));
         }
     }
 
     public void Dismiss(IssueBase issue, IssueOutcome outcome)
     {
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
         if (issue.IsSolvingWithAlternative) DismissTroops(issue, announce: false);
         else DismissQuest(issue, announce: false);
 
-        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
+        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
     }
 
     private void DismissTroops(IssueBase issue, bool announce)

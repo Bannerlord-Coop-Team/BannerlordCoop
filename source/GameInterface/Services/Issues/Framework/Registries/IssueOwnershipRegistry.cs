@@ -8,6 +8,7 @@ internal class IssueOwnershipRegistry : IIssueOwnershipRegistry
 {
     private readonly Dictionary<string, (string IssueId, string ControllerId)> owners =
         new Dictionary<string, (string IssueId, string ControllerId)>();
+    private readonly Dictionary<string, string> issueOwners = new Dictionary<string, string>();
 
     public bool TrySetOwner(string issueOwnerId, string issueId, string controllerId)
     {
@@ -19,8 +20,14 @@ internal class IssueOwnershipRegistry : IIssueOwnershipRegistry
             }
 
             owners[issueOwnerId] = (issueId, controllerId);
+            issueOwners[issueId] = issueOwnerId;
             return true;
         }
+    }
+
+    public bool TryGetIssueOwnerId(string issueId, out string issueOwnerId)
+    {
+        lock (owners) return issueOwners.TryGetValue(issueId, out issueOwnerId);
     }
 
     public bool TryGetOwner(string issueOwnerId, string issueId, out string controllerId)
