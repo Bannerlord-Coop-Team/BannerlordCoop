@@ -21,7 +21,15 @@ internal class LordNeedsGarrisonTroopsFinalizationProofStrategy : IFinalizationP
 
         if (!CanDeliver(garrisonQuest))
         {
-            Logger.Warning("The owner of {quest} no longer carries the requested garrison troops", garrisonQuest.StringId);
+            var party = MobileParty.MainParty;
+            if (garrisonQuest.IsOngoing && party != null && party.CurrentSettlement != garrisonQuest._settlement)
+            {
+                Logger.Warning("The owner of {quest} is not at the quest settlement", garrisonQuest.StringId);
+            }
+            else
+            {
+                Logger.Warning("The owner of {quest} no longer carries the requested garrison troops", garrisonQuest.StringId);
+            }
             return true;
         }
 
