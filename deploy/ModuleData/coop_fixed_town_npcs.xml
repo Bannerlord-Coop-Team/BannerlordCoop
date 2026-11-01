@@ -773,7 +773,7 @@
     coop_location="center"
     coop_spawn_tag="npc_common"
     coop_dialogue="Have you seen the rest of the boys? We got a war to win."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
