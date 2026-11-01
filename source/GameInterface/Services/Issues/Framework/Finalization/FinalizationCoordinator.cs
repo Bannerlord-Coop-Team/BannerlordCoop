@@ -14,6 +14,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -36,6 +37,8 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new();
+    private readonly object announcedIssuesLock = new();
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
 
@@ -337,6 +340,12 @@ internal class FinalizationCoordinator : IHandler
         if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
         {
             return;
+        }
+
+        lock (announcedIssuesLock)
+        {
+            if (announcedIssues.TryGetValue(issue, out _)) return;
+            announcedIssues.Add(issue, new object());
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
