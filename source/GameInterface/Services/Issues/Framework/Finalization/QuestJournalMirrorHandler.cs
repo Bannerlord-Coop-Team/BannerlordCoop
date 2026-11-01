@@ -116,7 +116,7 @@ internal class QuestJournalMirrorHandler : IHandler
         foreach (var entry in entries)
         {
             var matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
-                SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName)).ToArray();
+                JournalTextComparer.Same(log.LogText, entry.Text) && JournalTextComparer.Same(log.TaskName, entry.TaskName)).ToArray();
             var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
             // Existing server-created stages may have a different tick, but ambiguous occurrences cannot be reassigned.
             if (exact.Length > 1 || (exact.Length == 0 && matches.Length > 1)) return false;
@@ -137,21 +137,4 @@ internal class QuestJournalMirrorHandler : IHandler
         return true;
     }
 
-    private static bool SameText(TextObject first, TextObject second)
-    {
-        if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
-    }
 }

@@ -101,6 +101,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 
     public void RemoveRemaining(Quest quest)
     {
+        // This mirrors vanilla RemoveRemainingHorses: normal cancellation removes the requested
+        // count, while RollbackGrant uses the pre-grant snapshot to preserve pre-existing stock.
         var issueId = IssueManager.GetIssueOfQuest(quest)?.StringId;
         if (issueId == null && !string.IsNullOrEmpty(quest.StringId))
             questIssueIds.TryGetValue(quest.StringId, out issueId);

@@ -10,7 +10,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
-using System.Collections.Concurrent;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -66,7 +65,6 @@ internal class HeadmanHerdJournalHandler : IHandler
     private readonly IControllerIdProvider controllerId;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager players;
-    private readonly ConcurrentDictionary<(string GiverId, string IssueId), byte> pendingAccepts = new();
     private readonly IIssueConversationGuard conversationGuard;
 
     public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership, IPlayerManager players, IIssueConversationGuard conversationGuard)
@@ -81,53 +79,19 @@ internal class HeadmanHerdJournalHandler : IHandler
         this.conversationGuard = conversationGuard;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Subscribe<QuestSolutionAcceptTriggered>(TrackAccept);
-        broker.Subscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Subscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
-        broker.Subscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<HeadmanHerdLogAdded>(Send);
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
-        broker.Unsubscribe<QuestSolutionAcceptTriggered>(TrackAccept);
-        broker.Unsubscribe<QuestAcceptanceFinished>(FinishAccept);
         broker.Unsubscribe<NetworkQuestSolutionAccepted>(HandleAccepted);
-        broker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(HandleRejected);
-    }
-
-    private void TrackAccept(MessagePayload<QuestSolutionAcceptTriggered> payload) => TrackAccept(payload.What.Issue);
-
-    private void TrackAccept(IssueBase issue)
-    {
-        if (ModInformation.IsServer || issue?.IssueQuest is not Quest quest) return;
-        if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
-        pendingAccepts.TryAdd((giverId, issue.StringId), 0);
-    }
-
-    private void FinishAccept(MessagePayload<QuestAcceptanceFinished> payload)
-    {
-        if (ModInformation.IsServer)
-            return;
-
-        if (payload.What.Quest == null)
-        {
-            pendingAccepts.Clear();
-            return;
-        }
-
-        var issue = IssueManager.GetIssueOfQuest(payload.What.Quest);
-        if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
-            return;
-        pendingAccepts.TryRemove((giverId, issue.StringId), out _);
     }
 
     private void HandleAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId) return;
-
-        pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _);
 
         GameThread.RunSafe(() =>
         {
@@ -138,12 +102,6 @@ internal class HeadmanHerdJournalHandler : IHandler
             text.SetTextVariable("ANIMAL_TYPE", quest._herdTypeToDeliver.Name);
             MBInformationManager.AddQuickInformation(text);
         }, context: nameof(HeadmanHerdJournalHandler));
-    }
-
-    private void HandleRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
-    {
-        if (ModInformation.IsServer) return;
-        pendingAccepts.TryRemove((payload.What.IssueOwnerId, payload.What.IssueId), out _);
     }
 
     private void Send(MessagePayload<HeadmanHerdLogAdded> payload)
@@ -183,25 +141,8 @@ internal class HeadmanHerdJournalHandler : IHandler
     private static bool SameLog(JournalLog first, JournalLog second) =>
         first.LogTime.NumTicks == second.LogTime.NumTicks && first.Range == second.Range &&
         first.CurrentProgress == second.CurrentProgress && first.Type == second.Type &&
-        SameText(first.LogText, second.LogText) && SameText(first.TaskName, second.TaskName);
-
-    private static bool SameText(TextObject first, TextObject second)
-    {
-        if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
-    }
+        JournalTextComparer.Same(first.LogText, second.LogText) &&
+        JournalTextComparer.Same(first.TaskName, second.TaskName);
 }
 
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]

@@ -40,6 +40,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new ConditionalWeakTable<IssueBase, object>();
     private readonly object announcedIssuesLock = new object();
     private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new ConditionalWeakTable<IssueBase, NetPeer>();
+    private readonly object ownerPeersLock = new object();
     private readonly IIssueConversationGuard conversationGuard;
 
     public FinalizationCoordinator(
@@ -205,8 +206,11 @@ internal class FinalizationCoordinator : IHandler
                 return;
             if (!playerManager.TryGetPeer(data.ControllerId, out var peer))
                 return;
-            ownerPeers.Remove(issue);
-            ownerPeers.Add(issue, peer);
+            lock (ownerPeersLock)
+            {
+                ownerPeers.Remove(issue);
+                ownerPeers.Add(issue, peer);
+            }
         }, context: nameof(FinalizationCoordinator));
     }
 
@@ -230,7 +234,8 @@ internal class FinalizationCoordinator : IHandler
             playerManager.TryGetPeer(owner, out peer))
             return true;
 
-        return ownerPeers.TryGetValue(issue, out peer);
+        lock (ownerPeersLock)
+            return ownerPeers.TryGetValue(issue, out peer);
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -265,18 +270,26 @@ internal class FinalizationCoordinator : IHandler
                     foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
                     {
                         if (log.Text == null) continue;
-                        var index = existing.FindIndex(existingLog => SameEntry(existingLog, log));
-                        if (index >= 0)
+                        var exactMatches = existing
+                            .Select((existingLog, index) => (existingLog, index))
+                            .Where(candidate => SameEntry(candidate.existingLog, log))
+                            .ToArray();
+                        if (exactMatches.Length > 1) continue;
+                        if (exactMatches.Length == 1)
                         {
-                            existing.RemoveAt(index);
+                            existing.RemoveAt(exactMatches[0].index);
                             continue;
                         }
 
-                        index = existing.FindIndex(existingLog => SameEntryStage(existingLog, log));
-                        if (index >= 0)
+                        var stageMatches = existing
+                            .Select((existingLog, index) => (existingLog, index))
+                            .Where(candidate => SameEntryStage(candidate.existingLog, log))
+                            .ToArray();
+                        if (stageMatches.Length > 1) continue;
+                        if (stageMatches.Length == 1)
                         {
-                            existing[index].UpdateCurrentProgress(log.Progress);
-                            existing.RemoveAt(index);
+                            existing[stageMatches[0].index].UpdateCurrentProgress(log.Progress);
+                            existing.RemoveAt(stageMatches[0].index);
                             continue;
                         }
 
@@ -317,8 +330,11 @@ internal class FinalizationCoordinator : IHandler
         if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out var owner) &&
             playerManager.TryGetPeer(owner, out var ownerPeer))
         {
-            ownerPeers.Remove(issue);
-            ownerPeers.Add(issue, ownerPeer);
+            lock (ownerPeersLock)
+            {
+                ownerPeers.Remove(issue);
+                ownerPeers.Add(issue, ownerPeer);
+            }
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
@@ -422,29 +438,11 @@ internal class FinalizationCoordinator : IHandler
     private static bool SameEntryContent(JournalLog log, IssueJournalEntry entry) =>
         log.Range == entry.Range &&
         log.CurrentProgress == entry.Progress && log.Type == entry.Type &&
-        SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName);
+        JournalTextComparer.Same(log.LogText, entry.Text) && JournalTextComparer.Same(log.TaskName, entry.TaskName);
 
     private static bool SameEntryStage(JournalLog log, IssueJournalEntry entry) =>
         log.Range == entry.Range && log.Type == entry.Type &&
-        SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName);
-
-    private static bool SameText(TextObject first, TextObject second)
-    {
-        if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
-    }
+        JournalTextComparer.Same(log.LogText, entry.Text) && JournalTextComparer.Same(log.TaskName, entry.TaskName);
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
     {
