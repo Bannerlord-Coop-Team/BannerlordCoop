@@ -145,7 +145,8 @@ internal class FinalizationCoordinator : IHandler
             {
                 return;
             }
-            if (playerHero.PartyBelongedTo == null)
+            if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
+                && playerHero.PartyBelongedTo == null)
             {
                 Logger.Warning("Cannot run outcome {Outcome} for {IssueId}: the owner has no party", data.Outcome, data.IssueId);
                 return;
@@ -179,7 +180,8 @@ internal class FinalizationCoordinator : IHandler
             {
                 return;
             }
-            if (playerHero.PartyBelongedTo == null)
+            if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
+                && playerHero.PartyBelongedTo == null)
             {
                 Logger.Warning("Cannot run branch {Proof} for {IssueId}: the owner has no party", data.Proof, data.IssueId);
                 return;

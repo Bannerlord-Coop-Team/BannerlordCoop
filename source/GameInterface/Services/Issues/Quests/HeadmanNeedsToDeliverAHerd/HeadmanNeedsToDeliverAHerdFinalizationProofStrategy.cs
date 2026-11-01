@@ -11,7 +11,7 @@ internal enum HeadmanHerdBranch : byte
     Keep = 2,
 }
 
-internal class HeadmanNeedsToDeliverAHerdFinalizationProofStrategy : IFinalizationProofStrategy
+internal class HeadmanNeedsToDeliverAHerdFinalizationProofStrategy : IFinalizationProofStrategy, IOwnerPartyRequiredFinalizationProofStrategy
 {
     private static readonly Serilog.ILogger Logger = Common.Logging.LogManager.GetLogger<HeadmanNeedsToDeliverAHerdFinalizationProofStrategy>();
     public bool TryRunBranch(QuestBase quest, byte proof)
