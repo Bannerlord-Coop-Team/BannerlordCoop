@@ -25,6 +25,7 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
+    private const string ReturnedTroopsText = "{=V5Za6d4h}Your troops have returned from their mission.";
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
@@ -167,8 +168,8 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
     {
         Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
 
-        if (!issue.JournalEntries.Any(log => log.LogText?.ToString() == "Your troops have returned from their mission."))
-            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("{=V5Za6d4h}Your troops have returned from their mission.")));
+        if (!issue.JournalEntries.Any(log => log.LogText?.Value == ReturnedTroopsText))
+            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(ReturnedTroopsText)));
         messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(
             issue, IssueBase.IssueUpdateDetails.IssueCancel));
         issueDismisser.Dismiss(issue);

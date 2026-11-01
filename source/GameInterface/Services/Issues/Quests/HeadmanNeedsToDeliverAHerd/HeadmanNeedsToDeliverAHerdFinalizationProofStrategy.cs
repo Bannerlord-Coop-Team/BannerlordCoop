@@ -17,7 +17,7 @@ internal class HeadmanNeedsToDeliverAHerdFinalizationProofStrategy : IFinalizati
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest herd)) return false;
-        if (!herd.IsOngoing || MobileParty.MainParty.CurrentSettlement != herd._targetSettlement)
+        if (!herd.IsOngoing || MobileParty.MainParty == null || MobileParty.MainParty.CurrentSettlement != herd._targetSettlement)
         {
             Logger.Warning("Cannot run branch {proof} for {quest}: the quest is no longer ongoing or the owner is elsewhere", proof, herd.StringId);
             return true;

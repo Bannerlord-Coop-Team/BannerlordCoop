@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Common.Logging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -9,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -33,6 +35,7 @@ public readonly struct AlternativeSolutionEndingObserved : IEvent
 /// <summary>Replays the owner's authoritative alternative acceptance and ending journals.</summary>
 internal class AlternativeSolutionJournalHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AlternativeSolutionJournalHandler>();
     private readonly IMessageBroker broker;
     private readonly INetwork network;
     private readonly IObjectManager objects;
@@ -92,6 +95,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         {
             if (string.IsNullOrEmpty(issue.IssueOwner?.StringId)) return;
             giverId = $"Hero_{issue.IssueOwner.StringId}";
+            Logger.Warning("Using the stamped issue owner id {IssueOwnerId} after registry removal", giverId);
         }
         var report = issue.JournalEntries.LastOrDefault()?.LogText;
         // Vanilla failure binds the companion globally instead of saving it on the report.
