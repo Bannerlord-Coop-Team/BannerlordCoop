@@ -14,7 +14,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -37,11 +36,8 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
-    private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new ConditionalWeakTable<IssueBase, object>();
-    private readonly object announcedIssuesLock = new object();
-    private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new ConditionalWeakTable<IssueBase, NetPeer>();
-    private readonly object ownerPeersLock = new object();
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -52,7 +48,8 @@ internal class FinalizationCoordinator : IHandler
         IPlayerManager playerManager,
         IControllerIdProvider controller,
         IAlternativeSolutionCommitments commitments,
-        IIssueConversationGuard conversationGuard)
+        IIssueConversationGuard conversationGuard,
+        IQuestSolutionAcceptCoordinator acceptCoordinator)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -63,12 +60,12 @@ internal class FinalizationCoordinator : IHandler
         this.controller = controller;
         this.commitments = commitments;
         this.conversationGuard = conversationGuard;
+        this.acceptCoordinator = acceptCoordinator;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
-        messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerPeer);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -81,7 +78,6 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
-        messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerPeer);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -102,8 +98,11 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
-        network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        });
     }
 
     // Client only.
@@ -120,8 +119,11 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
-        network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        });
     }
 
     // Server only.
@@ -145,6 +147,7 @@ internal class FinalizationCoordinator : IHandler
             {
                 return;
             }
+
             if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
                 && playerHero.PartyBelongedTo == null)
             {
@@ -180,6 +183,7 @@ internal class FinalizationCoordinator : IHandler
             {
                 return;
             }
+
             if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
                 && playerHero.PartyBelongedTo == null)
             {
@@ -206,48 +210,22 @@ internal class FinalizationCoordinator : IHandler
         }, context: nameof(FinalizationCoordinator));
     }
 
-    private void RememberOwnerPeer(MessagePayload<QuestSolutionAcceptedOnServer> payload)
-    {
-        if (ModInformation.IsClient)
-            return;
-
-        var data = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-                return;
-            if (!playerManager.TryGetPeer(data.ControllerId, out var peer))
-                return;
-            lock (ownerPeersLock)
-            {
-                ownerPeers.Remove(issue);
-                ownerPeers.Add(issue, peer);
-            }
-        }, context: nameof(FinalizationCoordinator));
-    }
-
     private void Handle_IssueJournalObserved(MessagePayload<IssueJournalObserved> payload)
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithAlternative ||
-            !TryGetIssueOwnerId(issue, out var giverId) ||
-            !TryGetFinalizedOwnerPeer(issue, giverId, out var peer)) return;
+            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
+            !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
+            !playerManager.TryGetPeer(owner, out var peer)) return;
+        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
+            out _, out _, out var descriptor) && descriptor is ISuppressEndingJournalSnapshotDescriptor)
+            return;
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
             entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
-    }
-
-    private bool TryGetFinalizedOwnerPeer(IssueBase issue, string giverId, out NetPeer peer)
-    {
-        if (ownership.TryGetOwner(giverId, issue.StringId, out var owner) &&
-            playerManager.TryGetPeer(owner, out peer) && peer.ConnectionState == ConnectionState.Connected)
-            return true;
-
-        lock (ownerPeersLock)
-            return ownerPeers.TryGetValue(issue, out peer) && peer.ConnectionState == ConnectionState.Connected;
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -257,7 +235,7 @@ internal class FinalizationCoordinator : IHandler
         GameThread.RunSafe(() =>
         {
             if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
+                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor)) return;
 
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
@@ -270,47 +248,81 @@ internal class FinalizationCoordinator : IHandler
                 if (quest != null)
                 {
                     var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
-                    if (IsOlderSnapshot(quest, logs)) return;
-                    quest._journalEntries.Clear();
-                    foreach (var log in logs)
-                        quest._journalEntries.Add(log.ToJournalLog());
-                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
+                    if (descriptor is ISpecializedEndingJournalDescriptor)
+                    {
+                        var remaining = quest.JournalEntries.ToList();
+                        foreach (var log in logs)
+                        {
+                            var matches = remaining.Where(existing =>
+                                existing.Type == log.Type && existing.Range == log.Range &&
+                                SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
+                            if (matches.Length == 0)
+                                matches = remaining.Where(existing =>
+                                    existing.Type == log.Type && existing.Range == log.Range &&
+                                    SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
+                            var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
+                            if (existing == null && matches.Length == 1) existing = matches[0];
+                            if (existing == null && matches.Length > 0)
+                            {
+                                Logger.Warning("Ambiguous specialized journal row for {issue}; using journal order", data.IssueId);
+                                existing = matches[0];
+                            }
+                            if (existing != null)
+                            {
+                                existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
+                                remaining.Remove(existing);
+                            }
+                            else if (matches.Length == 0)
+                            {
+                                quest._journalEntries.Add(log.ToJournalLog());
+                            }
+                        }
+                    }
+                    else
+                    {
+                        quest._journalEntries.Clear();
+                        foreach (var log in logs)
+                            quest._journalEntries.Add(log.ToJournalLog());
+                    }
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                 }
                 else
                 {
-                    var existing = issue.JournalEntries.Where(log => log.LogText != null).ToList();
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
                     foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
                     {
                         if (log.Text == null) continue;
-                        var exactMatches = existing
-                            .Select((existingLog, index) => (existingLog, index))
-                            .Where(candidate => SameEntry(candidate.existingLog, log))
-                            .ToArray();
-                        if (exactMatches.Length > 1) continue;
-                        if (exactMatches.Length == 1)
-                        {
-                            existing.RemoveAt(exactMatches[0].index);
-                            continue;
-                        }
-
-                        var stageMatches = existing
-                            .Select((existingLog, index) => (existingLog, index))
-                            .Where(candidate => SameEntryStage(candidate.existingLog, log))
-                            .ToArray();
-                        if (stageMatches.Length > 1) continue;
-                        if (stageMatches.Length == 1)
-                        {
-                            existing[stageMatches[0].index].UpdateCurrentProgress(log.Progress);
-                            existing.RemoveAt(stageMatches[0].index);
-                            continue;
-                        }
-
-                        issue.AddLog(log.ToJournalLog());
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
                     }
                 }
             }
         }, context: nameof(FinalizationCoordinator));
     }
+
+    private static bool SameText(TextObject first, TextObject second)
+    {
+        if (ReferenceEquals(first, second)) return true;
+        if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes == null) != (second.Attributes == null) ||
+            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
+        if (first.Attributes == null) return true;
+        foreach (var pair in first.Attributes)
+        {
+            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
+            if (pair.Value is TextObject text)
+            {
+                if (!(value is TextObject other) || !SameText(text, other)) return false;
+            }
+            else if (!Equals(pair.Value, value)) return false;
+        }
+        return true;
+    }
+
+    private static bool SameKey(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
@@ -322,44 +334,15 @@ internal class FinalizationCoordinator : IHandler
 
         var issue = payload.What.Issue;
 
-        if (!TryGetIssueOwnerId(issue, out var issueOwnerId))
+        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
         {
             return;
-        }
-
-        lock (announcedIssuesLock)
-        {
-            if (announcedIssues.TryGetValue(issue, out _))
-            {
-                // An ending callback can run again while succession replays the native character-change event.
-                // Keep the first announcement, and let the weak table release the issue when it is gone.
-                return;
-            }
-
-            announcedIssues.Add(issue, new object());
-        }
-
-        if (ownership.TryGetOwner(issueOwnerId, issue.StringId, out var owner) &&
-            playerManager.TryGetPeer(owner, out var ownerPeer))
-        {
-            lock (ownerPeersLock)
-            {
-                ownerPeers.Remove(issue);
-                ownerPeers.Add(issue, ownerPeer);
-            }
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
-    }
-
-    private bool TryGetIssueOwnerId(IssueBase issue, out string issueOwnerId)
-    {
-        if (objectManager.TryGetIdWithLogging(issue.IssueOwner, out issueOwnerId)) return true;
-        issueOwnerId = null;
-        return false;
     }
 
     // Client only.
@@ -405,7 +388,7 @@ internal class FinalizationCoordinator : IHandler
         }
     }
 
-    // The quest Replay drives a hand-in, rather than one it would only discard
+    // The quest Replay drives, a hand in for example, rather than one it would only discard
     private bool IsOwnersRunningQuest(NetworkIssueFinalized data)
     {
         if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
@@ -417,33 +400,6 @@ internal class FinalizationCoordinator : IHandler
         var quest = issueOwner.Issue.IssueQuest;
         return quest != null && Campaign.Current.QuestManager.Quests.Contains(quest);
     }
-
-    private static bool IsOlderSnapshot(QuestBase quest, IssueJournalEntry[] entries)
-    {
-        var localLatest = quest.JournalEntries
-            .Where(log => log.LogText != null)
-            .Select(log => log.LogTime.NumTicks)
-            .DefaultIfEmpty(long.MinValue)
-            .Max();
-        var receivedLatest = entries
-            .Where(log => log.Text != null)
-            .Select(log => log.Time.NumTicks)
-            .DefaultIfEmpty(long.MinValue)
-            .Max();
-        return entries.Length < quest.JournalEntries.Count && receivedLatest <= localLatest;
-    }
-
-    private static bool SameEntry(JournalLog log, IssueJournalEntry entry) =>
-        log.LogTime.NumTicks == entry.Time.NumTicks && SameEntryContent(log, entry);
-
-    private static bool SameEntryContent(JournalLog log, IssueJournalEntry entry) =>
-        log.Range == entry.Range &&
-        log.CurrentProgress == entry.Progress && log.Type == entry.Type &&
-        JournalTextComparer.Same(log.LogText, entry.Text) && JournalTextComparer.Same(log.TaskName, entry.TaskName);
-
-    private static bool SameEntryStage(JournalLog log, IssueJournalEntry entry) =>
-        log.Range == entry.Range && log.Type == entry.Type &&
-        JournalTextComparer.Same(log.LogText, entry.Text) && JournalTextComparer.Same(log.TaskName, entry.TaskName);
 
     private bool TryGetPlayer(object who, string messageName, out Player player)
     {

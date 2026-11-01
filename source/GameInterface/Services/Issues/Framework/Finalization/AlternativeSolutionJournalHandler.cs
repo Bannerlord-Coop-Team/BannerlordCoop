@@ -99,7 +99,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
             StringHelpers.SetCharacterProperties("COMPANION", issue.AlternativeSolutionHero.CharacterObject, report);
         if (!TryGetOwnerPeer(issue, out var peer)) return;
 
-        var entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
+        var entries = issue.JournalEntries.Select(log => new IssueJournalEntry(log)).ToArray();
         network.Send(peer, new NetworkAlternativeSolutionJournal(giverId, issue.StringId, payload.What.Ending, entries));
     }
 
@@ -126,7 +126,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
             using (new AllowedThread())
             {
                 issue._journalEntries.Clear();
-                foreach (var entry in data.Entries ?? Array.Empty<AlternativeSolutionJournalEntry>())
+                foreach (var entry in data.Entries ?? Array.Empty<IssueJournalEntry>())
                     issue._journalEntries.Add(entry.ToJournalLog());
                 if (isAcceptance)
                 {

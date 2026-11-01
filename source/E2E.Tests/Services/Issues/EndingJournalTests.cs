@@ -1,9 +1,15 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -173,6 +179,188 @@ public class EndingJournalTests : IDisposable
             using var owner = OwnerScope();
             serverQuest.CompleteQuestWithCancel(Ending());
         });
+        environment.FlushCoalescer();
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RemovedOwnerLogDoesNotReturnAtEndingOrInSavedHistory(bool sendLaterSnapshot)
+    {
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        JournalLog progress = null!;
+        JournalLog removed = null!;
+        var removedText = new TextObject("All required crafting materials collected");
+        var serverText = new TextObject("Authoritative stage not yet observed by the owner");
+        scenario.Server.Call(() => serverQuest.AddLog(serverText));
+        scenario.ClientA.Call(() =>
+        {
+            progress = ownerQuest.AddDiscreteLog(new TextObject("Collect crafting materials"),
+                new TextObject("Materials"), 1, 1);
+            removed = ownerQuest.AddLog(removedText);
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() => Assert.Single(serverQuest.JournalEntries,
+            log => log.LogText.Value == removedText.Value));
+
+        scenario.ClientA.Call(() =>
+        {
+            progress.UpdateCurrentProgress(0);
+            ownerQuest.RemoveLog(removed);
+            Assert.DoesNotContain(removed, ownerQuest.JournalEntries);
+            if (sendLaterSnapshot) ownerQuest.AddLog(new TextObject("Later owner progress"));
+        });
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        environment.FlushCoalescer();
+
+        scenario.ClientA.Call(() =>
+        {
+            Assert.DoesNotContain(ownerQuest.JournalEntries, log => log.LogText.Value == removedText.Value);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.Value == serverText.Value);
+            Assert.Equal(0, Assert.Single(ownerQuest.JournalEntries,
+                log => log.LogText.Value == "Collect crafting materials").CurrentProgress);
+        });
+        scenario.Server.Call(() =>
+        {
+            Assert.DoesNotContain(serverQuest.JournalEntries, log => log.LogText.Value == removedText.Value);
+            Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == serverText.Value);
+        });
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertSavedHistoryMatches(ownerQuest, serverQuest);
+    }
+
+    [Fact]
+    public void RemovedOwnerRowStaysRemovedAfterJournalLoadAndServerHandlerRestart()
+    {
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        JournalLog removed = null!;
+        List<JournalLog> loaded = null!;
+        scenario.ClientA.Call(() =>
+        {
+            ownerQuest.AddLog(new TextObject("retained owner row"));
+            removed = ownerQuest.AddLog(new TextObject("removed while disconnected"));
+        });
+        scenario.Server.Call(() =>
+        {
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            loaded = new List<JournalLog>();
+            foreach (var row in serverQuest.JournalEntries)
+            {
+                var save = new SaveContext(definitions);
+                var metadata = new MetaData();
+                Assert.True(save.Save(row, metadata, out var error), error);
+                var driver = new InMemDriver();
+                Assert.Equal(SaveResult.Success, driver.Save("restart_journal", 1, metadata, save.SaveData)
+                    .GetAwaiter().GetResult().SaveResult);
+                var load = new LoadContext(definitions, driver);
+                Assert.True(load.Load(driver.Load("restart_journal"), loadAsLateInitialize: true));
+                loaded.Add(Assert.IsType<JournalLog>(load.RootObject));
+            }
+            Assert.Equal(2, loaded.Count);
+            Assert.NotSame(serverQuest.JournalEntries[0], loaded[0]);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            // The owner removes this while the server is offline, so it only appears in the next full snapshot.
+            using var replay = new QuestJournalReplay();
+            ownerQuest.RemoveLog(removed);
+        });
+
+        using var restartedBroker = new MessageBroker();
+        var serverBroker = scenario.Server.Resolve<IMessageBroker>();
+        Action<MessagePayload<RequestQuestJournal>> forwardJournal = payload => restartedBroker.Publish(payload.Who, payload.What);
+        QuestJournalMirrorHandler restarted = null!;
+        scenario.Server.Call(() =>
+        {
+            scenario.Server.Resolve<QuestJournalMirrorHandler>().Dispose();
+            serverBroker.Subscribe(forwardJournal);
+            serverQuest._journalEntries.Clear();
+            serverQuest._journalEntries.AddRange(loaded);
+            restarted = new QuestJournalMirrorHandler(restartedBroker, scenario.Server.Resolve<INetwork>(),
+                scenario.Server.Resolve<IObjectManager>(), scenario.Server.Resolve<IIssueResolver>(),
+                scenario.Server.Resolve<IIssueOwnershipRegistry>(), scenario.Server.Resolve<IQuestTypeRegistry>(),
+                scenario.Server.Resolve<IControllerIdProvider>(), scenario.Server.Resolve<IPlayerManager>());
+            // Only the restarted handler needs startup here, other subscribers require a running engine.
+            restartedBroker.Publish(this, new CampaignReady());
+            serverQuest.AddLog(new TextObject("authoritative row written after load"));
+        });
+        try
+        {
+            scenario.ClientA.Call(() => ownerQuest.AddLog(new TextObject("first owner snapshot after restart")));
+            scenario.Server.Call(() =>
+            {
+                Assert.DoesNotContain(serverQuest.JournalEntries, log => log.LogText.Value == "removed while disconnected");
+                Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == "authoritative row written after load");
+                using var owner = OwnerScope();
+                serverQuest.CompleteQuestWithCancel(Ending());
+            });
+            environment.FlushCoalescer();
+            AssertSavedHistoryMatches(ownerQuest, serverQuest);
+            scenario.ClientA.Call(() => Assert.DoesNotContain(ownerQuest.JournalEntries,
+                log => log.LogText.Value == "removed while disconnected"));
+        }
+        finally
+        {
+            scenario.Server.Call(() =>
+            {
+                serverBroker.Unsubscribe(forwardJournal);
+                restarted.Dispose();
+            });
+        }
+    }
+
+    [Fact]
+    public void CancellationBeforeDelayedAcceptReplyKeepsTheEarlyJournal()
+    {
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            scenario.QuestOf(scenario.Server).CompleteQuestWithCancel();
+        });
+        environment.FlushCoalescer();
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        scenario.AddIssue(giverId, "delayed_journal_issue");
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.SetLatency(scenario.Server.NetPeer, scenario.ClientA.NetPeer, TimeSpan.FromSeconds(1));
+        QuestBase ownerQuest = null!;
+        QuestBase serverQuest = null!;
+        scenario.ClientA.Call(() =>
+        {
+            var giver = scenario.ClientA.GetRegisteredObject<Hero>(giverId);
+            giver.Issue.StartIssueWithQuest();
+            ownerQuest = giver.Issue.IssueQuest;
+            using (new AllowedThread()) ownerQuest.StartQuest();
+            ownerQuest.AddLog(new TextObject("written before the delayed accept reply"));
+            Assert.False(scenario.ClientA.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, giver.Issue.StringId, out _));
+        });
+        scenario.Server.Call(() =>
+        {
+            serverQuest = scenario.Server.GetRegisteredObject<Hero>(giverId).Issue.IssueQuest;
+            Assert.NotNull(serverQuest);
+            Assert.True(serverQuest.IsOngoing);
+        });
+        scenario.ClientA.Call(() => ownerQuest.CompleteQuestWithCancel(Ending()));
+        scenario.Server.Call(() => Assert.True(serverQuest.IsOngoing));
+        Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            Assert.Single(serverQuest.JournalEntries, log => log.LogText.Value == "written before the delayed accept reply");
+            Assert.True(serverQuest.IsFinalized);
+        });
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
         environment.FlushCoalescer();
         AssertSavedHistoryMatches(ownerQuest, serverQuest);
     }
@@ -364,8 +552,10 @@ public class EndingJournalTests : IDisposable
             entry => entry.IsRelatedTo(ownerQuest))));
     }
 
-    [Fact]
-    public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void ProgressAfterAcceptanceSurvivesAnAuthoritativeEnding(int updatedProgress)
     {
         var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
@@ -373,12 +563,12 @@ public class EndingJournalTests : IDisposable
         scenario.Server.Call(() =>
         {
             using var owner = OwnerScope();
-            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 2, 5);
         });
         scenario.ClientA.Call(() =>
         {
-            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
-            progress.UpdateCurrentProgress(4);
+            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 2, 5);
+            progress.UpdateCurrentProgress(updatedProgress);
         });
         environment.FlushCoalescer();
         scenario.Server.Call(() =>
@@ -387,8 +577,8 @@ public class EndingJournalTests : IDisposable
             serverQuest.CompleteQuestWithCancel(Ending());
         });
         environment.FlushCoalescer();
-        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
-        scenario.ClientA.Call(() => Assert.Equal(4, ownerQuest.JournalEntries.First().CurrentProgress));
+        scenario.Server.Call(() => Assert.Equal(updatedProgress, serverProgress.CurrentProgress));
+        scenario.ClientA.Call(() => Assert.Equal(updatedProgress, ownerQuest.JournalEntries.First().CurrentProgress));
     }
 
     [Fact]
@@ -428,14 +618,14 @@ public class EndingJournalTests : IDisposable
             new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
         scenario.Server.Call(() =>
         {
-            Assert.Equal(new[] { 4, 2 }, serverQuest.JournalEntries.Select(log => log.CurrentProgress));
+            Assert.Equal(new[] { 99, 2 }, serverQuest.JournalEntries.Select(log => log.CurrentProgress));
             using var owner = OwnerScope();
             serverQuest.CompleteQuestWithCancel(Ending());
         });
         environment.FlushCoalescer();
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
             new RequestQuestJournal(scenario.NotableId, QuestScenario.IssueId, new[] { invalidProgress }));
-        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
+        scenario.Server.Call(() => Assert.Equal(99, serverProgress.CurrentProgress));
     }
 
     [Fact]

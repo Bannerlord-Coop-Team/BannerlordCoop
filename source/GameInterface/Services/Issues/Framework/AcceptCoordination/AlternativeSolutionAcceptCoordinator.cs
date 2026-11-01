@@ -162,7 +162,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             return;
         }
 
-        AlternativeSolutionJournalEntry[] entries;
+        IssueJournalEntry[] entries;
         try
         {
             troopValidator.Apply(issue, data.SentTroops);
@@ -173,7 +173,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
                 {
                     issue.AlternativeSolutionStartConsequence();
                     issue.StartIssueWithAlternativeSolution();
-                    entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
+                    entries = issue.JournalEntries.Select(log => new IssueJournalEntry(log)).ToArray();
                 }
             }
         }

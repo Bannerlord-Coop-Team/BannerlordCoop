@@ -24,6 +24,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -33,6 +34,10 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
@@ -498,6 +503,126 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Equal(0, Quest(Server)._recruitedPartyCount);
         Assert.Equal(0, Quest(ClientA)._questProgressLogTest.CurrentProgress);
         Assert.DoesNotContain(targetId, TargetIds());
+    }
+
+    [Fact]
+    public void AuthoritativeEndingPreservesOwnerHuntProgress()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        Accept();
+        var serverQuest = Quest(Server);
+        var ownerQuest = Quest(ClientA);
+        Destroy(TargetIds().First(), scenario.PlayerA);
+        ClientA.Call(() => Assert.Equal(1, ownerQuest._questProgressLogTest.CurrentProgress));
+
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            players.ClearPeer(ClientA.NetPeer);
+            serverQuest._destroyedPartyCount++;
+            Server.Resolve<IMerchantOutlawsProgress>().Send(serverQuest);
+            players.SetPeer(QuestScenario.ControllerA, ClientA.NetPeer);
+        });
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        ClientA.Call(() => Assert.Equal(2, ownerQuest._questProgressLogTest.CurrentProgress));
+        environment.FlushCoalescer();
+        Server.Call(() => Assert.Equal(2, Assert.Single(serverQuest.JournalEntries,
+            log => log.Range == serverQuest._totalPartyCount).CurrentProgress));
+
+        JournalLogEntry serverArchive = null!;
+        Server.Call(() =>
+        {
+            serverArchive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(Campaign.Current.LogEntryHistory, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("merchant_journal", 1, metadata, save.SaveData)
+                .GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("merchant_journal"), loadAsLateInitialize: true));
+            var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
+            var savedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            Assert.NotSame(serverArchive, savedArchive);
+            Assert.Equal(2, Assert.Single(savedArchive.GetEntries(), log => log.Range == serverQuest._totalPartyCount).CurrentProgress);
+        });
+
+        ClientA.Call(() =>
+        {
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded()));
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+        });
+        ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId) && entry.IsEnded())));
+    }
+
+    [Fact]
+    public void AuthoritativeEndingKeepsHigherOwnerHuntProgress()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        Accept();
+        var ownerQuest = Quest(ClientA);
+        Destroy(TargetIds().First(), scenario.PlayerA);
+        ClientA.Call(() => ownerQuest._questProgressLogTest.UpdateCurrentProgress(2));
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.Equal(2, ownerQuest._questProgressLogTest.CurrentProgress);
+            var archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(ownerQuest)));
+            Assert.Equal(2, Assert.Single(archive.GetEntries(), log => log.Range == ownerQuest._totalPartyCount).CurrentProgress);
+        });
+    }
+
+    [Fact]
+    public void AuthoritativeEndingConsumesEachRepeatedHuntRowOnce()
+    {
+        Accept();
+        var serverQuest = Quest(Server);
+        var ownerQuest = Quest(ClientA);
+
+        Server.Call(() =>
+        {
+            using var allowed = new AllowedThread();
+            serverQuest._journalEntries.Clear();
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(100),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 3, 5, LogType.Discreate));
+            serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(200),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 4, 5, LogType.Discreate));
+        });
+        ClientA.Call(() =>
+        {
+            using var allowed = new AllowedThread();
+            ownerQuest._journalEntries.Clear();
+            ownerQuest._journalEntries.Add(new JournalLog(new CampaignTime(101),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 0, 5, LogType.Discreate));
+            ownerQuest._journalEntries.Add(new JournalLog(new CampaignTime(201),
+                new TaleWorlds.Localization.TextObject("repeated hunt stage"),
+                new TaleWorlds.Localization.TextObject("Hunt"), 0, 5, LogType.Discreate));
+        });
+
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        ClientA.SimulateMessage(Server.NetPeer, Server.SerializeForWire(snapshot));
+        ClientA.Call(() => Assert.Equal(new[] { 3, 4 }, ownerQuest.JournalEntries
+            .Select(log => log.CurrentProgress).ToArray()));
     }
 
     [Fact]
@@ -1203,6 +1328,21 @@ public class MerchantOutlawsTests : IDisposable
         });
         Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText?.ToString().Contains(fails ? "failed to resolve" : "had resolved") == true));
         AssertEndedEverywhere();
+    }
+
+    [Fact]
+    public void ReceivedServerProgressDoesNotEchoAnOwnerSnapshot()
+    {
+        Accept();
+        var total = 0;
+        ClientA.Call(() => total = Quest(ClientA)._totalPartyCount);
+        Assert.True(total > 0);
+        var before = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        ClientA.SimulateMessage(Server.NetPeer, new NetworkMerchantOutlawsProgress(scenario.NotableId,
+            QuestScenario.IssueId, QuestScenario.ControllerA, total, 0, Array.Empty<string>(), Array.Empty<string>()));
+        environment.FlushCoalescer();
+        ClientA.Call(() => Assert.Equal(total, Quest(ClientA)._questProgressLogTest.CurrentProgress));
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before));
     }
 
     private void Accept(bool startQuest = true)
