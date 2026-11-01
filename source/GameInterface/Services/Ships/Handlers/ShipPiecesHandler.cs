@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Ships.Data;
 using GameInterface.Services.Ships.Messages;
@@ -72,7 +73,7 @@ internal class ShipPiecesHandler : IHandler
             }
         }
 
-        network.SendAll(new NetworkShipPiecesChanged(shipHandle, slots, unlockedPieceHandles));
+        network.SendAll(new NetworkShipPiecesChanged(shipHandle, slots, unlockedPieceHandles, ship.HitPoints));
     }
 
     /// <summary>
@@ -114,6 +115,11 @@ internal class ShipPiecesHandler : IHandler
                 ship._shipPieces.Add(slots[i].SlotTag, pieces[i]);
             }
             ship._unlockedUpgradePieces = unlockedPieces;
+
+            using (new AllowedThread())
+            {
+                ship.HitPoints = data.HitPoints;
+            }
 
             ship.Owner?.MobileParty?.SetNavalVisualAsDirty();
             ship.UpdateVersionNo();
