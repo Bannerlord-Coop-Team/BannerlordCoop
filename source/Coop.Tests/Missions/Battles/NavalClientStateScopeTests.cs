@@ -133,6 +133,27 @@ public class NavalClientStateScopeTests
         Assert.Equal(0f, other.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));
     }
 
+    // Each client container keeps its own deployment slot, and a side plan scope gives back the side planning before it.
+    [Fact]
+    public void DeploymentSlotTracker_IsOnePerClientContainer()
+    {
+        using var first = BuildClient();
+        using var second = BuildClient();
+        var slot = first.Resolve<INavalPlayerDeploymentSlotTracker>();
+        var side = ShipTestHulls.Uninitialized<NavalDLC.Missions.MissionLogics.DefaultNavalMissionLogic>();
+        slot.Rank = 1;
+        slot.PlayerCount = 2;
+
+        using (slot.PlanSide(side))
+        {
+            Assert.Same(side, slot.PlanningSide);
+            Assert.Null(second.Resolve<INavalPlayerDeploymentSlotTracker>().PlanningSide);
+        }
+
+        Assert.Null(slot.PlanningSide);
+        Assert.Equal(0, second.Resolve<INavalPlayerDeploymentSlotTracker>().PlayerCount);
+    }
+
     // A client container with the naval registrations.
     private static IContainer BuildClient()
     {

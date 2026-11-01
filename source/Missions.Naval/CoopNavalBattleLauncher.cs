@@ -61,6 +61,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalForeignHullRegistry foreignHulls;
     private readonly INavalRopeRegistry ropes;
     private readonly INavalShipDamageGate damageGate;
+    private readonly INavalPlayerDeploymentSlotTracker deploymentSlot;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -87,7 +88,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalMissionTracker missionTracker,
         INavalForeignHullRegistry foreignHulls,
         INavalRopeRegistry ropes,
-        INavalShipDamageGate damageGate
+        INavalShipDamageGate damageGate,
+        INavalPlayerDeploymentSlotTracker deploymentSlot
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -109,6 +111,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.foreignHulls = foreignHulls;
         this.ropes = ropes;
         this.damageGate = damageGate;
+        this.deploymentSlot = deploymentSlot;
         // One battle's copies, shared by the engine that tracks them and the behaviour that steers them.
         this.steeredCopies = steeredCopies;
         shipEngine = shipEngines(steeredCopies);
@@ -158,9 +161,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         SplitPlayerSideParties(sideParties, PartyBase.MainParty,
             out var ownMapEventParty, out var ownTeamParties, out var allyTeamParties);
         var playerParties = GetPlayerParties();
-        NavalPlayerDeploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
+        deploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
             sideParties.Select(party => party.Party), PartyBase.MainParty, playerParties.Contains);
-        NavalPlayerDeploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
+        deploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
             sideParties.Select(party => party.Party), playerParties.Contains);
         deploymentModel.GetShipDeploymentLimitsOfPlayerTeams(ownTeamParties, allyTeamParties,
             out var ownTeamLimit, out var allyTeamLimit);
@@ -182,7 +185,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
         Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank}/{PlayerCount} ownShips={ShipCount} " +
             "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
-            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, NavalPlayerDeploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
+            mapEventId, playerSide, deploymentSlot.Rank, deploymentSlot.PlayerCount, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
             string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
@@ -276,7 +279,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             );
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleetSpawner,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
-            ballistaTargets, missionTracker, foreignHulls, ropes, damageGate));
+            ballistaTargets, missionTracker, foreignHulls, ropes, damageGate, deploymentSlot));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.HullLedger, tallyReader,

@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Missions.Messages;
@@ -156,11 +158,12 @@ internal class NavalSidePlanScopePatch
 {
     // Records the side whose initial plan is being made.
     [HarmonyPrefix]
-    private static void Prefix(DefaultNavalMissionLogic __instance) => NavalPlayerDeploymentSlot.PlanningSide = __instance;
+    private static void Prefix(DefaultNavalMissionLogic __instance, out IDisposable __state) =>
+        __state = ContainerProvider.TryResolve<INavalPlayerDeploymentSlotTracker>(out var slots) ? slots.PlanSide(__instance) : null;
 
     // Ends the initial plan scope, also when the plan throws.
     [HarmonyFinalizer]
-    private static void Finalizer() => NavalPlayerDeploymentSlot.PlanningSide = null;
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
 
 // Replans keep the stored offset, so shifting the initial plan moves this client's fleet for the whole deployment.
@@ -175,9 +178,11 @@ internal class PlayerFleetDeploymentSlotPatch
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
     {
-        var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
-        int rank = NavalPlayerDeploymentSlot.Rank;
-        int playerCount = NavalPlayerDeploymentSlot.PlayerCount;
+        if (!ContainerProvider.TryResolve<INavalPlayerDeploymentSlotTracker>(out var slots)) return;
+
+        var planningSide = slots.PlanningSide;
+        int rank = slots.Rank;
+        int playerCount = slots.PlayerCount;
         var mission = Mission.Current;
         if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 

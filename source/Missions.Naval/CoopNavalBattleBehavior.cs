@@ -32,6 +32,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalForeignHullRegistry foreignHulls;
     private readonly INavalRopeRegistry ropes;
     private readonly INavalShipDamageGate damageGate;
+    private readonly INavalPlayerDeploymentSlotTracker deploymentSlot;
     private int lastAgentCount = -1;
     private bool retreated;
 
@@ -39,7 +40,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalSteeredCopies steeredCopies, INavalNpcFleetSpawner npcFleetSpawner,
         NavalShipsLogic shipsLogic, INavalTickFailureLog fixedTickFailures, INavalTickFailureLog missionTickFailures,
         INavalLateHullDeployment lateHullDeployment, INavalBallistaTargets ballistaTargets, INavalMissionTracker missionTracker,
-        INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropes, INavalShipDamageGate damageGate)
+        INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropes, INavalShipDamageGate damageGate,
+        INavalPlayerDeploymentSlotTracker deploymentSlot)
     {
         Services = services;
         this.steeredCopies = steeredCopies;
@@ -53,6 +55,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.foreignHulls = foreignHulls;
         this.ropes = ropes;
         this.damageGate = damageGate;
+        this.deploymentSlot = deploymentSlot;
         shipsLogic.ShipSpawnedEvent += OnShipSpawned;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
@@ -236,7 +239,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         // The registry outlives the mission, so a copy the engine never forgot is dropped here.
         foreignHulls.Clear();
         damageGate.Clear();
-        NavalPlayerDeploymentSlot.Reset();
+        deploymentSlot.Reset();
         base.OnEndMissionInternal();
     }
 }
