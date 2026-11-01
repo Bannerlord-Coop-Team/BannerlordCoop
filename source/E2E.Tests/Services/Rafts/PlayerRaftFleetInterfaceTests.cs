@@ -209,6 +209,82 @@ public class PlayerRaftFleetInterfaceTests : SyncTestBase
         });
     }
 
+    // Rejoining switches the client to its hero, which reaches the server as a character change for a party still on its raft.
+    [Fact]
+    public void OnPlayerCharacterChanged_PartyStillOnARaft_KeepsTheCachedFleet()
+    {
+        var fleet = CreatePlayerFleetAtSea();
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(fleet.PartyId);
+            var raftFleetInterface = Server.Resolve<IPlayerRaftFleetInterface>();
+            raftFleetInterface.StrandAfterRelease(party);
+
+            raftFleetInterface.OnPlayerCharacterChanged(party.LeaderHero, party);
+
+            Assert.True(party.IsInRaftState);
+            Assert.Empty(party.Ships);
+            Assert.True(CachedFleets().ContainsKey(fleet.HeroId));
+        }, RaftDisabledMethods);
+    }
+
+    // The fleet kept through a rejoin comes back on landing with the anchor cached at the stranding.
+    [Fact]
+    public void ReturnFleet_AfterRejoiningOnARaft_RebuildsTheShipsAndAnchor()
+    {
+        var fleet = CreatePlayerFleetAtSea();
+        string returnedShipId = null;
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(fleet.PartyId);
+            var raftFleetInterface = Server.Resolve<IPlayerRaftFleetInterface>();
+            raftFleetInterface.StrandAfterRelease(party);
+            raftFleetInterface.OnPlayerCharacterChanged(party.LeaderHero, party);
+
+            // Landing in MobileParty.FinishNavigationTransitionInternal resets the anchor and ends the raft before ReturnFleet
+            party.Anchor.ResetPosition();
+            party.IsInRaftState = false;
+            raftFleetInterface.ReturnFleet(party);
+
+            Assert.False(CachedFleets().ContainsKey(fleet.HeroId));
+            var ship = Assert.Single(party.Ships);
+            Assert.True(Server.ObjectManager.TryGetId(ship, out returnedShipId));
+            Assert.Same(Server.GetRegisteredObject<ShipHull>(fleet.HullId), ship.ShipHull);
+            Assert.Equal(new Vec2(30f, 40f), party.Anchor.Position.ToVec2());
+            Assert.Equal(new Vec2(31f, 41f), party.Anchor.GetLastUsedDisembarkPosition().ToVec2());
+        }, RaftDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            Assert.Same(client.GetRegisteredObject<MobileParty>(fleet.PartyId).Party, client.GetRegisteredObject<Ship>(returnedShipId).Owner);
+        }
+    }
+
+    // Heir selection migrates the cached fleet to the heir, whose party off a raft takes it straight away like vanilla.
+    [Fact]
+    public void OnPlayerCharacterChanged_HeirNotOnARaft_TakesTheMigratedFleet()
+    {
+        var fleet = CreatePlayerFleetAtSea();
+        var heirPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(fleet.PartyId);
+            var heirParty = Server.GetRegisteredObject<MobileParty>(heirPartyId);
+            var raftFleetInterface = Server.Resolve<IPlayerRaftFleetInterface>();
+            raftFleetInterface.StrandAfterRelease(party);
+            Server.Resolve<ICoopSessionMigrator>().MigratePlayerData(party.LeaderHero, heirParty.LeaderHero);
+
+            raftFleetInterface.OnPlayerCharacterChanged(heirParty.LeaderHero, heirParty);
+
+            Assert.Empty(CachedFleets());
+            Assert.Same(Server.GetRegisteredObject<ShipHull>(fleet.HullId), Assert.Single(heirParty.Ships).ShipHull);
+        }, RaftDisabledMethods);
+    }
+
     // Raft state change moves the party to the closest land, which needs the navigation mesh.
     private static readonly MethodBase[] RaftDisabledMethods =
     {

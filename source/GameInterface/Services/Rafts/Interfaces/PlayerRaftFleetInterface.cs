@@ -134,6 +134,9 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
             return;
         }
 
+        // A rejoin also arrives here, so a party still on its raft keeps the fleet for ReturnFleet to give back with its anchor on landing
+        if (newMainParty.IsInRaftState) return;
+
         if (!objectManager.TryGetIdWithLogging(newPlayerHero, out var playerHeroId)) return;
 
         TryTakeCachedFleet(playerHeroId, newMainParty, out _);
