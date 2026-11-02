@@ -386,6 +386,117 @@ public class BattleShipWeaponReplicatorTests
         Assert.Equal("state_not_in_mission", (string)harness.Inspect()["lastDrop"]!);
     }
 
+    // #4191 review: a state for a hull whose weapon isn't found yet waits for discovery instead of being dropped as unknown_weapon.
+    [Fact]
+    public void AcceptState_ForAWeaponNotFoundYet_AppliesOnceDiscoveryFindsIt()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        var loaded = new BattleShipWeaponState(0.3f, 0.1f, 0, 5);
+        harness.Replicator.Tick(0.01f);
+
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0, loaded));
+        harness.Replicator.Tick(0.01f);
+        int heldBeforeDiscovery = (int)harness.Inspect()["pendingStates"]!;
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        Assert.Equal(1, heldBeforeDiscovery);
+        harness.Engine.Verify(e => e.ApplyWeaponState(copy.Weapon, loaded, null), Times.Once);
+        Assert.Equal(0L, (long)harness.Inspect()["statesDropped"]!);
+    }
+
+    // #4191 review: a state held before its hull registered stays held while the new stream still looks for the weapon.
+    [Fact]
+    public void AcceptState_HeldForAHullNotSpawnedYet_StaysHeldUntilItsWeaponIsFound()
+    {
+        var harness = new Harness();
+        var shipId = Guid.NewGuid();
+        var loaded = new BattleShipWeaponState(0.3f, 0.1f, 0, 5);
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(shipId, WeaponKey, Peer, 1, 0, loaded));
+
+        var copy = harness.Register(Peer, isNpcParty: false, shipId, discovered: false);
+        harness.Replicator.Tick(0.01f);
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        harness.Engine.Verify(e => e.ApplyWeaponState(copy.Weapon, loaded, null), Times.Once);
+        Assert.Equal(0L, (long)harness.Inspect()["statesDropped"]!);
+    }
+
+    // #4191 review: shots for a weapon not found yet wait with the states in arrival order, since no keyframe recreates a missed
+    // projectile, and replay once, so the reload state never lands before the shot that caused it.
+    [Fact]
+    public void AcceptShots_ForAWeaponNotFoundYet_ReplayOnceDiscovered_InArrivalOrderWithTheirStates()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        var applied = new List<string>();
+        harness.Engine.Setup(e => e.ReplayWeaponShot(copy.Weapon, It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(), It.IsAny<bool>()))
+            .Callback(() => applied.Add("shot"))
+            .Returns(true);
+        harness.Engine.Setup(e => e.ApplyWeaponState(copy.Weapon, It.IsAny<BattleShipWeaponState>(), It.IsAny<BattleShipWeaponState>()))
+            .Callback<MissionObject, BattleShipWeaponState, BattleShipWeaponState>((_, state, _) => applied.Add($"state {state.AmmoCount}"));
+        harness.Replicator.Tick(0.01f);
+
+        harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, (int)RangedSiegeWeapon.WeaponState.Reloading, 4)));
+        harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 2, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, (int)RangedSiegeWeapon.WeaponState.Reloading, 3)));
+        int heldShots = (int)harness.Inspect()["pendingShots"]!;
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+        harness.Replicator.Tick(0.01f);
+
+        Assert.Equal(2, heldShots);
+        Assert.Equal(new[] { "shot", "state 4", "shot", "state 3" }, applied);
+        Assert.Equal(0L, (long)harness.Inspect()["shotsDropped"]!);
+    }
+
+    // #4191 review: held arrivals are checked again on replay, so an authority change while the weapon was missing drops them.
+    [Fact]
+    public void HeldArrivals_FromAnOwnerWhoLostTheHull_AreDroppedOnReplay()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        harness.Replicator.Tick(0.01f);
+        harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, 0, 5)));
+
+        copy.Ship.CurrentAuthority = Own;
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        harness.Engine.Verify(e => e.ReplayWeaponShot(It.IsAny<MissionObject>(), It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(),
+            It.IsAny<bool>()), Times.Never);
+        Assert.Equal(1L, (long)harness.Inspect()["shotsDropped"]!);
+        Assert.Equal(1L, (long)harness.Inspect()["statesDropped"]!);
+        Assert.Equal("state_own_hull", (string)harness.Inspect()["lastDrop"]!);
+    }
+
+    // #4191 review: a hull that leaves the mission before its weapon is found drops what waited for it.
+    [Fact]
+    public void HeldArrivals_OfAHullThatLeft_AreDropped()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        harness.Replicator.Tick(0.01f);
+        harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, 0, 5)));
+
+        harness.Registry.Remove(copy.Ship.ShipId);
+        harness.Replicator.Tick(0.01f);
+
+        Assert.Equal(0, (int)harness.Inspect()["pendingShots"]!);
+        Assert.Equal(0, (int)harness.Inspect()["pendingStates"]!);
+        Assert.Equal(1L, (long)harness.Inspect()["shotsDropped"]!);
+        Assert.Equal("state_hull_gone", (string)harness.Inspect()["lastDrop"]!);
+    }
+
     [Fact]
     public void ShotAndState_KeepTheirFieldsOverTheWire()
     {
@@ -459,16 +570,24 @@ public class BattleShipWeaponReplicatorTests
                 HullAuthority.Object, new HostEpochPolicy(), members.Object, Arrivals);
         }
 
-        /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>.</summary>
-        public (NetworkShipInfo Ship, MissionObject Weapon) Register(string authority, bool isNpcParty, Guid shipId = default)
+        /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>, found now or only once <see cref="Discover"/> runs.</summary>
+        public (NetworkShipInfo Ship, MissionObject Weapon) Register(string authority, bool isNpcParty, Guid shipId = default,
+            bool discovered = true)
         {
             var ship = new NetworkShipInfo(shipId == default ? Guid.NewGuid() : shipId, authority, "MapEventParty_2", isNpcParty,
                 ShipTestHulls.Create(), null);
             Registry.TryRegister(ship);
             MissionObject weapon = ShipTestHulls.CreateWeapon();
+            if (discovered) Discover(ship, weapon);
+            else Engine.Setup(e => e.TryGetWeapon(ship.Hull, out It.Ref<MissionObject>.IsAny, out It.Ref<string>.IsAny)).Returns(false);
+            return (ship, weapon);
+        }
+
+        /// <summary>Lets the engine find <paramref name="weapon"/> on the hull from the next lookup on.</summary>
+        public void Discover(NetworkShipInfo ship, MissionObject weapon)
+        {
             string key = WeaponKey;
             Engine.Setup(e => e.TryGetWeapon(ship.Hull, out weapon, out key)).Returns(true);
-            return (ship, weapon);
         }
 
         /// <summary>The projectile capture's event for a launch of <paramref name="weapon"/>.</summary>
