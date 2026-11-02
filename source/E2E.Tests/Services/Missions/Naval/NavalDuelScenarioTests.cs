@@ -62,4 +62,48 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(("B", battle.PartyIds["B"], false), (a.Ship(hullB).CurrentAuthority, a.Ship(hullB).MapEventPartyId,
             a.Ship(hullB).IsNpcParty));
     }
+
+    // #4213: after B rams A, B's copy of A's oarsman is let go locally, recovers, and is let go again on the next frame, as
+    // vanilla's oar tick did live. B keeps re-seating it at a bounded cadence while A keeps the seat, and stops once A releases.
+    [Fact]
+    public void Duel_ACopysOarsmanLetGoAgainAfterARam_IsReseatedWhileItsOwnerKeepsTheSeat()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var oarOnA = a.Hull(hullA).Station("oar");
+        a.UseStation(crewOnA, oarOnA, inUse: true);
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+
+        b.Ram(hullA, hullB, 30f);
+        b.Hull(hullA).Seats.Clear();
+        b.Tick();
+        var recovered = b.Hull(hullA).SeatedAt("oar");
+        b.Hull(hullA).Seats.Clear();
+        b.Tick();
+        var withinInterval = b.Hull(hullA).SeatedAt("oar");
+        b.Ticks(20);
+        var afterInterval = b.Hull(hullA).SeatedAt("oar");
+        battle.TickAll(2);
+
+        Assert.Same(crewOnB, recovered);
+        Assert.Null(withinInterval);
+        Assert.Same(crewOnB, afterInterval);
+        Assert.Single(a.Hull(hullA).AppliedDamage);
+        Assert.Equal(1, (long)b.StationStats()["unownedPuppetReleases"]!);
+
+        a.UseStation(crewOnA, oarOnA, inUse: false);
+        b.Hull(hullA).Seats.Clear();
+        b.Ticks(25);
+
+        Assert.Null(b.Hull(hullA).SeatedAt("oar"));
+        Assert.Equal(0, (int)b.StationStats()["appliedSeats"]!);
+    }
 }

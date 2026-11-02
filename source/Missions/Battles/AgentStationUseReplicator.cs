@@ -48,6 +48,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     // A use for an agent or hull that never arrives is dropped after this long.
     internal const float PendingLifetimeSeconds = 10f;
+    // A puppet vanilla keeps releasing from a seat its owner holds is re-seated at most this often.
+    internal const float ReseatRetrySeconds = 1f;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -62,7 +64,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly Dictionary<Guid, AuthorityStamp> appliedStamps = new Dictionary<Guid, AuthorityStamp>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
-    // Puppets the refresh found released here and re-seated once, counted unowned until their owner's next revision takes effect;
+    // Puppets the refresh found released here and re-seats, counted unowned once until their owner's next revision takes effect;
     // kept apart from the seat, which cleanup can drop before a delayed owner release arrives.
     private readonly HashSet<Guid> unjudgedLocalReleases = new HashSet<Guid>();
     private readonly List<string> joinersAwaitingSeats = new List<string>();
@@ -78,7 +80,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // those the owner's late release showed were its own; staleUses and obsoleteReleases (nothing left to release) are expected.
     private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, pinned, ownerReleases,
         sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
-        adoptedSeats;
+        adoptedSeats, reseatAttempts;
 
     // Subscribes to this client's use and release patches, the owners' uses and mission entries, and gives the movement and
     // action handlers its seats.
@@ -213,7 +215,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         alive && registered && !ownedHere && !hullSinking && !hullRemoved;
 
     // [Game thread] Runs after this frame's hull frame writes and the owners' uses. A puppet the owner keeps seated is re-pinned
-    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
+    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per retry interval.
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;
@@ -240,7 +242,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
             if (!engine.IsSeated(seat.Agent, seat.Point))
             {
-                if (unjudgedLocalReleases.Contains(entry.Key)) continue;
+                if (elapsed < seat.NextReseatAt) continue;
                 if (!IsStillStationOf(seat))
                 {
                     leftAgents.Add(entry.Key);
@@ -248,12 +250,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                     continue;
                 }
 
-                unjudgedLocalReleases.Add(entry.Key);
-                unownedPuppetReleases++;
-                Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
-                    "re-seating it once", entry.Key, DescribeStation(seat.Point));
-                Apply(seat.Agent, seat.Point, inUse: true);
-                if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
+                if (!Reseat(entry.Key, seat)) continue;
             }
 
             engine.PinToStation(seat.Agent, seat.Point);
@@ -262,6 +259,28 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         foreach (var agentId in leftAgents)
             appliedSeats.Remove(agentId);
+    }
+
+    // Seats a puppet vanilla let go here again while its owner holds the seat, and whether it took. One success is no proof the
+    // seat lasts, as vanilla can let it go again a frame later, so the next attempt waits a retry interval rather than the revision.
+    private bool Reseat(Guid agentId, AppliedSeat seat)
+    {
+        seat.NextReseatAt = elapsed + ReseatRetrySeconds;
+        reseatAttempts++;
+        if (unjudgedLocalReleases.Add(agentId))
+        {
+            unownedPuppetReleases++;
+            Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
+                "re-seating it", agentId, DescribeStation(seat.Point));
+        }
+        else
+        {
+            Logger.Debug("[NavalSync] Puppet {AgentId} left its station {Station} again under the same owner seat; re-seating it",
+                agentId, DescribeStation(seat.Point));
+        }
+
+        Apply(seat.Agent, seat.Point, inUse: true);
+        return engine.IsSeated(seat.Agent, seat.Point);
     }
 
     public int ReleaseSeatsOn(MissionObject hull)
@@ -521,12 +540,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         departedHullReleases,
         detachedSeats,
         adoptedSeats,
+        reseatAttempts,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
     };
 
-    // A remote owner's seat applied to its puppet here: the puppet, the hull and the point it sits at.
+    // A remote owner's seat applied to its puppet here: the puppet, the hull, the point it sits at and when a lost seat may next
+    // be re-seated.
     private sealed class AppliedSeat
     {
         public AppliedSeat(Agent agent, MissionObject hull, UsableMissionObject point)
@@ -539,6 +560,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         public Agent Agent { get; }
         public MissionObject Hull { get; }
         public UsableMissionObject Point { get; }
+        public float NextReseatAt { get; set; }
     }
 
     // A received use waiting for the tick, with the time it arrived.
