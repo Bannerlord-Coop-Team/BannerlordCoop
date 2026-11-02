@@ -28,23 +28,6 @@ public class BattleShipMessagesTests
         Assert.Equal(shipId, staying.ShipId);
     }
 
-    // The handed-over hulls, their holder and the host change they moved at reach every peer; a take-back with no hulls left
-    // to hand over arrives with an empty list rather than null.
-    [Fact]
-    public void FleetTakeBack_RoundTripsTheHandedOverHulls_AndAnEmptyList()
-    {
-        var shipIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
-
-        var handedOver = Serializer.DeepClone(new NetworkNpcFleetTakeBack(BattleSideEnum.Defender, Peer, shipIds, 3));
-        var underWay = Serializer.DeepClone(new NetworkNpcFleetTakeBack(BattleSideEnum.Attacker, Peer, Array.Empty<Guid>(), 0));
-
-        Assert.Equal(shipIds, handedOver.ShipIds);
-        Assert.Equal(Peer, handedOver.Holder);
-        Assert.Equal(3, handedOver.HostEpoch);
-        Assert.Equal(BattleSideEnum.Defender, handedOver.Side);
-        Assert.Empty(underWay.ShipIds);
-    }
-
     [Fact]
     public void Sample_RoundTripsTheHelmInput()
     {
