@@ -146,7 +146,7 @@ internal class GameStateInterface : IGameStateInterface
     }
 
     // The forced load below skips vanilla's NavalDLC added/removed check, so a mismatched save is refused here instead.
-    private bool RefuseNavalMismatch(SaveGameFileInfo save)
+    internal bool RefuseNavalMismatch(SaveGameFileInfo save)
     {
         string refusal = navalSaveCompatibility.GetHostRefusal(save.Name, save.MetaData.GetModules());
         if (refusal == null) return false;

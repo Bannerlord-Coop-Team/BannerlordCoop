@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.SaveSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.GameState;
@@ -39,6 +40,37 @@ public class GameStateInterfaceTests
                 It.IsAny<object>(),
                 It.IsAny<MainMenuEntered>()),
             Times.Never);
+    }
+
+    // The forced load skips vanilla's NavalDLC check, so a mismatched save must stop here and leave the loading screen.
+    [Fact]
+    public void RefuseNavalMismatch_StopsTheLoad_AndHidesTheLoadingScreen()
+    {
+        var saveCheck = new Mock<INavalSaveCompatibility>();
+        saveCheck.Setup(check => check.GetHostRefusal("vanilla", new[] { "Native", "Sandbox" })).Returns("refused");
+        var loading = new Mock<ILoadingInterface>();
+        var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { }, saveCheck.Object, loading.Object);
+        var metaData = new MetaData();
+        metaData.Add("Modules", "Native;Sandbox");
+
+        bool refused = gameStateInterface.RefuseNavalMismatch(new SaveGameFileInfo { Name = "vanilla", MetaData = metaData });
+
+        Assert.True(refused);
+        loading.Verify(value => value.HideLoadingScreen(), Times.Once);
+    }
+
+    // A save the check allows loads as before.
+    [Fact]
+    public void RefuseNavalMismatch_LetsAMatchingSaveLoad()
+    {
+        var loading = new Mock<ILoadingInterface>();
+        var gameStateInterface = new GameStateInterface(Mock.Of<IMessageBroker>(), () => { },
+            Mock.Of<INavalSaveCompatibility>(), loading.Object);
+
+        bool refused = gameStateInterface.RefuseNavalMismatch(new SaveGameFileInfo { Name = "naval", MetaData = new MetaData() });
+
+        Assert.False(refused);
+        loading.Verify(value => value.HideLoadingScreen(), Times.Never);
     }
 
     [Fact]
