@@ -87,6 +87,10 @@
     <Publicize Include="Coop.Naval" />
     <Publicize Include="NavalDLC" />
     <Publicize Include="NavalDLC.View" />
+    <Publicize Include="NavalDLC.GauntletUI" />
+    <Publicize Include="NavalDLC.ViewModelCollection" />
+    <Reference Include="SandBox.View"><HintPath>$(BannerlordDir)Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath></Reference>
+    <Publicize Include="SandBox.View" />
     <Reference Include="TaleWorlds.ScreenSystem"><HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath></Reference>
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />
