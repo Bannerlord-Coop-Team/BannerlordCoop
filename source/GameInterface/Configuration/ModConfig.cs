@@ -65,7 +65,7 @@ internal sealed class ModConfig : IModConfig
             ["autoAllocateClanMemberPerks"] = false,
         };
 
-    /// <summary>modOptions keys added after configs shipped, seeded into existing files with a short comment.</summary>
+    /// <summary>modOptions keys added after configs shipped, seeded with a short comment into a file that has a modOptions block.</summary>
     private static readonly (string Key, JToken Default, string Comment)[] SeededModOptions =
     {
         ("warSails", false, "// Toggle War Sails (NavalDLC) co-op. Not officially supported yet; see mod-config.default.json."),

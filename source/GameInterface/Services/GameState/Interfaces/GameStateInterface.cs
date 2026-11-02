@@ -40,20 +40,26 @@ internal class GameStateInterface : IGameStateInterface
 
     private readonly IMessageBroker messageBroker;
     private readonly Action endGame;
+    private readonly Func<SaveGameFileInfo[]> getSaveFiles;
+    private readonly Action<SaveGameFileInfo> forceLoadSave;
     private readonly INavalSaveCompatibility navalSaveCompatibility;
     private readonly ILoadingInterface loadingInterface;
 
     public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
         ILoadingInterface loadingInterface)
-        : this(messageBroker, MBGameManager.EndGame, navalSaveCompatibility, loadingInterface)
+        : this(messageBroker, MBGameManager.EndGame, () => MBSaveLoad.GetSaveFiles(null), ForceLoadSave,
+            navalSaveCompatibility, loadingInterface)
     {
     }
 
-    internal GameStateInterface(IMessageBroker messageBroker, Action endGame,
-        INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
+    // Lets tests replace the engine's end-game, save listing and forced load.
+    internal GameStateInterface(IMessageBroker messageBroker, Action endGame, Func<SaveGameFileInfo[]> getSaveFiles,
+        Action<SaveGameFileInfo> forceLoadSave, INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.endGame = endGame;
+        this.getSaveFiles = getSaveFiles;
+        this.forceLoadSave = forceLoadSave;
         this.navalSaveCompatibility = navalSaveCompatibility;
         this.loadingInterface = loadingInterface;
     }
@@ -131,7 +137,7 @@ internal class GameStateInterface : IGameStateInterface
         messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
-            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
+            var save = getSaveFiles().SingleOrDefault(x => x.Name == saveName);
 
             if (save == null)
             {
@@ -141,12 +147,12 @@ internal class GameStateInterface : IGameStateInterface
 
             if (RefuseNavalMismatch(save)) return;
 
-            ForceLoadSave(save);
+            forceLoadSave(save);
         }, blocking: true);
     }
 
     // The forced load below skips vanilla's NavalDLC added/removed check, so a mismatched save is refused here instead.
-    internal bool RefuseNavalMismatch(SaveGameFileInfo save)
+    private bool RefuseNavalMismatch(SaveGameFileInfo save)
     {
         string refusal = navalSaveCompatibility.GetHostRefusal(save.Name, save.MetaData.GetModules());
         if (refusal == null) return false;
@@ -163,7 +169,7 @@ internal class GameStateInterface : IGameStateInterface
         MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
     }
 
-    private void ForceLoadSave(SaveGameFileInfo save)
+    private static void ForceLoadSave(SaveGameFileInfo save)
     {
         LogModuleCompatibilityMismatches(save);
 
@@ -189,7 +195,7 @@ internal class GameStateInterface : IGameStateInterface
         }
     }
 
-    private void StartGame(LoadResult loadResult)
+    private static void StartGame(LoadResult loadResult)
     {
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
         MouseManager.ShowCursor(false);

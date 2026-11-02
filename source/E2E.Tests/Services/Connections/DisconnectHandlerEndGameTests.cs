@@ -11,9 +11,11 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.SaveSystem;
 
 namespace E2E.Tests.Services.Connections;
 
@@ -149,7 +151,7 @@ public class DisconnectHandlerEndGameTests
             {
                 DuringEndGame?.Invoke();
                 order.Enqueue("EndGame");
-            }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
+            }, Array.Empty<SaveGameFileInfo>, _ => { }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
             handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState);
         }
 
