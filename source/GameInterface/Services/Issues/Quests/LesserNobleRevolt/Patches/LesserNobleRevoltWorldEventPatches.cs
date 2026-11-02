@@ -17,15 +17,18 @@ internal static class LesserNobleRevoltWorldEventPatches
     [HarmonyPostfix]
     private static void HourlyTickParty(MobileParty mobileParty) => Run(service => service.HourlyTickParty(mobileParty));
 
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    [HarmonyPostfix]
+    private static void MapEventStarted(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
+        Run(service => service.MapEventStarted(mapEvent, attackerParty, defenderParty));
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
     internal static void SettlementEntered(MobileParty party, Settlement settlement, Hero hero) =>
         Run(service => service.SettlementEntered(party, settlement, hero));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void MapEventStarted(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty) =>
-        Run(service => service.MapEventStarted(mapEvent, attackerParty, defenderParty));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
