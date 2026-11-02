@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Missions.Messages;
@@ -44,7 +46,7 @@ internal class ForeignShipOrderTickPatch
 {
     // Skips the ship order's tick on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // ShipRetreatLogic removes a hull whose order is Retreat once it reaches the map edge; only the owner may retreat its hull.
@@ -54,7 +56,7 @@ internal class ForeignShipRetreatOrderPatch
 {
     // Refuses a retreat order on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // Detachments move crew onto machines; on a foreign copy that is the owner's decision.
@@ -64,7 +66,7 @@ internal class ForeignShipDetachmentsPatch
 {
     // Skips the detachment management on a copy.
     [HarmonyPrefix]
-    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHullRegistry.IsCopyHere(__instance._ownerShip);
 }
 
 // A copy has no controller: its owner steers it. Vanilla hands a hull one, with auto update re-armed, at init, at deployment end,
@@ -77,7 +79,7 @@ internal class ForeignHullControllerPatch
     [HarmonyPrefix]
     private static void Prefix(MissionShip __instance, ref ShipControllerType controllerType, ref bool autoUpdateController)
     {
-        if (!NavalForeignHulls.Contains(__instance)) return;
+        if (!NavalForeignHullRegistry.IsCopyHere(__instance)) return;
 
         controllerType = ShipControllerType.None;
         autoUpdateController = false;
@@ -95,8 +97,8 @@ internal class CopyPairCollisionFilterPatch
     private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
     {
         // The root scan only runs for a copy, since an own hull touches anything.
-        bool mineIsCopy = NavalForeignHulls.Contains(__instance);
-        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
+        bool mineIsCopy = NavalForeignHullRegistry.IsCopyHere(__instance);
+        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHullRegistry.ContainsRootOfHere(otherEntity))) return true;
 
 #if DEBUG
         NavalContactProbe.CountFilteredCopyPair();
@@ -123,7 +125,7 @@ internal class CopyCrewLoadPatch
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
-        if (!NavalForeignHulls.TryGetCopy(__instance, out var copy)) return true;
+        if (!NavalForeignHullRegistry.TryGetCopyHere(__instance, out var copy)) return true;
 
         // One read of the volatile load, which the game thread replaces with each sample.
         var ownerLoad = copy.CrewLoad;
@@ -156,11 +158,12 @@ internal class NavalSidePlanScopePatch
 {
     // Records the side whose initial plan is being made.
     [HarmonyPrefix]
-    private static void Prefix(DefaultNavalMissionLogic __instance) => NavalPlayerDeploymentSlot.PlanningSide = __instance;
+    private static void Prefix(DefaultNavalMissionLogic __instance, out IDisposable __state) =>
+        __state = ContainerProvider.TryResolve<INavalPlayerDeploymentSlotTracker>(out var slots) ? slots.PlanSide(__instance) : null;
 
     // Ends the initial plan scope, also when the plan throws.
     [HarmonyFinalizer]
-    private static void Finalizer() => NavalPlayerDeploymentSlot.PlanningSide = null;
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
 
 // Replans keep the stored offset, so shifting the initial plan moves this client's fleet for the whole deployment.
@@ -175,9 +178,11 @@ internal class PlayerFleetDeploymentSlotPatch
     [HarmonyPrefix]
     private static void Prefix(Team team, ref float spawnPathOffset)
     {
-        var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
-        int rank = NavalPlayerDeploymentSlot.Rank;
-        int playerCount = NavalPlayerDeploymentSlot.PlayerCount;
+        if (!ContainerProvider.TryResolve<INavalPlayerDeploymentSlotTracker>(out var slots)) return;
+
+        var planningSide = slots.PlanningSide;
+        int rank = slots.Rank;
+        int playerCount = slots.PlayerCount;
         var mission = Mission.Current;
         if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 
@@ -206,7 +211,7 @@ internal class CoopOrderOfBattleShipLayoutPatch
 {
     // Skips the saved layout load in a coop naval mission.
     [HarmonyPrefix]
-    internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
+    internal static bool Prefix() => !NavalMissionTracker.IsActiveHere();
 }
 
 // Owners announce station use; the replicator ignores agents this client does not drive. An item pickup is no station
@@ -218,7 +223,7 @@ internal class AgentStationUsePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject usedObject)
     {
-        if (!CoopNavalMissionScope.IsActive || usedObject == null || usedObject is SpawnedItemEntity) return;
+        if (!NavalMissionTracker.IsActiveHere() || usedObject == null || usedObject is SpawnedItemEntity) return;
 
         MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, usedObject, inUse: true));
     }
@@ -235,7 +240,7 @@ internal partial class AgentStationReleasePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject __state)
     {
-        if (!CoopNavalMissionScope.IsActive || __state == null || __state is SpawnedItemEntity
+        if (!NavalMissionTracker.IsActiveHere() || __state == null || __state is SpawnedItemEntity
             || __instance.CurrentlyUsedGameObject == __state)
             return;
 
@@ -256,12 +261,12 @@ internal class ForeignHelmUsePatch
     [HarmonyPrefix]
     private static bool Prefix(Agent __instance, UsableMissionObject targetObject)
     {
-        if (!__instance.IsMainAgent || !CoopNavalMissionScope.IsActive) return true;
+        if (!__instance.IsMainAgent || !NavalMissionTracker.IsActiveHere()) return true;
 
         var hull = HelmHullOf(targetObject);
         if (hull == null) return true;
 
-        return AllowsStart(NavalForeignHulls.Contains(hull), IsEnemyHull(hull, __instance));
+        return AllowsStart(NavalForeignHullRegistry.IsCopyHere(hull), IsEnemyHull(hull, __instance));
     }
 
     /// <summary>
@@ -300,7 +305,7 @@ internal class CoopShipCapturePatch
     [HarmonyPrefix]
     private static bool Prefix(ShipControllerMachine __instance, Agent captorAgent)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         MessageBroker.Instance.Publish(__instance, new ShipCaptureTimerElapsed(__instance.AttachedShip, captorAgent));
         return false;
@@ -317,7 +322,7 @@ internal class CapturedFormationConnectionPatch
     [HarmonyPrefix]
     internal static bool Prefix(MissionShip ship1, MissionShip ship2, ref bool __result)
     {
-        if (!CoopNavalMissionScope.IsActive || (ship1 != null && ship2 != null)) return true;
+        if (!NavalMissionTracker.IsActiveHere() || (ship1 != null && ship2 != null)) return true;
 
         __result = false;
         return false;

@@ -64,6 +64,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly INavalLateDeploymentPlanTracker latePlans;
     private readonly BattleSideEnum enemySide;
 
     // The battle's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
@@ -95,6 +96,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager,
         IPlayerManager playerManager,
+        INavalLateDeploymentPlanTracker latePlans,
         BattleSideEnum enemySide
 #if DEBUG
         , Func<bool> scenarioFailsSpawn = null
@@ -108,6 +110,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.latePlans = latePlans;
         this.enemySide = enemySide;
 #if DEBUG
         this.scenarioFailsSpawn = scenarioFailsSpawn;
@@ -289,7 +292,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         try
         {
             // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
-            NavalLateDeploymentPlan.MakeForSide(navalLogic, enemySide);
+            latePlans.MakeForSide(navalLogic, enemySide);
             SpawnAssignedHulls(shipsLogic, planning, team, formations, ships, parties);
         }
         finally

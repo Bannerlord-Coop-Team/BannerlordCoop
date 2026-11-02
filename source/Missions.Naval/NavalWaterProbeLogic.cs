@@ -33,6 +33,7 @@ public class NavalWaterProbeLogic : MissionLogic
     private readonly IBattleSession session;
     private readonly INetworkShipRegistry registry;
     private readonly INavalTickFailureLog fixedTickFailures;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
     private NavalWaterProbeSettings settings;
     private string probeId;
@@ -44,11 +45,14 @@ public class NavalWaterProbeLogic : MissionLogic
     private long ticks;
     private long frames;
 
-    public NavalWaterProbeLogic(IBattleSession session, INetworkShipRegistry registry, INavalTickFailureLog fixedTickFailures)
+    // Takes the battle's hulls and session, and the registry that tells this client's copies apart.
+    public NavalWaterProbeLogic(IBattleSession session, INetworkShipRegistry registry, INavalTickFailureLog fixedTickFailures,
+        INavalForeignHullRegistry foreignHulls)
     {
         this.session = session;
         this.registry = registry;
         this.fixedTickFailures = fixedTickFailures;
+        this.foreignHulls = foreignHulls;
     }
 
     public bool IsRunning => settings != null;
@@ -147,7 +151,7 @@ public class NavalWaterProbeLogic : MissionLogic
             if (!(ship.Hull is MissionShip hull) || hull.IsRemoved || !hull.GameEntity.IsValid) continue;
 
             var frame = hull.GlobalFrame;
-            bool isCopy = NavalForeignHulls.Contains(hull);
+            bool isCopy = foreignHulls.Contains(hull);
             var crewLoad = AppliedCrewLoad(hull, out string crewSource);
             yield return new NavalWaterProbeHull(NavalContactProbe.Short(ship.ShipId), isCopy ? "copy" : "own", NavalSteeredCopies.ModeName(hull),
                 frame.origin.x, frame.origin.y, YawDegrees(frame.rotation.f), frame.origin.z, AxisTiltDegrees(frame.rotation.f.z),
@@ -156,9 +160,9 @@ public class NavalWaterProbeLogic : MissionLogic
     }
 
     // The crew load the hull's physics takes: the owner's on a copy that has one (CopyCrewLoadPatch), vanilla's committed one otherwise.
-    private static BattleShipCrewLoad AppliedCrewLoad(MissionShip hull, out string source)
+    private BattleShipCrewLoad AppliedCrewLoad(MissionShip hull, out string source)
     {
-        var ownerLoad = NavalForeignHulls.TryGetCopy(hull.Physics, out var copy) ? copy.CrewLoad : null;
+        var ownerLoad = foreignHulls.TryGetCopy(hull.Physics, out var copy) ? copy.CrewLoad : null;
         source = ownerLoad != null ? "owner" : "vanilla";
         return ownerLoad ?? NavalShipEngine.ReadCrewLoad(hull);
     }

@@ -17,9 +17,14 @@ public interface INavalEdgeRetreatCoopCommand : ICoopCommand { }
 public sealed class NavalEdgeRetreatCoopCommand : INavalEdgeRetreatCoopCommand
 {
     private readonly INavalEdgeRetreatStaging staging;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
     /// <summary>Uses boundary geometry without introducing a second removal path.</summary>
-    public NavalEdgeRetreatCoopCommand(INavalEdgeRetreatStaging staging) => this.staging = staging;
+    public NavalEdgeRetreatCoopCommand(INavalEdgeRetreatStaging staging, INavalForeignHullRegistry foreignHulls)
+    {
+        this.staging = staging;
+        this.foreignHulls = foreignHulls;
+    }
 
     public string Prefix => "coop.debug.naval";
     public string Name => "edge_retreat";
@@ -47,7 +52,7 @@ public sealed class NavalEdgeRetreatCoopCommand : INavalEdgeRetreatCoopCommand
         if (info.CurrentAuthority != controller.Session.OwnControllerId)
             return Failed("Run on the selected hull's authority client.");
         var ship = info.Hull as MissionShip;
-        if (ship == null || ship.IsRemoved || ship.IsSinking || !ship.IsShipOrderActive || NavalForeignHulls.Contains(ship))
+        if (ship == null || ship.IsRemoved || ship.IsSinking || !ship.IsShipOrderActive || foreignHulls.Contains(ship))
             return Failed("Select an active, afloat owned hull.");
         if (ship.Formation == null) return Failed("Select a hull with an assigned formation.");
         if (ship.GetIsConnected()) return Failed("Disconnect ropes before staging a retreat.");

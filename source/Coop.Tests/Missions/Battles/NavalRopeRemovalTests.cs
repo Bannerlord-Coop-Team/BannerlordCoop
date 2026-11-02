@@ -30,17 +30,16 @@ public class NavalRopeRemovalTests
 
         var removedStation = Machine(owner: removed, preferred: null);
         removed._attachmentMachines.Add(removedStation);
-        NavalRopes.Clear();
-        NavalRopes.records[removedStation] = new NavalRopes.RopeRecord { Generation = 2 };
-        NavalRopes.records[preferringOther] = new NavalRopes.RopeRecord { Generation = 1 };
+        var ropes = Ropes();
+        ropes.records[removedStation] = new NavalRopeRegistry.RopeRecord { Generation = 2 };
+        ropes.records[preferringOther] = new NavalRopeRegistry.RopeRecord { Generation = 1 };
 
-        NavalRopeRemoval.ForgetRemovedHull(new[] { remaining, other }, removed);
+        NavalRopeRemoval.ForgetRemovedHull(new[] { remaining, other }, removed, ropes);
 
         Assert.Null(preferringRemoved.GetPreferredTargetShip());
         Assert.Same(other, preferringOther.GetPreferredTargetShip());
-        Assert.Null(NavalRopes.RecordOf(removedStation));
-        Assert.NotNull(NavalRopes.RecordOf(preferringOther));
-        NavalRopes.Clear();
+        Assert.Null(ropes.RecordOf(removedStation));
+        Assert.NotNull(ropes.RecordOf(preferringOther));
     }
 
     [Fact]
@@ -50,7 +49,7 @@ public class NavalRopeRemovalTests
         removed._isRemoved = true;
         var source = Machine(owner: Hull(), preferred: removed);
 
-        Assert.False(NavalRopes.AllowConnection(source, Point(removed)));
+        Assert.False(Ropes().AllowConnection(source, Point(removed)));
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public class NavalRopeRemovalTests
         var target = Hull();
         var source = Machine(owner: Hull(), preferred: target);
 
-        Assert.True(NavalRopes.AllowConnection(source, Point(target)));
-        Assert.True(NavalRopes.AllowConnection(source, null));
+        Assert.True(Ropes().AllowConnection(source, Point(target)));
+        Assert.True(Ropes().AllowConnection(source, null));
         Assert.Same(target, source.GetPreferredTargetShip());
     }
 
@@ -108,13 +107,13 @@ public class NavalRopeRemovalTests
     [Fact]
     public void AllowJointStep_SkipsAJointWithoutAHull_AndCountsIt()
     {
-        NavalRopes.Clear();
+        NavalRopeRemoval.Clear();
 
         Assert.True(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), Hull())));
         Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
         Assert.False(NavalRopeRemoval.AllowJointStep(JointBetween(Hull(), null)));
         Assert.Equal(2L, NavalRopeRemoval.JointStepsSkipped);
-        NavalRopes.Clear();
+        NavalRopeRemoval.Clear();
     }
 
     // S17 A1 / R49: vanilla's removal broke every rope in the battle; in co-op only a rope with an end on the removed hull breaks.
@@ -130,18 +129,14 @@ public class NavalRopeRemovalTests
         var target = Hull();
         var removed = removedEnd == "source" ? source : removedEnd == "target" ? target : Hull();
         var rope = Rope(source, removedEnd == "flying" ? null : target);
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = coopBattle;
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = coopBattle;
 
-            Assert.Equal(expected, NavalRopeRemoval.BreaksOnRemoval(rope, removed));
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        Assert.Equal(expected, NavalRopeRemoval.BreaksOnRemoval(rope, removed));
     }
+
+    // A rope registry of a client with no copies and no running battle.
+    private static NavalRopeRegistry Ropes() => new NavalRopeRegistry(new NavalForeignHullRegistry(), new NavalMissionTracker());
 
     // A constructor-skipped rope from a station on the source hull, hooked to a point on the target hull when one is given.
     internal static Attachment Rope(MissionShip source, MissionShip target)

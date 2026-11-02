@@ -40,7 +40,7 @@ public static class NavalRopeDebugCommands
         for (int index = 0; index < targets.Length; index++)
         {
             float candidate = Distance(source, targets[index]);
-            if (candidate >= distance || !IsInRange(candidate) || NavalRopes.IsBusy(targets[index]) || !IsAligned(source, targets[index]))
+            if (candidate >= distance || !IsInRange(candidate) || NavalRopeRegistry.IsBusy(targets[index]) || !IsAligned(source, targets[index]))
                 continue;
 
             best = index;
@@ -137,7 +137,7 @@ public static class NavalRopeDebugCommands
                     {
                         index,
                         key = KeyOf(target, foreign),
-                        free = !NavalRopes.IsBusy(target),
+                        free = !NavalRopeRegistry.IsBusy(target),
                         nearestSource = sources.Length == 0 ? (int?)null : nearest.sourceIndex,
                         distance = sources.Length == 0 ? (float?)null : nearest.distance,
                     };
@@ -209,7 +209,7 @@ public static class NavalRopeDebugCommands
             if (chosen >= targets.Length) return Failed($"The other hull has {targets.Length} attachment points.");
             distance = Distance(source, targets[chosen]);
             if (!IsInRange(distance)) return Failed($"Attachment point {chosen} is {distance:F1} m away, beyond {ThrowRange} m.");
-            if (NavalRopes.IsBusy(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
+            if (NavalRopeRegistry.IsBusy(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
             if (!IsAligned(source, targets[chosen])) return Failed($"Attachment point {chosen} does not face rope station {sourceIndex}.");
         }
 

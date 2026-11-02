@@ -45,6 +45,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     private readonly INetworkShipRegistry registry;
     private readonly IMessageBroker messageBroker;
     private readonly string mapEventId;
+    private readonly INavalShipDamageGate damageGate;
     // The scenario of this battle; adopted late when a returner's re-sent scenario arrives after it was pulled in.
     private NavalScenarioConfig config;
     private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
@@ -64,7 +65,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     private MissionShip placedTarget;
 
     public NavalScenarioMissionLogic(INavalScenarioState state, INavalDebugHulls hulls, IBattleSession session,
-        INetworkShipRegistry registry, IMessageBroker messageBroker, string mapEventId)
+        INetworkShipRegistry registry, IMessageBroker messageBroker, string mapEventId, INavalShipDamageGate damageGate)
     {
         this.state = state;
         this.hulls = hulls;
@@ -72,6 +73,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         this.registry = registry;
         this.messageBroker = messageBroker;
         this.mapEventId = mapEventId;
+        this.damageGate = damageGate;
     }
 
     // Runs this client's pending scenario steps for the battle's current phase.
@@ -356,7 +358,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         }
 
         var result = NavalDamageCoopCommand.Hit(hulls.ShipIdOf(target).ToString(), hull => SinkingHitDamage(hull.ShipOrigin.MaxHitPoints),
-            "NAVAL_DAMAGE");
+            "NAVAL_DAMAGE", damageGate);
         Complete(NavalScenarioState.SinkStep, result.Succeeded, result.Output);
     }
 

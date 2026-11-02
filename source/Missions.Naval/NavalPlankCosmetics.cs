@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface;
+using System;
 using System.Globalization;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
 
@@ -13,14 +14,15 @@ internal static class NavalPlankCosmetics
     internal static Random PlankCosmeticRandom(Attachment attachment, string purpose)
     {
         var source = attachment?.AttachmentSource;
-        if (!CoopNavalMissionScope.IsActive || source?.OwnerShip == null) return null;
+        if (!NavalMissionTracker.IsActiveHere() || source?.OwnerShip == null) return null;
+        if (!ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes)) return null;
 
-        var record = NavalRopes.RecordOf(source);
-        if (purpose == "AddRopesToBridge" && !NavalRopes.IsReplica(attachment) && record != null)
+        var record = ropes.RecordOf(source);
+        if (purpose == "AddRopesToBridge" && !ropes.IsReplica(attachment) && record != null)
             record.DecorationPlanks = attachment._numberOfPlanksNeeded;
 
         long generation = record?.Generation ?? 0;
-        if (!NavalRopes.BypassReplicaGates && !ReferenceEquals(record?.Attachment, attachment)) generation++;
+        if (!ropes.BypassReplicaGates && !ReferenceEquals(record?.Attachment, attachment)) generation++;
         string key = NavalShipEngine.EntityPath(source.GameEntity, source.OwnerShip.GameEntity) + ":"
             + generation.ToString(CultureInfo.InvariantCulture) + ":" + purpose;
         int seed = 17;
@@ -35,7 +37,9 @@ internal static class NavalPlankCosmetics
     // The plank count a decoration loop lays: the owner's for a replica it has sampled, else vanilla's own.
     internal static int DecorationCount(Attachment attachment)
     {
-        var record = NavalRopes.IsReplica(attachment) ? NavalRopes.RecordOf(attachment.AttachmentSource) : null;
+        var record = ContainerProvider.TryResolve<INavalRopeRegistry>(out var ropes) && ropes.IsReplica(attachment)
+            ? ropes.RecordOf(attachment.AttachmentSource)
+            : null;
         return record != null && record.DecorationPlanks > 0 ? record.DecorationPlanks : attachment._numberOfPlanksNeeded;
     }
 }

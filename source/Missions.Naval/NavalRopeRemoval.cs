@@ -30,15 +30,15 @@ internal static class NavalRopeRemoval
     /// Breaks every rope and plank that starts or ends on a hull about to leave, replicas included, before vanilla's removal;
     /// the owners of the other ends see their rope gone and send its removal.
     /// </summary>
-    internal static void BreakConnections(MissionShip hull) => NavalRopes.PastReplicaGates(hull.BreakAllExistingConnections);
+    internal static void BreakConnections(MissionShip hull, INavalRopeRegistry ropes) => ropes.PastReplicaGates(hull.BreakAllExistingConnections);
 
     /// <summary>
     /// Forgets a hull that left on every removal path: its stations' records, and every station's AI preference for it, which
     /// vanilla's removal keeps and its pilot AI throws at (GetBestEnemyAttachment) without a removal check.
     /// </summary>
-    internal static void ForgetRemovedHull(IEnumerable<MissionShip> ships, MissionShip removed)
+    internal static void ForgetRemovedHull(IEnumerable<MissionShip> ships, MissionShip removed, INavalRopeRegistry ropes)
     {
-        NavalRopes.Forget(removed);
+        ropes.Forget(removed);
 
         foreach (var ship in ships)
         {
@@ -56,17 +56,17 @@ internal static class NavalRopeRemoval
     /// on that hull breaks, because hulls leave mid-battle there and vanilla's removal would end every other boarding.
     /// </summary>
     internal static bool BreaksOnRemoval(Attachment rope, MissionShip removed) =>
-        !CoopNavalMissionScope.IsActive || rope.AttachmentSource?.OwnerShip == removed || rope.AttachmentTarget?.OwnerShip == removed;
+        !NavalMissionTracker.IsActiveHere() || rope.AttachmentSource?.OwnerShip == removed || rope.AttachmentTarget?.OwnerShip == removed;
 
     /// <summary>Whether a rope end has no hull: it left the mission, or never resolved to one (a joint built against a removed hull).</summary>
     internal static bool IsMissingOrRemoved(MissionShip hull) => hull == null || hull.IsRemoved;
 
     /// <summary>Breaks a rope whose end left; the machine tick destroys it right after this attachment's tick.</summary>
-    internal static bool BreakIfEndGone(Attachment attachment)
+    internal static bool BreakIfEndGone(Attachment attachment, INavalRopeRegistry ropes)
     {
         if (!EndIsGone(attachment)) return false;
 
-        NavalRopes.PastReplicaGates(() => attachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval));
+        ropes.PastReplicaGates(() => attachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval));
         return true;
     }
 

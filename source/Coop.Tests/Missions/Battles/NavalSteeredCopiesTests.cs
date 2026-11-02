@@ -22,22 +22,23 @@ public class NavalSteeredCopiesTests
         ship._physics = physics;
         var entity = NavalShipEngineTests.ValidEntity();
         AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(ship, entity);
-        var copies = new NavalSteeredCopies(new CopySteeringKnobs());
+        var foreignHulls = new NavalForeignHullRegistry();
+        var copies = new NavalSteeredCopies(new CopySteeringKnobs(), foreignHulls);
 
         try
         {
             copies.Track(ship);
-            Assert.True(NavalForeignHulls.Contains(ship));
-            Assert.True(NavalForeignHulls.IsCopyRoot(entity));
-            Assert.True(NavalForeignHulls.TryGetCopy(physics, out var copy));
+            Assert.True(foreignHulls.Contains(ship));
+            Assert.True(foreignHulls.IsCopyRoot(entity));
+            Assert.True(foreignHulls.TryGetCopy(physics, out var copy));
             Assert.Null(copy.CrewLoad);
             // The owner decides a copy, so it is left without an auto-updated controller.
             Assert.False(ship._autoUpdateController);
 
             copies.Forget(ship);
-            Assert.False(NavalForeignHulls.Contains(ship));
-            Assert.False(NavalForeignHulls.IsCopyRoot(entity));
-            Assert.False(NavalForeignHulls.TryGetCopy(physics, out _));
+            Assert.False(foreignHulls.Contains(ship));
+            Assert.False(foreignHulls.IsCopyRoot(entity));
+            Assert.False(foreignHulls.TryGetCopy(physics, out _));
         }
         finally
         {

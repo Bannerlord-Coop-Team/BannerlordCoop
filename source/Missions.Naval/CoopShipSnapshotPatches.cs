@@ -17,7 +17,7 @@ internal class SnapshotShipDestroyPatch
 {
     // Skips the destroy for a snapshot; campaign ships run it.
     [HarmonyPrefix]
-    private static bool Prefix(Ship ship) => !CoopShipSnapshots.Contains(ship);
+    private static bool Prefix(Ship ship) => !CoopShipSnapshotRegistry.IsSnapshotHere(ship, out _);
 }
 
 // Mission damage to a snapshot is not campaign ship damage, so it grants no Boatswain XP here; the mitigated part is summed and
@@ -30,9 +30,9 @@ internal class SnapshotShipDamageXpPatch
     [HarmonyPrefix]
     internal static bool Prefix(Ship ship, float rawDamage, float finalDamage)
     {
-        if (!CoopShipSnapshots.Contains(ship)) return true;
+        if (!CoopShipSnapshotRegistry.IsSnapshotHere(ship, out var snapshots)) return true;
 
-        CoopShipSnapshots.AddMitigatedDamage(ship, Math.Max(rawDamage - finalDamage, 0f));
+        snapshots.AddMitigatedDamage(ship, Math.Max(rawDamage - finalDamage, 0f));
         return false;
     }
 }
@@ -56,7 +56,7 @@ internal class SnapshotShipHitPointsSyncScopePatch
     private static void Prefix(Ship __instance, out IDisposable __state)
     {
         __state = null;
-        if (!CoopShipSnapshots.Contains(__instance)) return;
+        if (!CoopShipSnapshotRegistry.IsSnapshotHere(__instance, out _)) return;
 
         __state = CallOriginalPolicy.AllowOriginalsForCurrentOperation();
     }

@@ -13,10 +13,16 @@ namespace Missions.Naval;
 public sealed class NavalWeaponCoopCommand : ICoopCommand
 {
     private readonly INavalWeaponProbe probe;
+    private readonly INavalMissionTracker missionTracker;
     private const string Usage = "Usage: coop.debug.naval.weapon_probe start at-water-seconds [seconds], status or stop";
 
     /// <summary>Resolves a transient probe only used when the mission has no existing probe.</summary>
-    public NavalWeaponCoopCommand(INavalWeaponProbe probe) => this.probe = probe;
+    public NavalWeaponCoopCommand(INavalWeaponProbe probe, INavalMissionTracker missionTracker)
+    {
+        this.probe = probe;
+        this.missionTracker = missionTracker;
+    }
+
     public string Prefix => "coop.debug.naval";
     public string Name => "weapon_probe";
     public string Description => "Logs shared-clock weapon samples and animation events. " + Usage;
@@ -33,7 +39,7 @@ public sealed class NavalWeaponCoopCommand : ICoopCommand
         var values = args?.ToArray() ?? Array.Empty<string>();
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
-        if (controller == null || !CoopNavalMissionScope.IsActive) return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
+        if (controller == null || !missionTracker.IsActive) return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
         INavalWeaponProbe active = mission.GetMissionBehavior<NavalWeaponProbe>();
         if (values.Length == 1 && (values[0] == "status" || values[0] == "stop"))
         {

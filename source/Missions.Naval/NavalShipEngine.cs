@@ -38,14 +38,23 @@ public class NavalShipEngine : INavalShipEngine
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
     private readonly INavalCopyWeaponStates copyWeaponStates;
+    private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalRopeRegistry ropeRegistry;
+    private readonly ICoopShipSnapshotRegistry snapshots;
+    private readonly INavalShipDamageGate damageGate;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
-        INavalCopyWeaponStates copyWeaponStates)
+        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
+        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         SteeredCopies = steeredCopies;
         this.copyWeaponStates = copyWeaponStates;
+        this.foreignHulls = foreignHulls;
+        this.ropeRegistry = ropeRegistry;
+        this.snapshots = snapshots;
+        this.damageGate = damageGate;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -217,7 +226,7 @@ public class NavalShipEngine : INavalShipEngine
         int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State, copyWeaponStates.Take(weapon));
 
         // Breaks the old hull's ropes before vanilla's removal, as in RemoveHull.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 
@@ -393,7 +402,7 @@ public class NavalShipEngine : INavalShipEngine
 
         // The one targeted break of the leaving hull's ropes, as Quest5's RemoveShipInternal does; vanilla's removal then breaks
         // only ropes on this hull (RopeShipRemovalPatch). A copy stays a copy until the ShipRemovedEvent handler drops it.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         switch (RemovalPathOf(shipsLogic, ship))
         {
             case HullRemovalPath.Assigned:
@@ -737,13 +746,13 @@ public class NavalShipEngine : INavalShipEngine
     }
 
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Capture((MissionShip)hull, shipIdOf);
+        ropeRegistry.Capture((MissionShip)hull, shipIdOf);
 
     public void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final) =>
-        NavalRopes.Apply((MissionShip)hull, ropes, hullOf, final);
+        ropeRegistry.Apply((MissionShip)hull, ropes, hullOf, final);
 
     public object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
+        ropeRegistry.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
 
     public void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter)
     {
@@ -751,7 +760,7 @@ public class NavalShipEngine : INavalShipEngine
         if (!ship.GameEntity.IsValid || ship.IsDisabled) return;
 
         var point = ship.GlobalFrame.TransformToParent(damage.LocalPoint);
-        using (NavalShipDamageGate.RoutedApply())
+        using (damageGate.RoutedApply())
         {
             switch (damage.Kind)
             {
@@ -788,7 +797,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || foreignHulls.Contains(ship)) return 0;
 
         int active = agentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
         return Math.Max(0, agentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
@@ -800,7 +809,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || foreignHulls.Contains(ship)) return 0;
 
         // A taken-over hull never had its crew target set; vanilla's unbalanced AutoComputeDesiredTroopCountsPerShip uses the capacity.
         agentsLogic.SetDesiredTroopCountOfShip(ship, ship.TotalCrewCapacity);
@@ -822,9 +831,9 @@ public class NavalShipEngine : INavalShipEngine
         return added;
     }
 
-    public string CampaignShipIdOf(MissionObject hull) => CoopShipSnapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
+    public string CampaignShipIdOf(MissionObject hull) => snapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
-    public float ReadMitigatedDamage(MissionObject hull) => CoopShipSnapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
+    public float ReadMitigatedDamage(MissionObject hull) => snapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
 
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
     public void WithdrawAgent(Agent agent)
@@ -844,8 +853,8 @@ public class NavalShipEngine : INavalShipEngine
         var ship = (MissionShip)hull;
         if (condition == null || !ship.GameEntity.IsValid) return;
 
-        bool isCopy = NavalForeignHulls.Contains(ship);
-        using (NavalShipDamageGate.RoutedApply())
+        bool isCopy = foreignHulls.Contains(ship);
+        using (damageGate.RoutedApply())
         {
             if (ship.ShipOrigin is Ship origin)
             {

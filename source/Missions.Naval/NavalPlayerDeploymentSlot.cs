@@ -7,8 +7,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] The spawn path slot of this client's own fleet among its side's player parties, which every client
-/// plans at vanilla's first slot. Static because the deployment planning patches read it.
+/// The spawn path slot math for a player fleet among its side's player parties, which every client would otherwise plan at
+/// vanilla's first slot. Stateless; the slot itself lives in <see cref="INavalPlayerDeploymentSlotTracker"/>.
 /// </summary>
 internal static class NavalPlayerDeploymentSlot
 {
@@ -23,23 +23,6 @@ internal static class NavalPlayerDeploymentSlot
 
     // Float slack for the layout fit check; vanilla's placement adds and subtracts the same ranges.
     private const float FitTolerance = 0.01f;
-
-    /// <summary>The own party's index among the side's player parties; 0 is the front slot.</summary>
-    public static int Rank { get; set; }
-
-    /// <summary>How many player parties fight on the own side, the own one included; one or none keeps vanilla's plan.</summary>
-    public static int PlayerCount { get; set; }
-
-    /// <summary>The naval logic whose initial side plan is being made, so the plan patch can read its team range.</summary>
-    public static DefaultNavalMissionLogic PlanningSide { get; set; }
-
-    /// <summary>Clears the per-mission slot state.</summary>
-    public static void Reset()
-    {
-        Rank = 0;
-        PlayerCount = 0;
-        PlanningSide = null;
-    }
 
     /// <summary>How many player parties precede <paramref name="own"/> in the side's party order.</summary>
     internal static int RankOf<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isPlayerParty) where T : class

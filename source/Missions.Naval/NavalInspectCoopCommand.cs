@@ -15,12 +15,25 @@ namespace Missions.Naval;
 /// <summary>Reports the local coop naval battle: session, setup guard's reserve check and per-hull state.</summary>
 public sealed class NavalInspectCoopCommand : ICoopCommand
 {
+    private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalShipDamageGate damageGate;
 #if DEBUG
     private readonly INavalRamInspect ramInspect;
-
-    /// <summary>Reads owner-side crew morale independently of the other inspect sections.</summary>
-    public NavalInspectCoopCommand(INavalRamInspect ramInspect) => this.ramInspect = ramInspect;
 #endif
+
+    /// <summary>Tells copies apart, reads the damage gate, and in DEBUG reads owner-side crew morale independently of the other inspect sections.</summary>
+    public NavalInspectCoopCommand(INavalForeignHullRegistry foreignHulls, INavalShipDamageGate damageGate
+#if DEBUG
+        , INavalRamInspect ramInspect
+#endif
+        )
+    {
+        this.foreignHulls = foreignHulls;
+        this.damageGate = damageGate;
+#if DEBUG
+        this.ramInspect = ramInspect;
+#endif
+    }
 
     public string Prefix => "coop.debug.naval";
 
@@ -59,7 +72,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipReplicator.Inspect(),
             shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipCaptureReplicator.Inspect(),
             shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.Services.ShipDamageRouter.Inspect(),
-            shipDamageGate = NavalShipDamageGate.Inspect(),
+            shipDamageGate = damageGate.Inspect(),
 #if DEBUG
             // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
             ramProbe = ramInspect.Inspect(mission, controller),
@@ -88,7 +101,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 captureTimer = ship.ShipControllerMachine?.CaptureTimer,
                 controller = ship.Controller?.ControllerType.ToString() ?? "None",
                 activeBody = ship.GameEntity.IsValid ? (bool?)ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() : null,
-                foreign = NavalForeignHulls.Contains(ship),
+                foreign = foreignHulls.Contains(ship),
                 hitPoints = ship.HitPoints,
                 maxHitPoints = ship.ShipOrigin.MaxHitPoints,
 #if DEBUG

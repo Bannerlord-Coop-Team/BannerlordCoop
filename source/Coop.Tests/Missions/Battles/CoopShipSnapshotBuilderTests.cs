@@ -24,7 +24,7 @@ public class CoopShipSnapshotBuilderTests
         var party = CreateParty();
         var source = CreateOwnedShip(party, hitPoints: 600f);
 
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(source);
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), new CoopShipSnapshotRegistry()).Build(source);
 
         Assert.Same(party, snapshot.Owner);
         Assert.Equal(new[] { source }, party.Ships);
@@ -35,7 +35,7 @@ public class CoopShipSnapshotBuilderTests
     {
         var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
 
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(source);
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), new CoopShipSnapshotRegistry()).Build(source);
         snapshot.HitPoints = 100f;
 
         Assert.Equal(source.RandomValue, snapshot.RandomValue);
@@ -48,11 +48,12 @@ public class CoopShipSnapshotBuilderTests
     {
         var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
 
-        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(source);
+        var snapshots = new CoopShipSnapshotRegistry();
+        var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), snapshots).Build(source);
 
-        Assert.True(CoopShipSnapshots.Contains(snapshot));
-        Assert.False(CoopShipSnapshots.Contains(source));
-        Assert.False(CoopShipSnapshots.Contains(null));
+        Assert.True(snapshots.Contains(snapshot));
+        Assert.False(snapshots.Contains(source));
+        Assert.False(snapshots.Contains(null));
     }
 
     [Fact]
@@ -68,7 +69,7 @@ public class CoopShipSnapshotBuilderTests
                 postfix: new HarmonyMethod(typeof(CoopShipSnapshotBuilderTests), nameof(RecordOriginalsAllowed)));
             recordedOriginalsAllowed = new List<bool>();
 
-            new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(source);
+            new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), new CoopShipSnapshotRegistry()).Build(source);
 
             Assert.NotEmpty(recordedOriginalsAllowed);
             Assert.All(recordedOriginalsAllowed, allowed => Assert.True(allowed));
@@ -95,7 +96,7 @@ public class CoopShipSnapshotBuilderTests
             harmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)), postfix: probe);
             recordedOwnedSetters = new List<Ship>();
 
-            var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>()).Build(source);
+            var snapshot = new CoopShipSnapshotBuilder(Mock.Of<IObjectManager>(), new CoopShipSnapshotRegistry()).Build(source);
 
             Assert.Empty(recordedOwnedSetters);
             Assert.Equal(600f, snapshot.HitPoints);
@@ -117,15 +118,16 @@ public class CoopShipSnapshotBuilderTests
         var objectManager = new Mock<IObjectManager>();
         string sourceId = "Ship_3";
         objectManager.Setup(manager => manager.TryGetId(source, out sourceId)).Returns(true);
-        var builder = new CoopShipSnapshotBuilder(objectManager.Object);
+        var snapshots = new CoopShipSnapshotRegistry();
+        var builder = new CoopShipSnapshotBuilder(objectManager.Object, snapshots);
 
         var own = builder.Build(source);
         var ofUnregistered = builder.Build(unregistered);
 
-        Assert.Equal("Ship_3", CoopShipSnapshots.CampaignShipIdOf(own));
-        Assert.Null(CoopShipSnapshots.CampaignShipIdOf(ofUnregistered));
-        Assert.Null(CoopShipSnapshots.CampaignShipIdOf(source));
-        Assert.Null(CoopShipSnapshots.CampaignShipIdOf(null));
+        Assert.Equal("Ship_3", snapshots.CampaignShipIdOf(own));
+        Assert.Null(snapshots.CampaignShipIdOf(ofUnregistered));
+        Assert.Null(snapshots.CampaignShipIdOf(source));
+        Assert.Null(snapshots.CampaignShipIdOf(null));
     }
 
     [ThreadStatic]

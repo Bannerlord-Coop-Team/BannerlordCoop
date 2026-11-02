@@ -15,7 +15,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] This engine's copies of other owners' hulls, the only writer of <see cref="NavalForeignHulls"/>: each copy
+/// [Game thread] This engine's copies of other owners' hulls, the only writer of <see cref="INavalForeignHullRegistry"/>: each copy
 /// is steered toward its owner's latest sample while its body simulates, and gets its owner's frames written otherwise.
 /// </summary>
 public interface INavalSteeredCopies
@@ -52,6 +52,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
     private static readonly ILogger Logger = LogManager.GetLogger<NavalSteeredCopies>();
 
     private readonly CopySteeringKnobs knobs;
+    private readonly INavalForeignHullRegistry foreignHulls;
     // Copy on write: the fixed physics step enumerates it while a capture or a host change adds or drops a copy.
     private volatile Dictionary<MissionShip, SteeredCopy> copies = new Dictionary<MissionShip, SteeredCopy>();
 #if DEBUG
@@ -64,10 +65,11 @@ public class NavalSteeredCopies : INavalSteeredCopies
     public IReadOnlyDictionary<MissionShip, SteeredCopy> Copies => copies;
 #endif
 
-    /// <summary>Copies steered with this client's shared knobs, which copy_steer tunes.</summary>
-    public NavalSteeredCopies(CopySteeringKnobs knobs)
+    /// <summary>Copies steered with this client's shared knobs, which copy_steer tunes, and mirrored into its copy registry.</summary>
+    public NavalSteeredCopies(CopySteeringKnobs knobs, INavalForeignHullRegistry foreignHulls)
     {
         this.knobs = knobs;
+        this.foreignHulls = foreignHulls;
     }
 
     /// <inheritdoc/>
@@ -77,7 +79,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
         var copy = new SteeredCopy(new CopySteering(knobs));
         copies = new Dictionary<MissionShip, SteeredCopy>(copies) { [ship] = copy };
-        NavalForeignHulls.Add(ship, copy);
+        foreignHulls.Add(ship, copy);
         // The owner decides this hull. ForeignHullControllerPatch keeps every later write at no controller while it is a copy.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
@@ -156,13 +158,13 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var remaining = new Dictionary<MissionShip, SteeredCopy>(copies);
         remaining.Remove(ship);
         copies = remaining;
-        NavalForeignHulls.Remove(ship);
+        foreignHulls.Remove(ship);
     }
 
     /// <summary>"own", "steered" or "written": a copy is steered while its body simulates, otherwise its owner's frames are written.</summary>
     internal static string ModeName(MissionShip hull)
     {
-        if (!NavalForeignHulls.Contains(hull)) return "own";
+        if (!NavalForeignHullRegistry.IsCopyHere(hull)) return "own";
         return IsSimulating(hull) ? "steered" : "written";
     }
 

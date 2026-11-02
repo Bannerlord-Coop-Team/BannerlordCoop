@@ -20,17 +20,10 @@ public class CoopOrderOfBattleShipLayoutPatchTests
     [InlineData(false, true)]
     public void Prefix_SkipsTheSavedShipLayoutOnlyInACoopNavalBattle(bool coopNavalBattle, bool expectedVanillaLoad)
     {
-        bool previous = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = coopNavalBattle;
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = coopNavalBattle;
 
-            Assert.Equal(expectedVanillaLoad, CoopOrderOfBattleShipLayoutPatch.Prefix());
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = previous;
-        }
+        Assert.Equal(expectedVanillaLoad, CoopOrderOfBattleShipLayoutPatch.Prefix());
     }
 }
 #endif

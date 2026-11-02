@@ -31,23 +31,16 @@ public class CoopShipCapturePatchTests
     [Fact]
     public void AreShipsConnected_WithAMissingHull_ReadsNotConnected_OnlyInACoopBattle()
     {
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        try
-        {
-            CoopNavalMissionScope.IsActive = true;
-            bool connected = true;
-            bool runsVanilla = CapturedFormationConnectionPatch.Prefix(null!, null!, ref connected);
-            CoopNavalMissionScope.IsActive = false;
-            bool outsideRunsVanilla = CapturedFormationConnectionPatch.Prefix(null!, null!, ref connected);
+        using var naval = new NavalClientContainer();
+        naval.MissionTracker.IsActive = true;
+        bool connected = true;
+        bool runsVanilla = CapturedFormationConnectionPatch.Prefix(null!, null!, ref connected);
+        naval.MissionTracker.IsActive = false;
+        bool outsideRunsVanilla = CapturedFormationConnectionPatch.Prefix(null!, null!, ref connected);
 
-            Assert.False(runsVanilla);
-            Assert.False(connected);
-            Assert.True(outsideRunsVanilla);
-        }
-        finally
-        {
-            CoopNavalMissionScope.IsActive = wasActive;
-        }
+        Assert.False(runsVanilla);
+        Assert.False(connected);
+        Assert.True(outsideRunsVanilla);
     }
 }
 #endif

@@ -14,11 +14,13 @@ public interface INavalRopeCutCoopCommand : ICoopCommand { }
 public sealed class NavalRopeCutCoopCommand : INavalRopeCutCoopCommand
 {
     private readonly INavalDebugHulls hulls;
+    private readonly INavalRopeRegistry ropes;
 
-    /// <summary>Uses the same own-hull and station ordering as rope_list and rope_throw.</summary>
-    public NavalRopeCutCoopCommand(INavalDebugHulls hulls)
+    /// <summary>Uses the same own-hull and station ordering as rope_list and rope_throw, and this client's rope records.</summary>
+    public NavalRopeCutCoopCommand(INavalDebugHulls hulls, INavalRopeRegistry ropes)
     {
         this.hulls = hulls;
+        this.ropes = ropes;
     }
 
     public string Prefix => "coop.debug.naval";
@@ -48,7 +50,7 @@ public sealed class NavalRopeCutCoopCommand : INavalRopeCutCoopCommand
         var source = sources[index];
         if (args.Count == 2 && args[1] == "release_removal")
         {
-            bool released = NavalRopes.ReleaseRemoval(source);
+            bool released = ropes.ReleaseRemoval(source);
             return new CoopCommandResult(released, released
                 ? "NAVAL_ROPE_REMOVAL_RELEASED sourceIndex=" + index.ToString(CultureInfo.InvariantCulture)
                 : "This station has no held removal.", released ? null : "command_failed");
@@ -60,7 +62,7 @@ public sealed class NavalRopeCutCoopCommand : INavalRopeCutCoopCommand
             return new CoopCommandResult(false, "The station needs a live attached rope or plank to cut.", "command_failed");
 
         bool hold = args.Count == 2;
-        if (hold && !NavalRopes.HoldRemoval(source))
+        if (hold && !ropes.HoldRemoval(source))
             return new CoopCommandResult(false, "Wait for rope_status to show this live generation published, with no removal held.", "command_failed");
 
         // Rope decisions belong to the source hull's client authority, rather than the campaign server.

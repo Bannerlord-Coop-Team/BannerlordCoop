@@ -92,11 +92,11 @@ public class NavalRopePatchesTests
         hull._shipEventListeners = new MBList<IShipEventListener>();
 
         var harmony = new Harmony("coop.tests.naval.ropes.removal");
-        bool wasActive = CoopNavalMissionScope.IsActive;
+        using var naval = new NavalClientContainer();
         try
         {
             harmony.CreateClassProcessor(typeof(RopeShipRemovalPatch)).Patch();
-            CoopNavalMissionScope.IsActive = true;
+            naval.MissionTracker.IsActive = true;
 
             // The method's tail reaches the hull's actuators, which can't be built without the engine, after both rope loops.
             Assert.Throws<NullReferenceException>(() => hull.OnShipRemoved(NavalRopeRemovalTests.Hull()));
@@ -107,7 +107,6 @@ public class NavalRopePatchesTests
         }
         finally
         {
-            CoopNavalMissionScope.IsActive = wasActive;
             harmony.UnpatchAll(harmony.Id);
         }
     }
@@ -118,12 +117,12 @@ public class NavalRopePatchesTests
         var copyPhysics = ShipTestHulls.Uninitialized<NavalPhysics>();
         var copy = ShipTestHulls.Uninitialized<MissionShip>();
         copy._physics = copyPhysics;
-        bool wasActive = CoopNavalMissionScope.IsActive;
-        NavalRopes.Clear();
+        using var naval = new NavalClientContainer();
+        RopeForcePatch.ClearCounters();
         try
         {
-            CoopNavalMissionScope.IsActive = true;
-            NavalForeignHulls.Add(copy, null);
+            naval.MissionTracker.IsActive = true;
+            naval.Resolve<INavalForeignHullRegistry>().Add(copy, null);
 
             Assert.False(RopeForcePatch.AllowForce(copyPhysics, 1));
             Assert.True(RopeForcePatch.AllowForce(ShipTestHulls.Uninitialized<NavalPhysics>(), 0));
@@ -132,9 +131,7 @@ public class NavalRopePatchesTests
         }
         finally
         {
-            NavalForeignHulls.Remove(copy);
-            CoopNavalMissionScope.IsActive = wasActive;
-            NavalRopes.Clear();
+            RopeForcePatch.ClearCounters();
         }
     }
 

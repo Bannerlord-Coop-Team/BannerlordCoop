@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface;
 using Missions.Messages;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
@@ -15,10 +16,76 @@ using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] Rope replication: the source hull's owner publishes each throw station's rope, and every other client's
-/// replica of it changes only as those states apply. Static because the rope patches read its records.
+/// [Game thread] This client's rope replication: the source hull's owner publishes each throw station's rope, and every other
+/// client's replica of it changes only as those states apply. The rope patches resolve it.
 /// </summary>
-internal static class NavalRopes
+public interface INavalRopeRegistry
+{
+    /// <summary>Set while a replica rope may change: an owner state applies, or a local break of a rope whose hull left runs.</summary>
+    bool BypassReplicaGates { get; }
+
+    /// <summary>Forgets every rope record and counter when the battle ends.</summary>
+    void Clear();
+
+    /// <summary>Runs a rope change that the replica gates must let through.</summary>
+    void PastReplicaGates(Action change);
+
+    /// <summary>Forgets the records of a hull's throw stations.</summary>
+    void Forget(MissionShip hull);
+
+    /// <summary>The station's record, or null while it has none.</summary>
+    NavalRopeRegistry.RopeRecord RecordOf(ShipAttachmentMachine machine);
+
+    /// <summary>Whether the rope is a replica of another owner's rope.</summary>
+    bool IsReplica(Attachment attachment);
+
+    /// <summary>Opens a new generation when an owned station holds a rope its record hasn't seen.</summary>
+    void ObserveCreated(ShipAttachmentMachine machine);
+
+    /// <summary>The owned hull's rope at every station that ever threw, for its next sample; null when there is none.</summary>
+    BattleRopeState[] Capture(MissionShip hull, Func<MissionObject, Guid> shipIdOf);
+
+#if DEBUG
+    /// <summary>Holds only this generation's removal entries, leaving the normal sample omission clock running.</summary>
+    bool HoldRemoval(ShipAttachmentMachine source);
+
+    /// <summary>Restores normal capture for this station; an expired repeat window stays omitted.</summary>
+    bool ReleaseRemoval(ShipAttachmentMachine source);
+#endif
+
+    /// <summary>Applies an owner's rope set to its copy here; a final set also lays the replicas out once.</summary>
+    void Apply(MissionShip copy, BattleRopeState[] values, Func<Guid, MissionObject> hullOf, bool final);
+
+    /// <summary>Keeps the owner's throw curve for the next sample.</summary>
+    void ObserveCurve(Attachment attachment, Vec3 target, float angle);
+
+    /// <summary>A replica connects only as its owner's state applies, and no rope hooks a hull that left.</summary>
+    bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target);
+
+    /// <summary>A replica's state changes only as its owner's state applies.</summary>
+    bool AllowState(Attachment attachment);
+
+    /// <summary>A replica disconnects only as its owner's state applies.</summary>
+    bool AllowDisconnect(ShipAttachmentMachine source);
+
+    /// <summary>Bridge eligibility, endpoint retargeting and breaking are the owner's decisions.</summary>
+    bool AllowOwnerDecision(Attachment attachment);
+
+    /// <summary>Retargeting a copy's ropes is its owner's decision.</summary>
+    bool AllowConnectionRetarget(MissionShip hull);
+
+    /// <summary>The owner's plank flight clock arrives with each sample; a replica never runs its own completion clock.</summary>
+    bool TickPlankFlight(Attachment attachment);
+
+    /// <summary>Draws a replica rope from its owner's state, keeps vanilla's plank tick, and breaks a rope to a hull that left.</summary>
+    bool TickRope(Attachment attachment);
+
+    /// <summary>Every hull's stations and the rope counters, for rope_status.</summary>
+    object Inspect(IEnumerable<MissionShip> hulls, Func<MissionObject, Guid> shipIdOf);
+}
+
+/// <summary>One per client container, so E2E clients sharing a process and a later mission each keep their own rope records.</summary>
+public class NavalRopeRegistry : INavalRopeRegistry
 {
     internal enum ReplicaStep
     {
@@ -29,7 +96,7 @@ internal static class NavalRopes
     }
 
     /// <summary>What this client knows of one throw station's rope: the owner's attachment and generation, or the last applied state.</summary>
-    internal sealed class RopeRecord
+    public sealed class RopeRecord
     {
         internal Attachment Attachment;
         internal long Generation;
@@ -57,17 +124,27 @@ internal static class NavalRopes
     /// </summary>
     internal const int RemovedRepeatSamples = 100;
 
-    private static readonly Dictionary<ShipAttachmentMachine, RopeRecord> records = new Dictionary<ShipAttachmentMachine, RopeRecord>();
-    private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalRopes));
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalRopeRegistry>();
 
-    private static long replicaRejects, replicaFaults, finalsApplied;
-    private static string lastReplicaReject;
+    internal readonly Dictionary<ShipAttachmentMachine, RopeRecord> records = new Dictionary<ShipAttachmentMachine, RopeRecord>();
+    private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalMissionTracker missionTracker;
 
-    /// <summary>Set while a replica rope may change: an owner state applies, or a local break of a rope whose hull left runs.</summary>
-    internal static bool BypassReplicaGates { get; private set; }
+    private long replicaRejects, replicaFaults, finalsApplied;
+    private string lastReplicaReject;
+
+    // Tells replicas apart through this client's copy set, and observes owned ropes only in a coop naval battle.
+    public NavalRopeRegistry(INavalForeignHullRegistry foreignHulls, INavalMissionTracker missionTracker)
+    {
+        this.foreignHulls = foreignHulls;
+        this.missionTracker = missionTracker;
+    }
+
+    /// <inheritdoc/>
+    public bool BypassReplicaGates { get; private set; }
 
     /// <summary>Forgets every rope record and counter when the battle ends.</summary>
-    internal static void Clear()
+    public void Clear()
     {
         records.Clear();
         RopeForcePatch.ClearCounters();
@@ -78,7 +155,7 @@ internal static class NavalRopes
     }
 
     /// <summary>Runs a rope change that the replica gates must let through.</summary>
-    internal static void PastReplicaGates(Action change)
+    public void PastReplicaGates(Action change)
     {
         BypassReplicaGates = true;
         try
@@ -92,21 +169,21 @@ internal static class NavalRopes
     }
 
     /// <summary>Forgets the records of a hull's throw stations.</summary>
-    internal static void Forget(MissionShip hull)
+    public void Forget(MissionShip hull)
     {
         foreach (var machine in hull.AttachmentMachines)
             records.Remove(machine);
     }
 
     /// <summary>The station's record, or null while it has none.</summary>
-    internal static RopeRecord RecordOf(ShipAttachmentMachine machine) =>
+    public RopeRecord RecordOf(ShipAttachmentMachine machine) =>
         machine != null && records.TryGetValue(machine, out var record) ? record : null;
 
     /// <summary>Whether the station sits on another owner's copy here.</summary>
-    internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
+    internal bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && foreignHulls.Contains(machine.OwnerShip);
 
     /// <summary>Whether the rope is a replica of another owner's rope.</summary>
-    internal static bool IsReplica(Attachment attachment) => IsReplicaMachine(attachment?.AttachmentSource);
+    public bool IsReplica(Attachment attachment) => IsReplicaMachine(attachment?.AttachmentSource);
 
     /// <summary>Only the owner of the source hull decides a rope; a replica changes only while an owner state applies.</summary>
     internal static bool AllowsChange(bool sourceIsCopy, bool applyingOwnerState) => !sourceIsCopy || applyingOwnerState;
@@ -123,9 +200,9 @@ internal static class NavalRopes
     // ---- Owner side ----
 
     /// <summary>Opens a new generation when an owned station holds a rope its record hasn't seen.</summary>
-    internal static void ObserveCreated(ShipAttachmentMachine machine)
+    public void ObserveCreated(ShipAttachmentMachine machine)
     {
-        if (!CoopNavalMissionScope.IsActive || BypassReplicaGates || machine?.CurrentAttachment == null || IsReplicaMachine(machine)) return;
+        if (!missionTracker.IsActive || BypassReplicaGates || machine?.CurrentAttachment == null || IsReplicaMachine(machine)) return;
 
         if (!records.TryGetValue(machine, out var record)) records[machine] = record = new RopeRecord();
         if (ReferenceEquals(record.Attachment, machine.CurrentAttachment)) return;
@@ -141,7 +218,7 @@ internal static class NavalRopes
     }
 
     /// <summary>The owned hull's rope at every station that ever threw, for its next sample; null when there is none.</summary>
-    internal static BattleRopeState[] Capture(MissionShip hull, Func<MissionObject, Guid> shipIdOf)
+    public BattleRopeState[] Capture(MissionShip hull, Func<MissionObject, Guid> shipIdOf)
     {
         var result = new List<BattleRopeState>();
         foreach (var source in hull.AttachmentMachines)
@@ -179,7 +256,7 @@ internal static class NavalRopes
 
 #if DEBUG
     /// <summary>Holds only this generation's removal entries, leaving the normal sample omission clock running.</summary>
-    internal static bool HoldRemoval(ShipAttachmentMachine source)
+    public bool HoldRemoval(ShipAttachmentMachine source)
     {
         var record = RecordOf(source);
         if (record?.Last == null || record.Last.Generation != record.Generation
@@ -193,7 +270,7 @@ internal static class NavalRopes
     }
 
     /// <summary>Restores normal capture for this station; an expired repeat window stays omitted.</summary>
-    internal static bool ReleaseRemoval(ShipAttachmentMachine source)
+    public bool ReleaseRemoval(ShipAttachmentMachine source)
     {
         var record = RecordOf(source);
         if (record?.HeldRemovalLiveState == null) return false;
@@ -281,7 +358,7 @@ internal static class NavalRopes
     // ---- Replica side ----
 
     /// <summary>Applies an owner's rope set to its copy here; a final set also lays the replicas out once.</summary>
-    internal static void Apply(MissionShip copy, BattleRopeState[] values, Func<Guid, MissionObject> hullOf, bool final)
+    public void Apply(MissionShip copy, BattleRopeState[] values, Func<Guid, MissionObject> hullOf, bool final)
     {
         if (final && values == null) return;
 
@@ -312,7 +389,7 @@ internal static class NavalRopes
     }
 
     // An owner's sample carries every live rope, so a replica it omits lost its rope while this client missed the removal.
-    private static void RemoveOmitted(MissionShip copy, BattleRopeState[] values, DateTime sampleUtc)
+    private void RemoveOmitted(MissionShip copy, BattleRopeState[] values, DateTime sampleUtc)
     {
         foreach (var source in copy.AttachmentMachines)
         {
@@ -344,7 +421,7 @@ internal static class NavalRopes
     }
 
     // Runs one rope's apply, so one bad rope doesn't stop the others; counts a reject, and logs the mission's first fault.
-    private static void ApplyCounted(string sourceKey, Func<string> apply)
+    private void ApplyCounted(string sourceKey, Func<string> apply)
     {
         string reject;
         try
@@ -367,7 +444,7 @@ internal static class NavalRopes
     }
 
     // Applies one owner state to its station's replica; returns why it was rejected, or null.
-    private static string ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf, DateTime sampleUtc)
+    private string ApplyOne(MissionShip copy, BattleRopeState value, Func<Guid, MissionObject> hullOf, DateTime sampleUtc)
     {
         var source = Resolve<ShipAttachmentMachine>(copy, value.SourceKey);
         if (source == null) return "source_station_missing";
@@ -496,7 +573,7 @@ internal static class NavalRopes
     }
 
     // Lays a replica out once at its owner's last state, for an owner that sends no more samples.
-    private static void PresentFinal(MissionShip copy)
+    private void PresentFinal(MissionShip copy)
     {
         foreach (var source in copy.AttachmentMachines)
         {
@@ -518,7 +595,7 @@ internal static class NavalRopes
     // ---- Patch callbacks ----
 
     /// <summary>Keeps the owner's throw curve for the next sample.</summary>
-    internal static void ObserveCurve(Attachment attachment, Vec3 target, float angle)
+    public void ObserveCurve(Attachment attachment, Vec3 target, float angle)
     {
         if (IsReplica(attachment) || attachment?.AttachmentSource == null
             || !records.TryGetValue(attachment.AttachmentSource, out var record))
@@ -529,24 +606,24 @@ internal static class NavalRopes
     }
 
     // A replica connects only as its owner's state applies, and no rope hooks a hull that left.
-    internal static bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
+    public bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
         AllowsChange(IsReplicaMachine(source), BypassReplicaGates)
         && (target == null || !NavalRopeRemoval.IsMissingOrRemoved(target.OwnerShip));
 
     // A replica's state changes only as its owner's state applies.
-    internal static bool AllowState(Attachment attachment) => AllowsChange(IsReplica(attachment), BypassReplicaGates);
+    public bool AllowState(Attachment attachment) => AllowsChange(IsReplica(attachment), BypassReplicaGates);
 
     // A replica disconnects only as its owner's state applies.
-    internal static bool AllowDisconnect(ShipAttachmentMachine source) => AllowsChange(IsReplicaMachine(source), BypassReplicaGates);
+    public bool AllowDisconnect(ShipAttachmentMachine source) => AllowsChange(IsReplicaMachine(source), BypassReplicaGates);
 
     // Bridge eligibility, endpoint retargeting and breaking are the owner's decisions.
-    internal static bool AllowOwnerDecision(Attachment attachment) => !IsReplica(attachment);
+    public bool AllowOwnerDecision(Attachment attachment) => !IsReplica(attachment);
 
     // Retargeting a copy's ropes is its owner's decision.
-    internal static bool AllowConnectionRetarget(MissionShip hull) => !NavalForeignHulls.Contains(hull);
+    public bool AllowConnectionRetarget(MissionShip hull) => !foreignHulls.Contains(hull);
 
     // The owner's plank flight clock arrives with each sample; a replica never runs its own completion clock.
-    internal static bool TickPlankFlight(Attachment attachment)
+    public bool TickPlankFlight(Attachment attachment)
     {
         if (!IsReplica(attachment)) return true;
 
@@ -556,10 +633,10 @@ internal static class NavalRopes
     }
 
     // Replica ropes are drawn from the owner's state; planks keep vanilla's layout tick. A rope to a hull that left breaks.
-    internal static bool TickRope(Attachment attachment)
+    public bool TickRope(Attachment attachment)
     {
         var source = attachment.AttachmentSource;
-        if (NavalRopeRemoval.BreakIfEndGone(attachment)) return false;
+        if (NavalRopeRemoval.BreakIfEndGone(attachment, this)) return false;
 
         if (!IsReplica(attachment))
         {
@@ -603,7 +680,7 @@ internal static class NavalRopes
     // ---- Diagnostics ----
 
     /// <summary>Every hull's stations and the rope counters, for rope_status.</summary>
-    internal static object Inspect(IEnumerable<MissionShip> hulls, Func<MissionObject, Guid> shipIdOf) => new
+    public object Inspect(IEnumerable<MissionShip> hulls, Func<MissionObject, Guid> shipIdOf) => new
     {
         forceKinds = new[] { "force", "torque", "global_force_at_local_position" },
         ownForceWrites = RopeForcePatch.OwnForceWrites(),
@@ -616,14 +693,14 @@ internal static class NavalRopes
         hulls = hulls.Select(hull => new
         {
             shipId = shipIdOf(hull),
-            role = NavalForeignHulls.Contains(hull) ? "copy" : "owner",
+            role = foreignHulls.Contains(hull) ? "copy" : "owner",
             sources = hull.AttachmentMachines.Select(source => InspectSource(hull, source, shipIdOf))
                 .Where(source => source != null).ToArray(),
         }).ToArray(),
     };
 
     // One station's rope as rope_status shows it, or null for a station that never threw and has no user.
-    private static object InspectSource(MissionShip hull, ShipAttachmentMachine source, Func<MissionObject, Guid> shipIdOf)
+    private object InspectSource(MissionShip hull, ShipAttachmentMachine source, Func<MissionObject, Guid> shipIdOf)
     {
         records.TryGetValue(source, out var record);
         var attachment = source.CurrentAttachment;
