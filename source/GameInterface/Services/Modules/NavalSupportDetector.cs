@@ -2,7 +2,6 @@
 using Common.Logging;
 using Serilog;
 using System;
-using System.IO;
 using System.Linq;
 
 namespace GameInterface.Services.Modules;
@@ -12,7 +11,7 @@ namespace GameInterface.Services.Modules;
 /// </summary>
 public interface INavalSupportDetector
 {
-    /// <summary>Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies shipped.</summary>
+    /// <summary>Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies load.</summary>
     bool Detect();
 }
 
@@ -23,21 +22,21 @@ public class NavalSupportDetector : INavalSupportDetector
 
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly INavalFeatureFlag navalFeatureFlag;
-    private readonly Func<string, bool> isShipped;
+    private readonly Func<string, bool> isLoadable;
 
     // Takes each input separately so tests can turn the module, the flag and the assemblies on and off.
-    public NavalSupportDetector(IModuleInfoProvider moduleInfoProvider, INavalFeatureFlag navalFeatureFlag, Func<string, bool> isShipped)
+    public NavalSupportDetector(IModuleInfoProvider moduleInfoProvider, INavalFeatureFlag navalFeatureFlag, Func<string, bool> isLoadable)
     {
         this.moduleInfoProvider = moduleInfoProvider;
         this.navalFeatureFlag = navalFeatureFlag;
-        this.isShipped = isShipped;
+        this.isLoadable = isLoadable;
     }
 
-    // The startup composition: this build's TESTER and CoopNavalDlc flags and the naval assemblies next to assemblyDirectory.
+    // The startup composition: this build's TESTER and CoopNavalDlc flags, and the naval assemblies next to assemblyDirectory must load.
     public static NavalSupportDetector ForStartup(IModuleInfoProvider moduleInfoProvider, string assemblyDirectory)
     {
-        return new NavalSupportDetector(moduleInfoProvider, new NavalFeatureFlag(),
-            file => File.Exists(Path.Combine(assemblyDirectory, file)));
+        var loader = new NavalAssemblyLoader(assemblyDirectory);
+        return new NavalSupportDetector(moduleInfoProvider, new NavalFeatureFlag(), file => loader.TryLoad(file, out _));
     }
 
     /// <inheritdoc/>
@@ -46,7 +45,7 @@ public class NavalSupportDetector : INavalSupportDetector
         bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
             .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
         bool supported = navalFeatureFlag.IsNavalCodeBuilt
-            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isShipped);
+            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isLoadable);
         if (supported || !navalModuleEnabled) return supported;
 
         Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", UnsupportedReason());
@@ -58,6 +57,6 @@ public class NavalSupportDetector : INavalSupportDetector
     {
         if (!navalFeatureFlag.IsEnabled) return "War Sails co-op is only in tester builds";
         if (!navalFeatureFlag.IsNavalCodeBuilt) return "this build was made without CoopNavalDlc";
-        return "this build has no naval code";
+        return "a naval assembly is missing or failed to load";
     }
 }
