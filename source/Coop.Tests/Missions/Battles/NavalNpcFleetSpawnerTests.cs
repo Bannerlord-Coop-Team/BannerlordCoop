@@ -265,19 +265,36 @@ public class NavalNpcFleetSpawnerTests
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => !sent.Failed)), Times.Once);
     }
 
-    // A rollback that throws still leaves the attempt failed and sent once, so the side's hold is released.
+    // A rollback that throws keeps the attempt taking back, unsettled and unsent, and every tick retries it; the attempt fails
+    // once the take-back went through, and no second attempt starts meanwhile.
     [Fact]
-    public void ThrowingRollback_StillSettlesFailed_AndBroadcastsOnce()
+    public void ThrowingRollback_IsRetriedEveryTick_AndSettlesFailedOnlyOnceItWentThrough()
     {
         var harness = new Harness(BattleSideEnum.Defender) { IsLocalHost = true };
-        harness.Rollback.Setup(r => r.Rollback(It.IsAny<NavalNpcFleetAttemptWork>())).Throws(new InvalidOperationException("rollback"));
+        int rollbacks = 0;
+        harness.Rollback.Setup(r => r.Rollback(It.IsAny<NavalNpcFleetAttemptWork>())).Callback(() =>
+        {
+            if (++rollbacks < 3) throw new InvalidOperationException("rollback");
+        });
 
         harness.Spawner.AttemptFleet(work =>
         {
             work.Hulls.Add(ShipTestHulls.Create());
             throw new InvalidOperationException("crewing threw");
         });
+        harness.Spawner.Tick();
+        bool spawnedAgain = false;
+        harness.Spawner.AttemptFleet(_ => spawnedAgain = true);
 
+        Assert.False(spawnedAgain);
+        Assert.Equal(BattleSideEnum.None, harness.Spawner.FailedSide);
+        Assert.Equal(NavalNpcFleetSpawner.TakingBack, (string)Newtonsoft.Json.Linq.JObject.FromObject(harness.Spawner.Inspect())["state"]);
+        harness.Network.Verify(n => n.SendAll(It.IsAny<NetworkNpcFleetAttempted>()), Times.Never);
+
+        harness.Spawner.Tick();
+        harness.Spawner.Tick();
+
+        Assert.Equal(3, rollbacks);
         Assert.Equal(BattleSideEnum.Defender, harness.Spawner.FailedSide);
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.Failed)), Times.Once);
     }

@@ -22,6 +22,12 @@ public sealed class NavalNpcFleetAttemptWork
     /// <summary>Whether the side spawned reinforcements on tick before the crewing turned them on.</summary>
     public bool SpawnedOnTickBefore { get; private set; }
 
+    /// <summary>Whether a failed attempt's troops were dropped from vanilla's crewing, so a repeated take-back skips it.</summary>
+    public bool TroopsDropped { get; private set; }
+
+    // Records that the failed attempt's waiting troops were dropped.
+    public void MarkTroopsDropped() => TroopsDropped = true;
+
     // Marks the troops as handed to vanilla, with the reinforcement switch to put back if the attempt fails.
     public void BeginCrewing(TeamSideEnum side, bool spawnedOnTickBefore)
     {

@@ -97,6 +97,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   (`Missions.Naval/NavalNpcFleetSpawner.cs`, enemy side only).
   An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
   (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
+  A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
+  it went through.
 - Only AI hulls nobody captured have `FollowsBattleHost`. On every host change all clients move them to the new host at the
   same ordered event (`TransferHostHulls`), and their samples carry the host epoch so a stale host's traffic is dropped. A
   player's hull never changes owner unless it is captured: it stays with its player or leaves with it.

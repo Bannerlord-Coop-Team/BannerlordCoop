@@ -8,7 +8,10 @@ namespace Missions.Naval;
 /// <summary>[Game thread, battle host] Takes back what a failed AI fleet attempt left in the mission.</summary>
 public interface INavalNpcFleetRollback
 {
-    /// <summary>Drops the attempt's troops still waiting in vanilla's crewing, then takes back its hulls with their crew.</summary>
+    /// <summary>
+    /// Drops the attempt's troops still waiting in vanilla's crewing, then takes back its hulls with their crew. Repeatable: a
+    /// call after a throw resumes the step that threw.
+    /// </summary>
     void Rollback(NavalNpcFleetAttemptWork work);
 }
 
@@ -26,14 +29,20 @@ public sealed class NavalNpcFleetRollback : INavalNpcFleetRollback
         this.shipReplicator = shipReplicator;
     }
 
-    // Troops go first, so no reinforcement spawns onto a hull while its removal is queued.
+    // Troops go first and the hulls wait for them, so no reinforcement spawns onto a hull while its removal is queued.
     public void Rollback(NavalNpcFleetAttemptWork work)
     {
-        DropWaitingTroops(Mission.Current?.GetMissionBehavior<NavalAgentsLogic>(), work);
+        if (!work.TroopsDropped)
+        {
+            DropWaitingTroops(Mission.Current?.GetMissionBehavior<NavalAgentsLogic>(), work);
+            work.MarkTroopsDropped();
+        }
+
         if (work.Hulls.Count > 0) shipReplicator.RetractNpcHulls(work.Hulls);
     }
 
-    // Puts the reinforcement switch back and drops the attempt's troops vanilla still holds, reserved on its hulls or unassigned.
+    // Puts the reinforcement switch back and drops the attempt's troops vanilla still holds, reserved on its hulls or unassigned;
+    // each part finds nothing left to drop when it runs again.
     private static void DropWaitingTroops(NavalAgentsLogic agentsLogic, NavalNpcFleetAttemptWork work)
     {
         if (!work.CrewingStarted || agentsLogic == null) return;

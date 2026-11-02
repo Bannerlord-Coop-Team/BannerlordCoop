@@ -71,6 +71,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string Ready = "ready";
     internal const string Fielded = "fielded";
     internal const string Failed = "failed";
+    internal const string TakingBack = "taking_back";
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -111,6 +112,9 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     private string state = WaitingForHost;
     private int hullsSpawned;
     private int hullsRetracted;
+    // A failed attempt whose take-back threw; it is retried every tick and the attempt settles only once it went through.
+    private NavalNpcFleetAttemptWork unfinishedTakeBack;
+    private int takeBackFailures;
     private int troopsFielded;
     private string failure;
 
@@ -169,9 +173,16 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal static int ShipCount(int deploymentLimit, int ships, int troops, int freeFormations) =>
         Math.Max(0, Math.Min(Math.Min(deploymentLimit, ships), Math.Min(troops, Math.Min(freeFormations, MaxShipFormations))));
 
-    // Fields the fleet on the first tick Decide allows, then latches the attempt and sends it to the peers.
+    // Fields the fleet on the first tick Decide allows, then latches the attempt and sends it to the peers; a failed attempt's
+    // unfinished take-back is retried first.
     public void Tick()
     {
+        if (unfinishedTakeBack != null)
+        {
+            FinishFailedAttempt(unfinishedTakeBack);
+            return;
+        }
+
         var mission = Mission.Current;
         if (HasAttempt || mission == null) return;
 
@@ -183,11 +194,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         AttemptFleet(work => SpawnFleet(mission, supplier, parties, work));
     }
 
-    // Settles and broadcasts a single eligible spawn attempt, including a DEBUG-injected failure. A failed attempt is taken
+    // Makes the single eligible spawn attempt, including a DEBUG-injected failure, and settles it; a failed attempt is taken
     // back first, so peers drop its hulls before they hear it failed.
     internal void AttemptFleet(Action<NavalNpcFleetAttemptWork> spawn)
     {
-        if (HasAttempt) return;
+        if (HasAttempt || unfinishedTakeBack != null) return;
 
         // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
         var work = new NavalNpcFleetAttemptWork();
@@ -207,25 +218,57 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 
         attemptedHere = true;
         hullsSpawned = work.Hulls.Count;
-        bool failed = Outcome(hullsSpawned, failure) == Failed;
-        if (failed) TakeBack(work);
-        Settle(new NetworkNpcFleetAttempted(enemySide, failed));
-        network.SendAll(attempt);
+        if (Outcome(hullsSpawned, failure) == Failed)
+        {
+            FinishFailedAttempt(work);
+            return;
+        }
+
+        Publish(new NetworkNpcFleetAttempted(enemySide, failed: false));
     }
 
-    // A rollback that throws is logged, so the attempt still settles as failed and peers still hear it.
-    private void TakeBack(NavalNpcFleetAttemptWork work)
+    // Takes back a failed attempt and then settles it as failed; a take-back that throws keeps the work for the next tick.
+    private void FinishFailedAttempt(NavalNpcFleetAttemptWork work)
+    {
+        if (!TryTakeBack(work))
+        {
+            unfinishedTakeBack = work;
+            state = TakingBack;
+            return;
+        }
+
+        unfinishedTakeBack = null;
+        hullsRetracted = work.Hulls.Count;
+        if (!HasAttempt) Publish(new NetworkNpcFleetAttempted(enemySide, failed: true));
+    }
+
+    // The first throw is logged with its exception and a later recovery with the tries it took, so a stuck take-back logs once.
+    private bool TryTakeBack(NavalNpcFleetAttemptWork work)
     {
         try
         {
             rollback.Rollback(work);
-            hullsRetracted = work.Hulls.Count;
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "[NavalBattle] Could not take back the failed AI fleet attempt of {MapEventId} ({Hulls} hull(s))",
-                session.InstanceId, work.Hulls.Count);
+            if (++takeBackFailures == 1)
+                Logger.Error(exception,
+                    "[NavalBattle] Could not take back the failed AI fleet attempt of {MapEventId} ({Hulls} hull(s)); retrying every tick",
+                    session.InstanceId, work.Hulls.Count);
+            return false;
         }
+
+        if (takeBackFailures > 0)
+            Logger.Information("[NavalBattle] Took back the failed AI fleet attempt of {MapEventId} after {Tries} tries",
+                session.InstanceId, takeBackFailures + 1);
+        return true;
+    }
+
+    // Latches this host's attempt and tells the peers.
+    private void Publish(NetworkNpcFleetAttempted attempted)
+    {
+        Settle(attempted);
+        network.SendAll(attempt);
     }
 
     /// <summary>Whether the battle's attempt was made, here or by an earlier host.</summary>
