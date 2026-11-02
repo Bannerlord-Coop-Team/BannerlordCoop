@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Actions.Patches;
 
 [HarmonyPatch(typeof(ChangeShipOwnerAction))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ChangeShipOwnerActionPatches
 {
     [HarmonyPatch(nameof(ChangeShipOwnerAction.ApplyInternal))]
