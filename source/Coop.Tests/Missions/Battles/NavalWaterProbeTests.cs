@@ -1,4 +1,4 @@
-﻿#if COOP_NAVAL
+﻿#if COOP_NAVAL && DEBUG
 using Missions.Messages;
 using Missions.Naval;
 using Newtonsoft.Json.Linq;

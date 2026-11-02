@@ -306,7 +306,7 @@ public class BattleWaterClockTests
         Assert.False(copy.FromHost);
     }
 
-#if COOP_NAVAL
+#if COOP_NAVAL && DEBUG
     [Fact]
     public void DebugLine_ReportsPatchVanillaAndOffset()
     {

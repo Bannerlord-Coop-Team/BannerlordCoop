@@ -222,6 +222,14 @@ public class NavalCopySteeringTests
         Assert.False(steering.IsOwnerStale);
     }
 
+    [Fact]
+    public void Knobs_DefaultToNoLead()
+    {
+        Assert.Equal(0f, new CopySteeringKnobs().LeadSeconds);
+    }
+
+    // The oscillation count comes from the DEBUG-only CopyDiagnostics probe.
+#if DEBUG
     // R41b F4: an owner sampled at 20 Hz with jittered arrival, followed straight and through a constant-rate turn.
     [Theory]
     [InlineData(0f)]
@@ -274,12 +282,6 @@ public class NavalCopySteeringTests
         return step;
     }
 
-    [Fact]
-    public void Knobs_DefaultToNoLead()
-    {
-        Assert.Equal(0f, new CopySteeringKnobs().LeadSeconds);
-    }
-
     // R42: with no transit delay the sample's age already places the target on the owner; a lead puts the copy speed x lead ahead.
     [Theory]
     [InlineData(0f)]
@@ -321,6 +323,7 @@ public class NavalCopySteeringTests
         Assert.True(Math.Abs(alongMean - (speed * lead)) < 0.1f, $"along-track mean {alongMean} m, lead {lead} s");
         Assert.Equal(0, diagnostics.Oscillations);
     }
+#endif
 
     // R42: the probe measures drift against where the owner is, so a tuned lead doesn't count as drift.
     [Fact]

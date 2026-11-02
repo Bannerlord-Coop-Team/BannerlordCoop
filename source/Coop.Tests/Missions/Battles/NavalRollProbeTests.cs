@@ -1,4 +1,4 @@
-﻿#if COOP_NAVAL
+﻿#if COOP_NAVAL && DEBUG
 using GameInterface.Utils;
 using Missions.Battles;
 using Missions.Naval;
