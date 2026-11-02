@@ -17,6 +17,9 @@ public class EncounterMenuRebuildTests : MapEventTestBase
     private const string AttackOption = "attack";
     private const string LeaveOption = "leave";
 
+    // Counts Attack condition evaluations, so a test can see the production refresh run instead of recomputing it.
+    private int attackConditionEvaluations;
+
     /// <summary>Builds a fresh server and client environment per test.</summary>
     public EncounterMenuRebuildTests(ITestOutputHelper output) : base(output) { }
 
@@ -46,9 +49,12 @@ public class EncounterMenuRebuildTests : MapEventTestBase
     {
         var (ctx, partyId, client) = SetupJoinerBeforeAttach();
         OpenEncounterMenu(client, handler: null);
+        var evaluationsBeforeJoin = attackConditionEvaluations;
 
         JoinServerPartyToSide(ctx.MapEventId, partyId, BattleSideEnum.Defender);
 
+        Assert.True(attackConditionEvaluations > evaluationsBeforeJoin,
+            "the join should re-evaluate the unbound menu's option conditions");
         client.Call(() =>
         {
             Assert.NotNull(MobileParty.MainParty.MapEvent);
@@ -75,13 +81,13 @@ public class EncounterMenuRebuildTests : MapEventTestBase
     }
 
     /// <summary>Opens an "encounter" menu whose Attack option, like vanilla's, needs the main party in a map event.</summary>
-    private static void OpenEncounterMenu(EnvironmentInstance client, IMenuContextHandler? handler)
+    private void OpenEncounterMenu(EnvironmentInstance client, IMenuContextHandler? handler)
     {
         client.Call(() =>
         {
             var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
             starter.AddGameMenu("encounter", "Encounter", _ => { });
-            starter.AddGameMenuOption("encounter", AttackOption, "Attack!", _ => MobileParty.MainParty.MapEvent != null, _ => { });
+            starter.AddGameMenuOption("encounter", AttackOption, "Attack!", _ => CountAttackCondition(), _ => { });
             starter.AddGameMenuOption("encounter", LeaveOption, "Leave...", _ => true, _ => { });
 
             var state = Game.Current.GameStateManager.CreateState<MapState>();
@@ -90,6 +96,13 @@ public class EncounterMenuRebuildTests : MapEventTestBase
             state._menuContext.Handler = handler;
             Game.Current.GameStateManager._gameStates.Add(state);
         });
+    }
+
+    /// <summary>Attack's condition: records the evaluation, then holds only while the main party is in a map event.</summary>
+    private bool CountAttackCondition()
+    {
+        attackConditionEvaluations++;
+        return MobileParty.MainParty.MapEvent != null;
     }
 
     /// <summary>Lists the options a menu view shows when it rebuilds, the way <c>GameMenuVM.Refresh(true)</c> picks them.</summary>
