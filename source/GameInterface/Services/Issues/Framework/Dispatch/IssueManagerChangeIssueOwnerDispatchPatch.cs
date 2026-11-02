@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.OwnerChange;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -19,6 +20,12 @@ internal class IssueManagerChangeIssueOwnerDispatchPatch
     private static bool Prefix(IssueBase issue, out Hero __state)
     {
         __state = issue.IssueOwner;
+
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) &&
+            !coordinator.BeforeGiverOwnerChange(issue, __state))
+        {
+            return false;
+        }
 
         if (CallOriginalPolicy.IsOriginalAllowed())
         {

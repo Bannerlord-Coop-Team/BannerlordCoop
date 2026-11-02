@@ -49,6 +49,28 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         return true;
     }
 
+    public bool BeforeGiverOwnerChange(IssueBase issue, Hero deadOwner)
+    {
+        if (deadOwner == null || !deadOwner.IsDead || issue == null || issue.IssueOwner != deadOwner ||
+            issue.IssueQuest == null || !issue.IssueQuest.IsOngoing || !registry.IsRegistered(issue.GetType()))
+        {
+            return true;
+        }
+
+        if (!PrepareCancellation(issue, out var owner))
+        {
+            // Keep the dead giver attached while the owner-party retry is pending.
+            return false;
+        }
+
+        using (owner)
+        {
+            CancelQuestAndIssue(issue, BuildGiverDeathLog(issue));
+        }
+
+        return false;
+    }
+
     public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
     {
         if (ModInformation.IsClient) return;

@@ -913,6 +913,27 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void DeadHighPowerGiverOwnerChange_CancelsOwnerQuestAndArchivesJournal()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            var replacement = Object<Hero>(Server, targetId);
+            using (new AllowedThread()) giver._heroState = Hero.CharacterStates.Dead;
+            Campaign.Current.IssueManager.ChangeIssueOwner(giver.Issue, replacement);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        ClientA.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.QuestManager.Quests);
+            Assert.Contains(accepted[ClientA].JournalEntries, log => log.LogText?.ToString().Contains("canceled") == true);
+        });
+    }
+
+    [Fact]
     public void GiverDeathAfterOwnerRemoval_StillCancelsTheIssue()
     {
         Accept(ClientA);
