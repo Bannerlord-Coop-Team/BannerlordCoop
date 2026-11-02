@@ -271,11 +271,12 @@ internal class BattleSimulationRunHandler : IHandler
             {
                 network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
                 network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+
+                // Native Retreat finalizes the leader-owned event after the simulation ends. Only
+                // the caller that released the active claim owns that teardown; a late cancel after
+                // destruction must not publish a second finalize attempt and log a false error.
+                messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
             }
-            // Native Retreat runs OnPlayerRetreat and then PlayerEncounter.Finish. That path
-            // finalizes a leader-owned event through FinalizeBattle, so the authoritative co-op
-            // cancellation must tear down the same map event after releasing simulation state.
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }
