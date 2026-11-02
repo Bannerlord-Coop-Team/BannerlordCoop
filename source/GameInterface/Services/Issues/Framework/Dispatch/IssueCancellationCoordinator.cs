@@ -41,7 +41,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (issue == null) return true;
         if (!PrepareCancellation(issue, out owner))
         {
-            if (ModInformation.IsServer && issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(issue.GetType()))
+            if (CanRetry(issue))
                 pending[issue] = BuildGiverDeathLog(issue);
             return false;
         }
@@ -71,7 +71,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (!PrepareCancellation(issue, out owner))
         {
-            if (ModInformation.IsServer && log != null) pending[issue] = log;
+            if (log != null && CanRetry(issue)) pending[issue] = log;
             return false;
         }
 
@@ -144,6 +144,11 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
             if (owner == null) scope.Dispose();
         }
     }
+
+    private bool CanRetry(IssueBase issue) =>
+        ModInformation.IsServer && issue.IssueOwner?.Issue == issue &&
+        registry.IsRegistered(issue.GetType()) &&
+        (issue.IssueQuest?.IsOngoing == true || issue.IsSolvingWithAlternative);
 
     public void Retry()
     {

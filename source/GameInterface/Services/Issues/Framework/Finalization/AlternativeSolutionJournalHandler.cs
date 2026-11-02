@@ -38,10 +38,11 @@ internal class AlternativeSolutionJournalHandler : IHandler
     private readonly IQuestTypeRegistry registry;
     private readonly IControllerIdProvider controller;
     private readonly IPlayerManager players;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public AlternativeSolutionJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnerResolver owners, IQuestTypeRegistry registry,
-        IControllerIdProvider controller, IPlayerManager players)
+        IControllerIdProvider controller, IPlayerManager players, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.network = network;
@@ -51,6 +52,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         this.registry = registry;
         this.controller = controller;
         this.players = players;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<AlternativeSolutionEndingObserved>(HandleObserved);
         broker.Subscribe<NetworkAlternativeSolutionJournal>(HandleJournal);
     }
@@ -83,7 +85,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
         if (ModInformation.IsServer) return;
         var data = payload.What;
         var isAcceptance = data.Ending == IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if ((!isAcceptance && !IsEnding(data.Ending)) || !resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !issue.IsSolvingWithAlternative || !owners.TryGetOwnerControllerId(issue, out var owner) ||
@@ -106,7 +108,7 @@ internal class AlternativeSolutionJournalHandler : IHandler
                             ? null
                             : Hero.MainHero);
             }
-        }, context: nameof(AlternativeSolutionJournalHandler));
+        }, data.IssueOwnerId), context: nameof(AlternativeSolutionJournalHandler));
     }
 
     private static bool IsEnding(IssueBase.IssueUpdateDetails ending) =>
