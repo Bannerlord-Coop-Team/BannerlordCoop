@@ -675,6 +675,34 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
+    // C4 while deploying: a record held here leaves with its owner, but a captor's record of that hull still spawns it.
+    [Fact]
+    public void RemoveHullsOf_AHeldRecordOfTheDepartedPlayer_SpawnsAgainFromTheCaptorsRecord()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: false);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        harness.SetupForeignSpawn();
+        harness.Members.Add("captor");
+        var victims = ForeignRecord(Guid.NewGuid());
+        var captors = new BattleShipSpawnData(victims.ShipId, "captor", "MapEventParty_3", false, BattleSideEnum.Attacker, 0,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
+            100f, 50f, 1, "", captorControllerId: "captor", captureSequence: 1);
+        harness.Replicator.AcceptSpawnRecords(new[] { victims });
+
+        harness.Replicator.RemoveHullsOf(Peer);
+        harness.Replicator.AcceptSpawnRecords(new[] { captors });
+        deploying = false;
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        Assert.Equal(ShipLifecycle.Registered, harness.Registry.StateOf(victims.ShipId));
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Once);
+        harness.Engine.Verify(e => e.SpawnForeignHull(captors, It.IsAny<Team>(), out It.Ref<Formation>.IsAny), Times.Once);
+    }
+
     // An AI hull follows the battle host, so its record still waiting here when the host departs is kept and spawns under the
     // next host.
     [Fact]
