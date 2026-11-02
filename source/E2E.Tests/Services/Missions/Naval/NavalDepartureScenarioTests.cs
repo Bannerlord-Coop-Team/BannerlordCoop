@@ -74,7 +74,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
         b.UseStation(lateCrew, b.Hull(hullB).Station("oar", 1), inUse: true);
         Assert.Equal(1, (int)c.StationStats()["pending"]!);
-        var lateSample = b.SentSamples(hullB).Last();
+        var lateSample = b.SentSamples(hullB)[^1];
         var lateRecord = b.Network.NetworkSentMessages.GetMessages<NetworkSpawnBattleShips>().Last();
 
         battle.Leave(b);
@@ -114,7 +114,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         battle.CommitAll();
         battle.TickAll(2);
         SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
-        var lateSample = b.SentSamples(hullB).Last();
+        var lateSample = b.SentSamples(hullB)[^1];
 
         DropConnection(b);
         battle.TickAll(2);
@@ -178,7 +178,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         b.Hull(pirate).Frame = new MatrixFrame(Mat3.Identity, new Vec3(-20f, 300f, 0f));
         b.Tick();
         c.Tick();
-        Assert.Equal(battle.HostEpoch, b.SentSamples(pirate).Last().HostEpoch);
+        Assert.Equal(battle.HostEpoch, b.SentSamples(pirate)[^1].HostEpoch);
         Assert.Equal(-20f, c.Hull(pirate).Frame.origin.x, 3);
     }
 

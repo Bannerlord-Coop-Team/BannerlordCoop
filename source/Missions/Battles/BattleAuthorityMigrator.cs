@@ -372,7 +372,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (string.IsNullOrEmpty(newHost))
             newHost = session.OwnControllerId;
 
-
         if (!session.IsOwn(newHost))
         {
             TransferRemoteAuthority(previousHost, newHost);

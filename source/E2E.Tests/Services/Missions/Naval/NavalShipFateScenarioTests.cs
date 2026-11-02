@@ -418,7 +418,6 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         return prize;
     }
 
-
     private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
     {
         var prize = battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);

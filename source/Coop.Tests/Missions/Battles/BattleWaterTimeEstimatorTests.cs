@@ -48,7 +48,7 @@ public class BattleWaterTimeEstimatorTests
         for (float local = 1000.25f; local < 1100f; local += 0.25f)
         {
             float written = estimator.Advance(local, isHost: false);
-            Assert.True(written - previous >= (1 - BattleWaterTimeEstimator.SlewFraction) * 0.25f - 0.001f, $"{written} after {previous}");
+            Assert.True(written - previous >= ((1 - BattleWaterTimeEstimator.SlewFraction) * 0.25f) - 0.001f, $"{written} after {previous}");
             previous = written;
         }
     }

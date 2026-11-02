@@ -23,7 +23,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         using var battle = StartPirateBattle(out var a, out var b, out var c, out var pirates);
         var parkedCrew = SeatCrewOnCopy(b, pirates[0]);
         battle.TickAll(5);
-        var lateSampleFromA = a.SentSamples(pirates[0]).Last();
+        var lateSampleFromA = a.SentSamples(pirates[0])[^1];
         var copy = b.Hull(pirates[0]);
         var registeredBeforeSwap = b.RegisteredShipIds();
 
@@ -53,7 +53,7 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         b.Hull(pirates[0]).Frame = new MatrixFrame(Mat3.Identity, new Vec3(42f, 300f, 0f));
         b.Tick();
         c.Tick();
-        var newHostSample = b.SentSamples(pirates[0]).Last();
+        var newHostSample = b.SentSamples(pirates[0])[^1];
         Assert.True(newHostSample.Sequence < lateSampleFromA.Sequence);
         Assert.Equal(battle.HostEpoch, newHostSample.HostEpoch);
         Assert.Equal(newHostSample.Sequence, (long)c.Stream(pirates[0])["accepted"]!);

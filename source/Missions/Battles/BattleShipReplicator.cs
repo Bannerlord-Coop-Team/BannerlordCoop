@@ -498,7 +498,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Sent {Count} own hull record(s) to {Target}", records.Length, controllerId ?? "all peers");
     }
 
-
     public void SendFinalRopes()
     {
         if (!spawnRecordsSent) return;
@@ -803,7 +802,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     internal static bool IsForeignHullSpawnExhausted(int attempts) => attempts >= ForeignHullSpawnAttempts;
 
-
     // A player who left takes its hulls with it, whether or not its own removal reached this client first.
     // A player who left or disconnected (the server sends a naval disconnect as a leave, D4) takes its hulls; a departed
     // host's AI hulls stay and move to its successor with the host migration.
@@ -836,7 +834,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>
         !string.IsNullOrEmpty(controllerId) && (instanceId == null || instanceId == session.InstanceId) && !session.IsOwn(controllerId);
-
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {

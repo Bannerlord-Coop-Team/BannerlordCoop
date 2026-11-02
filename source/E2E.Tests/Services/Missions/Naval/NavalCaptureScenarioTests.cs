@@ -22,7 +22,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
     {
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
-        var lateSampleFromH = h.SentSamples(prize).Last();
+        var lateSampleFromH = h.SentSamples(prize)[^1];
         h.Hull(prize).IsVacant = true;
 
         c.ElapseCaptureTimer(prize, captorHull);

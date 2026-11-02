@@ -456,7 +456,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
         }
     }
 
-
     // Counts and logs a confirm this client won't apply.
     private ConfirmOutcome Drop(NetworkShipCaptured confirm, string reason)
     {
