@@ -41,6 +41,12 @@ public interface IBattleShipReplicator : IDisposable
     Guid RegisterNpcHull(MissionObject hull, Formation formation, string mapEventPartyId);
 
     /// <summary>
+    /// [Game thread, host] Takes back the AI hulls a failed fleet attempt spawned: peers drop their copies with the crew aboard,
+    /// and here the crew withdraws and the hulls go the way a departure's do. A hull that never registered goes here only.
+    /// </summary>
+    void RetractNpcHulls(IReadOnlyList<MissionObject> hulls);
+
+    /// <summary>
     /// [Game thread] Queues replacing an AI hull this client simulates with a fresh simulated hull of the same ship, one
     /// step per mission tick, keeping its ship id. Why it cannot, or null.
     /// </summary>
@@ -217,6 +223,31 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Registered AI hull {ShipId} of party {PartyId} on formation {Formation} at {Position}",
             ship.ShipId, mapEventPartyId, formation?.FormationIndex, engine.GetFrame(hull).origin);
         return ship.ShipId;
+    }
+
+    // Tells peers before the local removal queues, so their copies go with the crew the attempt fielded; nothing announces it
+    // later, since the removal drops the ship from the registry before vanilla's removal event reads it.
+    public void RetractNpcHulls(IReadOnlyList<MissionObject> hulls)
+    {
+        var retracted = new List<NetworkShipInfo>();
+        foreach (var hull in hulls)
+        {
+            if (Registry.TryGetByHull(hull, out var ship) && IsOwnHull(ship))
+            {
+                network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Leave, missionEnding: true));
+                removalsSent++;
+                retracted.Add(ship);
+                continue;
+            }
+
+            // Spawned and never registered, so no peer knows it and no crew boarded it.
+            engine.ReleaseHullStations(hull);
+            engine.RemoveHull(hull);
+        }
+
+        RemoveHulls(retracted, ShipRemovalReason.Leave, DepartingCrew.All);
+        Logger.Information("[NavalSync] Took back {Retracted} AI hull(s) of a failed fleet attempt ({Unregistered} never registered)",
+            retracted.Count, hulls.Count - retracted.Count);
     }
 
     // AI hulls follow the battle host. Every client moves their authority; the new host takes over simulating them and the
