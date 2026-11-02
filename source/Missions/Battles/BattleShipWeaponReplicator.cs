@@ -36,6 +36,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     internal const float KeyframeSeconds = 1f;
     // A grapeshot volley launches several projectiles in one frame; their release swing and sound play once.
     internal const float VolleySeconds = 0.25f;
+    // Arrivals held per hull while its weapon is unresolved; past it the oldest go, so a weapon never found can't grow the hold.
+    internal const int MaxHeldArrivalsPerShip = 32;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -50,6 +52,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private readonly Dictionary<Guid, WeaponStream> streams = new Dictionary<Guid, WeaponStream>();
     // The shots and states of a hull whose weapon isn't resolved here yet, in arrival order, replayed once it resolves.
     private readonly Dictionary<Guid, List<HeldArrival>> held = new Dictionary<Guid, List<HeldArrival>>();
+    // Hulls whose hold overflowed, warned about once until their hold empties.
+    private readonly HashSet<Guid> overflowWarned = new HashSet<Guid>();
     private List<MissionObject> simulatedWeapons;
     private float sendElapsed;
     private float elapsed;
@@ -88,6 +92,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         streams.Clear();
         held.Clear();
+        overflowWarned.Clear();
         engine.ClearSimulatedWeapons();
     }
 
@@ -394,19 +399,80 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     }
 
     // Holds a shot behind the hull's earlier arrivals, since a later keyframe cannot recreate a missed projectile.
-    private void HoldShot(NetworkShipWeaponShot shot) => HeldFor(shot.ShipId).Add(new HeldArrival(shot, null));
-
-    // Holds a state behind the hull's earlier arrivals; one right after a held state keeps only the newer of the two.
-    private void HoldState(NetworkShipWeaponState state)
+    private void HoldShot(NetworkShipWeaponShot shot)
     {
-        var arrivals = HeldFor(state.ShipId);
-        var last = arrivals.Count > 0 ? arrivals[arrivals.Count - 1].State : null;
-        if (last == null)
+        var arrival = new HeldArrival(shot, null);
+        var obsolete = ObsoleteReason(arrival);
+        if (obsolete != null)
         {
-            arrivals.Add(new HeldArrival(null, state));
+            DropShot(obsolete);
             return;
         }
-        if (state.Stamp.IsNewer(last.Stamp)) arrivals[arrivals.Count - 1] = new HeldArrival(null, state);
+        Hold(arrival);
+    }
+
+    // Holds a state behind the hull's earlier arrivals; one right after a held state of the same sender keeps only the newer.
+    private void HoldState(NetworkShipWeaponState state)
+    {
+        var arrival = new HeldArrival(null, state);
+        var obsolete = ObsoleteReason(arrival);
+        if (obsolete != null)
+        {
+            DropState(obsolete);
+            return;
+        }
+
+        var arrivals = HeldFor(state.ShipId);
+        var last = arrivals.Count > 0 ? arrivals[arrivals.Count - 1].State : null;
+        if (last == null || last.OwnerControllerId != state.OwnerControllerId)
+        {
+            Hold(arrival);
+            return;
+        }
+        if (state.Stamp.IsNewer(last.Stamp)) arrivals[arrivals.Count - 1] = arrival;
+    }
+
+    // Appends an arrival to its hull's hold, dropping the oldest past the cap so the rest keep their order.
+    private void Hold(HeldArrival arrival)
+    {
+        var arrivals = HeldFor(arrival.ShipId);
+        arrivals.Add(arrival);
+        if (arrivals.Count <= MaxHeldArrivalsPerShip) return;
+
+        Drop(arrivals[0], "hold_overflow");
+        arrivals.RemoveAt(0);
+        if (overflowWarned.Add(arrival.ShipId))
+            Logger.Warning("[NavalSync] Ship {ShipId}'s weapon is still unresolved with {Count} arrivals held; dropping the oldest",
+                arrival.ShipId, MaxHeldArrivalsPerShip);
+    }
+
+    /// <summary>Why a held arrival can never apply to its registered hull as it is now (not its authority, or a superseded host), or null.</summary>
+    private string ObsoleteReason(HeldArrival arrival)
+    {
+        if (!Registry.TryGet(arrival.ShipId, out var ship)) return null;
+
+        var rejection = AuthorityStamp.ValidateSender(arrival.Sender, ship.CurrentAuthority, session.OwnControllerId,
+            missionContext.ControllersInMission);
+        if (rejection != null) return rejection;
+        return ship.FollowsBattleHost && hostEpochPolicy.IsStale(arrival.HostEpoch, session.HostEpoch) ? "stale_epoch" : null;
+    }
+
+    // Drops the held arrivals an authority or host change made obsolete while the hull's weapon is still unresolved.
+    private void PruneObsolete(List<HeldArrival> arrivals)
+    {
+        arrivals.RemoveAll(arrival =>
+        {
+            var obsolete = ObsoleteReason(arrival);
+            if (obsolete != null) Drop(arrival, obsolete);
+            return obsolete != null;
+        });
+    }
+
+    // Removes a hull's hold and forgets its overflow warning.
+    private void Release(Guid shipId)
+    {
+        held.Remove(shipId);
+        overflowWarned.Remove(shipId);
     }
 
     // The hull's held arrivals, created empty on first use.
@@ -421,28 +487,30 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     {
         foreach (var shipId in held.Keys.ToArray())
         {
+            var arrivals = held[shipId];
             if (Registry.IsGone(shipId))
             {
-                DropHeld(held[shipId]);
-                held.Remove(shipId);
+                foreach (var arrival in arrivals) Drop(arrival, "hull_gone");
+                Release(shipId);
                 continue;
             }
-            if (!TryGetResolved(shipId, out _, out _)) continue;
+            if (!TryGetResolved(shipId, out _, out _))
+            {
+                PruneObsolete(arrivals);
+                if (arrivals.Count == 0) Release(shipId);
+                continue;
+            }
 
-            var arrivals = held[shipId];
-            held.Remove(shipId);
+            Release(shipId);
             foreach (var arrival in arrivals) Replay(arrival);
         }
     }
 
-    // Counts the held arrivals of a hull that could not spawn or left the mission.
-    private void DropHeld(List<HeldArrival> arrivals)
+    // Counts a held arrival dropped before replay and names why.
+    private void Drop(HeldArrival arrival, string reason)
     {
-        foreach (var arrival in arrivals)
-        {
-            if (arrival.Shot != null) DropShot("hull_gone");
-            else DropState("hull_gone");
-        }
+        if (arrival.Shot != null) DropShot(reason);
+        else DropState(reason);
     }
 
     // Accepts a held arrival as if it arrived now, so authority, epoch and revision are checked against the hull as it is now.
@@ -508,6 +576,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     // A shot or a state held until its hull's weapon resolves; exactly one of the two is set.
     private readonly struct HeldArrival
     {
+        // Wraps exactly one of a shot or a state.
         public HeldArrival(NetworkShipWeaponShot shot, NetworkShipWeaponState state)
         {
             Shot = shot;
@@ -516,6 +585,9 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
         public NetworkShipWeaponShot Shot { get; }
         public NetworkShipWeaponState State { get; }
+        public Guid ShipId => Shot?.ShipId ?? State.ShipId;
+        public string Sender => Shot?.OwnerControllerId ?? State.OwnerControllerId;
+        public int HostEpoch => Shot?.HostEpoch ?? State.HostEpoch;
     }
 
     // One hull's weapon as this client sees it: who simulates it, and what was sent or applied for it.

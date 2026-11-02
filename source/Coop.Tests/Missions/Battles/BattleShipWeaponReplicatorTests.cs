@@ -497,6 +497,78 @@ public class BattleShipWeaponReplicatorTests
         Assert.Equal("state_hull_gone", (string)harness.Inspect()["lastDrop"]!);
     }
 
+    // F8 review: a weapon never found here keeps only the newest arrivals, in order, instead of the owner's whole firing history.
+    [Fact]
+    public void HeldArrivals_WhileTheWeaponIsNeverFound_StayBounded_AndKeepTheNewestInOrder()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        var applied = harness.RecordApplied(copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        const int fired = 200;
+        for (int i = 1; i <= fired; i++)
+        {
+            harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+            harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, i, 0,
+                new BattleShipWeaponState(0.3f, 0.1f, (int)RangedSiegeWeapon.WeaponState.Reloading, i)));
+            harness.Replicator.Tick(0.01f);
+        }
+        var inspect = harness.Inspect();
+        int heldCount = (int)inspect["pendingShots"]! + (int)inspect["pendingStates"]!;
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        int keptPairs = BattleShipWeaponReplicator.MaxHeldArrivalsPerShip / 2;
+        Assert.Equal(BattleShipWeaponReplicator.MaxHeldArrivalsPerShip, heldCount);
+        Assert.Equal("state_hold_overflow", (string)inspect["lastDrop"]!);
+        Assert.Equal((long)(fired - keptPairs), (long)inspect["shotsDropped"]!);
+        var expected = Enumerable.Range(fired - keptPairs + 1, keptPairs).SelectMany(i => new[] { "shot", $"state {i}" });
+        Assert.Equal(expected, applied);
+    }
+
+    // F8 review: arrivals from an owner who lost the hull go while the weapon is still missing, not only once it is found.
+    [Fact]
+    public void HeldArrivals_FromAnOwnerWhoLostTheHull_AreDroppedWhileStillWaiting()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        harness.Replicator.Tick(0.01f);
+        harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, 0, 5)));
+
+        copy.Ship.CurrentAuthority = "someone_else";
+        harness.Replicator.Tick(0.01f);
+
+        Assert.Equal(0, (int)harness.Inspect()["pendingShots"]!);
+        Assert.Equal(0, (int)harness.Inspect()["pendingStates"]!);
+        Assert.Equal(1L, (long)harness.Inspect()["shotsDropped"]!);
+        Assert.Equal("state_not_authority", (string)harness.Inspect()["lastDrop"]!);
+    }
+
+    // F8 review: a delayed state from the hull's previous owner, in the same epoch, can't replace the new owner's held state.
+    [Fact]
+    public void HeldState_OfTheNewOwner_SurvivesADelayedStateFromThePreviousOwner()
+    {
+        const string newOwner = "someone_else";
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false, discovered: false);
+        harness.Replicator.Tick(0.01f);
+        copy.Ship.CurrentAuthority = newOwner;
+        harness.Replicator.Tick(0.01f);
+        var current = new BattleShipWeaponState(0.3f, 0.1f, 0, 4);
+
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, newOwner, 1, 0, current));
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 9, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, 0, 5)));
+        harness.Discover(copy.Ship, copy.Weapon);
+        harness.Replicator.Tick(0.01f);
+
+        harness.Engine.Verify(e => e.ApplyWeaponState(copy.Weapon, current, null), Times.Once);
+        Assert.Equal(1L, (long)harness.Inspect()["statesApplied"]!);
+    }
+
     [Fact]
     public void ShotAndState_KeepTheirFieldsOverTheWire()
     {
@@ -581,6 +653,18 @@ public class BattleShipWeaponReplicatorTests
             if (discovered) Discover(ship, weapon);
             else Engine.Setup(e => e.TryGetWeapon(ship.Hull, out It.Ref<MissionObject>.IsAny, out It.Ref<string>.IsAny)).Returns(false);
             return (ship, weapon);
+        }
+
+        /// <summary>Records, in order, each shot replayed and each state (by ammo count) applied on <paramref name="weapon"/>.</summary>
+        public List<string> RecordApplied(MissionObject weapon)
+        {
+            var applied = new List<string>();
+            Engine.Setup(e => e.ReplayWeaponShot(weapon, It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(), It.IsAny<bool>()))
+                .Callback(() => applied.Add("shot"))
+                .Returns(true);
+            Engine.Setup(e => e.ApplyWeaponState(weapon, It.IsAny<BattleShipWeaponState>(), It.IsAny<BattleShipWeaponState>()))
+                .Callback<MissionObject, BattleShipWeaponState, BattleShipWeaponState>((_, state, _) => applied.Add($"state {state.AmmoCount}"));
+            return applied;
         }
 
         /// <summary>Lets the engine find <paramref name="weapon"/> on the hull from the next lookup on.</summary>
