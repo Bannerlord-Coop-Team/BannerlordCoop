@@ -168,7 +168,6 @@ public class BattleSimulationEncounterTests : MapEventTestBase
                 Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
                 Assert.Single(ended);
                 Assert.False(ServerBattleModeArbiter.IsClaimed(context.MapEventId));
-
             }, MapEventDisabledMethods);
 
             client.Call(() =>
