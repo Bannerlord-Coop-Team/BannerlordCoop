@@ -102,6 +102,27 @@ internal readonly struct CopySteeringStep
     public float ErrorAlongHeading { get; }
 }
 
+/// <summary>A queued snap taken whole from one sample: the frame to teleport the copy to and the owner's motion it carries over.</summary>
+internal readonly struct CopySteeringSnap
+{
+    /// <summary>A snap to <paramref name="frame"/> that hands the copy the owner's velocity and yaw rate.</summary>
+    public CopySteeringSnap(MatrixFrame frame, Vec2 velocity, float yawRate)
+    {
+        Frame = frame;
+        Velocity = velocity;
+        YawRate = yawRate;
+    }
+
+    /// <summary>The owner's frame moved on to the target position and heading.</summary>
+    public MatrixFrame Frame { get; }
+
+    /// <summary>The owner's planar velocity the copy carries over, zero once the owner is stale.</summary>
+    public Vec2 Velocity { get; }
+
+    /// <summary>The owner's yaw rate the copy carries over, zero once the owner is stale.</summary>
+    public float YawRate { get; }
+}
+
 /// <summary>
 /// Steers a copy's planar position, yaw and, when roped, roll toward its owner's extrapolated sample: the owner's rate plus a
 /// clamped correction, blended in over tau. Heave and pitch float on local water (NavalBattles.md section 1).
@@ -120,11 +141,17 @@ internal sealed class CopySteering
     internal const float DegToRad = (float)(Math.PI / 180.0);
 
     private readonly CopySteeringKnobs knobs;
+    // The mission tick observes and snaps while the fixed tick, which the engine may call off that thread, computes, so every
+    // read and write of the sample, its age and the snap flag holds this lock and sees one whole sample.
+    private readonly object sampleLock = new object();
     private MatrixFrame sampleFrame;
     private Vec2 sampleVelocity;
     private float sampleYawRate;
     private float sampleRoll;
     private float sampleRollRate;
+    private float secondsSinceSample;
+    private bool hasTarget;
+    private bool isSnapQueued;
 
     /// <summary>A steering that reads the shared knobs on every step, so a tuned knob reaches it at once.</summary>
     public CopySteering(CopySteeringKnobs knobs)
@@ -133,46 +160,83 @@ internal sealed class CopySteering
     }
 
     /// <summary>Whether an owner sample arrived, without which there is nothing to steer toward.</summary>
-    public bool HasTarget { get; private set; }
+    public bool HasTarget
+    {
+        get { lock (sampleLock) return hasTarget; }
+    }
 
     /// <summary>
     /// A snap waits for the mission tick: a sample jumped past the snap distance or the copy fell that far behind. The
-    /// physics steps leave the copy alone until <see cref="TakeSnapFrame"/> clears it.
+    /// physics steps leave the copy alone until <see cref="TakeSnap"/> clears it.
     /// </summary>
-    public bool IsSnapQueued { get; private set; }
+    public bool IsSnapQueued
+    {
+        get { lock (sampleLock) return isSnapQueued; }
+    }
 
     /// <summary>The owner's latest sample frame as received, not extrapolated.</summary>
-    public MatrixFrame SampleFrame => sampleFrame;
+    public MatrixFrame SampleFrame
+    {
+        get { lock (sampleLock) return sampleFrame; }
+    }
 
     /// <summary>Where the owner is estimated to be right now: the sample moved on by its velocity for its age, without the lead.</summary>
-    internal (Vec2 Position, float Yaw) OwnerEstimate => Extrapolate(MaxExtrapolationSeconds, 0f);
+    internal (Vec2 Position, float Yaw) OwnerEstimate
+    {
+        get { lock (sampleLock) return Extrapolate(MaxExtrapolationSeconds, 0f); }
+    }
 
     /// <summary>Physics time stepped since the latest sample arrived.</summary>
-    public float SecondsSinceSample { get; private set; }
+    public float SecondsSinceSample
+    {
+        get { lock (sampleLock) return secondsSinceSample; }
+    }
 
     /// <summary>The owner's samples stopped coming, so their velocity no longer feeds forward.</summary>
-    public bool IsOwnerStale => SecondsSinceSample > StaleSeconds;
+    public bool IsOwnerStale
+    {
+        get { lock (sampleLock) return IsStale; }
+    }
+
+    // Whether the sample is older than StaleSeconds; the caller holds the lock.
+    private bool IsStale => secondsSinceSample > StaleSeconds;
 
     /// <summary>Takes the owner's latest sample; a jump past the snap distance from where the last one led queues a snap.</summary>
     public void ObserveOwner(MatrixFrame frame, Vec2 velocity, float yawRate, float rollRate = 0f)
     {
-        var led = Extrapolate(StaleSeconds, knobs.LeadSeconds).Position;
-        if (HasTarget && (frame.origin.AsVec2 - led).Length > knobs.SnapMetres) IsSnapQueued = true;
+        float roll = RollOf(frame.rotation);
+        lock (sampleLock)
+        {
+            var led = Extrapolate(StaleSeconds, knobs.LeadSeconds).Position;
+            if (hasTarget && (frame.origin.AsVec2 - led).Length > knobs.SnapMetres) isSnapQueued = true;
 
-        sampleRoll = RollOf(frame.rotation);
-        sampleRollRate = rollRate;
-        sampleFrame = frame;
-        sampleVelocity = velocity;
-        sampleYawRate = yawRate;
-        SecondsSinceSample = 0f;
-        HasTarget = true;
+            sampleRoll = roll;
+            sampleRollRate = rollRate;
+            sampleFrame = frame;
+            sampleVelocity = velocity;
+            sampleYawRate = yawRate;
+            secondsSinceSample = 0f;
+            hasTarget = true;
+        }
     }
 
     /// <summary>The planar position and yaw the copy steers toward right now.</summary>
-    internal (Vec2 Position, float Yaw) Target => Extrapolate(MaxExtrapolationSeconds, knobs.LeadSeconds);
+    internal (Vec2 Position, float Yaw) Target
+    {
+        get { lock (sampleLock) return CurrentTarget(); }
+    }
 
     /// <summary>The roll in radians a roped copy steers toward right now: the owner's sampled roll moved on by its roll rate.</summary>
-    internal float TargetRoll => sampleRoll + (sampleRollRate * Ahead(MaxExtrapolationSeconds, knobs.LeadSeconds));
+    internal float TargetRoll
+    {
+        get { lock (sampleLock) return CurrentTargetRoll(); }
+    }
+
+    // The sample extrapolated by its capped age plus the lead; the caller holds the lock.
+    private (Vec2 Position, float Yaw) CurrentTarget() => Extrapolate(MaxExtrapolationSeconds, knobs.LeadSeconds);
+
+    // The sampled roll moved on by its roll rate; the caller holds the lock.
+    private float CurrentTargetRoll() => sampleRoll + (sampleRollRate * Ahead(MaxExtrapolationSeconds, knobs.LeadSeconds));
 
     /// <summary>
     /// The correction for one physics step of <paramref name="dt"/> seconds from the copy's current state; <paramref name="roll"/>
@@ -180,19 +244,30 @@ internal sealed class CopySteering
     /// </summary>
     public CopySteeringStep Compute(float dt, Vec3 origin, float yaw, Vec2 velocity, float yawRate, (float Angle, float Rate)? roll = null)
     {
-        if (!HasTarget || !(dt > 0f) || float.IsInfinity(dt)) return default;
+        if (!(dt > 0f) || float.IsInfinity(dt)) return default;
 
-        SecondsSinceSample += dt;
-        var target = Target;
+        lock (sampleLock)
+        {
+            if (!hasTarget) return default;
+
+            secondsSinceSample += dt;
+            return Step(dt, origin, yaw, velocity, yawRate, roll);
+        }
+    }
+
+    // The step toward the current target, or a queued snap when the copy is too far off; the caller holds the lock.
+    private CopySteeringStep Step(float dt, Vec3 origin, float yaw, Vec2 velocity, float yawRate, (float Angle, float Rate)? roll)
+    {
+        var target = CurrentTarget();
         var error = target.Position - origin.AsVec2;
         float distance = error.Length;
-        if (IsSnapQueued || distance > knobs.SnapMetres)
+        if (isSnapQueued || distance > knobs.SnapMetres)
         {
-            IsSnapQueued = true;
+            isSnapQueued = true;
             return new CopySteeringStep(true, Vec2.Zero, 0f, 0f);
         }
 
-        bool stale = IsOwnerStale;
+        bool stale = IsStale;
         float rate = knobs.Gain / knobs.WindowSeconds;
         float blend = Math.Min(1f, dt / knobs.TauSeconds);
         var correction = ClampLength(error * (rate * SmoothStep(0f, knobs.SoftZoneMetres, distance)), knobs.ClampMetresPerSecond);
@@ -210,35 +285,42 @@ internal sealed class CopySteering
     }
 
     // The roll rate change toward the owner's roll rate plus a clamped pull to the target roll. Unlike the yaw it has no soft
-    // zone: the pass limit is a 0.5 degree mean, and a linear pull is already 0 at no error.
+    // zone: the pass limit is a 0.5 degree mean, and a linear pull is already 0 at no error. The caller holds the lock.
     private float RollRateChange((float Angle, float Rate) roll, bool stale, float blend)
     {
         float gain = knobs.RollGainPerSecond;
         if (gain <= 0f) return 0f;
 
         float clamp = RollClampDegreesPerSecond * DegToRad;
-        float correction = Clamp(WrapAngle(TargetRoll - roll.Angle) * gain, -clamp, clamp);
+        float correction = Clamp(WrapAngle(CurrentTargetRoll() - roll.Angle) * gain, -clamp, clamp);
         return ((stale ? 0f : sampleRollRate) + correction - roll.Rate) * blend;
     }
 
-    // The sample moved on by its velocity for its age, capped at maxAge, plus the lead.
+    // The sample moved on by its velocity for its age, capped at maxAge, plus the lead; the caller holds the lock.
     private (Vec2 Position, float Yaw) Extrapolate(float maxAge, float lead)
     {
         float ahead = Ahead(maxAge, lead);
         return (sampleFrame.origin.AsVec2 + (sampleVelocity * ahead), YawOf(sampleFrame.rotation.f) + (sampleYawRate * ahead));
     }
 
-    // Seconds a sample is moved on: its age capped at maxAge, plus the lead.
-    private float Ahead(float maxAge, float lead) => Math.Min(SecondsSinceSample, maxAge) + lead;
+    // Seconds a sample is moved on: its age capped at maxAge, plus the lead; the caller holds the lock.
+    private float Ahead(float maxAge, float lead) => Math.Min(secondsSinceSample, maxAge) + lead;
 
-    /// <summary>Clears the queued snap and returns the frame it teleports to now, from the latest sample, which covers any jump since.</summary>
-    public MatrixFrame TakeSnapFrame()
+    /// <summary>
+    /// Clears the queued snap and returns where it teleports to now, from the latest sample, which covers any jump since, with
+    /// that same sample's velocity and yaw rate, zero once the owner is stale.
+    /// </summary>
+    public CopySteeringSnap TakeSnap()
     {
-        IsSnapQueued = false;
-        return FrameAt(Target);
+        lock (sampleLock)
+        {
+            isSnapQueued = false;
+            bool stale = IsStale;
+            return new CopySteeringSnap(FrameAt(CurrentTarget()), stale ? Vec2.Zero : sampleVelocity, stale ? 0f : sampleYawRate);
+        }
     }
 
-    // The owner's sample frame moved and turned to the target.
+    // The owner's sample frame moved and turned to the target; the caller holds the lock.
     private MatrixFrame FrameAt((Vec2 Position, float Yaw) target)
     {
         var frame = sampleFrame;
@@ -246,12 +328,6 @@ internal sealed class CopySteering
         frame.rotation = RotateYaw(frame.rotation, WrapAngle(target.Yaw - YawOf(frame.rotation.f)));
         return frame;
     }
-
-    /// <summary>The owner's velocity the snap carries over, zero once the owner is stale.</summary>
-    public Vec2 FeedForwardVelocity => IsOwnerStale ? Vec2.Zero : sampleVelocity;
-
-    /// <summary>The owner's yaw rate the snap carries over, zero once the owner is stale.</summary>
-    public float FeedForwardYawRate => IsOwnerStale ? 0f : sampleYawRate;
 
     /// <summary>The rotation turned about the world up axis by <paramref name="radians"/>, counter-clockwise from above.</summary>
     internal static Mat3 RotateYaw(Mat3 rotation, float radians)

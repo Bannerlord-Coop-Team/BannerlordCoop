@@ -136,14 +136,14 @@ public class NavalSteeredCopies : INavalSteeredCopies
             if (!copy.Steering.IsSnapQueued) continue;
             if (ship.IsRemoved || !ship.GameEntity.IsValid)
             {
-                copy.Steering.TakeSnapFrame();
+                copy.Steering.TakeSnap();
                 continue;
             }
 
             // A copy whose body doesn't simulate gets its owner's frames written; its snap waits until the body simulates.
             if (!IsSimulating(ship)) continue;
 
-            Snap(ship, copy, copy.Steering.TakeSnapFrame());
+            Snap(ship, copy.Steering.TakeSnap());
 #if DEBUG
             copy.Diagnostics.RecordSnap();
 #endif
@@ -210,12 +210,12 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
     // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion. Like vanilla's
     // crew teleport, a rider keeps a station of this hull, which moved with it; only a point off the hull is let go.
-    private static void Snap(MissionShip ship, SteeredCopy copy, MatrixFrame target)
+    private static void Snap(MissionShip ship, CopySteeringSnap snap)
     {
         var entity = ship.GameEntity;
         var before = entity.GetGlobalFrame();
         var riders = RidersOf(ship);
-        ship.ShipsLogic.TeleportShip(ship, target, checkFreeArea: false);
+        ship.ShipsLogic.TeleportShip(ship, snap.Frame, checkFreeArea: false);
 
         var after = entity.GetGlobalFrame();
         foreach (var rider in riders)
@@ -224,9 +224,9 @@ public class NavalSteeredCopies : INavalSteeredCopies
             rider.TeleportToPosition(after.TransformToParent(before.TransformToLocalNonOrthogonal(rider.Position)));
         }
 
-        var ownerVelocity = copy.Steering.FeedForwardVelocity;
+        var ownerVelocity = snap.Velocity;
         entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
-        entity.SetAngularVelocity(new Vec3(0f, 0f, copy.Steering.FeedForwardYawRate));
+        entity.SetAngularVelocity(new Vec3(0f, 0f, snap.YawRate));
         Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Riders} rider(s) moved along)", ship.Index, riders.Count);
     }
 
