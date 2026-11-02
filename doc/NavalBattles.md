@@ -82,8 +82,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   the station frame, an agent that walks in sits at deck height, and a ram's stagger (`ShipCollisionOutcomeLogic`, rolled
   on each client) moves it again. A copy is seated the spawn way, so `StationSeatSettler` puts every oar and helm seat this
   client holds, own agents and copies alike, at vanilla's spawn placement once it settles: after an oar's sit-down ends or a
-  helm's pilot locks to its frame, and again after each stagger. The placement comes from the station frame on every
-  client, so no message carries it (#4213). Ballista, rope and other stations have no spawn placement and are left alone.
+  helm's pilot locks to its frame, and again after each stagger. The next pass checks the agent stayed there and places it
+  again if the engine moved it (a copy seated while off the hull is put on the deck a frame later), at most three times
+  per settle. The placement comes from the station frame on every client, so no message carries it (#4213). The settler
+  handles only oars and helms; a ballista's spawn seating also teleports to its pilot point, but its height after a ram
+  is unverified, and ropes and other stations are left alone.
 - A hit on a hull that another client simulates is sent only to that hull's current authority, which applies it through the
   vanilla damage method (`BattleShipDamageRouter`). A peer that no longer holds the hull drops it, so a hit applies at most
   once across a host change or a capture.
