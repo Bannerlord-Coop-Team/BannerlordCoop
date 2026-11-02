@@ -42,8 +42,6 @@ public enum ShipCaptureRefusal
 
     CannotBeTakenOver,
 
-    Sinking,
-
     /// <summary>Its crew still holds it: a unit of its formation is not swimming, or troops are queued on it.</summary>
     NotVacant,
 
