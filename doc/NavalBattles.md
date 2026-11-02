@@ -78,6 +78,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   thread. A puppet vanilla lets go while its owner keeps the seat is re-seated at once, then at most once a second for as
   long as the seat holds (#4213). A re-seat clears the oar's stand-up action first, because it otherwise rejects the seated
   idle and the oar drops the rower again on its next tick.
+  A seated agent's height isn't replicated and can differ between owner and copy by a few cm up to about 20 cm. Vanilla
+  holds a station user by XY and facing only, so its height is whatever it arrived with: spawn seating teleports to the
+  station frame, an agent that walks in sits at deck height, and a ram's stagger (`ShipCollisionOutcomeLogic`, rolled on
+  each client) moves it again. A copy is seated the spawn way.
 - A hit on a hull that another client simulates is sent only to that hull's current authority, which applies it through the
   vanilla damage method (`BattleShipDamageRouter`). A peer that no longer holds the hull drops it, so a hit applies at most
   once across a host change or a capture.

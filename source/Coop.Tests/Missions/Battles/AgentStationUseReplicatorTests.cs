@@ -977,6 +977,38 @@ public class AgentStationUseReplicatorTests
             use.AgentId == crew.AgentId && use.InUse && use.Revision == 1 && use.SenderControllerId == "local")), Times.Once);
     }
 
+    // #4213: a puppet adopted while its re-seat retries are still failing is this client's AI now, so it is neither re-seated
+    // nor announced as seated, and its retries stop.
+    [Fact]
+    public void RefreshAppliedSeats_StopsRetryingAPuppetAdoptedWhileUnseated()
+    {
+        var crew = SeatableCrew(out var seated);
+        seated.Holds = false;
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(s => s.OwnControllerId).Returns("local");
+        var network = new Mock<IBattleNetwork>();
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, network: network.Object,
+            session: session.Object);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+        replicator.Tick(AfterRetry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+
+        crew.Info.CurrentAuthority = "local";
+        seated.Holds = true;
+        replicator.Tick(AfterRetry);
+        replicator.Tick(AfterRetry);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+        Assert.False(seated.Value);
+        Assert.False(replicator.IsOwnSeat(crew.AgentId));
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(0, (long)inspected["adoptedSeats"]!);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkAgentStationUse>()), Times.Never);
+    }
+
     // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
     private sealed class RemoteCrew
     {
