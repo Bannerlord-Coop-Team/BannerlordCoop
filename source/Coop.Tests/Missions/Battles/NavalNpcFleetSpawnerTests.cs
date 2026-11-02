@@ -312,6 +312,7 @@ public class NavalNpcFleetSpawnerTests
 
         public Harness(BattleSideEnum enemySide, System.Func<bool> scenarioFailsSpawn = null)
         {
+            Rollback.SetReturnsDefault(NpcHullHandover.None);
             var session = new Mock<IBattleSession>();
             session.SetupGet(s => s.IsLocalHost).Returns(() => IsLocalHost);
             session.SetupGet(s => s.InstanceId).Returns("MapEvent_1");

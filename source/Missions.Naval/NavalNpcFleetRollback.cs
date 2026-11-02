@@ -10,9 +10,9 @@ public interface INavalNpcFleetRollback
 {
     /// <summary>
     /// Drops the attempt's troops still waiting in vanilla's crewing, then takes back its hulls with their crew. Repeatable: a
-    /// call after a throw resumes the step that threw.
+    /// call after a throw resumes the step that threw. Returns the hulls left for another client, or for a later call here.
     /// </summary>
-    void Rollback(NavalNpcFleetAttemptWork work);
+    NpcHullHandover Rollback(NavalNpcFleetAttemptWork work);
 }
 
 /// <summary>
@@ -30,22 +30,24 @@ public sealed class NavalNpcFleetRollback : INavalNpcFleetRollback
     }
 
     // Troops go first and the hulls wait for them, so no reinforcement spawns onto a hull while its removal is queued.
-    public void Rollback(NavalNpcFleetAttemptWork work)
+    public NpcHullHandover Rollback(NavalNpcFleetAttemptWork work)
     {
         if (!work.TroopsDropped)
         {
-            DropWaitingTroops(Mission.Current?.GetMissionBehavior<NavalAgentsLogic>(), work);
+            // A handed-over take-back never crewed here, so it has no troops in this client's crewing.
+            if (work.CrewingStarted) DropWaitingTroops(Mission.Current?.GetMissionBehavior<NavalAgentsLogic>(), work);
             work.MarkTroopsDropped();
         }
 
-        if (work.Hulls.Count > 0) shipReplicator.RetractNpcHulls(work.Hulls);
+        if (work.ShipIds.Count > 0) return shipReplicator.RetractNpcShips(work.ShipIds, work.HostEpoch);
+        return work.Hulls.Count > 0 ? shipReplicator.RetractNpcHulls(work.Hulls) : NpcHullHandover.None;
     }
 
     // Puts the reinforcement switch back and drops the attempt's troops vanilla still holds, reserved on its hulls or unassigned;
     // each part finds nothing left to drop when it runs again.
     private static void DropWaitingTroops(NavalAgentsLogic agentsLogic, NavalNpcFleetAttemptWork work)
     {
-        if (!work.CrewingStarted || agentsLogic == null) return;
+        if (agentsLogic == null) return;
 
         agentsLogic.SetSpawnReinforcementsOnTick(work.CrewSide, work.SpawnedOnTickBefore);
         foreach (var hull in work.Hulls)

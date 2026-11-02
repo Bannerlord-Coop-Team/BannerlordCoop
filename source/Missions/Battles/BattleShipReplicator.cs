@@ -43,9 +43,16 @@ public interface IBattleShipReplicator : IDisposable
     /// <summary>
     /// [Game thread, host] Takes back the AI hulls a failed fleet attempt spawned: peers drop their copies with the crew aboard,
     /// and here the crew withdraws and the hulls go the way a departure's do. A hull that never registered goes here only.
-    /// Repeatable: a call after a throw resumes each hull where it stopped and never queues a hull twice.
+    /// Repeatable: a call after a throw resumes each hull where it stopped and never queues a hull twice. Returns the hulls
+    /// left for the client that simulates them now, or for this client while a hull swap runs.
     /// </summary>
-    void RetractNpcHulls(IReadOnlyList<MissionObject> hulls);
+    NpcHullHandover RetractNpcHulls(IReadOnlyList<MissionObject> hulls);
+
+    /// <summary>
+    /// [Game thread] <see cref="RetractNpcHulls"/> for hulls another client handed over by ship id, once this client applied the
+    /// host change at <paramref name="hostEpoch"/>; until then it leaves them all here.
+    /// </summary>
+    NpcHullHandover RetractNpcShips(IReadOnlyList<Guid> shipIds, int hostEpoch);
 
     /// <summary>
     /// [Game thread] Queues replacing an AI hull this client simulates with a fresh simulated hull of the same ship, one
@@ -230,13 +237,23 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     // Each hull goes through its retraction once, so a repeated take-back resumes the hull a throw stopped and never removes a
     // queued or removed hull again, as its crew is parked and withdrawn only by the queued removal (R33).
-    public void RetractNpcHulls(IReadOnlyList<MissionObject> hulls)
+    public NpcHullHandover RetractNpcHulls(IReadOnlyList<MissionObject> hulls)
     {
-        foreach (var hull in hulls)
-            Retract(RetractionOf(hull));
+        var left = hulls.Select(RetractionOf).Where(retraction => !TryRetract(retraction)).Select(retraction => retraction.Ship).ToList();
 
-        Logger.Information("[NavalSync] Took back {Count} AI hull(s) of a failed fleet attempt ({Unregistered} never registered)",
-            hulls.Count, hulls.Count(hull => npcRetractions[hull].Ship.ShipId == Guid.Empty));
+        Logger.Information("[NavalSync] Took back {Count} AI hull(s) of a failed fleet attempt ({Unregistered} never registered, {Left} left)",
+            hulls.Count - left.Count, hulls.Count(hull => npcRetractions[hull].Ship.ShipId == Guid.Empty), left.Count);
+        return HandoverOf(left);
+    }
+
+    // A hull the sender saw move may still be ours here until this client applies the same host change, so it waits for it.
+    public NpcHullHandover RetractNpcShips(IReadOnlyList<Guid> shipIds, int hostEpoch)
+    {
+        var ships = shipIds.Select(id => Registry.TryGet(id, out var ship) ? ship : null).Where(ship => ship != null).ToList();
+        if (appliedHost.AppliedHostEpoch < hostEpoch)
+            return new NpcHullHandover(ships.Select(ship => ship.ShipId).ToList(), session.OwnControllerId, hostEpoch);
+
+        return RetractNpcHulls(ships.Select(ship => ship.Hull).ToList());
     }
 
     // The hull's retraction, made the first time it is taken back; an unregistered hull still has its crew parked and withdrawn
@@ -245,37 +262,63 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (npcRetractions.TryGetValue(hull, out var retraction)) return retraction;
 
-        if (Registry.TryGetByHull(hull, out var ship) && !IsOwnHull(ship))
-        {
-            Logger.Warning("[NavalSync] AI hull {ShipId} of a failed fleet attempt is simulated by {Owner} now; left it to them",
-                ship.ShipId, ship.CurrentAuthority);
-            retraction = NpcHullRetraction.Done(ship);
-        }
-        else
-        {
-            retraction = new NpcHullRetraction(ship ?? new NetworkShipInfo(Guid.Empty, session.OwnControllerId, null, true, hull, null));
-        }
-
+        if (!Registry.TryGetByHull(hull, out var ship))
+            ship = new NetworkShipInfo(Guid.Empty, session.OwnControllerId, null, true, hull, null);
+        retraction = new NpcHullRetraction(ship);
         npcRetractions[hull] = retraction;
         return retraction;
     }
 
-    // Queues the local removal, then forgets the ship and tells peers, each step recorded so a throw resumes where it stopped.
-    private void Retract(NpcHullRetraction retraction)
+    // Queues the local removal, tells peers, then forgets the ship, each step recorded so a throw resumes where it stopped; the
+    // ship stays registered until announced, so a host change still moves it. False leaves the hull: another client simulates
+    // it now, or a swap is replacing it here.
+    private bool TryRetract(NpcHullRetraction retraction)
     {
         var ship = retraction.Ship;
+        if (retraction.Queued && retraction.Announced && retraction.Forgotten) return true;
+
+        if (!retraction.Announced && !IsOwnHull(ship))
+        {
+            // Our copy already goes, so the registry forgets it and the new simulator's removal does not queue it again.
+            if (retraction.Queued) ForgetRetracted(retraction);
+            return false;
+        }
+
+        if (!retraction.Queued && hullAuthority.IsReplacing(ship.ShipId)) return false;
+
         if (!retraction.Queued)
         {
             QueueHullRemoval(new[] { ship }, DepartingCrew.All);
             retraction.Queued = true;
         }
 
-        if (retraction.Announced) return;
+        if (!retraction.Announced)
+        {
+            network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Leave, missionEnding: true));
+            removalsSent++;
+            retraction.Announced = true;
+        }
 
-        Forget(ship, ShipRemovalReason.Leave);
-        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, ShipRemovalReason.Leave, missionEnding: true));
-        removalsSent++;
-        retraction.Announced = true;
+        ForgetRetracted(retraction);
+        return true;
+    }
+
+    // Forgets a retracted ship once.
+    private void ForgetRetracted(NpcHullRetraction retraction)
+    {
+        if (retraction.Forgotten) return;
+
+        Forget(retraction.Ship, ShipRemovalReason.Leave);
+        retraction.Forgotten = true;
+    }
+
+    // Hulls a swap holds wait here; otherwise they go to the client the AI hulls moved to, at the host change applied here.
+    private NpcHullHandover HandoverOf(IReadOnlyList<NetworkShipInfo> left)
+    {
+        if (left.Count == 0) return NpcHullHandover.None;
+
+        string holder = left.Any(IsOwnHull) ? session.OwnControllerId : left[0].CurrentAuthority;
+        return new NpcHullHandover(left.Select(ship => ship.ShipId).ToList(), holder, appliedHost.AppliedHostEpoch);
     }
 
     // AI hulls follow the battle host. Every client moves their authority; the new host takes over simulating them and the
@@ -1014,16 +1057,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         public NpcHullRetraction(NetworkShipInfo ship)
         {
             Ship = ship;
-            Announced = ship.ShipId == Guid.Empty;
+            Announced = Forgotten = ship.ShipId == Guid.Empty;
         }
-
-        // A hull with nothing left to do here.
-        public static NpcHullRetraction Done(NetworkShipInfo ship) => new NpcHullRetraction(ship) { Queued = true, Announced = true };
 
         public NetworkShipInfo Ship { get; }
         /// <summary>Whether the hull authority holds its removal.</summary>
         public bool Queued { get; set; }
-        /// <summary>Whether the registry forgot it and the peers heard it leaves with its crew.</summary>
+        /// <summary>Whether the peers heard it leaves with its crew.</summary>
         public bool Announced { get; set; }
+        /// <summary>Whether the registry forgot it.</summary>
+        public bool Forgotten { get; set; }
     }
 }
