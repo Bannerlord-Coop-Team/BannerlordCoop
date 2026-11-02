@@ -4,6 +4,7 @@
     <LangVersion>10</LangVersion>
     <Nullable>enable</Nullable>
     <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -13,6 +14,7 @@
   <ItemGroup>
     <Compile Include="..\GameInterface\Services\GameState\Patches\NavigationCacheDeserializePatch.cs" Link="NavigationCacheDeserializePatch.cs" />
     <Compile Include="..\GameInterface.Tests\Services\GameState\NavigationCacheDeserializePatchTests.cs" Link="NavigationCacheDeserializePatchTests.cs" />
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
@@ -20,9 +22,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="0Harmony">
-      <HintPath>$(BannerlordDir)Modules\Coop\bin\Win64_Shipping_Client\0Harmony.dll</HintPath>
-    </Reference>
     <Reference Include="SandBox.View">
       <HintPath>$(BannerlordDir)Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
