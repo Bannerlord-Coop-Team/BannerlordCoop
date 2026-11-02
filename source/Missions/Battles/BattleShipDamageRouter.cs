@@ -15,7 +15,7 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleShipDamageRouter : IDisposable
 {
-    /// <summary>[Game thread] Sent, deferred and applied hits, and dropped ones by reason (diagnostics).</summary>
+    /// <summary>[Game thread] Sent, deferred, held and applied hits, and dropped ones by reason (diagnostics).</summary>
     object Inspect();
 }
 
@@ -33,7 +33,9 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     private readonly IBattleShipArrivals arrivals;
 
     private readonly Dictionary<string, long> drops = new Dictionary<string, long>();
-    private long sent, deferred, applied;
+    // Routed hits waiting in the arrivals queue for their hitter's hull to register here.
+    private readonly HashSet<NetworkApplyShipDamage> pendingHits = new HashSet<NetworkApplyShipDamage>();
+    private long sent, deferred, held, applied;
     private bool disposed;
 
     public BattleShipDamageRouter(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
@@ -55,6 +57,7 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     public void Dispose()
     {
         disposed = true;
+        pendingHits.Clear();
         messageBroker.Unsubscribe<BattleShipHit>(Handle_BattleShipHit);
         messageBroker.Unsubscribe<NetworkApplyShipDamage>(Handle_NetworkApplyShipDamage);
     }
@@ -129,10 +132,15 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         }, context: nameof(Handle_NetworkApplyShipDamage));
     }
 
-    /// <summary>[Game thread] Applies a routed hit when this client holds the hull's authority, otherwise drops it.</summary>
+    /// <summary>
+    /// [Game thread] Applies a routed hit when this client holds the hull's authority, otherwise drops it; a hit whose hitter hull
+    /// isn't registered here yet waits for it.
+    /// </summary>
     internal void ApplyNetworkDamage(NetworkApplyShipDamage damage)
     {
         if (disposed || damage == null) return;
+
+        bool retrying = pendingHits.Remove(damage);
 
         if (!Registry.TryGet(damage.ShipId, out var ship))
         {
@@ -147,7 +155,25 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
             return;
         }
 
+        if (IsHitterPending(damage))
+        {
+            HoldForHitter(damage, retrying);
+            return;
+        }
+
         Apply(ship, damage);
+    }
+
+    // A named hitter whose hull isn't registered here and hasn't failed or left yet, so its ram context would be lost.
+    private bool IsHitterPending(NetworkApplyShipDamage damage) =>
+        damage.HitterShipId != Guid.Empty && Registry.StateOf(damage.HitterShipId) == ShipLifecycle.Unknown;
+
+    // Retries the hit next tick behind the arrivals that may register its hitter, revalidating the target authority then.
+    private void HoldForHitter(NetworkApplyShipDamage damage, bool retrying)
+    {
+        if (!retrying) held++;
+        pendingHits.Add(damage);
+        arrivals.Enqueue(() => ApplyNetworkDamage(damage), nameof(HoldForHitter));
     }
 
     /// <summary>Why a routed hit must be dropped, or null to apply it; a hull handed on since the hit was sent is not_authority.</summary>
@@ -158,7 +184,7 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
         return null;
     }
 
-    // Replays the hit through the vanilla damage method, with its attacker and hitter resolved here.
+    // Replays the hit through the vanilla damage method, with its attacker and hitter resolved here; a hitter gone here is null.
     private void Apply(NetworkShipInfo ship, NetworkApplyShipDamage damage)
     {
         Agent attacker = null;
@@ -193,6 +219,8 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     {
         sent,
         deferred,
+        held,
+        pendingHits = pendingHits.Count,
         applied,
         drops = new Dictionary<string, long>(drops),
     };
