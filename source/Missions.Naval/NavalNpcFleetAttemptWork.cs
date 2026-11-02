@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -10,12 +9,6 @@ public sealed class NavalNpcFleetAttemptWork
 {
     /// <summary>Every hull the attempt spawned, in spawn order, whether or not it registered.</summary>
     public List<MissionObject> Hulls { get; } = new List<MissionObject>();
-
-    /// <summary>The registered hulls another client handed over by ship id, for this client to take back.</summary>
-    public IReadOnlyList<Guid> ShipIds { get; private set; } = Array.Empty<Guid>();
-
-    /// <summary>The host change the handed-over hulls moved at.</summary>
-    public int HostEpoch { get; private set; }
 
     /// <summary>The reserve troops the attempt pulled for its crew.</summary>
     public List<IAgentOriginBase> Troops { get; } = new List<IAgentOriginBase>();
@@ -31,10 +24,6 @@ public sealed class NavalNpcFleetAttemptWork
 
     /// <summary>Whether a failed attempt's troops were dropped from vanilla's crewing, so a repeated take-back skips it.</summary>
     public bool TroopsDropped { get; private set; }
-
-    // The take-back another client handed over: hulls only, since its troops waited in that client's crewing.
-    public static NavalNpcFleetAttemptWork HandedOver(IReadOnlyList<Guid> shipIds, int hostEpoch) =>
-        new NavalNpcFleetAttemptWork { ShipIds = shipIds, HostEpoch = hostEpoch };
 
     // Records that the failed attempt's waiting troops were dropped.
     public void MarkTroopsDropped() => TroopsDropped = true;

@@ -72,7 +72,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string Fielded = "fielded";
     internal const string Failed = "failed";
     internal const string TakingBack = "taking_back";
-    internal const string HandedOver = "handed_over";
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -87,8 +86,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 
     // The battle's one attempt, made here or by an earlier host; once set, this client never fields the fleet.
     private NetworkNpcFleetAttempted attempt;
-    // The failed attempt still being taken back, by this client or the one it names; no client fields the fleet meanwhile.
-    private NetworkNpcFleetTakeBack takeBack;
     private bool attemptedHere;
 #if DEBUG
     private NavalFleetFailStage? failNextSpawn;
@@ -98,7 +95,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     public string FailNextSpawn(NavalFleetFailStage stage = NavalFleetFailStage.BeforeSpawn)
     {
         if (!session.IsLocalHost) return "Run fleet_fail on the battle host client.";
-        if (HasAttempt || takeBack != null) return "The AI fleet was already attempted in this battle.";
+        if (HasAttempt) return "The AI fleet was already attempted in this battle.";
         failNextSpawn = stage;
         return null;
     }
@@ -152,7 +149,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 #endif
 
         messageBroker.Subscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
-        messageBroker.Subscribe<NetworkNpcFleetTakeBack>(Handle_NetworkNpcFleetTakeBack);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
@@ -160,7 +156,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
-        messageBroker.Unsubscribe<NetworkNpcFleetTakeBack>(Handle_NetworkNpcFleetTakeBack);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
@@ -189,7 +184,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         }
 
         var mission = Mission.Current;
-        if (HasAttempt || takeBack != null || mission == null) return;
+        if (HasAttempt || mission == null) return;
 
         var supplier = EnemySupplier();
         var parties = NpcParties(supplier);
@@ -203,7 +198,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     // back first, so peers drop its hulls before they hear it failed.
     internal void AttemptFleet(Action<NavalNpcFleetAttemptWork> spawn)
     {
-        if (HasAttempt || takeBack != null) return;
+        if (HasAttempt || unfinishedTakeBack != null) return;
 
         // One attempt per battle: it consumes reserve troops, so a failure is reported once instead of retried every tick.
         var work = new NavalNpcFleetAttemptWork();
@@ -232,62 +227,34 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         Publish(new NetworkNpcFleetAttempted(enemySide, failed: false));
     }
 
-    // Takes back a failed attempt and then settles it as failed. A take-back that throws or waits here keeps the work for the
-    // next tick; hulls a host change moved go to the client that simulates them now, which settles the attempt.
+    // Takes back a failed attempt and then settles it as failed; a take-back that throws keeps the work for the next tick.
     private void FinishFailedAttempt(NavalNpcFleetAttemptWork work)
     {
-        if (!TryTakeBack(work, out var left) || (left.ShipIds.Count > 0 && session.IsOwn(left.Holder)))
+        if (!TryTakeBack(work))
         {
-            HoldTakeBack(work);
+            unfinishedTakeBack = work;
+            state = TakingBack;
             return;
         }
 
         unfinishedTakeBack = null;
-        if (left.ShipIds.Count > 0)
-        {
-            HandOver(left);
-            return;
-        }
-
-        hullsRetracted = work.Hulls.Count + work.ShipIds.Count;
+        hullsRetracted = work.Hulls.Count;
         if (!HasAttempt) Publish(new NetworkNpcFleetAttempted(enemySide, failed: true));
     }
 
-    // Keeps the take-back for the next tick, and the first time tells the peers it is under way so none fields the fleet.
-    private void HoldTakeBack(NavalNpcFleetAttemptWork work)
-    {
-        unfinishedTakeBack = work;
-        state = TakingBack;
-        if (takeBack != null) return;
-
-        takeBack = new NetworkNpcFleetTakeBack(enemySide, session.OwnControllerId, Array.Empty<Guid>(), 0);
-        network.SendAll(takeBack);
-    }
-
-    // Hands the hulls left to the client that simulates them now; it takes them back and settles the attempt.
-    private void HandOver(NpcHullHandover left)
-    {
-        takeBack = new NetworkNpcFleetTakeBack(enemySide, left.Holder, left.ShipIds.ToArray(), left.HostEpoch);
-        state = HandedOver;
-        network.SendAll(takeBack);
-        Logger.Information("[NavalBattle] Handed {Count} AI hull(s) of the failed fleet attempt of {MapEventId} to {Holder}",
-            left.ShipIds.Count, session.InstanceId, left.Holder);
-    }
-
     // The first throw is logged with its exception and a later recovery with the tries it took, so a stuck take-back logs once.
-    private bool TryTakeBack(NavalNpcFleetAttemptWork work, out NpcHullHandover left)
+    private bool TryTakeBack(NavalNpcFleetAttemptWork work)
     {
         try
         {
-            left = rollback.Rollback(work);
+            rollback.Rollback(work);
         }
         catch (Exception exception)
         {
-            left = NpcHullHandover.None;
             if (++takeBackFailures == 1)
                 Logger.Error(exception,
                     "[NavalBattle] Could not take back the failed AI fleet attempt of {MapEventId} ({Hulls} hull(s)); retrying every tick",
-                    session.InstanceId, work.Hulls.Count + work.ShipIds.Count);
+                    session.InstanceId, work.Hulls.Count);
             return false;
         }
 
@@ -331,27 +298,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             attempted.Side, session.InstanceId, state);
     }
 
-    // [Poller] Hands a take-back under way to the game thread, where the spawner's state lives.
-    private void Handle_NetworkNpcFleetTakeBack(MessagePayload<NetworkNpcFleetTakeBack> payload)
-    {
-        var received = payload.What;
-        GameThread.RunSafe(() => AcceptTakeBack(received), context: nameof(Handle_NetworkNpcFleetTakeBack));
-    }
-
-    // [Game thread] Latches a failed attempt still being taken back; the client it names takes back the hulls it lists.
-    internal void AcceptTakeBack(NetworkNpcFleetTakeBack received)
-    {
-        if (HasAttempt) return;
-
-        takeBack = received;
-        state = TakingBack;
-        if (!session.IsOwn(received.Holder) || received.ShipIds.Length == 0) return;
-
-        unfinishedTakeBack = NavalNpcFleetAttemptWork.HandedOver(received.ShipIds, received.HostEpoch);
-        Logger.Information("[NavalBattle] Took over the take-back of {Count} AI hull(s) of the failed fleet attempt of {MapEventId}",
-            received.ShipIds.Length, session.InstanceId);
-    }
-
     // [Poller] Hands an entrant of this battle to the game thread, which sends it the attempt.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
@@ -361,14 +307,12 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         GameThread.RunSafe(() => SendAttemptTo(entered.ControllerId), context: nameof(Handle_PeerEntered));
     }
 
-    // [Game thread] Every client holding the attempt, or a take-back under way, passes it to an entrant, so one entering during
-    // a host change still gets it.
+    // [Game thread] Every client holding the attempt passes it to an entrant, so one entering during a host change still gets it.
     internal void SendAttemptTo(string controllerId)
     {
-        if (session.IsOwn(controllerId)) return;
+        if (!HasAttempt || session.IsOwn(controllerId)) return;
 
-        if (HasAttempt) network.Send(controllerId, attempt);
-        else if (takeBack != null) network.Send(controllerId, takeBack);
+        network.Send(controllerId, attempt);
     }
 
     // A failure after some hulls spawned still fails: the attempt takes them back, so the side never reads as fielded.
@@ -555,7 +499,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         attemptedHere,
         hullsSpawned,
         hullsRetracted,
-        takeBackHolder = takeBack?.Holder,
         firstCrewBatch = troopsFielded,
         failure,
     };
