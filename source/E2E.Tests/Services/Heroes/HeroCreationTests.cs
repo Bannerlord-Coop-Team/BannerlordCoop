@@ -193,6 +193,72 @@ public class HeroCreationTests : IDisposable
     }
 
     [Fact]
+    public void ClientHeroStub_IsListedOnlyOnceItsCharacterObjectArrives()
+    {
+        Hero? serverHero = null;
+        TestEnvironment.Server.Call(() => serverHero = new Hero());
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var stub));
+                Assert.Null(stub.CharacterObject);
+                // The encyclopedia and other list readers dereference CharacterObject on every listed hero
+                Assert.DoesNotContain(stub, Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes));
+            });
+        }
+
+        TestEnvironment.Server.Call(() =>
+        {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            serverHero!.SetCharacterObject(characterObject);
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.NotNull(hero.CharacterObject);
+                Assert.Single(Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes), listed => listed == hero);
+            });
+        }
+    }
+
+    [Fact]
+    public void ServerCreateSpecialHero_ListsTheHeroWithItsCharacterObjectOnClients()
+    {
+        Hero? serverHero = null;
+        TestEnvironment.Server.Call(() =>
+        {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            serverHero = HeroCreator.CreateSpecialHero(characterObject);
+        });
+        Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.NotNull(hero.CharacterObject);
+                Assert.Single(Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes), listed => listed == hero);
+            });
+        }
+    }
+
+    [Fact]
     public void ServerCreateBareHero_PreservesDefaultHealthOnClients()
     {
         Hero? serverHero = null;

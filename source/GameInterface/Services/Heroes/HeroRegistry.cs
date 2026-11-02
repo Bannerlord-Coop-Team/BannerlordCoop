@@ -65,10 +65,9 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
         }
 
+        // The campaign hero lists get the stub once its CharacterObject syncs, every list reader dereferences it
         GameThread.RunSafe(() =>
         {
-            Campaign.Current?.CampaignObjectManager?.AddHero(obj);
-
             MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: false, out _);
         });
     }

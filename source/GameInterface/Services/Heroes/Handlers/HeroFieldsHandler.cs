@@ -144,6 +144,10 @@ namespace GameInterface.Services.Heroes.Handlers
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.CharacterObjectId, out var character)) return;
 
                 instance._characterObject = character;
+
+                // A client stub from HeroRegistry.OnClientCreated joins the campaign hero lists only now
+                if (!Hero.AllAliveHeroes.Contains(instance) && !Hero.DeadOrDisabledHeroes.Contains(instance))
+                    Campaign.Current?.CampaignObjectManager?.AddHero(instance);
             });
         }
 
