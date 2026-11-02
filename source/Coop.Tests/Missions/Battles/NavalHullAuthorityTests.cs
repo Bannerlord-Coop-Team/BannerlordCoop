@@ -107,6 +107,32 @@ public class NavalHullAuthorityTests
         string Name(Agent agent) => agent == crew ? "crew" : agent == otherHullsCrew ? "otherHullsCrew" : "stray";
     }
 
+    // PR #4191 M6: a hull that fails to park ends the removal, but the agents an earlier hull already parked go back once.
+    [Fact]
+    public void Remove_WhenALaterHullFailsToPark_PutsBackTheAgentsAnEarlierHullParked()
+    {
+        var (authority, _, engine, withdrawal) = Create();
+        var first = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, ShipTestHulls.Create(), null);
+        var second = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, ShipTestHulls.Create(), null);
+        var bystanderParked = new HullSwapAgent(CreateAgent(), isCrew: false, isParked: true, Vec3.Zero, Vec3.Zero);
+        engine.Setup(e => e.ParkHullAgents(first.Hull)).Returns(new[] { bystanderParked });
+        engine.Setup(e => e.ParkHullAgents(second.Hull)).Throws(new InvalidOperationException("parking failed"));
+        var unparked = new List<IReadOnlyList<HullSwapAgent>>();
+        engine.Setup(e => e.BoardHullAgents(null!, It.IsAny<IReadOnlyList<HullSwapAgent>>()))
+            .Callback<MissionObject, IReadOnlyList<HullSwapAgent>>((_, agents) => unparked.Add(agents));
+
+        authority.Remove(new[] { first, second }, DepartingCrew.All);
+        authority.Tick();
+        authority.Tick();
+
+        var boarded = Assert.Single(unparked);
+        Assert.Equal(new[] { bystanderParked }, boarded);
+        engine.Verify(e => e.WithdrawAgent(It.IsAny<Agent>()), Times.Never);
+        withdrawal.Verify(w => w.Deregister(It.IsAny<Agent>()), Times.Never);
+        engine.Verify(e => e.RemoveHull(It.IsAny<MissionObject>()), Times.Never);
+        Assert.True(authority.IsSettledFor(Peer));
+    }
+
     // M8c: a departed owner's crew goes whether or not it stood aboard, but this client's main agent never withdraws.
     [Fact]
     public void Remove_HullsLeavingWithTheirOwner_WithdrawCrewNotAboard_ButNeverTheMainAgent()
