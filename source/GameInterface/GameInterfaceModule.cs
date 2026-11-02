@@ -329,12 +329,11 @@ public class GameInterfaceModule : Module
     internal static bool ShouldRegister(Type type, bool navalServicesEnabled) =>
         navalServicesEnabled || !NavalOnlyTypes.Contains(type);
 
-    // Loads Coop.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
+    // Loads Coop.Naval.dll; startup already loaded it to decide naval support, so only a test host that sets the flag can miss it.
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)
     {
-        var path = Path.Combine(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location), ModInformation.CoopNavalAssemblyFile);
-        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
-        return assembly != null;
+        var loader = new NavalAssemblyLoader(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location));
+        return loader.TryLoad(ModInformation.CoopNavalAssemblyFile, out assembly);
     }
 
     // Log injector
