@@ -150,4 +150,41 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.Same(crewOnA, a.Hull(hullA).SeatedAt("oar"));
         Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
     }
+
+    // #4213 PvE: A's own rower walks back to an oar after boarding, while B's copy of it is off the hull. B seats the copy from A's
+    // use at the spawn spot; on the next frame the engine puts it on the hull 13 cm higher, where it sat in row idle for good.
+    // Both end at the same spot of the oar.
+    [Fact]
+    public void Duel_ACopySeatedAsItsOwnerWalkedInAndMovedOnTheNextFrame_SitsAtTheSameSpotAsItsOwner()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        a.Engine.WalksIn.Add(crewOnA);
+
+        // Each of B's ticks is one frame, so the use's frame is the only settle pass before the engine moves the copy.
+        a.UseStation(crewOnA, a.Hull(hullA).Station("oar"), inUse: true, settlePeers: false);
+        for (int frame = 0; frame < 10 && b.Hull(hullA).SeatedAt("oar") == null; frame++)
+            b.Tick();
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+        b.Call(() => b.Engine.Shift(crewOnB, new Vec3(0f, 0.08f, 0.13f)));
+        battle.TickAll(3);
+        a.Call(() => a.Engine.FinishSitDown(crewOnA));
+        battle.TickAll(3);
+
+        var onA = a.Engine.SeatPoses[crewOnA];
+        var onB = b.Engine.SeatPoses[crewOnB];
+        var spawnOffset = FakeNavalShipEngine.SitDownDisplacement;
+        Assert.Single(a.Engine.SeatPlacements);
+        Assert.Single(b.Engine.SeatPlacements);
+        Assert.True((onA.Position - onA.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"owner sits at {onA.Position}");
+        Assert.True((onB.Position - onB.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"copy sits at {onB.Position}");
+    }
 }

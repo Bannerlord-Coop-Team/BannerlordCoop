@@ -152,8 +152,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         var use = new NetworkAgentStationUse(info.AgentId, ship.ShipId, stationKey, pointIndex, change.InUse, revision + 1,
             session.OwnControllerId);
         sentRevisions[info.AgentId] = use.Revision;
-        if (use.InUse) ownSeated[info.AgentId] = new OwnSeat(use, change.Agent, change.Point, hull);
-        else ownSeated.Remove(info.AgentId);
+        if (use.InUse)
+        {
+            ownSeated[info.AgentId] = new OwnSeat(use, change.Agent, change.Point, hull);
+            settler.Restart(info.AgentId);
+        }
+        else
+        {
+            ownSeated.Remove(info.AgentId);
+        }
 
         // Before the deployment commit peers have no own crew yet; the commit announces the seats taken by then.
         if (!seatsAnnounced) return;
@@ -295,6 +302,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         }
 
         Apply(seat.Agent, seat.Point, inUse: true);
+        settler.Restart(agentId);
         return engine.IsSeated(seat.Agent, seat.Point);
     }
 
@@ -459,6 +467,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         else if (!inUse) sinkingUseReleases++;
         CommitRevision(use);
         Apply(info.Agent, point, inUse);
+        // A release and use of the same point can both apply before the next settle pass, which then sees an unchanged seat.
+        if (inUse) settler.Restart(use.AgentId);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
     }

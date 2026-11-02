@@ -242,6 +242,13 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
             pose.Position + shift);
     }
 
+    /// <summary>
+    /// Moves a seated agent without a release or stagger, as the engine moved a copy seated while it walked in on the frame
+    /// after its seating.
+    /// </summary>
+    public void Shift(Agent agent, Vec3 shift) => SeatPoses[agent] = WithPose(SeatPoses[agent], SeatPoses[agent].IsSitting,
+        SeatPoses[agent].Position + shift);
+
     // The pose with another sitting state and position.
     private static StationSeatPose WithPose(StationSeatPose pose, bool isSitting, Vec3 position) =>
         new StationSeatPose(pose.Kind, isSitting, pose.IsStruck, pose.StationFrame, pose.SitDownDisplacement, position);

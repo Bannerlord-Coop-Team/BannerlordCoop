@@ -1033,8 +1033,10 @@ public class AgentStationUseReplicatorTests
         bool sitting = false;
         var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
         var sitDown = new Vec3(0f, -0.3f, -0.15f);
+        var position = new Vec3(4f, 4.7f, 2.02f);
         engine.Setup(e => e.ReadSeatPose(agent, point)).Returns(() => new StationSeatPose(StationSeatKind.Oar, sitting, false, frame,
-            sitDown, new Vec3(4f, 4.7f, 2.02f)));
+            sitDown, position));
+        engine.Setup(e => e.PlaceSeatedAgent(agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
         var broker = new MessageBroker();
         using var replicator = CreateReplicator(engine.Object, registry.Object, ships, broker);
         GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
@@ -1069,12 +1071,42 @@ public class AgentStationUseReplicatorTests
         replicator.Tick(Frame);
         crew.Engine.Verify(e => e.PlaceSeatedAgent(It.IsAny<Agent>(), It.IsAny<Vec3>()), Times.Never);
         struck = false;
-        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(new StationSeatPose(StationSeatKind.Helm, true, false,
-            frame, Vec3.Zero, raised));
+        var position = raised;
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Helm, true,
+            false, frame, Vec3.Zero, position));
+        crew.Engine.Setup(e => e.PlaceSeatedAgent(crew.Agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
         replicator.Tick(Frame);
         replicator.Tick(Frame);
 
         crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, frame.origin), Times.Once);
+    }
+
+    // #4213: the owner let go of its oar and took it again; both uses applied in one tick, so the settle pass saw the copy on the
+    // seat it had already placed. The fresh seat's spot is still checked, and the copy placed back when the engine moved it.
+    [Fact]
+    public void Tick_ChecksTheSpotAgainAfterAReleaseAndUseOfTheSamePointInOneTick()
+    {
+        var crew = SeatableCrew(out _);
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var sitDown = new Vec3(0f, -0.3f, -0.15f);
+        var spawnSpot = new Vec3(4f, 4.7f, 1.85f);
+        var position = spawnSpot;
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Oar, true,
+            false, frame, sitDown, position));
+        crew.Engine.Setup(e => e.PlaceSeatedAgent(crew.Agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 3, "owner"));
+        replicator.Tick(Frame);
+        position = spawnSpot + new Vec3(0f, 0f, 0.13f);
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
     }
 
     // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
