@@ -20,6 +20,19 @@ internal class IssueGiverDeathDispatchPatches
             coordinator.BeforeGiverDeath(victim, out __state);
     }
 
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPrefix]
+    private static bool CampaignEventPrefix(Hero victim, out IDisposable __state)
+    {
+        __state = null;
+        return !ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) ||
+            coordinator.BeforeGiverDeath(victim, out __state);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyFinalizer]
+    private static void CampaignEventFinalizer(IDisposable __state) => __state?.Dispose();
+
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
     private static void Finalizer(IDisposable __state) => __state?.Dispose();

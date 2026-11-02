@@ -893,6 +893,26 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void GiverDeathThroughCampaignDispatcher_CancelsOwnerQuestAndArchivesJournal()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            CampaignEventDispatcher.Instance.OnHeroKilled(giver, null,
+                KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge, false);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        ClientA.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.QuestManager.Quests);
+            Assert.Contains(accepted[ClientA].JournalEntries, log => log.LogText?.ToString().Contains("canceled") == true);
+        });
+    }
+
+    [Fact]
     public void GiverDeathAfterOwnerRemoval_StillCancelsTheIssue()
     {
         Accept(ClientA);
