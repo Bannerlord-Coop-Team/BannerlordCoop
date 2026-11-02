@@ -18,13 +18,13 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
     public readonly uint LeftOwnerHandle;
 
     [ProtoMember(4)]
-    public readonly uint MainHeroHandle;
+    public readonly string MainHeroId;
 
     [ProtoMember(5)]
-    public readonly uint PlayerClanHandle;
+    public readonly string PlayerClanId;
 
     [ProtoMember(6)]
-    public readonly uint MainPartyHandle;
+    public readonly string MainPartyId;
 
     [ProtoMember(7)]
     public readonly MBReadOnlyList<uint> PackedShipsToBuy;
@@ -51,9 +51,9 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
         PortScreenMode mode,
         uint rightOwnerHandle,
         uint leftOwnerHandle,
-        uint mainHeroHandle,
-        uint playerClanHandle,
-        uint mainPartyHandle,
+        string mainHeroId,
+        string playerClanId,
+        string mainPartyId,
         MBReadOnlyList<uint> packedShipsToBuy,
         MBReadOnlyList<uint> packedShipsToSell,
         MBReadOnlyList<uint> packedShipsToRepair,
@@ -65,9 +65,9 @@ internal readonly struct NetworkPortScreenChangesRequested : ICommand
         Mode = mode;
         RightOwnerHandle = rightOwnerHandle;
         LeftOwnerHandle = leftOwnerHandle;
-        MainHeroHandle = mainHeroHandle;
-        PlayerClanHandle = playerClanHandle;
-        MainPartyHandle = mainPartyHandle;
+        MainHeroId = mainHeroId;
+        PlayerClanId = playerClanId;
+        MainPartyId = mainPartyId;
         PackedShipsToBuy = packedShipsToBuy;
         PackedShipsToSell = packedShipsToSell;
         PackedShipsToRepair = packedShipsToRepair;

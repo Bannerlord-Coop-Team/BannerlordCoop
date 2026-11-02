@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Naval.CampaignBehaviors.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -18,15 +19,18 @@ internal class RepairShipsAtPortHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public RepairShipsAtPortHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<RequestRepairShipsAtPort>(Handle_RequestRepairShipsAtPort);
         messageBroker.Subscribe<NetworkRequestRepairShipsAtPort>(Handle_NetworkRequestRepairShipsAtPort);
@@ -42,10 +46,10 @@ internal class RepairShipsAtPortHandler : IHandler
 
     private void Handle_RequestRepairShipsAtPort(MessagePayload<RequestRepairShipsAtPort> obj)
     {
-        if (!objectManager.TryGetHandleWithLogging(obj.What.MainParty, out var mainPartyHandle)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.MainParty, out var mainPartyId)) return;
         if (!objectManager.TryGetHandleWithLogging(obj.What.CurrentSettlement, out var currentSettlementHandle)) return;
 
-        network.SendAll(new NetworkRequestRepairShipsAtPort(mainPartyHandle, currentSettlementHandle));
+        network.SendAll(new NetworkRequestRepairShipsAtPort(mainPartyId, currentSettlementHandle));
     }
 
     private void Handle_NetworkRequestRepairShipsAtPort(MessagePayload<NetworkRequestRepairShipsAtPort> obj)
@@ -54,8 +58,11 @@ internal class RepairShipsAtPortHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyHandle, out var mainParty)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementHandle, out var currentSettlement)) return;
+
+            if (mainParty.CurrentSettlement != currentSettlement) return;
 
             // Reject repair if client no longer has enough gold, summed as whole gold per ship like vanilla
             if (mainParty.Ships.Sum(ship => ship.HitPoints < ship.MaxHitPoints ? (int)Campaign.Current.Models.ShipCostModel.GetShipRepairCost(ship, mainParty.Party) : 0) > mainParty.LeaderHero?.Gold) return;

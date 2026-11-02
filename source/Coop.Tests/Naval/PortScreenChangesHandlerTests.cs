@@ -7,6 +7,7 @@ using Coop.Naval.PortScreen.Data;
 using Coop.Naval.PortScreen.Handlers;
 using Coop.Naval.PortScreen.Interfaces;
 using Coop.Naval.PortScreen.Messages;
+using GameInterface.Services.Players;
 using Moq;
 using ProtoBuf;
 using Serilog;
@@ -33,6 +34,7 @@ public class PortScreenChangesHandlerTests : IDisposable
     private readonly global::GameInterface.Services.ObjectManager.ObjectManager objectManager = new(Mock.Of<ILogger>());
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly RecordingPortScreenHandlerInterface portScreenHandlerInterface = new RecordingPortScreenHandlerInterface();
+    private readonly Mock<IPlayerManager> playerManager = new Mock<IPlayerManager>();
     private readonly PortScreenChangesHandler handler;
 
     private readonly PartyBase rightOwner;
@@ -53,7 +55,9 @@ public class PortScreenChangesHandlerTests : IDisposable
 
     public PortScreenChangesHandlerTests()
     {
-        handler = new PortScreenChangesHandler(messageBroker, objectManager, network.Object, portScreenHandlerInterface);
+        handler = new PortScreenChangesHandler(messageBroker, objectManager, network.Object, portScreenHandlerInterface, playerManager.Object);
+        playerManager.Setup(manager => manager.IsSenderControllingHero(It.IsAny<object>(), It.IsAny<string>())).Returns(true);
+        playerManager.Setup(manager => manager.IsSenderControllingParty(It.IsAny<object>(), It.IsAny<string>())).Returns(true);
 
         network
             .Setup(net => net.SendAll(It.IsAny<IMessage>()))

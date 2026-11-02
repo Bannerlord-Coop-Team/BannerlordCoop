@@ -23,16 +23,16 @@ public readonly struct RequestRepairShipsAtPort : IEvent
 internal readonly struct NetworkRequestRepairShipsAtPort : ICommand
 {
     [ProtoMember(1)]
-    public readonly uint MainPartyHandle;
+    public readonly string MainPartyId;
 
     [ProtoMember(2)]
     public readonly uint CurrentSettlementHandle;
 
     public NetworkRequestRepairShipsAtPort(
-        uint mainPartyHandle,
+        string mainPartyId,
         uint currentSettlementHandle)
     {
-        MainPartyHandle = mainPartyHandle;
+        MainPartyId = mainPartyId;
         CurrentSettlementHandle = currentSettlementHandle;
     }
 }

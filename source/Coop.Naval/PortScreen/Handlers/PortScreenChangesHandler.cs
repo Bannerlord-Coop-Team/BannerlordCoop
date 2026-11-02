@@ -5,6 +5,7 @@ using Coop.Naval.PortScreen.Data;
 using Coop.Naval.PortScreen.Interfaces;
 using Coop.Naval.PortScreen.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -20,18 +21,20 @@ internal class PortScreenChangesHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPortScreenHandlerInterface portScreenHandlerInterface;
+    private readonly IPlayerManager playerManager;
 
     public PortScreenChangesHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPortScreenHandlerInterface portScreenHandlerInterface)
+        IPortScreenHandlerInterface portScreenHandlerInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.portScreenHandlerInterface = portScreenHandlerInterface;
-
+        this.playerManager = playerManager;
         messageBroker.Subscribe<PortScreenChangesRequested>(Handle_PortScreenChangesRequested);
         messageBroker.Subscribe<NetworkPortScreenChangesRequested>(Handle_NetworkPortScreenChangesRequested);
     }
@@ -52,9 +55,9 @@ internal class PortScreenChangesHandler : IHandler
         if (data.RightOwner != null && !objectManager.TryGetHandleWithLogging(data.RightOwner, out rightOwnerHandle)) return;
         if (data.LeftOwner != null && !objectManager.TryGetHandleWithLogging(data.LeftOwner, out leftOwnerHandle)) return;
 
-        if (!objectManager.TryGetHandleWithLogging(data.MainHero, out var mainHeroHandle)) return;
-        if (!objectManager.TryGetHandleWithLogging(data.PlayerClan, out var playerClanHandle)) return;
-        if (!objectManager.TryGetHandleWithLogging(data.MainParty, out var mainPartyHandle)) return;
+        if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.PlayerClan, out var playerClanId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.MainParty, out var mainPartyId)) return;
 
         if (!TryConvertList<Ship, uint>(data.ShipsToBuy, objectManager.TryGetHandleWithLogging, out var packedShipsToBuy)) return;
         if (!TryConvertList<Ship, uint>(data.ShipsToSell, objectManager.TryGetHandleWithLogging, out var packedShipsToSell)) return;
@@ -68,9 +71,9 @@ internal class PortScreenChangesHandler : IHandler
             data.Mode,
             rightOwnerHandle,
             leftOwnerHandle,
-            mainHeroHandle,
-            playerClanHandle,
-            mainPartyHandle,
+            mainHeroId,
+            playerClanId,
+            mainPartyId,
             packedShipsToBuy,
             packedShipsToSell,
             packedShipsToRepair,
@@ -86,16 +89,20 @@ internal class PortScreenChangesHandler : IHandler
     {
         var data = obj.What;
 
+        // Validate sender controls hero and party before continuing
+        if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+        if (!playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
+
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+
             PartyBase rightOwner = null;
             PartyBase leftOwner = null;
             if (data.RightOwnerHandle != 0 && !objectManager.TryGetObjectWithLogging(data.RightOwnerHandle, out rightOwner)) return;
             if (data.LeftOwnerHandle != 0 && !objectManager.TryGetObjectWithLogging(data.LeftOwnerHandle, out leftOwner)) return;
-
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroHandle, out var mainHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanHandle, out var playerClan)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyHandle, out var mainParty)) return;
 
             if (!TryConvertList<uint, Ship>(data.PackedShipsToBuy, objectManager.TryGetObjectWithLogging, out var shipsToBuy)) return;
             if (!TryConvertList<uint, Ship>(data.PackedShipsToSell, objectManager.TryGetObjectWithLogging, out var shipsToSell)) return;

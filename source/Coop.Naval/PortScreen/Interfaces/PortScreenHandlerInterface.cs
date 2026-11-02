@@ -140,6 +140,9 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         foreach (Ship ship in changes.ShipsToSell)
         {
+            // Skip ships that changed owner since the screen opened
+            if (ship.Owner != changes.MainParty.Party) continue;
+
             DestroyShipAction.ApplyByDiscard(ship);
         }
         SendShipsToClan(changes);
@@ -149,27 +152,38 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
     private void ConfirmManageFleet(PortScreenChanges changes)
     {
+        // Vanilla opens this screen with no left side ships, so every change is to the player's own ships
+        var mainParty = changes.MainParty.Party;
         foreach (Ship ship in changes.ShipsToSell)
         {
+            if (ship.Owner != mainParty) continue;
+
             DestroyShipAction.ApplyByDiscard(ship);
         }
         foreach (Ship ship in changes.ShipsToBuy)
         {
-            ChangeShipOwnerAction.ApplyByTransferring(changes.RightOwner, ship);
+            if (ship.Owner != mainParty) continue;
+
+            ChangeShipOwnerAction.ApplyByTransferring(mainParty, ship);
         }
-        RenameShips(changes);
-        SendShipsToClan(changes);
+        RenameShips(changes, mainParty);
+        SendShipsToClan(changes, mainParty);
         ResetAnchorIfNoShips(changes.MainParty);
     }
 
     private void ConfirmManageOtherFleet(PortScreenChanges changes)
     {
+        // Skip ships that changed owner since the screen opened
         foreach (Ship ship in changes.ShipsToBuy)
         {
+            if (ship.Owner != changes.RightOwner) continue;
+
             ChangeShipOwnerAction.ApplyByTransferring(changes.MainParty.Party, ship);
         }
         foreach (Ship ship in changes.ShipsToSell)
         {
+            if (ship.Owner != changes.MainParty.Party) continue;
+
             ChangeShipOwnerAction.ApplyByTransferring(changes.RightOwner, ship);
         }
         ResetAnchorIfNoShips(changes.MainParty);
