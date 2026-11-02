@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules;
+using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -25,7 +27,9 @@ public class GameStateInterfaceTests
         bool endGameCalled = false;
         var gameStateInterface = new GameStateInterface(
             messageBroker.Object,
-            () => endGameCalled = true);
+            () => endGameCalled = true,
+            Mock.Of<INavalSaveCompatibility>(),
+            Mock.Of<ILoadingInterface>());
 
         gameStateInterface.EndGame();
 

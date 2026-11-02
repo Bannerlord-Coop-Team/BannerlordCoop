@@ -4,6 +4,8 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Modules;
+using GameInterface.Services.UI.Interfaces;
 using SandBox;
 using Serilog;
 using System;
@@ -11,6 +13,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
@@ -37,16 +40,22 @@ internal class GameStateInterface : IGameStateInterface
 
     private readonly IMessageBroker messageBroker;
     private readonly Action endGame;
+    private readonly INavalSaveCompatibility navalSaveCompatibility;
+    private readonly ILoadingInterface loadingInterface;
 
-    public GameStateInterface(IMessageBroker messageBroker)
-        : this(messageBroker, MBGameManager.EndGame)
+    public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
+        ILoadingInterface loadingInterface)
+        : this(messageBroker, MBGameManager.EndGame, navalSaveCompatibility, loadingInterface)
     {
     }
 
-    internal GameStateInterface(IMessageBroker messageBroker, Action endGame)
+    internal GameStateInterface(IMessageBroker messageBroker, Action endGame,
+        INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.endGame = endGame;
+        this.navalSaveCompatibility = navalSaveCompatibility;
+        this.loadingInterface = loadingInterface;
     }
 
     public void GoToMainMenu()
@@ -130,8 +139,22 @@ internal class GameStateInterface : IGameStateInterface
                 return;
             }
 
+            if (RefuseNavalMismatch(save)) return;
+
             ForceLoadSave(save);
         }, blocking: true);
+    }
+
+    // The forced load below skips vanilla's NavalDLC added/removed check, so a mismatched save is refused here instead.
+    private bool RefuseNavalMismatch(SaveGameFileInfo save)
+    {
+        string refusal = navalSaveCompatibility.GetHostRefusal(save.Name, save.MetaData.GetModules());
+        if (refusal == null) return false;
+
+        Logger.Error("Refusing to host: {Reason}", refusal);
+        loadingInterface.HideLoadingScreen();
+        InformationManager.DisplayMessage(new InformationMessage(refusal));
+        return true;
     }
 
     // Starts a new sandbox campaign; game thread only.

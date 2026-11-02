@@ -126,6 +126,9 @@ public sealed class ModOptionsData
 
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
+    /// <summary>Whether the hosting side runs War Sails (NavalDLC) co-op; only it reads this, clients follow its modules.</summary>
+    public bool? WarSails { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

@@ -44,6 +44,8 @@ namespace Coop.Core
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
         private readonly string coopLogFilePath;
+        // Set when startup decided this process must not host (a War Sails mismatch); every host attempt shows it instead.
+        private readonly string hostRefusal;
         private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
@@ -65,7 +67,8 @@ namespace Coop.Core
         public CoopartiveMultiplayerExperience(
             bool standaloneServerProcess = false,
             Action<string> setCrashPhase = null,
-            string coopLogFilePath = null)
+            string coopLogFilePath = null,
+            string hostRefusal = null)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
@@ -74,6 +77,7 @@ namespace Coop.Core
             this.standaloneServerProcess = standaloneServerProcess;
             this.setCrashPhase = setCrashPhase ?? (_ => { });
             this.coopLogFilePath = coopLogFilePath;
+            this.hostRefusal = hostRefusal;
 
             if (!standaloneServerProcess)
             {
@@ -460,6 +464,13 @@ namespace Coop.Core
         {
             // A second Host or Join click while patches are still applying would tear down the in-flight start
             if (coopStarting) return;
+
+            if (hostRefusal != null)
+            {
+                Logger.Error("Refusing to host: {Reason}", hostRefusal);
+                InformationManager.DisplayMessage(new InformationMessage(hostRefusal));
+                return;
+            }
 
             if (!ConnectionPassword.IsValid(password))
                 throw new ArgumentOutOfRangeException(nameof(password),

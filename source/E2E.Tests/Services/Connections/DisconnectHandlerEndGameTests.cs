@@ -7,6 +7,7 @@ using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
@@ -148,7 +149,7 @@ public class DisconnectHandlerEndGameTests
             {
                 DuringEndGame?.Invoke();
                 order.Enqueue("EndGame");
-            });
+            }, Mock.Of<INavalSaveCompatibility>(), Mock.Of<ILoadingInterface>());
             handler = new DisconnectHandler(Broker, new CoopFinalizer(Broker, loadingScreen.Object), gameState);
         }
 
