@@ -903,4 +903,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_bfb11aa3"
+    name="{=!}Giovanni Leas"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A4"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Mind your step! The keep&apos;s drains are choked with siege-sludge. I&apos;m Giovanni Leas. If the Lord&apos;s privy is backed up or the aqueduct needs a patch, they call for me. Speak quickly a burst pipe waits for no man."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_civil_f_cape" />
+        <equipment slot="Cape" id="Item.assassin_shoulder" />
+        <equipment slot="Body" id="Item.aserai_tunic_waistcoat" />
+        <equipment slot="Gloves" id="Item.leather_gloves" />
+        <equipment slot="Leg" id="Item.fine_town_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
