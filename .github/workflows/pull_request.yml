@@ -142,7 +142,7 @@ jobs:
 
       - name: Run Framework Tests
         working-directory: source
-        run: dotnet test GameInterface.Framework.Tests/bin/Release/net48/GameInterface.Framework.Tests.dll
+        run: dotnet test GameInterface.Framework.Tests/bin/x64/Release/net48/GameInterface.Framework.Tests.dll
 
   verification-harness:
     name: Verification plan and local harness profiles
