@@ -6,6 +6,7 @@ using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.CampaignBehaviors.Patches;
@@ -72,4 +73,30 @@ internal class RaftStateCampaignBehaviorPatches
     [HarmonyPatch(nameof(RaftStateCampaignBehavior.OnPlayerCharacterChanged))]
     [HarmonyPrefix]
     public static bool OnPlayerCharacterChangedPrefix() => ModInformation.IsServer;
+
+    // The server owns the raft state, so Continue only moves on to the wait menu on clients
+    [HarmonyPatch(nameof(RaftStateCampaignBehavior.player_raft_state_continue_on_consequence))]
+    [HarmonyPrefix]
+    public static bool PlayerRaftStateContinueOnConsequencePrefix()
+    {
+        GameMenu.SwitchToMenu("player_raft_state_wait");
+        return false;
+    }
+
+    [HarmonyPatch(nameof(RaftStateCampaignBehavior.OnMobilePartyRaftStateChanged))]
+    [HarmonyPrefix]
+    public static bool OnMobilePartyRaftStateChangedPrefix(MobileParty mobileParty)
+    {
+        if (ModInformation.IsServer) return false;
+
+        // Vanilla leaves the first raft menu open when the server lands the party
+        if (!mobileParty.IsInRaftState && mobileParty.IsMainParty &&
+            Campaign.Current.CurrentMenuContext?.GameMenu?.StringId == "player_raft_state")
+        {
+            GameMenu.SwitchToMenu("player_raft_state_wait");
+            return false;
+        }
+
+        return true;
+    }
 }
