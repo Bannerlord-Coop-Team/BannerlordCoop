@@ -39,7 +39,7 @@ internal class IssueManagerChangeIssueOwnerDispatchPatch
     [HarmonyPostfix]
     private static void Postfix(IssueBase issue, Hero __state)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed())
+        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed() || issue.IssueOwner == __state)
         {
             return;
         }

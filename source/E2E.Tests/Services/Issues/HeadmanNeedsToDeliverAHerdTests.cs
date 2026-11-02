@@ -11,6 +11,7 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -920,12 +921,14 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         {
             var giver = Object<Hero>(Server, scenario.NotableId);
             var replacement = Object<Hero>(Server, targetId);
+            giver._power = Campaign.Current.Models.NotablePowerModel.NotableDisappearPowerLimit;
             using (new AllowedThread()) giver._heroState = Hero.CharacterStates.Dead;
             Campaign.Current.IssueManager.ChangeIssueOwner(giver.Issue, replacement);
         });
         environment.FlushCoalescer();
 
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueOwnerChanged>());
         ClientA.Call(() =>
         {
             Assert.Empty(Campaign.Current.QuestManager.Quests);

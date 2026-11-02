@@ -59,6 +59,9 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
 
         if (!PrepareCancellation(issue, out var owner))
         {
+            if (ModInformation.IsServer && issue.IssueOwner?.Issue == issue && issue.IssueQuest?.IsOngoing == true)
+                pending[issue] = BuildGiverDeathLog(issue);
+
             // Keep the dead giver attached while the owner-party retry is pending.
             return false;
         }

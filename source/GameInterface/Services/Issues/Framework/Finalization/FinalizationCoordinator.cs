@@ -7,6 +7,7 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -75,6 +76,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
         messageBroker.Subscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Subscribe<IssueOwnerChanged>(Handle_IssueOwnerChanged);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -89,6 +91,7 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
         messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
         messageBroker.Unsubscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Unsubscribe<IssueOwnerChanged>(Handle_IssueOwnerChanged);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -390,6 +393,18 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         RememberOwnerIdentity(payload.What.IssueOwnerId, payload.What.IssueId, payload.What.ControllerId);
+    }
+
+    private void Handle_IssueOwnerChanged(MessagePayload<IssueOwnerChanged> payload)
+    {
+        if (ModInformation.IsClient || !objectManager.TryGetIdWithLogging(payload.What.Issue.IssueOwner, out var issueOwnerId))
+            return;
+
+        lock (ownerIdentitiesLock)
+        {
+            ownerIdentities.Remove(payload.What.Issue);
+            ownerIdentities.Add(payload.What.Issue, new OwnerIdentity(issueOwnerId));
+        }
     }
 
     private void RememberOwnerIdentity(string issueOwnerId, string issueId, string controllerId)
