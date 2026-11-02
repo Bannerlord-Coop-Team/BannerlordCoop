@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -35,7 +36,8 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
 
         using var replicator = new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(),
-            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>(), Members("owner"));
+            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>(), Members("owner"),
+            Mock.Of<IStationSeatSettler>());
         replicator.Apply(null!, null!, inUse: true);
 
         Assert.Equal(new[] { "forget", "use" }, calls);
@@ -517,7 +519,7 @@ public class AgentStationUseReplicatorTests
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
         IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null,
-        IBattleSession? session = null)
+        IBattleSession? session = null, IStationSeatSettler? settler = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
@@ -526,7 +528,7 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(),
             session ?? Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
-            members ?? Members("owner", "old", "new"));
+            members ?? Members("owner", "old", "new"), settler ?? new StationSeatSettler(engine));
     }
 
     // The server-announced mission members the membership gate reads.
@@ -1007,6 +1009,72 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(0, (int)inspected["appliedSeats"]!);
         Assert.Equal(0, (long)inspected["adoptedSeats"]!);
         network.Verify(n => n.SendAll(It.IsAny<NetworkAgentStationUse>()), Times.Never);
+    }
+
+    // #4213: the owner's rower walked in and sat down from deck height; once seated it is placed at vanilla's spawn spot, the
+    // spot its copies are seated at.
+    [Fact]
+    public void Tick_PlacesAnOwnRowerAtItsSpawnSpotOnceItSatDown()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ships = new NetworkShipRegistry();
+        ships.TryRegister(new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!));
+        var point = CreatePoint();
+        var engine = new Mock<INavalShipEngine>();
+        StationOf(engine, point, hull);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
+        bool sitting = false;
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var sitDown = new Vec3(0f, -0.3f, -0.15f);
+        engine.Setup(e => e.ReadSeatPose(agent, point)).Returns(() => new StationSeatPose(StationSeatKind.Oar, sitting, false, frame,
+            sitDown, new Vec3(4f, 4.7f, 2.02f)));
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships, broker);
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
+
+        replicator.Tick(Frame);
+        engine.Verify(e => e.PlaceSeatedAgent(It.IsAny<Agent>(), It.IsAny<Vec3>()), Times.Never);
+        sitting = true;
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        var spawnSpot = new Vec3(4f, 4.7f, 1.85f);
+        engine.Verify(e => e.PlaceSeatedAgent(agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
+    }
+
+    // #4213: a ram's stagger moved a copy's seated helm without a release; it is placed back at the helm once the stagger ends.
+    [Fact]
+    public void Tick_PlacesAPuppetsHelmBackOnceItsStaggerEnds()
+    {
+        var crew = SeatableCrew(out _);
+        bool struck = false;
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var raised = new Vec3(4f, 5f, 2.055f);
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Helm, true,
+            struck, frame, Vec3.Zero, struck ? raised : frame.origin));
+        crew.Engine.Setup(e => e.IsStruck(crew.Agent)).Returns(() => struck);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        struck = true;
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(It.IsAny<Agent>(), It.IsAny<Vec3>()), Times.Never);
+        struck = false;
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(new StationSeatPose(StationSeatKind.Helm, true, false,
+            frame, Vec3.Zero, raised));
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, frame.origin), Times.Once);
     }
 
     // A puppet of a remote owner, crewing a registered hull whose oar station resolves.

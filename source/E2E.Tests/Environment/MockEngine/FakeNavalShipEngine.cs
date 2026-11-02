@@ -204,11 +204,73 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     public UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex) =>
         Of(hull).Station(stationKey, pointIndex);
 
+    // Seats the way vanilla's spawn seating does, already sat down at the station's spawn placement, or for a walk-in still
+    // standing on the deck above it.
     public void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse)
     {
         var fake = HullOfStation(point);
-        if (inUse) fake.Seats[point] = agent;
-        else if (fake.Seats.TryGetValue(point, out var seated) && ReferenceEquals(seated, agent)) fake.Seats.Remove(point);
+        if (inUse)
+        {
+            fake.Seats[point] = agent;
+            var spawn = SpawnSeatPose(fake, point);
+            SeatPoses[agent] = WalksIn.Contains(agent) ? WithPose(spawn, isSitting: false, spawn.Position + WalkInRaise) : spawn;
+        }
+        else if (fake.Seats.TryGetValue(point, out var seated) && ReferenceEquals(seated, agent))
+        {
+            fake.Seats.Remove(point);
+            SeatPoses.Remove(agent);
+        }
+    }
+
+    /// <summary>The fake pilot seat poses by agent, which tests reshape to stand in for a walk-in or a stagger.</summary>
+    public Dictionary<Agent, StationSeatPose> SeatPoses { get; } = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The agents this client seats by walking in, as an owner's own crew reach a station, instead of at once.</summary>
+    public HashSet<Agent> WalksIn { get; } = new(ReferenceEqualityComparer.Instance);
+
+    // A rower that walked in sits about this far above the spawn placement once its sit-down ends, as live B1 measured.
+    public static readonly Vec3 WalkInRaise = new(0f, 0f, 0.17f);
+
+    /// <summary>Ends a walk-in's sit-down where it stands, as vanilla's oar tick does.</summary>
+    public void FinishSitDown(Agent agent) => SeatPoses[agent] = WithPose(SeatPoses[agent], isSitting: true, SeatPoses[agent].Position);
+
+    /// <summary>Starts or ends a stagger, which moves the seated agent by <paramref name="shift"/> without a release.</summary>
+    public void Stagger(Agent agent, bool isStruck, Vec3 shift)
+    {
+        var pose = SeatPoses[agent];
+        SeatPoses[agent] = new StationSeatPose(pose.Kind, pose.IsSitting, isStruck, pose.StationFrame, pose.SitDownDisplacement,
+            pose.Position + shift);
+    }
+
+    // The pose with another sitting state and position.
+    private static StationSeatPose WithPose(StationSeatPose pose, bool isSitting, Vec3 position) =>
+        new StationSeatPose(pose.Kind, isSitting, pose.IsStruck, pose.StationFrame, pose.SitDownDisplacement, position);
+
+    /// <summary>Each settle placement this client made, in order.</summary>
+    public List<(Agent Agent, Vec3 Position)> SeatPlacements { get; } = new();
+
+    // Every fake station is an oar, offset from its hull with an unrotated frame, so its spawn placement is the frame's origin
+    // plus the sit-down displacement.
+    public static readonly Vec3 StationOffset = new(1f, 2f, 1f);
+    public static readonly Vec3 SitDownDisplacement = new(0f, -0.3f, -0.15f);
+
+    /// <summary>The pose a spawn-seated pilot holds at <paramref name="point"/> of <paramref name="fake"/>.</summary>
+    public static StationSeatPose SpawnSeatPose(FakeHull fake, UsableMissionObject point)
+    {
+        var frame = new MatrixFrame(Mat3.Identity, fake.Frame.origin + StationOffset);
+        return new StationSeatPose(StationSeatKind.Oar, isSitting: true, isStruck: false, frame, SitDownDisplacement,
+            frame.origin + SitDownDisplacement);
+    }
+
+    public StationSeatPose ReadSeatPose(Agent agent, UsableMissionObject point) =>
+        IsSeated(agent, point) && SeatPoses.TryGetValue(agent, out var pose) ? pose : default;
+
+    public bool IsStruck(Agent agent) => SeatPoses.TryGetValue(agent, out var pose) && pose.IsStruck;
+
+    public void PlaceSeatedAgent(Agent agent, Vec3 position)
+    {
+        SeatPlacements.Add((agent, position));
+        if (SeatPoses.TryGetValue(agent, out var pose)) SeatPoses[agent] = WithPose(pose, pose.IsSitting, position);
     }
 
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
