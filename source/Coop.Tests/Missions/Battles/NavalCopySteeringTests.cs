@@ -138,7 +138,7 @@ public class NavalCopySteeringTests
 
         Assert.True(step.Snap);
         Assert.True(steering.IsSnapQueued);
-        Assert.Equal(0f, steering.TakeSnapFrame().origin.y, 3);
+        Assert.Equal(0f, steering.TakeSnap().Frame.origin.y, 3);
     }
 
     // M10 fix C5: the snap frame takes the extrapolated heading with the extrapolated position, not the sample's heading.
@@ -149,22 +149,22 @@ public class NavalCopySteeringTests
 
         var step = steering.Compute(0.1f, new Vec3(0f, 20f, 0f), 0f, Vec2.Zero, 0f);
 
-        var frame = steering.TakeSnapFrame();
+        var snap = steering.TakeSnap();
         Assert.True(step.Snap);
-        Assert.Equal(steering.Target.Position.x, frame.origin.x, 3);
-        Assert.Equal(steering.Target.Yaw, CopySteering.YawOf(frame.rotation.f), 3);
-        Assert.Equal(0.5f, steering.FeedForwardYawRate);
+        Assert.Equal(steering.Target.Position.x, snap.Frame.origin.x, 3);
+        Assert.Equal(steering.Target.Yaw, CopySteering.YawOf(snap.Frame.rotation.f), 3);
+        Assert.Equal(0.5f, snap.YawRate);
     }
 
     // M10 round 3: a snap queued in a physics step is applied on the mission tick, by when a newer sample may have arrived.
     [Fact]
-    public void TakeSnapFrame_UsesTheLatestSampleAndCoversAJumpSinceTheQueue()
+    public void TakeSnap_UsesTheLatestSampleAndCoversAJumpSinceTheQueue()
     {
         var steering = Observed(Knobs("snap=10", "lead=0"), 0f, Vec2.Zero);
         Assert.True(steering.Compute(Dt, new Vec3(0f, 20f, 0f), 0f, Vec2.Zero, 0f).Snap);
 
         steering.ObserveOwner(Frame(40f, 0f, 0f), Vec2.Zero, 0f);
-        var frame = steering.TakeSnapFrame();
+        var frame = steering.TakeSnap().Frame;
         var next = steering.Compute(Dt, frame.origin, 0f, Vec2.Zero, 0f);
 
         Assert.Equal(40f, frame.origin.x, 3);
@@ -195,14 +195,14 @@ public class NavalCopySteeringTests
         steering.ObserveOwner(Frame(40f, 0f, 0f), new Vec2(5f, 0f), 0f);
         bool queuedByTheJump = steering.IsSnapQueued;
         var jump = steering.Compute(Dt, new Vec3(40f, 0f, 0f), 0f, new Vec2(5f, 0f), 0f);
-        var frame = steering.TakeSnapFrame();
+        var snap = steering.TakeSnap();
         var after = steering.Compute(Dt, new Vec3(40f, 0f, 0f), 0f, new Vec2(5f, 0f), 0f);
 
         Assert.True(queuedByTheJump);
         Assert.True(jump.Snap);
-        Assert.InRange(frame.origin.x, 40f, 40.2f);
+        Assert.InRange(snap.Frame.origin.x, 40f, 40.2f);
         Assert.False(after.Snap);
-        Assert.Equal(5f, steering.FeedForwardVelocity.x);
+        Assert.Equal(5f, snap.Velocity.x);
     }
 
     [Fact]
@@ -217,7 +217,7 @@ public class NavalCopySteeringTests
         Assert.Equal(5f, fresh.DeltaVelocity.x, 3);
         Assert.True(steering.IsOwnerStale);
         Assert.Equal(0f, stale.DeltaVelocity.x, 3);
-        Assert.Equal(0f, steering.FeedForwardVelocity.Length);
+        Assert.Equal(0f, steering.TakeSnap().Velocity.Length);
         steering.ObserveOwner(Frame(2f, 0f, 0f), new Vec2(5f, 0f), 0f);
         Assert.False(steering.IsOwnerStale);
     }
