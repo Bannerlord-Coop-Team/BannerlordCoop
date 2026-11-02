@@ -196,8 +196,9 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    host capturing an AI hull it simulates).
 3. The authority decides on the real hull (`BattleShipCaptureReplicator.Decide`, reasons in `ShipCaptureRefusal`): it must
    still simulate it; the captor must be in the mission with a registered hull of its own that still has its formation; the
-   hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, not
-   sinking, and vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). It applies the
+   hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, and
+   vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). A sinking hull can be
+   captured, as at vanilla's helm. It applies the
    capture itself and broadcasts `NetworkShipCaptured`, or sends `NetworkShipCaptureRejected` to the captor alone.
 4. Every client applies `NetworkShipCaptured` in one step of its naval services tick (`OnMissionTick`), never from the
    game-thread queue: the queue drains while the engine's async agent and team tick runs, which reads the assignments and
