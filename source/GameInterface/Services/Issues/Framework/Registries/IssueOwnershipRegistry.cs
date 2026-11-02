@@ -8,6 +8,8 @@ internal class IssueOwnershipRegistry : IIssueOwnershipRegistry
 {
     private readonly Dictionary<string, (string IssueId, string ControllerId)> owners =
         new Dictionary<string, (string IssueId, string ControllerId)>();
+    // Keep the issue-to-owner tombstone after Remove so finalization can still
+    // route the terminal journal when the live owner registry entry is gone.
     private readonly Dictionary<string, string> issueOwners = new Dictionary<string, string>();
 
     public bool TrySetOwner(string issueOwnerId, string issueId, string controllerId)

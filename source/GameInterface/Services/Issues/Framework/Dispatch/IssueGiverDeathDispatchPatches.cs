@@ -25,8 +25,12 @@ internal class IssueGiverDeathDispatchPatches
     private static bool CampaignEventPrefix(Hero victim, out IDisposable __state)
     {
         __state = null;
-        return !ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) ||
+        if (ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator))
             coordinator.BeforeGiverDeath(victim, out __state);
+
+        // This prefix must not suppress the dispatcher itself. Returning false here
+        // skips every vanilla OnHeroKilled receiver, not just IssueManager.
+        return true;
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
