@@ -1015,7 +1015,7 @@ public class NavalShipEngine : INavalShipEngine
     }
 
     // The machine whose pilot point this is; the point entity sits at most a few levels below its machine.
-    private static UsableMachine PilotMachineOf(UsableMissionObject point)
+    internal static UsableMachine PilotMachineOf(UsableMissionObject point)
     {
         var entity = point.GameEntity;
         for (int depth = 0; depth < 4 && entity.IsValid; depth++)

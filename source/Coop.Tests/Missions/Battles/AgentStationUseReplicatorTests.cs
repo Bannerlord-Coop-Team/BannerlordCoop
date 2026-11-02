@@ -17,6 +17,48 @@ namespace Coop.Tests.Missions.Battles;
 
 public class AgentStationUseReplicatorTests
 {
+#if DEBUG
+    /// <summary>The diagnostic re-seat uses the same buffered-movement cleanup and engine calls as received uses.</summary>
+    [Fact]
+    public void DebugReseat_ReleasesThenUsesAndObservesOnce()
+    {
+        var calls = new System.Collections.Generic.List<string>();
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), false))
+            .Callback(() => calls.Add("release"));
+        engine.Setup(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), true))
+            .Callback(() => calls.Add("use"));
+        using var replicator = CreateReplicator(engine.Object);
+        replicator.StationProbeEvent += (agent, point, kind) => calls.Add(kind);
+
+        replicator.DebugReseat(null!, null!);
+
+        Assert.Equal(new[] { "release", "use", "reseat" }, calls);
+        Assert.Equal(2, (long)JObject.FromObject(replicator.Inspect())["applied"]!);
+    }
+
+    /// <summary>Recovery and pin observations follow the existing engine calls without adding another attempt.</summary>
+    [Fact]
+    public void RefreshAppliedSeats_ObservesCompletedRecoveryAndPin()
+    {
+        var crew = new RemoteCrew();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        using var replicator = crew.CreateReplicator();
+        replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        bool seated = false;
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => seated);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, true)).Callback(() => seated = true);
+        var events = new System.Collections.Generic.List<string>();
+        replicator.StationProbeEvent += (agent, point, kind) => events.Add(kind);
+
+        replicator.RefreshAppliedSeats();
+
+        Assert.Equal(new[] { "reseat", "pin" }, events);
+        crew.Engine.Verify(e => e.PinToStation(crew.Agent, crew.Point), Times.Once);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
+    }
+#endif
     [Fact]
     public void Apply_DropsTheBufferedOwnerPoseBeforeSeatingThePuppet()
     {

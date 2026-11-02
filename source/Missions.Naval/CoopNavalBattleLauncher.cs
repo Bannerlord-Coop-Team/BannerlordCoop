@@ -245,6 +245,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         AttachNavalServices(mission, playerSide.GetOppositeSide());
 #if DEBUG
         var debugController = mission.GetMissionBehavior<CoopBattleController>();
+        mission.AddMissionBehavior(new NavalStationProbeLogic(debugController, shipEngine, messageBroker,
+            mission.GetMissionBehavior<CoopNavalBattleBehavior>().Services.StationUseReplicator));
         mission.AddMissionBehavior(new NavalCopyProbeLogic(debugController.MissionComponent.ShipRegistry, steeredCopies, steeringKnobs));
         mission.AddMissionBehavior(new NavalWaterProbeLogic(debugController.Session, debugController.MissionComponent.ShipRegistry,
             tickFailureLogs(), foreignHulls));

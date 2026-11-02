@@ -24,6 +24,12 @@ public interface IShipStationSeats
 /// </summary>
 public interface IAgentStationUseReplicator : IShipStationSeats, IDisposable
 {
+#if DEBUG
+    /// <summary>Observes completed local recovery attempts and pin calls without changing seat decisions.</summary>
+    event Action<Agent, UsableMissionObject, string> StationProbeEvent;
+    /// <summary>[Mission tick] Tests release/use through the received-apply path, with owner patches left active.</summary>
+    void DebugReseat(Agent agent, UsableMissionObject point);
+#endif
     /// <summary>[Mission tick] Applies received uses, announces own seats at the deployment commit and to joiners, and re-pins
     /// applied seats.</summary>
     void Tick(float dt);
@@ -44,6 +50,18 @@ public interface IAgentStationUseReplicator : IShipStationSeats, IDisposable
 /// <inheritdoc cref="IAgentStationUseReplicator"/>
 public class AgentStationUseReplicator : IAgentStationUseReplicator
 {
+#if DEBUG
+    /// <inheritdoc />
+    public event Action<Agent, UsableMissionObject, string> StationProbeEvent;
+
+    /// <inheritdoc />
+    public void DebugReseat(Agent agent, UsableMissionObject point)
+    {
+        Apply(agent, point, inUse: false);
+        Apply(agent, point, inUse: true);
+        StationProbeEvent?.Invoke(agent, point, "reseat");
+    }
+#endif
     private static readonly ILogger Logger = LogManager.GetLogger<AgentStationUseReplicator>();
 
     // A use for an agent or hull that never arrives is dropped after this long.
@@ -253,10 +271,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
                     "re-seating it once", entry.Key, DescribeStation(seat.Point));
                 Apply(seat.Agent, seat.Point, inUse: true);
+#if DEBUG
+                StationProbeEvent?.Invoke(seat.Agent, seat.Point, "reseat");
+#endif
                 if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
             }
 
             engine.PinToStation(seat.Agent, seat.Point);
+#if DEBUG
+            StationProbeEvent?.Invoke(seat.Agent, seat.Point, "pin");
+#endif
             pinned++;
         }
 

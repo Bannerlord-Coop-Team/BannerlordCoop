@@ -93,6 +93,12 @@ public class NavalMissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 #if DEBUG
+        builder.RegisterType<NavalStationProbe>()
+            .As<INavalStationProbe>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalStationProbeCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalResultSilenceCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
