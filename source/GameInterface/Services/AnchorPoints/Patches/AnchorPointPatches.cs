@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.AnchorPoints.Messages;
+using GameInterface.Services.GameMenus;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -111,15 +112,12 @@ internal class AnchorPointPatches
         return ModInformation.IsClient && anchorPoint.Owner != null && anchorPoint.Owner == MobileParty.MainParty;
     }
 
-    // Port menu options like call fleet and set sail read the anchor; MapState.OnActivate refreshes it after a mission
+    // Port menu options like call fleet and set sail read the anchor
     private static void RefreshCurrentMenu()
     {
-        if (TaleWorlds.MountAndBlade.Mission.Current != null) return;
+        if (!ContainerProvider.TryResolve<IMenuOptionsRefresher>(out var refresher)) return;
 
-        var menuContext = Campaign.Current.CurrentMenuContext;
-        if (menuContext == null) return;
-
-        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
+        refresher.RefreshMenuOptions(Campaign.Current?.CurrentMenuContext);
     }
 }
 
@@ -129,13 +127,14 @@ internal class AnchorPointMenuRefreshPatch
 {
     // Time keeps passing in co-op menus, so the call fleet tooltip's arrival estimate needs refreshing
     [HarmonyPostfix]
-    private static void Postfix(MenuContext __instance)
+    internal static void Postfix(MenuContext __instance)
     {
         if (ModInformation.IsServer) return;
 
         var anchor = MobileParty.MainParty?.Anchor;
         if (anchor == null || !anchor.IsMovingToPoint) return;
+        if (!ContainerProvider.TryResolve<IMenuOptionsRefresher>(out var refresher)) return;
 
-        Campaign.Current.GameMenuManager.RefreshMenuOptions(__instance);
+        refresher.RefreshMenuOptions(__instance);
     }
 }
