@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
@@ -277,7 +278,7 @@ public class NavigationCacheDeserializePatchTests
                 Assert.Equal(bytes, first.ReadBytes(bytes.Length));
                 Assert.Equal(bytes, second.ReadBytes(bytes.Length));
                 // Unix only emulates FileShare with advisory locks, so a sharing writer isn't refused there
-                if (OperatingSystem.IsWindows())
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     Assert.Throws<IOException>(() =>
                     {
