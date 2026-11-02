@@ -37,6 +37,13 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Stamps CoopNavalDlc like GameInterface.csproj, so NavalFeatureFlagTests checks the flag against the same property. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>CoopNavalDlc</_Parameter1>
+      <_Parameter2>$(CoopNavalDlc)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Remove="Services\Parties\**" />
     <EmbeddedResource Remove="Services\Parties\**" />
     <None Remove="Services\Parties\**" />
