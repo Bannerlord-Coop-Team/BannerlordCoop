@@ -20,14 +20,19 @@ internal readonly struct NetworkShipPiecesChanged : ICommand
     [ProtoMember(4)]
     public readonly bool HasUnlockedPieces;
 
+    [ProtoMember(5)]
+    public readonly float HitPoints;
+
     public NetworkShipPiecesChanged(
         uint shipHandle,
         ShipSlotPieceData[] slots,
-        uint[] unlockedPieceHandles)
+        uint[] unlockedPieceHandles,
+        float hitPoints)
     {
         ShipHandle = shipHandle;
         Slots = slots;
         UnlockedPieceHandles = unlockedPieceHandles;
         HasUnlockedPieces = unlockedPieceHandles != null;
+        HitPoints = hitPoints;
     }
 }
