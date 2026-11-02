@@ -3803,7 +3803,7 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void MultiPlayerRaid_BattleSimulation_IsCancelled_ByInitiatingClient_CanBeStartedAgain()
+    public void MultiPlayerRaid_BattleSimulation_IsCancelled_ByInitiatingClient_FinalizesMapEvent()
     {
         var client = Clients.First();
         var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
@@ -3851,7 +3851,8 @@ public class VillageHostileActionTests : MapEventTestBase
 
             Server.Call(() => { Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)); });
 
-            // Start another simulation for the same battle.
+            // Native Retreat finalized the leader-owned event, so a retry must be rejected for
+            // the destroyed map-event identity instead of reviving stale simulation state.
             Server.NetworkSentMessages.Clear();
 
             client.Call(() => client.Resolve<INetwork>().SendAll(
@@ -3864,11 +3865,8 @@ public class VillageHostileActionTests : MapEventTestBase
 
             var retryReply = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>());
 
-            Assert.True(retryReply.Accepted);
-
-            var retryMode = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
-
-            Assert.Equal((int)BattleStartMode.Simulation, retryMode.Mode);
+            Assert.False(retryReply.Accepted);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out _));
         }
         finally
         {
@@ -3906,8 +3904,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Server.Call(() =>
             {
                 Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId));
-                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
-                Assert.False(mapEvent.BattleObserver is ForwardingBattleObserver);
+                Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out _));
             }, MapEventDisabledMethods);
         }
         finally

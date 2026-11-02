@@ -6,6 +6,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
@@ -271,6 +272,10 @@ internal class BattleSimulationRunHandler : IHandler
                 network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
                 network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
             }
+            // Native Retreat runs OnPlayerRetreat and then PlayerEncounter.Finish. That path
+            // finalizes a leader-owned event through FinalizeBattle, so the authoritative co-op
+            // cancellation must tear down the same map event after releasing simulation state.
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));
     }

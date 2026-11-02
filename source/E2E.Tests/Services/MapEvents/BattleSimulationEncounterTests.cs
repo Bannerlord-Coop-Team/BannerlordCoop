@@ -104,7 +104,7 @@ public class BattleSimulationEncounterTests : MapEventTestBase
     }
 
     [Fact]
-    public void NativeScoreboardRetreat_CancelsWithoutEndingMapEvent_AndCanResume()
+    public void NativeScoreboardRetreat_FinalizesLeaderMapEvent_AndClosesSimulation()
     {
         var context = CreateServerMapEvent();
         var client = Clients.First();
@@ -163,21 +163,21 @@ public class BattleSimulationEncounterTests : MapEventTestBase
 
             Server.Call(() =>
             {
-                var mapEvent = Server.GetRegisteredObject<MapEvent>(context.MapEventId);
-                Assert.False(mapEvent.IsFinalized);
-                Assert.False(mapEvent.HasWinner);
-                Assert.Empty(ended);
                 Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
                 Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+                Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out _));
+                Assert.Single(ended);
                 Assert.False(ServerBattleModeArbiter.IsClaimed(context.MapEventId));
 
-                Server.NetworkSentMessages.Clear();
-                Server.Resolve<IMessageBroker>().Publish(client.NetPeer, new NetworkBattleStartRequest(
-                    System.Guid.NewGuid().ToString(), (int)BattleStartMode.Simulation,
-                    context.MapEventId, context.AttackerPartyId));
-                Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
-                Assert.True(ServerBattleModeArbiter.IsClaimed(context.MapEventId));
-                Assert.Empty(ended);
+            }, MapEventDisabledMethods);
+
+            client.Call(() =>
+            {
+                client.SimulateMessage(Server.NetPeer, new NetworkBattleSimulationCancelled(context.MapEventId));
+                var mapState = Game.Current.GameStateManager.GameStates.OfType<MapState>().Single();
+                Assert.False(mapState.IsSimulationActive);
+                Assert.Null(PlayerEncounter.Current?.BattleSimulation);
+                Assert.False(BattleSimulationReplay.IsActiveFor(context.MapEventId));
             }, MapEventDisabledMethods);
         }
         finally
