@@ -75,7 +75,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   release patches never publish it, `NavalShipEngine` neither describes nor resolves it as a station, and a seat is only
   re-seated while its point is still a station of its hull (R41a-2 W2). A deactivated machine is still seated, since its
   state is recomputed locally and can lag the owner's. A use published on an agent tick worker is announced on the game
-  thread.
+  thread. A puppet vanilla lets go while its owner keeps the seat is re-seated at once, then at most once a second for as
+  long as the seat holds (#4213). A re-seat clears the oar's stand-up action first, because it otherwise rejects the seated
+  idle and the oar drops the rower again on its next tick.
 - A hit on a hull that another client simulates is sent only to that hull's current authority, which applies it through the
   vanilla damage method (`BattleShipDamageRouter`). A peer that no longer holds the hull drops it, so a hit applies at most
   once across a host change or a capture.

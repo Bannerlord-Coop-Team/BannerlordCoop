@@ -722,12 +722,23 @@ public class NavalShipEngine : INavalShipEngine
             // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew: the helm
             // sets its steering action and pins the pilot, an oar sits its rower down at once.
             var machine = PilotMachineOf(point);
-            if (machine != null && machine.PilotAgent == agent) machine.OnPilotAssignedDuringSpawn();
+            if (machine != null && machine.PilotAgent == agent) SeatAsSpawnPilot(agent, machine);
             return;
         }
 
         if (agent.CurrentlyUsedGameObject == point)
             agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+    }
+
+    // Seats the pilot through vanilla's spawn seating. A release just before (ours or vanilla's) leaves the oar's stand-up action
+    // playing, which rejects the spawn's idle and makes the oar's tick drop the pilot again, so both channels are cleared first.
+    private static void SeatAsSpawnPilot(Agent agent, UsableMachine machine)
+    {
+        agent.SetActionChannel(0, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        machine.OnPilotAssignedDuringSpawn();
     }
 
     public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
