@@ -27,6 +27,8 @@ namespace E2E.Tests.Services.Missions;
 /// <summary>Tests BR-005 result-ready finalization before another player can join an ended battle.</summary>
 public class BattleResultReadyTests : MissionTestEnvironment
 {
+    private const string PendingJoiner = "pending-joiner";
+
     public BattleResultReadyTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
@@ -206,28 +208,81 @@ public class BattleResultReadyTests : MissionTestEnvironment
         AssertMapEventRemoved(mapEventId);
     }
 
+    // The resolved host leaving with an accepted join outstanding holds the emptied battle for that joiner.
     [Fact]
     [Trait("Requirement", "BR-005")]
-    public void ResolvedHostLeavesBeforeAcceptedJoinerEnters_FinalizesBattle()
+    public void ResolvedHostLeavesBeforeAcceptedJoinerEnters_HoldsBattle()
     {
-        var (mapEventId, _) = SetupCoopBattle("host", "battle-opponent");
-        var host = Clients.First();
-        RegisterPeer(host, "host");
-        EnterBattleWithMembership(host, "host", mapEventId);
-        var reservationId = Guid.NewGuid();
+        HoldEmptiedBattleForJoiner();
+    }
+
+    // Cancelling the held join releases the emptied battle, which concludes from the host's retained report.
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HeldEmptyBattle_FinalizesWhenAcceptedJoinIsCancelled()
+    {
+        var (mapEventId, _, reservationId) = HoldEmptiedBattleForJoiner();
 
         Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
-            host.NetPeer,
-            new BattleJoinAccepted(mapEventId, "joining-player", reservationId)));
-        SendResult(host, mapEventId, BattleState.AttackerVictory);
-        AssertMapEventPresent(mapEventId);
+            this,
+            new BattleJoinCancelled(mapEventId, PendingJoiner, reservationId)), VictoryConclusionDisabledMethods());
 
-        Server.Call(
-            () => Server.SimulateMessage(
-                host.NetPeer,
-                new NetworkMissionLeft("host", mapEventId)),
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    // The pending joiner refusing to open the field battle releases the emptied battle.
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HeldEmptyBattle_FinalizesWhenAcceptedJoinerRefusesToOpen()
+    {
+        var (mapEventId, joiner, _) = HoldEmptiedBattleForJoiner();
+
+        joiner.Call(() => joiner.Resolve<INetwork>().SendAll(new NetworkFieldBattleOpenRefused(mapEventId)),
             VictoryConclusionDisabledMethods());
 
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    // The held join expiring on a campaign tick releases the emptied battle.
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HeldEmptyBattle_FinalizesWhenAcceptedJoinExpires()
+    {
+        var (mapEventId, _, _) = HoldEmptiedBattleForJoiner(TimeSpan.Zero);
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new CampaignTick()),
+            VictoryConclusionDisabledMethods());
+
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    // The pending joiner disconnecting after the last member left releases the emptied battle.
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HeldEmptyBattle_FinalizesWhenAcceptedJoinerDisconnects()
+    {
+        var (mapEventId, joiner, _) = HoldEmptiedBattleForJoiner();
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this,
+            new PlayerDisconnected(joiner.NetPeer, default)), VictoryConclusionDisabledMethods());
+        // Other disconnect subscribers queue their own game-thread follow-up work.
+        Server.PumpGameThread();
+
+        AssertMapEventRemoved(mapEventId);
+    }
+
+    // A joiner entering the held battle keeps it open until that joiner reports its own result.
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    public void HeldEmptyBattle_JoinerEntryWaitsForItsOwnResult()
+    {
+        var (mapEventId, joiner, _) = HoldEmptiedBattleForJoiner();
+
+        EnterBattleWithMembership(joiner, PendingJoiner, mapEventId);
+        AssertMapEventPresent(mapEventId);
+
+        SendResult(joiner, mapEventId, BattleState.AttackerVictory);
         AssertMapEventRemoved(mapEventId);
     }
 
@@ -521,6 +576,42 @@ public class BattleResultReadyTests : MissionTestEnvironment
             broker.Publish(this, new CampaignTick());
         }, VictoryConclusionDisabledMethods());
         Assert.Equal(1, publishedConclusions);
+    }
+
+    // Reports the host's result, accepts a join for the second client and has the host leave, then checks the
+    // emptied battle is still held for that join.
+    private (string MapEventId, EnvironmentInstance Joiner, Guid ReservationId) HoldEmptiedBattleForJoiner(
+        TimeSpan? reservationTimeout = null)
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", PendingJoiner);
+        var clients = Clients.ToArray();
+        var host = clients[0];
+        var joiner = clients[1];
+        RegisterPeer(host, "host");
+        RegisterPeer(joiner, PendingJoiner);
+        EnterBattleWithMembership(host, "host", mapEventId);
+        var reservationId = Guid.NewGuid();
+
+        Server.Call(() =>
+        {
+            if (reservationTimeout.HasValue)
+                Server.Resolve<ServerBattleCompletionHandler>().JoinReservationTimeout = reservationTimeout.Value;
+            Server.Resolve<IMessageBroker>().Publish(
+                joiner.NetPeer,
+                new BattleJoinAccepted(mapEventId, PendingJoiner, reservationId));
+        });
+        SendResult(host, mapEventId, BattleState.AttackerVictory);
+        AssertMapEventPresent(mapEventId);
+
+        Server.Call(
+            () => Server.SimulateMessage(
+                host.NetPeer,
+                new NetworkMissionLeft("host", mapEventId)),
+            VictoryConclusionDisabledMethods());
+
+        Server.Call(() => Assert.False(Server.Resolve<IMissionManager>().TryGetControllers(mapEventId, out _)));
+        AssertMapEventPresent(mapEventId);
+        return (mapEventId, joiner, reservationId);
     }
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)
