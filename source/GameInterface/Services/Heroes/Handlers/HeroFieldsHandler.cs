@@ -130,6 +130,15 @@ namespace GameInterface.Services.Heroes.Handlers
                 // Update caches
                 using (new AllowedThread())
                 {
+                    // ChangeState would list a stub that still waits for its CharacterObject, the CharacterObject sync lists it by this state
+                    if (instance._characterObject == null)
+                    {
+                        var oldState = instance._heroState;
+                        instance._heroState = (Hero.CharacterStates)data.HeroState;
+                        instance._clan?.OnHeroChangedState(instance, oldState);
+                        return;
+                    }
+
                     instance.ChangeState((Hero.CharacterStates)data.HeroState);
                 }
             });
