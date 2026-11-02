@@ -185,6 +185,22 @@ public class BattleShipMessagesTests
         Assert.Null(copies[1].CampaignShipId);
     }
 
+    // PR #4191 M5: a failed swap at the captor leaves no capture to record, so a joiner learns the hull's captor from this alone.
+    [Fact]
+    public void SpawnRecord_RoundTripsTheCommittedCaptor_SoAFailedCapturesAiHullStopsFollowingTheHost()
+    {
+        var record = new BattleShipSpawnData(Guid.NewGuid(), "captor", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", "host", committedCaptorId: "captor");
+
+        var copy = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { record })).Ships[0];
+
+        Assert.Equal("captor", copy.CommittedCaptorId);
+        Assert.Null(copy.CaptorControllerId);
+        Assert.Equal(0, copy.CaptureSequence);
+        Assert.False(copy.FollowsBattleHost);
+    }
+
     [Fact]
     public void Condition_DiffersOnlyBeyondTheToleranceOrOnSinkingState()
     {

@@ -217,6 +217,23 @@ public class NetworkShipRegistryTests
         Assert.False(prize.FollowsBattleHost);
     }
 
+    // PR #4191 M5: a committed captor alone (its swap failed here) stops an AI hull following the host, without a capture record.
+    [Fact]
+    public void TryCommitCaptor_StopsAnAiHullFollowingTheHost_WithoutMarkingItCaptured()
+    {
+        var registry = new NetworkShipRegistry();
+        var prize = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_2", true, CreateHull(), CreateFormation());
+        registry.TryRegister(prize);
+
+        Assert.True(registry.TryCommitCaptor(prize.ShipId, "captor"));
+
+        Assert.False(prize.FollowsBattleHost);
+        Assert.Equal("captor", prize.CommittedCaptorId);
+        Assert.Null(prize.Capture);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(registry.TryCommitCaptor(Guid.NewGuid(), "captor"));
+    }
+
     // A recapture gives an orphan a formation again.
     [Fact]
     public void MarkCaptured_OfAnOrphan_GivesItTheFormation()

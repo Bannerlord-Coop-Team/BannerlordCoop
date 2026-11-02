@@ -705,7 +705,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}{Held}",
             data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex,
             held.HeldForDeployment ? " after local deployment" : "");
-        // Before the host move below, since a captured AI hull no longer follows the host.
+        // Before the host move below, since a captured AI hull no longer follows the host. A failed swap at the captor still
+        // decided its authority, with no capture sequence to replay, so the committed captor goes on first.
+        if (registered) Registry.TryCommitCaptor(ship.ShipId, data.CommittedCaptorId);
         if (registered) ApplyRecordedCapture(ship, data);
         // A host change while the record waited only moved the registered hulls.
         var currentAuthority = registered ? CurrentAuthorityOf(ship) : null;
