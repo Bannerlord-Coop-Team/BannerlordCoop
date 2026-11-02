@@ -1,6 +1,7 @@
 ﻿#if COOP_NAVAL
 using Missions.Naval;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -228,8 +229,6 @@ public class NavalCopySteeringTests
         Assert.Equal(0f, new CopySteeringKnobs().LeadSeconds);
     }
 
-    // The oscillation count comes from the DEBUG-only CopyDiagnostics probe.
-#if DEBUG
     // R41b F4: an owner sampled at 20 Hz with jittered arrival, followed straight and through a constant-rate turn.
     [Theory]
     [InlineData(0f)]
@@ -240,7 +239,7 @@ public class NavalCopySteeringTests
         var copy = new SimulatedCopy(owner.PositionAt(0f), owner.VelocityAt(0f), 0f, yawRate);
         // The lead covers the modelled 80 ms transit, which the sample's age on this clock misses.
         var steering = new CopySteering(Knobs("lead=0.08"));
-        var diagnostics = new CopyDiagnostics();
+        var steps = new List<CopySteeringStep>();
         var random = new Random(41);
         const float latency = 0.08f;
         int nextSample = 0;
@@ -259,14 +258,16 @@ public class NavalCopySteeringTests
                 nextArrival = Math.Max(nextArrival, (nextSample * BattleShipSendInterval) + latency + jitter);
             }
 
-            copy.Step(Steer(steering, diagnostics, copy), Dt);
+            copy.Step(Steer(steering, copy, steps), Dt);
             if (time < 2f) continue;
 
             driftSum += (copy.Origin.AsVec2 - owner.PositionAt(time)).Length;
             driftSamples++;
         }
 
-        Assert.Equal(0, diagnostics.Oscillations);
+#if DEBUG
+        Assert.Equal(0L, Oscillations(steps));
+#endif
         Assert.False(steering.IsSnapQueued);
         // Inside the soft zone; a live copy's replayed rudder also turns its velocity, which this model leaves to the steering.
         Assert.True(driftSum / driftSamples < 0.4f, $"mean drift {driftSum / driftSamples} m");
@@ -274,13 +275,23 @@ public class NavalCopySteeringTests
 
     private const float BattleShipSendInterval = 0.05f;
 
-    // One steering step from the modelled copy's state, recorded the way NavalSteeredCopies records it (default tau).
-    private static CopySteeringStep Steer(CopySteering steering, CopyDiagnostics diagnostics, SimulatedCopy copy)
+    // One steering step from the modelled copy's state, kept so DEBUG builds can count oscillations over the run.
+    private static CopySteeringStep Steer(CopySteering steering, SimulatedCopy copy, List<CopySteeringStep> steps)
     {
         var step = steering.Compute(Dt, copy.Origin, copy.Yaw, copy.Velocity, copy.YawRate);
-        diagnostics.RecordStep(0f, Dt, new CopySteeringKnobs().TauSeconds, step);
+        steps.Add(step);
         return step;
     }
+
+#if DEBUG
+    // Oscillations the DEBUG-only CopyDiagnostics probe counts over the steps, recorded the way NavalSteeredCopies records them (default tau).
+    private static long Oscillations(IEnumerable<CopySteeringStep> steps)
+    {
+        var diagnostics = new CopyDiagnostics();
+        foreach (var step in steps) diagnostics.RecordStep(0f, Dt, new CopySteeringKnobs().TauSeconds, step);
+        return diagnostics.Oscillations;
+    }
+#endif
 
     // R42: with no transit delay the sample's age already places the target on the owner; a lead puts the copy speed x lead ahead.
     [Theory]
@@ -292,7 +303,7 @@ public class NavalCopySteeringTests
         var owner = new SimulatedOwner(speed, 0f);
         var copy = new SimulatedCopy(owner.PositionAt(0f), owner.VelocityAt(0f), 0f, 0f);
         var steering = new CopySteering(Knobs(FormattableString.Invariant($"lead={lead}")));
-        var diagnostics = new CopyDiagnostics();
+        var steps = new List<CopySteeringStep>();
         var random = new Random(42);
         int nextSample = 0;
         float nextArrival = 0f;
@@ -311,7 +322,7 @@ public class NavalCopySteeringTests
                 nextArrival = Math.Max(nextArrival, (nextSample * BattleShipSendInterval) + ((float)random.NextDouble() * 0.01f));
             }
 
-            copy.Step(Steer(steering, diagnostics, copy), Dt);
+            copy.Step(Steer(steering, copy, steps), Dt);
             if (time < 5f) continue;
 
             // The step moved the copy to the end of this tick.
@@ -321,9 +332,10 @@ public class NavalCopySteeringTests
 
         float alongMean = alongSum / samples;
         Assert.True(Math.Abs(alongMean - (speed * lead)) < 0.1f, $"along-track mean {alongMean} m, lead {lead} s");
-        Assert.Equal(0, diagnostics.Oscillations);
-    }
+#if DEBUG
+        Assert.Equal(0L, Oscillations(steps));
 #endif
+    }
 
     // R42: the probe measures drift against where the owner is, so a tuned lead doesn't count as drift.
     [Fact]
