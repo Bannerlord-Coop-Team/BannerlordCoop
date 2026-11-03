@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Ships.Messages;
 using System;
 using System.Collections.Generic;
@@ -77,10 +76,8 @@ internal class LootShipsHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<Ship>(shipHandle, out var ship)) continue;
 
-                // Matches (ship.Owner != PartyBase.MainParty) but for multiple players
-                if (ship.Owner == party.Party || ship.Owner.IsPlayerParty()) continue;
-
-                DestroyShipAction.Apply(ship);
+                // Only a ship still held ownerless went untaken, one sent to a clan party already has its new owner
+                if (ship.Owner == null) DestroyShipAction.Apply(ship);
             }
 
             lootShipHold.Release(party.Party);
