@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Services.MapEvents;
+﻿using Common.Util;
+using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts;
@@ -7,6 +8,7 @@ using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -135,8 +137,10 @@ public class HideoutMenuTests : MapEventTestBase
         });
     }
 
-    [Fact]
-    public void JoinConditions_WithoutAnEncounter_ReturnFalseInsteadOfThrowing()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void JoinConditions_WithoutAnEncounterParty_ReturnFalseInsteadOfThrowing(bool encounterBeingSetUp)
     {
         var player = CreatePlayerHeroParty("no-encounter");
         var client = Clients.Last();
@@ -146,7 +150,8 @@ public class HideoutMenuTests : MapEventTestBase
             var previousParty = Campaign.Current.MainParty;
             var previousEncounter = Campaign.Current.PlayerEncounter;
             Campaign.Current.MainParty = party;
-            Campaign.Current.PlayerEncounter = null;
+            // An encounter still being set up has no encountered party yet, native EncounteredBattle throws on both
+            Campaign.Current.PlayerEncounter = encounterBeingSetUp ? ObjectHelper.SkipConstructor<PlayerEncounter>() : null;
             try
             {
                 Assert.Null(Settlement.CurrentSettlement);
@@ -155,7 +160,7 @@ public class HideoutMenuTests : MapEventTestBase
                 var canJoin = AccessTools.Method(typeof(HideoutCampaignBehaviorPatch), "CanJoinHideout");
                 Assert.False((bool)canJoin.Invoke(null, new object[] { args }));
 
-                // The native help attackers and help defenders conditions run when no hideout encounter is open
+                // The prefix hands the help attackers and help defenders options back to native
                 var encounterOptions = AccessTools.Method(typeof(HideoutJoinEncounterOptionsPatch), "Prefix");
                 Assert.True((bool)encounterOptions.Invoke(null, new object[] { false }));
             }
