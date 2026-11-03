@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -80,6 +81,12 @@ public class EncounterContinueSiegeConditionTests : IDisposable
                 Assert.Equal(BattleSideEnum.Attacker, PartyBase.MainParty.Side);
                 Assert.Same(PartyBase.MainParty, mapEvent.GetLeaderParty(BattleSideEnum.Attacker));
 
+                // With a side the prefix hands the condition to vanilla
+                var shownByPrefix = false;
+                var prefixArguments = new object[] { new MenuCallbackArgs((MenuContext)null, null), shownByPrefix };
+                Assert.True((bool)AccessTools.Method(typeof(EncounterContinueSiegeConditionPatch), "Prefix")
+                    .Invoke(null, prefixArguments));
+
                 // The encountered party is no settlement, so vanilla reaches its leader check and declines
                 var (shown, _) = InvokeCondition();
 
@@ -101,7 +108,7 @@ public class EncounterContinueSiegeConditionTests : IDisposable
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         defenderSide = CreateSide(mapEvent, BattleSideEnum.Defender);
         attackerSide = CreateSide(mapEvent, BattleSideEnum.Attacker);
-        AccessTools.Field(typeof(MapEvent), "_sides").SetValue(mapEvent, new[] { defenderSide, attackerSide });
+        mapEvent._sides = new[] { defenderSide, attackerSide };
         return mapEvent;
     }
 
