@@ -230,6 +230,12 @@
     // Set what happens to clans when their kingdom is destroyed.
     // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
     // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
-    "clansAfterKingdomDestruction": "Vanilla"
+    "clansAfterKingdomDestruction": "Vanilla",
+
+    // Toggle War Sails (NavalDLC) co-op. War Sails is not officially supported yet.
+    // Only the hosting side reads this. Joining players must match the server's NavalDLC setting.
+    // (Default) false: NavalDLC must be disabled in the launcher, otherwise the server refuses to host.
+    // true: NavalDLC must be enabled in the launcher and the save made with it, otherwise the server refuses to host. Needs a tester build.
+    "warSails": false
   }
 }

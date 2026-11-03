@@ -1,4 +1,5 @@
 ﻿using GameInterface.Configuration;
+using GameInterface.Services.Modules;
 using System;
 using System.IO;
 using Xunit;
@@ -511,5 +512,71 @@ public class ModConfigTests : IDisposable
             Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
+    }
+
+    // War Sails isn't officially supported, so the shipped template and an absent key both leave it off.
+    [Fact]
+    public void ShippedTemplate_ShipsWarSailsOff()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+
+        var config = NewModConfig().Data;
+
+        Assert.False(config.ModOptions.WarSails);
+        Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
+    }
+
+    // A config made before the key existed gets warSails seeded off, keeping every operator value and comment.
+    [Fact]
+    public void ExistingModOptions_WithoutWarSails_IsSeededOffAndIsIdempotent()
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""modOptions"": {
+    // operator note
+    ""clientsCanUseCheats"": true
+  }
+}");
+
+        var config = NewModConfig().Data;
+        string firstMigration = File.ReadAllText(ConfigPath);
+        _ = NewModConfig().Data;
+
+        Assert.False(config.ModOptions.WarSails);
+        Assert.True(config.ModOptions.ClientsCanUseCheats);
+        Assert.Contains("\"warSails\": false", firstMigration);
+        Assert.Contains("// operator note", firstMigration);
+        Assert.Equal(firstMigration, File.ReadAllText(ConfigPath));
+    }
+
+    // An operator's warSails value wins over the seeded default.
+    [Fact]
+    public void ExistingWarSails_IsKept()
+    {
+        File.WriteAllText(ConfigPath, "{ \"modOptions\": { \"WarSails\": true } }");
+
+        var config = NewModConfig().Data;
+
+        Assert.True(config.ModOptions.WarSails);
+        Assert.DoesNotContain("\"warSails\": false", File.ReadAllText(ConfigPath));
+    }
+
+    // A config with no modOptions block is left without one, and warSails still reads as off.
+    [Fact]
+    public void MissingModOptionsBlock_IsNotAdded_AndWarSailsReadsOff()
+    {
+        File.WriteAllText(ConfigPath, "{ \"voice\": { \"mapMaximumDistance\": 20 } }");
+
+        var config = NewModConfig().Data;
+
+        Assert.False(new WarSailsSetting(new FixedConfig(config)).IsEnabled);
+        Assert.DoesNotContain("modOptions", File.ReadAllText(ConfigPath));
+    }
+
+    // Hands a loaded config to a consumer.
+    private sealed class FixedConfig : IModConfig
+    {
+        public FixedConfig(ModConfigData data) => Data = data;
+
+        public ModConfigData Data { get; }
     }
 }

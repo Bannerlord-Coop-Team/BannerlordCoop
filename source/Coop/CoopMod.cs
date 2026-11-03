@@ -94,6 +94,7 @@ namespace Coop
         private static string ClientServerModeMessage = "";
 
         private bool isServer = false;
+        private NavalSupportDecision navalSupport;
         private bool isAutoConnect = false;
         private bool autoConnectArgumentsValid;
         private NetworkConfig autoConnectConfiguration;
@@ -127,8 +128,10 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            ModInformation.IsNavalDlcActive = NavalSupportDetector.ForStartup(
-                moduleInfoProvider, System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location)).Detect();
+            // Only the hosting side reads warSails from mod-config.json; a mismatch refuses every later host attempt.
+            navalSupport = NavalSupportDetector.ForStartup(
+                moduleInfoProvider, System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location), isServer).Decide();
+            ModInformation.IsNavalDlcActive = navalSupport.IsActive;
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -488,7 +491,8 @@ namespace Coop
             Coop = new CoopartiveMultiplayerExperience(
                 isServer,
                 CrashDiagnostics.SetPhase,
-                activeLogFilePath);
+                activeLogFilePath,
+                navalSupport.HostRefusal);
 
 #if DEBUG
             global::Coop.Core.Common.Commands.JoinDebugCommands.ConfigureClientSessionStarter(

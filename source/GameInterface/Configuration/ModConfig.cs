@@ -65,6 +65,12 @@ internal sealed class ModConfig : IModConfig
             ["autoAllocateClanMemberPerks"] = false,
         };
 
+    /// <summary>modOptions keys added after configs shipped, seeded with a short comment into a file that has a modOptions block.</summary>
+    private static readonly (string Key, JToken Default, string Comment)[] SeededModOptions =
+    {
+        ("warSails", false, "// Toggle War Sails (NavalDLC) co-op. Not officially supported yet; see mod-config.default.json."),
+    };
+
     private static readonly ILogger Logger = LogManager.GetLogger<ModConfig>();
 
     private readonly string directoryOverride;
@@ -104,6 +110,7 @@ internal sealed class ModConfig : IModConfig
             }
 
             MigrateDifficultySettings(path);
+            SeedModOptionSettings(path);
 
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
@@ -163,14 +170,11 @@ internal sealed class ModConfig : IModConfig
             return;
         }
 
-        Match difficultyMatch = Regex.Match(original,
-            "(?:^|[{,])[\\t ]*(?<property>\\\"difficulty\\\"[\\t ]*:[\\t ]*\\{)",
-            RegexOptions.Multiline | RegexOptions.IgnoreCase);
-        if (!difficultyMatch.Success)
+        int openBrace = FindBlockOpenBrace(original, "difficulty");
+        if (openBrace < 0)
         {
             return;
         }
-        int openBrace = original.IndexOf('{', difficultyMatch.Groups["property"].Index);
         int closeBrace = FindMatchingBrace(original, openBrace);
         if (closeBrace < 0)
         {
@@ -217,6 +221,51 @@ internal sealed class ModConfig : IModConfig
         WriteIfValidMigration(path, original, migrated);
     }
 
+    // Adds modOptions keys that postdate an existing file, leaving operator values, comments and ordering alone.
+    // A file without a modOptions block is left as is, since an absent key already reads as its default.
+    private static void SeedModOptionSettings(string path)
+    {
+        string original = File.ReadAllText(path);
+        JObject root;
+        try
+        {
+            root = JObject.Parse(original);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (!(root.GetValue("modOptions", StringComparison.OrdinalIgnoreCase) is JObject modOptions)) return;
+
+        var lines = new List<string>();
+        foreach (var option in SeededModOptions)
+        {
+            if (modOptions.GetValue(option.Key, StringComparison.OrdinalIgnoreCase) != null) continue;
+
+            lines.Add("    " + option.Comment);
+            lines.Add("    \"" + option.Key + "\": " + option.Default.ToString(Formatting.None) + ",");
+        }
+        if (lines.Count == 0) return;
+
+        int openBrace = FindBlockOpenBrace(original, "modOptions");
+        if (openBrace < 0) return;
+
+        string insertion = Environment.NewLine + string.Join(Environment.NewLine, lines);
+        WriteIfValidMigration(path, original, original.Insert(openBrace + 1, insertion));
+    }
+
+    // Finds the opening brace of the "name": { block, or -1 when the text has none.
+    private static int FindBlockOpenBrace(string text, string blockName)
+    {
+        Match match = Regex.Match(text,
+            "(?:^|[{,])[\\t ]*(?<property>\\\"" + Regex.Escape(blockName) + "\\\"[\\t ]*:[\\t ]*\\{)",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        if (!match.Success) return -1;
+
+        return text.IndexOf('{', match.Groups["property"].Index);
+    }
+
     private static void WriteIfValidMigration(string path, string original, string migrated)
     {
         if (migrated == original)
@@ -228,7 +277,7 @@ internal sealed class ModConfig : IModConfig
             // Never replace a parseable user config with a bad migration.
             JObject.Parse(migrated);
             ReplaceFile(path, migrated);
-            Logger.Information("mod-config.json migrated in place: legacy/server difficulty activated ({Path})", path);
+            Logger.Information("mod-config.json migrated in place: missing settings activated ({Path})", path);
         }
         catch (Exception ex)
         {

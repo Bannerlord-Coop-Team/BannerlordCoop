@@ -12,6 +12,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 using Serilog;
 using System;
 using System.Threading;
@@ -34,11 +35,17 @@ public class ValidateModuleState : ClientStateBase
     /// </summary>
     internal static readonly TimeSpan ValidationTimeout = TimeSpan.FromSeconds(30);
 
+    internal const string NavalIncapableReason =
+        "The server runs War Sails, but this co-op build can't. It needs a tester build made with CoopNavalDlc " +
+        "and the naval assemblies; the co-op log names what is missing. Install the server's War Sails build.";
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
     private readonly IGameStateInterface gameStateInterface;
+    private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IModuleValidator moduleValidator;
     private readonly Timer validationTimeoutTimer;
 
     private volatile bool disposed;
@@ -67,13 +74,16 @@ public class ValidateModuleState : ClientStateBase
         ICoopFinalizer coopFinalizer,
         IGameStateInterface gameStateInterface,
         IModuleInfoProvider moduleInfoProvider,
-        IModuleNameProvider moduleNameProvider) : base(logic)
+        IModuleNameProvider moduleNameProvider,
+        IModuleValidator moduleValidator) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
         this.gameStateInterface = gameStateInterface;
+        this.moduleInfoProvider = moduleInfoProvider;
+        this.moduleValidator = moduleValidator;
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
 
@@ -140,15 +150,25 @@ public class ValidateModuleState : ClientStateBase
         }
 
         // Reaching this handshake proves both sides run Coop; only a version mismatch should block it.
-        if (obj.What.Matches || string.Equals(obj.What.Reason, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
-        {
-            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
-        }
-        else
+        bool accepted = obj.What.Matches ||
+            string.Equals(obj.What.Reason, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal);
+        if (!accepted)
         {
             RejectModuleValidation(obj.What.Reason);
+            return;
         }
+
+        if (!CanRunServerModules())
+        {
+            RejectModuleValidation(NavalIncapableReason);
+            return;
+        }
+
+        network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
     }
+
+    // The server only accepts NavalDLC when it runs War Sails, and the same build string can't tell whether this client can too.
+    private bool CanRunServerModules() => moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out _);
 
     private static string GetIncompatibleBuildReason(string? serverBuildVersion)
     {
