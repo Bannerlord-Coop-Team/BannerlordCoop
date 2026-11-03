@@ -274,7 +274,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         var npcFleetSpawner = new NavalNpcFleetSpawner(network, messageBroker, context.Session, services.ShipReplicator,
-            shipSnapshotBuilder, objectManager, playerManager, latePlans, enemySide
+            shipSnapshotBuilder, objectManager, playerManager, latePlans, new NavalNpcFleetRollback(services.ShipReplicator), enemySide
 #if DEBUG
             // Read at the eligible attempt, since the scenario can arrive after the mission opens or the host is elected.
             , () => scenarioState.Current?.MapEventId == context.Session.InstanceId && scenarioState.Current.FailNpcFleet

@@ -215,7 +215,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             busy: IsGoing(prize) || hullAuthority.IsReplacing(prize.ShipId) || IsSettlingAfterPromotion(prize)
                 || IsCaptorHullOfAPendingRequest(prize.ShipId),
             canBeTakenOver: captureEngine.CanBeTakenOver(prize.Hull),
-            isSinking: engine.IsSinking(prize.Hull),
             isVacant: captureEngine.IsVacantForCapture(prize.Hull),
             swapReady: captorShip != null && captureEngine.CheckCapture(prize.Hull, captorShip.Hull) == null);
     }
@@ -230,7 +229,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         if (!facts.IsEnemy) return ShipCaptureRefusal.NotEnemy;
         if (facts.Busy) return ShipCaptureRefusal.Busy;
         if (!facts.CanBeTakenOver) return ShipCaptureRefusal.CannotBeTakenOver;
-        if (facts.IsSinking) return ShipCaptureRefusal.Sinking;
         if (!facts.IsVacant) return ShipCaptureRefusal.NotVacant;
         if (!facts.SwapReady) return ShipCaptureRefusal.SwapUnavailable;
         return null;
@@ -319,7 +317,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         switch (reason)
         {
             case ShipCaptureRefusal.NotVacant: return "its crew still holds it";
-            case ShipCaptureRefusal.Sinking: return "it is sinking";
             case ShipCaptureRefusal.Busy: return "it is changing hands, try again";
             case ShipCaptureRefusal.AlreadyCaptured: return "someone captured it first";
             case ShipCaptureRefusal.NotEnemy: return "it is not an enemy ship";
@@ -376,7 +373,7 @@ internal readonly struct PendingRequest
 public readonly struct CaptureFacts
 {
     public CaptureFacts(bool isAuthority, bool alreadyCaptured, bool captorInMission, bool captorHullValid, bool isEnemy, bool busy,
-        bool canBeTakenOver, bool isSinking, bool isVacant, bool swapReady)
+        bool canBeTakenOver, bool isVacant, bool swapReady)
     {
         IsAuthority = isAuthority;
         AlreadyCaptured = alreadyCaptured;
@@ -385,7 +382,6 @@ public readonly struct CaptureFacts
         IsEnemy = isEnemy;
         Busy = busy;
         CanBeTakenOver = canBeTakenOver;
-        IsSinking = isSinking;
         IsVacant = isVacant;
         SwapReady = swapReady;
     }
@@ -402,7 +398,6 @@ public readonly struct CaptureFacts
     /// <summary>The prize is leaving, mid-swap, an inherited AI hull inside a promoted host's settle window, or this client's own hull a request of it waits on.</summary>
     public bool Busy { get; }
     public bool CanBeTakenOver { get; }
-    public bool IsSinking { get; }
     /// <summary>Vanilla's vacancy on the real hull: its formation all swimming or gone and nothing queued.</summary>
     public bool IsVacant { get; }
     /// <summary>Vanilla's swap can run on the two hulls here (INavalShipCaptureEngine.CheckCapture).</summary>

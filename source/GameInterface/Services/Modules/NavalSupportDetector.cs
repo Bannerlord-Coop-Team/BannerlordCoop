@@ -3,7 +3,6 @@ using Common.Logging;
 using GameInterface.Configuration;
 using Serilog;
 using System;
-using System.IO;
 using System.Linq;
 
 namespace GameInterface.Services.Modules;
@@ -14,7 +13,7 @@ namespace GameInterface.Services.Modules;
 public interface INavalSupportDetector
 {
     /// <summary>
-    /// Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies shipped.
+    /// Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies load.
     /// The hosting side also needs <c>modOptions.warSails</c> to match NavalDLC, otherwise it gets a refusal.
     /// </summary>
     NavalSupportDecision Decide();
@@ -27,26 +26,27 @@ public class NavalSupportDetector : INavalSupportDetector
 
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly INavalFeatureFlag navalFeatureFlag;
-    private readonly Func<string, bool> isShipped;
+    private readonly Func<string, bool> isLoadable;
     private readonly IWarSailsSetting warSailsSetting;
     private readonly bool isHost;
 
     // Takes each input separately so tests can turn the module, the flags, the assemblies and the side on and off.
     public NavalSupportDetector(IModuleInfoProvider moduleInfoProvider, INavalFeatureFlag navalFeatureFlag,
-        Func<string, bool> isShipped, IWarSailsSetting warSailsSetting, bool isHost)
+        Func<string, bool> isLoadable, IWarSailsSetting warSailsSetting, bool isHost)
     {
         this.moduleInfoProvider = moduleInfoProvider;
         this.navalFeatureFlag = navalFeatureFlag;
-        this.isShipped = isShipped;
+        this.isLoadable = isLoadable;
         this.warSailsSetting = warSailsSetting;
         this.isHost = isHost;
     }
 
-    // The startup composition: this build's flags, the naval assemblies next to assemblyDirectory and, when hosting, mod-config.json.
+    // The startup composition: this build's flags, the naval assemblies next to assemblyDirectory must load and, when hosting, mod-config.json.
     public static NavalSupportDetector ForStartup(IModuleInfoProvider moduleInfoProvider, string assemblyDirectory, bool isHost)
     {
+        var loader = new NavalAssemblyLoader(assemblyDirectory);
         return new NavalSupportDetector(moduleInfoProvider, new NavalFeatureFlag(),
-            file => File.Exists(Path.Combine(assemblyDirectory, file)), new WarSailsSetting(new ModConfig()), isHost);
+            file => loader.TryLoad(file, out _), new WarSailsSetting(new ModConfig()), isHost);
     }
 
     /// <inheritdoc/>
@@ -55,7 +55,7 @@ public class NavalSupportDetector : INavalSupportDetector
         bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
             .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
         bool supported = navalFeatureFlag.IsNavalCodeBuilt
-            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isShipped);
+            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isLoadable);
 
         if (isHost) return DecideForHost(navalModuleEnabled, supported);
 
@@ -97,6 +97,6 @@ public class NavalSupportDetector : INavalSupportDetector
     {
         if (!navalFeatureFlag.IsEnabled) return "War Sails co-op is only in tester builds";
         if (!navalFeatureFlag.IsNavalCodeBuilt) return "this build was made without CoopNavalDlc";
-        return "this build has no naval code";
+        return "a naval assembly is missing or failed to load";
     }
 }

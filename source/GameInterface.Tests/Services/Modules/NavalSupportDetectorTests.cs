@@ -53,7 +53,7 @@ public class NavalSupportDetectorTests
     [InlineData(true, false, true, true, true, false, "NavalDLC is not enabled")]
     [InlineData(true, true, false, true, true, false, "War Sails co-op is only in tester builds")]
     [InlineData(true, true, true, false, true, false, "this build was made without CoopNavalDlc")]
-    [InlineData(true, true, true, true, false, false, "this build has no naval code")]
+    [InlineData(true, true, true, true, false, false, "a naval assembly is missing or failed to load")]
     public void Decide_OnTheHost_FollowsWarSailsAndRefusesAMismatch(
         bool warSails, bool moduleEnabled, bool flagOn, bool navalBuilt, bool shipped, bool expectedActive, string refusal)
     {
@@ -71,19 +71,34 @@ public class NavalSupportDetectorTests
 
     // The startup composition must take this build's TESTER and CoopNavalDlc flags, so it can't turn naval on where either is off.
     [Fact]
-    public void ForStartup_OnAClient_FollowsThisBuildsFlags()
+    public void ForStartup_WithLoadableAssemblies_FollowsThisBuildsFlags()
+    {
+        bool detected = DetectAtStartup(path => NavalAssemblyLoaderTests.WriteAssembly(path, withMissingDependency: false));
+
+        var flag = new NavalFeatureFlag();
+        Assert.Equal(flag.IsEnabled && flag.IsNavalCodeBuilt, detected);
+    }
+
+    // A stale or partial deploy leaves files that exist but don't load; naval must stay off instead of failing container setup.
+    [Fact]
+    public void ForStartup_WithUnloadableAssemblies_StaysOff()
+    {
+        Assert.False(DetectAtStartup(path => File.WriteAllBytes(path, Array.Empty<byte>())));
+    }
+
+    // Ships both naval assemblies into a fresh folder with writeAssembly and runs the client's startup detection against it.
+    private static bool DetectAtStartup(Action<string> writeAssembly)
     {
         string directory = AssemblyDirectory();
         try
         {
-            bool detected = NavalSupportDetector.ForStartup(Modules(true), directory, isHost: false).Decide().IsActive;
+            foreach (string file in BothAssemblies) writeAssembly(Path.Combine(directory, file));
 
-            var flag = new NavalFeatureFlag();
-            Assert.Equal(flag.IsEnabled && flag.IsNavalCodeBuilt, detected);
+            return NavalSupportDetector.ForStartup(Modules(true), directory, isHost: false).Decide().IsActive;
         }
         finally
         {
-            Directory.Delete(directory, recursive: true);
+            TryDelete(directory);
         }
     }
 
@@ -105,17 +120,24 @@ public class NavalSupportDetectorTests
         finally
         {
             Environment.SetEnvironmentVariable("COOP_DATA_DIR", saved);
-            Directory.Delete(directory, recursive: true);
+            TryDelete(directory);
         }
     }
 
-    // A temp folder holding both naval assemblies.
+    // A fresh temp folder.
     private static string AssemblyDirectory()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"naval-detector-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
-        foreach (string file in BothAssemblies) File.WriteAllBytes(Path.Combine(directory, file), Array.Empty<byte>());
         return directory;
+    }
+
+    // Removes a test folder; a loaded assembly can keep its file locked.
+    private static void TryDelete(string directory)
+    {
+        try { Directory.Delete(directory, recursive: true); }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
     }
 
     // A detector over pinned inputs.

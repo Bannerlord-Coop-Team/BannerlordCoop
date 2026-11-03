@@ -41,15 +41,14 @@ public class BattleShipCaptureReplicatorTests
     [InlineData(4, ShipCaptureRefusal.NotEnemy)]
     [InlineData(5, ShipCaptureRefusal.Busy)]
     [InlineData(6, ShipCaptureRefusal.CannotBeTakenOver)]
-    [InlineData(7, ShipCaptureRefusal.Sinking)]
-    [InlineData(8, ShipCaptureRefusal.NotVacant)]
-    [InlineData(9, ShipCaptureRefusal.SwapUnavailable)]
+    [InlineData(7, ShipCaptureRefusal.NotVacant)]
+    [InlineData(8, ShipCaptureRefusal.SwapUnavailable)]
     [InlineData(-1, null)]
     public void Decide_NamesTheFirstFailingCheck(int failing, ShipCaptureRefusal? expected)
     {
         var facts = new CaptureFacts(isAuthority: failing != 0, alreadyCaptured: failing == 1, captorInMission: failing != 2,
             captorHullValid: failing != 3, isEnemy: failing != 4, busy: failing == 5, canBeTakenOver: failing != 6,
-            isSinking: failing == 7, isVacant: failing != 8, swapReady: failing != 9);
+            isVacant: failing != 7, swapReady: failing != 8);
 
         Assert.Equal(expected, BattleShipCaptureReplicator.Decide(facts));
     }
@@ -280,9 +279,9 @@ public class BattleShipCaptureReplicatorTests
         Assert.Null(prize.CaptorControllerId);
     }
 
-    // Q6: a sinking hull is refused even when vacant.
+    // PR #4191 review: vanilla's helm still captures a sinking hull that is vacant and connected, so its authority confirms it too.
     [Fact]
-    public void Request_ForASinkingHull_IsRefused()
+    public void Request_ForAVacantSinkingHull_IsCapturedLikeVanilla()
     {
         var harness = new Harness();
         var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
@@ -292,8 +291,11 @@ public class BattleShipCaptureReplicatorTests
 
         harness.Exchange.AcceptRequest(new NetworkShipCaptureRequest(prize.ShipId, Captor, captorShip.ShipId));
 
-        harness.Network.Verify(n => n.Send(Captor, It.Is<IMessage>(m => m is NetworkShipCaptureRejected
-            && ((NetworkShipCaptureRejected)m).Reason == ShipCaptureRefusal.Sinking)), Times.Once);
+        harness.Network.Verify(n => n.Send(Captor, It.Is<IMessage>(m => m is NetworkShipCaptureRejected)), Times.Never);
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCaptured
+            && ((NetworkShipCaptured)m).ShipId == prize.ShipId)), Times.Once);
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, captorShip.Hull), Times.Once);
+        Assert.Equal(Captor, prize.CurrentAuthority);
     }
 
     // C5: a promoted host refuses an inherited AI hull for the settle window, so a capture the old host confirmed just before it

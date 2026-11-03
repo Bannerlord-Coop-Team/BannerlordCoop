@@ -7,14 +7,17 @@ using Coop.Naval.CoopSession.Handlers;
 using Coop.Naval.CoopSession.Interfaces;
 using Coop.Naval.Notifications.Handlers;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Interfaces;
 using Moq;
+using NavalDLC.CampaignBehaviors;
 using Serilog;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using Xunit;
 
 namespace Coop.Tests.Naval;
@@ -32,6 +35,7 @@ public class CoopNavalModuleTests
         builder.RegisterInstance(Mock.Of<IPlayerManager>());
         builder.RegisterInstance(Mock.Of<ILogger>());
         builder.RegisterInstance(Mock.Of<IAutoRegistryFactory>());
+        builder.RegisterType<AutoSyncRegistry>().SingleInstance();
         builder.RegisterModule<CoopNavalModule>();
         return builder.Build();
     }
@@ -51,6 +55,17 @@ public class CoopNavalModuleTests
         using var container = BuildContainer();
 
         Assert.IsType<SessionNavalPlayerDataInterface>(container.Resolve<ISessionNavalPlayerDataInterface>());
+    }
+
+    [Fact]
+    public void Load_ActivatesNavalBuildingSyncTargets()
+    {
+        using var container = BuildContainer();
+
+        var registration = container.Resolve<AutoSyncRegistry>().Registrations[typeof(Building)];
+        Assert.Single(registration.TargetMethods, method =>
+            method.DeclaringType == typeof(NavalNimbleSurgeCampaignBehaviour) &&
+            method.Name == nameof(NavalNimbleSurgeCampaignBehaviour.OnSettlementEntered));
     }
 
     [Fact]

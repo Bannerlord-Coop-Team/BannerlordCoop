@@ -24,7 +24,10 @@ public sealed class NetworkShipRemoved : IEvent
     [ProtoMember(1)] public readonly Guid ShipId;
     [ProtoMember(2)] public readonly string OwnerControllerId;
     [ProtoMember(3)] public readonly ShipRemovalReason Reason;
-    /// <summary>Whether the owner's mission ended with the removal, so its crew left the battle with the hull.</summary>
+    /// <summary>
+    /// Whether the hull's crew left the battle with it: the owner's mission ended with the removal, or the owner took back a
+    /// failed AI fleet attempt.
+    /// </summary>
     [ProtoMember(4)] public readonly bool MissionEnding;
 
     public NetworkShipRemoved(Guid shipId, string ownerControllerId, ShipRemovalReason reason, bool missionEnding)

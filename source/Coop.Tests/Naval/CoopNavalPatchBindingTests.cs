@@ -22,6 +22,7 @@ public class CoopNavalPatchBindingTests
     {
         AccessTools.Method(typeof(ClanFleetManagementCampaignBehaviorPatches), nameof(ClanFleetManagementCampaignBehaviorPatches.HourlyTickPrefix)),
         AccessTools.Method(typeof(NavalTransitionCampaignBehaviorPatches), nameof(NavalTransitionCampaignBehaviorPatches.SetSailConsequencePrefix)),
+        AccessTools.Method(typeof(RaftStateCampaignBehaviorPatches), nameof(RaftStateCampaignBehaviorPatches.PlayerRaftStateContinueOnConsequencePrefix)),
         AccessTools.Method(typeof(NavalDLCFigureheadCampaignBehaviorPatches), "OnFigureheadUnlockedPrefix"),
     };
 

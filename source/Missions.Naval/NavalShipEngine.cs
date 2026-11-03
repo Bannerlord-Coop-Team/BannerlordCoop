@@ -722,12 +722,23 @@ public class NavalShipEngine : INavalShipEngine
             // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew: the helm
             // sets its steering action and pins the pilot, an oar sits its rower down at once.
             var machine = PilotMachineOf(point);
-            if (machine != null && machine.PilotAgent == agent) machine.OnPilotAssignedDuringSpawn();
+            if (machine != null && machine.PilotAgent == agent) SeatAsSpawnPilot(agent, machine);
             return;
         }
 
         if (agent.CurrentlyUsedGameObject == point)
             agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+    }
+
+    // Seats the pilot through vanilla's spawn seating. A release just before (ours or vanilla's) leaves the oar's stand-up action
+    // playing, which rejects the spawn's idle and makes the oar's tick drop the pilot again, so both channels are cleared first.
+    private static void SeatAsSpawnPilot(Agent agent, UsableMachine machine)
+    {
+        agent.SetActionChannel(0, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        machine.OnPilotAssignedDuringSpawn();
     }
 
     public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
@@ -745,6 +756,36 @@ public class NavalShipEngine : INavalShipEngine
         var frame = point.GetUserFrameForAgent(agent);
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
+
+    public StationSeatPose ReadSeatPose(Agent agent, UsableMissionObject point)
+    {
+        var machine = PilotMachineOf(point);
+        if (machine == null || machine.PilotAgent != agent) return default;
+
+        var frame = point.GameEntity.GetGlobalFrame();
+        bool isStruck = agent.IsInBeingStruckAction;
+        if (machine is ShipOarMachine oar)
+        {
+            int sitDown = MBActionSet.GetAnimationIndexOfAction(agent.ActionSet, in oar._rowSitDownActionIndex);
+            var displacement = MBAnimation.GetAnimationDisplacementAtProgress(sitDown, 1f);
+            return new StationSeatPose(StationSeatKind.Oar, oar._isPilotSitting, isStruck, frame, displacement, agent.Position);
+        }
+
+        if (machine is ShipControllerMachine helm)
+        {
+            // A walking pilot is not frame-locked yet, and the player's capture action plays at the helm until it lets go.
+            bool atHelm = agent.MovementLockedState != AgentMovementLockedState.None
+                && agent.GetCurrentAction(0) != helm._shipCaptureActionIndex;
+            return new StationSeatPose(StationSeatKind.Helm, atHelm, isStruck, frame, Vec3.Zero, agent.Position);
+        }
+
+        return default;
+    }
+
+    public bool IsStruck(Agent agent) => agent.IsInBeingStruckAction;
+
+    // Vanilla's spawn seating teleports the same way; the seat lock keeps steering the agent's XY and facing afterwards.
+    public void PlaceSeatedAgent(Agent agent, Vec3 position) => agent.TeleportToPosition(position);
 
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
         ropeRegistry.Capture((MissionShip)hull, shipIdOf);

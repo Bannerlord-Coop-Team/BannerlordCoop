@@ -75,7 +75,18 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   release patches never publish it, `NavalShipEngine` neither describes nor resolves it as a station, and a seat is only
   re-seated while its point is still a station of its hull (R41a-2 W2). A deactivated machine is still seated, since its
   state is recomputed locally and can lag the owner's. A use published on an agent tick worker is announced on the game
-  thread.
+  thread. A puppet vanilla lets go while its owner keeps the seat is re-seated at once, then at most once a second for as
+  long as the seat holds (#4213). A re-seat clears the oar's stand-up action first, because it otherwise rejects the seated
+  idle and the oar drops the rower again on its next tick.
+  Vanilla holds a station user by XY and facing only, so its height is whatever it arrived with: spawn seating teleports to
+  the station frame, an agent that walks in sits at deck height, and a ram's stagger (`ShipCollisionOutcomeLogic`, rolled
+  on each client) moves it again. A copy is seated the spawn way, so `StationSeatSettler` puts every oar and helm seat this
+  client holds, own agents and copies alike, at vanilla's spawn placement once it settles: after an oar's sit-down ends or a
+  helm's pilot locks to its frame, and again after each stagger. The next pass checks the agent stayed there and places it
+  again if the engine moved it (a copy seated while off the hull is put on the deck a frame later), at most three times
+  per settle. The placement comes from the station frame on every client, so no message carries it (#4213). The settler
+  handles only oars and helms; a ballista's spawn seating also teleports to its pilot point, but its height after a ram
+  is unverified, and ropes and other stations are left alone.
 - A hit on a hull that another client simulates is sent only to that hull's current authority, which applies it through the
   vanilla damage method (`BattleShipDamageRouter`). A peer that no longer holds the hull drops it, so a hit applies at most
   once across a host change or a capture.
@@ -95,6 +106,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 - The battle host fields the AI fleet late, once the NPC reserve reached it and its deployment is over
   (`Missions.Naval/NavalNpcFleetSpawner.cs`, enemy side only).
+  An attempt that fails after spawning takes back its own hulls, crew and waiting troops before it reports the failure
+  (`NavalNpcFleetRollback`); its pulled troops stay supplied, since the server's supply ledger never rewinds.
+  A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
+  it went through.
 - Only AI hulls nobody captured have `FollowsBattleHost`. On every host change all clients move them to the new host at the
   same ordered event (`TransferHostHulls`), and their samples carry the host epoch so a stale host's traffic is dropped. A
   player's hull never changes owner unless it is captured: it stays with its player or leaves with it.
@@ -196,8 +211,9 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    host capturing an AI hull it simulates).
 3. The authority decides on the real hull (`BattleShipCaptureReplicator.Decide`, reasons in `ShipCaptureRefusal`): it must
    still simulate it; the captor must be in the mission with a registered hull of its own that still has its formation; the
-   hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, not
-   sinking, and vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). It applies the
+   hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, and
+   vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). A sinking hull can be
+   captured, as at vanilla's helm. It applies the
    capture itself and broadcasts `NetworkShipCaptured`, or sends `NetworkShipCaptureRejected` to the captor alone.
 4. Every client applies `NetworkShipCaptured` in one step of its naval services tick (`OnMissionTick`), never from the
    game-thread queue: the queue drains while the engine's async agent and team tick runs, which reads the assignments and
@@ -847,7 +863,7 @@ For item 25, pair only the same instance, full ship id and unchanged authority, 
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
 | `result_silence [on \| off]` | non-host client, DEBUG only | `on` withholds this mission's result-ready event/report/snapshot and retreat/mission-left announcements; relay and mesh keep running while the mission is open. No argument prints `NAVAL_RESULT_SILENCE enabled=true/false instance=...`. `off` resumes reporting a retained result once deployment is committed. The flag belongs to the mission, so a later mission starts unsilenced; outside a mission `off` confirms `enabled=false instance=none`. This client owns its outgoing announcements, so run here rather than on the server. Arm before the host runs `win`; it cannot retract an earlier report. Local mission teardown still clears registries and stops its mesh, but keeps the server relay connected and withholds departure. |
-| `fleet_fail` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt in this mission to throw through its normal failure path. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawner.state=failed` and `npcFleet.spawner.failure` containing `DEBUG fleet_fail`. Mission-scoped, no retry after migration. |
+| `fleet_fail [before\|after_hull\|crewing]` | battle host | Before Ready, arms the next eligible AI fleet spawn attempt in this mission to throw through its normal failure path: before anything spawns (default), right after the first hull registered, or inside the crewing after its first batch spawned. Refuses after an attempt or on another client. `NAVAL_FLEET_FAIL armed` confirms arming; `inspect` then shows `npcFleet.spawner.state=failed`, `npcFleet.spawner.failure` containing `DEBUG fleet_fail` and `npcFleet.spawner.hullsRetracted`, the hulls the failed attempt took back (every client drops them and their crew within two ticks). Mission-scoped, no retry after migration. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `boatswain <partyId> [prepare]` | both; prepare server only | DEBUG. Reads the effective First Mate hero id, Boatswain level, XP and learning rate, plus campaign ship ids, hull/sail HP and a read-only 100-damage model probe. `prepare` sets that hero to Boatswain 100 (resetting its skill XP baseline) and raises focus to 5 before any map event, through normal replicated skill APIs. Capture the XP baseline after preparation. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
