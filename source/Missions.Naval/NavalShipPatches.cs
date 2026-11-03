@@ -1,11 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Missions.Messages;
+using NavalDLC.CampaignBehaviors;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.MissionLogics;
@@ -14,12 +16,16 @@ using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
 using NavalDLC.ViewModelCollection.OrderOfBattle;
 using Serilog;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
+using static NavalDLC.CampaignBehaviors.NavalOrderOfBattleCampaignBehavior;
 
 namespace Missions.Naval;
 
@@ -203,15 +209,77 @@ internal class PlayerFleetDeploymentSlotPatch
     }
 }
 
-// The order of battle restores its saved ship layout by Ship reference; a coop battle fields fresh snapshots that never
-// match, so it would empty every formation whose ship can move and remove all own hulls but the flagship at Ready.
+// The order of battle restores its saved ship layout by Ship reference, but a coop battle fields snapshots of the saved campaign
+// ships. A layout naming no ship (saved before coop kept campaign ships) would empty every formation whose ship can move and
+// remove all own hulls but the flagship at Ready.
 [HarmonyPatch(typeof(NavalOrderOfBattleVM), nameof(NavalOrderOfBattleVM.LoadConfigurationShips))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopOrderOfBattleShipLayoutPatch
 {
-    // Skips the saved layout load in a coop naval mission.
+    // In a coop naval mission, loads the saved layout against this battle's snapshots, or skips it when it names no ship.
     [HarmonyPrefix]
-    internal static bool Prefix() => !NavalMissionTracker.IsActiveHere();
+    internal static bool Prefix(out List<NavalOrderOfBattleFormationData> __state)
+    {
+        __state = null;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
+
+        // Vanilla's load returns without the behaviour too.
+        var behavior = Campaign.Current?.GetCampaignBehavior<NavalOrderOfBattleCampaignBehavior>();
+        if (behavior == null) return false;
+
+        var saved = MobileParty.MainParty.Army != null ? behavior._navalBattleArmyFormationInfos : behavior._navalBattleFormationInfos;
+        if (!saved.Any(formation => formation.Ship != null)) return false;
+
+        if (!ContainerProvider.TryResolve<ICoopShipSnapshotRegistry>(out var snapshots)
+            || !ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        // A saved ship with no snapshot in this battle stays unmatched, which vanilla treats like a ship that is gone
+        var playerShips = Mission.Current?.GetMissionBehavior<NavalDeploymentMissionController>()?.GetAllPlayerShips().OfType<Ship>().ToList()
+            ?? new List<Ship>();
+        var mapped = saved.Select(formation =>
+        {
+            var snapshot = formation.Ship != null && objectManager.TryGetId(formation.Ship, out var campaignShipId)
+                ? playerShips.FirstOrDefault(ship => snapshots.CampaignShipIdOf(ship) == campaignShipId)
+                : null;
+            return snapshot == null ? formation : new NavalOrderOfBattleFormationData(formation.Captain, snapshot, formation.FormationClass, formation.Filters);
+        }).ToList();
+
+        __state = saved;
+        if (MobileParty.MainParty.Army != null) behavior._navalBattleArmyFormationInfos = mapped;
+        else behavior._navalBattleFormationInfos = mapped;
+        return true;
+    }
+
+    // Puts the campaign ships back, so the snapshots never outlive this load.
+    [HarmonyFinalizer]
+    private static void Finalizer(List<NavalOrderOfBattleFormationData> __state)
+    {
+        if (__state == null) return;
+
+        var behavior = Campaign.Current.GetCampaignBehavior<NavalOrderOfBattleCampaignBehavior>();
+        if (MobileParty.MainParty.Army != null) behavior._navalBattleArmyFormationInfos = __state;
+        else behavior._navalBattleFormationInfos = __state;
+    }
+}
+
+// The order of battle saves each formation's mission ship, a snapshot no registry id names, so the campaign keeps the
+// campaign ship it stands for instead and the layout survives the next battle and a rejoin.
+[HarmonyPatch(typeof(NavalOrderOfBattleCampaignBehavior), nameof(NavalOrderOfBattleCampaignBehavior.SetFormationInfos))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CoopOrderOfBattleShipSavePatch
+{
+    // Runs before vanilla stores the list and the coop postfix sends it to the server.
+    [HarmonyPrefix]
+    private static void Prefix(ref List<NavalOrderOfBattleFormationData> formationInfos)
+    {
+        if (!ContainerProvider.TryResolve<ICoopShipSnapshotRegistry>(out var snapshots)
+            || !ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+
+        formationInfos = formationInfos.Select(formation =>
+            objectManager.TryGetObject<Ship>(snapshots.CampaignShipIdOf(formation.Ship), out var campaignShip)
+                ? new NavalOrderOfBattleFormationData(formation.Captain, campaignShip, formation.FormationClass, formation.Filters)
+                : formation).ToList();
+    }
 }
 
 // Owners announce station use; the replicator ignores agents this client does not drive. An item pickup is no station

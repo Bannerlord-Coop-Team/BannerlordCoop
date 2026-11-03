@@ -23,7 +23,7 @@ public class CoopOrderOfBattleShipLayoutPatchTests
         using var naval = new NavalClientContainer();
         naval.MissionTracker.IsActive = coopNavalBattle;
 
-        Assert.Equal(expectedVanillaLoad, CoopOrderOfBattleShipLayoutPatch.Prefix());
+        Assert.Equal(expectedVanillaLoad, CoopOrderOfBattleShipLayoutPatch.Prefix(out _));
     }
 }
 #endif
