@@ -20,7 +20,7 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 /// player is gone is ended silently, so its notable does not stay stuck on it. For this first
 /// iteration of quests, this will be the behavior, but this will change in the future.
 /// </summary>
-internal class ActiveIssueDismisser : IHandler
+internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
 
@@ -151,6 +151,14 @@ internal class ActiveIssueDismisser : IHandler
         {
             messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
         }
+    }
+
+    public void Dismiss(IssueBase issue, IssueOutcome outcome)
+    {
+        if (issue.IsSolvingWithAlternative) DismissTroops(issue, announce: false);
+        else DismissQuest(issue, announce: false);
+
+        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
     }
 
     private void DismissTroops(IssueBase issue, bool announce)

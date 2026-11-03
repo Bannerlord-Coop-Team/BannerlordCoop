@@ -6,10 +6,12 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
@@ -25,7 +27,7 @@ public readonly struct AlternativeSolutionEndingObserved : IEvent
     }
 }
 
-/// <summary>Replays the owner's alternative journal before the ordered finalization detaches the issue.</summary>
+/// <summary>Replays the owner's authoritative alternative acceptance and ending journals.</summary>
 internal class AlternativeSolutionJournalHandler : IHandler
 {
     private readonly IMessageBroker broker;
@@ -65,6 +67,11 @@ internal class AlternativeSolutionJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (!IsEnding(payload.What.Ending) || !issue.IsSolvingWithAlternative ||
             !registry.IsRegistered(issue.GetType()) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
+        var report = issue.JournalEntries.LastOrDefault()?.LogText;
+        // Vanilla failure binds the companion globally instead of saving it on the report.
+        if (payload.What.Ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest &&
+            report != null && issue.AlternativeSolutionHero != null)
+            StringHelpers.SetCharacterProperties("COMPANION", issue.AlternativeSolutionHero.CharacterObject, report);
         if (!owners.TryGetOwnerControllerId(issue, out var owner) || !players.TryGetPeer(owner, out var peer)) return;
 
         var entries = issue.JournalEntries.Select(log => new AlternativeSolutionJournalEntry(log)).ToArray();
@@ -75,9 +82,10 @@ internal class AlternativeSolutionJournalHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
+        var isAcceptance = data.Ending == IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest;
         GameThread.RunSafe(() =>
         {
-            if (!IsEnding(data.Ending) || !resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+            if ((!isAcceptance && !IsEnding(data.Ending)) || !resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !issue.IsSolvingWithAlternative || !owners.TryGetOwnerControllerId(issue, out var owner) ||
                 owner != controller.ControllerId) return;
 
@@ -86,12 +94,23 @@ internal class AlternativeSolutionJournalHandler : IHandler
                 issue._journalEntries.Clear();
                 foreach (var entry in data.Entries ?? Array.Empty<AlternativeSolutionJournalEntry>())
                     issue._journalEntries.Add(entry.ToJournalLog());
-                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Ending, Hero.MainHero);
+                if (isAcceptance)
+                {
+                    var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                        (JournalLogEntry entry) => entry.IsRelatedTo(issue));
+                    archive?.Update(issue.JournalEntries, data.Ending);
+                }
+                else
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Ending,
+                        data.Ending == IssueBase.IssueUpdateDetails.IssueCancel && !issue.IsTriedToSolveBefore
+                            ? null
+                            : Hero.MainHero);
             }
         }, context: nameof(AlternativeSolutionJournalHandler));
     }
 
     private static bool IsEnding(IssueBase.IssueUpdateDetails ending) =>
         ending == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest ||
-        ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest;
+        ending == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest ||
+        ending == IssueBase.IssueUpdateDetails.IssueCancel;
 }

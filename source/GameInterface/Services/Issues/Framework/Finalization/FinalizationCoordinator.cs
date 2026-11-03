@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -94,6 +95,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
         network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
     }
 
@@ -111,6 +113,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
         network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
     }
 

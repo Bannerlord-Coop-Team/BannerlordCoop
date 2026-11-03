@@ -58,6 +58,18 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public void Snapshot_FailsForAnEmptyLog()
+    {
+        Directory.CreateDirectory(tempRoot);
+        var logPath = Path.Combine(tempRoot, "Coop_server.log");
+        File.WriteAllBytes(logPath, Array.Empty<byte>());
+        var provider = new CoopLogSnapshotProvider(new CoopLogFile(logPath));
+
+        Assert.False(provider.TryCapture(out var snapshot));
+        Assert.Null(snapshot);
+    }
+
+    [Fact]
     public void Archive_ContainsManifestAndPseudonymousClientLogs()
     {
         Directory.CreateDirectory(tempRoot);
@@ -409,6 +421,36 @@ public class CoopLogBugReportTests : IDisposable
         Assert.Equal(
             serverSaveSidecar.Length,
             root.GetProperty("serverSave").GetProperty("sidecarLength").GetInt64());
+    }
+
+    [Fact]
+    public async Task Uploader_OmitsEmptyServerLog()
+    {
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler);
+        using var uploader = new BugReportUploader(
+            httpClient,
+            "https://bug-reports.example.test/api/v1/reports");
+        var report = new BugReportArchiveContents(
+            Guid.NewGuid().ToString("N"),
+            "network-client-1",
+            new[] { "player-submitted" },
+            new[] { new BugReportSubmission("network-client-1", "Summary", "Description") },
+            new CollectedBugReportServerLog(Array.Empty<byte>(), 0),
+            null,
+            DateTimeOffset.UtcNow,
+            Array.Empty<CollectedBugReportLog>(),
+            expectedClients: 0,
+            declinedClients: 0,
+            failedClients: 0,
+            timedOutClients: 0);
+
+        var result = await uploader.UploadAsync(report, CancellationToken.None);
+
+        Assert.True(result.Uploaded);
+        Assert.Null(handler.ServerLogBody);
+        using var json = JsonDocument.Parse(handler.Body);
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("serverLog").ValueKind);
     }
 
     [Fact]
