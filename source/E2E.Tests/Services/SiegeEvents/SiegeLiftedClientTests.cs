@@ -81,7 +81,7 @@ public class SiegeLiftedClientTests : SiegeTestBase
     private static MapEventSide CreateEndedBattleSide()
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        AccessTools.Field(typeof(MapEvent), "_state").SetValue(mapEvent, MapEventState.WaitingRemoval);
+        mapEvent._state = MapEventState.WaitingRemoval;
         var side = ObjectHelper.SkipConstructor<MapEventSide>();
         AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, mapEvent);
         return side;

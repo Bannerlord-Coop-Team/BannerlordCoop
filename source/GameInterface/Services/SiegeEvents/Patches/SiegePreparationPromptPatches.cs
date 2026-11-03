@@ -95,6 +95,10 @@ internal class SiegePreparationPromptPatches
 
         try
         {
+            // Taken before the early return below so a skipped finalize does not leave the entry behind
+            EmptiedCampParties.TryGetValue(__instance, out var emptiedParties);
+            EmptiedCampParties.Remove(__instance);
+
             var settlement = __instance.BesiegedSettlement;
             var mapEvent = settlement?.Party?.MapEvent;
             bool interruptedActiveAssault = IsInterruptedActiveAssault(mapEvent);
@@ -107,9 +111,8 @@ internal class SiegePreparationPromptPatches
             var camp = __instance.BesiegerCamp;
             var leaderParty = camp?.LeaderParty;
             var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
-            if (EmptiedCampParties.TryGetValue(__instance, out var emptiedParties))
+            if (emptiedParties != null)
             {
-                EmptiedCampParties.Remove(__instance);
                 attackerParties = attackerParties.Concat(emptiedParties).Distinct().ToArray();
             }
             var defenderParties = interruptedActiveAssault
