@@ -81,6 +81,15 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
+    /// <summary>[Game thread] How the agent sits at the point when it is an oar's or the helm's pilot; Kind None otherwise.</summary>
+    StationSeatPose ReadSeatPose(Agent agent, UsableMissionObject point);
+
+    /// <summary>[Game thread] Whether the agent plays a strike action, such as a ram's stagger.</summary>
+    bool IsStruck(Agent agent);
+
+    /// <summary>[Game thread] Moves a seated agent to <paramref name="position"/>, leaving its seat and actions as they are.</summary>
+    void PlaceSeatedAgent(Agent agent, Vec3 position);
+
     /// <summary>[Game thread] Hands a hull's simulation away from this client: it becomes a copy steered toward its owner's samples.</summary>
     void ReleaseHull(MissionObject hull);
 

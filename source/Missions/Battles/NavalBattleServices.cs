@@ -103,7 +103,7 @@ public class NavalBattleServices : INavalBattleServices
         conditions = new BattleShipConditionStream(network, messageBroker, context, shipEngine, appliedHost, heldShips, Arrivals);
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, context.Deployment, context.MissionContext);
+            shipEngine, context.Deployment, context.MissionContext, new StationSeatSettler(shipEngine));
         samples = new BattleShipSampleStream(network, messageBroker, context, shipEngine, conditions, heldShips, Arrivals);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, appliedHost, conditions, StationUseReplicator, captureEngine, Arrivals, HullLedger, heldShips, samples);

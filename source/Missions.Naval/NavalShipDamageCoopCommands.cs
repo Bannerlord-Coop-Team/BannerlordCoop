@@ -16,6 +16,14 @@ namespace Missions.Naval;
 /// </summary>
 public sealed class NavalDamageCoopCommand : ICoopCommand
 {
+    private readonly INavalShipDamageGate damageGate;
+
+    // Deals the hit through this client's damage gate.
+    public NavalDamageCoopCommand(INavalShipDamageGate damageGate)
+    {
+        this.damageGate = damageGate;
+    }
+
     public string Prefix => "coop.debug.naval";
 
     public string Name => "damage";
@@ -36,11 +44,11 @@ public sealed class NavalDamageCoopCommand : ICoopCommand
             || float.IsNaN(amount) || float.IsInfinity(amount) || amount <= 0f)
             return Failed("Usage: coop.debug.naval.damage <shipId-prefix> <amount>, with a positive amount");
 
-        return Hit(args[0], _ => amount, "NAVAL_DAMAGE");
+        return Hit(args[0], _ => amount, "NAVAL_DAMAGE", damageGate);
     }
 
     /// <summary>[Game thread] Hits the one registered hull whose ship id starts with <paramref name="prefix"/>.</summary>
-    internal static CoopCommandResult Hit(string prefix, Func<MissionShip, float> amountOf, string label)
+    internal static CoopCommandResult Hit(string prefix, Func<MissionShip, float> amountOf, string label, INavalShipDamageGate damageGate)
     {
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
@@ -55,7 +63,7 @@ public sealed class NavalDamageCoopCommand : ICoopCommand
         float amount = amountOf(hull);
         float before = hull.HitPoints;
         bool own = info.CurrentAuthority == controller.Session.OwnControllerId;
-        NavalShipDamageGate.DealLocalHit(hull, amount);
+        damageGate.DealLocalHit(hull, amount);
 
         string outcome = own
             ? "applied here: hp " + before.ToString("0.#", CultureInfo.InvariantCulture) + " -> " +
@@ -75,6 +83,14 @@ public sealed class NavalSinkCoopCommand : ICoopCommand
     // The owner's damage model may reduce raw damage; ten times the hull's maximum always leaves it at 0 HP.
     private const float MaxHitPointsMultiple = 10f;
 
+    private readonly INavalShipDamageGate damageGate;
+
+    // Deals the hit through this client's damage gate.
+    public NavalSinkCoopCommand(INavalShipDamageGate damageGate)
+    {
+        this.damageGate = damageGate;
+    }
+
     public string Prefix => "coop.debug.naval";
 
     public string Name => "sink";
@@ -92,7 +108,8 @@ public sealed class NavalSinkCoopCommand : ICoopCommand
     {
         if (args == null || args.Count != 1) return NavalDamageCoopCommand.Failed("Usage: coop.debug.naval.sink <shipId-prefix>");
 
-        return NavalDamageCoopCommand.Hit(args[0], hull => hull.ShipOrigin.MaxHitPoints * MaxHitPointsMultiple, "NAVAL_SINK");
+        return NavalDamageCoopCommand.Hit(args[0], hull => hull.ShipOrigin.MaxHitPoints * MaxHitPointsMultiple, "NAVAL_SINK",
+            damageGate);
     }
 }
 #endif

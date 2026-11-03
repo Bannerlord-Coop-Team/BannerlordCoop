@@ -58,6 +58,8 @@ public sealed class BattleShipSpawnData
     [ProtoMember(23)] public readonly Guid CapturedWithShipId;
     /// <summary>For a captured hull, the side it was taken from, which a joiner counts as a hull gone from that side.</summary>
     [ProtoMember(24)] public readonly BattleSideEnum CapturedFromSide;
+    /// <summary>The player a decided capture gave the hull to, even when vanilla's swap failed at its captor; empty before any.</summary>
+    [ProtoMember(25)] public readonly string CommittedCaptorId;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -82,7 +84,8 @@ public sealed class BattleShipSpawnData
         bool orphaned = false,
         int captureSequence = 0,
         Guid capturedWithShipId = default,
-        BattleSideEnum capturedFromSide = BattleSideEnum.None)
+        BattleSideEnum capturedFromSide = BattleSideEnum.None,
+        string committedCaptorId = null)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -107,11 +110,12 @@ public sealed class BattleShipSpawnData
         CaptureSequence = captureSequence;
         CapturedWithShipId = capturedWithShipId;
         CapturedFromSide = capturedFromSide;
+        CommittedCaptorId = committedCaptorId;
     }
 
     /// <summary>The player or host that fielded the hull.</summary>
     public string OriginalOwner => string.IsNullOrEmpty(OriginalOwnerControllerId) ? OwnerControllerId : OriginalOwnerControllerId;
 
     /// <summary>An AI hull nobody captured, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
-    public bool FollowsBattleHost => IsNpcParty && string.IsNullOrEmpty(CaptorControllerId);
+    public bool FollowsBattleHost => IsNpcParty && string.IsNullOrEmpty(CaptorControllerId) && string.IsNullOrEmpty(CommittedCaptorId);
 }

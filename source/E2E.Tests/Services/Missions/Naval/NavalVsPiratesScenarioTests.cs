@@ -57,7 +57,7 @@ public class NavalVsPiratesScenarioTests : NavalBattleTestEnvironment
         battle.FieldPlayerHull(b, new Vec3(30f, 0f, 0f));
         battle.CommitAll();
         battle.TickAll();
-        var firstSample = a.SentSamples(hullA).First();
+        var firstSample = a.SentSamples(hullA)[0];
 
         // The clocks are far apart: the sender's mission runs minutes ahead and the receiver's seconds.
         a.Tick(500f);
@@ -68,7 +68,7 @@ public class NavalVsPiratesScenarioTests : NavalBattleTestEnvironment
 
         Assert.Equal(10f, b.Hull(hullA).Frame.origin.x, 3);
         Assert.True((bool)b.Stream(hullA)["streaming"]!);
-        long latest = a.SentSamples(hullA).Last().Sequence;
+        long latest = a.SentSamples(hullA)[^1].Sequence;
 
         a.Call(() => a.Network.SendAll(firstSample));
         // A received sample applies with the arrivals of the receiver's next tick.

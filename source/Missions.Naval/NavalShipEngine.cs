@@ -38,14 +38,23 @@ public class NavalShipEngine : INavalShipEngine
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
     private readonly INavalCopyWeaponStates copyWeaponStates;
+    private readonly INavalForeignHullRegistry foreignHulls;
+    private readonly INavalRopeRegistry ropeRegistry;
+    private readonly ICoopShipSnapshotRegistry snapshots;
+    private readonly INavalShipDamageGate damageGate;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
-        INavalCopyWeaponStates copyWeaponStates)
+        INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
+        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         SteeredCopies = steeredCopies;
         this.copyWeaponStates = copyWeaponStates;
+        this.foreignHulls = foreignHulls;
+        this.ropeRegistry = ropeRegistry;
+        this.snapshots = snapshots;
+        this.damageGate = damageGate;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -90,7 +99,8 @@ public class NavalShipEngine : INavalShipEngine
             identity.IsOrphaned,
             identity.CaptureSequence,
             identity.Capture?.CaptorShipId ?? Guid.Empty,
-            identity.Capture?.FromSide ?? BattleSideEnum.None);
+            identity.Capture?.FromSide ?? BattleSideEnum.None,
+            identity.CommittedCaptorId);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -217,7 +227,7 @@ public class NavalShipEngine : INavalShipEngine
         int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State, copyWeaponStates.Take(weapon));
 
         // Breaks the old hull's ropes before vanilla's removal, as in RemoveHull.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 
@@ -393,7 +403,7 @@ public class NavalShipEngine : INavalShipEngine
 
         // The one targeted break of the leaving hull's ropes, as Quest5's RemoveShipInternal does; vanilla's removal then breaks
         // only ropes on this hull (RopeShipRemovalPatch). A copy stays a copy until the ShipRemovedEvent handler drops it.
-        NavalRopeRemoval.BreakConnections(ship);
+        NavalRopeRemoval.BreakConnections(ship, ropeRegistry);
         switch (RemovalPathOf(shipsLogic, ship))
         {
             case HullRemovalPath.Assigned:
@@ -712,12 +722,23 @@ public class NavalShipEngine : INavalShipEngine
             // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew: the helm
             // sets its steering action and pins the pilot, an oar sits its rower down at once.
             var machine = PilotMachineOf(point);
-            if (machine != null && machine.PilotAgent == agent) machine.OnPilotAssignedDuringSpawn();
+            if (machine != null && machine.PilotAgent == agent) SeatAsSpawnPilot(agent, machine);
             return;
         }
 
         if (agent.CurrentlyUsedGameObject == point)
             agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+    }
+
+    // Seats the pilot through vanilla's spawn seating. A release just before (ours or vanilla's) leaves the oar's stand-up action
+    // playing, which rejects the spawn's idle and makes the oar's tick drop the pilot again, so both channels are cleared first.
+    private static void SeatAsSpawnPilot(Agent agent, UsableMachine machine)
+    {
+        agent.SetActionChannel(0, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        agent.SetActionChannel(1, ActionIndexCache.act_none, ignorePriority: true, additionalFlags: AnimFlags.anf_restart,
+            forceFaceMorphRestart: false);
+        machine.OnPilotAssignedDuringSpawn();
     }
 
     public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
@@ -736,14 +757,44 @@ public class NavalShipEngine : INavalShipEngine
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
 
+    public StationSeatPose ReadSeatPose(Agent agent, UsableMissionObject point)
+    {
+        var machine = PilotMachineOf(point);
+        if (machine == null || machine.PilotAgent != agent) return default;
+
+        var frame = point.GameEntity.GetGlobalFrame();
+        bool isStruck = agent.IsInBeingStruckAction;
+        if (machine is ShipOarMachine oar)
+        {
+            int sitDown = MBActionSet.GetAnimationIndexOfAction(agent.ActionSet, in oar._rowSitDownActionIndex);
+            var displacement = MBAnimation.GetAnimationDisplacementAtProgress(sitDown, 1f);
+            return new StationSeatPose(StationSeatKind.Oar, oar._isPilotSitting, isStruck, frame, displacement, agent.Position);
+        }
+
+        if (machine is ShipControllerMachine helm)
+        {
+            // A walking pilot is not frame-locked yet, and the player's capture action plays at the helm until it lets go.
+            bool atHelm = agent.MovementLockedState != AgentMovementLockedState.None
+                && agent.GetCurrentAction(0) != helm._shipCaptureActionIndex;
+            return new StationSeatPose(StationSeatKind.Helm, atHelm, isStruck, frame, Vec3.Zero, agent.Position);
+        }
+
+        return default;
+    }
+
+    public bool IsStruck(Agent agent) => agent.IsInBeingStruckAction;
+
+    // Vanilla's spawn seating teleports the same way; the seat lock keeps steering the agent's XY and facing afterwards.
+    public void PlaceSeatedAgent(Agent agent, Vec3 position) => agent.TeleportToPosition(position);
+
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Capture((MissionShip)hull, shipIdOf);
+        ropeRegistry.Capture((MissionShip)hull, shipIdOf);
 
     public void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final) =>
-        NavalRopes.Apply((MissionShip)hull, ropes, hullOf, final);
+        ropeRegistry.Apply((MissionShip)hull, ropes, hullOf, final);
 
     public object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf) =>
-        NavalRopes.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
+        ropeRegistry.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
 
     public void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter)
     {
@@ -751,7 +802,7 @@ public class NavalShipEngine : INavalShipEngine
         if (!ship.GameEntity.IsValid || ship.IsDisabled) return;
 
         var point = ship.GlobalFrame.TransformToParent(damage.LocalPoint);
-        using (NavalShipDamageGate.RoutedApply())
+        using (damageGate.RoutedApply())
         {
             switch (damage.Kind)
             {
@@ -788,7 +839,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || foreignHulls.Contains(ship)) return 0;
 
         int active = agentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
         return Math.Max(0, agentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
@@ -800,7 +851,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         var ship = (MissionShip)hull;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || NavalForeignHulls.Contains(ship)) return 0;
+        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || foreignHulls.Contains(ship)) return 0;
 
         // A taken-over hull never had its crew target set; vanilla's unbalanced AutoComputeDesiredTroopCountsPerShip uses the capacity.
         agentsLogic.SetDesiredTroopCountOfShip(ship, ship.TotalCrewCapacity);
@@ -822,9 +873,9 @@ public class NavalShipEngine : INavalShipEngine
         return added;
     }
 
-    public string CampaignShipIdOf(MissionObject hull) => CoopShipSnapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
+    public string CampaignShipIdOf(MissionObject hull) => snapshots.CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
-    public float ReadMitigatedDamage(MissionObject hull) => CoopShipSnapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
+    public float ReadMitigatedDamage(MissionObject hull) => snapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
 
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
     public void WithdrawAgent(Agent agent)
@@ -844,8 +895,8 @@ public class NavalShipEngine : INavalShipEngine
         var ship = (MissionShip)hull;
         if (condition == null || !ship.GameEntity.IsValid) return;
 
-        bool isCopy = NavalForeignHulls.Contains(ship);
-        using (NavalShipDamageGate.RoutedApply())
+        bool isCopy = foreignHulls.Contains(ship);
+        using (damageGate.RoutedApply())
         {
             if (ship.ShipOrigin is Ship origin)
             {

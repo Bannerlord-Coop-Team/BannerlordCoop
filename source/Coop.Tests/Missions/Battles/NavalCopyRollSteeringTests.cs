@@ -115,7 +115,7 @@ public class NavalCopyRollSteeringTests
 
         steering.ObserveOwner(Rolled(30f * DegToRad, x: 30f), Vec2.Zero, 0f, 0f);
         Assert.True(steering.IsSnapQueued);
-        var snapped = steering.TakeSnapFrame();
+        var snapped = steering.TakeSnap().Frame;
         var step = steering.Compute(Dt, snapped.origin, 0f, Vec2.Zero, 0f, (CopySteering.RollOf(snapped.rotation), 0f));
 
         Assert.Equal(30f * DegToRad, steering.TargetRoll, 5);

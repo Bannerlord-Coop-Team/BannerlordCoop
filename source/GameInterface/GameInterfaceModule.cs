@@ -21,6 +21,7 @@ using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
+using GameInterface.Services.GameMenus;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
@@ -266,6 +267,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
+        builder.RegisterType<MenuOptionsRefresher>().As<IMenuOptionsRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenLockPreserver>().As<IPartyScreenLockPreserver>().InstancePerDependency();
         builder.RegisterType<PlayerTroopXpRelevance>().As<IPlayerTroopXpRelevance>().InstancePerDependency();
@@ -327,12 +329,11 @@ public class GameInterfaceModule : Module
     internal static bool ShouldRegister(Type type, bool navalServicesEnabled) =>
         navalServicesEnabled || !NavalOnlyTypes.Contains(type);
 
-    // Loads Coop.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
+    // Loads Coop.Naval.dll; startup already loaded it to decide naval support, so only a test host that sets the flag can miss it.
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)
     {
-        var path = Path.Combine(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location), ModInformation.CoopNavalAssemblyFile);
-        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
-        return assembly != null;
+        var loader = new NavalAssemblyLoader(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location));
+        return loader.TryLoad(ModInformation.CoopNavalAssemblyFile, out assembly);
     }
 
     // Log injector

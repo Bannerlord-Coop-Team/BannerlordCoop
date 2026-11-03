@@ -32,6 +32,28 @@ internal class AnchorVisualManagerPatches
         OtherPlayerFleets.Clear();
     }
 
+    // The server's removed main party has no anchor, which vanilla never expects, so it can't have an anchor visual
+    [HarmonyPatch(nameof(AnchorVisualManager.CanPartyHaveAnchor))]
+    [HarmonyPrefix]
+    private static bool CanPartyHaveAnchorPrefix(ref bool __result)
+    {
+        if (Campaign.Current?.MainParty?.Anchor != null) return true;
+
+        __result = false;
+        return false;
+    }
+
+    // Vanilla OnTick reads MainParty.Anchor unguarded, so without an anchor it only drops a visual left from before removal
+    [HarmonyPatch(nameof(AnchorVisualManager.OnTick))]
+    [HarmonyPrefix]
+    private static bool OnTickPrefix(AnchorVisualManager __instance)
+    {
+        if (Campaign.Current?.MainParty?.Anchor != null) return true;
+
+        if (__instance._anchorVisual != null) __instance.RemoveAnchorVisual();
+        return false;
+    }
+
     [HarmonyPatch(nameof(AnchorVisualManager.OnTick))]
     [HarmonyPostfix]
     private static void OnTickPostfix(AnchorVisualManager __instance)

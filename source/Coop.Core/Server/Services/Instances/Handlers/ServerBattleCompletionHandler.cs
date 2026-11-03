@@ -190,25 +190,20 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
+    // Concludes the battle once its reports agree, holding it while an accepted join has not entered yet.
     private void TryConcludeReportedBattle(string instanceId)
     {
         lock (pendingJoinersGate)
         {
+            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
             {
-                if (completionTracker.TryConcludeAbandoned(
-                        instanceId,
-                        out var abandonedState,
-                        out var abandonedEpoch,
-                        out var abandonedMemberCount))
-                {
-                    ConcludeAbandonedBattle(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
-                }
+                if (!hasPendingJoiners)
+                    TryConcludeAbandonedBattle(instanceId);
 
                 return;
             }
 
-            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!hostRegistry.TryGet(instanceId, out var assignment))
                 return;
 
@@ -229,6 +224,22 @@ public class ServerBattleCompletionHandler : IHandler
 
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
+    }
+
+    // Concludes an emptied battle from its retained reports. Callers hold it while a join is pending, and the
+    // cancel, refusal and expiry paths call back in once the join is released.
+    private void TryConcludeAbandonedBattle(string instanceId)
+    {
+        if (!completionTracker.TryConcludeAbandoned(
+                instanceId,
+                out var abandonedState,
+                out var abandonedEpoch,
+                out var abandonedMemberCount))
+        {
+            return;
+        }
+
+        ConcludeAbandonedBattle(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
     }
 
     private bool HasPendingJoiners(string instanceId)

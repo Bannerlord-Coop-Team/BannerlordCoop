@@ -29,9 +29,14 @@ public sealed class NavalLateHullProbe : INavalLateHullProbe
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalLateHullProbe>();
     private readonly INavalDebugHulls hulls;
+    private readonly INavalForeignHullRegistry foreignHulls;
 
     /// <summary>Uses the established content ordering and network hull identity helpers.</summary>
-    public NavalLateHullProbe(INavalDebugHulls hulls) => this.hulls = hulls;
+    public NavalLateHullProbe(INavalDebugHulls hulls, INavalForeignHullRegistry foreignHulls)
+    {
+        this.hulls = hulls;
+        this.foreignHulls = foreignHulls;
+    }
 
     /// <summary>[Game thread] Validates authority, then starts or stops normal vanilla station use.</summary>
     public CoopCommandResult Execute(string prefix, string operation, int agentIndex, int stationIndex)
@@ -91,7 +96,7 @@ public sealed class NavalLateHullProbe : INavalLateHullProbe
         var ai = hull.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi;
         return new
         {
-            ship = hulls.ShipIdOf(hull), copy = NavalForeignHulls.Contains(hull), time = Mission.Current.CurrentTime,
+            ship = hulls.ShipIdOf(hull), copy = foreignHulls.Contains(hull), time = Mission.Current.CurrentTime,
             stations = new[] { "climb", "rope", "oar" }.Select(kind => new
             {
                 kind,
@@ -172,7 +177,7 @@ public sealed class NavalLateHullProbe : INavalLateHullProbe
                 Logger.Information("NAVAL_LATE_HULL_RELEASE {State}", JsonConvert.SerializeObject(new
                 {
                     time = agent.Mission.CurrentTime,
-                    station = new { ship = info.ShipId, copy = NavalForeignHulls.Contains(hull), kind,
+                    station = new { ship = info.ShipId, copy = foreignHulls.Contains(hull), kind,
                         key = NavalShipEngine.EntityPath(point.GameEntity, hull.GameEntity),
                         expectedResetAction = point.GetComponent<ResetAnimationOnStopUsageComponent>()?._successfulResetAction.Index,
                         expectedResetActionName = point.GetComponent<ResetAnimationOnStopUsageComponent>()?._successfulResetAction.GetName(),

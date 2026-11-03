@@ -15,7 +15,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] This engine's copies of other owners' hulls, the only writer of <see cref="NavalForeignHulls"/>: each copy
+/// [Game thread] This engine's copies of other owners' hulls, the only writer of <see cref="INavalForeignHullRegistry"/>: each copy
 /// is steered toward its owner's latest sample while its body simulates, and gets its owner's frames written otherwise.
 /// </summary>
 public interface INavalSteeredCopies
@@ -52,6 +52,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
     private static readonly ILogger Logger = LogManager.GetLogger<NavalSteeredCopies>();
 
     private readonly CopySteeringKnobs knobs;
+    private readonly INavalForeignHullRegistry foreignHulls;
     // Copy on write: the fixed physics step enumerates it while a capture or a host change adds or drops a copy.
     private volatile Dictionary<MissionShip, SteeredCopy> copies = new Dictionary<MissionShip, SteeredCopy>();
 #if DEBUG
@@ -64,10 +65,11 @@ public class NavalSteeredCopies : INavalSteeredCopies
     public IReadOnlyDictionary<MissionShip, SteeredCopy> Copies => copies;
 #endif
 
-    /// <summary>Copies steered with this client's shared knobs, which copy_steer tunes.</summary>
-    public NavalSteeredCopies(CopySteeringKnobs knobs)
+    /// <summary>Copies steered with this client's shared knobs, which copy_steer tunes, and mirrored into its copy registry.</summary>
+    public NavalSteeredCopies(CopySteeringKnobs knobs, INavalForeignHullRegistry foreignHulls)
     {
         this.knobs = knobs;
+        this.foreignHulls = foreignHulls;
     }
 
     /// <inheritdoc/>
@@ -77,7 +79,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
         var copy = new SteeredCopy(new CopySteering(knobs));
         copies = new Dictionary<MissionShip, SteeredCopy>(copies) { [ship] = copy };
-        NavalForeignHulls.Add(ship, copy);
+        foreignHulls.Add(ship, copy);
         // The owner decides this hull. ForeignHullControllerPatch keeps every later write at no controller while it is a copy.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
@@ -134,14 +136,14 @@ public class NavalSteeredCopies : INavalSteeredCopies
             if (!copy.Steering.IsSnapQueued) continue;
             if (ship.IsRemoved || !ship.GameEntity.IsValid)
             {
-                copy.Steering.TakeSnapFrame();
+                copy.Steering.TakeSnap();
                 continue;
             }
 
             // A copy whose body doesn't simulate gets its owner's frames written; its snap waits until the body simulates.
             if (!IsSimulating(ship)) continue;
 
-            Snap(ship, copy, copy.Steering.TakeSnapFrame());
+            Snap(ship, copy.Steering.TakeSnap());
 #if DEBUG
             copy.Diagnostics.RecordSnap();
 #endif
@@ -156,13 +158,13 @@ public class NavalSteeredCopies : INavalSteeredCopies
         var remaining = new Dictionary<MissionShip, SteeredCopy>(copies);
         remaining.Remove(ship);
         copies = remaining;
-        NavalForeignHulls.Remove(ship);
+        foreignHulls.Remove(ship);
     }
 
     /// <summary>"own", "steered" or "written": a copy is steered while its body simulates, otherwise its owner's frames are written.</summary>
     internal static string ModeName(MissionShip hull)
     {
-        if (!NavalForeignHulls.Contains(hull)) return "own";
+        if (!NavalForeignHullRegistry.IsCopyHere(hull)) return "own";
         return IsSimulating(hull) ? "steered" : "written";
     }
 
@@ -208,12 +210,12 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
     // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion. Like vanilla's
     // crew teleport, a rider keeps a station of this hull, which moved with it; only a point off the hull is let go.
-    private static void Snap(MissionShip ship, SteeredCopy copy, MatrixFrame target)
+    private static void Snap(MissionShip ship, CopySteeringSnap snap)
     {
         var entity = ship.GameEntity;
         var before = entity.GetGlobalFrame();
         var riders = RidersOf(ship);
-        ship.ShipsLogic.TeleportShip(ship, target, checkFreeArea: false);
+        ship.ShipsLogic.TeleportShip(ship, snap.Frame, checkFreeArea: false);
 
         var after = entity.GetGlobalFrame();
         foreach (var rider in riders)
@@ -222,9 +224,9 @@ public class NavalSteeredCopies : INavalSteeredCopies
             rider.TeleportToPosition(after.TransformToParent(before.TransformToLocalNonOrthogonal(rider.Position)));
         }
 
-        var ownerVelocity = copy.Steering.FeedForwardVelocity;
+        var ownerVelocity = snap.Velocity;
         entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
-        entity.SetAngularVelocity(new Vec3(0f, 0f, copy.Steering.FeedForwardYawRate));
+        entity.SetAngularVelocity(new Vec3(0f, 0f, snap.YawRate));
         Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Riders} rider(s) moved along)", ship.Index, riders.Count);
     }
 

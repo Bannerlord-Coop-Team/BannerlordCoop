@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -17,6 +18,10 @@ namespace Coop.Tests.Missions.Battles;
 
 public class AgentStationUseReplicatorTests
 {
+    // One mission frame, and a step that passes a re-seat's retry interval with a frame to spare.
+    private const float Frame = 0.05f;
+    private const float AfterRetry = AgentStationUseReplicator.ReseatRetrySeconds + Frame;
+
     [Fact]
     public void Apply_DropsTheBufferedOwnerPoseBeforeSeatingThePuppet()
     {
@@ -31,7 +36,8 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
 
         using var replicator = new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(),
-            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>(), Members("owner"));
+            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>(), Members("owner"),
+            Mock.Of<IStationSeatSettler>());
         replicator.Apply(null!, null!, inUse: true);
 
         Assert.Equal(new[] { "forget", "use" }, calls);
@@ -53,8 +59,10 @@ public class AgentStationUseReplicatorTests
         engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
     }
 
+    // #4213: a lost seat is retried once per retry interval while the owner keeps it, not once per owner revision; a newer
+    // revision retries at once.
     [Fact]
-    public void RefreshAppliedSeats_ReseatsALocalReleaseOnlyOncePerOwnerRevision()
+    public void RefreshAppliedSeats_RetriesALocalReleaseOncePerRetryInterval()
     {
         var crew = new RemoteCrew();
         crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
@@ -66,10 +74,132 @@ public class AgentStationUseReplicatorTests
         replicator.RefreshAppliedSeats();
         crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(2));
 
+        replicator.Tick(AfterRetry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+
         replicator.TryApply(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 2, "owner"));
         replicator.RefreshAppliedSeats();
-        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(4));
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(5));
         crew.Engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+        // Each owner revision's lost seat counts once, however often it is retried.
+        Assert.Equal(2, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+    }
+
+    // #4213 A1: the re-seat reported seated in its frame, vanilla let the puppet go again on the next one, and the copy stayed
+    // unseated for good while its owner kept the seat.
+    [Fact]
+    public void Tick_ReseatsAgainWhenAPuppetIsReleasedRightAfterARecoveryThatHeld()
+    {
+        var crew = SeatableCrew(out var seated);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        seated.Value = false;
+        replicator.Tick(Frame);
+        bool recovered = seated.Value;
+        seated.Value = false;
+        replicator.Tick(Frame);
+        replicator.Tick(AfterRetry);
+
+        Assert.True(recovered);
+        Assert.True(seated.Value);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+    }
+
+    // #4213: a re-seat that does not take is retried, instead of using up the revision's only attempt.
+    [Fact]
+    public void Tick_RetriesAReseatThatFailed()
+    {
+        var crew = SeatableCrew(out var seated);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        seated.Value = false;
+        seated.Holds = false;
+        replicator.Tick(Frame);
+        bool afterFailure = seated.Value;
+        seated.Holds = true;
+        replicator.Tick(AfterRetry);
+
+        Assert.False(afterFailure);
+        Assert.True(seated.Value);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+        crew.Engine.Verify(e => e.PinToStation(crew.Agent, crew.Point), Times.AtLeastOnce);
+    }
+
+    // #4213: retries keep a bounded cadence, not one per frame, however many frames the puppet stays released.
+    [Fact]
+    public void Tick_RetriesAtMostOncePerRetryInterval()
+    {
+        var crew = SeatableCrew(out var seated);
+        seated.Holds = false;
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        int frames = (int)Math.Round(2.5f * AgentStationUseReplicator.ReseatRetrySeconds / Frame);
+        for (int frame = 0; frame < frames; frame++)
+            replicator.Tick(Frame);
+
+        // The use and its immediate re-seat, then one attempt after each of the two intervals that passed.
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(4));
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["unownedPuppetReleases"]!);
+    }
+
+    // #4213: retries stop once the seat is no longer the owner's to hold here, after they were still running before it.
+    [Theory]
+    [InlineData("ownerRelease")]
+    [InlineData("died")]
+    [InlineData("hullRemoved")]
+    [InlineData("hullSinking")]
+    [InlineData("stationDetached")]
+    [InlineData("unregistered")]
+    public void Tick_StopsRetryingTheReseat_WhenTheSeatIsNoLongerHeld(string stop)
+    {
+        var crew = SeatableCrew(out var seated);
+        seated.Holds = false;
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+        replicator.Tick(AfterRetry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+
+        if (stop == "ownerRelease") replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        if (stop == "died") crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(false);
+        if (stop == "hullRemoved") crew.Engine.Setup(e => e.IsHullRemoved(crew.Hull)).Returns(true);
+        if (stop == "hullSinking") crew.Engine.Setup(e => e.IsSinking(crew.Hull)).Returns(true);
+        if (stop == "stationDetached") StationOf(crew.Engine, crew.Point, ShipTestHulls.Create());
+        if (stop == "unregistered") crew.Registered = false;
+        replicator.Tick(AfterRetry);
+        replicator.Tick(AfterRetry);
+        replicator.Tick(AfterRetry);
+
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+        Assert.Equal(0, (int)JObject.FromObject(replicator.Inspect())["appliedSeats"]!);
+    }
+
+    // A remote crew member whose seat follows the engine's applies; Holds false makes a re-seat not take.
+    private static RemoteCrew SeatableCrew(out SeatState seated)
+    {
+        var crew = new RemoteCrew();
+        var state = seated = new SeatState();
+        crew.Engine.Setup(e => e.IsAlive(crew.Agent)).Returns(true);
+        crew.Engine.Setup(e => e.IsSeated(crew.Agent, crew.Point)).Returns(() => state.Value);
+        crew.Engine.Setup(e => e.ApplyStationUse(crew.Agent, crew.Point, It.IsAny<bool>()))
+            .Callback<Agent, UsableMissionObject, bool>((_, _, inUse) => state.Value = inUse && state.Holds);
+        StationOf(crew.Engine, crew.Point, crew.Hull);
+        return crew;
+    }
+
+    // Whether the fake engine has the puppet seated, and whether a use seats it.
+    private sealed class SeatState
+    {
+        public bool Value { get; set; }
+        public bool Holds { get; set; } = true;
     }
 
     // A new owner's use waiting for the migration is no applied revision, so its retries neither re-seat nor re-count.
@@ -389,7 +519,7 @@ public class AgentStationUseReplicatorTests
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
         IMissionContext? members = null, IBattleNetwork? network = null, IBattleDeploymentCoordinator? deployment = null,
-        IBattleSession? session = null)
+        IBattleSession? session = null, IStationSeatSettler? settler = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
@@ -398,7 +528,7 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(),
             session ?? Mock.Of<IBattleSession>(), component.Object, engine, deployment ?? Mock.Of<IBattleDeploymentCoordinator>(),
-            members ?? Members("owner", "old", "new"));
+            members ?? Members("owner", "old", "new"), settler ?? new StationSeatSettler(engine));
     }
 
     // The server-announced mission members the membership gate reads.
@@ -847,6 +977,136 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)inspected["adoptedSeats"]!);
         network.Verify(n => n.SendAll(It.Is<NetworkAgentStationUse>(use =>
             use.AgentId == crew.AgentId && use.InUse && use.Revision == 1 && use.SenderControllerId == "local")), Times.Once);
+    }
+
+    // #4213: a puppet adopted while its re-seat retries are still failing is this client's AI now, so it is neither re-seated
+    // nor announced as seated, and its retries stop.
+    [Fact]
+    public void RefreshAppliedSeats_StopsRetryingAPuppetAdoptedWhileUnseated()
+    {
+        var crew = SeatableCrew(out var seated);
+        seated.Holds = false;
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(s => s.OwnControllerId).Returns("local");
+        var network = new Mock<IBattleNetwork>();
+        using var replicator = CreateReplicator(crew.Engine.Object, crew.Registry.Object, crew.Ships, network: network.Object,
+            session: session.Object);
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+        replicator.Tick(AfterRetry);
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+
+        crew.Info.CurrentAuthority = "local";
+        seated.Holds = true;
+        replicator.Tick(AfterRetry);
+        replicator.Tick(AfterRetry);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        crew.Engine.Verify(e => e.ApplyStationUse(crew.Agent, crew.Point, true), Times.Exactly(3));
+        Assert.False(seated.Value);
+        Assert.False(replicator.IsOwnSeat(crew.AgentId));
+        Assert.Equal(0, (int)inspected["appliedSeats"]!);
+        Assert.Equal(0, (long)inspected["adoptedSeats"]!);
+        network.Verify(n => n.SendAll(It.IsAny<NetworkAgentStationUse>()), Times.Never);
+    }
+
+    // #4213: the owner's rower walked in and sat down from deck height; once seated it is placed at vanilla's spawn spot, the
+    // spot its copies are seated at.
+    [Fact]
+    public void Tick_PlacesAnOwnRowerAtItsSpawnSpotOnceItSatDown()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ships = new NetworkShipRegistry();
+        ships.TryRegister(new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!));
+        var point = CreatePoint();
+        var engine = new Mock<INavalShipEngine>();
+        StationOf(engine, point, hull);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
+        bool sitting = false;
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var sitDown = new Vec3(0f, -0.3f, -0.15f);
+        var position = new Vec3(4f, 4.7f, 2.02f);
+        engine.Setup(e => e.ReadSeatPose(agent, point)).Returns(() => new StationSeatPose(StationSeatKind.Oar, sitting, false, frame,
+            sitDown, position));
+        engine.Setup(e => e.PlaceSeatedAgent(agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships, broker);
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
+
+        replicator.Tick(Frame);
+        engine.Verify(e => e.PlaceSeatedAgent(It.IsAny<Agent>(), It.IsAny<Vec3>()), Times.Never);
+        sitting = true;
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        var spawnSpot = new Vec3(4f, 4.7f, 1.85f);
+        engine.Verify(e => e.PlaceSeatedAgent(agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
+    }
+
+    // #4213: a ram's stagger moved a copy's seated helm without a release; it is placed back at the helm once the stagger ends.
+    [Fact]
+    public void Tick_PlacesAPuppetsHelmBackOnceItsStaggerEnds()
+    {
+        var crew = SeatableCrew(out _);
+        bool struck = false;
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var raised = new Vec3(4f, 5f, 2.055f);
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Helm, true,
+            struck, frame, Vec3.Zero, struck ? raised : frame.origin));
+        crew.Engine.Setup(e => e.IsStruck(crew.Agent)).Returns(() => struck);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+
+        struck = true;
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(It.IsAny<Agent>(), It.IsAny<Vec3>()), Times.Never);
+        struck = false;
+        var position = raised;
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Helm, true,
+            false, frame, Vec3.Zero, position));
+        crew.Engine.Setup(e => e.PlaceSeatedAgent(crew.Agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, frame.origin), Times.Once);
+    }
+
+    // #4213: the owner let go of its oar and took it again; both uses applied in one tick, so the settle pass saw the copy on the
+    // seat it had already placed. The fresh seat's spot is still checked, and the copy placed back when the engine moved it.
+    [Fact]
+    public void Tick_ChecksTheSpotAgainAfterAReleaseAndUseOfTheSamePointInOneTick()
+    {
+        var crew = SeatableCrew(out _);
+        var frame = new MatrixFrame(Mat3.Identity, new Vec3(4f, 5f, 2f));
+        var sitDown = new Vec3(0f, -0.3f, -0.15f);
+        var spawnSpot = new Vec3(4f, 4.7f, 1.85f);
+        var position = spawnSpot;
+        crew.Engine.Setup(e => e.ReadSeatPose(crew.Agent, crew.Point)).Returns(() => new StationSeatPose(StationSeatKind.Oar, true,
+            false, frame, sitDown, position));
+        crew.Engine.Setup(e => e.PlaceSeatedAgent(crew.Agent, It.IsAny<Vec3>())).Callback<Agent, Vec3>((_, spot) => position = spot);
+        using var replicator = crew.CreateReplicator();
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 1, "owner"));
+        replicator.Tick(0f);
+        replicator.Tick(Frame);
+
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: false, revision: 2, "owner"));
+        replicator.AcceptUse(Use(crew.AgentId, crew.ShipId, inUse: true, revision: 3, "owner"));
+        replicator.Tick(Frame);
+        position = spawnSpot + new Vec3(0f, 0f, 0.13f);
+        replicator.Tick(Frame);
+        replicator.Tick(Frame);
+
+        crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
     }
 
     // A puppet of a remote owner, crewing a registered hull whose oar station resolves.

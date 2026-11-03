@@ -127,7 +127,7 @@ internal class ShiplessFormationBehaviorWeightPatch
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorComponent __instance, ref float __result)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         var shipsLogic = NavalShiplessFormations.ShipsLogic;
         var ship = NavalShiplessFormations.ShipOf(shipsLogic, __instance.Formation, out bool known);
@@ -201,7 +201,7 @@ internal class ShiplessTargetShipOrdersPatch
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorComponent __instance)
     {
-        if (!CoopNavalMissionScope.IsActive) return true;
+        if (!NavalMissionTracker.IsActiveHere()) return true;
 
         return ShiplessFormationBehaviorWeightPatch.MainShipOf(__instance) != null
             && NavalShiplessFormations.ClosestEnemyHasShip(NavalShiplessFormations.ShipsLogic, __instance.Formation);
@@ -218,7 +218,7 @@ internal class SkirmishOrderWithoutTargetPatch
 {
     // Skips the order for a missing target in a co-op battle.
     [HarmonyPrefix]
-    internal static bool Prefix(MissionShip shipToSkirmish) => !CoopNavalMissionScope.IsActive || shipToSkirmish != null;
+    internal static bool Prefix(MissionShip shipToSkirmish) => !NavalMissionTracker.IsActiveHere() || shipToSkirmish != null;
 }
 
 /// <summary>
@@ -231,7 +231,7 @@ internal class EngageOrderWithoutTargetPatch
 {
     // Skips the order for a missing target in a co-op battle.
     [HarmonyPrefix]
-    internal static bool Prefix(MissionShip shipToEngage) => !CoopNavalMissionScope.IsActive || shipToEngage != null;
+    internal static bool Prefix(MissionShip shipToEngage) => !NavalMissionTracker.IsActiveHere() || shipToEngage != null;
 }
 
 /// <summary>
@@ -244,7 +244,7 @@ internal class FollowOrderWithoutTargetPatch
 {
     // Skips the order for a missing target in a co-op battle.
     [HarmonyPrefix]
-    internal static bool Prefix(MissionShip shipToFollow) => !CoopNavalMissionScope.IsActive || shipToFollow != null;
+    internal static bool Prefix(MissionShip shipToFollow) => !NavalMissionTracker.IsActiveHere() || shipToFollow != null;
 }
 
 /// <summary>
@@ -271,7 +271,7 @@ internal class ShiplessSelectedFormationOrdersPatch
     {
         __state = null;
         var shipsLogic = NavalShiplessFormations.ShipsLogic;
-        if (!CoopNavalMissionScope.IsActive || shipsLogic == null) return true;
+        if (!NavalMissionTracker.IsActiveHere() || shipsLogic == null) return true;
 
         __state = TakeShipless(__instance._selectedFormations, formation =>
             NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) != null || !known);
@@ -321,7 +321,7 @@ internal class RammingCancelWithoutAiControllerPatch
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorNavalRamming __instance)
     {
-        if (!CoopNavalMissionScope.IsActive || __instance._ignoredShip == null) return true;
+        if (!NavalMissionTracker.IsActiveHere() || __instance._ignoredShip == null) return true;
         if (__instance._formationMainShip?.Controller is AIShipController) return true;
 
         __instance._isRammingActive = false;

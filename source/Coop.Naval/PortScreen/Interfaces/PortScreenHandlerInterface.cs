@@ -12,18 +12,27 @@ using static NavalDLC.ViewModelCollection.Port.PortScreenHandlers.PortScreenHand
 
 namespace Coop.Naval.PortScreen.Interfaces;
 
+/// <summary>
+/// Applies a player's confirmed port screen changes on the server.
+/// </summary>
 internal interface IPortScreenHandlerInterface : IGameAbstraction
 {
+    /// <summary>Applies the changes confirmed in the given port screen mode.</summary>
     void OnConfirmChanges(PortScreenMode mode, PortScreenChanges changes);
 }
 
+/// <summary>
+/// Applies confirmed port screen changes with patches live, refusing a trade the player can no longer afford.
+/// </summary>
 internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 {
     private readonly IPlayerMessageInterface playerMessageInterface;
+    private readonly IPortTransactionPricer portTransactionPricer;
 
-    public PortScreenHandlerInterface(IPlayerMessageInterface playerMessageInterface)
+    public PortScreenHandlerInterface(IPlayerMessageInterface playerMessageInterface, IPortTransactionPricer portTransactionPricer)
     {
         this.playerMessageInterface = playerMessageInterface;
+        this.portTransactionPricer = portTransactionPricer;
     }
 
     public void OnConfirmChanges(PortScreenMode mode, PortScreenChanges changes)
@@ -39,41 +48,10 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
     private void ConfirmTrade(PortScreenChanges changes)
     {
-        // GiveGoldAction caps a payment at the payer's gold, so a trade the hero can't afford would hand ships over for less
-        var shipCostModel = Campaign.Current.Models.ShipCostModel;
-        int totalCost = 0;
-        foreach (Ship ship in changes.ShipsToBuy)
-        {
-            if (!changes.LeftOwner.Ships.Contains(ship))
-            {
-                playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} was not bought because it is no longer available at {changes.MainHero.CurrentSettlement}");
-                continue;
-            }
+        NotifyUnavailableShips(changes);
 
-            totalCost += (int)shipCostModel.GetShipTradeValue(ship, changes.LeftOwner, changes.RightOwner);
-        }
-        foreach (Ship ship in changes.ShipsToSell)
-        {
-            if (!changes.RightOwner.Ships.Contains(ship))
-            {
-                playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} was not sold because it is no longer available in {changes.MainHero}'s party.");
-                continue;
-            }
-
-            totalCost -= (int)shipCostModel.GetShipTradeValue(ship, changes.RightOwner, changes.LeftOwner);
-        }
-        foreach (Ship ship in changes.ShipsToRepair)
-        {
-            if (ship.Owner == changes.RightOwner) totalCost += (int)shipCostModel.GetShipRepairCost(ship, changes.RightOwner);
-        }
-        foreach (ShipUpgradePieceInfo shipUpgradePieceInfo in changes.SelectedShipPieces)
-        {
-            if (shipUpgradePieceInfo.Ship.Owner == changes.RightOwner && shipUpgradePieceInfo.Piece != null)
-            {
-                totalCost += GetUpgradeCostOfShip(shipUpgradePieceInfo.Ship, shipUpgradePieceInfo.Piece, true, changes.RightOwner, changes.LeftOwner);
-            }
-        }
-        if (totalCost > changes.MainHero.Gold)
+        // GiveGoldAction caps a payment at the payer's gold, so a confirm made on a stale balance would hand ships over for less
+        if (portTransactionPricer.GetTradeCost(changes) > changes.MainHero.Gold)
         {
             playerMessageInterface.SendInformationMessageToHero(changes.MainHero, "The trade was cancelled because you do not have enough gold.");
             return;
@@ -132,6 +110,23 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
     }
     
+    // Tells the player which ships were sold or moved on the server before their confirm arrived
+    private void NotifyUnavailableShips(PortScreenChanges changes)
+    {
+        foreach (Ship ship in changes.ShipsToBuy)
+        {
+            if (changes.LeftOwner.Ships.Contains(ship)) continue;
+
+            playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} was not bought because it is no longer available at {changes.MainHero.CurrentSettlement}");
+        }
+        foreach (Ship ship in changes.ShipsToSell)
+        {
+            if (changes.RightOwner.Ships.Contains(ship)) continue;
+
+            playerMessageInterface.SendInformationMessageToHero(changes.MainHero, $"The {ship.Name} was not sold because it is no longer available in {changes.MainHero}'s party.");
+        }
+    }
+
     private void ConfirmLoot(PortScreenChanges changes)
     {
         foreach (Ship ship in changes.ShipsToBuy)
@@ -140,6 +135,9 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         foreach (Ship ship in changes.ShipsToSell)
         {
+            // Skip ships that changed owner since the screen opened
+            if (ship.Owner != changes.MainParty.Party) continue;
+
             DestroyShipAction.ApplyByDiscard(ship);
         }
         SendShipsToClan(changes);
@@ -149,27 +147,38 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
 
     private void ConfirmManageFleet(PortScreenChanges changes)
     {
+        // Vanilla opens this screen with no left side ships, so every change is to the player's own ships
+        var mainParty = changes.MainParty.Party;
         foreach (Ship ship in changes.ShipsToSell)
         {
+            if (ship.Owner != mainParty) continue;
+
             DestroyShipAction.ApplyByDiscard(ship);
         }
         foreach (Ship ship in changes.ShipsToBuy)
         {
-            ChangeShipOwnerAction.ApplyByTransferring(changes.RightOwner, ship);
+            if (ship.Owner != mainParty) continue;
+
+            ChangeShipOwnerAction.ApplyByTransferring(mainParty, ship);
         }
-        RenameShips(changes);
-        SendShipsToClan(changes);
+        RenameShips(changes, mainParty);
+        SendShipsToClan(changes, mainParty);
         ResetAnchorIfNoShips(changes.MainParty);
     }
 
     private void ConfirmManageOtherFleet(PortScreenChanges changes)
     {
+        // Skip ships that changed owner since the screen opened
         foreach (Ship ship in changes.ShipsToBuy)
         {
+            if (ship.Owner != changes.RightOwner) continue;
+
             ChangeShipOwnerAction.ApplyByTransferring(changes.MainParty.Party, ship);
         }
         foreach (Ship ship in changes.ShipsToSell)
         {
+            if (ship.Owner != changes.MainParty.Party) continue;
+
             ChangeShipOwnerAction.ApplyByTransferring(changes.RightOwner, ship);
         }
         ResetAnchorIfNoShips(changes.MainParty);

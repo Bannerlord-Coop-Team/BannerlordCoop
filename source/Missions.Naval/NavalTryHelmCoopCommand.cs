@@ -20,6 +20,14 @@ public sealed class NavalTryHelmCoopCommand : ICoopCommand
     internal const string Label = "NAVAL_TRY_HELM";
     internal const string ForceArg = "force";
 
+    private readonly INavalForeignHullRegistry foreignHulls;
+
+    // Takes the registry that tells this client's copies apart, for the report.
+    public NavalTryHelmCoopCommand(INavalForeignHullRegistry foreignHulls)
+    {
+        this.foreignHulls = foreignHulls;
+    }
+
     public string Prefix => "coop.debug.naval";
 
     public string Name => "try_helm";
@@ -72,7 +80,7 @@ public sealed class NavalTryHelmCoopCommand : ICoopCommand
 
     // [Game thread] Checks vanilla's gates as the interaction component does, then starts the use as the use key does; the co-op
     // block sits in HandleStartUsingAction (ForeignHelmUsePatch), so a refused start leaves the main agent off the helm.
-    private static CoopCommandResult TryHelm(MissionShip hull, Guid shipId, Agent main, bool force)
+    private CoopCommandResult TryHelm(MissionShip hull, Guid shipId, Agent main, bool force)
     {
         if (main == null || !main.IsActive()) return Failed("There is no living main agent.");
 
@@ -83,7 +91,7 @@ public sealed class NavalTryHelmCoopCommand : ICoopCommand
         bool vacant = main.ObjectHasVacantPosition(point);
         bool ableToUse = main.IsAbleToUseMachine() && !main.IsUsingGameObject;
         string facts = Label + " ship=" + shipId + " enemy=" + (main.Team != null && hull.BattleSide != main.Team.Side) +
-            " copy=" + NavalForeignHulls.Contains(hull) + " canUseObject=" + canUse + " vacant=" + vacant + " ableToUse=" + ableToUse;
+            " copy=" + foreignHulls.Contains(hull) + " canUseObject=" + canUse + " vacant=" + vacant + " ableToUse=" + ableToUse;
         if (!force && !(canUse && vacant && ableToUse))
             return Succeeded(facts + " result=REFUSED_BY_VANILLA (the use key would not offer it; add force to start the use anyway)");
 

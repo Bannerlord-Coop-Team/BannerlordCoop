@@ -33,11 +33,11 @@ internal static class NavalContactProbe
     /// <summary>[Physics thread] A hull contact callback of <paramref name="ship"/> against another hull, counted when a copy takes part.</summary>
     internal static void CountContact(MissionShip ship, WeakGameEntity otherEntity)
     {
-        if (!CoopNavalMissionScope.IsActive || !otherEntity.IsValid) return;
+        if (!NavalMissionTracker.IsActiveHere() || !otherEntity.IsValid) return;
         if (!(otherEntity.GetFirstScriptWithNameHash(MissionShip.MissionShipScriptNameHash) is MissionShip other)) return;
 
-        bool shipIsCopy = NavalForeignHulls.Contains(ship);
-        bool otherIsCopy = NavalForeignHulls.Contains(other);
+        bool shipIsCopy = NavalForeignHullRegistry.IsCopyHere(ship);
+        bool otherIsCopy = NavalForeignHullRegistry.IsCopyHere(other);
         if (shipIsCopy && otherIsCopy) Interlocked.Increment(ref contactCopyOnCopy);
         else if (shipIsCopy) Interlocked.Increment(ref contactCopyOnOwn);
         else if (otherIsCopy) Interlocked.Increment(ref contactOwnOnCopy);
@@ -146,7 +146,7 @@ internal static class NavalContactProbe
         rams = hulls.Select(hull => new
         {
             ship = Short(hull.ShipId),
-            copy = NavalForeignHulls.Contains(hull.Hull),
+            copy = NavalForeignHullRegistry.IsCopyHere(hull.Hull),
             hasRam = hull.Hull._ram != null,
         }).ToArray(),
         contactCallbacks = new

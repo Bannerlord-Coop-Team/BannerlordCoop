@@ -1,4 +1,4 @@
-﻿#if COOP_NAVAL
+﻿#if COOP_NAVAL && DEBUG
 using Common.Commands;
 using Missions.Naval;
 using Missions.Messages;
@@ -25,7 +25,7 @@ public class NavalRopeCutCoopCommandTests
     public void ProcessCommand_RejectsMalformedIndices(int count, string? index)
     {
         var hulls = new Mock<INavalDebugHulls>(MockBehavior.Strict);
-        var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(Args(count, index));
+        var result = new NavalRopeCutCoopCommand(hulls.Object, Mock.Of<INavalRopeRegistry>()).ProcessCommand(Args(count, index));
 
         Assert.False(result.Succeeded);
         Assert.Equal("command_failed", result.ErrorCode);
@@ -40,7 +40,7 @@ public class NavalRopeCutCoopCommandTests
         MissionShip hull = null!;
         hulls.Setup(value => value.TryGetOwnHull(out hull)).Returns("This client owns no registered hull.");
 
-        var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(Args(1, "0"));
+        var result = new NavalRopeCutCoopCommand(hulls.Object, Mock.Of<INavalRopeRegistry>()).ProcessCommand(Args(1, "0"));
 
         Assert.False(result.Succeeded);
         Assert.Equal("This client owns no registered hull.", result.Output);
@@ -58,7 +58,7 @@ public class NavalRopeCutCoopCommandTests
         hulls.Setup(value => value.TryGetOwnHull(out hull)).Returns((string)null!);
         hulls.Setup(value => value.RopeStations(hull)).Returns(new[] { station });
 
-        var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(Args(1, index));
+        var result = new NavalRopeCutCoopCommand(hulls.Object, Mock.Of<INavalRopeRegistry>()).ProcessCommand(Args(1, index));
 
         Assert.False(result.Succeeded);
         Assert.Equal("command_failed", result.ErrorCode);
@@ -81,7 +81,7 @@ public class NavalRopeCutCoopCommandTests
         hulls.Setup(value => value.TryGetOwnHull(out hull)).Returns((string)null!);
         hulls.Setup(value => value.RopeStations(hull)).Returns(new[] { station });
 
-        var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(Args(1, "0"));
+        var result = new NavalRopeCutCoopCommand(hulls.Object, Mock.Of<INavalRopeRegistry>()).ProcessCommand(Args(1, "0"));
 
         Assert.False(result.Succeeded);
         Assert.Equal("The station needs a live attached rope or plank to cut.", result.Output);
@@ -96,18 +96,18 @@ public class NavalRopeCutCoopCommandTests
         var hulls = new Mock<INavalDebugHulls>(MockBehavior.Strict);
         hulls.Setup(value => value.TryGetOwnHull(out hull)).Returns((string)null!);
         hulls.Setup(value => value.RopeStations(hull)).Returns(new[] { station });
-        var records = NavalRopes.records;
-        NavalRopes.Clear();
+        var ropes = new NavalRopeRegistry(new NavalForeignHullRegistry(), new NavalMissionTracker());
+        var records = ropes.records;
         try
         {
-            records[station] = new NavalRopes.RopeRecord { Generation = 1, Last = BattleRopeStateTests.Rope(1, BattleRopeState.RopesPulling) };
-            Assert.True(NavalRopes.HoldRemoval(station));
+            records[station] = new NavalRopeRegistry.RopeRecord { Generation = 1, Last = BattleRopeStateTests.Rope(1, BattleRopeState.RopesPulling) };
+            Assert.True(ropes.HoldRemoval(station));
             var args = new Mock<ICoopCommandArgs>();
             args.SetupGet(value => value.Count).Returns(2);
             args.SetupGet(value => value[0]).Returns("0");
             args.SetupGet(value => value[1]).Returns("release_removal");
 
-            var result = new NavalRopeCutCoopCommand(hulls.Object).ProcessCommand(args.Object);
+            var result = new NavalRopeCutCoopCommand(hulls.Object, ropes).ProcessCommand(args.Object);
 
             Assert.True(result.Succeeded);
             Assert.Equal("NAVAL_ROPE_REMOVAL_RELEASED sourceIndex=0", result.Output);
@@ -116,7 +116,7 @@ public class NavalRopeCutCoopCommandTests
         }
         finally
         {
-            NavalRopes.Clear();
+            ropes.Clear();
         }
     }
 

@@ -45,7 +45,7 @@ public class NavalDeploymentHoldScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(2, b.Engine.ForeignSpawnAttempts);
         Assert.Equal(2, b.Engine.Copies.Count);
         Assert.Equal(3f, b.Hull(hullA).Frame.origin.x, 3);
-        Assert.Equal(a.SentSamples(hullA).Last().Sequence, (long)b.Stream(hullA)["accepted"]!);
+        Assert.Equal(a.SentSamples(hullA)[^1].Sequence, (long)b.Stream(hullA)["accepted"]!);
         Assert.Equal(40f, b.Hull(pirate).HitPoints, 3);
         Assert.Equal(1, b.Hull(pirate).AppliedConditions);
         Assert.Equal(1, b.Hull(hullA).FinalRopesApplied);

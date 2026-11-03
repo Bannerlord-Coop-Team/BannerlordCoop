@@ -80,6 +80,90 @@ public class BattleShipDamageRouterTests
         Assert.Equal(1, (long)harness.Inspect()["applied"]!);
     }
 
+    // F3: a ram can reach the target's authority before the rammer's hull record spawns here (held for deployment), so the hit
+    // waits for that hull instead of applying with a null hitter.
+    [Fact]
+    public void RoutedHit_WithAHitterNotRegisteredYet_WaitsAndAppliesWithTheHitterOnceItRegisters()
+    {
+        var harness = new Harness();
+        var target = harness.Register(Own, isNpcParty: false);
+        var rammerId = Guid.NewGuid();
+        var damage = Damage(target.ShipId, BattleShipDamageKind.Collision, 120f, hitterShipId: rammerId);
+
+        harness.Router.ApplyNetworkDamage(damage);
+        harness.Arrivals.ApplyAll();
+        harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
+            It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(1, (long)harness.Inspect()["held"]!);
+
+        var rammer = harness.Register(Peer, isNpcParty: false, rammerId);
+        harness.Arrivals.ApplyAll();
+        harness.Arrivals.ApplyAll();
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(target.Hull, damage, null, rammer.Hull), Times.Once);
+        harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
+            It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Once);
+        Assert.Equal(1, (long)harness.Inspect()["held"]!);
+        Assert.Equal(0, (long)harness.Inspect()["pendingHits"]!);
+        Assert.Equal(0, harness.Arrivals.Count);
+    }
+
+    // A hitter whose spawn was given up or that left the mission never registers, so its hit applies without it.
+    [Theory]
+    [InlineData(ShipLifecycle.Removed)]
+    [InlineData(ShipLifecycle.SpawnFailed)]
+    public void RoutedHit_WithAHitterGoneHere_AppliesAtOnceWithoutIt(ShipLifecycle hitterState)
+    {
+        var harness = new Harness();
+        var target = harness.Register(Own, isNpcParty: false);
+        var rammerId = Guid.NewGuid();
+        if (hitterState == ShipLifecycle.Removed) harness.Registry.MarkRemoved(rammerId);
+        else harness.Registry.MarkSpawnFailed(rammerId);
+        var damage = Damage(target.ShipId, BattleShipDamageKind.Collision, 120f, hitterShipId: rammerId);
+
+        harness.Router.ApplyNetworkDamage(damage);
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(target.Hull, damage, null, null), Times.Once);
+        Assert.Equal(0, (long)harness.Inspect()["held"]!);
+    }
+
+    // A held hit is revalidated on retry, so a hull handed on while it waited doesn't take it here.
+    [Fact]
+    public void HeldHit_OnAHullHandedOnWhileItWaited_IsDropped()
+    {
+        var harness = new Harness();
+        var target = harness.Register(Own, isNpcParty: false);
+        var rammerId = Guid.NewGuid();
+        harness.Router.ApplyNetworkDamage(Damage(target.ShipId, BattleShipDamageKind.Collision, 120f, hitterShipId: rammerId));
+
+        target.CurrentAuthority = Peer;
+        harness.Register(Peer, isNpcParty: false, rammerId);
+        harness.Arrivals.ApplyAll();
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
+            It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(1, harness.Drops("not_authority"));
+        Assert.Equal(0, (long)harness.Inspect()["pendingHits"]!);
+    }
+
+    // The battle ending drops a hit still waiting for its hitter.
+    [Fact]
+    public void HeldHit_IsNotAppliedAfterDispose()
+    {
+        var harness = new Harness();
+        var target = harness.Register(Own, isNpcParty: false);
+        var rammerId = Guid.NewGuid();
+        harness.Router.ApplyNetworkDamage(Damage(target.ShipId, BattleShipDamageKind.Collision, 120f, hitterShipId: rammerId));
+
+        harness.Router.Dispose();
+        harness.Register(Peer, isNpcParty: false, rammerId);
+        harness.Arrivals.ApplyAll();
+
+        harness.Engine.Verify(e => e.ApplyShipDamage(It.IsAny<MissionObject>(), It.IsAny<NetworkApplyShipDamage>(),
+            It.IsAny<Agent>(), It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(0, (long)harness.Inspect()["pendingHits"]!);
+    }
+
     [Fact]
     public void RoutedHit_OnAHullAnotherClientSimulates_IsDropped()
     {

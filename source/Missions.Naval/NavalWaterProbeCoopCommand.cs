@@ -16,6 +16,14 @@ namespace Missions.Naval;
 /// </summary>
 public sealed class NavalWaterProbeCoopCommand : ICoopCommand
 {
+    private readonly INavalMissionTracker missionTracker;
+
+    // Takes the tracker that says whether this client runs a coop naval battle.
+    public NavalWaterProbeCoopCommand(INavalMissionTracker missionTracker)
+    {
+        this.missionTracker = missionTracker;
+    }
+
     public string Prefix => "coop.debug.naval";
 
     public string Name => "water_probe";
@@ -38,7 +46,7 @@ public sealed class NavalWaterProbeCoopCommand : ICoopCommand
     {
         var mission = Mission.Current;
         var probe = mission?.GetMissionBehavior<NavalWaterProbeLogic>();
-        if (probe == null || !CoopNavalMissionScope.IsActive) return Failed("No active coop naval battle mission.");
+        if (probe == null || !missionTracker.IsActive) return Failed("No active coop naval battle mission.");
 
         var values = args?.ToArray() ?? Array.Empty<string>();
         if (values.Length == 0) return Failed(NavalWaterProbeSettings.Usage);

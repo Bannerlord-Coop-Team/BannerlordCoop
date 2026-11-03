@@ -17,38 +17,41 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
-    // Refuses before touching anything when a precondition fails; a throw inside vanilla's swap is logged (RunVanillaSwap).
-    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
+    // Refuses before touching anything when a precondition fails; a throw inside vanilla's swap is logged and reported as Failed.
+    public CaptureSwapResult ApplyCapture(MissionObject prize, MissionObject captorHull)
     {
         var blocker = CheckCapture(prize, captorHull);
         if (blocker != null)
         {
             Logger.Warning("[NavalSync] Refused replaying the capture of hull {Index} here: {Reason}", (prize as MissionShip)?.Index, blocker);
-            return;
+            return CaptureSwapResult.Refused;
         }
 
         var ship = (MissionShip)prize;
         var captor = (MissionShip)captorHull;
         var formerFormation = ship.Formation;
-        RunVanillaSwap(ship, captor);
+        bool swapped = RunVanillaSwap(ship, captor);
         TurnOffShiplessBehaviors(ship, formerFormation);
         // As the helm's capture branch does once the swap ran.
         ship.InvalidateActiveFormationTroopOnShipCache();
         captor.InvalidateActiveFormationTroopOnShipCache();
+        return swapped ? CaptureSwapResult.Applied : CaptureSwapResult.Failed;
     }
 
-    // Diagnostic only: vanilla's swap (NavalShipsLogic.OnShipCaptured) moves assignments, formations and controllers, then runs
-    // the ship orders, the query expiry, ShipCapturedEvent's agent rebinding and the team AI refresh, so a throw half-applies it.
-    private static void RunVanillaSwap(MissionShip ship, MissionShip captor)
+    // Runs vanilla's swap (NavalShipsLogic.OnShipCaptured), which moves assignments, formations and controllers, then runs the ship
+    // orders, the query expiry, ShipCapturedEvent's agent rebinding and the team AI refresh, so a throw half-applies it; false then.
+    private static bool RunVanillaSwap(MissionShip ship, MissionShip captor)
     {
         try
         {
             ShipsLogic.OnShipCaptured(ship, captor.Formation);
+            return true;
         }
         catch (Exception exception)
         {
             Logger.Error(exception, "[NavalSync] Vanilla's capture swap of hull {Index} into hull {CaptorIndex}'s formation is half-applied: " +
                 "it threw in its {Stage} after the checks passed", ship.Index, captor.Index, SwapStage(exception.StackTrace));
+            return false;
         }
     }
 

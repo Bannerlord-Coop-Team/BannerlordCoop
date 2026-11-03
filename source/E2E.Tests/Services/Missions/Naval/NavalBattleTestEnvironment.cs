@@ -729,9 +729,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
         /// <summary>
         /// The use/release patch's event for an agent this client drives at a station of its local hull, published after
-        /// vanilla seated or released it.
+        /// vanilla seated or released it. Without <paramref name="settlePeers"/> the use stays in flight for the peers' next ticks.
         /// </summary>
-        public void UseStation(Agent agent, UsableMissionObject point, bool inUse)
+        public void UseStation(Agent agent, UsableMissionObject point, bool inUse, bool settlePeers = true)
         {
             Call(() =>
             {
@@ -739,7 +739,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
                 Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
             });
             // Peers keep the use pending for their next tick, which applies it.
-            SettleMesh?.Invoke();
+            if (settlePeers) SettleMesh?.Invoke();
         }
 
         /// <summary>

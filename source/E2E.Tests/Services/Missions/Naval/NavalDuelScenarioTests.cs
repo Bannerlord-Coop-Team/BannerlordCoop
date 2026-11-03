@@ -1,4 +1,5 @@
-﻿using TaleWorlds.Core;
+﻿using E2E.Tests.Environment.MockEngine;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
 
@@ -61,5 +62,129 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(both, b.RegisteredShipIds());
         Assert.Equal(("B", battle.PartyIds["B"], false), (a.Ship(hullB).CurrentAuthority, a.Ship(hullB).MapEventPartyId,
             a.Ship(hullB).IsNpcParty));
+    }
+
+    // #4213: after B rams A, B's copy of A's oarsman is let go locally, recovers, and is let go again on the next frame, as
+    // vanilla's oar tick did live. B keeps re-seating it at a bounded cadence while A keeps the seat, and stops once A releases.
+    [Fact]
+    public void Duel_ACopysOarsmanLetGoAgainAfterARam_IsReseatedWhileItsOwnerKeepsTheSeat()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var oarOnA = a.Hull(hullA).Station("oar");
+        a.UseStation(crewOnA, oarOnA, inUse: true);
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+
+        b.Ram(hullA, hullB, 30f);
+        b.Hull(hullA).Seats.Clear();
+        b.Tick();
+        var recovered = b.Hull(hullA).SeatedAt("oar");
+        b.Hull(hullA).Seats.Clear();
+        b.Tick();
+        var withinInterval = b.Hull(hullA).SeatedAt("oar");
+        b.Ticks(20);
+        var afterInterval = b.Hull(hullA).SeatedAt("oar");
+        battle.TickAll(2);
+
+        Assert.Same(crewOnB, recovered);
+        Assert.Null(withinInterval);
+        Assert.Same(crewOnB, afterInterval);
+        Assert.Single(a.Hull(hullA).AppliedDamage);
+        Assert.Equal(1, (long)b.StationStats()["unownedPuppetReleases"]!);
+
+        a.UseStation(crewOnA, oarOnA, inUse: false);
+        b.Hull(hullA).Seats.Clear();
+        b.Ticks(25);
+
+        Assert.Null(b.Hull(hullA).SeatedAt("oar"));
+        Assert.Equal(0, (int)b.StationStats()["appliedSeats"]!);
+    }
+
+    // #4213: A's own rower walks in and sits down from deck height while B seats its copy at vanilla's spawn spot; a ram then
+    // staggers B's copy without a release. Once each settles, both clients hold it at the same spot of the station.
+    [Fact]
+    public void Duel_AnOarsmanWalkedInOnItsOwnerAndStaggeredOnItsCopy_SitsAtTheSameSpotOnBothOnceSettled()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        a.Engine.WalksIn.Add(crewOnA);
+        var oarOnA = a.Hull(hullA).Station("oar");
+        a.UseStation(crewOnA, oarOnA, inUse: true);
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+
+        battle.TickAll(3);
+        Assert.Empty(a.Engine.SeatPlacements);
+        a.Call(() => a.Engine.FinishSitDown(crewOnA));
+        battle.TickAll(3);
+
+        b.Ram(hullA, hullB, 30f);
+        b.Call(() => b.Engine.Stagger(crewOnB, isStruck: true, new Vec3(0f, 0.04f, 0.055f)));
+        battle.TickAll(3);
+        Assert.Empty(b.Engine.SeatPlacements);
+        b.Call(() => b.Engine.Stagger(crewOnB, isStruck: false, Vec3.Zero));
+        battle.TickAll(3);
+
+        var onA = a.Engine.SeatPoses[crewOnA];
+        var onB = b.Engine.SeatPoses[crewOnB];
+        var spawnOffset = FakeNavalShipEngine.SitDownDisplacement;
+        Assert.Single(a.Engine.SeatPlacements);
+        Assert.Single(b.Engine.SeatPlacements);
+        Assert.True((onA.Position - onA.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"owner sits at {onA.Position}");
+        Assert.True((onB.Position - onB.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"copy sits at {onB.Position}");
+        Assert.Same(crewOnA, a.Hull(hullA).SeatedAt("oar"));
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+    }
+
+    // #4213 PvE: A's own rower walks back to an oar after boarding, while B's copy of it is off the hull. B seats the copy from A's
+    // use at the spawn spot; on the next frame the engine puts it on the hull 13 cm higher, where it sat in row idle for good.
+    // Both end at the same spot of the oar.
+    [Fact]
+    public void Duel_ACopySeatedAsItsOwnerWalkedInAndMovedOnTheNextFrame_SitsAtTheSameSpotAsItsOwner()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        a.Engine.WalksIn.Add(crewOnA);
+
+        // Each of B's ticks is one frame, so the use's frame is the only settle pass before the engine moves the copy.
+        a.UseStation(crewOnA, a.Hull(hullA).Station("oar"), inUse: true, settlePeers: false);
+        for (int frame = 0; frame < 10 && b.Hull(hullA).SeatedAt("oar") == null; frame++)
+            b.Tick();
+        Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
+        b.Call(() => b.Engine.Shift(crewOnB, new Vec3(0f, 0.08f, 0.13f)));
+        battle.TickAll(3);
+        a.Call(() => a.Engine.FinishSitDown(crewOnA));
+        battle.TickAll(3);
+
+        var onA = a.Engine.SeatPoses[crewOnA];
+        var onB = b.Engine.SeatPoses[crewOnB];
+        var spawnOffset = FakeNavalShipEngine.SitDownDisplacement;
+        Assert.Single(a.Engine.SeatPlacements);
+        Assert.Single(b.Engine.SeatPlacements);
+        Assert.True((onA.Position - onA.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"owner sits at {onA.Position}");
+        Assert.True((onB.Position - onB.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"copy sits at {onB.Position}");
     }
 }

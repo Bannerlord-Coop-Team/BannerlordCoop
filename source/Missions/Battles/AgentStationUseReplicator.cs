@@ -24,8 +24,8 @@ public interface IShipStationSeats
 /// </summary>
 public interface IAgentStationUseReplicator : IShipStationSeats, IDisposable
 {
-    /// <summary>[Mission tick] Applies received uses, announces own seats at the deployment commit and to joiners, and re-pins
-    /// applied seats.</summary>
+    /// <summary>[Mission tick] Applies received uses, announces own seats at the deployment commit and to joiners, re-pins
+    /// applied seats, and places own and applied seats once they settle.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] The station an agent uses on a registered hull, or null (diagnostics).</summary>
@@ -48,6 +48,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     // A use for an agent or hull that never arrives is dropped after this long.
     internal const float PendingLifetimeSeconds = 10f;
+    // A puppet vanilla keeps releasing from a seat its owner holds is re-seated at most this often.
+    internal const float ReseatRetrySeconds = 1f;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -56,13 +58,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly INavalShipEngine engine;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IMissionContext missionContext;
+    private readonly IStationSeatSettler settler;
 
     private readonly Dictionary<Guid, long> sentRevisions = new Dictionary<Guid, long>();
-    private readonly Dictionary<Guid, NetworkAgentStationUse> ownSeated = new Dictionary<Guid, NetworkAgentStationUse>();
+    private readonly Dictionary<Guid, OwnSeat> ownSeated = new Dictionary<Guid, OwnSeat>();
     private readonly Dictionary<Guid, AuthorityStamp> appliedStamps = new Dictionary<Guid, AuthorityStamp>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
-    // Puppets the refresh found released here and re-seated once, counted unowned until their owner's next revision takes effect;
+    // Puppets the refresh found released here and re-seats, counted unowned once until their owner's next revision takes effect;
     // kept apart from the seat, which cleanup can drop before a delayed owner release arrives.
     private readonly HashSet<Guid> unjudgedLocalReleases = new HashSet<Guid>();
     private readonly List<string> joinersAwaitingSeats = new List<string>();
@@ -78,7 +81,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // those the owner's late release showed were its own; staleUses and obsoleteReleases (nothing left to release) are expected.
     private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, pinned, ownerReleases,
         sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
-        adoptedSeats;
+        adoptedSeats, reseatAttempts;
 
     // Subscribes to this client's use and release patches, the owners' uses and mission entries, and gives the movement and
     // action handlers its seats.
@@ -89,7 +92,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         ICoopMissionComponent missionComponent,
         INavalShipEngine engine,
         IBattleDeploymentCoordinator deployment,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        IStationSeatSettler settler)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -98,6 +102,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         this.engine = engine;
         this.deployment = deployment;
         this.missionContext = missionContext;
+        this.settler = settler;
 
         messageBroker.Subscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Subscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
@@ -147,8 +152,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         var use = new NetworkAgentStationUse(info.AgentId, ship.ShipId, stationKey, pointIndex, change.InUse, revision + 1,
             session.OwnControllerId);
         sentRevisions[info.AgentId] = use.Revision;
-        if (use.InUse) ownSeated[info.AgentId] = use;
-        else ownSeated.Remove(info.AgentId);
+        if (use.InUse)
+        {
+            ownSeated[info.AgentId] = new OwnSeat(use, change.Agent, change.Point, hull);
+            settler.Restart(info.AgentId);
+        }
+        else
+        {
+            ownSeated.Remove(info.AgentId);
+        }
 
         // Before the deployment commit peers have no own crew yet; the commit announces the seats taken by then.
         if (!seatsAnnounced) return;
@@ -185,13 +197,25 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         if (!seatsAnnounced && deployment.IsCommitted)
         {
             seatsAnnounced = true;
-            foreach (var use in ownSeated.Values)
-                network.SendAll(use);
+            foreach (var seat in ownSeated.Values)
+                network.SendAll(seat.Use);
             sent += ownSeated.Count;
         }
 
         DrainPending();
         RefreshAppliedSeats();
+        SettleSeats();
+    }
+
+    // Places every seat held here, this client's own agents and its puppets alike, once its seat settles, so all clients sit an
+    // agent at the same spot of its station.
+    private void SettleSeats()
+    {
+        foreach (var entry in appliedSeats)
+            settler.Settle(entry.Key, entry.Value.Agent, entry.Value.Point, entry.Value.Hull);
+        foreach (var entry in ownSeated)
+            settler.Settle(entry.Key, entry.Value.Agent, entry.Value.Point, entry.Value.Hull);
+        settler.EndPass();
     }
 
     // An agent whose authority moved away sends no release, so its seat is no longer this client's to announce or withhold.
@@ -213,7 +237,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         alive && registered && !ownedHere && !hullSinking && !hullRemoved;
 
     // [Game thread] Runs after this frame's hull frame writes and the owners' uses. A puppet the owner keeps seated is re-pinned
-    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
+    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per retry interval.
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;
@@ -240,7 +264,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
             if (!engine.IsSeated(seat.Agent, seat.Point))
             {
-                if (unjudgedLocalReleases.Contains(entry.Key)) continue;
+                if (elapsed < seat.NextReseatAt) continue;
                 if (!IsStillStationOf(seat))
                 {
                     leftAgents.Add(entry.Key);
@@ -248,12 +272,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                     continue;
                 }
 
-                unjudgedLocalReleases.Add(entry.Key);
-                unownedPuppetReleases++;
-                Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
-                    "re-seating it once", entry.Key, DescribeStation(seat.Point));
-                Apply(seat.Agent, seat.Point, inUse: true);
-                if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
+                if (!Reseat(entry.Key, seat)) continue;
             }
 
             engine.PinToStation(seat.Agent, seat.Point);
@@ -262,6 +281,29 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         foreach (var agentId in leftAgents)
             appliedSeats.Remove(agentId);
+    }
+
+    // Seats a puppet vanilla let go here again while its owner holds the seat, and whether it took. One success is no proof the
+    // seat lasts, as vanilla can let it go again a frame later, so the next attempt waits a retry interval rather than the revision.
+    private bool Reseat(Guid agentId, AppliedSeat seat)
+    {
+        seat.NextReseatAt = elapsed + ReseatRetrySeconds;
+        reseatAttempts++;
+        if (unjudgedLocalReleases.Add(agentId))
+        {
+            unownedPuppetReleases++;
+            Logger.Warning("[NavalSync] Puppet {AgentId} left its station {Station} locally while its owner keeps it seated; " +
+                "re-seating it", agentId, DescribeStation(seat.Point));
+        }
+        else
+        {
+            Logger.Debug("[NavalSync] Puppet {AgentId} left its station {Station} again under the same owner seat; re-seating it",
+                agentId, DescribeStation(seat.Point));
+        }
+
+        Apply(seat.Agent, seat.Point, inUse: true);
+        settler.Restart(agentId);
+        return engine.IsSeated(seat.Agent, seat.Point);
     }
 
     public int ReleaseSeatsOn(MissionObject hull)
@@ -425,6 +467,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         else if (!inUse) sinkingUseReleases++;
         CommitRevision(use);
         Apply(info.Agent, point, inUse);
+        // A release and use of the same point can both apply before the next settle pass, which then sees an unchanged seat.
+        if (inUse) settler.Restart(use.AgentId);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
     }
@@ -484,8 +528,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         if (seatsAnnounced)
         {
             foreach (var joiner in joinersAwaitingSeats)
-                foreach (var use in ownSeated.Values)
-                    network.Send(joiner, use);
+                foreach (var seat in ownSeated.Values)
+                    network.Send(joiner, seat.Use);
         }
 
         joinersAwaitingSeats.Clear();
@@ -521,12 +565,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         departedHullReleases,
         detachedSeats,
         adoptedSeats,
+        reseatAttempts,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
+        settle = settler.Inspect(),
     };
 
-    // A remote owner's seat applied to its puppet here: the puppet, the hull and the point it sits at.
+    // A remote owner's seat applied to its puppet here: the puppet, the hull, the point it sits at and when a lost seat may next
+    // be re-seated.
     private sealed class AppliedSeat
     {
         public AppliedSeat(Agent agent, MissionObject hull, UsableMissionObject point)
@@ -539,6 +586,24 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         public Agent Agent { get; }
         public MissionObject Hull { get; }
         public UsableMissionObject Point { get; }
+        public float NextReseatAt { get; set; }
+    }
+
+    // A seat this client announced for an agent it drives: the use peers get, and the agent, point and hull it holds here.
+    private sealed class OwnSeat
+    {
+        public OwnSeat(NetworkAgentStationUse use, Agent agent, UsableMissionObject point, MissionObject hull)
+        {
+            Use = use;
+            Agent = agent;
+            Point = point;
+            Hull = hull;
+        }
+
+        public NetworkAgentStationUse Use { get; }
+        public Agent Agent { get; }
+        public UsableMissionObject Point { get; }
+        public MissionObject Hull { get; }
     }
 
     // A received use waiting for the tick, with the time it arrived.

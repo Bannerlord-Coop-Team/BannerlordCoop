@@ -7,6 +7,7 @@ using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
@@ -347,12 +348,11 @@ public class MissionModule : Module
             builder.RegisterAssemblyModules(navalAssembly);
     }
 
-    // Loads Missions.Naval.dll; startup already checked it shipped, so only a test host that sets the flag can miss it.
+    // Loads Missions.Naval.dll; startup already loaded it to decide naval support, so only a test host that sets the flag can miss it.
     private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
     {
-        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), ModInformation.MissionsNavalAssemblyFile);
-        assembly = File.Exists(path) ? Assembly.LoadFrom(path) : null;
-        return assembly != null;
+        var loader = new NavalAssemblyLoader(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location));
+        return loader.TryLoad(ModInformation.MissionsNavalAssemblyFile, out assembly);
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

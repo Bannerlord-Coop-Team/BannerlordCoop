@@ -2,6 +2,7 @@
 using Common.Commands;
 using Common.Messaging;
 using Common.Util;
+using Coop.Naval.PortScreen;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
@@ -45,6 +46,8 @@ public class CoopNavalModule : Module
         {
             builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
+
+        builder.RegisterType<PortTransactionPricer>().As<IPortTransactionPricer>().InstancePerDependency();
 
         // AutoSyncModule only scans GameInterface, and these must activate before AutoSyncPatcher builds
         foreach (var type in GetConcreteTypes<IAutoSync>())

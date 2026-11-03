@@ -29,11 +29,13 @@ public interface ICoopShipSnapshotBuilder
 public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
 {
     private readonly IObjectManager objectManager;
+    private readonly ICoopShipSnapshotRegistry snapshots;
 
-    // Takes the object manager that names an own snapshot's campaign ship.
-    public CoopShipSnapshotBuilder(IObjectManager objectManager)
+    // Takes the object manager that names an own snapshot's campaign ship, and this client's snapshot registry.
+    public CoopShipSnapshotBuilder(IObjectManager objectManager, ICoopShipSnapshotRegistry snapshots)
     {
         this.objectManager = objectManager;
+        this.snapshots = snapshots;
     }
 
     // Copies a party's campaign ship field by field; the copy carries the source's registry id for its fate report.
@@ -85,7 +87,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
     }
 
     // Creates the bare ship with its owner and records it as a snapshot of the campaign ship it stands for.
-    private static Ship Create(ShipHull hull, PartyBase owner, string campaignShipId)
+    private Ship Create(ShipHull hull, PartyBase owner, string campaignShipId)
     {
         var snapshot = new Ship(hull);
 
@@ -93,7 +95,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         snapshot._owner = owner;
 
         // CoopShipSnapshotPatches keep its mission damage out of the campaign (destroy action, skill XP).
-        CoopShipSnapshots.Add(snapshot, campaignShipId);
+        snapshots.Add(snapshot, campaignShipId);
         return snapshot;
     }
 }
