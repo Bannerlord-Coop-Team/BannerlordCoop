@@ -26,7 +26,7 @@ internal class CraftingVMConstructorPatch
         MessageBroker.Instance.Publish(__instance, new CraftingVMCreated(__instance));
     }
 
-    // The closed screen nulls its crafting scene, so a later order refresh on this VM would throw
+    // A later order refresh would otherwise run on this finalized VM and its finalized children
     [HarmonyPatch(nameof(CraftingVM.OnFinalize))]
     [HarmonyPostfix]
     public static void OnFinalizePostfix(CraftingVM __instance)

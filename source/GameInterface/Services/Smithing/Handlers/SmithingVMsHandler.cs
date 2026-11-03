@@ -171,13 +171,14 @@ internal class SmithingVMsHandler : IHandler
 
     private void RefreshWeaponDesignVM(Town town)
     {
-        var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
-        var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
-
-        if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
-
         GameThread.RunSafe(() =>
         {
+            // Read on the game thread, otherwise a screen closed before this runs still gets refreshed
+            var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+
+            if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
+
             using (new AllowedThread())
             {
                 currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
