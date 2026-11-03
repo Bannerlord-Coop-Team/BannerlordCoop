@@ -4,6 +4,7 @@ using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.Hideouts.Patches.Disable;
 using GameInterface.Services.Villages.Interfaces;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -130,6 +131,38 @@ public class HideoutMenuTests : MapEventTestBase
                 Assert.True(join.GetConditionsHold(Game.Current, context));
                 Assert.DoesNotContain(context.GameMenu.MenuOptions, option => option.IdString == "assault");
                 Assert.DoesNotContain(context.GameMenu.MenuOptions, option => option.IdString == "attack");
+            }
+        });
+    }
+
+    [Fact]
+    public void JoinConditions_WithoutAnEncounter_ReturnFalseInsteadOfThrowing()
+    {
+        var player = CreatePlayerHeroParty("no-encounter");
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.partyId, out var party));
+            var previousParty = Campaign.Current.MainParty;
+            var previousEncounter = Campaign.Current.PlayerEncounter;
+            Campaign.Current.MainParty = party;
+            Campaign.Current.PlayerEncounter = null;
+            try
+            {
+                Assert.Null(Settlement.CurrentSettlement);
+                var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
+                var args = new MenuCallbackArgs(context, TextObject.GetEmpty());
+                var canJoin = AccessTools.Method(typeof(HideoutCampaignBehaviorPatch), "CanJoinHideout");
+                Assert.False((bool)canJoin.Invoke(null, new object[] { args }));
+
+                // The native help attackers and help defenders conditions run when no hideout encounter is open
+                var encounterOptions = AccessTools.Method(typeof(HideoutJoinEncounterOptionsPatch), "Prefix");
+                Assert.True((bool)encounterOptions.Invoke(null, new object[] { false }));
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = previousEncounter;
+                Campaign.Current.MainParty = previousParty;
             }
         });
     }
