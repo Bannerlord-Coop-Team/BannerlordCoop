@@ -15,7 +15,7 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Voice;
 using Missions;
-#if DEBUG
+#if DEBUG || COOP_NAVAL
 using GameInterface.Services.MapEvents;
 using Missions.Battles;
 #endif
@@ -112,7 +112,9 @@ namespace Coop.Tests.Autofac
             Assert.IsType<NavalBattleServicesFactory>(container.Resolve<INavalBattleServicesFactory>());
             Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
             Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
+#if DEBUG
             Assert.IsType<NavalDebugHulls>(container.Resolve<INavalDebugHulls>());
+#endif
 
             ICoopCommand[] navalCommands = container.Resolve<IEnumerable<ICoopCommand>>()
                 .Where(command => command.GetType().Assembly == typeof(NavalMissionModule).Assembly)

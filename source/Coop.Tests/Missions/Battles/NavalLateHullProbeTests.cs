@@ -1,4 +1,4 @@
-﻿#if COOP_NAVAL
+﻿#if COOP_NAVAL && DEBUG
 using Missions.Naval;
 using Moq;
 using NavalDLC.Missions.Objects;

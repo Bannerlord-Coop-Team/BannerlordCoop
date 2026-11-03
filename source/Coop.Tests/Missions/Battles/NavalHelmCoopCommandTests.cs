@@ -1,4 +1,4 @@
-﻿#if COOP_NAVAL
+﻿#if COOP_NAVAL && DEBUG
 using HarmonyLib;
 using System;
 using Missions.Naval;
