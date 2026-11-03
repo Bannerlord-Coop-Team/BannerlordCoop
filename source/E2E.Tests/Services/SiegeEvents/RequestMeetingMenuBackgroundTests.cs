@@ -1,7 +1,10 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.SiegeEvents.Patches;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameMenus.GameMenuInitializationHandlers;
@@ -76,6 +79,39 @@ public class RequestMeetingMenuBackgroundTests : IDisposable
                 DefaultEncounter.game_menu_town_menu_request_meeting_on_init(args);
 
                 Assert.Equal("wait_encounter_town", args.MenuContext.CurrentBackgroundMeshName);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData("game_menu_request_meeting_town_leave_on_consequence")]
+    [InlineData("game_menu_request_meeting_castle_leave_on_consequence")]
+    public void ForgetIt_WithoutAnEncounter_SetsLeaveEncounterOnlyWhenOneIsOpen(string consequence)
+    {
+        var original = AccessTools.Method(typeof(EncounterGameMenuBehavior), consequence);
+        var setLeaveEncounter = AccessTools.PropertySetter(typeof(PlayerEncounter), nameof(PlayerEncounter.LeaveEncounter));
+        var instructions = PatchProcessor.GetOriginalInstructions(original);
+        Assert.Contains(instructions, instruction => instruction.Calls(setLeaveEncounter));
+
+        var rewritten = RequestMeetingLeavePatch.Transpiler(instructions).ToList();
+        Assert.DoesNotContain(rewritten, instruction => instruction.Calls(setLeaveEncounter));
+
+        Client.Call(() =>
+        {
+            Campaign.Current.PlayerEncounter = null;
+            RequestMeetingLeavePatch.SetLeaveEncounterIfOpen(false);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._leaveEncounter = true;
+            Campaign.Current.PlayerEncounter = encounter;
+            try
+            {
+                RequestMeetingLeavePatch.SetLeaveEncounterIfOpen(false);
+                Assert.False(encounter._leaveEncounter);
             }
             finally
             {
