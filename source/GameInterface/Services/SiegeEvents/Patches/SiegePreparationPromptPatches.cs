@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -28,6 +29,8 @@ internal class SiegePreparationPromptPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegePreparationPromptPatches>();
     private static readonly HashSet<SiegeEvent> FinalizingSieges = new();
+    // Weak keys so a siege that never finalizes cannot keep its parties alive
+    private static readonly ConditionalWeakTable<SiegeEvent, MobileParty[]> EmptiedCampParties = new();
 
     private sealed class SiegeTerminationState
     {
@@ -70,6 +73,18 @@ internal class SiegePreparationPromptPatches
         MessageBroker.Instance.Publish(null, new SiegePreparationStarted(besiegerParty, settlement));
     }
 
+    // Lifting a siege and ending its battles empty the camp before the siege finalizes, so the finalize snapshot
+    // would miss every party that was camped there
+    [HarmonyPatch(typeof(BesiegerCamp), nameof(BesiegerCamp.RemoveAllSiegeParties))]
+    [HarmonyPrefix]
+    private static void RemoveAllSiegePartiesPrefix(BesiegerCamp __instance)
+    {
+        if (ModInformation.IsClient || __instance?.SiegeEvent == null) return;
+
+        EmptiedCampParties.Remove(__instance.SiegeEvent);
+        EmptiedCampParties.Add(__instance.SiegeEvent, __instance._besiegerParties.ToArray());
+    }
+
     [HarmonyPatch(typeof(SiegeEvent), nameof(SiegeEvent.FinalizeSiegeEvent))]
     [HarmonyPrefix]
     private static void FinalizeSiegeEventPrefix(SiegeEvent __instance, out SiegeTerminationState __state)
@@ -92,6 +107,11 @@ internal class SiegePreparationPromptPatches
             var camp = __instance.BesiegerCamp;
             var leaderParty = camp?.LeaderParty;
             var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
+            if (EmptiedCampParties.TryGetValue(__instance, out var emptiedParties))
+            {
+                EmptiedCampParties.Remove(__instance);
+                attackerParties = attackerParties.Concat(emptiedParties).Distinct().ToArray();
+            }
             var defenderParties = interruptedActiveAssault
                 ? GetMapEventParties(mapEvent.DefenderSide)
                 : GetDefenderParties(settlement);
