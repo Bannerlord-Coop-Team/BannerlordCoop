@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
@@ -57,6 +58,11 @@ namespace GameInterface.Services.Kingdoms.Patches
         public static bool DailyTickClanPrefix(KingdomDecisionProposalBehavior __instance, Clan clan)
         {
             if (ModInformation.IsClient) return false;
+
+            // Every proposal builds kingdom elections that read each voting clan's leader, and a clan can lose its
+            // leader mid-session, while the load-time repair only runs on the next load
+            if (ContainerProvider.TryResolve<ILeaderlessClanResolver>(out var leaderlessClanResolver))
+                leaderlessClanResolver.RepairLoadedClans();
 
             // Mirrors vanilla's `clan == Clan.PlayerClan` skip. Proposing for a registered
             // player clan would spend that player's influence and author a decision in their name.

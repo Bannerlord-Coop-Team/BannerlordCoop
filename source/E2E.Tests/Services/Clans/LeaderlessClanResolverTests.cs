@@ -2,7 +2,10 @@
 using TaleWorlds.CampaignSystem.Settlements;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using Common.Util;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Kingdoms.Patches;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using HarmonyLib;
 using System.Reflection;
@@ -241,6 +244,30 @@ public class LeaderlessClanResolverTests : IDisposable
                 Assert.Null(companion.CompanionOf);
             });
         }
+    }
+
+    [Fact]
+    public void DailyProposerTick_RepairsAVotingClanThatLostItsLeaderMidSession()
+    {
+        var leaderlessClanId = CreateKingdomClan(out var kingdomId);
+        var successorId = AddPartyLeader(leaderlessClanId, age: 30);
+        var ledClanId = CreateKingdomClan(out _, kingdomId);
+        var ledLeaderId = AddPartyLeader(ledClanId, age: 40);
+
+        environment.Server.Call(() =>
+        {
+            var leaderlessClan = environment.Server.GetRegisteredObject<Clan>(leaderlessClanId);
+            var ledClan = environment.Server.GetRegisteredObject<Clan>(ledClanId);
+            var ledLeader = environment.Server.GetRegisteredObject<Hero>(ledLeaderId);
+            ledClan.SetLeader(ledLeader);
+            Assert.Null(leaderlessClan.Leader);
+
+            CoopKingdomDecisionProposalBehaviorPatch.DailyTickClanPrefix(
+                ObjectHelper.SkipConstructor<KingdomDecisionProposalBehavior>(), ledClan);
+
+            Assert.Same(environment.Server.GetRegisteredObject<Hero>(successorId), leaderlessClan.Leader);
+            Assert.Same(ledLeader, ledClan.Leader);
+        }, TextMethods);
     }
 
     private string CreateKingdomClan(out string kingdomId, string existingKingdomId = null)
