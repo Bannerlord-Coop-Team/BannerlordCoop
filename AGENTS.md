@@ -57,6 +57,8 @@ Run from the repo root on Windows. The build finds the local Bannerlord install 
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees skip it with a message unless built with `-p:DeployFromWorktree=true`. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
+The debug launch profiles (`Coop.csproj.user`, `ClientDebug.csproj.user`, `ClientDebug2.csproj.user` and the `Coop.Core.csproj` Debug `StartArguments`) append `$(COOP_DEBUG_MODULES)` after `StoryMode` in the `_MODULES_` list, so a developer can load extra modules such as War Sails (`*NavalDLC`) from a user environment variable (see the README's Contributing section). Keep it in every profile and in any new one. It isn't a local-only or undefined setting to strip from a PR, because it expands to nothing when unset.
+
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 
 If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
