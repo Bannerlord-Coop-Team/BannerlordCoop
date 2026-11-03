@@ -1031,6 +1031,8 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            // Vanilla compares party.Army with MainParty.Army and then reads Army.LeaderParty, so two null armies throw
+            if (mobileParty.Army == null) return;
 
             notificationsBehavior.OnPartyJoinedArmy(mobileParty);
         });
@@ -1233,9 +1235,10 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MotherId, out var mother)) return;
 
             var aliveOffsprings = new List<Hero>();
-            foreach (var aliveOffspringId in obj.What.AliveOffspringsIds)
+            // Protobuf delivers an empty list as null
+            foreach (var aliveOffspringId in obj.What.AliveOffspringsIds ?? new List<string>())
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(aliveOffspringId, out var aliveOffspring)) return;
+                if (!objectManager.TryGetObjectWithLogging<Hero>(aliveOffspringId, out var aliveOffspring)) continue;
 
                 aliveOffsprings.Add(aliveOffspring);
             }
@@ -1413,7 +1416,7 @@ internal class DefaultNotificationsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<ItemObject>(obj.What.PrizeId, out var prize)) return;
 
             var participants = new MBReadOnlyList<CharacterObject>();
-            foreach (var participantId in obj.What.ParticipantsIds)
+            foreach (var participantId in obj.What.ParticipantsIds ?? new MBReadOnlyList<string>())
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(participantId, out var participant)) continue;
 
