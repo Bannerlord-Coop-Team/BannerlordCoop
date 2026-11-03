@@ -166,7 +166,9 @@ internal class SiegeEventCampaignBehaviorPatches
 
         var siegeEvent = PlayerSiege.PlayerSiegeEvent;
         var settlement = siegeEvent?.BesiegedSettlement;
-        if (settlement?.SiegeEvent == siegeEvent &&
+        // Without a player siege both sides of the settlement check are null and would pass
+        if (siegeEvent != null &&
+            settlement?.SiegeEvent == siegeEvent &&
             siegeEvent.BesiegerCamp?.SiegeEvent == siegeEvent &&
             (PlayerSiege.PlayerSide != BattleSideEnum.Attacker ||
              (MobileParty.MainParty?.BesiegerCamp == siegeEvent.BesiegerCamp &&
