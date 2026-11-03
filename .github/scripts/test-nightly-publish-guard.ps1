@@ -10,7 +10,7 @@ $guard = [scriptblock]::Create($guardText)
 
 function Invoke-TestRclone {
     param([string]$Command, [string]$Source, [string]$Destination)
-    $expectedSource = if ($Command -eq 'lsjson') { 'patron:test-nightlies' } else { 'patron:test-nightlies/nightly/client.json' }
+    $expectedSource = if ($Command -eq 'lsjson') { 'private:test-inputs' } else { 'private:test-inputs/nightly-client/manifest.json' }
     if ($Source -ne $expectedSource) { throw 'Unexpected manifest source' }
     $script:commands += $Command
     $global:LASTEXITCODE = 0
@@ -20,7 +20,7 @@ function Invoke-TestRclone {
         if ($null -ne $script:scenario.LookupText) { return $script:scenario.LookupText }
         $size = [Text.Encoding]::UTF8.GetByteCount($script:scenario.Manifest)
         if ($script:scenario.MetadataSize) { $size = $script:scenario.MetadataSize }
-        return ((ConvertTo-Json -InputObject @(@{ Path = 'nightly/client.json'; IsDir = $false; Size = $size })) -split '\r?\n')
+        return ((ConvertTo-Json -InputObject @(@{ Path = 'nightly-client/manifest.json'; IsDir = $false; Size = $size })) -split '\r?\n')
     }
     if ($Command -ne 'copyto') { throw "Unexpected storage command: $Command" }
     $global:LASTEXITCODE = $script:scenario.DownloadExit
@@ -53,7 +53,7 @@ New-Item -ItemType Directory -Path $testRoot | Out-Null
 Push-Location $testRoot
 try {
     $env:R2_ACCOUNT_ID = 'test-account'
-    $env:R2_NIGHTLY_BUCKET = 'test-nightlies'
+    $env:R2_PRIVATE_BUCKET = 'test-inputs'
     $env:RELEASE_DATE = '2026-10-01'
     foreach ($case in $cases) {
         $script:scenario = @{ Event = 'schedule'; Missing = $false; LookupExit = 0; DownloadExit = 0; WriteFile = $true; Manifest = '{"releaseDate":"2026-09-30"}' }
