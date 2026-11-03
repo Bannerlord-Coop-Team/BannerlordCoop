@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
@@ -20,6 +21,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     private static readonly List<(Hero Mother, int Offspring, int Stillborn)> Births = new();
     private static readonly List<Exception> JoinedArmyExceptions = new();
     private static int joinedArmyCalls;
+    private static int attachedPartyCalls;
 
     private readonly Harmony harmony = new Harmony("e2e.notifications.null-lists");
     private E2ETestEnvironment TestEnvironment { get; }
@@ -31,11 +33,15 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         Births.Clear();
         JoinedArmyExceptions.Clear();
         joinedArmyCalls = 0;
+        attachedPartyCalls = 0;
 
         harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnGivenBirth"),
             postfix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordBirth)));
         harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnPartyJoinedArmy"),
             prefix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(CountJoinedArmy)),
+            finalizer: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordJoinedArmyException)));
+        harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnPartyAttachedAnotherParty"),
+            prefix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(CountAttachedParty)),
             finalizer: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordJoinedArmyException)));
 
         Client.Call(() => Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
@@ -52,6 +58,8 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         => Births.Add((mother, aliveOffsprings.Count, stillbornCount));
 
     private static void CountJoinedArmy() => joinedArmyCalls++;
+
+    private static void CountAttachedParty() => attachedPartyCalls++;
 
     private static Exception RecordJoinedArmyException(Exception __exception)
     {
@@ -75,7 +83,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     }
 
     [Fact]
-    public void GivenBirth_UnresolvableChild_StillNotifiesTheResolvedOnes()
+    public void GivenBirth_UnresolvableChild_SkipsInsteadOfShowingTheWrongCount()
     {
         string motherId = TestEnvironment.CreateRegisteredObject<Hero>();
         string childId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -85,7 +93,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         Client.SimulateMessage(this, message);
         Client.PumpGameThread();
 
-        Assert.Equal(1, Assert.Single(Births).Offspring);
+        Assert.Empty(Births);
     }
 
     [Fact]
@@ -118,5 +126,35 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
 
         Assert.Empty(JoinedArmyExceptions);
         Assert.Equal(0, joinedArmyCalls);
+    }
+
+    [Fact]
+    public void PartyJoinedArmy_PartyInAnArmy_StillReachesVanilla()
+    {
+        string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Client.Call(() => Client.GetRegisteredObject<MobileParty>(partyId)._army = ObjectHelper.SkipConstructor<Army>());
+
+        Client.SimulateMessage(this, new NetworkNotifyPartyJoinedArmy(partyId));
+        Client.PumpGameThread();
+
+        Assert.Empty(JoinedArmyExceptions);
+        Assert.Equal(1, joinedArmyCalls);
+    }
+
+    [Fact]
+    public void PartyAttachedAnotherParty_PartyWithoutArmy_DoesNotThrow()
+    {
+        string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Client.Call(() =>
+        {
+            Assert.Null(Client.GetRegisteredObject<MobileParty>(partyId).Army);
+            Assert.Null(MobileParty.MainParty.Army);
+        });
+
+        Client.SimulateMessage(this, new NetworkNotifyPartyAttachedAnotherParty(partyId));
+        Client.PumpGameThread();
+
+        Assert.Empty(JoinedArmyExceptions);
+        Assert.Equal(0, attachedPartyCalls);
     }
 }

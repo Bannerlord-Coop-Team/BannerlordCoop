@@ -1054,6 +1054,8 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            // Same vanilla Army.LeaderParty read as OnPartyJoinedArmy
+            if (mobileParty.Army == null) return;
 
             notificationsBehavior.OnPartyAttachedAnotherParty(mobileParty);
         });
@@ -1238,7 +1240,8 @@ internal class DefaultNotificationsHandler : IHandler
             // Protobuf delivers an empty list as null
             foreach (var aliveOffspringId in obj.What.AliveOffspringsIds ?? new List<string>())
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(aliveOffspringId, out var aliveOffspring)) continue;
+                // Vanilla picks the text from the child count, so a missing child would show the wrong one
+                if (!objectManager.TryGetObjectWithLogging<Hero>(aliveOffspringId, out var aliveOffspring)) return;
 
                 aliveOffsprings.Add(aliveOffspring);
             }
