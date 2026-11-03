@@ -48,4 +48,35 @@ public sealed class SmithingVMsHandlerTests
         Assert.False(weaponDesign.IsInFinalCraftingStage);
         Assert.Null(weaponDesign.CraftingResultPopup);
     }
+
+    [Fact]
+    public void FinalizedScreen_IsDroppedSoALaterOrderRefreshSkipsIt()
+    {
+        var craftingVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
+        var provider = new SmithingVMsProvider();
+        using var broker = new MessageBroker();
+        using var handler = new SmithingVMsHandler(broker, Mock.Of<IObjectManager>(), provider);
+        broker.Publish(this, new CraftingVMCreated(craftingVM));
+
+        broker.Publish(this, new CraftingVMFinalized(craftingVM));
+
+        Assert.Null(provider.GetCurrentCraftingVM());
+        Assert.Null(provider.GetCurrentWeaponDesignVM());
+    }
+
+    [Fact]
+    public void FinalizingAnOldScreen_KeepsTheOpenOne()
+    {
+        var oldVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
+        var openVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
+        var provider = new SmithingVMsProvider();
+        using var broker = new MessageBroker();
+        using var handler = new SmithingVMsHandler(broker, Mock.Of<IObjectManager>(), provider);
+        broker.Publish(this, new CraftingVMCreated(oldVM));
+        broker.Publish(this, new CraftingVMCreated(openVM));
+
+        broker.Publish(this, new CraftingVMFinalized(oldVM));
+
+        Assert.Same(openVM, provider.GetCurrentCraftingVM());
+    }
 }
