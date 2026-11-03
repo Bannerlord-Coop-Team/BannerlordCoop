@@ -4,8 +4,8 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using Common.Util;
 using GameInterface.Services.Clans;
-using GameInterface.Services.Kingdoms.Patches;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Election;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using HarmonyLib;
 using System.Reflection;
@@ -251,23 +251,36 @@ public class LeaderlessClanResolverTests : IDisposable
     {
         var leaderlessClanId = CreateKingdomClan(out var kingdomId);
         var successorId = AddPartyLeader(leaderlessClanId, age: 30);
-        var ledClanId = CreateKingdomClan(out _, kingdomId);
-        var ledLeaderId = AddPartyLeader(ledClanId, age: 40);
+        var proposerClanId = CreateKingdomClan(out _, kingdomId);
+        var proposerLeaderId = AddPartyLeader(proposerClanId, age: 40);
 
         environment.Server.Call(() =>
         {
             var leaderlessClan = environment.Server.GetRegisteredObject<Clan>(leaderlessClanId);
-            var ledClan = environment.Server.GetRegisteredObject<Clan>(ledClanId);
-            var ledLeader = environment.Server.GetRegisteredObject<Hero>(ledLeaderId);
-            ledClan.SetLeader(ledLeader);
+            var proposerClan = environment.Server.GetRegisteredObject<Clan>(proposerClanId);
+            var proposerLeader = environment.Server.GetRegisteredObject<Hero>(proposerLeaderId);
+            proposerClan.SetLeader(proposerLeader);
+            proposerClan.Influence = 1000f;
             Assert.Null(leaderlessClan.Leader);
 
-            CoopKingdomDecisionProposalBehaviorPatch.DailyTickClanPrefix(
-                ObjectHelper.SkipConstructor<KingdomDecisionProposalBehavior>(), ledClan);
+            var behavior = ObjectHelper.SkipConstructor<KingdomDecisionProposalBehavior>();
+            behavior._kingdomDecisionsList = new List<KingdomDecision>();
+            behavior.DailyTick();
+
+            // The proposer tick builds elections like this one, which read every voting clan's leader
+            var election = new KingdomElection(new KingdomPolicyDecision(proposerClan, DefaultPolicies.Serfdom, false));
+            _ = election.GetLikelihoodForSponsor(proposerClan);
 
             Assert.Same(environment.Server.GetRegisteredObject<Hero>(successorId), leaderlessClan.Leader);
-            Assert.Same(ledLeader, ledClan.Leader);
+            Assert.Same(proposerLeader, proposerClan.Leader);
         }, TextMethods);
+
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() => Assert.Same(
+                client.GetRegisteredObject<Hero>(successorId),
+                client.GetRegisteredObject<Clan>(leaderlessClanId).Leader));
+        }
     }
 
     private string CreateKingdomClan(out string kingdomId, string existingKingdomId = null)

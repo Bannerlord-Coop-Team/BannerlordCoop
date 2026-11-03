@@ -59,11 +59,6 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (ModInformation.IsClient) return false;
 
-            // Every proposal builds kingdom elections that read each voting clan's leader, and a clan can lose its
-            // leader mid-session, while the load-time repair only runs on the next load
-            if (ContainerProvider.TryResolve<ILeaderlessClanResolver>(out var leaderlessClanResolver))
-                leaderlessClanResolver.RepairLoadedClans();
-
             // Mirrors vanilla's `clan == Clan.PlayerClan` skip. Proposing for a registered
             // player clan would spend that player's influence and author a decision in their name.
             if (clan.IsPlayerClan())
@@ -77,6 +72,12 @@ namespace GameInterface.Services.Kingdoms.Patches
                 || clan.IsBanditFaction
                 || clan.Kingdom == null
                 || clan.Influence < 100f)
+            {
+                return false;
+            }
+
+            // Every proposal builds kingdom elections, for this or another kingdom, that read each voting clan's leader
+            if (Clan.All.Any(other => other.Leader == null && IsLeaderlessVoter(other)))
             {
                 return false;
             }
@@ -138,6 +139,36 @@ namespace GameInterface.Services.Kingdoms.Patches
             clan.Kingdom.AddDecision(kingdomDecision);
             return false;
         }
+
+        // A clan can lose its leader mid-session while LeaderlessClanResolver otherwise runs only on load and retirement.
+        // Runs once a day outside the per-clan ticker, so closing a clan cant change the Clan.All being ticked.
+        [HarmonyPatch("DailyTick")]
+        [HarmonyPostfix]
+        public static void DailyTickPostfix()
+        {
+            if (ModInformation.IsClient) return;
+
+            // Player clans are left to their heir flow
+            var leaderless = Clan.All.Where(clan => IsLeaderlessVoter(clan) && !clan.IsPlayerClan()).ToList();
+            if (leaderless.Count == 0) return;
+
+            if (!ContainerProvider.TryResolve<ILeaderlessClanResolver>(out var resolver)) return;
+
+            foreach (var clan in leaderless)
+            {
+                try
+                {
+                    resolver.Resolve(clan);
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Failed to resolve leaderless kingdom clan {ClanId}", clan.StringId);
+                }
+            }
+        }
+
+        private static bool IsLeaderlessVoter(Clan clan) =>
+            LeaderlessClanResolver.NeedsLeader(clan) && !clan.IsUnderMercenaryService;
 
         /// <summary>
         /// Server authoritative replacement for the vanilla hourly sweep. Drains every kingdom's
