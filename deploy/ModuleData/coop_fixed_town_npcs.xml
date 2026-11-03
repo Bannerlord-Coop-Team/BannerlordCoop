@@ -933,4 +933,33 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_cb3fe1da"
+    name="{=!}Tabetha"
+    default_group="Infantry"
+    level="1"
+    is_female="true"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You came here dressed like that?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.fine_southern_dress" />
+        <equipment slot="Gloves" id="Item.highland_gloves" />
+        <equipment slot="Leg" id="Item.decorated_imperial_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
