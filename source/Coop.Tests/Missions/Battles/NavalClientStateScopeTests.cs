@@ -39,10 +39,10 @@ public class NavalClientStateScopeTests
         try
         {
             using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(idle))
-                Assert.True(CoopOrderOfBattleShipLayoutPatch.Prefix());
+                Assert.True(CoopOrderOfBattleShipLayoutPatch.Prefix(out _));
 
             using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(inBattle))
-                Assert.False(CoopOrderOfBattleShipLayoutPatch.Prefix());
+                Assert.False(CoopOrderOfBattleShipLayoutPatch.Prefix(out _));
         }
         finally
         {
