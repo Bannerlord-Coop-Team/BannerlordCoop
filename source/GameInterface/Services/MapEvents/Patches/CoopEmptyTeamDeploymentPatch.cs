@@ -1,11 +1,13 @@
 ﻿using System;
 #if DEBUG
-using System.Collections.Generic;
 using Common;
 using Common.Commands;
 using Newtonsoft.Json;
 #endif
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -53,6 +55,35 @@ internal class CoopEmptyTeamDeploymentPatch
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
     [HarmonyFinalizer]
     private static void MakeTeamPlans_Finalizer() => _inMakeTeamPlans = false;
+
+    // IsPlanMade is small enough for the JIT to inline into CheckDeployment, where the postfix below never runs, and a
+    // spawn path never plans an empty team, so its spawn gate read false and the player side never spawned (#4223)
+    [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "CheckDeployment")]
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> CheckDeployment_Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var isPlanMade = AccessTools.Method(typeof(DefaultMissionDeploymentPlan),
+            nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) });
+        var spawnGate = AccessTools.Method(typeof(CoopEmptyTeamDeploymentPatch), nameof(IsPlanMadeForSpawnGate));
+
+        foreach (var instruction in instructions)
+        {
+            if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
+                && instruction.operand is MethodInfo method && method == isPlanMade)
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = spawnGate;
+            }
+            yield return instruction;
+        }
+    }
+
+    internal static bool IsPlanMadeForSpawnGate(DefaultMissionDeploymentPlan plan, Team team)
+    {
+        bool result = plan.IsPlanMade(team);
+        IsPlanMade_Postfix(team, ref result);
+        return result;
+    }
 
     [HarmonyPatch(typeof(DefaultMissionDeploymentPlan), nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) })]
     [HarmonyPostfix]
