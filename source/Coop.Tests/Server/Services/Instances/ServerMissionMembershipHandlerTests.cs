@@ -6,7 +6,6 @@ using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Missions.Messages;
 using Moq;
@@ -250,12 +249,9 @@ public class ServerMissionMembershipHandlerTests
     {
         var oldPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51009), 9);
         var currentPeer = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51010), 10);
-        var player = new Player("current", string.Empty, string.Empty, string.Empty, string.Empty);
-        var playerManager = new Mock<IPlayerManager>();
-        var mappedPlayer = player;
-        var mappedPeer = currentPeer;
-        playerManager.Setup(manager => manager.TryGetPlayer(oldPeer, out mappedPlayer)).Returns(true);
-        playerManager.Setup(manager => manager.TryGetPeer("current", out mappedPeer)).Returns(true);
+        var playerManager = CreatePlayerManager(currentPeer, "current");
+        string staleControllerId = null;
+        playerManager.Setup(manager => manager.TryGetCurrentController(oldPeer, out staleControllerId)).Returns(false);
         var missionManager = new Mock<IMissionManager>();
         var messageBroker = new TestMessageBroker();
         using var handler = new ServerMissionMembershipHandler(
@@ -394,10 +390,9 @@ public class ServerMissionMembershipHandlerTests
     private static Mock<IPlayerManager> CreatePlayerManager(NetPeer peer, string controllerId)
     {
         var playerManager = new Mock<IPlayerManager>();
-        var player = new Player(controllerId, string.Empty, string.Empty, string.Empty, string.Empty);
-        var mappedPlayer = player;
+        var mappedControllerId = controllerId;
         var mappedPeer = peer;
-        playerManager.Setup(manager => manager.TryGetPlayer(peer, out mappedPlayer)).Returns(true);
+        playerManager.Setup(manager => manager.TryGetCurrentController(peer, out mappedControllerId)).Returns(true);
         playerManager.Setup(manager => manager.TryGetPeer(controllerId, out mappedPeer)).Returns(true);
         return playerManager;
     }

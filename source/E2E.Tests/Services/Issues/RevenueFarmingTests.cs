@@ -94,7 +94,7 @@ public sealed class RevenueFarmingTests : IDisposable
                 behavior.AddVillageEvents(new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager));
             }
         });
-        scenario = new QuestScenario(environment, giver =>
+        scenario = new QuestScenario(environment, (_, giver) =>
         {
             Assert.True(ContainerProvider.TryResolve<IObjectManager>(out var objects));
             Assert.True(objects.TryGetObject<Settlement>(townId, out var town));

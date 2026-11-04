@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.Chat.Messages;
+using System;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Chat;
@@ -8,7 +9,9 @@ internal enum ChatChannelKind
     All = 0,
     Events = 1,
     Global = 2,
-    Direct = 3,
+    Clan = 3,
+    Kingdom = 4,
+    Direct = 5,
 }
 
 /// <summary>One selectable feed or direct-message channel.</summary>
@@ -30,6 +33,7 @@ internal sealed class ChatChannelVM : ViewModel
 
         ControllerId = controllerId ?? string.Empty;
         Kind = kind;
+        SendChannel = SendChannelForKind(kind);
         this.displayName = string.IsNullOrWhiteSpace(displayName) ? ControllerId : displayName;
         this.select = select;
     }
@@ -38,11 +42,18 @@ internal sealed class ChatChannelVM : ViewModel
 
     public ChatChannelKind Kind { get; }
 
+    /// <summary>Null for Events (read-only). All sends on Global.</summary>
+    public ChatChannel? SendChannel { get; }
+
     public bool IsAll => Kind == ChatChannelKind.All;
 
     public bool IsEvents => Kind == ChatChannelKind.Events;
 
     public bool IsGlobal => Kind == ChatChannelKind.Global;
+
+    public bool IsClan => Kind == ChatChannelKind.Clan;
+
+    public bool IsKingdom => Kind == ChatChannelKind.Kingdom;
 
     public bool IsDirect => Kind == ChatChannelKind.Direct;
 
@@ -98,6 +109,11 @@ internal sealed class ChatChannelVM : ViewModel
         if (hidden || !IsSelected) HasUnreadMessages = true;
     }
 
+    public void ClearUnreadMessages()
+    {
+        HasUnreadMessages = false;
+    }
+
     public void SetMuted(bool muted)
     {
         if (isMuted == muted) return;
@@ -112,5 +128,23 @@ internal sealed class ChatChannelVM : ViewModel
 
         displayName = name;
         OnPropertyChanged(nameof(Name));
+    }
+
+    private static ChatChannel? SendChannelForKind(ChatChannelKind kind)
+    {
+        switch (kind)
+        {
+            case ChatChannelKind.All:
+            case ChatChannelKind.Global:
+                return ChatChannel.Global;
+            case ChatChannelKind.Clan:
+                return ChatChannel.Clan;
+            case ChatChannelKind.Kingdom:
+                return ChatChannel.Kingdom;
+            case ChatChannelKind.Direct:
+                return ChatChannel.Direct;
+            default:
+                return null;
+        }
     }
 }

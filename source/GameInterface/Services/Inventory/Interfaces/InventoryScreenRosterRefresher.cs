@@ -8,8 +8,6 @@ using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.ScreenSystem;
-using SandBox.GauntletUI;
 
 namespace GameInterface.Services.Inventory.Interfaces;
 
@@ -26,6 +24,13 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 {
     private const string PendingChangesResetMessage = "Inventory updated. Pending changes reset.";
     private readonly ConditionalWeakTable<InventoryLogic, InventoryBaseline> inventoryBaselines = new();
+    private readonly IInventoryScreenViewInterface screenView;
+
+    /// <summary>Takes the view used to show received changes on the open screen.</summary>
+    public InventoryScreenRosterRefresher(IInventoryScreenViewInterface screenView)
+    {
+        this.screenView = screenView;
+    }
 
     public void CaptureInventoryBaseline(InventoryLogic logic)
     {
@@ -65,9 +70,11 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
             }
 
             baseline.Rosters[side].AddToCounts(element, amount);
+            if (logic._rostersBackup[side].Count == 0) logic._rostersBackup[side] = new ItemRoster();
             logic._rostersBackup[side].AddToCounts(element, amount);
             roster.AddToCounts(element, amount);
-            RefreshInventory(logic);
+            // One item changed, so refresh its row; rebuilding the whole screen per update froze trading (#4124).
+            screenView.RefreshItem(logic, (InventoryLogic.InventorySide)side, element, amount);
         }
         return true;
     }
@@ -82,12 +89,10 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         using (new AllowedThread())
         using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
         {
+            // Reset copies the cleared backup into the live rosters and rebuilds the screen once.
+            baseline.Rosters[side].Clear();
             RestoreInventoryBackup(logic);
             logic.Reset(false);
-            baseline.Rosters[side].Clear();
-            logic._rostersBackup[side].Clear();
-            roster.Clear();
-            RefreshInventory(logic);
         }
         return true;
     }
@@ -97,7 +102,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         if (!inventoryBaselines.TryGetValue(logic, out var baseline)) return;
         // Slaughter refreshes rosters and equipment together; rollback must do the same.
         for (int side = 0; side < baseline.Rosters.Length; side++)
-            logic._rostersBackup[side] = new ItemRoster(baseline.Rosters[side]);
+            logic._rostersBackup[side] = Copy(baseline.Rosters[side]);
         logic._partyInitialEquipment = baseline.PlayerEquipment;
         logic._otherPartyInitialEquipment = baseline.OtherPartyEquipment;
     }
@@ -110,17 +115,17 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 
         public InventoryBaseline(InventoryLogic logic)
         {
-            Rosters = logic._rosters.Select(roster => new ItemRoster(roster)).ToArray();
+            Rosters = logic._rosters.Select(Copy).ToArray();
             PlayerEquipment = logic._partyInitialEquipment;
             OtherPartyEquipment = logic._otherPartyInitialEquipment;
         }
     }
 
-    private static void RefreshInventory(InventoryLogic logic)
+    /// <summary>Copies a roster so the copy can grow; ItemRoster(ItemRoster) sizes an empty copy to zero and it never grows.</summary>
+    private static ItemRoster Copy(ItemRoster source)
     {
-        if (Game.Current == null) return;
-        var view = (ScreenManager.TopScreen as GauntletInventoryScreen)?._dataSource;
-        if (view != null && ReferenceEquals(view._inventoryLogic, logic))
-            view.AfterReset(logic, false);
+        var copy = new ItemRoster();
+        copy.Add(source);
+        return copy;
     }
 }

@@ -12,6 +12,7 @@ using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
 using GameInterface.Services.Missions;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Voice;
 using Missions;
 using System.Collections.Generic;
@@ -34,6 +35,8 @@ namespace Coop.Tests.Autofac
 
             var client = container.Resolve<INetwork>();
             Assert.NotNull(client);
+            Assert.NotNull(container.Resolve<IIssueCancellationCoordinator>());
+            Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
             Assert.NotNull(container.Resolve<IVoiceClient>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
@@ -98,6 +101,12 @@ namespace Coop.Tests.Autofac
 
             var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
+            Assert.Same(container.Resolve<IIssueCancellationCoordinator>(), container.Resolve<IIssueCancellationCoordinator>());
+            Assert.NotNull(container.Resolve<IActiveIssueDismisser>());
+            using (var session = container.BeginLifetimeScope())
+            {
+                Assert.NotSame(container.Resolve<IIssueCancellationCoordinator>(), session.Resolve<IIssueCancellationCoordinator>());
+            }
             Assert.False(container.IsRegistered<IVoiceClient>());
             Assert.False(container.IsRegistered<IDiscordPresenceClient>());
             Assert.False(container.IsRegistered<IVoiceAudio>());
@@ -107,7 +116,7 @@ namespace Coop.Tests.Autofac
 
             // The restart command is an operator command, so Release servers have it too.
             Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
-            Assert.Same(container.Resolve<IServerAdmissionGate>(), container.Resolve<IServerAdmissionGate>());
+            Assert.Same(container.Resolve<IServerJoinAdmission>(), container.Resolve<IServerJoinAdmission>());
             Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
 
 #if DEBUG

@@ -1,14 +1,17 @@
 ﻿using Common;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEvents;
 
-internal interface IEncounterMenuConditionRefresher
+public interface IEncounterMenuConditionRefresher
 {
     void RefreshForMapEvent(MapEvent mapEvent);
     void RefreshForRoster(TroopRoster roster);
@@ -29,6 +32,18 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
         if (MobileParty.MainParty?.MapEvent != mapEvent && PlayerEncounter.Battle != mapEvent)
             return;
 
+        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && !mapEvent.HasWinner &&
+            PlayerEncounter.Battle == mapEvent && MobileParty.MainParty?.Party.MapEventSide == mapEvent.AttackerSide &&
+            mapEvent.DefenderSide.TroopCount == 0 && mapEvent.MapEventSettlement?.Militia == 0f &&
+            Game.Current?.GameStateManager.ActiveState is MapState { MapConversationActive: false })
+        {
+            // Surrender can arrive after encounter init; wait for both defender and militia replay.
+            if (PlayerEncounter.InsideSettlement)
+                PlayerEncounter.LeaveSettlement();
+            GameMenu.ActivateGameMenu("raiding_village");
+            return;
+        }
+
         if (NeedsEncounterMenuReinit(mapEvent))
         {
             // The menu opened after the client's battle request timed out, so it was built without a battle and
@@ -48,6 +63,10 @@ internal class EncounterMenuConditionRefresher : IEncounterMenuConditionRefreshe
 
     public void RefreshForRoster(TroopRoster roster)
     {
-        RefreshForMapEvent(roster?.OwnerParty?.MapEvent);
+        var party = roster?.OwnerParty;
+        var mapEvent = party?.MapEvent;
+        if (mapEvent == null && party?.MobileParty?.PartyComponent is MilitiaPartyComponent militia)
+            mapEvent = militia.Settlement?.Party.MapEvent;
+        RefreshForMapEvent(mapEvent);
     }
 }

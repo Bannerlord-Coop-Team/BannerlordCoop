@@ -1,6 +1,9 @@
-﻿using GameInterface.Services.Party;
+﻿using Common.Util;
+using GameInterface.Services.Party;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -48,8 +51,9 @@ public class PartyScreenRosterRefresherTests
         visible.AddToCounts(character, -4);
         logic.CurrentData.LeftMemberRoster.AddToCounts(character, 4);
         int notificationCount = 0;
+        var lockPreserver = new RecordingLockPreserver();
 
-        var applied = CreateRefresher().TryApply(
+        var applied = CreateRefresher(lockPreserver).TryApply(
             logic,
             visible,
             character,
@@ -64,6 +68,7 @@ public class PartyScreenRosterRefresherTests
         Assert.True(applied);
         Assert.Equal(1, notificationCount);
         Assert.False(logic.IsThereAnyChanges());
+        Assert.Same(logic, Assert.Single(lockPreserver.Resets));
         AssertRoster(logic.CurrentData.RightMemberRoster, character, 3, 1);
         AssertRoster(logic._initialData.RightMemberRoster, character, 3, 1);
         Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
@@ -120,7 +125,8 @@ public class PartyScreenRosterRefresherTests
         authoritative.AddToCounts(character, 5, false, 1);
         visible.AddToCounts(character, -2);
         var refresher = new PartyScreenRosterRefresher(
-            new FixedBaselineProvider(logic._initialData.RightMemberRoster));
+            new FixedBaselineProvider(logic._initialData.RightMemberRoster),
+            new RecordingLockPreserver());
 
         var applied = refresher.TryApply(logic, authoritative, character, Heal, () => { });
 
@@ -242,6 +248,55 @@ public class PartyScreenRosterRefresherTests
         AssertRoster(visible, character, 5, 1);
     }
 
+    /// <summary>
+    /// A talk started from the party screen is the active state on top of it. A prisoner the server
+    /// frees during the talk (a recruited lord's companion) must leave the screen data too, otherwise
+    /// the Done that vanilla runs on resume resets him back into the live prison roster.
+    /// </summary>
+    [Fact]
+    public void ServerRelease_DuringPartyScreenTalk_StaysOutAfterDoneReset()
+    {
+        var prisoner = new CharacterObject();
+        var logic = CreateLogic(new CharacterObject(), 5, 0, out _);
+        var prisoners = logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        prisoners.AddToCounts(prisoner, 1);
+        logic._initialData.RightPrisonerRoster.AddToCounts(prisoner, 1);
+
+        var gameStates = new GameStateManager(null, GameStateManager.GameStateManagerType.Game);
+        gameStates._gameStates.Add(new PartyState { PartyScreenLogic = logic });
+        gameStates._gameStates.Add(ObjectHelper.SkipConstructor<TaleWorlds.MountAndBlade.MissionState>());
+
+        // Same fallback as TroopRosterDeltaHandler when no open screen takes the change.
+        var openLogic = PartyScreenRosterRefresher.GetOpenLogic(gameStates);
+        if (!CreateRefresher().TryApply(openLogic, prisoners, prisoner, Release, () => { }))
+            Release(prisoners, prisoner);
+
+        logic.Reset(true);
+
+        Assert.Same(logic, openLogic);
+        Assert.Equal(-1, prisoners.FindIndexOfTroop(prisoner));
+        Assert.Equal(-1, logic._initialData.RightPrisonerRoster.FindIndexOfTroop(prisoner));
+    }
+
+    /// <summary>
+    /// With no party screen in the stack the change goes straight to the live roster.
+    /// </summary>
+    [Fact]
+    public void GetOpenLogic_NoPartyState_ReturnsNull()
+    {
+        var gameStates = new GameStateManager(null, GameStateManager.GameStateManagerType.Game);
+        gameStates._gameStates.Add(ObjectHelper.SkipConstructor<TaleWorlds.MountAndBlade.MissionState>());
+
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(gameStates));
+        Assert.Null(PartyScreenRosterRefresher.GetOpenLogic(null));
+    }
+
+    private static void Release(TroopRoster roster, CharacterObject troop)
+    {
+        roster.AddToCounts(troop, -roster.GetTroopCount(troop), false, 0, 0, true);
+        roster.InitializeCachedData();
+    }
+
     private static PartyScreenLogic CreateLogic(
         CharacterObject character,
         int number,
@@ -271,8 +326,10 @@ public class PartyScreenRosterRefresherTests
         return logic;
     }
 
-    private static PartyScreenRosterRefresher CreateRefresher()
-        => new PartyScreenRosterRefresher(new PartyScreenRosterBaselineProvider());
+    private static PartyScreenRosterRefresher CreateRefresher(RecordingLockPreserver lockPreserver = null)
+        => new PartyScreenRosterRefresher(
+            new PartyScreenRosterBaselineProvider(),
+            lockPreserver ?? new RecordingLockPreserver());
 
     private static void Heal(TroopRoster roster, CharacterObject troop)
     {
@@ -291,6 +348,17 @@ public class PartyScreenRosterRefresherTests
         Assert.True(index >= 0);
         Assert.Equal(number, roster.GetElementNumber(index));
         Assert.Equal(wounded, roster.GetElementWoundedNumber(index));
+    }
+
+    private sealed class RecordingLockPreserver : IPartyScreenLockPreserver
+    {
+        public List<PartyScreenLogic> Resets { get; } = new List<PartyScreenLogic>();
+
+        public void Reset(PartyScreenLogic logic, Action reset)
+        {
+            Resets.Add(logic);
+            reset();
+        }
     }
 
     private sealed class FixedBaselineProvider : IPartyScreenRosterBaselineProvider

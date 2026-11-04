@@ -6,17 +6,25 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
+
+env:
+  # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+  BANNERLORD_DIR: /home/mb2
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,9 +33,6 @@ jobs:
       - name: Validate release tag
         run: |
           printf '%s' "$GITHUB_REF_NAME" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Restore .NET Framework build inputs
         run: |
@@ -127,16 +132,16 @@ jobs:
     needs: build
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Download test build output
         uses: actions/download-artifact@v8
@@ -163,16 +168,16 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
-      - name: Link Bannerlord assemblies
-        run: ln -s /home/mb2 mb2
 
       - name: Download test build output
         uses: actions/download-artifact@v8

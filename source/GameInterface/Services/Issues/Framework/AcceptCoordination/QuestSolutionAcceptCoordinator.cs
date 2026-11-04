@@ -5,14 +5,19 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -22,7 +27,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// The first player to accept an issue's quest solution gets it. The server arbitrates and keeps a
 /// quest object for the owner's outcomes to run on, other clients only learn that the issue is taken.
 /// </summary>
-internal class QuestSolutionAcceptCoordinator : IHandler
+internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCoordinator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<QuestSolutionAcceptCoordinator>();
 
@@ -36,6 +41,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
     private readonly IQuestJournalOwnerResolver journal;
+    private readonly Dictionary<QuestBase, int> acceptingQuests = new();
+    private readonly IIssueConversationGuard conversationGuard;
+    private readonly ConditionalWeakTable<IssueBase, List<Action>> pendingAccepts = new();
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -47,7 +55,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IControllerIdProvider controllerIdProvider,
         IIssueConversationTracker conversationTracker,
         IIssueAcceptPreconditions acceptPreconditions,
-        IQuestJournalOwnerResolver journal)
+        IQuestJournalOwnerResolver journal,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -59,8 +68,14 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.conversationTracker = conversationTracker;
         this.acceptPreconditions = acceptPreconditions;
         this.journal = journal;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
+        messageBroker.Subscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
+        messageBroker.Subscribe<QuestAcceptanceJournalFlushRequested>(Handle_QuestAcceptanceJournalFlushRequested);
+        messageBroker.Subscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
         messageBroker.Subscribe<NetworkQuestSolutionAccepted>(Handle_NetworkQuestSolutionAccepted);
         messageBroker.Subscribe<NetworkQuestSolutionAcceptRejected>(Handle_NetworkQuestSolutionAcceptRejected);
@@ -69,9 +84,21 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
+        messageBroker.Unsubscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
+        messageBroker.Unsubscribe<QuestAcceptanceJournalFlushRequested>(Handle_QuestAcceptanceJournalFlushRequested);
+        messageBroker.Unsubscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
+        acceptingQuests.Clear();
         messageBroker.Unsubscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
         messageBroker.Unsubscribe<NetworkQuestSolutionAccepted>(Handle_NetworkQuestSolutionAccepted);
         messageBroker.Unsubscribe<NetworkQuestSolutionAcceptRejected>(Handle_NetworkQuestSolutionAcceptRejected);
+    }
+
+    public void RunWhenAccepted(IssueBase issue, Action request)
+    {
+        if (pendingAccepts.TryGetValue(issue, out var waiting)) waiting.Add(request);
+        else request();
     }
 
     private void Handle_QuestSolutionAcceptTriggered(MessagePayload<QuestSolutionAcceptTriggered> payload)
@@ -95,7 +122,94 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var captured = descriptor.QuestSolutionAcceptStrategy.Capture(issue);
 
+        pendingAccepts.GetOrCreateValue(issue);
         network.SendAll(new RequestQuestSolutionAccept(issueOwnerId, issue.StringId, issue._issueDifficultyMultiplier, captured));
+
+        var quest = issue.IssueQuest;
+        if (quest == null) return;
+
+        if (!acceptingQuests.ContainsKey(quest)) acceptingQuests.Add(quest, 0);
+    }
+
+    private void Handle_QuestAcceptanceStarted(MessagePayload<QuestAcceptanceStarted> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var quest = payload.What.Quest;
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        if (issue == null || !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId) ||
+            !issueResolver.TryResolve(issueOwnerId, issue.StringId, out _, out _, out _)) return;
+
+        // StartQuest runs before the acceptance callback writes its introduction, sometimes on a later dialogue turn.
+        if (!acceptingQuests.ContainsKey(quest)) acceptingQuests.Add(quest, 0);
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
+
+    private void Handle_QuestAcceptanceJournalFlushRequested(MessagePayload<QuestAcceptanceJournalFlushRequested> payload) => FlushAcceptanceJournals();
+
+    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload)
+    {
+        FlushAcceptanceJournals();
+        if (payload.What.Quest != null) acceptingQuests.Remove(payload.What.Quest);
+        else acceptingQuests.Clear();
+    }
+
+    private void FlushAcceptanceJournals()
+    {
+        if (ModInformation.IsServer || acceptingQuests.Count == 0) return;
+
+        foreach (var entry in acceptingQuests.ToArray())
+        {
+            var quest = entry.Key;
+            var issue = IssueManager.GetIssueOfQuest(quest);
+            if (issue == null || !quest.IsOngoing)
+            {
+                acceptingQuests.Remove(quest);
+                continue;
+            }
+
+            // The callback can update a discrete log after AddLog has announced it.
+            for (var index = entry.Value; index < quest.JournalEntries.Count; index++)
+                SendAcceptanceLog(issue, quest, index);
+
+            acceptingQuests[quest] = quest.JournalEntries.Count;
+        }
+    }
+
+    private void SendAcceptanceLog(IssueBase issue, QuestBase quest, int index)
+    {
+        if (objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
+            network.SendAll(new RequestQuestAcceptanceJournal(issueOwnerId, issue.StringId, index, quest.JournalEntries[index]));
+    }
+
+    private void Handle_RequestQuestAcceptanceJournal(MessagePayload<RequestQuestAcceptanceJournal> payload)
+    {
+        if (ModInformation.IsClient || !(payload.Who is NetPeer peer) ||
+            !playerManager.TryGetPlayer(peer, out var player)) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId ||
+                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+                issue.IssueQuest == null || !issue.IssueQuest.IsOngoing || data.Text == null ||
+                !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) return;
+
+            var quest = issue.IssueQuest;
+            // An accept strategy may already have written this stage; repeated packets must not duplicate it.
+            if (data.Index < quest.JournalEntries.Count) return;
+            if (data.Index != quest.JournalEntries.Count)
+            {
+                Logger.Warning("Ignoring out-of-order acceptance journal {index} for {issue}", data.Index, data.IssueId);
+                return;
+            }
+
+            using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
+            {
+                quest._journalEntries.Add(new JournalLog(data.Time, data.Text, data.TaskName, data.Progress, data.Range, data.Type));
+                CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+            }
+        }, context: nameof(QuestSolutionAcceptCoordinator));
     }
 
     private void Handle_RequestQuestSolutionAccept(MessagePayload<RequestQuestSolutionAccept> payload)
@@ -148,6 +262,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)
@@ -164,7 +280,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             data.IssueId,
             player.ControllerId,
             data.DifficultyMultiplier,
-            data.Captured));
+            data.Captured,
+            issue.IssueQuest?.QuestDueTime.NumTicks ?? 0,
+            issue.IssueQuest != null));
     }
 
     // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
@@ -200,7 +318,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
-        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
+        long? dueTime = issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) &&
+            issue.IsOngoingWithoutQuest ? issue.IssueDueTime.NumTicks : (long?)null;
+        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId, dueTime));
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -212,10 +332,13 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // An issue the server just made can still wait behind the giver's ended one
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
+                if (issue?.StringId == data.IssueId)
+                    pendingAccepts.Remove(issue);
                 return;
             }
 
@@ -224,16 +347,29 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             // The accepting player already ran the accept locally
             if (data.ControllerId == controllerIdProvider.ControllerId)
             {
-                return;
+                if (issue.IssueQuest != null)
+                    messageBroker.Publish(this, new QuestJournalChanged(issue.IssueQuest));
+                // Journal and ending requests share the reliable ordered channel.
+                if (pendingAccepts.TryGetValue(issue, out var waiting))
+                {
+                    pendingAccepts.Remove(issue);
+                    foreach (var request in waiting) request();
+                }
+            }
+            else
+            {
+                // No quest object here, its dialogs would answer this player's conversations too
+                pendingAccepts.Remove(issue);
+                issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
+                issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                issue.IssueDueTime = CampaignTime.Never;
+
+                descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
             }
 
-            // No quest object here, its dialogs would answer this player's conversations too
-            issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
-            issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
-            issue.IssueDueTime = CampaignTime.Never;
-
-            descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+            if (data.HasQuestDueTime && issue.IssueQuest != null)
+                issue.IssueQuest.ChangeQuestDueTime(new CampaignTime(data.QuestDueTimeTicks));
+        }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 
     private void Handle_NetworkQuestSolutionAcceptRejected(MessagePayload<NetworkQuestSolutionAcceptRejected> payload)
@@ -245,35 +381,51 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         var data = payload.What;
 
-        GameThread.RunSafe(() =>
+        // Cancelling the stray quest takes its dialog lines, which the player may still be answering
+        GameThread.RunSafe(() => conversationGuard.RunWhenNotTalkingTo(() => CancelStrayQuest(data), data.IssueOwnerId),
+            context: nameof(QuestSolutionAcceptCoordinator));
+    }
+
+    private void CancelStrayQuest(NetworkQuestSolutionAcceptRejected data)
+    {
+        if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
-            {
-                return;
-            }
+            if (issue?.StringId == data.IssueId)
+                pendingAccepts.Remove(issue);
+            return;
+        }
 
-            var strayQuest = issue.IssueQuest;
-            if (strayQuest == null)
-            {
-                return;
-            }
+        pendingAccepts.Remove(issue);
 
-            // set to null first so cancelling the quest does not finalize the issue the winner owns
-            issue.IssueQuest = null;
+        var strayQuest = issue.IssueQuest;
+        if (strayQuest == null)
+        {
+            return;
+        }
 
-            // This player never held the issue, so its ending must not be credited to them
-            issue.IsTriedToSolveBefore = false;
+        acceptingQuests.Remove(strayQuest);
 
-            // With no winner the server still offers the issue, so undo the local accept
-            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
-            {
-                issue._issueState = IssueBase.IssueState.Ongoing;
-            }
+        // set to null first so cancelling the quest does not finalize the issue the winner owns
+        issue.IssueQuest = null;
 
-            using (new AllowedThread())
-            {
-                strayQuest.CompleteQuestWithCancel();
-            }
-        }, context: nameof(QuestSolutionAcceptCoordinator));
+        // This player never held the issue, so its ending must not be credited to them
+        issue.IsTriedToSolveBefore = false;
+
+        // With no winner the server still offers the issue, so undo the local accept
+        // Read when this runs, which keeps message order, so a winner's accept that came first is in even if it waited
+        var hasOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _);
+        if (!hasOwner)
+        {
+            issue._issueState = IssueBase.IssueState.Ongoing;
+        }
+
+        using (new AllowedThread())
+        {
+            strayQuest.CompleteQuestWithCancel();
+        }
+
+        journal.DiscardArchive(issue);
+        if (data.IssueDueTimeTicks.HasValue && !hasOwner)
+            issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
     }
 }

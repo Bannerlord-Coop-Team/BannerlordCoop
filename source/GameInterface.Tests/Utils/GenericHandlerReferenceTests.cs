@@ -36,8 +36,8 @@ public class GenericHandlerReferenceTests
 
         var result = builder.GetSubscription(new Debuggable<System.Reflection.FieldInfo>(field, false));
 
-        Assert.Equal(filtersHeadless, result.Contains("DedicatedServer.NoOpMapEventVisualCreator+NoOpMapEventVisual"));
-        Assert.Equal(filtersHeadless, result.Contains("MapEventBattleFactory+HeadlessMapEventVisual"));
+        Assert.Equal(filtersHeadless, result.Contains("MapEventVisualSyncFilter.IsHeadless(value)"));
+        Assert.DoesNotContain("GetType().FullName", result);
         Assert.Contains($"instance.{memberName} = value", result);
     }
 

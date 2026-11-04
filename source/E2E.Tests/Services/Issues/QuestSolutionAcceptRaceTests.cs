@@ -2,6 +2,7 @@
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -53,10 +54,36 @@ public class QuestSolutionAcceptRaceTests : IDisposable
     }
 
     [Fact]
-    public void TheSecondPlayerToAcceptIsRejectedAndItsStrayQuestIsCancelledWithoutEndingTheIssue()
+    public void TheServersQuestMarksNothingForAClientThatLoadsIt()
     {
         scenario.Accept(scenario.ClientA);
+
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            var quest = notable.Issue.IssueQuest;
+            Assert.False(quest.IsTrackEnabled);
+            // A joining client loads this quest with the save and builds the giver's quest markers from it.
+            Assert.DoesNotContain(quest, CampaignUIHelper.GetQuestsRelatedToHero(notable));
+        });
+
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            Assert.True(notable.Issue.IssueQuest.IsTrackEnabled);
+        });
+    }
+
+    [Fact]
+    public void TheSecondPlayerToAcceptIsRejectedAndItsStrayQuestIsCancelledWithoutEndingTheIssue()
+    {
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        // The second player is still looking at the offer when the first acceptance wins.
+        router.PauseLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
+        scenario.Accept(scenario.ClientA);
         scenario.Accept(scenario.ClientB);
+        router.ResumeLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
+        TestEnvironment.FlushCoalescer();
 
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());

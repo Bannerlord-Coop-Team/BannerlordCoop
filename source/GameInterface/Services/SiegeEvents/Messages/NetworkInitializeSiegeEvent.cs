@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace GameInterface.Services.SiegeEvents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
+internal readonly struct NetworkInitializeSiegeEvent : ICommand
 {
     [ProtoMember(1)]
     public string SiegeEventId { get; }

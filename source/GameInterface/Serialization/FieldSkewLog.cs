@@ -1,18 +1,31 @@
 ﻿using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace GameInterface.Serialization
 {
     /// <summary>
-    /// Reports each skewed field once. A modded hero can carry thousands of lists with the same
-    /// missing field, and one warning per value kept the dedicated server busy writing its console
-    /// long enough to time out the join time hero transfer.
+    /// Handles packed fields the sender's runtime has but this runtime's type doesn't, warning once per field.
     /// </summary>
     internal static class FieldSkewLog
     {
         private static readonly ConcurrentDictionary<(Type, string), byte> Reported = new ConcurrentDictionary<(Type, string), byte>();
 
+        // The net6 dedicated server lacks private fields net472 clients pack (List<T>._syncRoot), so a
+        // missing field is skipped with a warning instead of a SetValue on a null FieldInfo.
+        public static bool TryGetField(ILogger logger, Type type, IEnumerable<FieldInfo> fields, string fieldName, out FieldInfo field)
+        {
+            field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+            if (field != null) return true;
+
+            WarnOnce(logger, type, fieldName);
+            return false;
+        }
+
+        // Logs the skew warning the first time this field is missing on this type.
         public static void WarnOnce(ILogger logger, Type type, string fieldName)
         {
             if (FirstTime(type, fieldName))

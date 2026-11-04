@@ -1,4 +1,4 @@
-using GameInterface.Services.Inventory.Data;
+﻿using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem;
@@ -14,6 +14,7 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     void BeginHostileActionPresentation(VillageHostileAction action);
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
+    void ResolveRaidDefenders(MapEvent mapEvent);
     void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action);
     void ApproveMapEventStart(PartyBase attacker, Settlement settlement, VillageHostileAction action);
     bool TryConsumeApprovedMapEventStart(PartyBase attacker, PartyBase defender, BattleCreationFlags flags, out VillageHostileActionDeniedReason reason);

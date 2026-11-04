@@ -10,14 +10,18 @@ internal class QuestEventRelay : IQuestEventRelay
 {
     private static readonly ConcurrentDictionary<(Type Quest, string Listener), MethodInfo> Listeners =
         new ConcurrentDictionary<(Type Quest, string Listener), MethodInfo>();
+    private static readonly ConcurrentDictionary<(Type Quest, string Listener), byte> MissingListeners =
+        new ConcurrentDictionary<(Type Quest, string Listener), byte>();
 
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IQuestTypeRegistry registry;
+    private readonly IIssueCancellationCoordinator cancellation;
 
-    public QuestEventRelay(IOutcomeDispatcher dispatcher, IQuestTypeRegistry registry)
+    public QuestEventRelay(IOutcomeDispatcher dispatcher, IQuestTypeRegistry registry, IIssueCancellationCoordinator cancellation)
     {
         this.dispatcher = dispatcher;
         this.registry = registry;
+        this.cancellation = cancellation;
     }
 
     public void Relay(string listenerName, Type[] parameterTypes, params object[] arguments)
@@ -25,15 +29,29 @@ internal class QuestEventRelay : IQuestEventRelay
         dispatcher.RunAsOwners<QuestBase>(quest =>
         {
             var issue = quest.QuestGiver?.Issue;
-            if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()))
+            if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()) ||
+                (listenerName == "OnHeroKilled" && cancellation.IsPending(issue)))
             {
                 return;
             }
 
             // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
-            var listener = Listeners.GetOrAdd((quest.GetType(), listenerName), key => FindListener(key.Quest, key.Listener, parameterTypes));
+            var key = (Quest: quest.GetType(), Listener: listenerName);
+            if (MissingListeners.ContainsKey(key)) return;
 
-            listener?.Invoke(quest, arguments);
+            if (!Listeners.TryGetValue(key, out var listener))
+            {
+                listener = FindListener(key.Quest, key.Listener, parameterTypes);
+                if (listener == null)
+                {
+                    MissingListeners.TryAdd(key, 0);
+                    return;
+                }
+
+                Listeners.TryAdd(key, listener);
+            }
+
+            listener.Invoke(quest, arguments);
         });
     }
 

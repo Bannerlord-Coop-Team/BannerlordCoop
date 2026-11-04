@@ -2,9 +2,9 @@
 <!--
   Deploy.targets
 
-  Deploys a built module into the Bannerlord install via the `mb2` junction
-  (see memory: build-environment / deploy-wipes-module). Replaces the old
-  deploy.ps1 + config_*.json + PostBuildEvent pipeline.
+  Deploys a built module into the Bannerlord install at $(BannerlordDir)
+  (from the BANNERLORD_DIR env var, see source/Directory.Build.props).
+  Replaces the old deploy.ps1 + config_*.json + PostBuildEvent pipeline.
 
   A consuming .csproj must set these properties before importing this file:
 
@@ -17,15 +17,29 @@
     - Runs on every build (no Inputs/Outputs skip). Copy uses SkipUnchangedFiles
       so unchanged files still aren't re-copied. No more wipe-and-recreate of the
       module folder, so an empty build output can no longer delete the live module.
-    - No-ops cleanly when the mb2 junction is absent (CI / fresh checkout)
-      instead of throwing.
+    - Skips cleanly when $(BannerlordDir)Modules is missing instead of
+      throwing. An unset BANNERLORD_DIR already fails the build earlier, in
+      source/Directory.Build.targets.
+    - Only the main checkout deploys. Linked git worktrees (where .git is a
+      file) skip with a message, so parallel worktrees can't overwrite the
+      live module; pass -p:DeployFromWorktree=true to deploy from one anyway.
+      -p:ModName= turns deploy off everywhere.
 -->
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!-- Says why a worktree build didn't deploy, otherwise F5 silently runs the main checkout's last deploy. -->
+  <Target Name="ReportWorktreeDeploySkipped"
+          AfterTargets="Build"
+          Condition="'$(ModName)' != '' and '$(IsMainCheckout)' != 'true' and '$(DeployFromWorktree)' != 'true'">
+    <Message Importance="high" Text="Skipping deploy of $(ModName): linked git worktree. Pass -p:DeployFromWorktree=true to deploy from here." />
+  </Target>
 
   <PropertyGroup>
     <!-- This file lives at the repo root; locate everything relative to it. -->
     <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-    <ModsRoot>$(RepoRoot)mb2\Modules</ModsRoot>
+    <ModsRoot>$(BannerlordDir)Modules</ModsRoot>
+    <!-- A linked worktree's .git is a file, so only the main checkout has .git\HEAD. -->
+    <IsMainCheckout Condition="Exists('$(RepoRoot).git\HEAD')">true</IsMainCheckout>
     <DeploySourceDir>$(RepoRoot)deploy</DeploySourceDir>
     <UIMoviesDir>$(RepoRoot)UIMovies</UIMoviesDir>
     <SubModuleTemplate>$(DeploySourceDir)\SubModule.xml</SubModuleTemplate>
@@ -37,7 +51,7 @@
 
   <Target Name="DeployToGame"
           AfterTargets="Build"
-          Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')">
+          Condition="'$(ModName)' != '' and ('$(IsMainCheckout)' == 'true' or '$(DeployFromWorktree)' == 'true') and Exists('$(ModsRoot)')">
 
     <!-- Discover these at execution time so files added after Visual Studio evaluated the project are deployed. -->
     <ItemGroup>

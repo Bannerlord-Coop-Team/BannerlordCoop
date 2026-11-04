@@ -12,23 +12,16 @@ $RuntimeDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPat
 $profilePath = Join-Path $RuntimeDirectory 'profiles.json'
 
 try {
-    # Existing operator settings are never regenerated, even if mb2 has moved.
+    # Existing operator settings are never regenerated, even if BANNERLORD_DIR has changed.
     if (!(Test-Path -LiteralPath $profilePath -PathType Leaf)) {
+        if (!$GameDirectory) { $GameDirectory = $env:BANNERLORD_DIR }
         if (!$GameDirectory) {
-            $junctionPath = Join-Path $repoRoot 'mb2'
-            if (!(Test-Path -LiteralPath $junctionPath)) {
-                throw 'mb2 junction missing. Run runmefirst.cmd or supply -GameDirectory with the game install directory.'
-            }
-            $junction = Get-Item -LiteralPath $junctionPath -Force -ErrorAction Stop
-            if ($junction.LinkType -ne 'Junction' -or !$junction.Target) {
-                throw 'mb2 must be a real Windows junction, or supply -GameDirectory with the game install directory.'
-            }
-            $GameDirectory = @($junction.Target)[0]
+            throw 'BANNERLORD_DIR is not set. Run runmefirst.cmd and restart this terminal, set BANNERLORD_DIR to the game install directory, or supply -GameDirectory.'
         }
         $GameDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($GameDirectory)
         $executable = Join-Path $GameDirectory 'bin\Win64_Shipping_Client\Bannerlord.exe'
         if (!(Test-Path -LiteralPath $executable -PathType Leaf)) {
-            throw "Bannerlord.exe not found at $executable. Run runmefirst.cmd or supply -GameDirectory."
+            throw "Bannerlord.exe not found at $executable. Run runmefirst.cmd, fix BANNERLORD_DIR or supply -GameDirectory."
         }
         $profileSettings = [ordered]@{
             artifactDirectory = Join-Path $RuntimeDirectory 'runs'

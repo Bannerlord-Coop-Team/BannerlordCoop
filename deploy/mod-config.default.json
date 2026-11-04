@@ -225,6 +225,11 @@
 
     // Set the time in seconds players have to vote on kingdom decisions.
     // Default is 60. Values of 0 or lower will default back to 60.
-    "kingdomDecisionVoteTimeoutSeconds": 60
+    "kingdomDecisionVoteTimeoutSeconds": 60,
+
+    // Set what happens to clans when their kingdom is destroyed.
+    // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
+    // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
+    "clansAfterKingdomDestruction": "Vanilla"
   }
 }

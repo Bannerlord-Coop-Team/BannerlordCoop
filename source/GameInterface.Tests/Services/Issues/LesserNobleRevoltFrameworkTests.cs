@@ -104,28 +104,36 @@ public class LesserNobleRevoltFrameworkTests
     }
 
     [Fact]
-    public void BattleState_IsSharedWithinTheSessionAndEmptyInTheNextLifetimeScope()
+    public void BattleState_IsSharedAcrossMissionScopesAndEmptyInTheNextSession()
     {
-        var builder = new ContainerBuilder();
-        builder.RegisterModule<IssuesModule>();
-        builder.RegisterInstance(new Mock<IObjectManager>().Object);
-        builder.RegisterInstance(new Mock<INetwork>().Object);
-        builder.RegisterInstance(new Mock<IIssueOwnerResolver>().Object);
-        builder.RegisterInstance(new Mock<IPlayerManager>().Object);
-        builder.RegisterInstance(new Mock<IOutcomeDispatcher>().Object);
-        using var container = builder.Build();
         var quest = ObjectHelper.SkipConstructor<Quest>();
         var owner = ObjectHelper.SkipConstructor<Hero>();
-        using (var session = container.BeginLifetimeScope())
+        using (var session = CreateSession())
         {
             var service = (LesserNobleRevoltWorldEventService)session.Resolve<ILesserNobleRevoltWorldEventService>();
             service.RecordOwnerBattle(quest, owner, null);
-            Assert.Same(service, session.Resolve<ILesserNobleRevoltWorldEventService>());
+            using (var mission = session.BeginLifetimeScope())
+            {
+                Assert.Same(service, mission.Resolve<ILesserNobleRevoltWorldEventService>());
+                Assert.True(mission.Resolve<ILesserNobleRevoltWorldEventService>().IsProtectedHero(owner));
+            }
             Assert.True(session.Resolve<ILesserNobleRevoltWorldEventService>().IsProtectedHero(owner));
         }
 
-        using var nextSession = container.BeginLifetimeScope();
+        using var nextSession = CreateSession();
         Assert.False(nextSession.Resolve<ILesserNobleRevoltWorldEventService>().IsProtectedHero(owner));
+
+        static IContainer CreateSession()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterModule<IssuesModule>();
+            builder.RegisterInstance(new Mock<IObjectManager>().Object);
+            builder.RegisterInstance(new Mock<INetwork>().Object);
+            builder.RegisterInstance(new Mock<IIssueOwnerResolver>().Object);
+            builder.RegisterInstance(new Mock<IPlayerManager>().Object);
+            builder.RegisterInstance(new Mock<IOutcomeDispatcher>().Object);
+            return builder.Build();
+        }
     }
 
     [Fact]

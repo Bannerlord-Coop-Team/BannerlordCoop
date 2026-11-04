@@ -47,6 +47,8 @@ public sealed class ModDeploymentServiceTests : IDisposable
         build.Action = CreateOutputs;
     }
 
+    private string GameRoot => settings.Profiles["fixture"].GameRoot();
+
     private ModDeploymentService Service() => new(settings, runs, new DeploymentLease(paths), environment,
         new DeploymentPlan(paths, files), build, files, new BridgeBuildInspector(), paths);
 
@@ -360,9 +362,9 @@ public sealed class ModDeploymentServiceTests : IDisposable
             e => Assert.Contains(Path.DirectorySeparatorChar + configuration + Path.DirectorySeparatorChar, e.Source));
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(report.ArtifactDirectory, "manifest.json")));
         Assert.Equal(configuration, manifest.RootElement.GetProperty("configuration").GetString());
-        var info = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", durable, "Coop", configuration);
+        var info = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable, "Coop", configuration);
         Assert.Contains("-p:Configuration=" + configuration, info.ArgumentList);
-        var naval = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", durable, "Missions.Naval", configuration);
+        var naval = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable, "Missions.Naval", configuration);
         Assert.Contains("-p:Configuration=" + configuration, naval.ArgumentList);
     }
 
@@ -379,7 +381,7 @@ public sealed class ModDeploymentServiceTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => Service().DeployAsync(solution, "fixture", default, configuration));
         Assert.Equal(0, build.Calls);
         Assert.False(Directory.Exists(durable));
-        Assert.Throws<ArgumentException>(() => ModBuildService.CreateStartInfo(repository, "MSBuild.exe", durable, "Coop", configuration));
+        Assert.Throws<ArgumentException>(() => ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable, "Coop", configuration));
     }
 
     [Fact]
@@ -419,19 +421,20 @@ public sealed class ModDeploymentServiceTests : IDisposable
     [Fact]
     public void BuildArgumentsDisableEveryDeployDestinationAndNeverAcceptShellCommands()
     {
-        var info = ModBuildService.CreateStartInfo(repository, settings.Profiles["fixture"].Deployment.MsbuildPath, durable, "Coop");
+        var info = ModBuildService.CreateStartInfo(repository, settings.Profiles["fixture"].Deployment.MsbuildPath, GameRoot, durable, "Coop");
         Assert.False(info.UseShellExecute);
         Assert.Contains("-t:Rebuild", info.ArgumentList);
         Assert.Contains("-p:Configuration=Release", info.ArgumentList);
         Assert.Contains("-p:ModName=", info.ArgumentList);
+        Assert.Contains("-p:BannerlordDir=" + Path.Combine(root, "game") + Path.DirectorySeparatorChar, info.ArgumentList);
         Assert.Contains("-p:PostBuildEvent=", info.ArgumentList);
         Assert.Contains("-p:PreBuildEvent=", info.ArgumentList);
         foreach (string property in new[] { "ModsRoot", "ModDir", "ModBinDir", "ModPrefabDir" })
             Assert.StartsWith("-p:" + property + "=" + durable, Assert.Single(info.ArgumentList, a => a.StartsWith("-p:" + property + "=")));
-        Assert.Throws<ArgumentException>(() => ModBuildService.CreateStartInfo(repository, "cmd.exe", durable, "anything & launch"));
-        var naval = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", durable, "Missions.Naval");
+        Assert.Throws<ArgumentException>(() => ModBuildService.CreateStartInfo(repository, "cmd.exe", GameRoot, durable, "anything & launch"));
+        var naval = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable, "Missions.Naval");
         Assert.Contains("-p:BuildProjectReferences=false", naval.ArgumentList);
-        var escaped = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", durable + ";ModName=Coop%", "Coop");
+        var escaped = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable + ";ModName=Coop%", "Coop");
         string redirected = Assert.Single(escaped.ArgumentList, a => a.StartsWith("-p:ModsRoot="));
         Assert.DoesNotContain(";", redirected);
         Assert.Contains("%3BModName=Coop%25", redirected);
@@ -486,7 +489,7 @@ public sealed class ModDeploymentServiceTests : IDisposable
         public string Configuration;
         public TaskCompletionSource Block;
         public TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public async Task BuildAsync(string repository, DeploymentSettings settings, string artifacts, CancellationToken cancellationToken, string configuration = "Release")
+        public async Task BuildAsync(string repository, LaunchProfile profile, string artifacts, CancellationToken cancellationToken, string configuration = "Release")
         {
             Configuration = configuration;
             Calls++; Entered.TrySetResult();

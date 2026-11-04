@@ -916,7 +916,8 @@ public class KingdomHandlerTests
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object);
     }
 
     private static Action<MessagePayload<RemoveDecision>> CreateRemoveDecisionHandler(
@@ -937,7 +938,8 @@ public class KingdomHandlerTests
             voteManager,
             new Mock<IKingdomMembershipState>().Object,
             kingdomInterface,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object);
         return removeDecisionHandler;
     }
 
@@ -974,7 +976,8 @@ public class KingdomHandlerTests
             new Mock<IKingdomDecisionVoteManager>().Object,
             new Mock<IKingdomMembershipState>().Object,
             new Mock<IKingdomInterface>().Object,
-            new Mock<IKingdomCreator>().Object);
+            new Mock<IKingdomCreator>().Object,
+            new Mock<IKingdomDecisionDataConverter>().Object);
 
         return handler;
     }

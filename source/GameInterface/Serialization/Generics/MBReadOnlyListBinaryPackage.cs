@@ -61,16 +61,7 @@ namespace GameInterface.Serialization.Generics
 
             foreach (string fieldName in StoredFields.Keys)
             {
-                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
-
-                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): a net472 sender
-                // packs List<T>._syncRoot, which does not exist on the net6 dedicated server —
-                // the null SetValue here was the join-time hero-transfer fatal. Skip unknowns.
-                if (field == null)
-                {
-                    FieldSkewLog.WarnOnce(Logger, type, fieldName);
-                    continue;
-                }
+                if (!FieldSkewLog.TryGetField(Logger, type, fields, fieldName, out var field)) continue;
 
                 if (type.IsValueType)
                 {
