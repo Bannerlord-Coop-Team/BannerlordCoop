@@ -71,8 +71,9 @@ public class ServerKingdomHandler : IHandler
     {
         var payload = obj.What;
         var partyId = payload.PartyId;
+        if (!TryGetSenderControllerId(obj.Who, payload.ControllerId, out var controllerId)) return;
 
-        if (playerManager.TryGetPlayer(payload.ControllerId, out var player))
+        if (playerManager.TryGetPlayer(controllerId, out var player))
         {
             if (string.IsNullOrWhiteSpace(partyId))
             {
@@ -81,7 +82,7 @@ public class ServerKingdomHandler : IHandler
 
             if (TryCreatePendingSettlementRestore(partyId, payload.SettlementId, out var pending))
             {
-                pendingKingdomCreationSettlements[payload.ControllerId] = pending;
+                pendingKingdomCreationSettlements[controllerId] = pending;
                 settlementTracker.Track(pending.PartyId, pending.SettlementId);
             }
 
@@ -91,7 +92,22 @@ public class ServerKingdomHandler : IHandler
             });
         }
 
-        messageBroker.Publish(this, new CreateKingdom(payload.ControllerId, payload.KingdomName, payload.CultureId));
+        messageBroker.Publish(this, new CreateKingdom(controllerId, payload.KingdomName, payload.CultureId));
+    }
+
+    // A peer always acts as its own controller, whatever id the message carries; server-published requests keep theirs.
+    private bool TryGetSenderControllerId(object sender, string requestedControllerId, out string controllerId)
+    {
+        controllerId = requestedControllerId;
+        if (sender is not NetPeer peer) return true;
+        if (playerManager.TryGetPlayer(peer, out var player))
+        {
+            controllerId = player.ControllerId;
+            return true;
+        }
+
+        Logger.Warning("Ignoring a kingdom request from peer {PeerId} with no registered player", peer.Id);
+        return false;
     }
 
     private void HandleNetworkRequestChangeKingdomName(MessagePayload<NetworkRequestChangeKingdomName> obj)
@@ -250,6 +266,7 @@ public class ServerKingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
+        if (!TryGetSenderControllerId(obj.Who, payload.ControllerId, out var controllerId)) return;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
@@ -258,18 +275,19 @@ public class ServerKingdomHandler : IHandler
             Logger.Information(
                 "Received kingdom decision vote from controller {ControllerId} for {KingdomId} " +
                 "decision {DecisionIndex}; final {IsFinal}",
-                payload.ControllerId,
+                controllerId,
                 payload.VoteData.KingdomId,
                 payload.VoteData.DecisionIndex,
                 payload.VoteData.IsFinal);
         }
 
-        messageBroker.Publish(this, new ChangeKingdomDecisionVote(payload.ControllerId, payload.VoteData));
+        messageBroker.Publish(this, new ChangeKingdomDecisionVote(controllerId, payload.VoteData));
     }
 
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
+        if (obj.Who is NetPeer && !IsSenderInKingdom(obj.Who, payload.KingdomId)) return;
 
         messageBroker.Publish(
             this,
@@ -288,6 +306,18 @@ public class ServerKingdomHandler : IHandler
         }
 
         network.SendAll(message);
+    }
+
+    // Only a member clan can propose a decision to its kingdom. The client's IgnoreInfluenceCost stays, because
+    // vanilla adds accepted trade, peace and alliance offers to the player's kingdom for free.
+    private bool IsSenderInKingdom(object sender, string kingdomId)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var hero) &&
+            objectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom) &&
+            hero.Clan?.Kingdom == kingdom) return true;
+
+        Logger.Warning("Ignoring a decision for kingdom {KingdomId} from a peer whose clan is not in it", kingdomId);
+        return false;
     }
 
     private void HandleLocalKingdomPolicyChanged(MessagePayload<KingdomPolicyChanged> obj)

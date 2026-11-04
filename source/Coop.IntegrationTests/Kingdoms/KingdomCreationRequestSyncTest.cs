@@ -25,6 +25,10 @@ public class KingdomCreationRequestSyncTest
         var client1 = TestEnvironment.Clients.First();
         var server = TestEnvironment.Server;
         client1.Resolve<IControllerIdProvider>().SetControllerId("player1");
+        // The server acts for the controller registered to the sending peer.
+        var playerManager = server.Resolve<IPlayerManager>();
+        playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
+        playerManager.SetPeer("player1", client1.NetPeer);
 
         GameThreadTestRunner.Run(() =>
             client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire")));

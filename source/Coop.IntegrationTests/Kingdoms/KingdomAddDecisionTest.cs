@@ -3,6 +3,8 @@ using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 namespace Coop.IntegrationTests.Kingdoms
@@ -48,7 +50,15 @@ namespace Coop.IntegrationTests.Kingdoms
             var client1 = TestEnvironment.Clients.First();
             var server = TestEnvironment.Server;
             var kingdom = client1.CreateRegisteredObject<Kingdom>("kingdom1");
-            server.CreateRegisteredObject<Kingdom>("kingdom1");
+            var serverKingdom = server.CreateRegisteredObject<Kingdom>("kingdom1");
+            // The server only takes a decision from a peer whose clan is in that kingdom.
+            var clan = server.CreateRegisteredObject<Clan>("clan1");
+            var hero = server.CreateRegisteredObject<Hero>("hero1");
+            clan._kingdom = serverKingdom;
+            hero._clan = clan;
+            var playerManager = server.Resolve<IPlayerManager>();
+            playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
+            playerManager.SetPeer("player1", client1.NetPeer);
             var decision = CreateDecision(client1);
             var triggerMessage = new DecisionAdded(kingdom, decision, false, 0f);
             // Act

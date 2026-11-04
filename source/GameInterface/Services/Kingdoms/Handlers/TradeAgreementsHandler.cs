@@ -6,6 +6,8 @@ using Common.Util;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -20,15 +22,18 @@ internal class TradeAgreementsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public TradeAgreementsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<UpdateTradeAgreement>(Handle_UpdateTradeAgreement);
         messageBroker.Subscribe<NetworkUpdateTradeAgreement>(Handle_NetworkUpdateTradeAgreement);
@@ -113,6 +118,7 @@ internal class TradeAgreementsHandler : IHandler
     private void Handle_NetworkClientAcceptsTradeAgreementOffer(MessagePayload<NetworkClientAcceptsTradeAgreementOffer> obj)
     {
         var data = obj.What;
+        var sender = obj.Who;
 
         // Run new trade agreement on server to use patch, updating all clients as well
         GameThread.RunSafe(() =>
@@ -121,12 +127,21 @@ internal class TradeAgreementsHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.FromKingdomId, out var fromKingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.PlayerKingdomId, out var playerKingdom)) return;
+            // Vanilla offers the agreement to the player's kingdom ruler, so only that ruler's player may accept it.
+            if (sender is NetPeer && !IsSenderRuling(sender, playerKingdom)) return;
 
             tradeAgreementsBehavior.MakeTradeAgreement(
                 fromKingdom,
                 playerKingdom,
                 Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(fromKingdom, playerKingdom));
         });
+    }
+
+    private bool IsSenderRuling(object sender, Kingdom kingdom)
+    {
+        string leaderId = null;
+        if (kingdom.Leader != null) objectManager.TryGetId(kingdom.Leader, out leaderId);
+        return playerManager.IsSenderControllingHero(sender, leaderId);
     }
 
     private void Handle_TradeGoldDistributedInKingdom(MessagePayload<TradeGoldDistributedInKingdom> obj)
