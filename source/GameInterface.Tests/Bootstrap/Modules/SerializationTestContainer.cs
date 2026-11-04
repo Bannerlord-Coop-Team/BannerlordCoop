@@ -13,7 +13,13 @@ internal static class SerializationTestContainer
     /// <summary>
     /// Starts a scope with its own object manager, so registrations made by one test never reach another.
     /// </summary>
-    public static ILifetimeScope BeginScope() => Container.Value.BeginLifetimeScope();
+    public static ILifetimeScope BeginScope() => Container.Value.BeginLifetimeScope(scopeBuilder =>
+    {
+        // ObjectManager is mutable test state, so each test needs its own registration store.
+        scopeBuilder.RegisterType<global::GameInterface.Services.ObjectManager.ObjectManager>()
+            .As<global::GameInterface.Services.ObjectManager.IObjectManager>()
+            .SingleInstance();
+    });
 
     // The registry modules scan every loaded type, so this runs once per test run instead of once per test.
     private static IContainer BuildContainer()

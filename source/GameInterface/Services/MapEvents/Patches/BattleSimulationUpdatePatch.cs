@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -41,6 +43,18 @@ public class BattleSimulationUpdatePatch
                 MessageBroker.Instance.Publish(typeof(BattleSimulationEndPatch), new RequestCancelBattleSimulation(mapEventId));
             }
         }
+    }
+}
+
+[HarmonyPatch(typeof(MapEvent), nameof(MapEvent.SimulateBattleRound))]
+internal class MapEventSimulationRoundPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        // Leaving any started encounter (village Leave included) runs one native round directly, bypassing
+        // BattleSimulation.Tick. Clients never simulate, so that parting round is skipped in co-op.
+        return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
     }
 }
 

@@ -11,6 +11,7 @@ using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
@@ -51,6 +52,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public ServerOptions ServerOptions { get; }
     [ProtoMember(14)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+    [ProtoMember(15)]
+    public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -66,7 +69,8 @@ public record NetworkGameSaveDataReceived : IEvent
         AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -82,5 +86,6 @@ public record NetworkGameSaveDataReceived : IEvent
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
+        OrderOfBattlePlayerData = orderOfBattlePlayerData;
     }
 }

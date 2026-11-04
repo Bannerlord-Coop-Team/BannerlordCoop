@@ -20,15 +20,24 @@ namespace GameInterface.Utils
         protected readonly IMessageBroker messageBroker;
         protected readonly IObjectManager objectManager;
         protected readonly INetwork network;
-        protected readonly ILogger Logger = LogManager.GetLogger<THandler>();
+        protected readonly ILogger Logger;
 
         private readonly List<Action> disposeFunctions = new List<Action>();
 
+        // Only touched inside MarshalApply, so always on the game thread
+        private readonly HashSet<uint> failedInstanceIds = new HashSet<uint>();
+
         public GenericHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+            : this(messageBroker, objectManager, network, LogManager.GetLogger<THandler>())
+        {
+        }
+
+        protected GenericHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, ILogger logger)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            Logger = logger;
         }
 
         /// <summary>
@@ -90,7 +99,16 @@ namespace GameInterface.Utils
                 MarshalApply(() =>
                 {
                     if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
-                    messageHandler(instance, data);
+
+                    try
+                    {
+                        messageHandler(instance, data);
+                    }
+                    catch
+                    {
+                        LogFirstFailure(data.InstanceId, instance, data);
+                        throw;
+                    }
                 });
             };
             messageBroker.Subscribe(payloadHandler);
@@ -111,7 +129,15 @@ namespace GameInterface.Utils
                     TValue value = null;
                     if (data.ValueId != 0 && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
 
-                    messageHandler(instance, value, data);
+                    try
+                    {
+                        messageHandler(instance, value, data);
+                    }
+                    catch
+                    {
+                        LogFirstFailure(data.InstanceId, instance, data);
+                        throw;
+                    }
                 });
             };
             messageBroker.Subscribe(payloadHandler);
@@ -134,6 +160,16 @@ namespace GameInterface.Utils
                     apply();
                 }
             }, context: typeof(THandler).Name);
+        }
+
+        // The game thread error only names the handler, so name the object once, the first time one of its applies fails
+        private void LogFirstFailure(uint instanceId, TInstance instance, object message)
+        {
+            if (!failedInstanceIds.Add(instanceId)) return;
+
+            objectManager.TryGetId(instance, out var stringId);
+            Logger.Error("Failed to apply {Message} to {Type} {StringId} with handle {Handle}",
+                message.GetType().Name, typeof(TInstance).Name, stringId, instanceId);
         }
 
         public void Dispose()

@@ -34,6 +34,10 @@ public class ArmyPatches
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
     private static readonly ConditionalWeakTable<Army, object> LongTermBehaviorTextFailures = new();
 
+    [HarmonyPatch(nameof(Army.OnSettlementOwnerChanged))]
+    [HarmonyPrefix]
+    private static bool OnSettlementOwnerChangedPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)

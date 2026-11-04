@@ -83,6 +83,9 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> AbsentControllers = new HashSet<string>();
         public readonly HashSet<string> PresentControllers = new HashSet<string>();
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
+        // Withdrew from this battle and have not entered it again; their parties stay theirs, never the host's.
+        // Folds into one participant status with the sets above in #2181.
+        public readonly HashSet<string> WithdrawnControllers = new HashSet<string>();
         public readonly HashSet<string> HostGrantedParties = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public readonly Dictionary<string, PartyHealthReports> HealthReports = new();
@@ -549,10 +552,12 @@ internal class BattleHostHandler : IHandler
         return true;
     }
 
+    // Forgets a departing controller's party reserves once its last troop health is in, and keeps it out of the host's scope.
     private void WithdrawPartyReserves(string mapEventId, MapEvent mapEvent, string controllerId)
     {
         if (mapEvent.IsHideoutBattle) return;
         var state = GetOrCreateRuntimeState(mapEventId);
+        if (!state.WithdrawnControllers.Add(controllerId)) return;
         if (state.HealthWithdrawals.Any(value => value.ControllerId == controllerId)) return;
         var pending = new PendingHealthWithdrawal { ControllerId = controllerId };
         foreach (var party in mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties))
@@ -667,6 +672,9 @@ internal class BattleHostHandler : IHandler
         var present = runtimeState != null
             ? new HashSet<string>(runtimeState.PresentControllers)
             : new HashSet<string>();
+        // A controller that withdrew keeps its party while it is away, so an offline one never falls to the host.
+        if (runtimeState != null)
+            present.UnionWith(runtimeState.WithdrawnControllers);
         foreach (var player in playerManager.Players)
             if (playerManager.IsConnected(player))
                 present.Add(player.ControllerId);
@@ -1157,7 +1165,8 @@ internal class BattleHostHandler : IHandler
     }
 
     // The party-visibility handler still has the peer-to-player mapping when a disconnect begins. This signal
-    // covers a player whose party is in the MapEvent but who dropped before joining the mission instance.
+    // covers a player whose party is in the MapEvent but who dropped before joining the mission instance. A
+    // player that already withdrew keeps its party out of the host's hands.
     private void Handle_PlayerDisconnectedFromMapEvent(MessagePayload<PlayerDisconnectedFromMapEvent> payload)
     {
         if (ModInformation.IsClient) return;
@@ -1169,8 +1178,15 @@ internal class BattleHostHandler : IHandler
         if (!battleRuntimeStates.ContainsKey(mapEventId) && !hasAssignment) return;
 
         MarkDeparted(mapEventId, controllerId);
-        bool newlyAbsent = MarkAbsent(mapEventId, controllerId);
         CancelPendingReturns(mapEventId, controllerId);
+        if (HasWithdrawn(mapEventId, controllerId))
+        {
+            Logger.Information("[BattleHost] {Controller} disconnected after withdrawing from battle {MapEventId}; its parties stay out of the host's reserve scope",
+                controllerId, mapEventId);
+            return;
+        }
+
+        bool newlyAbsent = MarkAbsent(mapEventId, controllerId);
         if (!newlyAbsent || !hasAssignment) return;
         if (assignment.HostControllerId == controllerId) return;
 
@@ -1303,10 +1319,17 @@ internal class BattleHostHandler : IHandler
         return true;
     }
 
+    // A controller entering the battle is present again, which also ends an earlier withdrawal.
     private void MarkPresent(string mapEventId, string controllerId)
     {
-        GetOrCreateRuntimeState(mapEventId).PresentControllers.Add(controllerId);
+        var runtimeState = GetOrCreateRuntimeState(mapEventId);
+        runtimeState.PresentControllers.Add(controllerId);
+        runtimeState.WithdrawnControllers.Remove(controllerId);
     }
+
+    // [Server, game thread] Whether the controller withdrew from this battle and has not entered it again.
+    private bool HasWithdrawn(string mapEventId, string controllerId) =>
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.WithdrawnControllers.Contains(controllerId);
 
     private void TrackOfflineControllersInHostScope(string mapEventId, MapEvent mapEvent,
         ISet<string> present)

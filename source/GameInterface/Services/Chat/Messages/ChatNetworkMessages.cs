@@ -9,6 +9,8 @@ public enum ChatChannel
     Global = 0,
     Direct = 1,
     System = 2,
+    Clan = 3,
+    Kingdom = 4,
 }
 
 public static class ChatMessageLimits

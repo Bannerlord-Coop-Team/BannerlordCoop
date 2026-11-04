@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
@@ -55,6 +56,51 @@ public class BattleResultReadyTests : MissionTestEnvironment
             }
         }, VictoryConclusionDisabledMethods());
 
+        Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
+        AssertMapEventPresent(mapEventId);
+    }
+
+    // A coop mission victory sets the client's BattleState without the managed-write error or a relayed state change.
+    [Theory]
+    [InlineData(BattleSideEnum.Attacker, BattleState.AttackerVictory)]
+    [InlineData(BattleSideEnum.Defender, BattleState.DefenderVictory)]
+    public void CoopMissionOverrideWinner_WindsDownLocallyWithoutAManagedClientWrite(BattleSideEnum winner, BattleState expected)
+    {
+        var (mapEventId, _) = SetupCoopBattle("host", "campaign-player");
+        var host = Clients.First();
+        var diagnostics = new List<string>();
+        Action<string> capture = message =>
+        {
+            if (message.Contains("Client updated managed") && message.Contains("BattleState"))
+                diagnostics.Add(message);
+        };
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            host.Call(() =>
+            {
+                Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                host.NetworkSentMessages.Clear();
+                bool wasInCoopBattleMission = BattleConclusionGate.IsInCoopBattleMission;
+                BattleConclusionGate.IsInCoopBattleMission = true;
+                try
+                {
+                    mapEvent.SetOverrideWinner(winner);
+                }
+                finally
+                {
+                    BattleConclusionGate.IsInCoopBattleMission = wasInCoopBattleMission;
+                }
+
+                Assert.Equal(expected, mapEvent.BattleState);
+            }, VictoryConclusionDisabledMethods());
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
+
+        Assert.Empty(diagnostics);
         Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
         AssertMapEventPresent(mapEventId);
     }

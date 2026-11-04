@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Patches;
 using Newtonsoft.Json;
 using TaleWorlds.CampaignSystem.Settlements;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using System.Globalization;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -21,20 +22,29 @@ public class CrimeDebugCommands
         public string Name => "read";
         public string Description => "Read each registered player's crime rating and faction hostility.";
         public CoopCommandSide Side => CoopCommandSide.Both;
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("faction_id", "The faction registry id.") };
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("faction_id", "Faction (clan or kingdom) name or id; quote names with spaces.") };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that maps the faction argument from a name or id.
+        public Read(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objects)
-                || !ContainerProvider.TryResolve<IPlayerManager>(out var players)
-                || !objects.TryGetObjectWithLogging<IFaction>(args[0], out var faction))
+                || !ContainerProvider.TryResolve<IPlayerManager>(out var players))
                 return new CoopCommandResult(false, "Faction or services unavailable.", "command_failed");
+            if (!resolver.TryResolveFaction(args[0], out var faction, out var error))
+                return new CoopCommandResult(false, error, "command_failed");
             objects.TryGetId(faction, out var factionId);
             var rows = players.Players.Select(player =>
             {
                 player.CrimeRatings.TryGetValue(factionId, out var rating);
                 objects.TryGetObject<Hero>(player.HeroId, out var hero);
-                return $"hero={player.HeroId};faction={args[0]};rating={rating.ToString(CultureInfo.InvariantCulture)};war={hero?.MapFaction?.IsAtWarWith(faction)}";
+                return $"hero={player.HeroId};faction={factionId};rating={rating.ToString(CultureInfo.InvariantCulture)};war={hero?.MapFaction?.IsAtWarWith(faction)}";
             });
             return new CoopCommandResult(true, string.Join("\n", rows));
         }
@@ -81,18 +91,28 @@ public class CrimeDebugCommands
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The player hero registry id."),
-            new ExpectedArgs("faction_id", "The faction registry id."),
+            new ExpectedArgs("hero_id", "Player hero name or id; quote names with spaces."),
+            new ExpectedArgs("faction_id", "Faction (clan or kingdom) name or id; quote names with spaces."),
             new ExpectedArgs("delta", "The crime rating change.")
         };
 
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that maps the hero and faction arguments from a name or id.
+        public Apply(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objects)
-                || !ContainerProvider.TryResolve<ICrimeRatingService>(out var ratings)
-                || !objects.TryGetObjectWithLogging<Hero>(args[0], out var hero)
-                || !objects.TryGetObjectWithLogging<IFaction>(args[1], out var faction)
-                || !PlayerManager.TryGetControlledObjectInfo(hero, out _)
+            if (!ContainerProvider.TryResolve<ICrimeRatingService>(out var ratings))
+                return new CoopCommandResult(false, "Invalid player, faction, or finite delta.", "command_failed");
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (!resolver.TryResolveFaction(args[1], out var faction, out error))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (!PlayerManager.TryGetControlledObjectInfo(hero, out _)
                 || !float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var delta)
                 || float.IsNaN(delta) || float.IsInfinity(delta))
                 return new CoopCommandResult(false, "Invalid player, faction, or finite delta.", "command_failed");
@@ -109,17 +129,26 @@ public class CrimeDebugCommands
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The player hero registry id."),
-            new ExpectedArgs("caravan_id", "The caravan registry id.")
+            new ExpectedArgs("hero_id", "Player hero name or id; quote names with spaces."),
+            new ExpectedArgs("caravan_id", "Caravan party name or id; quote names with spaces.")
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that maps the hero and caravan arguments from a name or id.
+        public Coerce(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objects)
-                || !objects.TryGetObjectWithLogging<Hero>(args[0], out var hero)
-                || !objects.TryGetObjectWithLogging<MobileParty>(args[1], out var caravan)
-                || !PlayerManager.TryGetControlledObjectInfo(hero, out _)
-                || hero.PartyBelongedTo == null || !caravan.IsCaravan)
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (!resolver.TryResolve(args[1], MobileParty.All.Where(party => party.IsCaravan), party => party.Name?.ToString(), out var caravan, out error))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (!PlayerManager.TryGetControlledObjectInfo(hero, out _)
+                || hero.PartyBelongedTo == null)
                 return new CoopCommandResult(false, "Registered player party and caravan required.", "command_failed");
             BeHostileAction.ApplyMinorCoercionHostileAction(hero.PartyBelongedTo.Party, caravan.Party);
             return new CoopCommandResult(true, "Caravan coercion action applied.");

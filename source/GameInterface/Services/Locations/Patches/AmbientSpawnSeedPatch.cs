@@ -1,5 +1,6 @@
 using Common;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Utils;
 using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using Serilog.Core;
@@ -91,23 +92,7 @@ internal class AmbientSpawnSeedPatch
 
         // A deterministic per-location key, distinct per location so the tavern and the town centre do
         // not share an identical crowd.
-        seed = StableHash($"{settlement.StringId}_{location.StringId}");
+        seed = StableHash.FromString($"{settlement.StringId}_{location.StringId}");
         return true;
-    }
-
-    // Maps the per-location key to a seed that is identical on every machine. A runtime string hash is
-    // randomized per process, so clients would derive different seeds and spawn different crowds.
-    private static uint StableHash(string value)
-    {
-        const uint offsetBasis = 2166136261;
-        const uint prime = 16777619;
-
-        var hash = offsetBasis;
-        foreach (var c in value)
-        {
-            hash = (hash ^ c) * prime;
-        }
-
-        return hash;
     }
 }

@@ -127,9 +127,9 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
 
-        // a won siege's army member sees the leader's aftermath, like vanilla DoEnd (#3903); this finishes
-        // the encounter itself, otherwise the stale assault menu stays up with only Leave
-        if (siegeEventInterface?.TryRouteArmyMemberToAftermath() == true)
+        // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd
+        // (#3903); this finishes the encounter itself, otherwise the stale assault menu stays up with only Leave
+        if (siegeEventInterface?.TryRouteToAftermath(playerEncounter._mapEvent) == true)
             return;
 
         PlayerEncounter.Finish(true);

@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Inventory.Interfaces;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Messages;
@@ -16,6 +17,14 @@ namespace GameInterface.Services.Inventory.Patches;
 internal class InventoryLogicPatches
 {
     private static readonly ILogger logger = LogManager.GetLogger<InventoryLogicPatches>();
+
+    [HarmonyPatch(nameof(InventoryLogic.InitializeRosters))]
+    [HarmonyPostfix]
+    static void InitializeRostersPostfix(InventoryLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var inventory))
+            inventory.CaptureInventoryBaseline(__instance);
+    }
 
     [HarmonyPatch(nameof(InventoryLogic.DoneLogic))]
     [HarmonyPrefix]
@@ -51,6 +60,13 @@ internal class InventoryLogicPatches
             }
         }
 
+        if (!ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var screenInventory))
+        {
+            logger.Error("Unable to resolve inventory services while closing the inventory screen.");
+            __result = false;
+            return false;
+        }
+
         // Send rosters and equipment slots to server to manage
         ForceTransferScreenTracker.TryClaimForceTransferId(__instance._rosters[0], out var forceTransferId);
         var message = new TradeAttempted(
@@ -68,7 +84,8 @@ internal class InventoryLogicPatches
             __instance.CurrentSettlementComponent,
             __instance.GetBoughtItems(),
             __instance.GetSoldItems(),
-            forceTransferId
+            forceTransferId,
+            screenInventory.GetInventoryBaseline(__instance)
         );
 
         MessageBroker.Instance.Publish(__instance, message);
@@ -76,6 +93,7 @@ internal class InventoryLogicPatches
         // Reset rosters so they are set on the server side
         using (new AllowedThread())
         {
+            screenInventory.RestoreInventoryBackup(__instance);
             __instance.Reset(true);
         }
 

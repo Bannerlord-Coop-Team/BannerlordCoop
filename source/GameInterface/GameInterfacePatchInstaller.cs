@@ -1,4 +1,5 @@
-﻿using GameInterface.Utils;
+﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Utils;
 using HarmonyLib;
 
 namespace GameInterface;
@@ -17,6 +18,13 @@ public interface IGameInterfacePatchInstaller
 /// <inheritdoc cref="IGameInterfacePatchInstaller"/>
 internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
 {
+    private readonly IQuestFeatureFlag questFeatureFlag;
+
+    public GameInterfacePatchInstaller(IQuestFeatureFlag questFeatureFlag)
+    {
+        this.questFeatureFlag = questFeatureFlag;
+    }
+
     /// <inheritdoc/>
     public void Install(Harmony harmony)
     {
@@ -28,5 +36,10 @@ internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
 
         harmony.PatchCategory(assembly, GameInterface.HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        if (questFeatureFlag.IsEnabled)
+        {
+            harmony.PatchCategory(assembly, GameInterface.HARMONY_QUESTS_CATEGORY);
+        }
     }
 }

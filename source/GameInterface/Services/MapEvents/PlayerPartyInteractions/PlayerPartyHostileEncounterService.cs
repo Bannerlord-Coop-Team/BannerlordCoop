@@ -254,15 +254,9 @@ internal class PlayerPartyHostileEncounterService : IPlayerPartyHostileEncounter
 
     private static void DeclareWarByPlayerHostility(PartyBase initiatorParty, IFaction initiatorFaction, IFaction responderFaction)
     {
-        var previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
-        try
+        using (new MainHeroSubstitutionScope(initiatorParty.LeaderHero, initiatorParty.MobileParty))
         {
-            ResolvedMainHeroContext.ResolvedMainHero = initiatorParty.LeaderHero;
             DeclareWarAction.ApplyByPlayerHostility(initiatorFaction, responderFaction);
-        }
-        finally
-        {
-            ResolvedMainHeroContext.ResolvedMainHero = previousResolvedMainHero;
         }
     }
 

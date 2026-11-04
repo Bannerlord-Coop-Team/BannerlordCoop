@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -27,12 +28,14 @@ public class ArmyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
 
-    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
@@ -214,6 +217,7 @@ public class ArmyHandler : IHandler
         var obj = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(payload.Who, obj.LeaderId)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;

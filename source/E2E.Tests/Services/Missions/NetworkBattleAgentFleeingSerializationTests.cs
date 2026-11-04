@@ -57,10 +57,13 @@ public class NetworkBattleAgentFleeingSerializationTests
         Assert.True(result.IsRunningAway);
     }
 
-    [Fact]
-    public void NetworkRouteBattleEnemies_RoundTripsMapEventAndRemainingFighters()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(BattleSideEnum.Attacker)]
+    [InlineData(BattleSideEnum.Defender)]
+    public void NetworkRouteBattleEnemies_RoundTripsMapEventRemainingFightersAndOptionalSide(BattleSideEnum? side)
     {
-        var original = new NetworkRouteBattleEnemies("MapEvent_Created_42", 1);
+        var original = new NetworkRouteBattleEnemies("MapEvent_Created_42", 1, side);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
 
@@ -69,5 +72,6 @@ public class NetworkBattleAgentFleeingSerializationTests
 
         Assert.Equal("MapEvent_Created_42", result.MapEventId);
         Assert.Equal(1, result.EnemiesToLeaveFighting);
+        Assert.Equal(side, result.Side);
     }
 }

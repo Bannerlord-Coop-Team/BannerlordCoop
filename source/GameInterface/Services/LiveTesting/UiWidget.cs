@@ -23,6 +23,9 @@ public sealed class UiWidget
     internal object Native;
     internal object Layer;
     internal bool ContentTruncated;
+    internal bool IsExactButton;
+    internal string FullText;
+    internal string FullValue;
     public int Parent { get; set; }
     public int ChildIndex { get; set; }
     public string Id { get; set; }

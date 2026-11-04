@@ -31,7 +31,7 @@ public class AutoSyncBuilder
     public Assembly Build()
     {
         // Only the server/host process manages the export directory (ExportFiles=true by
-        // default; the client sets it to false in StartAsClient before calling PatchAll).
+        // default in DEBUG, false in Release; the client sets it to false in StartAsClient).
         //
         // Why it is safe for the client never to delete or write the export directory:
         //

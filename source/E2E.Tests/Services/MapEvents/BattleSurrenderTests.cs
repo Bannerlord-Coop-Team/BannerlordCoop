@@ -114,6 +114,56 @@ public class BattleSurrenderTests : MapEventTestBase
     }
 
     /// <summary>
+    /// A surrender clicked before the server's battle has reached the client cannot be sent, so it must not
+    /// latch the local pending state either. Once the server's real battle party attach lands, the next click
+    /// sends exactly one request for that battle, even though the encounter never adopted it.
+    /// </summary>
+    [Fact]
+    public void RealSurrenderAction_BeforeServerBattleArrives_DoesNotLatch_ThenSendsOnceItArrives()
+    {
+        var ctx = CreateServerMapEvent();
+        var partyId = CreateServerParty();
+        var client = Clients.Last();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Campaign.Current.MainParty = party;
+        }, MapEventDisabledMethods);
+        SetMockPlayerEncounter(client);
+
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.Null(MobileParty.MainParty.MapEvent);
+
+            InvokePatchedSurrender(encounter);
+            Assert.False(encounter._playerSurrender, "a surrender that could not be sent must not latch");
+        }, WithoutNetworkDelivery());
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+
+        JoinServerPartyToSide(ctx.MapEventId, partyId, BattleSideEnum.Defender);
+
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(MobileParty.MainParty.MapEvent);
+            Assert.Null(encounter._mapEvent);
+
+            InvokePatchedSurrender(encounter);
+            Assert.True(encounter._playerSurrender);
+
+            // A second click while the reply is in flight still sends nothing more.
+            InvokePatchedSurrender(encounter);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+        Assert.Equal(partyId, request.PlayerParty);
+        Assert.Equal(ctx.MapEventId, request.MapEventId);
+    }
+
+    /// <summary>
     /// BR-061: the final battle result records the surrendered hero as a prisoner of the captor. Driven from
     /// the real surrender action, the surrendered hero is captive of the captor party on the server and every
     /// client, and its party has left the battle.

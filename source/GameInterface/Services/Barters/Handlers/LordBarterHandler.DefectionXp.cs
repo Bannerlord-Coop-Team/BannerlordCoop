@@ -1,4 +1,5 @@
 using GameInterface.Services.Barters.Messages;
+using GameInterface.Services.Heroes.Patches;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -79,9 +80,16 @@ internal sealed partial class LordBarterHandler
     /// SetSkillXpPatch and ChangeSkillLevelPatch all swallow client-side XP writes. Those three
     /// must stay as they are or this double-awards.
     /// </remarks>
-    private void ApplyDefectionPersuasionXp(Hero playerHero, DefectionPersuasionOutcome[] outcomes)
+    private void ApplyDefectionPersuasionXp(Hero playerHero, Hero targetHero, DefectionPersuasionOutcome[] outcomes)
     {
-        if (playerHero == null || outcomes == null || outcomes.Length == 0) return;
+        if (playerHero == null) return;
+
+        using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
+        {
+            TraitLevelingHelper.OnPersuasionDefection(targetHero);
+        }
+
+        if (outcomes == null || outcomes.Length == 0) return;
 
         // TryResolveContext already rejects an over-long list; this is defence in depth.
         var count = Math.Min(outcomes.Length, Patches.LordBarterPatch.MaxDefectionPersuasionOutcomes);

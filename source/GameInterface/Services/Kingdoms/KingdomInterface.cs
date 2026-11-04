@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using Serilog;
@@ -27,16 +28,30 @@ internal class KingdomInterface : IKingdomInterface
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomInterface>();
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
     private readonly IOfflineWarProtection offlineWarProtection;
-    public KingdomInterface(IKingdomDecisionVoteManager decisionVoteManager, IOfflineWarProtection offlineWarProtection)
+    private readonly IKingdomDecisionDataConverter decisionDataConverter;
+    public KingdomInterface(
+        IKingdomDecisionVoteManager decisionVoteManager,
+        IOfflineWarProtection offlineWarProtection,
+        IKingdomDecisionDataConverter decisionDataConverter)
     {
         this.decisionVoteManager = decisionVoteManager;
         this.offlineWarProtection = offlineWarProtection;
+        this.decisionDataConverter = decisionDataConverter;
     }
     public bool AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient)
         {
+            // The server could not add it for everyone, so a local copy would shift this client's indexes.
+            if (!decisionDataConverter.IsSupported(kingdomDecision))
+            {
+                Logger.Warning("Dropped a {DecisionType} proposal: Coop cannot send this kingdom decision type",
+                    kingdomDecision.GetType().Name);
+                MessageBroker.Instance.Publish(this, new SendInformationMessage(
+                    "This kingdom decision can't be proposed in Coop because its type isn't synced."));
+                return false;
+            }
             float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
             MessageBroker.Instance.Publish(kingdom,
                 new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, clientRandomNumber));
@@ -106,12 +121,24 @@ internal class KingdomInterface : IKingdomInterface
             int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
             ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
         }
-        bool hasEligiblePlayerClan = decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
+        // Votes and removals address decisions by list index, so a type clients cannot receive never enters
+        // the list; it resolves here like a decision no player votes on.
+        bool isSupported = decisionDataConverter.IsSupported(kingdomDecision);
+        bool hasEligiblePlayerClan = isSupported && decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
         CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, hasEligiblePlayerClan);
         if (!hasEligiblePlayerClan)
         {
             CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
-            election.StartElectionCoop();
+            if (isSupported)
+            {
+                election.StartElectionCoop();
+            }
+            else
+            {
+                // An online player clan still counts as a supporter, which would leave the AI waiting for a vote
+                // that can never be cast.
+                election.StartElectionWithoutPlayerCoop();
+            }
             return election.RandomFloat;
         }
         kingdom._unresolvedDecisions.Add(kingdomDecision);

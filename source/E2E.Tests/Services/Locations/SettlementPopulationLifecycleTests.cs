@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -65,13 +66,13 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
         Assert.Equal(0, peer.Mission.NativeLocationAnimalPopulationCalls);
         clients[0].Call(() =>
         {
-            Assert.True(clients[0].Resolve<ILocationNpcGate>().IsLocalHostConfirmed);
-            Assert.False(clients[0].Resolve<ILocationNpcGate>().ShouldSuppressNativeSpawns);
+            Assert.True(clients[0].Resolve<ILocationNpcAuthorityState>().IsLocalHostConfirmed);
+            Assert.False(clients[0].Resolve<ILocationNpcAuthorityState>().ShouldSuppressNativeSpawns);
         });
         clients[1].Call(() =>
         {
-            Assert.False(clients[1].Resolve<ILocationNpcGate>().IsLocalHostConfirmed);
-            Assert.True(clients[1].Resolve<ILocationNpcGate>().ShouldSuppressNativeSpawns);
+            Assert.False(clients[1].Resolve<ILocationNpcAuthorityState>().IsLocalHostConfirmed);
+            Assert.True(clients[1].Resolve<ILocationNpcAuthorityState>().ShouldSuppressNativeSpawns);
         });
 
         Assert.Single(clients[0].InternalMessages.GetMessages<AgentSpawnedInLocation>());
@@ -123,7 +124,7 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
     }
 
     [Fact]
-    public void GracefulLeaveAndReentry_CreateCleanMissionAndGateState()
+    public void GracefulLeaveAndReentry_CreateCleanMissionAndLocationAuthorityState()
     {
         EnvironmentInstance client = Clients.First();
         var (instanceId, _) = CreateSettlement("A");
@@ -140,19 +141,33 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
         Assert.False(first.Mesh.IsStarted);
         Assert.Null(first.Mesh.ActiveInstanceId);
         AssertMissionMembers(instanceId);
-        AssertCleanGate(client, activeInstanceId: null, localHostConfirmed: false);
+        AssertCleanLocationAuthority(client, activeInstanceId: null, localHostConfirmed: false);
+        // The client keeps its own assignment after the instance empties, so it still names this client.
+        client.Call(() => Assert.True(client.Resolve<ILocationHostRegistry>().IsHost(instanceId)));
 
+        bool suppressedBeforeReady = false;
+        bool confirmedBeforeReady = true;
         SettlementClientFixture second = EnterLocation(
             client,
             instanceId,
-            enableNativePopulationBoundary: true);
+            enableNativePopulationBoundary: true,
+            beforeMissionReady: mission =>
+            {
+                ILocationNpcAuthorityState authorityState = client.Resolve<ILocationNpcAuthorityState>();
+                suppressedBeforeReady = authorityState.ShouldSuppressNativeSpawns;
+                confirmedBeforeReady = authorityState.IsLocalHostConfirmed;
+                // Vanilla's AfterStart population pass runs while the mission loads, before the election.
+                mission.LocationAgentHandler.SpawnLocationCharacters();
+            });
 
+        Assert.True(suppressedBeforeReady);
+        Assert.False(confirmedBeforeReady);
         Assert.NotSame(first.Mission, second.Mission);
         Assert.NotSame(first.Controller, second.Controller);
         Assert.Single(second.Mission.Agents);
         Assert.Equal(1, second.Mission.NativeLocationPopulationCalls);
         AssertMissionMembers(instanceId, "A");
-        AssertCleanGate(client, instanceId, localHostConfirmed: true);
+        AssertCleanLocationAuthority(client, instanceId, localHostConfirmed: true);
     }
 
     private static void AssertRosterBoundNpc(SettlementClientFixture fixture, string characterId)
@@ -204,19 +219,19 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
         });
     }
 
-    private static void AssertCleanGate(
+    private static void AssertCleanLocationAuthority(
         EnvironmentInstance client,
         string? activeInstanceId,
         bool localHostConfirmed)
     {
         client.Call(() =>
         {
-            ILocationNpcGate gate = client.Resolve<ILocationNpcGate>();
-            Assert.Equal(activeInstanceId, gate.ActiveInstanceId);
-            Assert.Equal(activeInstanceId != null, gate.IsCoopLocationMissionActive);
-            Assert.Equal(localHostConfirmed, gate.IsLocalHostConfirmed);
-            Assert.False(gate.SuppressCapture);
-            Assert.False(gate.IsReplayingNativePopulation);
+            ILocationNpcAuthorityState state = client.Resolve<ILocationNpcAuthorityState>();
+            Assert.Equal(activeInstanceId, state.ActiveInstanceId);
+            Assert.Equal(activeInstanceId != null, state.IsCoopLocationMissionActive);
+            Assert.Equal(localHostConfirmed, state.IsLocalHostConfirmed);
+            Assert.False(state.IsCaptureSuppressed);
+            Assert.False(state.IsReplayingNativePopulation);
         });
     }
 }

@@ -29,7 +29,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly Mock<IConnectionCollection> connections = new Mock<IConnectionCollection>();
     private readonly Mock<IJoinPeerTerminator> terminator = new Mock<IJoinPeerTerminator>();
-    private readonly ServerAdmissionGate gate = new ServerAdmissionGate();
+    private readonly ServerJoinAdmission joinAdmission = new ServerJoinAdmission();
     private readonly Mock<ISaveInterface> saves = new Mock<ISaveInterface>();
     private readonly Mock<IMissionManager> missions = new Mock<IMissionManager>();
     private readonly List<IConnectionLogic> connectionList = new List<IConnectionLogic>();
@@ -69,7 +69,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
             network.Object,
             connections.Object,
             terminator.Object,
-            gate,
+            joinAdmission,
             saves.Object,
             missions.Object,
             () => now,
@@ -115,26 +115,26 @@ public class ServerShutdownCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void JoinGate_ClosesWith120SecondsLeft()
+    public void JoinAdmission_ClosesWith120SecondsLeft()
     {
         AddPlayer();
         Schedule(200);
 
         TickFor(79);
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
 
         Advance(1);
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Fact]
-    public void JoinGate_ShortCountdown_ClosesAtOnce()
+    public void JoinAdmission_ShortCountdown_ClosesAtOnce()
     {
         AddPlayer();
 
         Schedule(120);
 
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
         Assert.Equal(ServerShutdownPhase.Countdown, coordinator.Phase);
     }
 
@@ -145,7 +145,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
 
         Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
         Assert.Equal(new[] { LoadedSave }, queuedSaves);
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         connectionList.Remove(connection);
         TickFor(479);
         Assert.Equal(ServerShutdownPhase.Countdown, coordinator.Phase);
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
 
         // 120 s left: joins close, and with nobody connected nobody can arrive.
         Advance(1);
@@ -170,7 +170,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
     {
         var connection = AddPlayer();
         Schedule(100);
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
 
         connectionList.Remove(connection);
         Advance(1);
@@ -259,7 +259,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void Draining_ConnectionAcceptedJustBeforeTheGateClosed_IsDisconnectedToo()
+    public void Draining_ConnectionAcceptedJustBeforeJoinsClosed_IsDisconnectedToo()
     {
         peersLeaveOnDisconnect = false;
         var first = AddPlayer();
@@ -272,7 +272,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void Saving_ConnectionAcceptedJustBeforeTheGateClosed_IsDisconnectedToo()
+    public void Saving_ConnectionAcceptedJustBeforeJoinsClosed_IsDisconnectedToo()
     {
         // Nobody connected, so the drain ends at once and the racer only shows up while saving.
         Schedule(0);
@@ -318,7 +318,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.Equal(LoadedSave, completed.SaveName);
         Assert.Empty(broker.Messages.GetMessages<ServerShutdownFailed>());
         Assert.Equal(tickersStarted, tickersStopped);
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Fact]
@@ -405,7 +405,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.True(coordinator.TryCancel(out _));
 
         Assert.Equal(ServerShutdownPhase.Idle, coordinator.Phase);
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
         Assert.Equal("The server restart was cancelled.", Notices().Last());
         Assert.Equal(1, tickersStopped);
         TickFor(200);
@@ -425,7 +425,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Advance(1);
         Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
         Assert.False(coordinator.TryCancel(out _));
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Fact]
@@ -437,7 +437,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.True(coordinator.TryCancel(out _));
 
         Assert.Equal(ServerShutdownPhase.Idle, coordinator.Phase);
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
     }
 
     [Fact]
@@ -450,7 +450,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         broker.Publish(new object(), new GameSaveCompleted(LoadedSave, true));
 
         Assert.False(coordinator.TryCancel(out _));
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Theory]
@@ -461,14 +461,14 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Schedule(0);
         broker.Publish(new object(), new CoopSessionWritten(LoadedSave, true));
         broker.Publish(new object(), new GameSaveCompleted(LoadedSave, saved));
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
         AddPlayer();
 
         Schedule(600);
 
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
         TickFor(480);
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
     }
 
     [Fact]
@@ -510,7 +510,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.False(coordinator.TrySchedule(seconds, saveName!, out _));
 
         Assert.Equal(ServerShutdownPhase.Idle, coordinator.Phase);
-        Assert.True(gate.IsOpen);
+        Assert.True(joinAdmission.IsOpen);
         Assert.Empty(Notices());
         Assert.Equal(0, tickersStarted);
     }
@@ -620,7 +620,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         network.Object,
         connections.Object,
         terminator.Object,
-        new ServerAdmissionGate(),
+        new ServerJoinAdmission(),
         saves.Object,
         missions.Object,
         () => now,
@@ -650,7 +650,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.Equal(ServerShutdownPhase.Failed, coordinator.Phase);
         Assert.Equal(reason, Assert.Single(broker.Messages.GetMessages<ServerShutdownFailed>()).Reason);
         Assert.Empty(broker.Messages.GetMessages<ServerShutdownCompleted>());
-        Assert.False(gate.IsOpen);
+        Assert.False(joinAdmission.IsOpen);
         Assert.Equal(tickersStarted, tickersStopped);
     }
 

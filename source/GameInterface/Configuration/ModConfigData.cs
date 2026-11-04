@@ -122,6 +122,10 @@ public sealed class ModOptionsData
 
     public bool? ShowPlayerNameplates { get; set; }
 
+    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
+
+    public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
@@ -144,6 +148,15 @@ public enum LordDefectionRetryMode
 
     /// <summary>A refusal never blocks; the lord can be asked again straight away.</summary>
     AlwaysRetry
+}
+
+/// <summary>
+/// What happens to clans left without a kingdom after their kingdom is destroyed.
+/// </summary>
+public enum ClansAfterKingdomDestructionMode
+{
+    Vanilla,
+    KeepClans
 }
 
 public enum GoldFoodChangeMode

@@ -166,12 +166,13 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Stop();
     }
 
+    /// <summary>Opens the mission socket on the configured bind address once, then points the Steam bridge at it.</summary>
     public void Start()
     {
         if (netManager.IsRunning == false)
         {
             Logger.Debug("Starting P2P Client");
-            netManager.Start();
+            netManager.Start(Config.BindAddressIPv4, Config.BindAddressIPv6, 0);
             poller.Start();
         }
 

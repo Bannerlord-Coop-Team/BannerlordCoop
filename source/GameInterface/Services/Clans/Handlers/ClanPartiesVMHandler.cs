@@ -7,6 +7,7 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Helpers;
 using LiteNetLib;
 using Serilog;
@@ -27,18 +28,21 @@ internal class ClanPartiesVMHandler : IHandler
     private readonly INetwork network;
     private readonly ISendCoalescer sendCoalescer;
     private readonly ICoopClanPermissions permissions;
+    private readonly IPlayerManager playerManager;
 
     public ClanPartiesVMHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ICoopClanPermissions permissions,
+        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.permissions = permissions;
+        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyCreated>(Handle_NewClanPartyCreated);
         messageBroker.Subscribe<CreateNewClanParty>(Handle_CreateNewClanParty);
@@ -71,6 +75,7 @@ internal class ClanPartiesVMHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out var newLeader)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.TargetClanId, out var targetClan)) return;
@@ -124,6 +129,7 @@ internal class ClanPartiesVMHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
             Hero newLeader = null;

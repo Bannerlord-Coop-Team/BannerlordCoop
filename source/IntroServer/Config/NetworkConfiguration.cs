@@ -94,6 +94,10 @@ namespace IntroServer.Config
         public TimeSpan ObjectCreationTimeout => DisconnectTimeout;
 
         public TimeSpan NetworkPollInterval => UpdateTime;
+
+        public IPAddress BindAddressIPv4 => IPAddress.Any;
+
+        public IPAddress BindAddressIPv6 => IPAddress.IPv6Any;
         #endregion
     }
 }
