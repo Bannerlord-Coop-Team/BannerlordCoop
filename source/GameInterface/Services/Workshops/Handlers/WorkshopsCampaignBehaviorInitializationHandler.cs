@@ -75,11 +75,14 @@ namespace GameInterface.Services.Workshops.Handlers
         private void Handle(MessagePayload<NetworkInitializeServerWorkshopDataKeys> obj)
         {
             string playerHeroId = obj.What.PlayerHeroId;
-            sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
+            GameThread.RunSafe(() =>
+            {
+                sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
 
-            if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
+                if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
 
-            workshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId);
+                workshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId);
+            });
         }
 
         internal static IEnumerable<Workshop> GetWorkshopsOwnedBy(Hero playerHero)
