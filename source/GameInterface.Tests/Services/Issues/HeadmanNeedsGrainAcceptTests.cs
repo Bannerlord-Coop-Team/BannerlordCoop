@@ -1,10 +1,14 @@
 ﻿using GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Moq;
 using ProtoBuf;
 using System;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssueQuest;
@@ -67,8 +71,13 @@ public class HeadmanNeedsGrainAcceptTests
         var sourceIssue = (Issue)source;
         sourceIssue._issueDifficultyMultiplier = 0.25f;
         sourceIssue.IssueDueTime = new CampaignTime(123456);
+        var market = (Settlement)RuntimeHelpers.GetUninitializedObject(typeof(Settlement));
+        sourceIssue._nearbySuitableSettlementCache = market;
         var target = IssueWithQuest(12, 0, new CampaignTime(1));
-        var strategy = new HeadmanNeedsGrainCreationCaptureStrategy(null);
+        var objects = new Mock<IObjectManager>();
+        var marketId = "market";
+        objects.Setup(manager => manager.TryGetIdWithLogging(market, out marketId)).Returns(true);
+        var strategy = new HeadmanNeedsGrainCreationCaptureStrategy(objects.Object);
 
         strategy.ApplyAfterCreation(target, strategy.Capture(source));
 

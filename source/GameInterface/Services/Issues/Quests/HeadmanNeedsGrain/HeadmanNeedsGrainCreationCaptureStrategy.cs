@@ -21,7 +21,7 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
     public byte[] Capture(IssueBase issue)
     {
         var grainIssue = (Issue)issue;
-        var market = grainIssue.NearbySuitableSettlement;
+        var market = grainIssue._nearbySuitableSettlementCache ?? grainIssue.NearbySuitableSettlement;
         var marketId = string.Empty;
         if (market != null)
         {
