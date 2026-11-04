@@ -69,7 +69,7 @@ Always call **`stop_run`**, confirm cleanup succeeded, and only then exit/reload
 
 To join a dedicated server on `127.0.0.1:4200`:
 
-1. Deploy the client's DEBUG build first if it changed, because `deploy_mod` refuses while a server process is running. Then start the dedicated server yourself, listening on UDP port 4200, and wait until its own console or log shows it serving. Clients launch with a bare `/autoconnect`, which uses `localhost:4200`, and a profile can't change that endpoint yet.
+1. Deploy the client's DEBUG build first if it changed, because `deploy_mod` refuses while a local `Bannerlord*`, `DedicatedServer` or `ServerConsole` process is running. Then start the dedicated server yourself, listening on UDP port 4200, and wait until its own console or log shows it serving. Clients launch with a bare `/autoconnect`, which uses `localhost:4200`, and a profile can't change that endpoint yet.
 2. `preflight_run`: `{"profile":"dedicated","client_count":1}`. It counts clients only. The bridge check covers the client's DEBUG deployment, and the server's build and modules are left to the game's own join validation.
 3. `start_run`: `{"profile":"dedicated","client_count":0}`. This launches nothing and returns `state: "started"` with no instances.
 4. `start_client`, with the returned `runId` as `run_id` and `client_index: 1`.
