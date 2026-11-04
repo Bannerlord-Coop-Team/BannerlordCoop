@@ -5,7 +5,6 @@ using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.ItemRosters.Handlers;

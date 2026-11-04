@@ -70,15 +70,9 @@ internal static class MapEventHostileActionConsequences
 
     private static void DeclareWarByPlayerHostility(PartyBase attackerParty, IFaction attackerFaction, IFaction defenderFaction)
     {
-        var previousResolvedMainHero = ResolvedMainHeroContext.ResolvedMainHero;
-        try
+        using (new MainHeroSubstitutionScope(attackerParty.LeaderHero, attackerParty.MobileParty))
         {
-            ResolvedMainHeroContext.ResolvedMainHero = attackerParty.LeaderHero;
             DeclareWarAction.ApplyByPlayerHostility(attackerFaction, defenderFaction);
-        }
-        finally
-        {
-            ResolvedMainHeroContext.ResolvedMainHero = previousResolvedMainHero;
         }
     }
 

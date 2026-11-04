@@ -4,10 +4,10 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>
-/// Ends a rejected local accept and restores the offer when the server still has it available.
+/// Sent to a client whose accept lost to another player's.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientCommand
+public readonly struct NetworkQuestSolutionAcceptRejected : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;
@@ -16,21 +16,12 @@ public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientComma
     public readonly string IssueId;
 
     [ProtoMember(3)]
-    public readonly bool Available;
+    public readonly long? IssueDueTimeTicks;
 
-    [ProtoMember(4)]
-    public readonly long DueTimeTicks;
-
-    [ProtoMember(5)]
-    public readonly bool PreviouslyTried;
-
-    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId,
-        bool available = false, long dueTimeTicks = 0, bool previouslyTried = false)
+    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId, long? issueDueTimeTicks = null)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
-        Available = available;
-        DueTimeTicks = dueTimeTicks;
-        PreviouslyTried = previouslyTried;
+        IssueDueTimeTicks = issueDueTimeTicks;
     }
 }

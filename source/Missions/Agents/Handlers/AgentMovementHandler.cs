@@ -102,6 +102,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementRateController movementRateController;
     private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
     private readonly IRelayNetwork relayNetwork;
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -439,6 +440,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext,
+        ILocationNpcAuthorityState locationAuthorityState,
         IRelayNetwork relayNetwork = null)
     {
         if (movementRateController == null) throw new ArgumentNullException(nameof(movementRateController));
@@ -459,8 +461,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        this.locationAuthorityState = locationAuthorityState;
         this.relayNetwork = relayNetwork;
-        _interpolator = new AgentPositionInterpolator(agentRegistry);
+        _interpolator = new AgentPositionInterpolator(agentRegistry, locationAuthorityState);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -1848,7 +1851,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 // continuous-state writes: the local point it uses drives alignment and animation
                 // natively, and every direction/look write here would fight it (the seated-NPC
                 // spin). Its position target still flows to the interpolator below.
-                if (!LocationPoseLock.IsPointOwned(agent))
+                if (!LocationPoseLock.IsPointOwned(locationAuthorityState, agent))
                 {
                     if (!agent.HasMount)
                         data.ApplyContinuousState(agent);
@@ -2149,7 +2152,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
         // controller's player and companion agents; its host-owned NPC puppets survive for migration,
         // so this all-agents sweep would fade the whole crowd out with its host.
-        if (LocationNpcGate.IsCoopLocationMissionActive) return;
+        if (locationAuthorityState.IsCoopLocationMissionActive) return;
 
         bool sceneActive = Mission.Current != null;
 

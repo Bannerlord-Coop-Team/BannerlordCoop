@@ -4,6 +4,8 @@ using Common.Network;
 using Common.Serialization;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Tests.Services.Issues;
 using System;
 using System.Threading;
 
@@ -37,6 +39,9 @@ internal class PatchBootstrap : IDisposable
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
         builder.RegisterModule<GameInterfaceModule>();
+
+        builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
+
         Container = builder.Build();
 
         // This will not allow changing of the container in ContainerProvider until containerLock is disposed

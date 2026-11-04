@@ -76,7 +76,7 @@ public class EscortMerchantCaravanTests : IDisposable
     {
         environment = new E2ETestEnvironment(output);
         spawn = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.SpawnCaravan)));
-        scenario = new QuestScenario(environment, hero => new Issue(hero));
+        scenario = new QuestScenario(environment, (_, hero) => new Issue(hero));
         caravanId = environment.CreateRegisteredObject<MobileParty>();
 
         var townId = environment.CreateRegisteredObject<Settlement>();

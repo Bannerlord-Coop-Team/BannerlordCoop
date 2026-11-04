@@ -7,7 +7,12 @@ namespace GameInterface.AutoSync
     {
         public static string ExportPath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\AutoSyncExport";
 
+        // Export is a debug inspection aid only, the generated assembly is compiled and loaded in memory.
+#if DEBUG
         public static bool ExportFiles { get; set; } = true;
+#else
+        public static bool ExportFiles { get; set; } = false;
+#endif
 
         public static bool Enabled { get; } = true;
 

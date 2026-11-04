@@ -64,7 +64,10 @@ namespace GameInterface.Services.Heroes.Patches
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
-                yield return method;
+                if (method.Name != nameof(Hero.AddPower))
+                {
+                    yield return method;
+                }
             }
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
@@ -264,7 +267,7 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._power));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PowerIntercept));
@@ -373,6 +376,19 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
 
             instance.IsPregnant = isPregnant;
+        }
+    }
+
+    // Quest outcomes such as a hand-in raise a hero's power through AddPower, which a patched caller inlines when it is
+    // compiled before this writer is installed. Only AddPower is moved ahead; the rest of HeroFieldPatches stays where it was.
+    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
+    [HarmonyPatch(typeof(Hero), nameof(Hero.AddPower))]
+    internal class HeroAddPowerPatch
+    {
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return HeroFieldPatches.PowerTranspiler(instructions);
         }
     }
 }

@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior.Lord
 
 namespace GameInterface.Services.Issues.Quests.LordNeedsHorses.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.GiveMounts))]
 internal class LordNeedsHorsesGiveMountsPatch
 {

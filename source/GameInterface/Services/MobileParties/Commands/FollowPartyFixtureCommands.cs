@@ -5,6 +5,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using Helpers;
 using System.Collections.Generic;
 using System.Globalization;
@@ -25,6 +26,10 @@ internal static class FollowPartyFixtureCommands
 
     public sealed class SetupCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public SetupCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "follow_fixture_setup";
@@ -35,7 +40,7 @@ internal static class FollowPartyFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("playerPartyId", "The player party id."),
+            new ExpectedArgs("playerPartyId", "Player party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -47,12 +52,12 @@ internal static class FollowPartyFixtureCommands
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
                 !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
                 return Failed("Unable to resolve fixture services.");
-            if (!TryFindParty(args[0], out MobileParty playerParty))
-                return Failed($"Player party '{args[0]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out MobileParty playerParty, out var error))
+                return Failed(error);
             if (!playerParty.IsPlayerParty())
-                return Failed($"Party '{args[0]}' is not registered as a player party.");
+                return Failed($"Party '{resolver.DisplayId(playerParty)}' is not registered as a player party.");
             if (!IsAvailableOnMap(playerParty))
-                return Failed($"Player party '{args[0]}' must be active on the campaign map and outside a map event, settlement, or army.");
+                return Failed($"Player party '{resolver.DisplayId(playerParty)}' must be active on the campaign map and outside a map event, settlement, or army.");
 
             MobileParty targetParty = MobileParty.All
                 .Where(party => party != playerParty &&
@@ -97,6 +102,10 @@ internal static class FollowPartyFixtureCommands
 
     public sealed class FollowCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public FollowCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "follow_fixture_follow";
@@ -107,15 +116,15 @@ internal static class FollowPartyFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("targetPartyId", "The target party id."),
+            new ExpectedArgs("targetPartyId", "Target party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient)
                 return Failed("Command can only be run on a client.");
-            if (!TryFindParty(args[0], out MobileParty targetParty))
-                return Failed($"Target party '{args[0]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out MobileParty targetParty, out var error))
+                return Failed(error);
 
             MobileParty playerParty = MobileParty.MainParty;
             if (!IsAvailableOnMap(playerParty) || !IsAvailableOnMap(targetParty))
@@ -174,6 +183,10 @@ internal static class FollowPartyFixtureCommands
 
     public sealed class StateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public StateCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.mobileparty";
 
         public string Name => "follow_fixture_state";
@@ -184,16 +197,16 @@ internal static class FollowPartyFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("playerPartyId", "The player party id."),
-            new ExpectedArgs("targetPartyId", "The target party id."),
+            new ExpectedArgs("playerPartyId", "Player party name or id; quote names with spaces."),
+            new ExpectedArgs("targetPartyId", "Target party name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryFindParty(args[0], out MobileParty playerParty))
-                return Failed($"Player party '{args[0]}' was not found.");
-            if (!TryFindParty(args[1], out MobileParty targetParty))
-                return Failed($"Target party '{args[1]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out MobileParty playerParty, out var error))
+                return Failed(error);
+            if (!resolver.TryResolveMobileParty(args[1], out MobileParty targetParty, out error))
+                return Failed(error);
 
             return Succeeded($"player={playerParty.StringId}|target={targetParty.StringId}|" +
                 $"distance={Distance(playerParty, targetParty).ToString("R", CultureInfo.InvariantCulture)}|" +
@@ -254,12 +267,6 @@ internal static class FollowPartyFixtureCommands
         party.MapEvent == null &&
         party.Army == null &&
         !party.IsTransitionInProgress;
-
-    private static bool TryFindParty(string id, out MobileParty party)
-    {
-        party = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(id);
-        return party != null;
-    }
 
     private static float Distance(MobileParty first, MobileParty second) =>
         first.Position.Distance(second.Position);

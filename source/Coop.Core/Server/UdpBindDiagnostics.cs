@@ -15,9 +15,9 @@ namespace Coop.Core.Server;
 public interface IUdpBindDiagnostics
 {
     /// <summary>
-    /// Binds <paramref name="port"/> again the way LiteNetLib does and describes the result. Never throws.
+    /// Binds <paramref name="address"/>:<paramref name="port"/> again the way LiteNetLib does and describes the result. Never throws.
     /// </summary>
-    UdpBindFailure Describe(int port);
+    UdpBindFailure Describe(IPAddress address, int port);
 }
 
 /// <summary>
@@ -50,13 +50,14 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     private static readonly string[] GenericHostNames = { "dotnet", "testhost" };
     private static readonly char[] PathSeparators = { '\\', '/' };
 
-    public UdpBindFailure Describe(int port)
+    /// <inheritdoc/>
+    public UdpBindFailure Describe(IPAddress address, int port)
     {
         try
         {
             if (port <= 0) return new UdpBindFailure(ReasonUnavailable, Closing);
 
-            SocketError? error = Probe(port);
+            SocketError? error = Probe(address, port);
             // Only AddressAlreadyInUse can mean a holder; AccessDenied never does for an exclusive wildcard bind.
             string? owners = error == SocketError.AddressAlreadyInUse ? DescribeOwners(port) : null;
             string detail = owners == null ? Format(port, error) : owners + " " + Closing;
@@ -69,7 +70,7 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     }
 
     // Mirrors LiteNetLib's exclusive IPv4 bind, otherwise a holder on one address would read as a free port.
-    internal static SocketError? Probe(int port)
+    internal static SocketError? Probe(IPAddress address, int port)
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         try
@@ -83,7 +84,7 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
 
         try
         {
-            socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            socket.Bind(new IPEndPoint(address, port));
             return null;
         }
         catch (SocketException ex)

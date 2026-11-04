@@ -51,6 +51,16 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
+        /// <summary>
+        /// Like native <see cref="KingdomElection.StartElectionWithoutPlayer"/>: the AI picks and applies the outcome
+        /// even when a player clan supports the decision.
+        /// </summary>
+        public void StartElectionWithoutPlayerCoop()
+        {
+            this._ignorePlayerSupport = true;
+            this.StartElectionCoop();
+        }
+
         public void SetupPlayerVoteElection()
         {
             this.Setup();

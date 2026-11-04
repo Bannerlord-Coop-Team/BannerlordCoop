@@ -222,10 +222,10 @@ public class CoopMissionControllerTeardownTests
 
         protected override void OnLeaving() => onLeaving?.Invoke();
 
-        public override void Dispose()
+        protected override void DisposeMission()
         {
             onDispose?.Invoke();
-            base.Dispose();
+            base.DisposeMission();
         }
     }
 }

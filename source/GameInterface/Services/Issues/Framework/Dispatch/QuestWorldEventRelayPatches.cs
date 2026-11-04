@@ -2,13 +2,32 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class QuestWorldEventRelayPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPostfix]
+    private static void OnHeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
+    {
+        Relay("OnHeroKilled", new[] { typeof(Hero), typeof(Hero), typeof(KillCharacterAction.KillCharacterActionDetail), typeof(bool) }, victim, killer, detail, showNotification);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    [HarmonyPostfix]
+    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (!mapEvent.IsForcingSupplies && !mapEvent.IsForcingVolunteers) return;
+
+        Relay("OnMapEventStarted", new[] { typeof(MapEvent), typeof(PartyBase), typeof(PartyBase) }, mapEvent, attackerParty, defenderParty);
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
     [HarmonyPostfix]
     private static void OnWarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
@@ -31,6 +50,29 @@ internal class QuestWorldEventRelayPatches
             "OnClanChangedKingdom",
             new[] { typeof(Clan), typeof(Kingdom), typeof(Kingdom), typeof(ChangeKingdomAction.ChangeKingdomActionDetail), typeof(bool) },
             clan, oldKingdom, newKingdom, actionDetail, showNotification);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
+    [HarmonyPostfix]
+    private static void OnSettlementOwnerChangedPostfix(
+        Settlement settlement,
+        bool openToClaim,
+        Hero newOwner,
+        Hero oldOwner,
+        Hero capturerHero,
+        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    {
+        Relay(
+            "OnSettlementOwnerChanged",
+            new[] { typeof(Settlement), typeof(bool), typeof(Hero), typeof(Hero), typeof(Hero), typeof(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail) },
+            settlement, openToClaim, newOwner, oldOwner, capturerHero, detail);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnArmyDispersed))]
+    [HarmonyPostfix]
+    private static void OnArmyDispersedPostfix(Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
+    {
+        Relay("OnArmyDispersed", new[] { typeof(Army), typeof(Army.ArmyDispersionReason), typeof(bool) }, army, reason, isPlayersArmy);
     }
 
     private static void Relay(string listenerName, System.Type[] parameterTypes, params object[] arguments)

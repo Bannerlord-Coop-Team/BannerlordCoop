@@ -63,10 +63,17 @@ internal static class LargeBattleRosterFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
-            new ExpectedArgs("second_party_or_controller_id", "The second party or controller id.", true),
+            new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
+            new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
             new ExpectedArgs("troops_per_party", "The troops per party.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public LargeBattleRosterBeginCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -83,6 +90,7 @@ internal static class LargeBattleRosterFixtureCommands
             if (!TryGetObjectManager(out IObjectManager objectManager))
                 return Failed("Unable to resolve ObjectManager.");
             if (!TryResolveParty(
+                    resolver,
                     objectManager,
                     args[0],
                     out MobileParty firstParty,
@@ -91,6 +99,7 @@ internal static class LargeBattleRosterFixtureCommands
                 return Failed(firstError);
             }
             if (!TryResolveParty(
+                    resolver,
                     objectManager,
                     args[1],
                     out MobileParty secondParty,
@@ -139,10 +148,17 @@ internal static class LargeBattleRosterFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
-            new ExpectedArgs("second_party_or_controller_id", "The second party or controller id.", true),
+            new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
+            new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
             new ExpectedArgs("healthy_per_party", "The healthy per party.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ExactBattleRosterBeginCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -154,7 +170,7 @@ internal static class LargeBattleRosterFixtureCommands
                 return Failed("Invalid command argument value.");
             }
 
-            return BeginExact(args[0], args[1], healthyPerParty, healthyPerParty);
+            return BeginExact(resolver, args[0], args[1], healthyPerParty, healthyPerParty);
         }
     }
 
@@ -170,11 +186,18 @@ internal static class LargeBattleRosterFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
-            new ExpectedArgs("second_party_or_controller_id", "The second party or controller id.", true),
+            new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
+            new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
             new ExpectedArgs("first_healthy", "The first healthy.", true),
             new ExpectedArgs("second_healthy", "The second healthy.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public BattleSizeRosterBeginCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -190,11 +213,12 @@ internal static class LargeBattleRosterFixtureCommands
                 return Failed("Invalid command argument value.");
             }
 
-            return BeginExact(args[0], args[1], firstHealthyCount, secondHealthyCount);
+            return BeginExact(resolver, args[0], args[1], firstHealthyCount, secondHealthyCount);
         }
     }
 
     private static CoopCommandResult BeginExact(
+        ICommandObjectResolver resolver,
         string firstPartyId,
         string secondPartyId,
         int firstHealthyCount,
@@ -208,6 +232,7 @@ internal static class LargeBattleRosterFixtureCommands
             return Failed("Unable to resolve the exact battle fixture services.");
         }
         if (!TryResolveParty(
+                resolver,
                 objectManager,
                 firstPartyId,
                 out MobileParty firstParty,
@@ -216,6 +241,7 @@ internal static class LargeBattleRosterFixtureCommands
             return Failed(firstError);
         }
         if (!TryResolveParty(
+                resolver,
                 objectManager,
                 secondPartyId,
                 out MobileParty secondParty,
@@ -309,23 +335,31 @@ internal static class LargeBattleRosterFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
-            new ExpectedArgs("second_party_or_controller_id", "The second party or controller id.", true),
+            new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
+            new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public LargeBattleRosterStatusCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args);
+            return Status(resolver, args);
         }
     }
 
-    private static CoopCommandResult Status(IReadOnlyList<string> args)
+    private static CoopCommandResult Status(ICommandObjectResolver resolver, IReadOnlyList<string> args)
     {
         if (!ModInformation.IsServer)
             return Failed("Run this command on the server.");
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return Failed("Unable to resolve ObjectManager.");
         if (!TryResolveParty(
+                resolver,
                 objectManager,
                 args[0],
                 out MobileParty firstParty,
@@ -334,6 +368,7 @@ internal static class LargeBattleRosterFixtureCommands
             return Failed(firstError);
         }
         if (!TryResolveParty(
+                resolver,
                 objectManager,
                 args[1],
                 out MobileParty secondParty,
@@ -362,13 +397,20 @@ internal static class LargeBattleRosterFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
-            new ExpectedArgs("second_party_or_controller_id", "The second party or controller id.", true),
+            new ExpectedArgs("first_party_or_controller_id", "First mobile party name or id, or a player controller id; quote names with spaces.", true),
+            new ExpectedArgs("second_party_or_controller_id", "Second mobile party name or id, or a player controller id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ExactBattleRosterStatusCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args);
+            return Status(resolver, args);
         }
     }
 
@@ -487,18 +529,16 @@ internal static class LargeBattleRosterFixtureCommands
         return container.TryResolve(out objectManager);
     }
 
+    // Resolves a party by name or id, then falls back to a player controller id mapped to that player's party.
     private static bool TryResolveParty(
+        ICommandObjectResolver resolver,
         IObjectManager objectManager,
         string id,
         out MobileParty party,
         out string error)
     {
-        if (objectManager.TryGetObject(id, out party)
-            || CommandHelpers.TryGetMobileParty(id, out party, out _))
-        {
-            error = null;
+        if (resolver.TryResolveMobileParty(id, out party, out error))
             return true;
-        }
 
         if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)
             && playerManager.TryGetPlayer(id, out var player)
@@ -508,7 +548,9 @@ internal static class LargeBattleRosterFixtureCommands
             return true;
         }
 
-        error = $"Unable to resolve party or player controller {id}.";
+        if (error != null && !resolver.IsAmbiguous(error))
+            error += $" No player controller with id '{id}' was found either.";
+
         return false;
     }
 

@@ -8,7 +8,6 @@ using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
@@ -37,8 +36,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             HorseComponent.Maneuver = 55;
             HorseComponent.Speed = 513;
 
-            Monster monster = MBObjectManager.Instance.CreateObject<Monster>();
-            monster.StringId = "testMonster";
+            Monster monster = new Monster { StringId = "testMonster" };
 
             HorseComponent.Monster = monster;
 

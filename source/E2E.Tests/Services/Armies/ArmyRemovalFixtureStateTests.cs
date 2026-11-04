@@ -2,6 +2,7 @@
 using Common.Commands;
 using E2E.Tests.Environment;
 using GameInterface.Services.Armies.Commands;
+using GameInterface.Utils.Commands;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,13 +35,15 @@ public class ArmyRemovalFixtureStateTests : IDisposable
         {
             instance.Call(() =>
             {
-                var command = new ArmyRemovalFixtureStateCommand(instance.ObjectManager);
+                var command = new ArmyRemovalFixtureStateCommand(instance.ObjectManager, instance.Resolve<ICommandObjectResolver>());
                 var args = new CoopCommandArgsFactory().FromValues(new[] { armyId, leaderId, memberId });
                 var result = command.ProcessCommand(args);
                 Assert.True(result.Succeeded);
                 var state = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
                 Assert.True(state.Value<bool>("armyExists"));
                 Assert.Equal(leaderId, state.Value<string>("leaderId"));
+                Assert.Equal(leaderId, state["parties"]![0]!.Value<string>("partyId"));
+                Assert.Equal(memberId, state["parties"]![1]!.Value<string>("partyId"));
                 Assert.Equal(leaderId, state["parties"]![1]!.Value<string>("attachedToId"));
                 Assert.Contains(memberId, state["parties"]![0]!["attachedPartyIds"]!.Values<string>());
             });
@@ -50,7 +53,7 @@ public class ArmyRemovalFixtureStateTests : IDisposable
         {
             instance.Call(() =>
             {
-                var result = new ArmyRemovalFixtureStateCommand(instance.ObjectManager).ProcessCommand(
+                var result = new ArmyRemovalFixtureStateCommand(instance.ObjectManager, instance.Resolve<ICommandObjectResolver>()).ProcessCommand(
                     new CoopCommandArgsFactory().FromValues(new[] { armyId, leaderId, memberId }));
                 Assert.True(result.Succeeded);
                 var state = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));

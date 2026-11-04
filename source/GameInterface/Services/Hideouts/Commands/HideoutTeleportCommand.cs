@@ -3,7 +3,7 @@ using Common.Commands;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -19,17 +19,16 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
 {
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyBehaviorSnapshot behaviorSnapshot;
-    private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
 
     public HideoutTeleportCommand(IMessageBroker messageBroker, IMobilePartyBehaviorSnapshot behaviorSnapshot,
-        IObjectManager objectManager)
+        ICommandObjectResolver resolver)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (behaviorSnapshot == null) throw new ArgumentNullException(nameof(behaviorSnapshot));
-        if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
         this.messageBroker = messageBroker;
         this.behaviorSnapshot = behaviorSnapshot;
-        this.objectManager = objectManager;
+        this.resolver = resolver;
     }
 
     public string Prefix => "coop.debug.hideout";
@@ -38,7 +37,7 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("partyId", "The registered party id shown by coop.debug.players.list."),
+        new ExpectedArgs("partyId", "Party name or id (ids shown by coop.debug.players.list); quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -49,9 +48,9 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
         if (campaign == null)
             return new CoopCommandResult(false, "Campaign is not loaded.", "campaign_unavailable");
 
-        var partyId = args[0];
-        if (!objectManager.TryGetObject<MobileParty>(partyId, out var party))
-            return new CoopCommandResult(false, $"No party with id '{partyId}' was found.", "party_not_found");
+        if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+            return new CoopCommandResult(false, error, "party_not_found");
+        var partyId = resolver.DisplayId(party);
         if (!party.IsActive)
             return new CoopCommandResult(false, $"Party '{partyId}' is not active.", "party_unavailable");
         if (party.CurrentSettlement != null || party.MapEvent != null || party.SiegeEvent != null || party.Army != null)

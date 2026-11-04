@@ -15,7 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
-using UnregisteredIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+using UnregisteredIssue = E2E.Tests.Services.Issues.NeverRegisteredIssue;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -108,11 +108,13 @@ public class ActiveIssueDismisserTests : IDisposable
         instance.Call(() => instance.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(leaver.NetPeer, default(DisconnectInfo))));
     }
 
-    [Fact]
-    public void ServerStart_DismissesAQuestIssueNobodyOwns()
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
+    [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
+    public void ServerStart_DismissesAnIssueNobodyOwns(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        AddIssue(Server, notableId, state);
 
         PublishServerStarted(Server);
 
@@ -215,15 +217,17 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.True(HasOwner(notableId));
     }
 
-    [Fact]
-    public void PlayerDisconnected_DismissesTheQuestOfAnOwnerThatLeftAndEveryClientEndsIt()
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
+    [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
+    public void PlayerDisconnected_DismissesTheIssueOfAnOwnerThatLeftAndEveryClientEndsIt(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterPlayer(ControllerId);
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
-        AddIssue(Client, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
-        AddIssue(OtherClient, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        AddIssue(Server, notableId, state);
+        AddIssue(Client, notableId, state);
+        AddIssue(OtherClient, notableId, state);
         SetOwner(notableId, ControllerId);
 
         Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer));
@@ -240,13 +244,15 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
     }
 
-    [Fact]
-    public void PlayerDisconnected_KeepsTheQuestOfAnOwnerThatIsStillConnected()
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
+    [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
+    public void PlayerDisconnected_KeepsTheIssueOfAnOwnerThatIsStillConnected(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterPlayer(ControllerId);
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        AddIssue(Server, notableId, state);
         SetOwner(notableId, ControllerId);
 
         PublishDisconnected(Server, OtherClient);

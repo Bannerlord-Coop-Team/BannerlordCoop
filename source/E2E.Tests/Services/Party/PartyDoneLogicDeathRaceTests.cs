@@ -2,6 +2,8 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -52,6 +54,11 @@ public class PartyDoneLogicDeathRaceTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(targetHero, out targetHeroId));
             Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out targetCharacterId));
             Assert.True(Server.ObjectManager.TryGetId(ordinaryTroop, out ordinaryTroopId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var leaderHeroId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", leaderHeroId, string.Empty, string.Empty, string.Empty)));
+            playerManager.SetPeer("RequestingControllerId", Clients.First().NetPeer);
         });
         TestEnvironment.FlushCoalescer();
 
