@@ -123,10 +123,14 @@ public readonly struct RequestClearAlley : ICommand
     public readonly string AlleyId;
     [ProtoMember(2)]
     public readonly string ClearerId;
-    public RequestClearAlley(string alleyId, string clearerId)
+    /// <summary>The gang leader the client saw owning the alley when it chose to leave it empty.</summary>
+    [ProtoMember(3)]
+    public readonly string GangOwnerId;
+    public RequestClearAlley(string alleyId, string clearerId, string gangOwnerId)
     {
         AlleyId = alleyId;
         ClearerId = clearerId;
+        GangOwnerId = gangOwnerId;
     }
 }
 

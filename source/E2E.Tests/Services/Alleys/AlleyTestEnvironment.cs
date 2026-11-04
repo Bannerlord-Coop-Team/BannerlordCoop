@@ -214,7 +214,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             Configure(client);
     }
 
-    private void ConfigureHeroIdentity(string heroId)
+    protected void ConfigureHeroIdentity(string heroId)
     {
         uint id = unchecked((uint)StringComparer.Ordinal.GetHashCode(heroId)) | 1u;
 

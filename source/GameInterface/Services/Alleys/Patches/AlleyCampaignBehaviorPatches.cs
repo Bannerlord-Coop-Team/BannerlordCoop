@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -19,12 +21,15 @@ namespace GameInterface.Services.Alleys.Patches;
 /// the don't-die-in-an-alley-fight guard, and the alley-leader-can't-lead-a-party restriction). The AI
 /// activity (daily ticks, hero-killed) can't run per client - the host's <c>_playerOwnedCommonAreaData</c>
 /// is empty and RNG would diverge - so those handlers publish a trigger the server-side AlleyHandler
-/// applies authoritatively; new-game gang seeding runs on the server only; and the occupied/cleared
-/// handlers stay off (the take-over is already driven through AlleyManagementHandler).
+/// applies authoritatively; new-game gang seeding runs on the server only; the occupied handler stays
+/// off (the take-over is already driven through AlleyManagementHandler); and the cleared handler skips
+/// its body and has the client ask AlleyManagementHandler to free the alley on the server.
 /// </summary>
 [HarmonyPatch(typeof(AlleyCampaignBehavior))]
 internal class AlleyCampaignBehaviorPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AlleyCampaignBehaviorPatches>();
+
     // Client-only. The host has no main hero, so these are either client UI/scene wiring or guard on
     // Hero.MainHero (no-ops on the server); only the client should run them.
 
@@ -69,8 +74,14 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnAlleyClearedByPlayerPrefix(Alley alley)
     {
-        if (ModInformation.IsClient && alley != null && Hero.MainHero != null)
-            MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero));
+        if (ModInformation.IsServer || alley == null) return false;
+        if (Hero.MainHero == null)
+        {
+            Logger.Error("Could not clear alley {Alley}: the client has no main hero", alley.Tag);
+            return false;
+        }
+
+        MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero));
         return false;
     }
 
