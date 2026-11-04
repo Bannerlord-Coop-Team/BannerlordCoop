@@ -20,5 +20,4 @@ internal class HeadmanNeedsGrainCompanionSelectionPatches
             issue.AlternativeSolutionSentTroops.AddToCounts(hero.CharacterObject, 1);
         return false;
     }
-
 }
