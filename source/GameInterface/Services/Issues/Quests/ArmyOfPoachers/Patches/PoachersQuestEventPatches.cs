@@ -80,8 +80,7 @@ internal class PoachersQuestEventPatches
                     if (hero.IsPrisoner) EndCaptivityAction.ApplyByPeace(hero);
                 }, context: nameof(PoachersQuestEventPatches));
         }
-        else if (PlayerEncounter.Current != null &&
-            Campaign.Current.CurrentMenuContext?.GameMenu.StringId == "army_of_poachers_village")
+        else if (Campaign.Current.CurrentMenuContext?.GameMenu.StringId == "army_of_poachers_village")
         {
             // Replay runs under AllowedThread, so forcing the player out would only move the client party.
             PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
