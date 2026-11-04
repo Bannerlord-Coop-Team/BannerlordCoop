@@ -54,6 +54,33 @@ After initialization, agents can directly use all nineteen tools without develop
 
 Always call **`stop_run`**, confirm cleanup succeeded, and only then exit/reload/reconnect Pi or Codex. Lazy-keep-alive retains owned runs across idle, not across client exit or forced process termination. Restarted sessions cannot adopt old runs. Never blindly retry uncertain mutations; inspect state/logs first. Setup-only checks prove no live UI/autoconnect/runtime behavior.
 
+## Testing a client against a dedicated server
+
+`start_run` normally launches its own in-game server. A profile with `externalServer: true` launches clients only, so a real client can join a dedicated server the operator runs. MCP never starts, checks, commands or stops that server. Add a profile like this next to `local` in `.mcp-local/profiles.json`. `executable` is the client's game install, and `modules` must match the server you test against:
+
+```json
+"dedicated": {
+  "externalServer": true,
+  "executable": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Mount & Blade II Bannerlord\\bin\\Win64_Shipping_Client\\Bannerlord.exe",
+  "modules": ["Native", "SandBoxCore", "SandBox", "StoryMode", "Coop"],
+  "clientPlatformIds": ["testclient1", "testclient2"]
+}
+```
+
+To join a dedicated server on `127.0.0.1:4200`:
+
+1. Deploy the client's DEBUG build first if it changed, because `deploy_mod` refuses while a server process is running. Then start the dedicated server yourself, listening on UDP port 4200, and wait until its own console or log shows it serving. Clients launch with a bare `/autoconnect`, which uses `localhost:4200`, and a profile can't change that endpoint yet.
+2. `preflight_run`: `{"profile":"dedicated","client_count":1}`. It counts clients only. The bridge check covers the client's DEBUG deployment, and the server's build and modules are left to the game's own join validation.
+3. `start_run`: `{"profile":"dedicated","client_count":0}`. This launches nothing and returns `state: "started"` with no instances.
+4. `start_client`, with the returned `runId` as `run_id` and `client_index: 1`.
+5. `wait_for_state` on `client1`, `state: "readyToJoin"`, `timeout_seconds: 300`.
+6. `join_client` on `client1`, once. Check `ok` and `result.started`.
+7. `wait_for_state` on `client1`, `state: "readyForCampaignTests"`, `timeout_seconds: 300`. If nothing is listening or the server refuses the client, the client never reaches this state and the wait ends with `outcome: "deadline_expired"`. Read the `client1` log with `read_logs` instead of retrying the join.
+8. Use `execute_command`, `capture_screenshot` and `read_logs` on `client1` as usual. Run state-changing cheats from the dedicated server's own console, because MCP has no way to reach it.
+9. `stop_run` stops and cleans up the clients it launched. Stop the dedicated server yourself.
+
+On this profile `instance: "server"` fails with an error on every tool, and `start_run` rejects `save_name`, because the dedicated server loads its own save.
+
 ## Checks without launching a game
 
 ```powershell
