@@ -85,7 +85,32 @@ public class AlleyClearTests : AlleyTestEnvironment
     }
 
     [Fact]
-    public void ClearOfAnAlleyOwnedByAnotherPlayer_IsIgnored()
+    public void StaleClearOfAnAlleyANewGangLeaderNowHolds_IsIgnored()
+    {
+        var scenario = CreateClearScenario();
+        string merchantId = AddNotables(scenario);
+        string newGangLeaderId = CreateGangLeader();
+
+        // Another gang took the alley on the server before the client's request arrived; the client still shows the old one.
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId)
+                    .SetOwner(Server.GetRegisteredObject<Hero>(newGangLeaderId));
+            }
+        });
+
+        LeaveItEmpty(Clients.First(), scenario.AttackerAlleyId);
+
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Hero>(newGangLeaderId),
+            Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
+        AssertRelations(scenario, merchantId, gangLeaderRelation: 0, merchantRelation: 0);
+    }
+
+    [Fact]
+    public void ClearOfAnAlleyOwnedByAPlayer_IsIgnored()
     {
         var scenario = CreateClearScenario();
         var clients = Clients.ToArray();
@@ -163,6 +188,34 @@ public class AlleyClearTests : AlleyTestEnvironment
     }
 
     [Fact]
+    public void ClearingADifferentGang_KeepsTheAttackOnThePlayersAlley()
+    {
+        var scenario = CreateClearScenario();
+        var ownerClient = Clients.First();
+        AcquireAlley(
+            ownerClient,
+            scenario,
+            scenario.OwnerHeroId,
+            new TroopRosterElementData(CharacterHandle(scenario.OwnerHeroId), 1, 0, 0));
+        ForceAttack(scenario);
+
+        // Made after the attack so the attack can only have come from the scenario's gang alley.
+        string otherGangAlleyId = CreateAlley(scenario.SettlementId, "other_gang_alley");
+        string otherGangLeaderId = CreateGangLeader();
+        Server.Call(() => Server.GetRegisteredObject<Alley>(otherGangAlleyId)
+            .SetOwner(Server.GetRegisteredObject<Hero>(otherGangLeaderId)));
+
+        LeaveItEmpty(ownerClient, otherGangAlleyId);
+
+        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(otherGangAlleyId).Owner));
+        Assert.Equal(scenario.AttackerAlleyId, GetManagementData(scenario.PlayerAlleyId).UnderAttackByAlleyId);
+        var ownerData = GetClientAlleyData(ownerClient, scenario.PlayerAlleyId);
+        ownerClient.Call(() => Assert.Same(
+            ownerClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId),
+            ownerData.UnderAttackBy));
+    }
+
+    [Fact]
     public void ClearedGangAlley_CanThenBeTakenOver()
     {
         var scenario = CreateClearScenario();
@@ -226,6 +279,14 @@ public class AlleyClearTests : AlleyTestEnvironment
         });
 
         return merchantId;
+    }
+
+    private string CreateGangLeader()
+    {
+        string gangLeaderId = CreateRegisteredObject<Hero>();
+        ConfigureHeroIdentity(gangLeaderId);
+        Server.Call(() => Server.GetRegisteredObject<Hero>(gangLeaderId).SetNewOccupation(Occupation.GangLeader));
+        return gangLeaderId;
     }
 
     private void AssertRelations(AlleyDomainScenario scenario, string merchantId, int gangLeaderRelation, int merchantRelation)

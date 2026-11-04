@@ -6,7 +6,6 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
@@ -21,8 +20,8 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Alleys.Handlers;
 
 /// <summary>
-/// Routes the player's alley management actions (abandon, change overseer, manage garrison) as
-/// client to server requests, performs them authoritatively on the server with patches live, and
+/// Routes the player's alley management actions (abandon, clear a beaten gang's alley, change overseer,
+/// manage garrison) as client to server requests, performs them authoritatively on the server with patches live, and
 /// replicates the resulting garrison/overseer state to the owning client so its in-game menus stay
 /// correct. The authoritative garrison/overseer is held in the CoopSession via
 /// <see cref="ISessionAlleyPlayerDataInterface"/>; the owning client mirror lives in the behavior
@@ -120,6 +119,8 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Clearer, out var clearerId)) return;
+        // Already free on this client, so there is nothing to clear.
+        if (payload.What.Alley.Owner == null) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley.Owner, out var gangOwnerId)) return;
 
         network.SendAll(new RequestClearAlley(alleyId, clearerId, gangOwnerId));
@@ -271,11 +272,10 @@ internal class AlleyManagementHandler : IHandler
         });
     }
 
-    // Same gang test as AlleyHandler.StartAttack, plus a player check so a clear can never free a player's alley.
+    // Same gang test as AlleyHandler.StartAttack. A player owner is never a gang leader, so a clear can't free a player's alley.
     private bool IsExpectedGangOwner(Hero owner, string expectedOwnerId)
     {
         if (owner == null || !owner.IsGangLeader) return false;
-        if (owner.IsPlayerHero() || owner.Clan.IsPlayerClan()) return false;
         return objectManager.TryGetId(owner, out var ownerId) && ownerId == expectedOwnerId;
     }
 
