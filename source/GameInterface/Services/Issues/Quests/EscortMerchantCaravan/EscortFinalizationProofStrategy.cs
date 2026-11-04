@@ -3,6 +3,8 @@ using TaleWorlds.CampaignSystem;
 using GameInterface.Services.Heroes.Patches;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Actions;
+using Common.Logging;
+using Serilog;
 using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
@@ -14,6 +16,7 @@ internal enum EscortBranch : byte
 
 internal sealed class EscortFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<EscortFinalizationProofStrategy>();
     private readonly IEscortOwnerParty parties;
 
     public EscortFinalizationProofStrategy(IEscortOwnerParty parties)
@@ -23,10 +26,13 @@ internal sealed class EscortFinalizationProofStrategy : IFinalizationProofStrate
 
     public bool TryRunBranch(QuestBase questBase, byte proof)
     {
-        if (!(questBase is Quest quest) || !quest.IsOngoing ||
-            proof != (byte)EscortBranch.AttackCaravan || quest._questCaravanMobileParty?.IsActive != true ||
+        if (!(questBase is Quest quest) || proof != (byte)EscortBranch.AttackCaravan) return false;
+        if (!quest.IsOngoing || quest._questCaravanMobileParty?.IsActive != true ||
             !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
-            return false;
+        {
+            Logger.Warning("Escort attack branch {proof} was already handled for {quest}", proof, quest.StringId);
+            return true;
+        }
 
         using (new MainHeroSubstitutionScope(Hero.MainHero, party))
         {

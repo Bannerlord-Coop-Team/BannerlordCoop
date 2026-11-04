@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -16,9 +15,8 @@ namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.ChangeIssueOwner))]
 internal class EscortGiverChangePatch
 {
-    private static bool Prefix(IssueBase issue, Hero newOwner, out Hero __state)
+    private static bool Prefix(IssueBase issue, Hero newOwner)
     {
-        __state = null;
         if (!(issue is Issue)) return true;
         if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
         var previous = issue.IssueOwner;
@@ -36,14 +34,6 @@ internal class EscortGiverChangePatch
             }
             return false;
         }
-        if (newOwner == null || newOwner == previous || newOwner.Issue != null) return false;
-        __state = previous;
-        return true;
-    }
-
-    private static void Postfix(IssueBase issue, Hero __state)
-    {
-        if (ModInformation.IsServer && __state != null && issue is Issue escort && issue.IssueOwner != __state)
-            MessageBroker.Instance.Publish(issue, new EscortGiverChanged(escort, __state));
+        return newOwner != null && newOwner != previous && newOwner.Issue == null;
     }
 }

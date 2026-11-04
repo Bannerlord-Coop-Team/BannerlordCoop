@@ -49,15 +49,6 @@ internal class EscortQuestPatches
             MobileParty.MainParty.Speed >= Campaign.Current.Models.PartySpeedCalculatingModel.MinimumSpeed;
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.conversation_caravan_fight_on_consequence))]
-    [HarmonyPrefix]
-    private static bool Attack(Quest __instance)
-    {
-        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
-            dispatcher.BeforeQuestBranch(__instance, (byte)EscortBranch.AttackCaravan);
-        return false;
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.caravan_talk_on_condition))]
     [HarmonyPrefix]
     private static bool Talk(Quest __instance, ref bool __result)

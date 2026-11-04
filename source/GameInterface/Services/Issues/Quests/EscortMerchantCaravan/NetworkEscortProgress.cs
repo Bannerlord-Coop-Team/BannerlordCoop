@@ -18,7 +18,6 @@ public readonly struct NetworkEscortProgress : ICommand
     [ProtoMember(10)] public readonly byte[] Journal;
     [ProtoMember(11)] public readonly string[] TrackedParties;
     [ProtoMember(12)] public readonly string[] TrackedSettlements;
-    [ProtoMember(13)] public readonly bool Alternative;
     [ProtoMember(14)] public readonly byte[] Notice;
     [ProtoMember(15)] public readonly int ExtraTime;
     [ProtoMember(16)] public readonly bool FollowCaravan;
@@ -36,7 +35,6 @@ public readonly struct NetworkEscortProgress : ICommand
         byte[] journal = null,
         string[] trackedParties = null,
         string[] trackedSettlements = null,
-        bool alternative = false,
         byte[] notice = null,
         int extraTime = 0,
         bool followCaravan = false,
@@ -54,7 +52,6 @@ public readonly struct NetworkEscortProgress : ICommand
         Journal = journal;
         TrackedParties = trackedParties;
         TrackedSettlements = trackedSettlements;
-        Alternative = alternative;
         Notice = notice;
         ExtraTime = extraTime;
         FollowCaravan = followCaravan;

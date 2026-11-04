@@ -713,25 +713,6 @@ public class EscortMerchantCaravanTests : IDisposable
     }
 
     [Fact]
-    public void SelectingAnHeirCancelsTheOriginalPlayersAgreement()
-    {
-        Accept();
-        var ownerQuest = QuestOn(Owner);
-        var heirId = environment.CreateRegisteredObject<Hero>();
-        Server.Call(() =>
-        {
-            var players = Server.Resolve<IPlayerManager>();
-            Assert.True(players.TryGetPlayer(QuestScenario.ControllerA, out var original));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heirId, out var heir));
-            Assert.True(players.ReplacePlayer(original, new Player(original.ControllerId, heirId,
-                original.MobilePartyId, original.ClanId, original.CharacterObjectId)));
-            Server.Resolve<IMessageBroker>().Publish(this, new PlayerHeirSelectionCompleted(heir));
-        });
-        Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-    }
-
-    [Fact]
     public void AnAcceptFailureRestoresTheIssueInsteadOfLeavingAnUnownedQuest()
     {
         var harmony = new Harmony($"escort-accept-failure-{Guid.NewGuid()}");

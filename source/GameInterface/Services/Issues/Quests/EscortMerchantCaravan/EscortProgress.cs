@@ -146,23 +146,11 @@ internal sealed class EscortProgressHandler : IHandler
         this.dispatcher = dispatcher;
         this.conversations = conversations;
         messages.Subscribe<NetworkEscortProgress>(Receive);
-        messages.Subscribe<PlayerHeirSelectionCompleted>(HeirSelected);
     }
 
     public void Dispose()
     {
         messages.Unsubscribe<NetworkEscortProgress>(Receive);
-        messages.Unsubscribe<PlayerHeirSelectionCompleted>(HeirSelected);
-    }
-
-    private void HeirSelected(MessagePayload<PlayerHeirSelectionCompleted> payload)
-    {
-        if (ModInformation.IsClient) return;
-        GameThread.RunSafe(() => dispatcher.RunAsOwners<Quest>(quest =>
-        {
-            if (Hero.MainHero == payload.What.PlayerHero)
-                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
-        }), context: nameof(EscortProgressHandler));
     }
 
     private void Receive(MessagePayload<NetworkEscortProgress> payload)
@@ -185,10 +173,12 @@ internal sealed class EscortProgressHandler : IHandler
             var caravan = Resolve<MobileParty>(state.CaravanId);
             var bandit = Resolve<MobileParty>(state.BanditId);
             var other = Resolve<MobileParty>(state.OtherBanditId);
-            var visited = (state.VisitedIds ?? Array.Empty<string>()).Select(Resolve<Settlement>).ToList();
+            var visited = (state.VisitedIds ?? Array.Empty<string>()).Select(Resolve<Settlement>).Where(value => value != null).ToList();
             var tracked = new HashSet<ITrackableCampaignObject> { quest.QuestGiver };
-            foreach (var id in state.TrackedParties ?? Array.Empty<string>()) tracked.Add(Resolve<MobileParty>(id));
-            foreach (var id in state.TrackedSettlements ?? Array.Empty<string>()) tracked.Add(Resolve<Settlement>(id));
+            foreach (var id in state.TrackedParties ?? Array.Empty<string>())
+                if (Resolve<MobileParty>(id) is { } party) tracked.Add(party);
+            foreach (var id in state.TrackedSettlements ?? Array.Empty<string>())
+                if (Resolve<Settlement>(id) is { } settlement) tracked.Add(settlement);
             var logs = ReadJournal(state.Journal);
 
             using (new AllowedThread())
@@ -217,8 +207,7 @@ internal sealed class EscortProgressHandler : IHandler
     private T Resolve<T>(string id) where T : class
     {
         if (id == null) return null;
-        if (!objects.TryGetObjectWithLogging<T>(id, out var value))
-            throw new InvalidOperationException($"Escort progress references missing {typeof(T).Name} {id}.");
+        if (!objects.TryGetObjectWithLogging<T>(id, out var value)) return null;
         return value;
     }
 
