@@ -1,5 +1,4 @@
-using HarmonyLib;
-using Serilog;
+﻿using HarmonyLib;
 using System;
 using System.IO;
 using System.Reflection;
@@ -10,12 +9,8 @@ namespace Coop
 {
     internal static class BootPatches
     {
-        // Static classes can't be used as a generic type argument, so use Log.ForContext(Type) directly.
-        // Property (not field) ensures we pick up the logger after Serilog is configured.
-        private static ILogger Logger => Serilog.Log.ForContext(typeof(BootPatches));
-
-        // Fallback file log in case Serilog isn't ready yet.
-        private static void FileLog(string message)
+        // Runs before Coop logging is set up, so it writes its own file.
+        internal static void FileLog(string message)
         {
             try { File.AppendAllText("BootPatches.log", $"{DateTime.Now:HH:mm:ss.fff} {message}\n"); }
             catch { }
@@ -101,7 +96,6 @@ namespace Coop
                     var prefix = typeof(BootPatches).GetMethod(nameof(LoadMovieAux_EnsureResources), BindingFlags.Static | BindingFlags.NonPublic);
                     harmony.Patch(loadMovieAux, prefix: new HarmonyMethod(prefix));
                     FileLog("Patched LoadMovieAux successfully");
-                    Logger.Information("[BootPatches] GauntletLayer.LoadMovieAux patched to guard null FontFactory");
                 }
                 else
                 {
@@ -119,7 +113,6 @@ namespace Coop
             catch (Exception ex)
             {
                 FileLog($"Apply() threw: {ex}");
-                Logger.Error(ex, "[BootPatches] Apply() failed");
             }
         }
 
@@ -195,7 +188,6 @@ namespace Coop
                 //  DefaultFont checked via reflection to avoid requiring TaleWorlds.TwoDimension assembly reference.
                 if (HasValidDefaultFont(ff)) return;
 
-                Logger.Warning("[BootPatches] LoadMovieAux called with null/empty FontFactory on layer — forcing Refresh()");
                 FileLog($"FontFactory={ff != null} DefaultFont={HasValidDefaultFont(ff)} — calling UIResourceManager.Refresh()");
 
                 UIResourceManager.Refresh();
@@ -207,18 +199,15 @@ namespace Coop
                 {
                     onRefreshEnd.Invoke(__instance, new object[] { new System.Collections.Generic.List<GauntletMovieIdentifier>() });
                     FileLog("OnResourceRefreshEnd called — UIContext rebuilt");
-                    Logger.Information("[BootPatches] UIContext rebuilt with valid FontFactory before LoadMovieAux");
                 }
                 else
                 {
                     FileLog("OnResourceRefreshEnd not found — UIContext not rebuilt");
-                    Logger.Warning("[BootPatches] OnResourceRefreshEnd not found — crash may still occur");
                 }
             }
             catch (Exception ex)
             {
                 FileLog($"LoadMovieAux_EnsureResources threw: {ex}");
-                Logger.Error(ex, "[BootPatches] LoadMovieAux prefix failed");
             }
         }
 
@@ -232,7 +221,7 @@ namespace Coop
                 FileLog($"GauntletLayer ctor postfix: FontFactory={ff != null} DefaultFont={HasValidDefaultFont(ff)}");
                 if (HasValidDefaultFont(ff)) return;
 
-                Logger.Warning("[BootPatches] GauntletLayer ctor: null FontFactory — forcing Refresh()");
+                FileLog("GauntletLayer ctor postfix: null FontFactory, forcing Refresh()");
                 UIResourceManager.Refresh();
 
                 var onRefreshEnd = typeof(GauntletLayer).GetMethod("OnResourceRefreshEnd", BindingFlags.Public | BindingFlags.Instance);
@@ -245,7 +234,6 @@ namespace Coop
             catch (Exception ex)
             {
                 FileLog($"GauntletLayer_ctor_Postfix threw: {ex}");
-                Logger.Error(ex, "[BootPatches] Ctor postfix failed");
             }
         }
     }

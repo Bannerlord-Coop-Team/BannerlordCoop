@@ -802,8 +802,15 @@ namespace Coop
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            Logger?.Fatal(ex, "Unhandled exception");
-            Logger?.Fatal(ex.StackTrace);
+            if (Logger == null)
+            {
+                // Logging isn't set up yet, so keep the exception in the boot log instead of dropping it
+                BootPatches.FileLog($"Unhandled exception before logging was set up: {ex}");
+                return;
+            }
+
+            Logger.Fatal(ex, "Unhandled exception");
+            Logger.Fatal(ex.StackTrace);
             Serilog.Log.CloseAndFlush();
         }
 
