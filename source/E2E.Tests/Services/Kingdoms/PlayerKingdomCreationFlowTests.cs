@@ -623,6 +623,92 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
     
     [Fact]
+    public void LeaveKingdomRequest_FromAClanMemberWhoDoesNotLeadIt_IsIgnored()
+    {
+        var (leader, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
+
+        Server.SimulateMessage(member.NetPeer, new RequestLeaveVassalService(leader.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Kingdom>(kingdomId), Server.GetRegisteredObject<Clan>(leader.ClanId).Kingdom));
+    }
+
+    [Fact]
+    public void LeaveKingdomRequest_FromTheClanLeader_LeavesTheKingdom()
+    {
+        var (leader, _, _) = CreateClanLeaderAndMemberInKingdom();
+
+        Server.SimulateMessage(Clients.First().NetPeer, new RequestLeaveVassalService(leader.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Clan>(leader.ClanId).Kingdom));
+    }
+
+    [Fact]
+    public void RebellionRequest_FromAClanMemberWhoDoesNotLeadIt_IsIgnored()
+    {
+        var (leader, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
+
+        Server.SimulateMessage(member.NetPeer, new NetworkStartRebellion(leader.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Kingdom>(kingdomId), Server.GetRegisteredObject<Clan>(leader.ClanId).Kingdom));
+    }
+
+    [Fact]
+    public void MercenaryServiceRequest_FromAClanMemberWhoDoesNotLeadIt_IsIgnored()
+    {
+        var leader = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        CreateSyncedPlayerContextInClan("ClanMember", Clients.Last(), leader.ClanId);
+        var ruler = CreateSyncedPlayerContext("MercenaryRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+
+        Server.SimulateMessage(Clients.Last().NetPeer, new RequestMercenaryService(kingdomId, 1, leader.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() =>
+        {
+            var clan = Server.GetRegisteredObject<Clan>(leader.ClanId);
+            Assert.Null(clan.Kingdom);
+            Assert.False(clan.IsUnderMercenaryService);
+        });
+    }
+
+    [Fact]
+    public void MercenaryDismissalRequest_FromAClanMemberWhoDoesNotLeadIt_IsIgnored()
+    {
+        var (leader, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+                Server.GetRegisteredObject<Clan>(leader.ClanId).IsUnderMercenaryService = true;
+        });
+
+        Server.SimulateMessage(member.NetPeer, new RequestMercenaryDismissalService(kingdomId, leader.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() =>
+        {
+            var clan = Server.GetRegisteredObject<Clan>(leader.ClanId);
+            Assert.Same(Server.GetRegisteredObject<Kingdom>(kingdomId), clan.Kingdom);
+            Assert.True(clan.IsUnderMercenaryService);
+        });
+    }
+
+    // The member plays a hero in the leader's clan but doesn't lead it.
+    private (PlayerContext Leader, EnvironmentInstance Member, string KingdomId) CreateClanLeaderAndMemberInKingdom()
+    {
+        var leader = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        CreateSyncedPlayerContextInClan("ClanMember", Clients.Last(), leader.ClanId);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(leader.ClanId, kingdomId);
+        return (leader, Clients.Last(), kingdomId);
+    }
+
+    [Fact]
     public void VassalServiceAccepted_DuringSettlementLocationConversation_JoinsKingdomAndReleasesConversationLock()
     {
         const string LocationId = "vassal_oath_settlement";

@@ -27,19 +27,22 @@ internal class VassalServiceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public VassalServiceHandler(
         IMessageBroker messageBroker,
         IKingdomMembershipState kingdomMembershipState,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<VassalServiceAccepted>(HandleVassalServiceAccepted);
         messageBroker.Subscribe<RequestVassalService>(HandleRequestVassalService);
@@ -204,6 +207,7 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            if (!IsSenderClanLeader(payload.Who, clan)) return;
             ChangeKingdomAction.ApplyByLeaveKingdom(clan, true);
         });
     }
@@ -218,7 +222,17 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
+            if (!IsSenderClanLeader(payload.Who, clan)) return;
             ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan, true);
         });
+    }
+
+    // Leaving or rebelling takes the whole clan out of its kingdom, so only the clan leader's player may ask.
+    private bool IsSenderClanLeader(object sender, Clan clan)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
+
+        Logger.Warning("Ignoring a kingdom leave for clan {ClanId} from a peer that does not lead it", clan.StringId);
+        return false;
     }
 }

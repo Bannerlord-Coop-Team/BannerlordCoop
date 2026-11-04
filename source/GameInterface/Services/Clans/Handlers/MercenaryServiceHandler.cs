@@ -24,17 +24,20 @@ internal class MercenaryServiceHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public MercenaryServiceHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<MercenaryServiceAccepted>(HandleMercenaryServiceAccepted);
         messageBroker.Subscribe<RequestMercenaryService>(HandleRequestMercenaryService);
@@ -89,6 +92,7 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
+        if (!IsLeaderOf(hero, clan)) return;
 
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
@@ -131,6 +135,7 @@ internal class MercenaryServiceHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
+        if (!IsLeaderOf(hero, clan)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
@@ -140,6 +145,15 @@ internal class MercenaryServiceHandler : IHandler
 
         ChangeClanInfluenceAction.Apply(clan, -hero.Clan.Influence);
         ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan, true);
+    }
+
+    // Mercenary service binds the whole clan, so only the clan leader's player may take or end it.
+    private bool IsLeaderOf(Hero hero, Clan clan)
+    {
+        if (permissions.CanManageClan(hero, clan)) return true;
+
+        Logger.Warning("Ignoring a mercenary service change for clan {ClanId} from a player who does not lead it", clan.StringId);
+        return false;
     }
     private void HandlePlayerRelationChange(MessagePayload<PlayerRelationChange> payload)
     {
