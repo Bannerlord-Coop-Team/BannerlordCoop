@@ -31,8 +31,7 @@ internal class EscapeMenuCoopOptionsPatch
     private static readonly TextObject UnstuckText = new TextObject("I'm stuck");
 
     private static readonly TextObject UnstuckConfirmText = new TextObject(
-        "Move your party out of whatever it is stuck in? Your party leaves any battle, siege, settlement or menu " +
-        "it is in, and any army it follows. An army you lead stays together.");
+        "Get your party out of whatever it is stuck in? This does the same as typing coop.unstuck in the console.");
 
     [HarmonyPostfix]
     static void AddCoopOptionsItem(MapScreen __instance, List<EscapeMenuItemVM> __result)
