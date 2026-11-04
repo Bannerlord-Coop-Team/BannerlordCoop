@@ -285,6 +285,7 @@ public class EscortMerchantCaravanTests : IDisposable
             }
         });
         Accept();
+        Other.SimulateMessage(Server.NetPeer, new NetworkQuestSolutionAcceptRejected(scenario.NotableId, QuestScenario.IssueId, 0));
         Other.Call(() =>
         {
             var giver = Other.GetRegisteredObject<Hero>(scenario.NotableId);
