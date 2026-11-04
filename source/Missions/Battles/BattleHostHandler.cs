@@ -37,11 +37,14 @@ namespace Missions.Battles;
 /// mission has FINISHED LOADING (<see cref="BattleMissionReady"/>, published by
 /// <c>CoopBattleController.AfterStart</c>) it asks the server to elect via
 /// <see cref="NetworkRequestBattleHost"/>, and stores the reply (<see cref="NetworkBattleHostAssigned"/>).
-/// Server: the first MISSION-READY client becomes the battle's host (BR-010), unless the server lists preferred
-/// hosts (<see cref="IPreferredBattleHosts"/>); later ready clients join the successor line in mission-ready
-/// order, preferred ones first (BR-013), so migration promotes the earliest still in the mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
-/// ready client's reply includes its sides with explicit empties so its spawn sizing can proceed. The result
-/// is cached, so a duplicate request just re-confirms, and every change is broadcast to all clients.
+/// Server: the first MISSION-READY client becomes the battle's host (BR-010). When the server lists preferred
+/// hosts (<see cref="IPreferredBattleHosts"/>) the election is held up to <see cref="PreferredHostWait"/> while
+/// a higher ranked listed player is still loading, then the best ranked ready player wins. Later ready clients
+/// join the successor line in mission-ready order, listed ones first by rank (BR-013), so migration promotes
+/// the next in that line still in the mission. The unowned (NPC) reserves are issued to the elected host
+/// together with the election, and every ready client's reply includes its sides with explicit empties so
+/// its spawn sizing can proceed. The result is cached, so a duplicate request just re-confirms, and every
+/// change is broadcast to all clients.
 /// The server also supports an explicitly non-withdrawing absence: that member is marked absent so its
 /// parties fall into the host's owned set, and its RETURN re-issues the current scope to both sides of the
 /// handoff — the returner's grant and a
@@ -131,8 +134,8 @@ internal class BattleHostHandler : IHandler
     internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
 
     /// <summary>
-    /// [Server] How long the first election waits for a preferred host that is still loading before the
-    /// first mission-ready player is elected anyway. Internal-settable so tests can expire it.
+    /// [Server] How long the first election waits for a higher ranked preferred host that is still loading
+    /// before the best ranked ready player is elected anyway. Internal-settable so tests can expire it.
     /// </summary>
     internal TimeSpan PreferredHostWait { get; set; } = TimeSpan.FromSeconds(5);
 
@@ -365,8 +368,9 @@ internal class BattleHostHandler : IHandler
         Logger.Information("[BattleHost] Mission ready — requested host election for battle {MapEventId}", mapEventId);
     }
 
-    /// <summary>[Server] Elect the host (first MISSION-READY requester wins, BR-010) and append later ready
-    /// requesters to the successor line in arrival (= mission-ready, BR-013) order; broadcast the assignment.
+    /// <summary>[Server] Elect the host (first MISSION-READY requester wins, or the best ranked preferred host
+    /// after a bounded hold, BR-010) and add later ready requesters to the successor line in arrival
+    /// (= mission-ready) order, preferred ones first by rank (BR-013); broadcast the assignment.
     /// A duplicate/late requester just gets a re-confirm.</summary>
     private void Handle_NetworkRequestBattleHost(MessagePayload<NetworkRequestBattleHost> payload)
     {
@@ -452,55 +456,115 @@ internal class BattleHostHandler : IHandler
         SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
     }
 
-    // [Server, game thread] Holds the first election while a connected preferred host in this battle is still
-    // loading, so a slower preferred player can host instead of whoever loaded first. Bounded by PreferredHostWait.
+    // [Server, game thread] Holds the first election while a listed player ranked above every ready requester
+    // is still loading, so a slower preferred player can host instead of whoever loaded first. Bounded by PreferredHostWait.
     private bool TryHoldElection(string mapEventId, MapEvent mapEvent, string requesterId, NetPeer requester,
         bool hideoutStateReady)
     {
-        var request = new HeldHostRequest { ControllerId = requesterId, Peer = requester, HideoutStateReady = hideoutStateReady };
         if (pendingElections.TryGetValue(mapEventId, out var pending))
         {
-            pending.Requests.RemoveAll(held => held.ControllerId == requesterId);
-            pending.Requests.Add(request);
-            if (preferredHosts.RankOf(requesterId) >= 0)
-                CompleteHeldElection(mapEventId, "a preferred host is ready");
+            // A duplicate updates in place so the requester keeps its mission-ready place for the tie break.
+            var held = pending.Requests.Find(request => request.ControllerId == requesterId);
+            if (held == null)
+                pending.Requests.Add(held = new HeldHostRequest { ControllerId = requesterId });
+            held.Peer = requester;
+            held.HideoutStateReady = hideoutStateReady;
+            ReleaseHeldElectionIfNobodyAwaited(mapEventId, mapEvent, pending, leftControllerId: null);
             return true;
         }
 
         if (preferredHosts.IsEmpty || hostRegistry.TryGet(mapEventId, out _) ||
-            preferredHosts.RankOf(requesterId) >= 0 || !IsPreferredHostLoading(mapEvent, requesterId))
+            !IsHigherRankedHostLoading(mapEventId, mapEvent, SuccessorRank(requesterId), requesterId, null, null))
             return false;
 
         pending = new PendingElection { DeadlineUtc = DateTime.UtcNow + PreferredHostWait };
-        pending.Requests.Add(request);
+        pending.Requests.Add(new HeldHostRequest { ControllerId = requesterId, Peer = requester, HideoutStateReady = hideoutStateReady });
         pendingElections[mapEventId] = pending;
-        Logger.Information("[BattleHost] Holding the election for {MapEventId} up to {Wait} for a preferred host still loading",
+        Logger.Information("[BattleHost] Holding the election for {MapEventId} up to {Wait} for a higher ranked preferred host still loading",
             mapEventId, PreferredHostWait);
         return true;
     }
 
-    private bool IsPreferredHostLoading(MapEvent mapEvent, string readyControllerId)
+    // True while a listed player ranked above `rank` is in the battle and connected but has not sent its own
+    // host request yet. Withdrawn and absent players, and the one just leaving, are not waited for.
+    private bool IsHigherRankedHostLoading(string mapEventId, MapEvent mapEvent, int rank, string readyControllerId,
+        PendingElection pending, string leftControllerId)
     {
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState);
         foreach (var player in playerManager.Players)
         {
-            if (player.ControllerId != readyControllerId && preferredHosts.RankOf(player.ControllerId) >= 0 &&
-                playerManager.IsConnected(player) && IsRequesterInBattle(mapEvent, player.ControllerId))
+            var controllerId = player.ControllerId;
+            int playerRank = preferredHosts.RankOf(controllerId);
+            if (playerRank < 0 || playerRank >= rank || controllerId == readyControllerId || controllerId == leftControllerId)
+                continue;
+            if (pending != null && pending.Requests.Exists(request => request.ControllerId == controllerId))
+                continue;
+            if (runtimeState != null && (runtimeState.WithdrawnControllers.Contains(controllerId) ||
+                runtimeState.AbsentControllers.Contains(controllerId)))
+                continue;
+            if (playerManager.IsConnected(player) && IsRequesterInBattle(mapEvent, controllerId))
                 return true;
         }
         return false;
     }
 
-    // [Server, game thread] Elects the best-ranked held requester (the first ready one when none is preferred),
-    // then replays the rest so they join the successor line.
+    // [Server, game thread] Ends the hold early once no listed player ranked above the best held requester is
+    // still loading. A hold left with no requesters is dropped, so the next ready player starts a fresh one.
+    private void ReleaseHeldElectionIfNobodyAwaited(string mapEventId, MapEvent mapEvent, PendingElection pending,
+        string leftControllerId)
+    {
+        if (pending.Requests.Count == 0)
+        {
+            pendingElections.Remove(mapEventId);
+            Logger.Information("[BattleHost] Dropped the held election for {MapEventId}: every held requester left", mapEventId);
+            return;
+        }
+
+        int bestReadyRank = pending.Requests.Min(request => SuccessorRank(request.ControllerId));
+        if (IsHigherRankedHostLoading(mapEventId, mapEvent, bestReadyRank, null, pending, leftControllerId))
+            return;
+
+        CompleteHeldElection(mapEventId, leftControllerId == null
+            ? "no higher ranked preferred host is still loading"
+            : $"{leftControllerId} left");
+    }
+
+    // [Server, game thread] A player left or disconnected: forget its held request so a gone player is never
+    // elected, and stop waiting if it was the one being waited for.
+    private void DropHeldRequest(string mapEventId, MapEvent mapEvent, string controllerId)
+    {
+        if (pendingElections.Count == 0 || !pendingElections.TryGetValue(mapEventId, out var pending)) return;
+
+        pending.Requests.RemoveAll(request => request.ControllerId == controllerId);
+        if (mapEvent == null)
+        {
+            pendingElections.Remove(mapEventId);
+            return;
+        }
+        ReleaseHeldElectionIfNobodyAwaited(mapEventId, mapEvent, pending, controllerId);
+    }
+
+    // [Server, game thread] Elects the best-ranked held requester still in the mission and connected (the first
+    // ready one when none is preferred), then replays the rest so they join the successor line.
     private void CompleteHeldElection(string mapEventId, string reason)
     {
         if (!pendingElections.TryGetValue(mapEventId, out var pending)) return;
         pendingElections.Remove(mapEventId);
         if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent)) return;
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState);
 
-        var requests = pending.Requests.Where(held => IsRequesterInBattle(mapEvent, held.ControllerId)).ToList();
-        if (requests.Count == 0) return;
+        var requests = pending.Requests.Where(held => runtimeState != null &&
+            runtimeState.PresentControllers.Contains(held.ControllerId) &&
+            playerManager.TryGetPlayer(held.ControllerId, out var player) && playerManager.IsConnected(player) &&
+            IsRequesterInBattle(mapEvent, held.ControllerId)).ToList();
+        if (requests.Count == 0)
+        {
+            Logger.Information("[BattleHost] Released the held election for {MapEventId} ({Reason}) with no requester left; nobody elected",
+                mapEventId, reason);
+            return;
+        }
 
+        // OrderBy is stable, so equal ranks keep mission-ready order.
         var host = requests.OrderBy(held => SuccessorRank(held.ControllerId)).First();
         Logger.Information("[BattleHost] Releasing the held election for {MapEventId} ({Reason}); host {Host}",
             mapEventId, reason, host.ControllerId);
@@ -1014,10 +1078,12 @@ internal class BattleHostHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
+        if (battleRuntimeStates.Count == 0 && pendingElections.Count == 0) return;
 
         var now = DateTime.UtcNow;
-        foreach (var held in pendingElections.Where(pair => now >= pair.Value.DeadlineUtc).Select(pair => pair.Key).ToList())
-            CompleteHeldElection(held, "the preferred host wait expired");
+        if (pendingElections.Count > 0)
+            foreach (var held in pendingElections.Where(pair => now >= pair.Value.DeadlineUtc).Select(pair => pair.Key).ToList())
+                CompleteHeldElection(held, "the preferred host wait expired");
 
         if (battleRuntimeStates.Count == 0) return;
 
@@ -1180,7 +1246,11 @@ internal class BattleHostHandler : IHandler
                         report.Value.Owner = null;
 
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
-                return; // no host elected yet — the departure bookkeeping above is all that applies
+            {
+                // No host elected yet. A held election runs after the absence above, so its host inherits the leaver's parties.
+                DropHeldRequest(mapEventId, mapEvent, controllerId);
+                return;
+            }
 
             var successors = new List<string>(assignment.SuccessorControllerIds);
 
@@ -1228,7 +1298,8 @@ internal class BattleHostHandler : IHandler
                 if (battleRuntimeStates.TryGetValue(mapEventId, out var migratingRuntimeState))
                     migratingRuntimeState.HostEndpoint = null;
 
-                // Promote the earliest-joined successor still present (the line is kept current as members leave).
+                // Promote the first successor still present: preferred hosts by rank, then mission-ready order
+                // (the line is kept current as members leave).
                 // BR-102: the host CHANGED, so the promotion opens the next hosting generation (epoch + 1).
                 var newHost = successors[0];
                 successors.RemoveAt(0);
@@ -1290,10 +1361,13 @@ internal class BattleHostHandler : IHandler
         {
             Logger.Information("[BattleHost] {Controller} disconnected after withdrawing from battle {MapEventId}; its parties stay out of the host's reserve scope",
                 controllerId, mapEventId);
+            DropHeldRequest(mapEventId, mapEvent, controllerId);
             return;
         }
 
         bool newlyAbsent = MarkAbsent(mapEventId, controllerId);
+        // A hold only exists before any host, so an election it releases here already sees the absence above.
+        DropHeldRequest(mapEventId, mapEvent, controllerId);
         if (!newlyAbsent || !hasAssignment) return;
         if (assignment.HostControllerId == controllerId) return;
 

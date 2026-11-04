@@ -235,7 +235,7 @@
     // Players the server prefers as battle host, highest priority first, by controller id
     // (the player's Steam id on Steam builds). The battle host runs the battle simulation and
     // uploads it to everyone else, so list players with a fast, stable upload.
-    // A preferred player who is still loading is waited for a few seconds before the first ready player is chosen instead.
+    // If a player higher in the list than everyone ready is still loading, the server waits up to 5 seconds for them.
     // (Default) []: The first player to finish loading hosts, as before.
     // e.g. ["76561198000000001", "76561198000000002"]
     "preferredBattleHosts": []
