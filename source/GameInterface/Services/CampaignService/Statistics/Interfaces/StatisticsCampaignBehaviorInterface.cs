@@ -417,22 +417,24 @@ public class StatisticsCampaignBehaviorInterface : IStatisticsCampaignBehaviorIn
     {
         if (affectorAgent == null) return;
 
+        var affectorHero = affectorAgent.IsHero ? (affectorAgent.Character as CharacterObject)?.HeroObject : null;
+
         if (affectorAgent == Agent.Main)
         {
             missionTroopsKnockedOrKilledByPlayer++;
         }
-        else if (affectorAgent.IsPlayerTroop || affectorAgent.Origin?.BattleCombatant == PartyBase.MainParty)
+        // Before the party check, because CoopAgentOrigin.BattleCombatant is also the party for companions in it
+        else if (affectorHero != null && affectorHero.IsPlayerCompanion)
         {
-            missionTroopsKnockedOrKilledAsParty++;
-        }
-        else if (affectorAgent.IsHero)
-        {
-            var hero = (affectorAgent.Character as CharacterObject)?.HeroObject;
-            if (hero != null && hero.IsPlayerCompanion && objectManager.TryGetId(hero, out var companionId))
+            if (objectManager.TryGetId(affectorHero, out var companionId))
             {
                 missionCompanionKills.TryGetValue(companionId, out var kills);
                 missionCompanionKills[companionId] = kills + 1;
             }
+        }
+        else if (affectorAgent.IsPlayerTroop || affectorAgent.Origin?.BattleCombatant == PartyBase.MainParty)
+        {
+            missionTroopsKnockedOrKilledAsParty++;
         }
 
         // Hero deaths are counted once by OnHeroKilled on the server, since every client in the mission sees the same death
