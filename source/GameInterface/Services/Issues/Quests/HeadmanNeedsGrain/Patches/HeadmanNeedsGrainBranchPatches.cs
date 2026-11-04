@@ -33,15 +33,20 @@ internal class HeadmanNeedsGrainBranchPatches
         System.Collections.Generic.IEnumerable<CodeInstruction> instructions)
     {
         var getter = AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.CurrentSettlement));
+        var replacements = 0;
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(getter))
             {
+                replacements++;
                 yield return new CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_0).MoveLabelsFrom(instruction);
                 yield return CodeInstruction.Call(typeof(HeadmanNeedsGrainBranchPatches), nameof(GiverSettlement));
             }
             else yield return instruction;
         }
+
+        if (replacements != 1)
+            throw new System.InvalidOperationException($"Expected one current-settlement read in grain success, found {replacements}");
     }
 
     private static Settlement GiverSettlement(Quest quest) => quest.QuestGiver.CurrentSettlement;

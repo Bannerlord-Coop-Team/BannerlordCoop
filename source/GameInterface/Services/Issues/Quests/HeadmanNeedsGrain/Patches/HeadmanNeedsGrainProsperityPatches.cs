@@ -27,15 +27,20 @@ public class HeadmanNeedsGrainProsperityPatches
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         var setter = AccessTools.PropertySetter(typeof(Town), nameof(Town.Prosperity));
+        var replacements = 0;
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(setter))
             {
+                replacements++;
                 yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(HeadmanNeedsGrainProsperityPatches),
                     nameof(SetProsperity))).MoveLabelsFrom(instruction);
             }
             else yield return instruction;
         }
+
+        if (replacements != 1)
+            throw new InvalidOperationException($"Expected one prosperity setter in the grain quest method, found {replacements}");
     }
 
     // Native callers can inline the small setter; AutoSync instruments this field write explicitly.

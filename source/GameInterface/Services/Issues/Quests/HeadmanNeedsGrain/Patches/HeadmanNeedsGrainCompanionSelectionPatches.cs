@@ -21,12 +21,4 @@ internal class HeadmanNeedsGrainCompanionSelectionPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence))]
-    [HarmonyPrefix, HarmonyPriority(Priority.Last)]
-    private static bool CancelSelectionPrefix()
-    {
-        if (ModInformation.IsServer || !(IssuesCampaignBehavior.GetIssueOwnersIssue() is Issue issue)) return true;
-        issue.AlternativeSolutionSentTroops.Clear();
-        return false;
-    }
 }

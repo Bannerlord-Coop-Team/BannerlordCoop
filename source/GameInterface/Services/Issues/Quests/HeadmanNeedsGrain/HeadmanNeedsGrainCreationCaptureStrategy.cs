@@ -51,13 +51,16 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
             {
                 var marketId = reader.ReadString();
                 var grainIssue = (Issue)issue;
-                if (marketId.Length != 0 && objectManager.TryGetObjectWithLogging<Settlement>(marketId, out var market))
-                {
-                    grainIssue._nearbySuitableSettlementCache = market;
-                }
+                var difficultyMultiplier = reader.ReadSingle();
+                var dueTime = new CampaignTime(reader.ReadInt64());
+                Settlement market = null;
+                if (marketId.Length != 0 && objectManager.TryGetObjectWithLogging<Settlement>(marketId, out var resolvedMarket))
+                    market = resolvedMarket;
 
-                grainIssue._issueDifficultyMultiplier = reader.ReadSingle();
-                grainIssue.IssueDueTime = new CampaignTime(reader.ReadInt64());
+                if (market != null)
+                    grainIssue._nearbySuitableSettlementCache = market;
+                grainIssue._issueDifficultyMultiplier = difficultyMultiplier;
+                grainIssue.IssueDueTime = dueTime;
             }
         }
         catch (EndOfStreamException)
