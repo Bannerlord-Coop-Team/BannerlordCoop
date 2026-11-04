@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.ArmyOfPoachers;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestPoachersParty : ICommand
+public readonly struct RequestPoachersParty : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -17,7 +17,7 @@ internal readonly struct RequestPoachersParty : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkPoachersPartyCreated : IServerToClientCommand
+public readonly struct NetworkPoachersPartyCreated : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

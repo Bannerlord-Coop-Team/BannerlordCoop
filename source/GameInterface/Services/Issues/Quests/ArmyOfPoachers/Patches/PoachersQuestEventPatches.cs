@@ -15,6 +15,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.ArmyOfPoachers.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class PoachersQuestEventPatches
 {
@@ -33,21 +34,6 @@ internal class PoachersQuestEventPatches
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
     [HarmonyPostfix]
     private static void MapEventEndedPostfix(MapEvent mapEvent) => RunAsOwners(quest => quest.MapEventCheck(mapEvent));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void WarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void ClanChangedPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.CanHeroBecomePrisoner))]
     [HarmonyPostfix]

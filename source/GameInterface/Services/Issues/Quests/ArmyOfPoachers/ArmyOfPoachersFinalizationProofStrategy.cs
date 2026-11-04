@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common.Logging;
+using GameInterface.Services.Issues.Framework.Interface;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssueQuest;
 
@@ -12,6 +14,8 @@ internal enum ArmyOfPoachersBranch : byte
 
 internal class ArmyOfPoachersFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ArmyOfPoachersFinalizationProofStrategy>();
+
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest poachers) || !poachers.IsOngoing)
@@ -23,6 +27,7 @@ internal class ArmyOfPoachersFinalizationProofStrategy : IFinalizationProofStrat
         if (poachers._poachersParty?.IsActive != true || poachers._poachersParty.MapEvent != null ||
             Hero.MainHero.PartyBelongedTo?.CurrentSettlement != poachers._questVillage.Settlement)
         {
+            Logger.Warning("Skipping late poachers branch {proof} for quest {quest}", proof, poachers.StringId);
             return true;
         }
 

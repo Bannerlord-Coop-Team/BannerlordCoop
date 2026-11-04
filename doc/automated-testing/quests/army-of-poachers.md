@@ -1,6 +1,10 @@
 # Army of Poachers
 
-Live verification is pending. No game was launched for this port.
+Current-head live verification is pending lane assignment. Historical live evidence on
+`5ac1e5023` covered decline/accept, duplicate refusal, concurrent owners, night spawn,
+battle entry, leave-alone server effects and disconnect cleanup. It did not prove
+persuasion, combat endings or companion outcomes. The development merge supersedes
+that evidence for current behavior, especially ending journals, giver power and location.
 
 The installed Native module is v1.4.8. `TaleWorlds.CampaignSystem.dll` has SHA-256
 `1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE`.
@@ -27,23 +31,40 @@ persuasion and combat must use the owning client's normal UI.
 | Leave the poachers alone | Quest `QuestFailedAfterTalkingWithPoachers` | Choosing to leave runs one server failure: no gold, -5 base giver relation, -50 giver power, -30 town prosperity and -5 security. Conclusion log belongs to the owner; party is removed. |
 | Direct attack and attack after talking | Quest `StartQuestBattle`; Behavior `engage_poachers_consequence`; shared encounter/mission coordinators | Both entries wait for encounter approval, create the same authoritative battle and open the selected village's `village_center` scene. Nearby AI parties do not reinforce. Verify party/map-event IDs on all three peers. |
 | Owner combat victory | Quest `QuestSuccessWithPlayerDefeatedPoachers`; co-op `PoachersQuestEventPatches` | Fight the actual mission. Owner receives quest gold and +5 base giver relation; giver gains 30 power and town gains 50 prosperity. No additional security penalty or quest renown. Leather follows the ordinary battle-loot path. Quest and party are cleaned up on all peers. |
-| Owner defeat, retreat or unresolved battle | Quest `QuestFailWithPlayerDefeatedAgainstPoachers`; co-op `PoachersQuestEventPatches` | Owner receives no quest gold; -5 base relation, -50 giver power, -30 prosperity and -5 security. As in vanilla, a defeated owner is taken prisoner by the poachers and is released when the quest fails, with no Roguery XP from the release. Another player's captivity is unchanged. |
+| Owner defeat, retreat or unresolved battle | Quest `QuestFailWithPlayerDefeatedAgainstPoachers`; co-op `PoachersQuestEventPatches` | Owner receives no quest gold; -5 base relation, -50 giver power, -30 prosperity and -5 security. Vanilla blocks capturing the owner while the quest battle is active. If the server battle path nevertheless captures the owner, quest finalization releases them outside the owner substitution scope, including from a captor who joined the battle. Verify no extra Roguery XP and no change to another player's captivity. |
 | Another player fights the party | Co-op `PoachersQuestEventPatches.BattleFinalizingPrefix` | Defeating the party without its owner cancels that owner's quest without paying them. If the poachers win, the owner's quest stays active. Another player's separate copy is unchanged. |
 | Timeout | Quest `OnTimedOut`; framework timeout dispatch | Expire the 20-day direct quest: one server penalty matching combat defeat, one owner conclusion log and party cleanup. Client replay does not apply penalties again. |
 | Village raid | Quest `MapEventCheck`, `QuestCanceledTargetVillageRaided` | A raid starting or ending at the selected village fails the quest with its raid log, without the combat failure's extra reward/penalty effects. Other villages do not end it. |
 | War and clan change | Quest `OnWarDeclared`, `OnClanChangedKingdom`; `QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest` | War against the giver's faction fails the quest if caused by the player, otherwise cancels it. Joining a hostile kingdom cancels it. Unrelated wars and clan changes leave it active. |
 | Village coercion | Quest `MapEventStarted`; `QuestHelper.CheckMinorMajorCoercion`, `ApplyGenericMinorMajorCoercionConsequences` | Owner forcing supplies/volunteers from a settlement protected by the giver fails the quest, changes relation by -5 and giver power by -10. Vanilla counts a village as protected only when the giver is in its owner clan or among its notables, which a town merchant normally is not, so this is not expected to fire live. Another player's coercion does not fail this quest. |
 | Companion start, success, failure and return | Issue `AlternativeSolutionCondition`, `GetAlternativeSolutionSkill`, `AlternativeSolutionEndWithSuccessConsequence`, `AlternativeSolutionEndWithFailureConsequence`; inherited `IssueBase` completion | Real picker accepts tier-2-or-better healthy troops and a companion using the best of Bow/Crossbow/Throwing (150). Server rolls duration, failure and casualties once. Success gives the owner's gold and +5 base relation, +30 giver power and +50 prosperity. Failure gives no gold, -5 relation, -50 power, -30 prosperity and -5 security. Verify surviving/wounded troops, companion, casualties, XP and troop returns belong only to the owner, and that the owner's journal shows "Your men should be on their way." once. Decline/cancel selection and an invalid roster leave the offer available and return selected troops. |
-| Reconnect, save/load and player replacement | Framework ownership snapshot and resolution; inherited quest/issue lifecycle | Reconnect both clients during direct and companion progress. Confirm owner journal, target party, outcomes and returns retain identity. An owner who leaves after the poachers appear has the quest dismissed, and the server removes the poachers party. Exercise giver death/issue transfer and player replacement; retain any framework limitation as an unverified failure. |
+| Reconnect, save/load and player replacement | Framework ownership snapshot and resolution; inherited quest/issue lifecycle | Quests are dismissed when their owner leaves or the server restarts. Disconnect the owner during direct and companion progress, then rejoin: no active quest or target party remains. Check companion/troop disposition and that Old Quests contains only that player's own history. Exercise giver death/issue transfer and player replacement; retain any framework limitation as unverified. |
 
 No lord solution or bribe is offered: the issue returns `IsThereLordSolution =
 false`, and the poacher dialogue offers persuasion, combat and leaving only.
 Village ownership changes and ordinary captivity have no separate listener in
 this quest; their resulting war, raid or timeout paths above remain applicable.
-Trait XP remains disabled by the framework because vanilla shares one trait
-store between players, including the `OnIssueFailed` entry used by this quest.
+Trait XP uses the shared per-player trait service inside `MainHeroSubstitutionScope`;
+there is no quest-local trait mirror. Leave-alone applies Honor -50 and Mercy +20
+only to the owner. Persuasion applies Honor +10 and Mercy +50; combat victory
+applies Honor +50, defeat and timeout Honor -30. Check companion failure Honor -30.
+The shared campaign trait store and the other player must stay unchanged.
 
 For every live flow retain before/after journals, gold, renown, giver relation,
 power, town security/prosperity, party IDs and cleanup on the server and both
 clients. Record the actual tested source and screenshots; automated harness
 results do not establish that these live flows passed.
+
+## Live handoff after the development merge
+
+Repeat all flows above on the assigned lane. For leave-alone and persuasion, record
+the owner's conclusion line exactly once in Old Quests and compare the owner's
+settlement/encounter location with the server. Compare giver power on all peers.
+For battles cover owner win, defeat, retreat/no winner, another player winning
+or losing without the owner, and another player joining on the owner's side.
+For companion routes cover cancel/invalid selection, success/failure, the returning
+line exactly once, owner-only troop returns and non-owner journal safety.
+Also cover timeout, selected versus unrelated raid, player-caused versus unrelated
+war, hostile kingdom change, giver death and disconnect/rejoin during both routes.
+The historical dawn/request-race and protected-village coercion cases remain
+unverified unless the assigned run stages them.

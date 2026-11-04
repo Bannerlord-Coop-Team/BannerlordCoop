@@ -4,6 +4,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.ArmyOfPoachers.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class PoachersBranchPatches
 {

@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.CoopSessionData;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -12,13 +13,17 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ArmyOfPoachers;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Party.Messages;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using LiteNetLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
@@ -171,7 +176,43 @@ public class ArmyOfPoachersTests : IDisposable
         AssertOutcome(rewarded, securityChange, prosperityChange);
         Owner.Call(() => Owner.Resolve<INetwork>().SendAll(new RequestQuestBranch(scenario.NotableId, QuestScenario.IssueId, branch)));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Owner.Call(() => Assert.NotEmpty(quest.JournalEntries));
+        Owner.Call(() => Assert.Equal(2, quest.JournalEntries.Count));
+    }
+
+    [Fact]
+    public void LeaveAloneChangesOnlyTheOwnersTraitXp()
+    {
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                foreach (var trait in new[] { DefaultTraits.Honor, DefaultTraits.Mercy })
+                {
+                    var id = "poachers_" + trait.StringId;
+                    var handle = instance.Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle(id);
+                    Assert.True(instance.ObjectManager.AddExisting(id, trait, handle));
+                }
+                Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
+            });
+        Accept();
+        AttachParty();
+        Server.Call(() =>
+        {
+            var xp = Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
+            foreach (var player in new[] { playerA, playerB })
+                xp[player.HeroId] = new Dictionary<string, int> { ["poachers_Honor"] = 100, ["poachers_Mercy"] = 100 };
+        });
+
+        Owner.Call(() => QuestOf(Owner).QuestFailedAfterTalkingWithPoachers());
+
+        Server.Call(() =>
+        {
+            var xp = Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
+            Assert.Equal(50, xp[playerA.HeroId]["poachers_" + DefaultTraits.Honor.StringId]);
+            Assert.Equal(120, xp[playerA.HeroId]["poachers_" + DefaultTraits.Mercy.StringId]);
+            Assert.All(xp[playerB.HeroId].Values, value => Assert.Equal(100, value));
+            Assert.All(new[] { DefaultTraits.Honor, DefaultTraits.Mercy }, trait => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait)));
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Theory]
@@ -264,6 +305,38 @@ public class ArmyOfPoachersTests : IDisposable
             var release = Assert.Single(releases);
             Assert.Same(owner, release.Prisoner);
             Assert.NotSame(owner.CharacterObject, release.PlayerTroop);
+        });
+        AssertOutcome(false, -5, -30);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DefeatReleasesTheOwnerFromACaptorWhoJoinedTheBattle(bool captorJoined)
+    {
+        Accept();
+        AttachParty();
+        var captorId = environment.CreateRegisteredObject<MobileParty>();
+        WithRecordedReleases(() =>
+        {
+            Server.Call(() =>
+            {
+                var owner = Get<Hero>(Server, playerA.HeroId);
+                var poachers = Get<MobileParty>(Server, poachersId);
+                var captor = Get<MobileParty>(Server, captorId);
+                var battle = MapEventBattleFactory.CreateMapEvent(owner.PartyBelongedTo.Party, poachers.Party, default);
+                Assert.NotNull(battle);
+                if (captorJoined) captor.Party.MapEventSide = battle.DefenderSide;
+                MakePrisoner(owner, captor.Party);
+                battle.BattleState = BattleState.DefenderVictory;
+                battle.FinalizeEvent();
+                Assert.True(owner.IsPrisoner);
+            }, new[] { AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)) });
+
+            Assert.Empty(releases);
+            Server.PumpGameThread();
+            var release = Assert.Single(releases);
+            Assert.NotSame(release.Prisoner.CharacterObject, release.PlayerTroop);
         });
         AssertOutcome(false, -5, -30);
     }
@@ -510,6 +583,7 @@ public class ArmyOfPoachersTests : IDisposable
                     var troop = Get<CharacterObject>(instance, troopId);
                     troop.Level = 15;
                     troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                    Assert.True(troop.Tier >= 2);
                 }
             });
         }
@@ -523,6 +597,15 @@ public class ArmyOfPoachersTests : IDisposable
                 sent.AddToCounts(Get<Hero>(Owner, companionId).CharacterObject, 1);
                 sent.AddToCounts(Get<CharacterObject>(Owner, troopId), 40);
             }
+            Assert.True(IssueOf(Owner).DoTroopsSatisfyAlternativeSolution(sent, out var explanation), explanation?.ToString());
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetHandle(Get<CharacterObject>(Server, troopId), out var handle));
+                var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 40, 0, 0) });
+                Server.Resolve<IMessageBroker>().Publish(this, new PartyDoneLogicApplied(Owner.NetPeer,
+                    PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
+                    playerA.HeroId, scenario.NotableId, QuestScenario.IssueId));
+            });
             IssueOf(Owner).StartIssueWithAlternativeSolution();
         });
 

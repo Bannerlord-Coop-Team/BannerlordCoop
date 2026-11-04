@@ -15,10 +15,11 @@ namespace GameInterface.Services.Issues.Quests.ArmyOfPoachers.Patches;
 using Behavior = MerchantArmyOfPoachersIssueBehavior;
 using Quest = MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Behavior))]
 internal class PoachersMenuPatches
 {
-    [HarmonyPatch("Instance", MethodType.Getter)]
+    [HarmonyPatch(nameof(Behavior.Instance), MethodType.Getter)]
     [HarmonyPrefix]
     private static bool InstancePrefix(ref Quest __result)
     {
@@ -29,7 +30,7 @@ internal class PoachersMenuPatches
         return false;
     }
 
-    [HarmonyPatch("OnSessionLaunched")]
+    [HarmonyPatch(nameof(Behavior.OnSessionLaunched))]
     [HarmonyPrefix]
     private static bool SessionLaunchedPrefix() => ModInformation.IsClient;
 
@@ -37,7 +38,7 @@ internal class PoachersMenuPatches
     [HarmonyPrefix]
     private static bool CheckForIssuePrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch("army_of_poachers_village_on_init")]
+    [HarmonyPatch(nameof(Behavior.army_of_poachers_village_on_init))]
     [HarmonyPrefix]
     private static bool MenuInitPrefix(MenuCallbackArgs args)
     {
@@ -55,11 +56,11 @@ internal class PoachersMenuPatches
         return false;
     }
 
-    [HarmonyPatch("engage_poachers_condition")]
+    [HarmonyPatch(nameof(Behavior.engage_poachers_condition))]
     [HarmonyPostfix]
     private static void FightReadyPostfix(MenuCallbackArgs args) => CheckPartyReady(args);
 
-    [HarmonyPatch("talk_to_leader_of_poachers_condition")]
+    [HarmonyPatch(nameof(Behavior.talk_to_leader_of_poachers_condition))]
     [HarmonyPostfix]
     private static void TalkReadyPostfix(MenuCallbackArgs args) => CheckPartyReady(args);
 
@@ -70,7 +71,7 @@ internal class PoachersMenuPatches
         args.Tooltip = new TextObject("{=CoopPoachersPreparing}Waiting for the poachers party.");
     }
 
-    [HarmonyPatch("poachers_menu_back_condition")]
+    [HarmonyPatch(nameof(Behavior.poachers_menu_back_condition))]
     [HarmonyPostfix]
     private static void BackWhileWaitingPostfix(ref bool __result)
     {
@@ -79,6 +80,7 @@ internal class PoachersMenuPatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest))]
 internal class PoachersEncounterPatches
 {
@@ -121,15 +123,15 @@ internal class PoachersEncounterPatches
         return false;
     }
 
-    [HarmonyPatch("HourlyTick")]
+    [HarmonyPatch(nameof(Quest.HourlyTick))]
     [HarmonyPrefix]
     private static bool HourlyTickPrefix(Quest __instance) => IsLocalOwner(__instance);
 
-    [HarmonyPatch("GameMenuOpened")]
+    [HarmonyPatch(nameof(Quest.GameMenuOpened))]
     [HarmonyPrefix]
     private static bool GameMenuOpenedPrefix(Quest __instance) => IsLocalOwner(__instance);
 
-    [HarmonyPatch("SetStartDialogOnCondition")]
+    [HarmonyPatch(nameof(Quest.SetStartDialogOnCondition))]
     [HarmonyPrefix]
     private static bool StartDialogPrefix(Quest __instance, ref bool __result)
     {

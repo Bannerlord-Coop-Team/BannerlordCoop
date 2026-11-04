@@ -32,10 +32,12 @@ internal class PoachersEncounterHandler : IHandler
     private readonly IIssueOwnerResolver owners;
     private readonly IControllerIdProvider controller;
     private readonly IPlayerManager players;
+    private readonly IIssueConversationGuard conversationGuard;
     private readonly HashSet<Quest> pendingBattles = new HashSet<Quest>();
 
     public PoachersEncounterHandler(IMessageBroker messages, INetwork network, IObjectManager objects,
-        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players)
+        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
+        IIssueConversationGuard conversationGuard)
     {
         this.messages = messages;
         this.network = network;
@@ -44,6 +46,7 @@ internal class PoachersEncounterHandler : IHandler
         this.owners = owners;
         this.controller = controller;
         this.players = players;
+        this.conversationGuard = conversationGuard;
         messages.Subscribe<RequestPoachersParty>(OnPartyRequested);
         messages.Subscribe<NetworkPoachersPartyCreated>(OnPartyCreated);
     }
@@ -104,7 +107,7 @@ internal class PoachersEncounterHandler : IHandler
             }
 
             if (!objects.TryGetIdWithLogging(quest._poachersParty, out var partyId)) return;
-            network.SendAll(new NetworkPoachersPartyCreated(request.IssueOwnerId, request.IssueId, ownerId, partyId));
+            network.Send(peer, new NetworkPoachersPartyCreated(request.IssueOwnerId, request.IssueId, ownerId, partyId));
         }, context: nameof(PoachersEncounterHandler));
     }
 
@@ -114,7 +117,7 @@ internal class PoachersEncounterHandler : IHandler
         var data = payload.What;
         if (data.ControllerId != controller.ControllerId) return;
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!TryGetQuest(data.IssueOwnerId, data.IssueId, out var quest) ||
                 !objects.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party)) return;
@@ -123,7 +126,7 @@ internal class PoachersEncounterHandler : IHandler
             var menu = Campaign.Current.CurrentMenuContext;
             if (menu?.GameMenu.StringId == "army_of_poachers_village")
                 Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menu);
-        }, context: nameof(PoachersEncounterHandler));
+        }, data.IssueOwnerId), context: nameof(PoachersEncounterHandler));
     }
 
     public void StartBattle(Quest quest)
