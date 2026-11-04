@@ -93,6 +93,9 @@
     <Reference Include="TaleWorlds.MountAndBlade.View">
       <HintPath>$(BannerlordDir)Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
+      <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
+    </Reference>
 	  <Reference Include="TaleWorlds.ModuleManager">
 		  <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
 	  </Reference>

@@ -7,10 +7,17 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.BugReporting.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Patches;
+using HarmonyLib;
+using System.Reflection;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -67,6 +74,80 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(player.HeroId, request.HeroId);
     }
+
+    [Fact]
+    public void EscapeMenuUnstuck_ConfirmYes_SendsTheSameRequestAsTheCommand()
+    {
+        var player = SetupRegisteredMainHeroAndParty();
+
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm(Client.Resolve<IPlayerUnstuckRequester>()));
+
+            var inquiry = Assert.Single(shownInquiries);
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+
+            Client.Call(() => inquiry.AffirmativeAction());
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+
+        var request = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+        Assert.Equal(player.PartyId, request.PartyId);
+        Assert.Equal(player.HeroId, request.HeroId);
+    }
+
+    [Fact]
+    public void UnstuckButton_IsOnlyInTheCampaignMapEscapeMenuOfClients()
+    {
+        var campaignPostfix = AccessTools.Method(typeof(EscapeMenuCoopOptionsPatch), "AddCoopOptionsItem");
+        var missionPostfix = AccessTools.Method(typeof(MissionEscapeMenuCoopOptionsPatch), "AddCoopOptionsItem");
+
+        List<string> clientCampaign = null;
+        List<string> clientMission = null;
+        Client.Call(() =>
+        {
+            clientCampaign = RunEscapeMenuPostfix(campaignPostfix);
+            clientMission = RunEscapeMenuPostfix(missionPostfix);
+        });
+
+        List<string> serverCampaign = null;
+        Server.Call(() => serverCampaign = RunEscapeMenuPostfix(campaignPostfix));
+
+        var stuckIndex = clientCampaign.IndexOf("I'm stuck");
+        Assert.True(stuckIndex > clientCampaign.IndexOf("Coop Options"));
+        Assert.Equal(clientCampaign.Count - 2, stuckIndex);
+        Assert.DoesNotContain("I'm stuck", clientMission);
+        Assert.DoesNotContain("I'm stuck", serverCampaign);
+    }
+
+    /// <summary>Runs an escape menu postfix on a stock-like item list and returns the item texts in order.</summary>
+    private static List<string> RunEscapeMenuPostfix(MethodInfo postfix)
+    {
+        var items = new List<EscapeMenuItemVM>
+        {
+            CreateEscapeMenuItem("{=e139gKZc}Return to the Game"),
+            CreateEscapeMenuItem("{=PXT6aA4J}Campaign Options"),
+            CreateEscapeMenuItem("{=NqarFr4P}Options"),
+        };
+
+        postfix.Invoke(null, new object[] { null, items });
+
+        return items.Select(item => item.ActionText).ToList();
+    }
+
+    private static EscapeMenuItemVM CreateEscapeMenuItem(string text) =>
+        new EscapeMenuItemVM(new TextObject(text), _ => { }, null, () => new Tuple<bool, TextObject>(false, new TextObject("")));
 
     [Fact]
     public void PlayerBugReport_RequestsDiagnosticLogsFromEveryConnectedClient()

@@ -258,7 +258,7 @@ public class SystemDeveloperDirectCommandTests
             return new ModOptionsCommands.VoiceEnabledCoopCommand(Mock.Of<INetwork>(), Mock.Of<IMessageBroker>());
         // Only the metadata is read here, so the server dependencies can stay empty.
         if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
-            return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);
+            return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null, null);
         return CommandTestFactory.Create<ICoopCommand>(type);
     }
 

@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using HarmonyLib;
@@ -11,11 +12,13 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 using TaleWorlds.ScreenSystem;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
-/// Adds co-op client options and bug reporting to the campaign-map escape menu.
+/// Adds co-op client options, bug reporting and the unstuck request to the campaign-map escape menu.
 /// </summary>
 [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
 internal class EscapeMenuCoopOptionsPatch
@@ -24,6 +27,12 @@ internal class EscapeMenuCoopOptionsPatch
 
     private static readonly TextObject BugReportUnavailableDuringConversation =
         new TextObject("Bug reporting is unavailable during conversations.");
+
+    private static readonly TextObject UnstuckText = new TextObject("I'm stuck");
+
+    private static readonly TextObject UnstuckConfirmText = new TextObject(
+        "Move your party out of whatever it is stuck in? Your party leaves any battle, siege, settlement or menu " +
+        "it is in, and any army it follows. An army you lead stays together.");
 
     [HarmonyPostfix]
     static void AddCoopOptionsItem(MapScreen __instance, List<EscapeMenuItemVM> __result)
@@ -41,13 +50,24 @@ internal class EscapeMenuCoopOptionsPatch
             getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
             isPositiveBehaviored: false));
 
+        int nextIndex = coopOptionsIndex + 1;
         if (TryGetAvailableBugReportOverlay(out var overlay))
         {
-            __result.Insert(coopOptionsIndex + 1, new EscapeMenuItemVM(
+            __result.Insert(nextIndex++, new EscapeMenuItemVM(
                 new TextObject("Report Coop Bug"),
                 _ => OpenBugReport(__instance, overlay),
                 identifier: null,
                 getIsDisabledAndReason: GetBugReportDisabledState,
+                isPositiveBehaviored: false));
+        }
+
+        if (ContainerProvider.TryResolve(out IPlayerUnstuckRequester unstuckRequester))
+        {
+            __result.Insert(nextIndex, new EscapeMenuItemVM(
+                UnstuckText,
+                _ => OpenUnstuckConfirm(__instance, unstuckRequester),
+                identifier: null,
+                getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
                 isPositiveBehaviored: false));
         }
 
@@ -84,6 +104,23 @@ internal class EscapeMenuCoopOptionsPatch
         if (!CanOpenBugReport(overlay.IsAvailable, IsConversationInProgress())) return;
         mapScreen.OnEscapeMenuToggled(false);
         overlay.Open();
+    }
+
+    private static void OpenUnstuckConfirm(MapScreen mapScreen, IPlayerUnstuckRequester requester)
+    {
+        mapScreen.OnEscapeMenuToggled(false);
+        ShowUnstuckConfirm(requester);
+    }
+
+    internal static void ShowUnstuckConfirm(IPlayerUnstuckRequester requester)
+    {
+        InformationManager.ShowInquiry(new InquiryData(
+            UnstuckText.ToString(),
+            UnstuckConfirmText.ToString(),
+            true, true,
+            GameTexts.FindText("str_yes").ToString(),
+            GameTexts.FindText("str_no").ToString(),
+            () => requester.TryRequest(), null));
     }
 }
 
