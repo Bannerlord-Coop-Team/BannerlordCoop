@@ -87,7 +87,7 @@ public class AlternativeSolutionRejectTests : IDisposable
 
             party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
             party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
-            party.MemberRoster.AddToCounts(troop, KeptTroops);
+            party.MemberRoster.AddToCounts(troop, KeptTroops + SentTroops);
 
             heroesInParty = party.MemberRoster.TotalHeroes;
         });
@@ -120,11 +120,12 @@ public class AlternativeSolutionRejectTests : IDisposable
                 Campaign.Current.MainParty = party;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
                 clientIssue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                clientIssue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
             }
 
             Assert.True(party.MemberRoster.FindIndexOfTroop(companion.CharacterObject) < 0);
 
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(playerHeroId, out var owner));
+            AlternativeSolutionPickerDriver.Commit(Client, clientIssue, owner, party, troop, SentTroops);
             Client.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(clientIssue));
         });
         TestEnvironment.FlushCoalescer();

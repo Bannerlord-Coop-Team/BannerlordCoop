@@ -4,9 +4,8 @@ using ProtoBuf;
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
 /// <summary>
-/// Opens a walls-assault or siege-ambush mission on an authoritative participant. Carries the mission-defining siege
-/// inputs snapshotted once per map event on the server, so every entrant loads a physically identical scene
-/// even if campaign-side bombardment sync is mid-flight on their machine.
+/// Opens a walls-assault or siege-ambush mission on an authoritative participant. Carries the server's siege inputs,
+/// rebuilt on each new mission claim and shared by every entrant of that mission so they load the same scene.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkStartSiegeMission : ICommand

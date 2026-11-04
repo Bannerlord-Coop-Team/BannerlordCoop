@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
 /// Only the server finalizes map events, so it checks every running quest's hideout battle as its owning player
 /// and applies the consequences there. A client only ends its copy of the quest once the server announces it.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class CapturedByBountyHuntersOutcomePatches
 {

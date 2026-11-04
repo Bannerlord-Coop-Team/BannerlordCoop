@@ -21,23 +21,24 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
-    private readonly Func<EnvironmentInstance, Hero, IssueBase> issueFactory;
-    private readonly Action<EnvironmentInstance, Hero>? configureGiver;
 
     public string NotableId { get; }
-    public (string HeroId, string PartyId) PlayerA { get; }
-    public (string HeroId, string PartyId) PlayerB { get; }
+    public Player PlayerA { get; }
+    public Player PlayerB { get; }
+    public string OwnerHeroId => PlayerA.HeroId;
+    public string OwnerPartyId => PlayerA.MobilePartyId;
+    public string OtherHeroId => PlayerB.HeroId;
+    public string OtherPartyId => PlayerB.MobilePartyId;
 
     public EnvironmentInstance Server => testEnvironment.Server;
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment, Func<EnvironmentInstance, Hero, IssueBase>? issueFactory = null,
+    public QuestScenario(E2ETestEnvironment testEnvironment,
+        Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null,
         Action<EnvironmentInstance, Hero>? configureGiver = null)
     {
         this.testEnvironment = testEnvironment;
-        this.issueFactory = issueFactory ?? ((instance, hero) => new AllowedIssue(hero, null));
-        this.configureGiver = configureGiver;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
@@ -46,20 +47,24 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance);
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(NotableId, out var giver));
+                configureGiver?.Invoke(instance, giver);
+            });
+            AddIssue(instance, NotableId, IssueId, createIssue);
         }
     }
 
-    public string OwnerHeroId => PlayerA.HeroId;
-    public string OwnerPartyId => PlayerA.PartyId;
-    public string OtherHeroId => PlayerB.HeroId;
-    public string OtherPartyId => PlayerB.PartyId;
-
-    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase> issueFactory,
-        Action<EnvironmentInstance, Hero>? configureGiver = null)
-        : this(testEnvironment, (instance, hero) => issueFactory(hero), configureGiver)
+    // Gives another hero an issue nobody has taken, on every machine
+    public void AddIssue(string heroId, string issueId)
     {
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            AddIssue(instance, heroId, issueId, null);
+        }
     }
+
     public void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
@@ -113,32 +118,33 @@ internal sealed class QuestScenario
         return controllerId;
     }
 
-    private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
+    private Player RegisterPlayer(EnvironmentInstance client, string controllerId)
     {
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
 
-        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
+        var player = new Player(controllerId, heroId, partyId, "", "");
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(player)));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
-        return (heroId, partyId);
+        return player;
     }
 
-    private void AddIssue(EnvironmentInstance instance)
+    private static void AddIssue(EnvironmentInstance instance, string heroId, string issueId,
+        Func<EnvironmentInstance, Hero, IssueBase>? createIssue)
     {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
 
             using (new AllowedThread())
             {
-                configureGiver?.Invoke(instance, notable);
-                var issue = issueFactory(instance, notable);
-                issue.StringId = IssueId;
+                var issue = createIssue == null ? new AllowedIssue(hero, null) : createIssue(instance, hero);
+                issue.StringId = issueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
-                Campaign.Current.IssueManager._issues.Add(notable, issue);
-                notable.OnIssueCreatedForHero(issue);
+                Campaign.Current.IssueManager._issues.Add(hero, issue);
+                hero.OnIssueCreatedForHero(issue);
             }
         });
     }

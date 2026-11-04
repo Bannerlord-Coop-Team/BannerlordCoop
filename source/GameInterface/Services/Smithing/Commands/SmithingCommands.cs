@@ -6,6 +6,7 @@ using Common.Logging;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System.Collections.Generic;
 using System.Text;
@@ -44,6 +45,14 @@ internal class SmithingCommands
     /// </summary>
     public sealed class CraftingGiveSuppliesCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look command arguments up by name or id.
+        public CraftingGiveSuppliesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.crafting";
 
         public string Name => "give_supplies";
@@ -54,7 +63,7 @@ internal class SmithingCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -66,47 +75,37 @@ internal class SmithingCommands
                 return Failed("Unable to resolve ObjectManager.");
             }
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            var itemsToAdd = new Dictionary<string, int>()
             {
-                if (hero.Name.ToString() == strings[0])
+                { "hardwood", 100 },
+                { "iron", 50 },
+                { "charcoal", 100 },
+                { "ironIngot1", 50 },
+                { "ironIngot2", 50 },
+                { "ironIngot3", 50 },
+                { "ironIngot4", 50 },
+                { "ironIngot5", 50 },
+                { "ironIngot6", 50 },
+                { "empire_sword_4_t4", 3 }
+            };
+
+            foreach (var itemId in itemsToAdd.Keys)
+            {
+                if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
                 {
-                    var itemsToAdd = new Dictionary<string, int>()
-                    {
-                        { "hardwood", 100 },
-                        { "iron", 50 },
-                        { "charcoal", 100 },
-                        { "ironIngot1", 50 },
-                        { "ironIngot2", 50 },
-                        { "ironIngot3", 50 },
-                        { "ironIngot4", 50 },
-                        { "ironIngot5", 50 },
-                        { "ironIngot6", 50 },
-                        { "empire_sword_4_t4", 3 }
-                    };
-
-                    foreach (var itemId in itemsToAdd.Keys)
-                    {
-                        if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
-                        {
-                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
-                        }
-                        else
-                        {
-                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
-                        }
-                    }
-
-                    stringBuilder.AppendLine(strings[0] + " was given smithing supplies.");
+                    stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
+                }
+                else
+                {
+                    hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
                 }
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            stringBuilder.AppendLine(hero.Name + " was given smithing supplies.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -156,6 +155,14 @@ internal class SmithingCommands
     /// </summary>
     public sealed class CraftingTownOrdersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look command arguments up by name or id.
+        public CraftingTownOrdersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.crafting";
 
         public string Name => "town_orders";
@@ -166,34 +173,23 @@ internal class SmithingCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("town_name", "The exact town display name.", isRequired: true),
+            new ExpectedArgs("town_name", "Town name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
-
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
+            if (!resolver.TryResolveTown(strings[0], out var town, out var error)) return Failed(error);
+            if (!town.Settlement.IsTown) return Failed($"{town.Name} is not a town");
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var town in Town.AllTowns)
+            stringBuilder.AppendLine("Target town " + town.Name.ToString() + " has orders:");
+            CraftingOrder[] slots = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftingOrders[town].Slots;
+            foreach (CraftingOrder order in slots)
             {
-                if (town.Name.ToString() == strings[0])
-                {
-                    stringBuilder.AppendLine("Target town " + town.Name.ToString() + " has orders:");
-                    CraftingOrder[] slots = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftingOrders[town].Slots;
-                    foreach (CraftingOrder order in slots)
-                    {
-                        stringBuilder.AppendLine("Order slot: " + order?.OrderDifficulty + " for hero: " + order?.OrderOwner);
-                    }
-                }
+                stringBuilder.AppendLine("Order slot: " + order?.OrderDifficulty + " for hero: " + order?.OrderOwner);
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Town not found.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -202,6 +198,14 @@ internal class SmithingCommands
     /// </summary>
     public sealed class CraftingAddTownOrderCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look command arguments up by name or id.
+        public CraftingAddTownOrderCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.crafting";
 
         public string Name => "add_town_order";
@@ -212,35 +216,21 @@ internal class SmithingCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-            var heroName = strings[0]; // Example hero name: "Vaminesa the Minter"
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
 
-            StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            for (int i = 0; i < 6; i++)
             {
-                if (hero.Name.ToString() == heroName)
-                {
-                    for (int i = 0; i < 6; i++)
-                    {
-                        Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
-                    }
-
-                    stringBuilder.AppendLine("Orders have been added for " + heroName + " in " + hero.CurrentSettlement.Town.Name.ToString());
-                }
+                Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Town not found.");
+            return Succeeded("Orders have been added for " + hero.Name + " in " + hero.CurrentSettlement.Town.Name.ToString());
         }
     }
 
@@ -249,6 +239,14 @@ internal class SmithingCommands
     /// </summary>
     public sealed class CraftingAddCraftedItemsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look command arguments up by name or id.
+        public CraftingAddCraftedItemsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.crafting";
 
         public string Name => "add_crafted_items";
@@ -259,7 +257,7 @@ internal class SmithingCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -268,37 +266,27 @@ internal class SmithingCommands
 
             if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             var craftedItemPrefix = "crafted_item_";
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            int craftedItemCount = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemCount;
+            for (int i = 0; i < craftedItemCount; i++)
             {
-                if (hero.Name.ToString() == strings[0])
+                string craftedItemId = craftedItemPrefix + i.ToString();
+                if (!objectManager.TryGetObject(craftedItemId, out ItemObject itemObject))
                 {
-                    int craftedItemCount = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemCount;
-                    for (int i = 0; i < craftedItemCount; i++)
-                    {
-                        string craftedItemId = craftedItemPrefix + i.ToString();
-                        if (!objectManager.TryGetObject(craftedItemId, out ItemObject itemObject))
-                        {
-                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + craftedItemId);
-                        }
-                        else
-                        {
-                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, 1);
-                        }
-                    }
-
-                    stringBuilder.AppendLine(strings[0] + " was given all crafted items.");
+                    stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + craftedItemId);
+                }
+                else
+                {
+                    hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, 1);
                 }
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Town not found.");
+            stringBuilder.AppendLine(hero.Name + " was given all crafted items.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 

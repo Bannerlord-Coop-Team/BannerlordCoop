@@ -1,7 +1,7 @@
 ﻿using Common.Commands;
-using Autofac;
 using Common;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using GameInterface.Services.Towns.Patches;
 using Helpers;
 using SandBox.View.Map;
@@ -23,19 +23,6 @@ public class TownDebugCommand
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
-
-    /// <summary>
-    /// Attempts to get the ObjectManager
-    /// </summary>
-    /// <param name="objectManager">Resolved ObjectManager, will be null if unable to resolve</param>
-    /// <returns>True if ObjectManager was resolved, otherwise False</returns>
-    private static bool TryGetObjectManager(out IObjectManager objectManager)
-    {
-        objectManager = null;
-        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
-
-        return container.TryResolve(out objectManager);
-    }
 
     // coop.debug.town.list
     /// <summary>
@@ -114,6 +101,14 @@ public class TownDebugCommand
     /// <returns>Information regarding the town.</returns>
     public sealed class InfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public InfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "info";
@@ -124,27 +119,21 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(args[0], out Town town) == false)
-            {
-                return Failed($"ID: '{args[0]}' not found");
+                return Failed(error);
             }
 
             Fief fief = town.Settlement.SettlementComponent as Fief;
 
             StringBuilder sb = new();
 
-            sb.AppendFormat("ID: '{0}'\n", args[0]);
+            sb.AppendFormat("ID: '{0}'\n", town.StringId);
             sb.AppendFormat("Name: '{0}'\n", town.Name);
             sb.AppendFormat("Governor: '{0}'\n", (town.Governor != null) ? town.Governor.Name : "null");
             sb.AppendFormat("LastCapturedBy: '{0}'\n", (town.LastCapturedBy != null) ? town.LastCapturedBy.Name : "null");
@@ -200,6 +189,16 @@ public class TownDebugCommand
 
     public sealed class GarrisonBacklinkCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Takes the resolver for name or id lookups and the object manager for registry ids.
+        public GarrisonBacklinkCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "garrison_backlink";
@@ -210,29 +209,31 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            if (!TryGetObjectManager(out var objectManager))
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
+                return Failed(error);
             }
 
-            if (!objectManager.TryGetObject(args[0], out Town town))
-            {
-                return Failed($"ID: '{args[0]}' not found");
-            }
-
-            return Succeeded(FormatGarrisonBacklink(objectManager, town, args[0]));
+            return Succeeded(FormatGarrisonBacklink(objectManager, town));
 
         }
     }
 
     public sealed class FocusGarrisonCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public FocusGarrisonCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "focus_garrison";
@@ -243,20 +244,14 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            if (!TryGetObjectManager(out var objectManager))
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject(args[0], out Town town))
-            {
-                return Failed($"ID: '{args[0]}' not found");
+                return Failed(error);
             }
 
             var activeGarrisons = GetActiveGarrisons(town);
@@ -283,6 +278,16 @@ public class TownDebugCommand
 
     public sealed class ApplyGarrisonLifecycleCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Takes the resolver for name or id lookups and the object manager for registry ids.
+        public ApplyGarrisonLifecycleCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "apply_garrison_lifecycle";
@@ -293,7 +298,7 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("operation", "The operation."),
         };
 
@@ -305,14 +310,9 @@ public class TownDebugCommand
             }
 
 
-            if (!TryGetObjectManager(out var objectManager))
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (!objectManager.TryGetObject(args[0], out Town town))
-            {
-                return Failed($"ID: '{args[0]}' not found");
+                return Failed(error);
             }
 
             var activeGarrisons = GetActiveGarrisons(town);
@@ -344,12 +344,12 @@ public class TownDebugCommand
             }
 
             return Succeeded($"Applied {args[1].ToLowerInvariant()} to {activeGarrisons[0].StringId}; " +
-                   FormatGarrisonBacklink(objectManager, town, args[0]));
+                   FormatGarrisonBacklink(objectManager, town));
 
         }
     }
 
-    private static string FormatGarrisonBacklink(IObjectManager objectManager, Town town, string townId)
+    private static string FormatGarrisonBacklink(IObjectManager objectManager, Town town)
     {
         var activeGarrisons = GetActiveGarrisons(town);
         var backlink = town.GarrisonPartyComponent;
@@ -363,7 +363,7 @@ public class TownDebugCommand
                                      ReferenceEquals(activeGarrisons[0].PartyComponent, backlink);
 
         return $"{(ModInformation.IsServer ? "SERVER" : "CLIENT")} " +
-               $"town={townId} settlement={town.Settlement.StringId} " +
+               $"town={town.StringId} settlement={town.Settlement.StringId} " +
                $"backlinkComponent={backlinkId} backlinkParty={backlink?.MobileParty?.StringId ?? "null"} " +
                $"activeGarrisonCount={activeGarrisons.Count} activeGarrisonParties={activeParties} " +
                $"backlinkMatchesActive={backlinkMatchesActive}";
@@ -386,6 +386,14 @@ public class TownDebugCommand
     /// </summary>
     public sealed class ListBuildingsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public ListBuildingsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "list_buildings";
@@ -396,13 +404,15 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
-            if (objectManager.TryGetObject(args[0], out Town town) == false) return Failed($"ID: '{args[0]}' not found");
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+            {
+                return Failed(error);
+            }
 
             StringBuilder sb = new();
             sb.AppendFormat("Buildings for '{0}' ({1}):\n", town.Name, town.Buildings.Count);
@@ -423,6 +433,14 @@ public class TownDebugCommand
     /// </summary>
     public sealed class ListWorkshopsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public ListWorkshopsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "list_workshops";
@@ -433,13 +451,15 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
-            if (objectManager.TryGetObject(args[0], out Town town) == false) return Failed($"ID: '{args[0]}' not found");
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+            {
+                return Failed(error);
+            }
 
             StringBuilder sb = new();
             sb.AppendFormat("Workshops for '{0}' ({1}):\n", town.Name, town.Workshops.Length);
@@ -458,6 +478,14 @@ public class TownDebugCommand
     /// <returns></returns>
     public sealed class SetFoodStocksCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetFoodStocksCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_food_stocks";
@@ -468,23 +496,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("foodStocks", "The food stocks."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string foodStocksString = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"Town with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             Fief fief = town.Settlement.SettlementComponent as Fief;
@@ -509,6 +531,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownGovernorCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownGovernorCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_governor";
@@ -519,29 +549,20 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
-            new ExpectedArgs("heroId", "The hero id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
+            new ExpectedArgs("heroId", "Hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
-            string heroId = args[1];
-
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
+                return Failed(error);
             }
 
-            if (objectManager.TryGetObject(townId, out Town town) == false)
+            if (!resolver.TryResolveHero(args[1], out var hero, out var heroError))
             {
-                return Failed($"Town with ID: '{townId}' not found");
-            }
-
-            if (objectManager.TryGetObject(heroId, out Hero hero) == false)
-            {
-                return Failed($"Hero with ID: '{heroId}' not found");
+                return Failed(heroError);
             }
 
             town.Governor = hero;
@@ -559,6 +580,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownLastCapturedByCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownLastCapturedByCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_last_captured_by";
@@ -569,29 +598,20 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
-            new ExpectedArgs("clanId", "The clan id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
+            new ExpectedArgs("clanId", "Clan name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
-            string clanId = args[1];
-
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
+                return Failed(error);
             }
 
-            if (objectManager.TryGetObject(townId, out Town town) == false)
+            if (!resolver.TryResolveClan(args[1], out var clan, out var clanError))
             {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
-            }
-
-            if (objectManager.TryGetObject(clanId, out Clan clan) == false)
-            {
-                return Failed($"{nameof(Clan)} with ID: '{clanId}' not found");
+                return Failed(clanError);
             }
 
             town.LastCapturedBy = clan;
@@ -609,6 +629,16 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class AddToTownSoldItemsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Takes the resolver for name or id lookups and the object manager for registry ids.
+        public AddToTownSoldItemsCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "add_item_to_sold_items";
@@ -619,26 +649,19 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("itemId", "The item id."),
             new ExpectedArgs("numberOfItems", "The number of items."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string itemId = args[1];
             string count = args[2];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (objectManager.TryGetObject(itemId, out ItemCategory item) == false)
@@ -685,6 +708,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownProsperityCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownProsperityCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_prosperity";
@@ -695,24 +726,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("prosperity", "The prosperity."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string prosperityValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (int.TryParse(prosperityValue, out int prosperity) == false)
@@ -734,6 +758,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownLoyaltyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownLoyaltyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_loyalty";
@@ -744,24 +776,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("loyalty", "The loyalty."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string loyaltyValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (float.TryParse(loyaltyValue, out float loyalty) == false)
@@ -783,6 +808,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownSecurityCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownSecurityCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_security";
@@ -793,24 +826,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("security", "The security."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string securityValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (float.TryParse(securityValue, out float security) == false)
@@ -833,6 +859,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownInRebelliousStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownInRebelliousStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_in_rebellious_state";
@@ -843,24 +877,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("inRebelliousState", "The in rebellious state."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string rebellionStateValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (bool.TryParse(rebellionStateValue, out bool inRebelliousState) == false)
@@ -876,6 +903,14 @@ public class TownDebugCommand
 
     public sealed class StartRebellionCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public StartRebellionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "start_rebellion";
@@ -886,15 +921,16 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run coop.debug.town.start_rebellion on the server.");
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager");
-            if (objectManager.TryGetObject(args[0], out Town town) == false)
-                return Failed($"{nameof(Town)} with ID: '{args[0]}' not found");
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+            {
+                return Failed(error);
+            }
             if (town.OwnerClan.IsRebelClan) return Failed($"{town.Name} is already owned by a rebel clan.");
             if (town.Settlement.Party.MapEvent != null) return Failed($"{town.Name} is in a map event.");
             if (town.Settlement.Party.SiegeEvent != null) return Failed($"{town.Name} is under siege.");
@@ -916,6 +952,14 @@ public class TownDebugCommand
     /// <returns>information if it changed</returns>
     public sealed class SetTownGarrisonAutoRecruitmentIsEnabledCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTownGarrisonAutoRecruitmentIsEnabledCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_garrison_auto_recruitment";
@@ -926,24 +970,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("enabled", "The enabled."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string garrisonRecruitmentValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (bool.TryParse(garrisonRecruitmentValue, out bool garrisonAutoRecruitmentIsEnabled) == false)
@@ -965,6 +1002,14 @@ public class TownDebugCommand
     /// <returns>string output if success</returns>
     public sealed class SetTradeTaxAccumulatedCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public SetTradeTaxAccumulatedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "set_trade_tax_acc";
@@ -975,24 +1020,17 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
             new ExpectedArgs("tradeTax", "The trade tax."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
-            string townId = args[0];
             string tradeTaxAccumulatedValue = args[1];
 
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
 
             if (int.TryParse(tradeTaxAccumulatedValue, out int tradeTaxAccumulated) == false)
@@ -1014,6 +1052,14 @@ public class TownDebugCommand
     /// <returns>string output if success</returns>
     public sealed class ChangeCurrentBuildingCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public ChangeCurrentBuildingCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "change_current_building";
@@ -1024,20 +1070,14 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            string townId = args[0];
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
             //BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
             return Succeeded("success");
@@ -1053,6 +1093,14 @@ public class TownDebugCommand
     /// <returns>string output if success</returns>
     public sealed class ChangeCurrentBuildingQueueCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public ChangeCurrentBuildingQueueCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "change_current_building_queue";
@@ -1063,20 +1111,14 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townId", "The town id."),
+            new ExpectedArgs("townId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            string townId = args[0];
-            if (TryGetObjectManager(out var objectManager) == false)
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
             {
-                return Failed("Unable to resolve ObjectManager");
-            }
-
-            if (objectManager.TryGetObject(townId, out Town town) == false)
-            {
-                return Failed($"{nameof(Town)} with ID: '{townId}' not found");
+                return Failed(error);
             }
             BuildingHelper.ChangeCurrentBuildingQueue(town.Buildings, town);
             return Succeeded("success");
@@ -1089,6 +1131,14 @@ public class TownDebugCommand
     /// </summary>
     public sealed class ViewManagementDataCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver used to look the town up by name or id.
+        public ViewManagementDataCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "management_data";
@@ -1099,36 +1149,28 @@ public class TownDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+            new ExpectedArgs("townName", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
+            if (!resolver.TryResolveTown(strings[0], out var town, out var error))
+            {
+                return Failed(error);
+            }
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var town in Town.AllTowns)
+            stringBuilder.AppendLine(town.Name.ToString() + ":");
+            stringBuilder.AppendLine("Reserves: " + town.BoostBuildingProcess.ToString());
+            stringBuilder.AppendLine("Governor Name: " + town.Governor?.Name?.ToString());
+            stringBuilder.AppendLine("Current default building: " + town.CurrentDefaultBuilding?.Name?.ToString());
+            stringBuilder.AppendLine("Current building queue:");
+            foreach (var building in town.BuildingsInProgress)
             {
-                if (town.Name.ToString() == strings[0])
-                {
-                    stringBuilder.AppendLine(town.Name.ToString() + ":");
-                    stringBuilder.AppendLine("Reserves: " + town.BoostBuildingProcess.ToString());
-                    stringBuilder.AppendLine("Governor Name: " + town.Governor?.Name?.ToString());
-                    stringBuilder.AppendLine("Current default building: " + town.CurrentDefaultBuilding?.Name?.ToString());
-                    stringBuilder.AppendLine("Current building queue:");
-                    foreach (var building in town.BuildingsInProgress)
-                    {
-                        stringBuilder.AppendLine(building.Name.ToString());
-                    }
-                }
+                stringBuilder.AppendLine(building.Name.ToString());
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Town not found.");
-
+            return Succeeded(stringBuilder.ToString());
         }
     }
 }

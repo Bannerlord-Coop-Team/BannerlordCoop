@@ -9,6 +9,7 @@ namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), MethodType.Constructor, new[] { typeof(string), typeof(Hero), typeof(Settlement), typeof(CampaignTime), typeof(int) })]
 internal static class TheConquestOfSettlementIdentityPatch
 {

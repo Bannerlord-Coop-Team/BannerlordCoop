@@ -152,10 +152,12 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
             Add(client);
     }
 
+    /// <summary>Opens a location mission on the client and brings it to mission-ready; <paramref name="beforeMissionReady"/> runs in the loading window before that.</summary>
     public SettlementClientFixture EnterLocation(
         EnvironmentInstance client,
         string instanceId,
-        bool enableNativePopulationBoundary = false)
+        bool enableNativePopulationBoundary = false,
+        Action<MockMission>? beforeMissionReady = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         if (string.IsNullOrEmpty(instanceId)) throw new ArgumentException("instanceId is required", nameof(instanceId));
@@ -221,6 +223,7 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
                 client.Resolve<IMessageBroker>().Publish(
                     this,
                     new PlayerEnteredLocation(settlement, location));
+                beforeMissionReady?.Invoke(mission);
                 controller.OnRenderingStarted();
             });
         }

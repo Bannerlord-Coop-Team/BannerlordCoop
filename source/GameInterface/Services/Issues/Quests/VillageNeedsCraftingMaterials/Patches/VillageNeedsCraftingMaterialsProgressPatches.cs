@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials.Pat
 /// Trades are applied by the server, so vanilla's inventory exchange event never reaches the owner's
 /// quest. The owner's client recounts the materials whenever the server changes its party's items.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(ItemRoster))]
 internal class VillageNeedsCraftingMaterialsProgressPatches
 {

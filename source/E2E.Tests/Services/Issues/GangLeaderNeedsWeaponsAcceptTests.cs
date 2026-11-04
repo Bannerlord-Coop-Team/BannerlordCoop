@@ -544,10 +544,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 troop.Level = 20;
                 playerHero.Gold = startingGoldOverride ?? 100000;
                 startingGold = playerHero.Gold;
-                party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
-                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
-                party.MemberRoster.AddToCounts(troop, SentTroops);
             }
+            party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+            party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            party.MemberRoster.AddToCounts(troop, SentTroops);
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
             using (difficultyMultiplier is float multiplier
@@ -579,10 +579,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             {
                 Campaign.Current.MainParty = party;
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
             }
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
+            AlternativeSolutionPickerDriver.Commit(ClientA, giver.Issue, clientOwner, party, troop, SentTroops);
             clientGoldBefore = clientOwner.Gold;
             using (difficultyMultiplier is float multiplier
                 ? new IssueDifficultyOverride(multiplier)

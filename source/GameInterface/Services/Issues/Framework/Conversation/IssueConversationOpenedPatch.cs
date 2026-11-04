@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Conversation;
 
 namespace GameInterface.Services.Issues.Framework.Conversation;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(ConversationManager))]
 internal static class IssueConversationOpenedPatch
 {

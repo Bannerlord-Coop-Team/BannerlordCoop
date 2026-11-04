@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Framework.Visibility;
 /// journal there. Vanilla's daily tick advances the first journal entry of every troops mission and would throw on it
 /// every day, so the client leaves other players' missions out of the tick. The server completes them.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
 internal class ForeignTroopsMissionDailyTickPatch
 {

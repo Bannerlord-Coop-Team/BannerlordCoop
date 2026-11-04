@@ -14,9 +14,10 @@ namespace Missions.Agents;
 /// </summary>
 internal static class LocationPoseLock
 {
-    public static bool IsPointOwned(Agent agent)
+    /// <summary>True if the agent is using a scene point inside an active coop location mission.</summary>
+    public static bool IsPointOwned(ILocationNpcAuthorityState authorityState, Agent agent)
     {
-        return LocationNpcGate.IsCoopLocationMissionActive
+        return authorityState.IsCoopLocationMissionActive
             && agent != null
             && agent.CurrentlyUsedGameObject != null;
     }

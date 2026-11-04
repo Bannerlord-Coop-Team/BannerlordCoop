@@ -29,6 +29,13 @@ Use the existing framework for each of these instead of building a parallel one:
 | Add a console or debug command | an `ICoopCommand` registered in the owning module, not a new `[CommandLineArgumentFunction]` method |
 | Lay out a feature | `Services/<Feature>/` with `Commands`, `Handlers`, `Interfaces`, `Messages` and `Patches` folders, plus `<Feature>Registry`/`<Feature>Sync` |
 | Fake dependencies in unit tests | `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs` |
+| Read per-client state or a service from a Harmony patch | resolve it inside the patch with `ContainerProvider.TryResolve<T>`, and run vanilla when the resolve fails |
+| Hold state that Missions writes and GameInterface patches read | an interface plus a `*Registry`/`*Tracker` in GameInterface, registered `InstancePerLifetimeScope`, like `IBattleHostRegistry` |
+| Let GameInterface ask Missions a question | an interface declared in GameInterface, implemented in Missions and registered in `MissionModule`, like `ICoopBattleBehaviorAttacher` |
+| Carry context through a vanilla call, such as "dont capture this spawn" | `AllowedThread` on the receive path, otherwise an `IDisposable` scope from an injected service that restores the previous value on dispose |
+| Give a vanilla mission behavior per-mission data | a `Coop<Vanilla>` subclass built by the launcher, like `CoopSiegeDeploymentMissionController` |
+
+Don't add a `static` class, or a `*Gate`, that other code writes and patches read as ambient state. The usual reason given, "patches are static so they can't resolve DI", isn't true here, because patches resolve through `ContainerProvider`. A static also leaks between E2E client instances, which share one process. Decompile the vanilla type before patching too, because vanilla often already has the switch (for example `GauntletChatLogView.SetEnabled`).
 
 ## Classes, Interfaces, and DI
 

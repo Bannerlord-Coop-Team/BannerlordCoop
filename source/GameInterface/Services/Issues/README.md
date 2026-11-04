@@ -6,6 +6,9 @@ stays switched off.
 
 How it works and how to add a quest type are in [AGENTS.md](AGENTS.md).
 
+Quests only run in nightly builds and local Debug builds. Stable releases have every issue and quest
+switched off, and a server running one cancels any quest a nightly save still has in progress.
+
 ## What players get
 
 - Every player sees the same issue on the same notable or lord, built from the server's values.
@@ -13,6 +16,7 @@ How it works and how to add a quest type are in [AGENTS.md](AGENTS.md).
   no journal entry, no pop-up.
 - Rewards, relations and endings are worked out by the server as the owning player. Clients only show the
   result.
+- Settlement ownership changes reach active quests on the server, so vanilla cancellations end the owner's quest.
 - Quests are not saved between sessions. A quest ends when its player leaves or the server restarts.
 
 ## Trying it in game
@@ -29,6 +33,10 @@ Use a server and a client. All commands are `coop.debug.issues.*`.
   replayed, not that a success pays out.
 - `army_needs_supplies.setup <controller_id>` (server) gets a player ready to take Army Needs Supplies from
   Rhagaea, and `army_needs_supplies.stock` (server) tops up the owner's party with what the quest asks for.
+- `the_conquest_of_settlement.setup <controller_id>` (server) puts a player in a ruler's kingdom, gives the ruler
+  The Conquest of Settlement and counts the player as having talked to them. `the_conquest_of_settlement.accept
+  <ruler id>` (that player's client) then accepts it like the dialog does, and `the_conquest_of_settlement.state
+  <ruler id>` (both sides) prints the issue and the conquest quests in that machine's quest manager.
 
 Example on Danustica (`town_ES1`): stand in the town on a client and run
 `coop.debug.settlements.list_notables`. It prints each notable's id and what they offer. On the server run

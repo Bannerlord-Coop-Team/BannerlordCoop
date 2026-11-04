@@ -24,6 +24,7 @@ using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Shutdown.Commands;
+using Coop.Core.Server.Services.SiegeEvents;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
@@ -95,9 +96,11 @@ public class ServerModule : CommonModule
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
+        builder.RegisterType<BreakInReceipts>().As<IBreakInReceipts>().InstancePerLifetimeScope();
+        builder.RegisterType<SiegeSacrifice>().As<ISiegeSacrifice>().InstancePerDependency();
 
         // Graceful restart, in Release too.
-        builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerJoinAdmission>().As<IServerJoinAdmission>().InstancePerLifetimeScope();
         // AutoActivate so it sees the GameLoaded save name.
         builder.RegisterType<ServerShutdownCoordinator>()
             .As<IServerShutdownCoordinator>()

@@ -9,6 +9,7 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches;
 /// still running. The framework only runs quest outcomes on the server, so for now the guards do not appear
 /// and the player delivers the weapons directly.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementEnter))]
 internal class GangLeaderNeedsWeaponsGuardsPatch
 {

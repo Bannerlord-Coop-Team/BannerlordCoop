@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.Ar
 
 namespace GameInterface.Services.Issues.Quests.ArmyNeedsSupplies.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ArmyNeedsSuppliesBranchPatches
 {

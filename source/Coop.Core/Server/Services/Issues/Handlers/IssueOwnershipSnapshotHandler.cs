@@ -16,15 +16,18 @@ internal class IssueOwnershipSnapshotHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IQuestFeatureFlag questFeatureFlag;
 
     public IssueOwnershipSnapshotHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        IIssueOwnershipRegistry ownership)
+        IIssueOwnershipRegistry ownership,
+        IQuestFeatureFlag questFeatureFlag)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.ownership = ownership;
+        this.questFeatureFlag = questFeatureFlag;
 
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
     }
@@ -36,7 +39,7 @@ internal class IssueOwnershipSnapshotHandler : IHandler
 
     private void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !questFeatureFlag.IsEnabled)
         {
             return;
         }

@@ -1,0 +1,14 @@
+<Project>
+  <!-- Fails a game-referencing project with one clear error when BANNERLORD_DIR is unset or isn't an install, instead
+       of a wall of MSB3245/CS0246. A global -p:BannerlordDir skips EnsureTrailingSlash, so a missing slash lands here too. -->
+  <Target Name="CheckBannerlordDir"
+          BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(BannerlordDir)' == '' or !Exists('$(BannerlordDir)bin\Win64_Shipping_Client')">
+    <ItemGroup>
+      <_BannerlordGameReference Include="@(Reference)"
+                                Condition="$([System.String]::Copy('%(Reference.HintPath)').Contains('Win64_Shipping_Client'))" />
+    </ItemGroup>
+    <Error Condition="'@(_BannerlordGameReference)' != ''"
+           Text="BANNERLORD_DIR is not set or isn't a Bannerlord install (BannerlordDir is '$(BannerlordDir)', expected it to hold bin\Win64_Shipping_Client). Run runmefirst.cmd (or linux-only-runmefirst.sh) to point it at your install, then restart your shell/IDE; a -p:BannerlordDir override needs a trailing slash. $(MSBuildProjectName) references game assemblies from it." />
+  </Target>
+</Project>

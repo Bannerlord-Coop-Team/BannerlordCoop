@@ -3,18 +3,19 @@ using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
 
 /// <summary>
-/// Role gates for the vanilla siege behavior's handlers. Menu registration (OnSessionLaunched) runs
-/// everywhere so clients get the siege menus; the campaign mutations (tactics, XP, RNG casualties)
-/// run on the server only and reach clients as sync messages.
+/// Picks which side runs the vanilla siege behavior's handlers (campaign mutations on the server, menus everywhere)
+/// and restricts the assault menu options to a fully synced siege commanded by the BesiegerCamp leader.
 /// </summary>
 [HarmonyPatch(typeof(SiegeEventCampaignBehavior))]
 internal class SiegeEventCampaignBehaviorPatches
@@ -114,6 +115,68 @@ internal class SiegeEventCampaignBehaviorPatches
     {
         if (ContainerProvider.TryResolve<ISiegeDefenderCommandAuthority>(out var authority))
             return authority.HasPlayerDefender(siegeEvent, BattleSideEnum.Defender);
+        return false;
+    }
+
+    // Hides "Lead assault" until the client's siege graph is fully synced.
+    [HarmonyPatch(nameof(SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition))]
+    [HarmonyPrefix]
+    private static bool LeadAssaultConditionPrefix(MenuCallbackArgs args, ref bool __result) =>
+        ValidateSiegeGraph(args, GameMenuOption.LeaveType.LeadAssault, ref __result);
+
+    // Hides "Order troops to attack" until the client's siege graph is fully synced.
+    [HarmonyPatch(nameof(SiegeEventCampaignBehavior.game_menu_siege_strategies_order_assault_on_condition))]
+    [HarmonyPrefix]
+    private static bool OrderAssaultConditionPrefix(MenuCallbackArgs args, ref bool __result) =>
+        ValidateSiegeGraph(args, GameMenuOption.LeaveType.OrderTroopsToAttack, ref __result);
+
+    // Only the BesiegerCamp leader can lead the assault.
+    [HarmonyPatch(nameof(SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition))]
+    [HarmonyPostfix]
+    private static void LeadAssaultConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForCoBesieger(args, __result);
+
+    // Only the BesiegerCamp leader can order the assault.
+    [HarmonyPatch(nameof(SiegeEventCampaignBehavior.game_menu_siege_strategies_order_assault_on_condition))]
+    [HarmonyPostfix]
+    private static void OrderAssaultConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForCoBesieger(args, __result);
+
+    // Disables a shown assault option when the main party is not the synced BesiegerCamp leader; joining an active
+    // assault stays on the vanilla encounter flow.
+    private static void DisableForCoBesieger(MenuCallbackArgs args, bool result)
+    {
+        if (!result) return;
+
+        var settlement = MobileParty.MainParty?.BesiegedSettlement;
+        if (settlement == null) return;
+
+        var leader = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+        if (leader == MobileParty.MainParty) return;
+
+        args.IsEnabled = false;
+        args.Tooltip = new TextObject("{=!}Only the siege leader can command the assault.");
+    }
+
+    // Lets vanilla evaluate the option only when the settlement, camp and engine containers all point at the player's siege.
+    private static bool ValidateSiegeGraph(
+        MenuCallbackArgs args,
+        GameMenuOption.LeaveType leaveType,
+        ref bool result)
+    {
+        args.optionLeaveType = leaveType;
+
+        var siegeEvent = PlayerSiege.PlayerSiegeEvent;
+        var settlement = siegeEvent?.BesiegedSettlement;
+        if (settlement?.SiegeEvent == siegeEvent &&
+            siegeEvent.BesiegerCamp?.SiegeEvent == siegeEvent &&
+            (PlayerSiege.PlayerSide != BattleSideEnum.Attacker ||
+             (MobileParty.MainParty?.BesiegerCamp == siegeEvent.BesiegerCamp &&
+              siegeEvent.BesiegerCamp.SiegeEngines != null &&
+              settlement.SiegeEngines != null)))
+        {
+            return true;
+        }
+
+        result = false;
         return false;
     }
 }

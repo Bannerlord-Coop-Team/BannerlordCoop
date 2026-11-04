@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches;
 /// checks the weapons in the hand-in dialog, which is the owner's machine, so the server runs the hand-in as
 /// the owning player and refuses it when that player is away from the giver or does not carry them.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.PlayerSuccessfullyDeliveredWeapons))]
 internal class GangLeaderNeedsWeaponsDeliveryPatch
 {

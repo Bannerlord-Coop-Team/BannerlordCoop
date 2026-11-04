@@ -173,7 +173,7 @@ internal class SiegeAftermathPatches
         }
         else
         {
-            PendingAftermaths.TryRemove(settlement, out _);
+            DiscardPending(settlement);
             Logger.Error("Discarded pending siege aftermath for {Settlement}: behavior unavailable before owner transfer",
                 settlement.Name?.ToString());
         }
@@ -282,7 +282,7 @@ internal class SiegeAftermathPatches
             // Make sure the leading player actually gets the choice menu: their local encounter flow
             // usually opens it, but if it doesn't (encounter torn down first), the server would wait
             // on this pending entry forever.
-            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement));
+            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement, settlement.OwnerClan));
             return false;
         }
 
@@ -299,7 +299,7 @@ internal class SiegeAftermathPatches
         {
             if (!pair.Value.MatchesCurrentCapture(pair.Key))
             {
-                if (PendingAftermaths.TryRemove(pair.Key, out _))
+                if (DiscardPending(pair.Key))
                 {
                     Logger.Warning("Discarded stale siege aftermath for {Settlement}: capture identity no longer matches",
                         pair.Key?.Name?.ToString());
@@ -414,7 +414,7 @@ internal class SiegeAftermathPatches
 
         if (pending.MatchesCurrentCapture(settlement)) return;
 
-        PendingAftermaths.TryRemove(settlement, out _);
+        DiscardPending(settlement);
         Logger.Warning("Invalidated pending siege aftermath for {Settlement}: settlement ownership no longer matches the capture",
             settlement.Name?.ToString());
     }
@@ -482,14 +482,17 @@ internal class SiegeAftermathPatches
             Dictionary<MobileParty, float>> applyAftermath = null)
     {
         if (behavior == null || settlement == null) return false;
-        if (!PendingAftermaths.TryRemove(settlement, out var pending)) return false;
+        if (!PendingAftermaths.TryGetValue(settlement, out var pending)) return false;
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
+            DiscardPending(settlement);
             Logger.Warning("Discarded pending siege aftermath for {Settlement} ({Reason}): capture identity no longer matches",
                 settlement.Name?.ToString(), reason);
             return false;
         }
+
+        PendingAftermaths.TryRemove(settlement, out _);
 
         determineAftermath ??= static (aftermathBehavior, leaderParty, capturedSettlement) =>
             aftermathBehavior.DetermineAISiegeAftermath(leaderParty, capturedSettlement);
@@ -500,6 +503,16 @@ internal class SiegeAftermathPatches
         applyAftermath(pending.LeaderParty, settlement, aftermath, pending.PreviousOwnerClan, pending.Contributions);
         Logger.Information("Resolved pending siege aftermath for {Settlement} because {Reason}",
             settlement.Name?.ToString(), reason);
+        return true;
+    }
+
+    // Drops a parked aftermath without applying it. Only an applied one is broadcast otherwise, so the leader's
+    // client would keep holding a choice the server no longer accepts.
+    internal static bool DiscardPending(Settlement settlement)
+    {
+        if (!PendingAftermaths.TryRemove(settlement, out _)) return false;
+
+        MessageBroker.Instance.Publish(null, new SiegeAftermathDiscarded(settlement));
         return true;
     }
 }

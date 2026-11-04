@@ -15,7 +15,7 @@ Deployment is disabled when the profile's `deployment` property is omitted or nu
 }
 ```
 
-The server does not discover/install MSBuild or edit MCP settings. The root must be absolute, outside Windows/user Temp and separate from the source checkout and game installation. Deployment paths must not traverse junctions/symlinks; configure the real installation path, not its `mb2` alias. The checkout's read-only build-reference `mb2` junction remains supported. Do not put this durable root on disposable storage or delete it to resolve a failure.
+The server does not discover/install MSBuild or edit MCP settings. The root must be absolute, outside Windows/user Temp and separate from the source checkout and game installation. Deployment paths must not traverse junctions/symlinks; configure the real installation path. Do not put this durable root on disposable storage or delete it to resolve a failure.
 
 Use one MCP session/host per machine as before. All deployment-enabled profiles/sessions for the same installation must use the same durable root. The shared root's exclusive file lease serializes deployment and `start_run`/`start_client` across those sessions. Within a server, the existing run lifecycle gate covers all profiles, including deployment-disabled profiles. An owned run must be stopped with confirmed cleanup before deployment, even if its root process exited.
 

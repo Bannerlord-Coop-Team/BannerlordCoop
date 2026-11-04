@@ -188,7 +188,7 @@ public class CoopAgentOrigin : IAgentOriginBase
         if (mapEventParty == null) return;
 
         MessageBroker.Instance.Publish(this, new OnTroopScoreHitAttempted(
-            mapEventParty, _troop, attackedTroop, damage, isFatal, isSimulatedHit: false));
+            mapEventParty, _troop, attackedTroop, damage, isFatal, isSimulatedHit: false, attackerWeapon));
     }
 
     // The map event party this troop fights under, resolved lazily: the origin outlives battle setup, and

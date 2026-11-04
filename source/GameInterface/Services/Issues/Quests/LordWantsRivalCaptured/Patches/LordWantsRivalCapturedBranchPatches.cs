@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest))]
 internal class LordWantsRivalCapturedBranchPatches
 {

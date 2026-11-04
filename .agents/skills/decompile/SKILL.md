@@ -1,11 +1,11 @@
 ---
 name: decompile
-description: Decompile Bannerlord game types from the DLLs under the mb2 junction before asserting anything about vanilla behavior. Use when you need to know what vanilla game code actually does (method bodies, field writers, which side sets state) for BannerlordCoop work.
+description: Decompile Bannerlord game types from the DLLs in the BANNERLORD_DIR game install before asserting anything about vanilla behavior. Use when you need to know what vanilla game code actually does (method bodies, field writers, which side sets state) for BannerlordCoop work.
 ---
 
 # decompile
 
-Wraps `ilspycmd` so the game assemblies don't get rediscovered every session. Run it from anywhere inside a checkout; it walks up from cwd to the `mb2` junction, and from a worktree it falls back to the main checkout's junction.
+Wraps `ilspycmd` so the game assemblies don't get rediscovered every session. Run it from anywhere; it reads the game install from the `BANNERLORD_DIR` environment variable (set by `runmefirst.cmd`, forwarded to WSL through `WSLENV`) and fails with a clear error if that's unset or has no `bin/Win64_Shipping_Client`. A Windows-style value is converted with `cygpath -u` under Git Bash or `wslpath -u` under WSL.
 
 ## Usage
 
@@ -21,7 +21,7 @@ Wraps `ilspycmd` so the game assemblies don't get rediscovered every session. Ru
 
 ## Where it looks
 
-- `mb2/bin/Win64_Shipping_Client/TaleWorlds.*.dll` and `SandBox*.dll` (core engine/campaign types)
-- `mb2/Modules/*/bin/Win64_Shipping_Client/*.dll` (SandBox/Alley/GauntletUI module types live here, not the top-level bin)
+- `$BANNERLORD_DIR/bin/Win64_Shipping_Client/TaleWorlds.*.dll` and `SandBox*.dll` (core engine/campaign types)
+- `$BANNERLORD_DIR/Modules/*/bin/Win64_Shipping_Client/*.dll` (SandBox/Alley/GauntletUI module types live here, not the top-level bin)
 
 Type lists are cached in `~/.cache/bannerlord-decompile/` and invalidated when a DLL's mtime changes (game update).
