@@ -4,7 +4,9 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -22,15 +24,21 @@ internal class TeleportHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public TeleportHeroHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<HeroTeleported>(Handle_HeroTeleported);
         messageBroker.Subscribe<TeleportHero>(Handle_TeleportHero);
@@ -70,9 +78,22 @@ internal class TeleportHeroHandler : IHandler
             MobileParty targetParty = null;
             if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
 
+            if (ModInformation.IsServer && obj.Who is NetPeer && !CanSenderTeleport(obj.Who, hero, targetSettlement, targetParty)) return;
+
             TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 
             messageBroker.Publish(this, new ClanManagementChanged(hero.Clan, ClanManagementRefresh.Members));
         });
+    }
+
+    // Same rule as the client gate in TeleportHeroActionPatches, checked for the hero the sending peer plays.
+    private bool CanSenderTeleport(object sender, Hero hero, Settlement targetSettlement, MobileParty targetParty)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var actor) &&
+            (permissions.CanRecallHero(actor, hero) ||
+             (targetSettlement != null && targetParty == null && permissions.CanManageHero(actor, hero)))) return true;
+
+        Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that cannot manage it", hero.StringId);
+        return false;
     }
 }

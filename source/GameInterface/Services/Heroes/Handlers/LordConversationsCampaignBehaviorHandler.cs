@@ -7,6 +7,7 @@ using GameInterface.Services.Heroes.Messages.LordConversations;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -113,10 +114,19 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderControllingParty(obj.Who, mainParty)) return;
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },
         context: nameof(Handle_NetworkTakeLordPrisoner));
+    }
+
+    // The conversation's captor is the requesting player's own party.
+    private bool IsSenderControllingParty(object sender, PartyBase party)
+    {
+        string partyId = null;
+        if (party.MobileParty != null) objectManager.TryGetId(party.MobileParty, out partyId);
+        return playerManager.IsSenderControllingParty(sender, partyId);
     }
 
     private void Handle_LordHelpedInBattle(MessagePayload<LordHelpedInBattle> obj)
@@ -133,6 +143,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (ModInformation.IsServer && obj.Who is NetPeer && !playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 

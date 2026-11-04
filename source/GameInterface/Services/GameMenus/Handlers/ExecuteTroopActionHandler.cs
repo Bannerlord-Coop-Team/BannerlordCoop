@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -18,15 +20,18 @@ internal class ExecuteTroopActionHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public ExecuteTroopActionHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MenuHeroTakenToParty>(Handle_MenuHeroTakenToParty);
         messageBroker.Subscribe<MenuTakeHeroToParty>(Handle_MenuTakeHeroToParty);
@@ -48,6 +53,7 @@ internal class ExecuteTroopActionHandler : IHandler
 
     private void Handle_MenuTakeHeroToParty(MessagePayload<MenuTakeHeroToParty> obj)
     {
+        if (ModInformation.IsServer && obj.Who is NetPeer && !playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 

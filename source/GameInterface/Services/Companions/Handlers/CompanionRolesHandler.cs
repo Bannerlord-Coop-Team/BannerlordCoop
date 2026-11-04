@@ -388,6 +388,7 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (ModInformation.IsServer && obj.Who is NetPeer && !playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
@@ -669,6 +670,15 @@ internal class CompanionRolesHandler : IHandler
         network.SendImmediate(requester, completion);
     }
 
+    // A player only rescues a companion of its own clan.
+    private bool IsSenderInHerosClan(object sender, Hero hero)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var actor) && actor.Clan != null && actor.Clan == hero.Clan) return true;
+
+        logger.Warning("Ignoring a rescue of companion {HeroId} from a peer outside its clan", hero.StringId);
+        return false;
+    }
+
     private void Handle_CompanionRescued(MessagePayload<CompanionRescued> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero, out var oneToOneConversationHeroId)) return;
@@ -686,6 +696,7 @@ internal class CompanionRolesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!oneToOneConversationHero.IsPrisoner) return;
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderInHerosClan(obj.Who, oneToOneConversationHero)) return;
 
             EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
         }, context: nameof(RescueCompanion));
