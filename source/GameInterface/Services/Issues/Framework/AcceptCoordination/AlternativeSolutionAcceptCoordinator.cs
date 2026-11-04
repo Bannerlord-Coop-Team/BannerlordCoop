@@ -186,6 +186,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             return;
         }
 
+        messageBroker.Publish(this, new AlternativeSolutionAcceptedOnServer(
+            data.IssueOwnerId, data.IssueId, player.ControllerId));
         network.SendAll(new NetworkAlternativeSolutionAccepted(
             data.IssueOwnerId,
             data.IssueId,
