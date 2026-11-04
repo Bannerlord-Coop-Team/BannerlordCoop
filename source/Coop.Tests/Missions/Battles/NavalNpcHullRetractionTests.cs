@@ -21,6 +21,7 @@ using TaleWorlds.Core;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>Checks the battle host taking back a failed AI fleet attempt's hulls through the ship replicator.</summary>
+[Collection("Mission.Current")]
 public class NavalNpcHullRetractionTests
 {
     private const string Own = "host";
