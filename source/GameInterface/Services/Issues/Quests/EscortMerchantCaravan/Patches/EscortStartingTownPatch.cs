@@ -21,7 +21,7 @@ internal class EscortStartingTownPatch
             if (instruction.Calls(original))
             {
                 count++;
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Ldarg_0).MoveLabelsFrom(instruction);
                 instruction.opcode = OpCodes.Call;
                 instruction.operand = town;
             }

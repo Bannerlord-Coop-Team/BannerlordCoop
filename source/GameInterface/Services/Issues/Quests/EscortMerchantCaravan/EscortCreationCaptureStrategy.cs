@@ -19,6 +19,8 @@ internal sealed class EscortCreationCaptureStrategy : ICreationCaptureStrategy
 
     public void ApplyAfterCreation(IssueBase issue, byte[] captured)
     {
+        if (captured == null || captured.Length != sizeof(int))
+            throw new ArgumentException("Escort creation capture must contain one reward roll.", nameof(captured));
         ((Issue)issue)._companionRewardRandom = BitConverter.ToInt32(captured, 0);
     }
 

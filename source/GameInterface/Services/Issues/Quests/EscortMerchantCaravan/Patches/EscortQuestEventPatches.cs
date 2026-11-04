@@ -19,7 +19,6 @@ namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 internal class EscortQuestEventPatches
 {
     [ThreadStatic] internal static Quest CurrentQuest;
-    [ThreadStatic] internal static bool IsRunning;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
@@ -63,19 +62,17 @@ internal class EscortQuestEventPatches
         if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
             !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
         {
-            quest.CompleteQuestWithCancel(new TextObject("Your caravan escort ended because your party is no longer available."));
+            quest.CompleteQuestWithCancel(new TextObject("{=r3953PartyGone}Your caravan escort ended because your party is no longer available."));
             return false;
         }
 
         var previous = CurrentQuest;
-        var previousRunning = IsRunning;
         CurrentQuest = quest;
         var before = Progress(quest);
         using (new MainHeroSubstitutionScope(Hero.MainHero, party))
         {
             try
             {
-                IsRunning = true;
                 action(quest);
                 if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
                     ContainerProvider.TryResolve<IEscortProgress>(out var progress))
@@ -83,7 +80,6 @@ internal class EscortQuestEventPatches
             }
             finally
             {
-                IsRunning = previousRunning;
                 CurrentQuest = previous;
             }
         }

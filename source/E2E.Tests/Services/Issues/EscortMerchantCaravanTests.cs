@@ -65,7 +65,6 @@ public class EscortMerchantCaravanTests : IDisposable
 
     private static void ObserveKingdom()
     {
-        if (!EscortQuestEventPatches.IsRunning) return;
         observedKingdomCalls++;
         observedMainParty = MobileParty.MainParty;
         observedMainHero = Hero.MainHero;
