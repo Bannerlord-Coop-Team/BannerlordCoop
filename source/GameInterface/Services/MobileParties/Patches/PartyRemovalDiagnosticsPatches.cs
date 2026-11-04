@@ -13,8 +13,8 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
-/// Diagnostics for #3588: logs every party removal and destroy at Debug, and warns when a client removes a party
-/// outside the receive path, which leaves it registered but gone locally while the server still counts it.
+/// Diagnostics for #3588: logs every party removal and destroy at Debug, and warns when a client removes a registered
+/// party outside the receive path, which leaves it registered but gone locally while the server still counts it.
 /// </summary>
 [HarmonyPatch]
 internal class PartyRemovalDiagnosticsPatches
@@ -24,14 +24,23 @@ internal class PartyRemovalDiagnosticsPatches
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static void RemovePartyPrefix(MobileParty __instance)
+    internal static void RemovePartyPrefix(MobileParty __instance)
     {
         bool debug = Logger.IsEnabled(LogEventLevel.Debug);
-        if (!debug && ModInformation.IsServer) return;
+        bool isServer = ModInformation.IsServer;
+        if (!debug && isServer) return;
 
-        string partyId = GetPartyId(__instance);
-        if (debug) LogDebug("MobileParty.RemoveParty", partyId);
-        WarnIfClientLocalRemoval(partyId);
+        // Without Debug the id is only needed for a warning, so skip the lookup when none can fire.
+        bool originalsAllowed = CallOriginalPolicy.IsOriginalAllowed();
+        if (!debug && originalsAllowed) return;
+
+        bool isRegistered = TryGetRegisteredId(__instance, out string partyId);
+        if (debug) LogDebug("MobileParty.RemoveParty", partyId, originalsAllowed);
+        if (ShouldWarn(isServer, isRegistered, originalsAllowed))
+        {
+            Logger.Warning("[PartyRemoval] Party {PartyId} was removed on this client without a server destroy message",
+                partyId);
+        }
     }
 
     [HarmonyPatch(typeof(DestroyPartyAction), nameof(DestroyPartyAction.ApplyInternal))]
@@ -41,34 +50,32 @@ internal class PartyRemovalDiagnosticsPatches
     {
         if (!Logger.IsEnabled(LogEventLevel.Debug)) return;
 
-        LogDebug("DestroyPartyAction.ApplyInternal", GetPartyId(destroyedParty));
+        TryGetRegisteredId(destroyedParty, out string partyId);
+        LogDebug("DestroyPartyAction.ApplyInternal", partyId, CallOriginalPolicy.IsOriginalAllowed());
     }
 
-    // Received destroys are applied under AllowedThread, so a client removal outside it never came from the server.
-    internal static bool WarnIfClientLocalRemoval(string partyId)
-    {
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed()) return false;
+    // Received destroys and allowed originals (AllowedThread, save load) are expected, and so is a client
+    // destroying a party the server never registered, like a quest spawned one.
+    internal static bool ShouldWarn(bool isServer, bool isRegistered, bool originalsAllowed) =>
+        !isServer && isRegistered && !originalsAllowed;
 
-        Logger.Warning("[PartyRemoval] Party {PartyId} was removed on this client without a server destroy message",
-            partyId);
-        return true;
-    }
-
-    private static void LogDebug(string operation, string partyId)
+    private static void LogDebug(string operation, string partyId, bool originalsAllowed)
     {
         Logger.Debug("[PartyRemoval] {Operation} party={PartyId} thread={ThreadId} allowedThread={AllowedThread} originalsAllowed={OriginalsAllowed}",
             operation,
             partyId,
             Thread.CurrentThread.ManagedThreadId,
             AllowedThread.IsThisThreadAllowed(),
-            CallOriginalPolicy.IsOriginalAllowed());
+            originalsAllowed);
     }
 
-    private static string GetPartyId(MobileParty party)
+    private static bool TryGetRegisteredId(MobileParty party, out string partyId)
     {
-        if (party == null) return "none";
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) && objectManager.TryGetId(party, out string id))
-            return id;
-        return party.StringId ?? "unregistered";
+        if (party != null && ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
+            && objectManager.TryGetId(party, out partyId))
+            return true;
+
+        partyId = party == null ? "none" : party.StringId ?? "unregistered";
+        return false;
     }
 }
