@@ -805,7 +805,7 @@ namespace Coop
             if (Logger == null)
             {
                 // Logging isn't set up yet, so keep the exception in the boot log instead of dropping it
-                BootPatches.FileLog($"Unhandled exception before logging was set up: {ex}");
+                BootPatches.FileLog("Unhandled exception before logging was set up", ex);
                 return;
             }
 

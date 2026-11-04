@@ -2,6 +2,7 @@ using HarmonyLib;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Threading;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI;
 
@@ -9,10 +10,31 @@ namespace Coop
 {
     internal static class BootPatches
     {
+        private static readonly object _fileLogLock = new object();
+
         // Runs before Coop logging is set up, so it writes its own file.
+        // The lock keeps threads apart and the short retry covers a second game process writing the same file.
         internal static void FileLog(string message)
         {
-            try { File.AppendAllText("BootPatches.log", $"{DateTime.Now:HH:mm:ss.fff} {message}\n"); }
+            try
+            {
+                string line = $"{DateTime.Now:HH:mm:ss.fff} {message}\n";
+                lock (_fileLogLock)
+                {
+                    for (int attempt = 0; ; attempt++)
+                    {
+                        try { File.AppendAllText("BootPatches.log", line); return; }
+                        catch (IOException) when (attempt < 4) { Thread.Sleep(25); }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // Formats the exception inside the try, so an exception whose ToString throws can't escape the caller.
+        internal static void FileLog(string message, Exception exception)
+        {
+            try { FileLog($"{message}: {exception}"); }
             catch { }
         }
 
