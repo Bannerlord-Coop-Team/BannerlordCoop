@@ -267,7 +267,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             Configure(client);
     }
 
-    private string CreateAlley(string settlementId, string tag)
+    protected string CreateAlley(string settlementId, string tag)
     {
         string alleyId = null;
         Server.Call(() =>
