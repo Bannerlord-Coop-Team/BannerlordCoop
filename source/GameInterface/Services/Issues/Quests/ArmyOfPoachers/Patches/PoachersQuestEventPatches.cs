@@ -83,7 +83,8 @@ internal class PoachersQuestEventPatches
         else if (PlayerEncounter.Current != null &&
             Campaign.Current.CurrentMenuContext?.GameMenu.StringId == "army_of_poachers_village")
         {
-            PlayerEncounter.Finish();
+            // Replay runs under AllowedThread, so forcing the player out would only move the client party.
+            PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
         }
 
         return false;
