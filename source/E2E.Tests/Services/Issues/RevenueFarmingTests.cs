@@ -18,6 +18,7 @@ using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -204,6 +205,38 @@ public sealed class RevenueFarmingTests : IDisposable
         Client.Call(() => Quest(Client).HourlyTick());
         Client.Call(() => Assert.Equal(80, Quest(Client).RevenueVillages[0].CollectedAmount));
         Assert.Empty(menus.MenusFor(Observer));
+    }
+
+    [Fact]
+    public void CollectionStateWaitsBehindHeldWorkForTheGiver()
+    {
+        Accept();
+        var heldWorkApplied = false;
+        Client.Call(() =>
+        {
+            var character = ObjectHelper.SkipConstructor<CharacterObject>();
+            character.HeroObject = Object<Hero>(Client, scenario.NotableId);
+            Campaign.Current.ConversationManager.SetupAndStartMapConversation(
+                null, new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
+            Campaign.Current.ConversationManager.IsConversationInProgress = true;
+            Client.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(
+                () => heldWorkApplied = true, scenario.NotableId);
+            Assert.False(heldWorkApplied);
+        }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
+
+        Collect();
+        Tick();
+        Client.Call(() =>
+        {
+            Assert.False(heldWorkApplied);
+            Assert.False(Quest(Client).CollectingRevenues);
+            Assert.Equal(0, Quest(Client).RevenueVillages[0].CollectedAmount);
+            Campaign.Current.ConversationManager.IsConversationInProgress = false;
+            Client.Resolve<IIssueConversationGuard>().OnConversationEnded();
+            Assert.True(heldWorkApplied);
+            Assert.True(Quest(Client).CollectingRevenues);
+            Assert.Equal(80, Quest(Client).RevenueVillages[0].CollectedAmount);
+        });
     }
 
     [Fact]
@@ -483,6 +516,8 @@ public sealed class RevenueFarmingTests : IDisposable
     public void UnchangedWorldCallbackDoesNotAdvanceRevisionOrRepublishState()
     {
         Accept();
+        using var callbacks = new MethodCallRecorder(Priority.First, true,
+            AccessTools.Method(typeof(Quest), nameof(RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest.OnSettlementOwnerChanged)));
         int revision = 0;
         int messages = 0;
         Server.Call(() =>
@@ -495,6 +530,7 @@ public sealed class RevenueFarmingTests : IDisposable
         });
         Server.Call(() =>
         {
+            Assert.Equal(1, callbacks.CountFor(Server));
             Assert.Equal(revision, Session(Server).Revision);
             Assert.Equal(messages, Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Count());
         });

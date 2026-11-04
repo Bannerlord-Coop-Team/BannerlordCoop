@@ -32,9 +32,11 @@ internal sealed class RevenueFarmingStateHandler : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IRevenueFarmingSessionStore sessions;
     private readonly IRevenueFarmingActions actions;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public RevenueFarmingStateHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IPlayerManager players,
-        IIssueOwnershipRegistry ownership, IRevenueFarmingSessionStore sessions, IRevenueFarmingActions actions)
+        IIssueOwnershipRegistry ownership, IRevenueFarmingSessionStore sessions, IRevenueFarmingActions actions,
+        IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.network = network;
@@ -43,6 +45,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         this.ownership = ownership;
         this.sessions = sessions;
         this.actions = actions;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<RequestRevenueFarmingAction>(HandleRequest);
         broker.Subscribe<RevenueFarmingChanged>(HandleChanged);
         broker.Subscribe<NetworkRevenueFarmingState>(HandleState);
@@ -160,9 +163,9 @@ internal sealed class RevenueFarmingStateHandler : IHandler
     private void HandleState(MessagePayload<NetworkRevenueFarmingState> payload)
     {
         if (ModInformation.IsServer) return;
-        GameThread.RunSafe(() =>
+        var state = payload.What;
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
-            var state = payload.What;
             if (!objects.TryGetObjectWithLogging<Hero>(state.GiverId, out var giver)) return;
             // Steward navigation arrives after framework completion removes the giver's issue.
             var session = sessions.Get(giver, state.QuestId);
@@ -216,7 +219,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             if (newLog) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
             // Vanilla finalization needs the current revenue menu to decide whether to finish the encounter.
             if (!state.IsFinalizing) Present(session, state, newPrompt, menuSettlement);
-        });
+        }, state.GiverId), context: nameof(RevenueFarmingStateHandler));
     }
 
     private static void Validate(NetworkRevenueFarmingState state, Quest quest)

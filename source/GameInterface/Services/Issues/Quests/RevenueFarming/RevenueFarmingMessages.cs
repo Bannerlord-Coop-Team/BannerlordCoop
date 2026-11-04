@@ -42,7 +42,7 @@ public readonly struct RequestRevenueFarmingAction : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkRevenueFarmingState : IServerToClientCommand
+public readonly struct NetworkRevenueFarmingState : ICommand
 {
     private readonly string[] _usedIncidents;
 
