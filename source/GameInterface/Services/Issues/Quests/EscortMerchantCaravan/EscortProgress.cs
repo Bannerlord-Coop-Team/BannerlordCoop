@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -132,18 +131,16 @@ internal sealed class EscortProgressHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IBinaryPackageFactory packages;
-    private readonly IOutcomeDispatcher dispatcher;
     private readonly IIssueConversationGuard conversations;
 
     public EscortProgressHandler(IMessageBroker messages, IObjectManager objects, IIssueResolver issues,
-        IControllerIdProvider controller, IBinaryPackageFactory packages, IOutcomeDispatcher dispatcher, IIssueConversationGuard conversations)
+        IControllerIdProvider controller, IBinaryPackageFactory packages, IIssueConversationGuard conversations)
     {
         this.messages = messages;
         this.objects = objects;
         this.issues = issues;
         this.controller = controller;
         this.packages = packages;
-        this.dispatcher = dispatcher;
         this.conversations = conversations;
         messages.Subscribe<NetworkEscortProgress>(Receive);
     }
