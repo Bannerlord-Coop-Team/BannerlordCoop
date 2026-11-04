@@ -94,5 +94,4 @@ internal class HeadmanNeedsGrainBranchPatches
             }
         }
     }
-
 }

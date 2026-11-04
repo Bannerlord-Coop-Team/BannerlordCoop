@@ -40,5 +40,4 @@ public class HeadmanNeedsGrainProsperityPatches
 
     // Native callers can inline the small setter; AutoSync instruments this field write explicitly.
     public static void SetProsperity(Town town, float value) => town._prosperity = Math.Max(0f, value);
-
 }

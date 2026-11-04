@@ -32,5 +32,4 @@ internal class HeadmanNeedsGrainJournalPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
     private static bool TimeoutPrefix() => ModInformation.IsServer;
-
 }

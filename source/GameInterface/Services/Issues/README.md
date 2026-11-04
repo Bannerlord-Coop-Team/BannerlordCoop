@@ -17,6 +17,8 @@ switched off, and a server running one cancels any quest a nightly save still ha
 - Rewards, relations and endings are worked out by the server as the owning player. Clients only show the
   result.
 - Settlement ownership changes reach active quests on the server, so vanilla cancellations end the owner's quest.
+- Village Needs Grain Seeds supports direct delivery, timeout, war/crime endings and the funded companion solution;
+  its verification recipe is [here](../../../doc/automated-testing/headman-needs-grain.md).
 - Quests are not saved between sessions. A quest ends when its player leaves or the server restarts.
 
 ## Trying it in game

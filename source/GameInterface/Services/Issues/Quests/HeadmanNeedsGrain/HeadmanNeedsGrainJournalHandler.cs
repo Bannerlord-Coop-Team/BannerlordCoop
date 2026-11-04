@@ -54,5 +54,4 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
             issue._areIssueEffectsResolved = true;
         }, data.GiverId), context: nameof(HeadmanNeedsGrainJournalHandler));
     }
-
 }

@@ -39,6 +39,45 @@ public class HeadmanNeedsGrainAcceptTests
     }
 
     [Fact]
+    public void CreationCapture_EmptyPayloadLeavesTheIssueUnchanged()
+    {
+        var issue = IssueWithQuest(12, 0, new CampaignTime(1));
+        var strategy = new HeadmanNeedsGrainCreationCaptureStrategy(null);
+
+        strategy.ApplyAfterCreation(issue, Array.Empty<byte>());
+
+        var grainIssue = (Issue)issue;
+        Assert.Equal(0f, grainIssue._issueDifficultyMultiplier);
+        Assert.Equal(0, grainIssue.IssueDueTime.NumTicks);
+    }
+
+    [Fact]
+    public void CreationCapture_TruncatedPayloadDoesNotThrow()
+    {
+        var issue = IssueWithQuest(12, 0, new CampaignTime(1));
+        var strategy = new HeadmanNeedsGrainCreationCaptureStrategy(null);
+
+        strategy.ApplyAfterCreation(issue, new byte[] { 1 });
+    }
+
+    [Fact]
+    public void CreationCapture_RoundTripsDifficultyAndDeadline()
+    {
+        var source = IssueWithQuest(12, 0, new CampaignTime(1));
+        var sourceIssue = (Issue)source;
+        sourceIssue._issueDifficultyMultiplier = 0.25f;
+        sourceIssue.IssueDueTime = new CampaignTime(123456);
+        var target = IssueWithQuest(12, 0, new CampaignTime(1));
+        var strategy = new HeadmanNeedsGrainCreationCaptureStrategy(null);
+
+        strategy.ApplyAfterCreation(target, strategy.Capture(source));
+
+        var targetIssue = (Issue)target;
+        Assert.Equal(0.25f, targetIssue._issueDifficultyMultiplier);
+        Assert.Equal(123456, targetIssue.IssueDueTime.NumTicks);
+    }
+
+    [Fact]
     public void PriceSnapshot_PreservesTheCompanionFundingPriceOnTheWire()
     {
         using (var stream = new MemoryStream())
