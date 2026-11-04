@@ -10,6 +10,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavio
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class EscortNotificationPatch
 {

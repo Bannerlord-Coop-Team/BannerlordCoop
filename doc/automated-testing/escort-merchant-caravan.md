@@ -4,7 +4,7 @@ Live testing is pending. Use the assigned dedicated server and two clients after
 
 Start in Danustica (`town_ES1`, Southern Empire). Enter the town on a client and run `coop.debug.settlements.list_notables` to resolve a merchant in the loaded save, then run on the server `coop.debug.issues.give` with that merchant's registered id and `EscortMerchantCaravanIssue`. Accept through the real merchant dialogue. Resolve a second merchant for the other player's concurrent quest. State-changing setup belongs on the server; inspect each player's journal on that player's client.
 
-For each flow, compare the server's quest/party state and both clients. The owner alone should receive the personal journal, progress, relation changes and gold. Both clients should agree with the server about the caravan, raiders, battles and cleanup. Quest trait XP follows the framework's current disabled policy.
+For each flow, compare the server's quest/party state and both clients. The owner alone should receive the personal journal, progress, relation changes and gold. Both clients should agree with the server about the caravan, raiders, battles and cleanup. Honor trait XP goes to the owner through the shared trait synchronization inside the owner scope.
 
 | Flow | Expected server result | Expected owner and other client results |
 | --- | --- | --- |

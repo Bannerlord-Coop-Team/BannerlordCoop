@@ -9,6 +9,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,7 +28,6 @@ namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 internal interface IEscortProgress
 {
     void Publish(Quest quest, bool followCaravan = false);
-    void PublishAlternative(Issue issue);
     void Notify(Quest quest, TextObject text, int extraTime);
 }
 
@@ -36,63 +36,54 @@ internal sealed class EscortProgress : IEscortProgress
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
     private readonly INetwork network;
+    private readonly IPlayerManager players;
     private readonly ISendCoalescer coalescer;
     private readonly IBinaryPackageFactory packages;
 
     public EscortProgress(IObjectManager objects, IIssueOwnerResolver owners, INetwork network,
-        IBinaryPackageFactory packages, ISendCoalescer coalescer = null)
+        IBinaryPackageFactory packages, IPlayerManager players, ISendCoalescer coalescer = null)
     {
         this.objects = objects;
         this.owners = owners;
         this.network = network;
         this.coalescer = coalescer;
         this.packages = packages;
+        this.players = players;
     }
 
     public void Publish(Quest quest, bool followCaravan = false)
     {
         if (ModInformation.IsClient) return;
         var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || !owners.TryGetOwnerControllerId(issue, out var controller)) return;
+        if (issue == null || !owners.TryGetOwnerControllerId(issue, out var controller) ||
+            !players.TryGetPeer(controller, out var peer)) return;
         var tracked = Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest);
-        var state = new NetworkEscortProgress
-        {
-            GiverId = Id(issue.IssueOwner), IssueId = issue.StringId, ControllerId = controller,
-            CaravanId = PartyId(quest._questCaravanMobileParty), BanditId = PartyId(quest._questBanditMobileParty),
-            OtherBanditId = PartyId(quest._otherBanditParty), VisitedIds = quest._visitedSettlements.Select(Id).ToArray(),
-            Days = quest._daysSpentForEscorting, Warned = quest._isPlayerNotifiedForDanger,
-            Journal = CaptureJournal(quest.JournalEntries),
-            TrackedParties = tracked.OfType<MobileParty>().Where(p => p.IsActive).Select(Id).ToArray(),
-            TrackedSettlements = tracked.OfType<Settlement>().Select(Id).ToArray(),
-            FollowCaravan = followCaravan,
-            DueTimeTicks = quest.QuestDueTime.NumTicks,
-        };
+        var state = new NetworkEscortProgress(
+            giverId: Id(issue.IssueOwner), issueId: issue.StringId, controllerId: controller,
+            caravanId: PartyId(quest._questCaravanMobileParty), banditId: PartyId(quest._questBanditMobileParty),
+            otherBanditId: PartyId(quest._otherBanditParty), visitedIds: quest._visitedSettlements.Select(Id).ToArray(),
+            days: quest._daysSpentForEscorting, warned: quest._isPlayerNotifiedForDanger,
+            journal: CaptureJournal(quest.JournalEntries),
+            trackedParties: tracked.OfType<MobileParty>().Where(p => p.IsActive).Select(Id).ToArray(),
+            trackedSettlements: tracked.OfType<Settlement>().Select(Id).ToArray(),
+            followCaravan: followCaravan,
+            dueTimeTicks: quest.QuestDueTime.NumTicks
+        );
         // Party creation and updates must reach the game-thread queue before the quest references them.
         coalescer?.Flush(network);
-        network.SendAll(state);
-    }
-
-    public void PublishAlternative(Issue issue)
-    {
-        if (ModInformation.IsClient || !owners.TryGetOwnerControllerId(issue, out var controller)) return;
-        coalescer?.Flush(network);
-        network.SendAll(new NetworkEscortProgress
-        {
-            GiverId = Id(issue.IssueOwner), IssueId = issue.StringId, ControllerId = controller,
-            Alternative = true, Journal = CaptureJournal(issue.JournalEntries),
-        });
+        network.Send(peer, state);
     }
 
     public void Notify(Quest quest, TextObject text, int extraTime)
     {
         var issue = IssueManager.GetIssueOfQuest(quest);
-        if (ModInformation.IsClient || issue == null || !owners.TryGetOwnerControllerId(issue, out var controller)) return;
-        network.SendAll(new NetworkEscortProgress
-        {
-            GiverId = Id(issue.IssueOwner), IssueId = issue.StringId, ControllerId = controller,
-            Notice = BinaryPackageSerializer.Serialize(packages.GetBinaryPackage<TextObjectBinaryPackage>(text)),
-            ExtraTime = extraTime,
-        });
+        if (ModInformation.IsClient || issue == null || !owners.TryGetOwnerControllerId(issue, out var controller) ||
+            !players.TryGetPeer(controller, out var peer)) return;
+        network.Send(peer, new NetworkEscortProgress(
+            giverId: Id(issue.IssueOwner), issueId: issue.StringId, controllerId: controller,
+            notice: BinaryPackageSerializer.Serialize(packages.GetBinaryPackage<TextObjectBinaryPackage>(text)),
+            extraTime: extraTime
+        ));
     }
 
     private string Id(object obj)
@@ -142,9 +133,10 @@ internal sealed class EscortProgressHandler : IHandler
     private readonly IControllerIdProvider controller;
     private readonly IBinaryPackageFactory packages;
     private readonly IOutcomeDispatcher dispatcher;
+    private readonly IIssueConversationGuard conversations;
 
     public EscortProgressHandler(IMessageBroker messages, IObjectManager objects, IIssueResolver issues,
-        IControllerIdProvider controller, IBinaryPackageFactory packages, IOutcomeDispatcher dispatcher)
+        IControllerIdProvider controller, IBinaryPackageFactory packages, IOutcomeDispatcher dispatcher, IIssueConversationGuard conversations)
     {
         this.messages = messages;
         this.objects = objects;
@@ -152,6 +144,7 @@ internal sealed class EscortProgressHandler : IHandler
         this.controller = controller;
         this.packages = packages;
         this.dispatcher = dispatcher;
+        this.conversations = conversations;
         messages.Subscribe<NetworkEscortProgress>(Receive);
         messages.Subscribe<PlayerHeirSelectionCompleted>(HeirSelected);
     }
@@ -176,7 +169,7 @@ internal sealed class EscortProgressHandler : IHandler
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
         var state = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversations.RunInOrder(() =>
         {
             if (!issues.TryResolve(state.GiverId, state.IssueId, out _, out var issue, out _)) return;
             if (state.Notice != null)
@@ -185,15 +178,6 @@ internal sealed class EscortProgressHandler : IHandler
                     MBInformationManager.AddQuickInformation(
                         BinaryPackageSerializer.Deserialize<TextObjectBinaryPackage>(state.Notice).Unpack<TextObject>(packages),
                         state.ExtraTime);
-                return;
-            }
-            if (state.Alternative)
-            {
-                if (!(issue is Issue) || !issue.IsSolvingWithAlternative) return;
-                var journal = ReadJournal(state.Journal);
-                issue._journalEntries.Clear();
-                issue._journalEntries.AddRange(journal);
-                CampaignEventDispatcher.Instance.OnIssueLogAdded(issue, true);
                 return;
             }
             if (!(issue.IssueQuest is Quest quest) || !quest.IsOngoing) return;
@@ -227,7 +211,7 @@ internal sealed class EscortProgressHandler : IHandler
                 if (state.FollowCaravan) caravan?.Party.SetAsCameraFollowParty();
                 CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
             }
-        }, context: nameof(EscortProgressHandler));
+        }, state.GiverId), context: nameof(EscortProgressHandler));
     }
 
     private T Resolve<T>(string id) where T : class

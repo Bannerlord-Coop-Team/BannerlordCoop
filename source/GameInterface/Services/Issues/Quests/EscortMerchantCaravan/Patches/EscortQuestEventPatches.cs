@@ -14,6 +14,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavio
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class EscortQuestEventPatches
 {
@@ -34,12 +35,6 @@ internal class EscortQuestEventPatches
     [HarmonyPostfix]
     private static void Battle(MapEvent mapEvent)
         => Run(quest => quest.OnMapEventEnded(mapEvent));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
-    [HarmonyPostfix]
-    private static void Owner(Settlement settlement, bool openToClaim, Hero newOwner, Hero oldOwner,
-        Hero capturerHero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
-        => Run(quest => quest.OnSettlementOwnerChanged(settlement, openToClaim, newOwner, oldOwner, capturerHero, detail));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
     [HarmonyPostfix]
@@ -64,7 +59,7 @@ internal class EscortQuestEventPatches
 
     internal static bool RunOwned(Quest quest, Action<Quest> action)
     {
-        if (ModInformation.IsClient || quest._questCaravanMobileParty == null) return false;
+        if (ModInformation.IsClient || !quest.IsOngoing || quest._questCaravanMobileParty == null) return false;
         if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
             !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
         {

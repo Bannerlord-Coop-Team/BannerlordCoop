@@ -10,6 +10,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavio
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class EscortQuestPatches
 {
@@ -38,6 +39,15 @@ internal class EscortQuestPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.SpawnCaravan))]
     [HarmonyPrefix]
     private static bool Spawn() => ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.AdjustCaravansSpeed))]
+    [HarmonyPrefix]
+    private static bool AdjustSpeed()
+    {
+        // Vanilla cannot converge below the caravan's minimum speed.
+        return ModInformation.IsServer &&
+            MobileParty.MainParty.Speed >= Campaign.Current.Models.PartySpeedCalculatingModel.MinimumSpeed;
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.conversation_caravan_fight_on_consequence))]
     [HarmonyPrefix]
@@ -93,29 +103,22 @@ internal class EscortQuestPatches
     private static bool Kingdom(Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
         TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
     {
-        if (EscortQuestEventPatches.CurrentQuest == __instance && EscortQuestEventPatches.IsRunning) return true;
-        EscortQuestEventPatches.RunOwned(__instance,
-            quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, detail, showNotification));
+        EscortQuestEventPatches.RunOwned(__instance, quest => quest.CheckWarDeclaration());
         return false;
     }
 
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged))]
     [HarmonyPrefix]
-    private static void FinalJournal(QuestBase __instance)
+    private static bool SettlementOwner(Quest __instance)
     {
-        if (ModInformation.IsServer && __instance is Quest quest &&
-            ContainerProvider.TryResolve<IEscortProgress>(out var progress))
-            progress.Publish(quest);
+        EscortQuestEventPatches.RunOwned(__instance, quest => quest.CheckWarDeclaration());
+        return false;
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
     [HarmonyPrefix]
     private static void Dismiss(IssueBase __instance)
     {
-        if (ModInformation.IsServer &&
-            __instance is EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue issue &&
-            issue.IsSolvingWithAlternative && ContainerProvider.TryResolve<IEscortProgress>(out var progress))
-            progress.PublishAlternative(issue);
         // The framework dismisses a disconnected player's issue without completing its quest.
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing)
         {

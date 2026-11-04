@@ -6,6 +6,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavio
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class EscortServerMethodsPatch
 {
@@ -16,7 +17,6 @@ internal class EscortServerMethodsPatch
             nameof(Quest.OnFinalize), nameof(Quest.OnTimedOut), nameof(Quest.SuccessConsequences),
             nameof(Quest.FailConsequences), nameof(Quest.FailByPlayerHostileConsequences),
             nameof(Quest.OnSettlementEntered), nameof(Quest.OnSettlementLeft), nameof(Quest.OnMapEventEnded),
-            nameof(Quest.OnSettlementOwnerChanged),
             nameof(Quest.OnPartyHourlyTick), nameof(Quest.HourlyTick), nameof(Quest.DailyTick),
         })
             yield return AccessTools.DeclaredMethod(typeof(Quest), name);

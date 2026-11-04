@@ -6,6 +6,7 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]
 internal class EscortVisibilityPatch
 {

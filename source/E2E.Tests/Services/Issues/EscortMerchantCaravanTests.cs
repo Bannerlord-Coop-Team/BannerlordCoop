@@ -41,12 +41,25 @@ public class EscortMerchantCaravanTests : IDisposable
     private static MobileParty? observedMainParty;
     private static Hero? observedMainHero;
     private static int observedKingdomCalls;
+    private static float ownerSpeed;
+    private static MobileParty? speedOwner;
+    private static int completedHourlyTicks;
+    private static bool ReadSpeed(MobileParty __instance, ref float __result)
+    {
+        __result = __instance == speedOwner ? ownerSpeed : Math.Max(1f, ownerSpeed);
+        return false;
+    }
 
-    private static void ObserveReroute()
+    private static void CompletedHourlyTick() => completedHourlyTicks++;
+
+    private static bool ObserveReroute(Quest __instance)
     {
         observedReroutes++;
         observedMainParty = MobileParty.MainParty;
         observedMainHero = Hero.MainHero;
+        __instance.AddLog(new TextObject("Relay route update"));
+        MBInformationManager.AddQuickInformation(new TextObject("Relay route notice"));
+        return false;
     }
 
     private static void ObserveWar() => observedWarCalls++;
@@ -262,13 +275,22 @@ public class EscortMerchantCaravanTests : IDisposable
     [Fact]
     public void ARejectedAcceptCannotRestartFromTheDelayedNpcConsequence()
     {
-        Accept();
         Quest rejected = null!;
         Other.Call(() =>
         {
-            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            var giver = Other.GetRegisteredObject<Hero>(scenario.NotableId);
+            using (new AllowedThread())
+            {
+                rejected = new Quest("pending_escort", giver, giver.Issue.IssueDueTime, 0.5f, 100);
+                giver.Issue.IssueQuest = rejected;
+            }
+        });
+        Accept();
+        Other.Call(() =>
+        {
+            var giver = Other.GetRegisteredObject<Hero>(scenario.NotableId);
             giver.Issue.StartIssueWithQuest();
-            rejected = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            Assert.Null(giver.Issue.IssueQuest);
         });
         Other.Call(() =>
         {
@@ -285,6 +307,8 @@ public class EscortMerchantCaravanTests : IDisposable
     {
         Accept();
         CampaignTime due = default;
+        Owner.InternalMessages.Clear();
+        Other.InternalMessages.Clear();
         Server.Call(() =>
         {
             var quest = QuestOn(Server);
@@ -312,6 +336,8 @@ public class EscortMerchantCaravanTests : IDisposable
             Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
             Assert.Null(giver.Issue.IssueQuest);
         });
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkEscortProgress>());
+        Assert.Empty(Other.InternalMessages.GetMessages<NetworkEscortProgress>());
     }
 
     [Fact]
@@ -382,9 +408,9 @@ public class EscortMerchantCaravanTests : IDisposable
     {
         Accept();
         var quest = QuestOn(Owner);
-        var state = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().Last();
-        state.CaravanId = caravanId;
-        state.Days = 9;
+        var previous = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().Last();
+        var state = new NetworkEscortProgress(previous.GiverId, previous.IssueId, previous.ControllerId,
+            caravanId: caravanId, days: 9, journal: previous.Journal, dueTimeTicks: previous.DueTimeTicks);
         MobileParty caravan = null!;
         Owner.Call(() =>
         {
@@ -421,11 +447,10 @@ public class EscortMerchantCaravanTests : IDisposable
     public void AProgressMessageForAnotherIssueCannotReplaceTheOwnersCaravan()
     {
         Accept();
-        Owner.SimulateMessage(Server.NetPeer, new NetworkEscortProgress
-        {
-            GiverId = scenario.NotableId, IssueId = "old_issue", ControllerId = QuestScenario.ControllerA,
-            CaravanId = caravanId,
-        });
+        Owner.SimulateMessage(Server.NetPeer, new NetworkEscortProgress(
+            giverId: scenario.NotableId, issueId: "old_issue", controllerId: QuestScenario.ControllerA,
+            caravanId: caravanId
+        ));
         Owner.Call(() => Assert.Null(QuestOn(Owner)._questCaravanMobileParty));
     }
 
@@ -455,11 +480,14 @@ public class EscortMerchantCaravanTests : IDisposable
                 if (success) issue.AlternativeSolutionEndWithSuccessConsequence();
                 else issue.AlternativeSolutionEndWithFailureConsequence();
                 issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("Companion returned")));
+                CampaignEventDispatcher.Instance.OnIssueUpdated(issue, success
+                    ? IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest
+                    : IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, hero);
                 issue.IssueFinalized();
             }
             Assert.Equal(before + prosperityChange, giver.CurrentSettlement.Town.Prosperity);
         });
-        Owner.Call(() => Assert.Contains(ownerIssue.JournalEntries, log => log.LogText.ToString() == "Companion returned"));
+        Owner.Call(() => Assert.Single(ownerIssue.JournalEntries, log => log.LogText.ToString() == "Companion returned"));
         Other.Call(() =>
         {
             Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
@@ -574,6 +602,49 @@ public class EscortMerchantCaravanTests : IDisposable
     {
         observedHourlyParty = MobileParty.MainParty;
         return false;
+    }
+
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(0.5f)]
+    [InlineData(1f)]
+    [InlineData(2f)]
+    public void RealHourlyTicksReturnWhenTheOwnerIsSlowerThanTheCaravanMinimum(float speed)
+    {
+        Accept();
+        var harmony = new Harmony($"escort-speed-{Guid.NewGuid()}");
+        var getter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.Speed));
+        var hourly = AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
+        harmony.Patch(getter, prefix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ReadSpeed)));
+        harmony.Patch(hourly, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(CompletedHourlyTick)));
+        using var worldWork = new MethodCallRecorder(
+            AccessTools.Method(typeof(Quest), nameof(Quest.NotifyPlayerOrCancelTheQuestIfCaravanIsFar)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.ThinkAboutSpawningBanditParty)));
+        try
+        {
+            Server.Call(() =>
+            {
+                var quest = QuestOn(Server);
+                var caravan = Server.GetRegisteredObject<MobileParty>(caravanId);
+                speedOwner = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+                speedOwner.IsActive = true;
+                ownerSpeed = speed;
+                caravan._targetSettlement = quest.QuestGiver.CurrentSettlement;
+                quest._questCaravanMobileParty = caravan;
+                completedHourlyTicks = 0;
+                Server.NetworkSentMessages.Clear();
+                for (var i = 0; i < 200; i++) Campaign.Current.QuestManager.HourlyTick();
+                Assert.Equal(200, completedHourlyTicks);
+                Assert.True(quest.IsOngoing);
+                Assert.Empty(quest._visitedSettlements);
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>());
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            speedOwner = null;
+        }
     }
 
     [Fact]
@@ -849,7 +920,7 @@ public class EscortMerchantCaravanTests : IDisposable
         var harmony = new Harmony($"escort-relay-war-{Guid.NewGuid()}");
         var reroute = AccessTools.Method(typeof(Quest), nameof(Quest.TryToFindAndSetTargetToNextSettlement));
         var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
-        harmony.Patch(reroute, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveReroute)));
+        harmony.Patch(reroute, prefix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveReroute)));
         harmony.Patch(handler, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveWar)));
         try
         {
@@ -862,6 +933,7 @@ public class EscortMerchantCaravanTests : IDisposable
             {
                 var quest = QuestOn(Server);
                 quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
+                quest._questCaravanMobileParty._targetSettlement = null;
                 var ownerPlayer = Server.Resolve<IPlayerManager>().Players.Single(player => player.ControllerId == QuestScenario.ControllerA);
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPlayer.MobilePartyId, out var ownerParty));
@@ -880,7 +952,7 @@ public class EscortMerchantCaravanTests : IDisposable
         }
         finally
         {
-            harmony.Unpatch(reroute, HarmonyPatchType.Postfix, harmony.Id);
+            harmony.Unpatch(reroute, HarmonyPatchType.Prefix, harmony.Id);
             harmony.Unpatch(handler, HarmonyPatchType.Postfix, harmony.Id);
         }
     }
@@ -892,7 +964,7 @@ public class EscortMerchantCaravanTests : IDisposable
         PrepareWarState();
         Accept();
         var harmony = new Harmony($"escort-relay-kingdom-{Guid.NewGuid()}");
-        var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+        var handler = AccessTools.Method(typeof(Quest), nameof(Quest.CheckWarDeclaration));
         harmony.Patch(handler, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveKingdom)));
         try
         {
@@ -904,6 +976,7 @@ public class EscortMerchantCaravanTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Clan>(changedClanId, out var changedClan));
                 var quest = QuestOn(Server);
+                quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
                 var ownerPlayer = Server.Resolve<IPlayerManager>().Players.Single(player => player.ControllerId == QuestScenario.ControllerA);
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPlayer.MobilePartyId, out var ownerParty));
@@ -928,6 +1001,7 @@ public class EscortMerchantCaravanTests : IDisposable
     [InlineData(IssueOutcome.QuestTimeOut)]
     public void FinalizationReplaysWithoutRunningWorldCleanupOnTheOwner(IssueOutcome outcome)
     {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(new[] { Server, Owner, Other });
         Accept();
         var quest = QuestOn(Owner);
         using var cleanup = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnFinalize)));
@@ -947,8 +1021,10 @@ public class EscortMerchantCaravanTests : IDisposable
         Owner.Call(() =>
         {
             Assert.True(quest.IsFinalized);
-            Assert.Contains(quest.JournalEntries, log => log.LogText.ToString() == "Final escort result");
+            Assert.Single(quest.JournalEntries, log => log.LogText.ToString() == "Final escort result");
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        if (outcome == IssueOutcome.QuestSuccess || outcome == IssueOutcome.QuestFail)
+            QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, Owner, Other, QuestScenario.IssueId, quest, outcome);
     }
 }

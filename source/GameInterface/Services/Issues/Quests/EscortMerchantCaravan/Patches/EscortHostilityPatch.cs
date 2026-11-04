@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction))]
 internal class EscortHostilityPatch
 {

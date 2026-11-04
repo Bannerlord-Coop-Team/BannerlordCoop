@@ -12,7 +12,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavio
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 
-internal readonly struct EscortGiverChanged : IEvent
+public readonly struct EscortGiverChanged : IEvent
 {
     public readonly Issue Issue;
     public readonly Hero Previous;
@@ -25,12 +25,20 @@ internal readonly struct EscortGiverChanged : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal sealed class NetworkEscortGiverChanged : IServerToClientCommand
+public readonly struct NetworkEscortGiverChanged : ICommand
 {
-    [ProtoMember(1)] public string PreviousId;
-    [ProtoMember(2)] public string GiverId;
-    [ProtoMember(3)] public string IssueId;
-    [ProtoMember(4)] public string ControllerId;
+    [ProtoMember(1)] public readonly string PreviousId;
+    [ProtoMember(2)] public readonly string GiverId;
+    [ProtoMember(3)] public readonly string IssueId;
+    [ProtoMember(4)] public readonly string ControllerId;
+
+    public NetworkEscortGiverChanged(string previousId, string giverId, string issueId, string controllerId)
+    {
+        PreviousId = previousId;
+        GiverId = giverId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+    }
 }
 
 internal sealed class EscortGiverChangedHandler : IHandler
@@ -70,10 +78,7 @@ internal sealed class EscortGiverChangedHandler : IHandler
         ownership.TryGetOwner(previousId, issue.StringId, out var controller);
         MoveOwnership(previousId, giverId, issue.StringId, controller);
         coalescer?.Flush(network);
-        network.SendAll(new NetworkEscortGiverChanged
-        {
-            PreviousId = previousId, GiverId = giverId, IssueId = issue.StringId, ControllerId = controller,
-        });
+        network.SendAll(new NetworkEscortGiverChanged(previousId, giverId, issue.StringId, controller));
     }
 
     private void Receive(MessagePayload<NetworkEscortGiverChanged> payload)
