@@ -12,9 +12,10 @@ internal class QuestTypeRegistry : IQuestTypeRegistry
 
     public IReadOnlyCollection<IQuestTypeDescriptor> Descriptors { get; }
 
-    public QuestTypeRegistry(IEnumerable<IQuestTypeDescriptor> descriptors)
+    public QuestTypeRegistry(IEnumerable<IQuestTypeDescriptor> descriptors, IQuestFeatureFlag questFeatureFlag)
     {
-        Descriptors = descriptors.ToList();
+        // An empty registry keeps every issue behavior off and every framework path idle
+        Descriptors = questFeatureFlag.IsEnabled ? descriptors.ToList() : new List<IQuestTypeDescriptor>();
 
         foreach (var descriptor in Descriptors)
         {

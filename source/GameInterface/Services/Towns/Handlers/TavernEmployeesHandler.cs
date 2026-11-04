@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Towns.Messages;
 using LiteNetLib;
 using SandBox.CampaignBehaviors;
@@ -23,6 +24,7 @@ internal class TavernEmployeesHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     private readonly int ClanInfoOfferCost = 500;
 
@@ -30,12 +32,14 @@ internal class TavernEmployeesHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
+        ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<DailyTickDrinkThisDayInSettlement>(Handle_DailyTickDrinkThisDayInSettlement);
         messageBroker.Subscribe<NetworkDailyTickDrinkThisDayInSettlement>(Handle_NetworkDailyTickDrinkThisDayInSettlement);
@@ -146,6 +150,7 @@ internal class TavernEmployeesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
 
@@ -195,6 +200,7 @@ internal class TavernEmployeesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             // Validate ids before adding to CoopSession
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var _)) return;
@@ -217,6 +223,7 @@ internal class TavernEmployeesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
             if (mainHero.Gold - data.TunPrice < 0)
@@ -259,6 +266,7 @@ internal class TavernEmployeesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             // Validate id before adding to CoopSession
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
 
@@ -280,6 +288,7 @@ internal class TavernEmployeesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
             GiveGoldAction.ApplyBetweenCharacters(mainHero, null, 2, false);

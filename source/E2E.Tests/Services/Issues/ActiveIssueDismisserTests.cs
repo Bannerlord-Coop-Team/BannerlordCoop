@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -15,7 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
-using UnregisteredIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+using UnregisteredIssue = E2E.Tests.Services.Issues.NeverRegisteredIssue;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -290,4 +290,3 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 }
-

@@ -28,7 +28,7 @@ public interface ISiegeInteractionDebugBehavior
     object Observe(Guid? observedAgentId = null, int? requestedMachineId = null);
 }
 
-internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInteractionDebugBehavior
+public sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInteractionDebugBehavior
 {
     private const int UseGameKeyId = 13;
     private readonly IMessageBroker messageBroker;

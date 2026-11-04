@@ -8,15 +8,14 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
-using Issue = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class TheConquestOfSettlementEventPatches
 {
@@ -68,6 +67,7 @@ internal static class TheConquestOfSettlementEventPatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(DiplomacyHelper), nameof(DiplomacyHelper.IsWarCausedByPlayer))]
 internal static class TheConquestOfSettlementWarInitiatorPatch
 {
@@ -82,19 +82,7 @@ internal static class TheConquestOfSettlementWarInitiatorPatch
     }
 }
 
-[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
-internal static class TheConquestOfSettlementRewardPatch
-{
-    [HarmonyPrefix]
-    private static void Prefix(IssueBase issue, ref Hero issueSolver)
-    {
-        if (issue is Issue && ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
-        {
-            issueSolver = null;
-        }
-    }
-}
-
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
 internal static class TheConquestOfSettlementTimeoutPatch
 {
@@ -103,6 +91,7 @@ internal static class TheConquestOfSettlementTimeoutPatch
 }
 
 // The server times the quest out from its own tick, so the relation penalty needs the owner as the main hero
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
 internal static class TheConquestOfSettlementTimeoutOwnerPatch
 {

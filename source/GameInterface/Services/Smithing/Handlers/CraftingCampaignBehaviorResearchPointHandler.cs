@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
@@ -15,17 +16,20 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface;
 
     public CraftingCampaignBehaviorResearchPointHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.sessionCraftingPlayerDataInterface = sessionCraftingPlayerDataInterface;
 
         messageBroker.Subscribe<UpdateResearchPoints>(Handle_UpdateResearchPoints);
@@ -54,6 +58,8 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
 
     private void Handle_NetworkUpdateResearchPoints(MessagePayload<NetworkUpdateResearchPoints> obj)
     {
+        if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.PlayerHeroId)) return;
+
         // Save crafting piece xp on server in CoopSession
         sessionCraftingPlayerDataInterface.SetCraftingPieceXp(
             obj.What.PlayerHeroId,
@@ -72,6 +78,8 @@ internal class CraftingCampaignBehaviorResearchPointHandler : IHandler
 
     private void Handle_NetworkOpenCraftingPart(MessagePayload<NetworkOpenCraftingPart> obj)
     {
+        if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.PlayerHeroId)) return;
+
         // Save unlocked piece on server in CoopSession
         sessionCraftingPlayerDataInterface.UnlockCraftingPiece(
             obj.What.PlayerHeroId,

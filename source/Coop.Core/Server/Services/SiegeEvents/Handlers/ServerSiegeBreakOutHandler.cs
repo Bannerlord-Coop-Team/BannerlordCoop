@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -13,7 +12,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -29,25 +27,26 @@ internal class ServerSiegeBreakOutHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeBreakOut breakOut;
-    private readonly ISendCoalescer coalescer;
+    private readonly ISiegeSacrifice sacrifice;
     private readonly Dictionary<MobileParty, Receipt> receipts = new();
 
     private sealed class Receipt
     {
         public SiegeEvent Siege;
+        public bool IsFromPort;
         public NetworkBreakOutResult Result;
     }
 
     public ServerSiegeBreakOutHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        ISendCoalescer coalescer = null)
+        ISiegeSacrifice sacrifice)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.breakOut = breakOut;
-        this.coalescer = coalescer;
+        this.sacrifice = sacrifice;
         messageBroker.Subscribe<NetworkRequestBreakOut>(Handle);
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(HandleEnter);
         messageBroker.Subscribe<SettlementEncounterLeaveApplied>(HandleLeave);
@@ -57,69 +56,75 @@ internal class ServerSiegeBreakOutHandler : IHandler
     {
         if (!(payload.Who is NetPeer peer)) return;
         var request = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => network.Send(peer, Answer(peer, request)), context: nameof(NetworkRequestBreakOut));
+    }
+
+    // Every failure still answers, so the client never waits on a reply that is not coming.
+    private NetworkBreakOutResult Answer(NetPeer peer, NetworkRequestBreakOut request)
+    {
+        var rejected = new NetworkBreakOutResult(request.RequestId, false, Array.Empty<uint>(), Array.Empty<int>(), -1);
+        try
         {
-            var result = new NetworkBreakOutResult(request.RequestId, false, Array.Empty<uint>(), Array.Empty<int>(), -1);
-            if (playerManager.TryGetPlayer(peer, out var player) &&
-                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var controlled) &&
-                objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) &&
-                ReferenceEquals(controlled, party) &&
-                objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) &&
-                objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) &&
-                party.IsActive && party.CurrentSettlement == settlement && settlement.SiegeEvent == siege &&
-                party.BesiegerCamp == null && party.MapEvent == null && settlement.Party?.MapEvent == null)
-            {
-                if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
-                {
-                    result = receipt.Result;
-                    result = new NetworkBreakOutResult(request.RequestId, result.Approved,
-                        result.CharacterIds, result.Counts, result.ArmyCasualties);
-                }
-                else
-                {
-                    try
-                    {
-                        var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
-                        int losses = breakOut.GetRequiredCasualties(party);
-                        if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
-                        {
-                            network.Send(peer, result);
-                            return;
-                        }
-                        foreach (var member in parties)
-                        {
-                            if (!objectManager.TryGetHandleWithLogging(member.MemberRoster, out _))
-                                throw new InvalidOperationException("Breakout roster is not registered");
-                            foreach (var element in member.MemberRoster.GetTroopRoster())
-                                if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
-                                    throw new InvalidOperationException("Breakout troop is not registered");
-                        }
-                        // Cache only once mutation can begin; affordability and registrations may recover on retry.
-                        receipt = new Receipt { Siege = siege, Result = result };
-                        receipts[party] = receipt;
-                        var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
-                        var elements = casualties.GetTroopRoster();
-                        var ids = new uint[elements.Count];
-                        var counts = new int[elements.Count];
-                        for (int index = 0; index < elements.Count; index++)
-                        {
-                            objectManager.TryGetHandleWithLogging(elements[index].Character, out ids[index]);
-                            counts[index] = elements[index].Number;
-                        }
-                        foreach (var member in parties)
-                            if (objectManager.TryGetHandle(member.MemberRoster, out var rosterId))
-                                coalescer?.FlushInstance(rosterId, network);
-                        result = new NetworkBreakOutResult(request.RequestId, true, ids, counts, armyCasualties);
-                        receipt.Result = result;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex, "Failed to apply breakout request {RequestId}", request.RequestId);
-                    }
-                }
-            }
-            network.Send(peer, result);
-        }, context: nameof(NetworkRequestBreakOut));
+            return Apply(peer, request, rejected);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to apply breakout request {RequestId}", request.RequestId);
+            return rejected;
+        }
+    }
+
+    private NetworkBreakOutResult Apply(NetPeer peer, NetworkRequestBreakOut request, NetworkBreakOutResult rejected)
+    {
+        if (!playerManager.TryGetPlayer(peer, out var player) ||
+            !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var controlled) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(request.PartyId, out var party) ||
+            !ReferenceEquals(controlled, party))
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} from a peer that does not control party {PartyId}",
+                request.RequestId, request.PartyId);
+            return rejected;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) ||
+            !objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) ||
+            settlement.SiegeEvent != siege)
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} for party {PartyId} and settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        if (!party.IsActive || party.CurrentSettlement != settlement || party.BesiegerCamp != null ||
+            party.MapEvent != null || settlement.Party?.MapEvent != null)
+        {
+            Logger.Warning("Rejecting breakout request {RequestId} for party {PartyId} that cannot leave settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        // The client flag alone never opens the port; vanilla needs a port, ships and the fleet anchored there.
+        if (request.IsFromPort && !breakOut.CanBreakOutFromPort(party, settlement))
+        {
+            Logger.Warning("Rejecting port breakout request {RequestId} for party {PartyId} that cannot use the port of {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
+        {
+            // A paid gate break out is not reused for the port or the other way round, so this request is turned down.
+            if (receipt.IsFromPort != request.IsFromPort) return rejected;
+            return new NetworkBreakOutResult(request.RequestId, receipt.Result.Approved,
+                receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
+        }
+
+        int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
+        var paidReceipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = rejected };
+        var paid = sacrifice.TryApply(party, losses, () => receipts[party] = paidReceipt);
+        if (paid == null) return rejected;
+        paidReceipt.Result = new NetworkBreakOutResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
+        return paidReceipt.Result;
     }
 
     private void HandleEnter(MessagePayload<PartyEnterSettlementAttempted> payload)
@@ -132,7 +137,8 @@ internal class ServerSiegeBreakOutHandler : IHandler
         var party = payload.What.Party;
         if (!receipts.TryGetValue(party, out var receipt)) return;
         receipts.Remove(party);
-        if (!receipt.Result.Approved || party.CurrentSettlement != null ||
+        // A port break out sails away from the port, so it keeps the position vanilla gives it.
+        if (!receipt.Result.Approved || receipt.IsFromPort || party.CurrentSettlement != null ||
             payload.What.Settlement != receipt.Siege.BesiegedSettlement) return;
 
         breakOut.ProtectAfterLeave(party, payload.What.Settlement);

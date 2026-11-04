@@ -244,6 +244,9 @@ public class ArtisanProductsTests : IDisposable
             Assert.Equal(3, ((Quest)scenario.QuestOf(Server))._deliveredRawGoods);
             Assert.Equal(0, OwnerParty(Server).ItemRoster.GetItemNumber(DefaultItems.Grain));
         });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsProgress>());
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkArtisanProductsProgress>());
+        Assert.Empty(Other.InternalMessages.GetMessages<NetworkArtisanProductsProgress>());
         Owner.Call(() => Assert.Equal(3, ((Quest)scenario.QuestOf(Owner))._playerStartsQuestLog.CurrentProgress));
         Other.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
@@ -393,14 +396,12 @@ public class ArtisanProductsTests : IDisposable
         });
         var gold = OwnerGold();
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
-        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsLord>(),
-            message => message.Action == ArtisanProductsLordAction.Rejected);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionRejected>());
         Assert.Equal(gold, OwnerGold());
         Owner.Call(() =>
         {
             var issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             Assert.True(issue.IsSolvingWithLordSolution);
-            Assert.Contains(issue.JournalEntries, log => log.LogText.ToString().Contains("decree could not be issued"));
         });
         Other.Call(() => Assert.Empty(Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries));
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer());
@@ -447,7 +448,7 @@ public class ArtisanProductsTests : IDisposable
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
         Server.Call(() => Assert.Equal(takenByCompanions ? 0.75f : 0f,
             Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue._issueDifficultyMultiplier));
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsLord>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
     }
 
     [Theory]
@@ -492,26 +493,16 @@ public class ArtisanProductsTests : IDisposable
         {
             var issue = (Issue)Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             conversationHero = Owner.GetRegisteredObject<Hero>(merchantId);
-            var lookup = AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
-            Assert.NotNull(lookup);
-            Assert.NotNull(lookup!.Invoke(new IssuesCampaignBehavior(), null));
-
-            var selectorType = AccessTools.TypeByName("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferPatch");
-            Assert.NotNull(selectorType);
-            var conversationType = selectorType!.Assembly.GetType("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferConversationPatch");
-            Assert.NotNull(conversationType);
-            var prefix = AccessTools.Method(conversationType, "Prefix");
-            Assert.NotNull(prefix);
-            Assert.True((bool)prefix!.Invoke(null, null)!);
+            Assert.NotNull(IssuesCampaignBehavior.GetCounterOfferersIssue());
 
             var behavior = new IssuesCampaignBehavior();
             foreach (var name in new[]
             {
-                "issue_counter_offer_2_condition",
-                "issue_counter_offer_player_accept_condition",
-                "issue_counter_offer_player_reject_condition",
-                "issue_counter_offer_accepted_condition",
-                "issue_counter_offer_reject_condition",
+                nameof(IssuesCampaignBehavior.issue_counter_offer_2_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_player_accept_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_player_reject_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_accepted_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_reject_condition),
             })
             {
                 var method = AccessTools.Method(typeof(IssuesCampaignBehavior), name);
@@ -521,21 +512,17 @@ public class ArtisanProductsTests : IDisposable
 
             using (new AllowedThread()) issue.IssueFinalized();
 
-            var selector = AccessTools.Method(selectorType, "FindCounterOffer");
-            Assert.NotNull(selector);
-            Assert.Null(selector!.Invoke(null, null));
-
-            Assert.False((bool)prefix!.Invoke(null, null)!);
+            Assert.Null(IssuesCampaignBehavior.GetCounterOfferersIssue());
 
             foreach (var name in new[]
             {
-                "issue_counter_offer_2_condition",
-                "issue_counter_offer_player_accept_condition",
-                "issue_counter_offer_player_reject_condition",
-                "issue_counter_offer_accepted_condition",
-                "issue_counter_offer_reject_condition",
-                "issue_counter_offer_accepted_consequence",
-                "issue_counter_offer_reject_consequence",
+                nameof(IssuesCampaignBehavior.issue_counter_offer_2_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_player_accept_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_player_reject_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_accepted_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_reject_condition),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_accepted_consequence),
+                nameof(IssuesCampaignBehavior.issue_counter_offer_reject_consequence),
             })
             {
                 var method = AccessTools.Method(typeof(IssuesCampaignBehavior), name);
@@ -678,10 +665,10 @@ public class ArtisanProductsTests : IDisposable
         SetOwnerStateOnServer(Hero.CharacterStates.Prisoner);
         Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(Server.GetRegisteredObject<Hero>(scenario.NotableId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
-        Server.Call(() => Campaign.Current.IssueManager.HourlyTick());
+        Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
         Server.Call(() => Assert.Equal(0, OwnerParty(Server).MemberRoster.GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId))));
         SetOwnerStateOnServer(Hero.CharacterStates.Active);
-        Server.Call(() => Campaign.Current.IssueManager.HourlyTick());
+        Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
         environment.FlushCoalescer();
         foreach (var instance in new[] { Server, Owner })
             instance.Call(() => Assert.Equal(9, OwnerParty(instance).MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId))));

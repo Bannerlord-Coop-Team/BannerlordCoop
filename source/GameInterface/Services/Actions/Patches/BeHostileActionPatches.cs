@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;

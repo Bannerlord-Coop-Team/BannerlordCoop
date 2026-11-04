@@ -1,27 +1,25 @@
-﻿using Common;
-using Common.Messaging;
-using Common.Util;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue;
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts.Patches;
 
-[HarmonyPatch(typeof(IssueManager), nameof(IssueManager.ChangeIssueOwner))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
+[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueOwnerChanged))]
 internal class ArtisanProductsInheritancePatch
 {
-    [HarmonyPrefix]
-    private static bool Before(IssueBase issue, out Hero __state)
-    {
-        __state = issue.IssueOwner;
-        return !(issue is Issue) || ModInformation.IsServer || AllowedThread.IsThisThreadAllowed();
-    }
-
     [HarmonyPostfix]
-    private static void After(IssueBase issue, Hero __state, bool __runOriginal)
+    private static void After(IssueBase issue, Hero oldOwner)
     {
-        if (ModInformation.IsServer && __runOriginal && issue is Issue artisan && issue.IssueOwner != __state)
-            MessageBroker.Instance.Publish(issue, new ArtisanProductsOwnerChanged(artisan, __state));
+        if (!(issue is Issue) || issue.IssueQuest == null) return;
+        var quest = issue.IssueQuest;
+        quest.QuestGiver = issue.IssueOwner;
+        var manager = Campaign.Current.QuestManager;
+        if (!manager.Quests.Contains(quest)) return;
+        if (manager.TrackedObjects.TryGetValue(oldOwner, out var oldQuests) && oldQuests.Contains(quest))
+            manager.RemoveTrackedObjectForQuest(oldOwner, quest);
+        if (!manager.TrackedObjects.TryGetValue(issue.IssueOwner, out var newQuests) || !newQuests.Contains(quest))
+            manager.AddTrackedObjectForQuest(issue.IssueOwner, quest);
     }
 }

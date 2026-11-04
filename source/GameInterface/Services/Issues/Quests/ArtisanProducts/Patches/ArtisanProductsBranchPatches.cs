@@ -12,6 +12,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPri
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ArtisanProductsBranchPatches
 {
@@ -61,6 +62,7 @@ internal class ArtisanProductsBranchPatches
     private static int GrantGoods(ItemRoster roster, ItemObject item, int count) => -1;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ArtisanProductsCompletionProgressPatch
 {
@@ -75,20 +77,4 @@ internal class ArtisanProductsCompletionProgressPatch
     [HarmonyPrefix]
     private static bool Before() => ModInformation.IsServer;
 
-    [HarmonyPostfix]
-    private static void After(Quest __instance)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IArtisanProductsProgress>(out var progress)) progress.Send(__instance);
-    }
-}
-
-[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
-internal class ArtisanProductsJournalPatch
-{
-    [HarmonyPostfix]
-    private static void After(QuestBase __instance)
-    {
-        if (ModInformation.IsServer && __instance is Quest quest && quest.IsOngoing &&
-            ContainerProvider.TryResolve<IArtisanProductsProgress>(out var progress)) progress.Send(quest);
-    }
 }

@@ -6,6 +6,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehav
 namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
 
 // The hideout's spotted state is server managed, the owner's client marks its quest hideout for itself on purpose
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
 internal class CapturedByBountyHuntersHideoutRevealPatch
 {

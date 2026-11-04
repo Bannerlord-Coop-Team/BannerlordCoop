@@ -11,6 +11,8 @@ concurrency:
 
 env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+  BANNERLORD_DIR: /home/mb2
 
 # Use the event's merge commit in every job so scripts, sources, and build artifacts
 # match the workflow, even when the PR branch is behind development.
@@ -36,17 +38,21 @@ jobs:
     timeout-minutes: 30
     if: ${{ !github.event.pull_request.draft }}
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-
-      - name: Link Game Assemblies Folder
-        run: ln -s /home/mb2 mb2
 
       - name: Cache NuGet Packages
         uses: actions/cache@v6
@@ -77,17 +83,21 @@ jobs:
     timeout-minutes: 30
     needs: build
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-
-      - name: Link Game Assemblies Folder
-        run: ln -s /home/mb2 mb2
 
       - name: Cache NuGet Packages
         uses: actions/cache@v6
@@ -154,17 +164,21 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-
-      - name: Link Game Assemblies Folder
-        run: ln -s /home/mb2 mb2
 
       - name: Download Build Output
         uses: actions/download-artifact@v8

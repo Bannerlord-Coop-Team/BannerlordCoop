@@ -10,6 +10,7 @@ namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 /// <summary>
 /// The smugglers' party is spawned and removed by the server, the owner's quest only points at it.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class SmugglersPartyPatches
 {

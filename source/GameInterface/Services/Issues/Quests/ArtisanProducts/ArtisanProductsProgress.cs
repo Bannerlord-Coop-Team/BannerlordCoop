@@ -2,16 +2,13 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Entity;
+using GameInterface.Services.Players;
 using ProtoBuf;
-using System;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Localization;
-using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
@@ -19,7 +16,6 @@ namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 internal interface IArtisanProductsProgress
 {
     void Send(Quest quest);
-    void SendIssue(IssueBase issue, IssueBase.IssueUpdateDetails detail);
 }
 
 internal class ArtisanProductsProgress : IArtisanProductsProgress
@@ -27,58 +23,43 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
     private readonly INetwork network;
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
+    private readonly IPlayerManager players;
 
-    public ArtisanProductsProgress(INetwork network, IObjectManager objects, IIssueOwnerResolver owners)
+    public ArtisanProductsProgress(INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players)
     {
         this.network = network;
         this.objects = objects;
         this.owners = owners;
+        this.players = players;
     }
 
     public void Send(Quest quest)
     {
         var issue = IssueManager.GetIssueOfQuest(quest);
-        if (!(issue is Issue artisan) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = quest.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? float.NaN;
-        network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, quest._deliveredRawGoods,
-            quest._counterOfferRefused, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId,
-            prosperity));
-    }
-
-    public void SendIssue(IssueBase issue, IssueBase.IssueUpdateDetails detail)
-    {
-        if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = issue is Issue artisan ? artisan.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? float.NaN : float.NaN;
-        network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, 0, false,
-            issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId, prosperity, detail));
+        if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
+            !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
+            !players.TryGetPeer(controllerId, out var peer)) return;
+        network.Send(peer, new NetworkArtisanProductsProgress(giverId, issue.StringId, quest._deliveredRawGoods,
+            quest._counterOfferRefused, controllerId));
     }
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkArtisanProductsProgress : IServerToClientCommand
+public readonly struct NetworkArtisanProductsProgress : ICommand
 {
-    [ProtoMember(1)] public readonly string OwnerId;
+    [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly int Delivered;
     [ProtoMember(4)] public readonly bool MerchantRefused;
-    [ProtoMember(5)] public readonly string[] Logs;
-    [ProtoMember(6)] public readonly string ControllerId;
-    [ProtoMember(7)] public readonly IssueBase.IssueUpdateDetails Detail;
-    [ProtoMember(8)] public readonly float Prosperity;
+    [ProtoMember(5)] public readonly string ControllerId;
 
-    public NetworkArtisanProductsProgress(string ownerId, string issueId, int delivered, bool merchantRefused, string[] logs,
-        string controllerId = null, float prosperity = 0, IssueBase.IssueUpdateDetails detail = IssueBase.IssueUpdateDetails.None)
+    public NetworkArtisanProductsProgress(string giverId, string issueId, int delivered, bool merchantRefused, string controllerId)
     {
-        OwnerId = ownerId;
+        GiverId = giverId;
         IssueId = issueId;
         Delivered = delivered;
         MerchantRefused = merchantRefused;
-        Logs = logs;
         ControllerId = controllerId;
-        Prosperity = prosperity;
-        Detail = detail;
     }
 }
 
@@ -87,12 +68,15 @@ internal class ArtisanProductsProgressHandler : IHandler
     private readonly IMessageBroker broker;
     private readonly IIssueResolver resolver;
     private readonly IControllerIdProvider controller;
+    private readonly IIssueConversationGuard conversationGuard;
 
-    public ArtisanProductsProgressHandler(IMessageBroker broker, IIssueResolver resolver, IControllerIdProvider controller)
+    public ArtisanProductsProgressHandler(IMessageBroker broker, IIssueResolver resolver, IControllerIdProvider controller,
+        IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.resolver = resolver;
         this.controller = controller;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkArtisanProductsProgress>(Handle);
     }
 
@@ -102,28 +86,18 @@ internal class ArtisanProductsProgressHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
-            if (string.IsNullOrEmpty(data.ControllerId)) return;
-            if (!resolver.TryResolve(data.OwnerId, data.IssueId, out _, out var issue, out _)) return;
-            if (!(issue is Issue artisan)) return;
+            if (data.ControllerId != controller.ControllerId ||
+                !resolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) ||
+                !(issue.IssueQuest is Quest quest)) return;
             using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
-                if (!float.IsNaN(data.Prosperity) && artisan.IssueOwner?.CurrentSettlement?.Town != null)
-                    artisan.IssueOwner.CurrentSettlement.Town.Prosperity = data.Prosperity;
-                if (data.ControllerId != controller.ControllerId) return;
-                var logs = data.Logs ?? Array.Empty<string>();
-                if (!(issue.IssueQuest is Quest quest))
-                {
-                    foreach (var text in logs.Skip(issue.JournalEntries.Count)) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
-                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Detail, Hero.MainHero);
-                    return;
-                }
                 quest._deliveredRawGoods = data.Delivered;
                 quest._counterOfferRefused = data.MerchantRefused;
                 if (quest._playerStartsQuestLog != null) quest.UpdateQuestTaskStage(quest._playerStartsQuestLog, data.Delivered);
-                foreach (var text in logs.Skip(quest.JournalEntries.Count)) quest.AddLog(new TextObject(text));
             }
-        }, context: nameof(ArtisanProductsProgressHandler));
+        }, data.GiverId), context: nameof(ArtisanProductsProgressHandler));
     }
 }

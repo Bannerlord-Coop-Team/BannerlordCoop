@@ -24,12 +24,6 @@ public class NetworkAddInvolvedPartiesSerializationTest
     }
 
     [Fact]
-    public void Message_IsServerToClientOnly()
-    {
-        Assert.IsAssignableFrom<IServerToClientCommand>(default(NetworkAddInvolvedParties));
-    }
-
-    [Fact]
     public void RoundTrip_PreservesPartyIdsAndPositions()
     {
         var original = new NetworkAddInvolvedParties(

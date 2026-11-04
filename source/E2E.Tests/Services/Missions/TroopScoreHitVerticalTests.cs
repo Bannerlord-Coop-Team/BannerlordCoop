@@ -56,7 +56,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
             // The blow-applying client reports the hit; the server accounts it.
             Server.Resolve<IMessageBroker>().Publish(this,
-                new NetworkTroopScoreHit(partyId, attackerId, victimId, damage: 30, isFatal: true, isSimulatedHit: false));
+                new NetworkTroopScoreHit(partyId, attackerId, victimId, damage: 30, isFatal: true, isSimulatedHit: false, attackerWeapon: null));
 
             Assert.True(party.ContributionToBattle > before,
                 $"Server contribution did not increase (before={before}, after={party.ContributionToBattle})");

@@ -103,12 +103,14 @@ public class ConquestQuestOwnershipTests : IDisposable
     }
 
     [Fact]
-    public void PersistenceHooksAreDiscoveredByTheUncategorizedInstaller()
+    public void PersistenceHooksAreDiscoveredByTheQuestCategory()
     {
         var harmony = new Harmony($"{nameof(ConquestQuestOwnershipTests)}.{Guid.NewGuid():N}");
         try
         {
-            harmony.PatchAllUncategorized(typeof(global::GameInterface.GameInterface).Assembly);
+            harmony.PatchCategory(
+                typeof(global::GameInterface.GameInterface).Assembly,
+                global::GameInterface.GameInterface.HARMONY_QUESTS_CATEGORY);
 
             Assert.Contains(
                 Harmony.GetPatchInfo(AccessTools.Method(typeof(Campaign), "OnInitialize")).Prefixes,

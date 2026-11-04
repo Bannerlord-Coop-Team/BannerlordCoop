@@ -97,6 +97,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             GameThread.Run(() =>
             {
                 using (new AllowedThread())
+                using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
                 {
                     itemRoster?.Clear();
                 }

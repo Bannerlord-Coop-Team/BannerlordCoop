@@ -23,17 +23,20 @@ internal class CreationCaptureRunner : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IQuestTypeRegistry registry;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public CreationCaptureRunner(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IQuestTypeRegistry registry)
+        IQuestTypeRegistry registry,
+        IIssueConversationGuard conversationGuard)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.registry = registry;
+        this.conversationGuard = conversationGuard;
 
         messageBroker.Subscribe<IssueCreated>(Handle_IssueCreated);
         messageBroker.Subscribe<NetworkIssueCreated>(Handle_NetworkIssueCreated);
@@ -78,7 +81,8 @@ internal class CreationCaptureRunner : IHandler
 
         var data = payload.What;
         
-        GameThread.RunSafe(() =>
+        // The giver may still hold an issue the server ended, kept until this player's conversation with them ends
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.IssueOwnerId, out var issueOwner))
             {
@@ -121,6 +125,6 @@ internal class CreationCaptureRunner : IHandler
                 issue.StringId = data.IssueId;
             }
             strategy.ApplyAfterCreation(issue, captured);
-        }, context: nameof(CreationCaptureRunner));
+        }, data.IssueOwnerId), context: nameof(CreationCaptureRunner));
     }
 }
