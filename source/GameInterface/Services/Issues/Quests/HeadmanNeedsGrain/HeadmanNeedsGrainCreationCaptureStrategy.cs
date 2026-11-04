@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using System;
 using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -41,18 +42,32 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
 
     public void ApplyAfterCreation(IssueBase issue, byte[] captured)
     {
-        using (var stream = new MemoryStream(captured))
-        using (var reader = new BinaryReader(stream))
-        {
-            var marketId = reader.ReadString();
-            var grainIssue = (Issue)issue;
-            if (marketId.Length != 0 && objectManager.TryGetObjectWithLogging<Settlement>(marketId, out var market))
-            {
-                grainIssue._nearbySuitableSettlementCache = market;
-            }
+        if (captured == null || captured.Length == 0) return;
 
-            grainIssue._issueDifficultyMultiplier = reader.ReadSingle();
-            grainIssue.IssueDueTime = new CampaignTime(reader.ReadInt64());
+        try
+        {
+            using (var stream = new MemoryStream(captured))
+            using (var reader = new BinaryReader(stream))
+            {
+                var marketId = reader.ReadString();
+                var grainIssue = (Issue)issue;
+                if (marketId.Length != 0 && objectManager.TryGetObjectWithLogging<Settlement>(marketId, out var market))
+                {
+                    grainIssue._nearbySuitableSettlementCache = market;
+                }
+
+                grainIssue._issueDifficultyMultiplier = reader.ReadSingle();
+                grainIssue.IssueDueTime = new CampaignTime(reader.ReadInt64());
+            }
+        }
+        catch (EndOfStreamException)
+        {
+        }
+        catch (IOException)
+        {
+        }
+        catch (FormatException)
+        {
         }
     }
 

@@ -12,7 +12,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 internal class HeadmanNeedsGrainCompanionSelectionPatches
 {
     [HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]
-    [HarmonyPrefix]
+    [HarmonyPrefix, HarmonyPriority(Priority.Last)]
     private static bool SelectCompanionPrefix()
     {
         if (ModInformation.IsServer || !(IssuesCampaignBehavior.GetIssueOwnersIssue() is Issue issue)) return true;
@@ -22,7 +22,7 @@ internal class HeadmanNeedsGrainCompanionSelectionPatches
     }
 
     [HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence))]
-    [HarmonyPrefix]
+    [HarmonyPrefix, HarmonyPriority(Priority.Last)]
     private static bool CancelSelectionPrefix()
     {
         if (ModInformation.IsServer || !(IssuesCampaignBehavior.GetIssueOwnersIssue() is Issue issue)) return true;
