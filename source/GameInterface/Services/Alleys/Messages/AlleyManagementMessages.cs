@@ -82,6 +82,18 @@ public readonly struct AlleyAcquiredRequested : IEvent
     }
 }
 
+/// <summary>Player won the alley fight and chose to leave the alley empty instead of taking it over.</summary>
+public readonly struct AlleyClearedRequested : IEvent
+{
+    public readonly Alley Alley;
+    public readonly Hero Clearer;
+    public AlleyClearedRequested(Alley alley, Hero clearer)
+    {
+        Alley = alley;
+        Clearer = clearer;
+    }
+}
+
 // --- Networked client -> server requests ---
 
 [ProtoContract(SkipConstructor = true)]
@@ -101,6 +113,20 @@ public readonly struct RequestAcquireAlley : ICommand
         OwnerId = ownerId;
         OverseerId = overseerId;
         Garrison = garrison;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestClearAlley : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AlleyId;
+    [ProtoMember(2)]
+    public readonly string ClearerId;
+    public RequestClearAlley(string alleyId, string clearerId)
+    {
+        AlleyId = alleyId;
+        ClearerId = clearerId;
     }
 }
 

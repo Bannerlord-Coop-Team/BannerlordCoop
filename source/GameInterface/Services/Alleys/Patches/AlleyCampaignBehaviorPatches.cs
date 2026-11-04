@@ -64,9 +64,15 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnAlleyOccupiedByPlayerPrefix() => false;
 
+    // "Leave it empty" after winning the fight only fires this event, so the client asks the server to free the alley.
     [HarmonyPatch("OnAlleyClearedByPlayer")]
     [HarmonyPrefix]
-    private static bool OnAlleyClearedByPlayerPrefix() => false;
+    private static bool OnAlleyClearedByPlayerPrefix(Alley alley)
+    {
+        if (ModInformation.IsClient && alley != null && Hero.MainHero != null)
+            MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero));
+        return false;
+    }
 
     // AI activity: on the server, hand off to AlleyHandler (RNG rolled once, results replicated) and
     // skip the vanilla body on both sides (host list is empty, per-client RNG would diverge).

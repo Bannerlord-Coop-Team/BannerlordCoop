@@ -54,12 +54,14 @@ internal class AlleyManagementHandler : IHandler
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
+        messageBroker.Subscribe<AlleyClearedRequested>(Handle_AlleyClearedRequested);
         messageBroker.Subscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Subscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
         messageBroker.Subscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Subscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Subscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
+        messageBroker.Subscribe<RequestClearAlley>(Handle_RequestClearAlley);
         messageBroker.Subscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Subscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
         messageBroker.Subscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
@@ -72,12 +74,14 @@ internal class AlleyManagementHandler : IHandler
     {
         messageBroker.Unsubscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Unsubscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
+        messageBroker.Unsubscribe<AlleyClearedRequested>(Handle_AlleyClearedRequested);
         messageBroker.Unsubscribe<ChangeAlleyOverseerRequested>(Handle_ChangeAlleyOverseerRequested);
         messageBroker.Unsubscribe<SetAlleyGarrisonRequested>(Handle_SetAlleyGarrisonRequested);
         messageBroker.Unsubscribe<RecruitAlleyTroopsRequested>(Handle_RecruitAlleyTroopsRequested);
 
         messageBroker.Unsubscribe<RequestAcquireAlley>(Handle_RequestAcquireAlley);
         messageBroker.Unsubscribe<RequestAbandonAlley>(Handle_RequestAbandonAlley);
+        messageBroker.Unsubscribe<RequestClearAlley>(Handle_RequestClearAlley);
         messageBroker.Unsubscribe<RequestChangeAlleyOverseer>(Handle_RequestChangeAlleyOverseer);
         messageBroker.Unsubscribe<RequestSetAlleyGarrison>(Handle_RequestSetAlleyGarrison);
         messageBroker.Unsubscribe<RequestRecruitAlleyTroops>(Handle_RequestRecruitAlleyTroops);
@@ -104,6 +108,15 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
 
         network.SendAll(new RequestAbandonAlley(alleyId, payload.What.FromClanScreen));
+    }
+
+    private void Handle_AlleyClearedRequested(MessagePayload<AlleyClearedRequested> payload)
+    {
+        if (ModInformation.IsServer) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Clearer, out var clearerId)) return;
+
+        network.SendAll(new RequestClearAlley(alleyId, clearerId));
     }
 
     private void Handle_ChangeAlleyOverseerRequested(MessagePayload<ChangeAlleyOverseerRequested> payload)
@@ -223,6 +236,39 @@ internal class AlleyManagementHandler : IHandler
         var alleyId = payload.What.AlleyId;
         var fromClanScreen = payload.What.FromClanScreen;
         GameThread.RunSafe(() => AbandonAlley(alleyId, fromClanScreen));
+    }
+
+    private void Handle_RequestClearAlley(MessagePayload<RequestClearAlley> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClearerId, out var clearer)) return;
+
+            ApplyClearRelationChanges(clearer, alley);
+            alley.SetOwner(null);
+        });
+    }
+
+    /// <summary>
+    /// Replays vanilla OnAlleyClearedByPlayer's relation changes keyed off the clearing player, because
+    /// Hero.MainHero is null on the host: the displaced gang leader loses 5 and other notables gain 1.
+    /// </summary>
+    private static void ApplyClearRelationChanges(Hero clearer, Alley alley)
+    {
+        var displacedOwner = alley.Owner;
+        if (displacedOwner != null && displacedOwner != clearer)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(clearer, displacedOwner, -5, showQuickNotification: false);
+
+        if (alley.Settlement?.Notables == null) return;
+        foreach (var notable in alley.Settlement.Notables)
+        {
+            if (notable != null && !notable.IsGangLeader)
+                ChangeRelationAction.ApplyRelationChangeBetweenHeroes(clearer, notable, 1, showQuickNotification: false);
+        }
     }
 
     private void Handle_RequestChangeAlleyOverseer(MessagePayload<RequestChangeAlleyOverseer> payload)
