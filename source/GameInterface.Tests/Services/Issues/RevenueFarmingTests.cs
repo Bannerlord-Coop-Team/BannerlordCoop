@@ -14,6 +14,7 @@ using HarmonyLib;
 using Moq;
 using ProtoBuf.Meta;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +26,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.Issues;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
+using Issue = RevenueFarmingIssueBehavior.RevenueFarmingIssue;
 
 [Collection(ModInformationRoleCollection.Name)]
 public class RevenueFarmingTests
@@ -48,6 +50,30 @@ public class RevenueFarmingTests
             Assert.False(sessions.IsLocal(otherQuest));
         }
         Assert.Throws<InvalidOperationException>(() => sessions.Register(localQuest, otherHero, "other"));
+    }
+
+    [Fact]
+    public void LoadingLegacySessionBackfillsIssueIdFromLinkedIssue()
+    {
+        var giver = ObjectHelper.SkipConstructor<Hero>();
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        issue.IssueOwner = giver;
+        issue.StringId = "issue_legacy";
+        var quest = ObjectHelper.SkipConstructor<Quest>();
+        quest.QuestGiver = giver;
+        issue.IssueQuest = quest;
+        giver.Issue = issue;
+
+        var legacy = new RevenueFarmingSession(quest, ObjectHelper.SkipConstructor<Hero>(), "owner", null);
+        var records = new Dictionary<string, object>
+        {
+            ["_coop_revenue_farming_sessions"] = new List<RevenueFarmingSession> { legacy },
+        };
+        var restored = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
+
+        restored.SyncData(new TestDataStore(false, records));
+
+        Assert.Equal("issue_legacy", restored.Get(quest).IssueId);
     }
 
     [Fact]
@@ -135,6 +161,33 @@ public class RevenueFarmingTests
         finally
         {
             harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private sealed class TestDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        public TestDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving)
+            {
+                records[key] = data;
+                return true;
+            }
+
+            if (!records.TryGetValue(key, out var value)) return false;
+            data = (T)value;
+            return true;
         }
     }
 }

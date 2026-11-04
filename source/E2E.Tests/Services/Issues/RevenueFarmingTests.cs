@@ -449,6 +449,12 @@ public sealed class RevenueFarmingTests : IDisposable
         Assert.Single(Client.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.Finalization.RequestQuestBranch>());
         environment.FlushCoalescer();
         Client.Call(() => Assert.True(quest.IsFinalized));
+        if (ending == "steward")
+        {
+            var states = Server.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Quests.RevenueFarming.NetworkRevenueFarmingState>().ToArray();
+            Assert.True(states.Any(state => state.Menu == "town"), string.Join(",", states.Select(state => $"menu={state.Menu ?? "null"};final={state.IsFinalizing};finish={state.FinishEncounter}")));
+            Assert.Contains("town", menus.MenusFor(Client));
+        }
         foreach (var instance in Instances) instance.Call(() => Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue));
         environment.FlushCoalescer();
         Server.Call(() =>

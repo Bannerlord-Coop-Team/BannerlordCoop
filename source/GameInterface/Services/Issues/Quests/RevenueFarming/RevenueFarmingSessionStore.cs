@@ -77,7 +77,14 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
     {
         dataStore.SyncData("_coop_revenue_farming_sessions", ref sessions);
         if (dataStore.IsLoading)
+        {
             sessions = sessions?.Where(session => session?.Quest != null && session.PlayerHero != null).ToList() ?? new();
+            foreach (var session in sessions)
+            {
+                if (session.IssueId == null && session.Quest.QuestGiver?.Issue?.IssueQuest == session.Quest)
+                    session.IssueId = session.Quest.QuestGiver.Issue.StringId;
+            }
+        }
     }
 }
 
