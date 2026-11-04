@@ -90,6 +90,9 @@ internal class BattleHostHandler : IHandler
         // Withdrew from this battle and have not entered it again; their parties stay theirs, never the host's.
         // Folds into one participant status with the sets above in #2181.
         public readonly HashSet<string> WithdrawnControllers = new HashSet<string>();
+        // Left the mission or dropped and have not entered again. Only the preferred host hold reads it, since a
+        // graceful hideout leaver is neither withdrawn nor absent but must not be waited for.
+        public readonly HashSet<string> DepartedControllers = new HashSet<string>();
         public readonly HashSet<string> HostGrantedParties = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public readonly Dictionary<string, PartyHealthReports> HealthReports = new();
@@ -486,7 +489,7 @@ internal class BattleHostHandler : IHandler
     }
 
     // True while a listed player ranked above `rank` is in the battle and connected but has not sent its own
-    // host request yet. Withdrawn and absent players, and the one just leaving, are not waited for.
+    // host request yet. Departed, withdrawn and absent players, and the one just leaving, are not waited for.
     private bool IsHigherRankedHostLoading(string mapEventId, MapEvent mapEvent, int rank, string readyControllerId,
         PendingElection pending, string leftControllerId)
     {
@@ -499,8 +502,8 @@ internal class BattleHostHandler : IHandler
                 continue;
             if (pending != null && pending.Requests.Exists(request => request.ControllerId == controllerId))
                 continue;
-            if (runtimeState != null && (runtimeState.WithdrawnControllers.Contains(controllerId) ||
-                runtimeState.AbsentControllers.Contains(controllerId)))
+            if (runtimeState != null && (runtimeState.DepartedControllers.Contains(controllerId) ||
+                runtimeState.WithdrawnControllers.Contains(controllerId) || runtimeState.AbsentControllers.Contains(controllerId)))
                 continue;
             if (playerManager.IsConnected(player) && IsRequesterInBattle(mapEvent, controllerId))
                 return true;
@@ -538,6 +541,7 @@ internal class BattleHostHandler : IHandler
         pending.Requests.RemoveAll(request => request.ControllerId == controllerId);
         if (mapEvent == null)
         {
+            // The map event no longer resolves, so the battle is gone and the whole hold goes with it.
             pendingElections.Remove(mapEventId);
             return;
         }
@@ -1247,7 +1251,8 @@ internal class BattleHostHandler : IHandler
 
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
             {
-                // No host elected yet. A held election runs after the absence above, so its host inherits the leaver's parties.
+                // No host elected yet. A held election released here runs after the bookkeeping above, so a
+                // dropped leaver's parties are already in its host's grant.
                 DropHeldRequest(mapEventId, mapEvent, controllerId);
                 return;
             }
@@ -1510,6 +1515,7 @@ internal class BattleHostHandler : IHandler
         var runtimeState = GetOrCreateRuntimeState(mapEventId);
         runtimeState.PresentControllers.Add(controllerId);
         runtimeState.WithdrawnControllers.Remove(controllerId);
+        runtimeState.DepartedControllers.Remove(controllerId);
     }
 
     // [Server, game thread] Whether the controller withdrew from this battle and has not entered it again.
@@ -1534,6 +1540,7 @@ internal class BattleHostHandler : IHandler
     {
         if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)) return;
         runtimeState.PresentControllers.Remove(controllerId);
+        runtimeState.DepartedControllers.Add(controllerId);
         runtimeState.DeferredHealthGrants.Remove(controllerId);
     }
 

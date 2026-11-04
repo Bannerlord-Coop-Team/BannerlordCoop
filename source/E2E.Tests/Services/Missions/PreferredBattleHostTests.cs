@@ -2,12 +2,17 @@
 using E2E.Tests.Environment.Instance;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using Missions.Battles;
 using Missions.Messages;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -137,17 +142,22 @@ public class PreferredBattleHostTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PreferredHostThatLeftWhileLoading_DoesNotHoldTheElection(bool wasRetreat)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void PreferredHostThatLeftWhileLoading_DoesNotHoldTheElection(bool wasRetreat, bool hideout)
     {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var (mapEventId, partyIds) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
         var clients = Clients.ToArray();
         SetPreferredHosts("ctrl-C");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
+        if (hideout)
+            Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
 
         EnterBattle(clients[2], mapEventId, missionReady: false);
         DepartBattle("ctrl-C", mapEventId, wasRetreat);
+        // A graceful leaver keeps its party on the map event, and a hideout leaver is never marked withdrawn.
+        Assert.NotNull(GetMapEventPartyId(mapEventId, partyIds[2]));
         EnterBattle(clients[0], mapEventId);
 
         AssertHost(Server, mapEventId, "ctrl-A");
@@ -158,21 +168,57 @@ public class PreferredBattleHostTests : MissionTestEnvironment
     [InlineData(true)]
     public void AwaitedPreferredHostLeaving_EndsTheHoldAtOnce(bool disconnect)
     {
+        var (mapEventId, partyIds) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        SetPreferredHosts("ctrl-C");
+        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
+
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            GiveRoster(mapEventId, partyIds[2], 3);
+            var leaverMepId = GetMapEventPartyId(mapEventId, partyIds[2]);
+
+            EnterBattle(clients[2], mapEventId, missionReady: false);
+            EnterBattle(clients[0], mapEventId);
+            AssertNoHost(mapEventId);
+            int baseline = clients[0].InternalMessages.GetMessages<NetworkBattleTroopReserve>().Count();
+
+            if (disconnect)
+                Disconnect(clients[2], "ctrl-C", mapEventId);
+            else
+                DepartBattle("ctrl-C", mapEventId);
+
+            AssertHost(Server, mapEventId, "ctrl-A");
+            // The host elected on release is granted the dropped leaver's party with the election.
+            var grants = clients[0].InternalMessages.GetMessages<NetworkBattleTroopReserve>().Skip(baseline)
+                .Where(message => message.MapEventId == mapEventId);
+            Assert.Contains(grants, grant => grant.Parties.Any(party => party.PartyId == leaverMepId));
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
+    }
+
+    [Fact]
+    public void InstanceEmptyingOut_DropsTheHeldElection()
+    {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
         var clients = Clients.ToArray();
         SetPreferredHosts("ctrl-C");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
 
-        EnterBattle(clients[2], mapEventId, missionReady: false);
         EnterBattle(clients[0], mapEventId);
         AssertNoHost(mapEventId);
+        DepartBattle("ctrl-A", mapEventId, isInstanceEmpty: true);
 
-        if (disconnect)
-            Disconnect(clients[2], "ctrl-C", mapEventId);
-        else
-            DepartBattle("ctrl-C", mapEventId);
+        // A hold left behind would keep its old 5 s deadline, so B would join it and nobody would be elected.
+        Server.Call(() => Server.Resolve<BattleHostHandler>().PreferredHostWait = TimeSpan.Zero);
+        EnterBattle(clients[1], mapEventId);
+        Tick();
 
-        AssertHost(Server, mapEventId, "ctrl-A");
+        AssertHost(Server, mapEventId, "ctrl-B");
     }
 
     [Fact]
@@ -258,6 +304,32 @@ public class PreferredBattleHostTests : MissionTestEnvironment
             Server.Resolve<IMessageBroker>().Publish(this,
                 new PlayerDisconnectedFromMapEvent(controllerId, Server.GetRegisteredObject<MapEvent>(mapEventId)));
         });
+    }
+
+    private string GetMapEventPartyId(string mapEventId, string partyId)
+    {
+        string? mepId = null;
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            var mep = Server.GetRegisteredObject<MapEvent>(mapEventId).FindMapEventParty(party.Party);
+            if (mep != null) Assert.True(Server.ObjectManager.TryGetId(mep, out mepId));
+        });
+        return mepId!;
+    }
+
+    // A known roster, so the party is in the reserve grant whatever the harness rolled.
+    private void GiveRoster(string mapEventId, string partyId, int troopCount)
+    {
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            var mep = Server.GetRegisteredObject<MapEvent>(mapEventId).FindMapEventParty(party.Party);
+            var troop = Server.CreateRegisteredObject<CharacterObject>($"preferred_host_troop_{partyId}");
+            mep.Party.MemberRoster.Clear();
+            mep.Party.MemberRoster.AddToCounts(troop, troopCount);
+            mep.Update();
+        }, MapEventDisabledMethods);
     }
 
     private void Tick()
