@@ -29,7 +29,7 @@ internal class HeadmanNeedsGrainQuestSolutionAcceptStrategy : IQuestSolutionAcce
 
     public void Apply(IssueBase issue, byte[] captured)
     {
-        if (!(issue.IssueQuest is Quest quest) || captured.Length == 0) return;
+        if (!(issue.IssueQuest is Quest quest) || captured == null || captured.Length < sizeof(int) * 2 + sizeof(long)) return;
 
         using (var stream = new MemoryStream(captured))
         using (var reader = new BinaryReader(stream))

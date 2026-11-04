@@ -43,6 +43,14 @@ public class HeadmanNeedsGrainAcceptTests
     }
 
     [Fact]
+    public void AcceptCapture_TruncatedPayloadDoesNotThrow()
+    {
+        var issue = IssueWithQuest(12, 50, new CampaignTime(123456));
+        var strategy = new HeadmanNeedsGrainQuestSolutionAcceptStrategy();
+
+        strategy.Apply(issue, new byte[] { 1 });
+    }
+    [Fact]
     public void CreationCapture_EmptyPayloadLeavesTheIssueUnchanged()
     {
         var issue = IssueWithQuest(12, 0, new CampaignTime(1));

@@ -33,6 +33,9 @@ internal class HeadmanNeedsGrainWorldEventPatches
     [HarmonyPostfix]
     private static void RaidPostfix(Village village) => RunAsOwners(quest => quest.OnVillageBeingRaided(village));
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnHeroPrisonerTaken))]
+    [HarmonyPrefix]
+    private static bool PrisonerTakenPrefix() => ModInformation.IsClient;
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
     [HarmonyPrefix]
     private static bool WarPrefix(Quest __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
