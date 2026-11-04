@@ -163,6 +163,30 @@ public class PreferredBattleHostTests : MissionTestEnvironment
         AssertHost(Server, mapEventId, "ctrl-A");
     }
 
+    [Fact]
+    public void PreferredHostReenteringAHideoutAfterLeaving_IsWaitedForAgain()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        SetPreferredHosts("ctrl-C");
+        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+
+        EnterBattle(clients[2], mapEventId, missionReady: false);
+        DepartBattle("ctrl-C", mapEventId, wasRetreat: true);
+        EnterBattle(clients[2], mapEventId, missionReady: false);
+        EnterBattle(clients[0], mapEventId);
+        AssertNoHost(mapEventId);
+
+        MakeMissionReady(clients[2], mapEventId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            Assert.Equal("ctrl-C", assignment.HostControllerId);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
