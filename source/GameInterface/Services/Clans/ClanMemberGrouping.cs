@@ -8,6 +8,7 @@ public interface IClanMemberGrouping : IGameAbstraction
 {
     ClanMemberGroup GetGroup(Hero member, Hero viewer);
     bool AreRelated(Hero first, Hero second);
+    bool AreBloodRelated(Hero first, Hero second);
 }
 
 public class ClanMemberGrouping : IClanMemberGrouping
@@ -35,6 +36,9 @@ public class ClanMemberGrouping : IClanMemberGrouping
             ancestors.Overlaps(GetAncestors(second.Spouse)) ||
             GetAncestors(first.Spouse).Overlaps(GetAncestors(second));
     }
+
+    public bool AreBloodRelated(Hero first, Hero second)
+        => first != null && second != null && GetAncestors(first).Overlaps(GetAncestors(second));
 
     private HashSet<Hero> GetAncestors(Hero hero)
     {

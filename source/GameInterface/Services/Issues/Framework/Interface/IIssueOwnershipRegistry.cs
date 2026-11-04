@@ -9,6 +9,8 @@ public interface IIssueOwnershipRegistry
 
     bool TryGetOwner(string issueOwnerId, string issueId, out string controllerId);
 
+    bool TryGetIssueOwnerId(string issueId, out string issueOwnerId);
+
     void Remove(string issueOwnerId);
 
     void Remove(string issueOwnerId, string issueId);

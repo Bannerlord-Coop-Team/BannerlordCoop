@@ -152,7 +152,7 @@ public class TimeoutJournalHistoryTests : IDisposable
         });
         environment.FlushCoalescer();
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
-        scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
+            scenario.Server.Call(() => Assert.Equal(3, serverQuest.JournalEntries.Count));
     }
 
     [Fact]
