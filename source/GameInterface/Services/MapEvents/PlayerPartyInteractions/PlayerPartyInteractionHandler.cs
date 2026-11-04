@@ -9,6 +9,7 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapTracking;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -410,6 +411,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             ? ResolveTroopIds(GetOfferedBarterTroops(message.BarterVM))
             : Array.Empty<TroopRosterElementData>();
         var offeredPeace = message.BarterVM != null && HasOfferedPeace(message.BarterVM);
+        var offeredMarriages = message.BarterVM != null
+            ? ResolveMarriageIds(GetOfferedBarterMarriages(message.BarterVM))
+            : Array.Empty<PlayerPartyMarriageOfferData>();
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             message.SessionId,
             partyId,
@@ -418,7 +422,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             offeredGold,
             offeredFiefs,
             offeredPrisoners,
-            offeredPeace));
+            offeredPeace,
+            offeredMarriages));
     }
 
     private void Handle_PlayerPartyTradeAcceptSelected(MessagePayload<PlayerPartyTradeAcceptSelected> payload)
@@ -454,7 +459,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedGold,
             message.OfferedFiefs,
             message.OfferedPrisoners,
-            offeredPeace);
+            offeredPeace,
+            message.OfferedMarriages);
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
@@ -465,7 +471,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedGold,
             message.OfferedFiefs,
             message.OfferedPrisoners,
-            offeredPeace));
+            offeredPeace,
+            message.OfferedMarriages));
         SendTradeStates(session, false);
     }
 
@@ -863,7 +870,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorOfferedGold,
             session.InitiatorOfferedFiefs,
             session.InitiatorOfferedPrisoners,
-            session.InitiatorOfferedPeace));
+            session.InitiatorOfferedPeace,
+            session.InitiatorOfferedMarriages));
 
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             session.SessionId,
@@ -873,7 +881,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ResponderOfferedGold,
             session.ResponderOfferedFiefs,
             session.ResponderOfferedPrisoners,
-            session.ResponderOfferedPeace));
+            session.ResponderOfferedPeace,
+            session.ResponderOfferedMarriages));
     }
 
     private void SendInitiatorState(
@@ -1781,6 +1790,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         barterData.AddBarterGroup(new PrisonerBarterGroup());
         barterData.AddBarterGroup(new ItemBarterGroup());
         barterData.AddBarterGroup(new OtherBarterGroup());
+        barterData.AddBarterGroup(new PlayerPartyMarriageBarterGroup());
         barterData.AddBarterGroup(new GoldBarterGroup());
     }
 
@@ -1803,6 +1813,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddPartyPrisonerBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyItemBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyTroopBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
+        AddPartyMarriageBarterables(barterData, ownerHero, ownerParty, otherParty);
     }
 
     private static void AddPartyPeaceBarterable(
@@ -1920,6 +1931,20 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
     }
 
+    private static void AddPartyMarriageBarterables(
+        BarterData barterData,
+        Hero ownerHero,
+        PartyBase ownerParty,
+        PartyBase otherParty)
+    {
+        foreach (var (hero, spouse) in PlayerPartyMarriageBarterable.GetMarriageCandidates(ownerParty, otherParty))
+        {
+            barterData.AddBarterable<PlayerPartyMarriageBarterGroup>(
+                new PlayerPartyMarriageBarterable(ownerHero, ownerParty, hero, spouse),
+                false);
+        }
+    }
+
     private ItemRosterElementData[] ResolveItemIds(IEnumerable<(ItemRosterElement, int)> items)
     {
         var result = new List<ItemRosterElementData>();
@@ -1937,6 +1962,21 @@ internal class PlayerPartyInteractionHandler : IHandler
             result.Add(new ItemRosterElementData(
                 new ItemObjectData(itemObjectId, itemModifierId, item.EquipmentElement.ItemModifier == null),
                 count));
+        }
+
+        return result.ToArray();
+    }
+
+    private PlayerPartyMarriageOfferData[] ResolveMarriageIds(IEnumerable<PlayerPartyMarriageBarterable> marriages)
+    {
+        var result = new List<PlayerPartyMarriageOfferData>();
+
+        foreach (var marriage in marriages)
+        {
+            if (!objectManager.TryGetIdWithLogging(marriage.HeroBeingMarried, out var heroId)) continue;
+            if (!objectManager.TryGetIdWithLogging(marriage.Spouse, out var spouseId)) continue;
+
+            result.Add(new PlayerPartyMarriageOfferData(heroId, spouseId));
         }
 
         return result.ToArray();
@@ -2064,6 +2104,18 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         return false;
+    }
+
+    private static IEnumerable<PlayerPartyMarriageBarterable> GetOfferedBarterMarriages(BarterVM barterVM)
+    {
+        if (barterVM == null) return Enumerable.Empty<PlayerPartyMarriageBarterable>();
+
+        return (barterVM.LeftOfferList ?? Enumerable.Empty<BarterItemVM>())
+            .Concat(barterVM.RightOfferList ?? Enumerable.Empty<BarterItemVM>())
+            .Where(offeredItem => PlayerPartyTradeContext.CanOffer(offeredItem.Barterable))
+            .Select(offeredItem => offeredItem.Barterable)
+            .OfType<PlayerPartyMarriageBarterable>()
+            .ToArray();
     }
 
     private static IEnumerable<Settlement> GetOfferedBarterFiefs(BarterVM barterVM)

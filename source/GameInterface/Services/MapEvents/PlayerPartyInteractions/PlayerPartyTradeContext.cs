@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
@@ -8,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,6 +37,8 @@ internal static class PlayerPartyTradeContext
         typeof(TransferPrisonerBarterable).GetField("_prisonerCharacter", BindingFlags.Instance | BindingFlags.NonPublic);
 
     private static readonly HashSet<BarterItemVM> scratchItems = new HashSet<BarterItemVM>();
+    private static readonly List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)> hiddenMarriageItems =
+        new List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)>();
 
     public static void Begin(string sessionId, PartyBase localParty = null)
     {
@@ -44,6 +48,7 @@ internal static class PlayerPartyTradeContext
         RemoteAccepted = false;
         activeBarterVM = null;
         resetButton = null;
+        hiddenMarriageItems.Clear();
     }
 
     public static void End(string sessionId = null, PlayerPartyInteractionOutcomeType outcomeType = PlayerPartyInteractionOutcomeType.None)
@@ -58,6 +63,7 @@ internal static class PlayerPartyTradeContext
         RemoteAccepted = false;
         activeBarterVM = null;
         resetButton = null;
+        hiddenMarriageItems.Clear();
 
         try
         {
@@ -80,7 +86,29 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return;
 
         activeBarterVM = barterVM;
+        UseMarriageItemVMs(barterVM.LeftDiplomaticList);
+        UseMarriageItemVMs(barterVM.RightDiplomaticList);
         RefreshBarterControls();
+    }
+
+    // Vanilla never maps a group to the Diplomatic column, so marriages take it over as their own category.
+    public static void AddMarriageGroupLists(BarterVM barterVM, BarterData barterData)
+    {
+        var group = barterData?.GetBarterGroup<PlayerPartyMarriageBarterGroup>();
+        if (group == null) return;
+
+        barterVM._leftList[group] = barterVM.LeftDiplomaticList;
+        barterVM._rightList[group] = barterVM.RightDiplomaticList;
+    }
+
+    // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
+    private static void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
+    {
+        for (int i = 0; i < items.Count; i++)
+        {
+            if (items[i].Barterable is PlayerPartyMarriageBarterable marriage)
+                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, activeBarterVM.OnOfferedAmountChange);
+        }
     }
 
     public static void UpdateAcceptance(bool localAccepted, bool remoteAccepted)
@@ -105,6 +133,7 @@ internal static class PlayerPartyTradeContext
         if (!IsActive) return true;
         if (!CanModifyOffer()) return false;
         if (barterable == null || LocalParty == null) return false;
+        if (hiddenMarriageItems.Any(hidden => hidden.Item.Barterable == barterable)) return false;
         if (barterable is FiefBarterable fiefBarterable)
             return IsOwnedByLocalParty(fiefBarterable);
 
@@ -238,6 +267,7 @@ internal static class PlayerPartyTradeContext
             ApplyPrisonerOffers(message, objectManager);
             ApplyTroopOffers(message, objectManager);
             ApplyPeaceOffer(message, objectManager);
+            ApplyMarriageOffers(message, objectManager);
             RefreshBarterControls();
         }
         finally
@@ -250,17 +280,50 @@ internal static class PlayerPartyTradeContext
     {
         if (activeBarterVM == null) return;
 
-        activeBarterVM.DiplomaticLbl = string.Empty;
+        activeBarterVM.DiplomaticLbl = "Marriages";
         activeBarterVM.OtherLbl = "Misc";
-        activeBarterVM.LeftDiplomaticList?.Clear();
-        activeBarterVM.RightDiplomaticList?.Clear();
         activeBarterVM.OfferLbl = "Accept";
         activeBarterVM.IsOfferDisabled = LocalAccepted;
         RefreshResetButton();
+        RefreshHiddenMarriages();
 
         foreach (var item in GetAllBarterItems(activeBarterVM))
             item.IsItemTransferrable = CanOffer(item.Barterable);
     }
+
+    // Hides marriages that share a hero with an offered marriage until that marriage is taken off the offer.
+    private static void RefreshHiddenMarriages()
+    {
+        var offeredHeroes = new HashSet<Hero>(activeBarterVM.LeftOfferList
+            .Concat(activeBarterVM.RightOfferList)
+            .Select(item => item.Barterable)
+            .OfType<PlayerPartyMarriageBarterable>()
+            .SelectMany(marriage => new[] { marriage.HeroBeingMarried, marriage.Spouse }));
+
+        foreach (var hidden in hiddenMarriageItems.ToArray())
+        {
+            if (IsBlockedMarriage(hidden.Item, offeredHeroes)) continue;
+
+            hiddenMarriageItems.Remove(hidden);
+            hidden.List.Add(hidden.Item);
+        }
+
+        HideBlockedMarriages(activeBarterVM.LeftDiplomaticList, offeredHeroes);
+        HideBlockedMarriages(activeBarterVM.RightDiplomaticList, offeredHeroes);
+    }
+
+    private static void HideBlockedMarriages(MBBindingList<BarterItemVM> items, HashSet<Hero> offeredHeroes)
+    {
+        foreach (var item in items.Where(item => IsBlockedMarriage(item, offeredHeroes)).ToArray())
+        {
+            items.Remove(item);
+            hiddenMarriageItems.Add((item, items));
+        }
+    }
+
+    private static bool IsBlockedMarriage(BarterItemVM item, HashSet<Hero> offeredHeroes)
+        => !item.IsOffered && item.Barterable is PlayerPartyMarriageBarterable marriage &&
+           (offeredHeroes.Contains(marriage.HeroBeingMarried) || offeredHeroes.Contains(marriage.Spouse));
 
     private static void RefreshResetButton()
     {
@@ -368,6 +431,23 @@ internal static class PlayerPartyTradeContext
         }
     }
 
+    private static void ApplyMarriageOffers(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
+    {
+        var offeredMarriages = new HashSet<string>(
+            (message.OfferedMarriages ?? Array.Empty<PlayerPartyMarriageOfferData>())
+                .Select(offer => $"{offer.HeroId}|{offer.SpouseId}"));
+
+        foreach (var item in GetAllBarterItems(activeBarterVM))
+        {
+            if (!IsOwnedByParty(item, message.PartyId, objectManager)) continue;
+            if (!(item.Barterable is PlayerPartyMarriageBarterable marriageBarterable)) continue;
+            if (!objectManager.TryGetId(marriageBarterable.HeroBeingMarried, out var heroId)) continue;
+            if (!objectManager.TryGetId(marriageBarterable.Spouse, out var spouseId)) continue;
+
+            ApplyOfferedAmount(item, offeredMarriages.Contains($"{heroId}|{spouseId}") ? 1 : 0);
+        }
+    }
+
     private static Dictionary<string, int> BuildOfferedItems(ItemRosterElementData[] offeredItems)
     {
         var result = new Dictionary<string, int>();
@@ -447,6 +527,7 @@ internal static class PlayerPartyTradeContext
         AddItems(barterVM.RightGoldList);
         AddItems(barterVM.LeftOfferList);
         AddItems(barterVM.RightOfferList);
+        AddItems(hiddenMarriageItems.Select(hidden => hidden.Item));
 
         return scratchItems.ToArray();
     }
@@ -548,7 +629,8 @@ internal static class PlayerPartyTradeContext
             Contains(barterVM.LeftItemList, item) ||
             Contains(barterVM.LeftOtherList, item) ||
             Contains(barterVM.LeftDiplomaticList, item) ||
-            Contains(barterVM.LeftGoldList, item))
+            Contains(barterVM.LeftGoldList, item) ||
+            hiddenMarriageItems.Contains((item, barterVM.LeftDiplomaticList)))
             return barterVM.LeftOfferList;
 
         return barterVM.RightOfferList;
