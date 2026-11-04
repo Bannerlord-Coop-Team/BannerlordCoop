@@ -446,7 +446,7 @@ public sealed class RevenueFarmingTests : IDisposable
             else if (ending == "betray") quest.QuestCompletedWithBetray();
             else quest.QuestCompletedWithSuccess();
         });
-        Assert.NotEmpty(Client.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.Finalization.RequestQuestBranch>());
+        Assert.Single(Client.NetworkSentMessages.GetMessages<GameInterface.Services.Issues.Framework.Finalization.RequestQuestBranch>());
         environment.FlushCoalescer();
         Client.Call(() => Assert.True(quest.IsFinalized));
         foreach (var instance in Instances) instance.Call(() => Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue));

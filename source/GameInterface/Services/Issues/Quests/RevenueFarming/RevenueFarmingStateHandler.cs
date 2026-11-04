@@ -126,9 +126,13 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             if (!objects.TryGetIdWithLogging(settlement, out var settlementId)) return;
             menuSettlementId = settlementId;
         }
-        if (!objects.TryGetIdWithLogging(changed.Session.Quest.QuestGiver, out var giverId) ||
-            !ownership.TryGetOwner(giverId, changed.Session.IssueId, out var controllerId) ||
-            !players.TryGetPeer(controllerId, out var peer)) return;
+        if (!objects.TryGetIdWithLogging(changed.Session.Quest.QuestGiver, out var giverId)) return;
+        if (!ownership.TryGetOwner(giverId, changed.Session.IssueId, out var controllerId))
+        {
+            if (!changed.IsFinalizing || string.IsNullOrEmpty(changed.Session.ControllerId)) return;
+            controllerId = changed.Session.ControllerId;
+        }
+        if (!players.TryGetPeer(controllerId, out var peer)) return;
         var revision = ++changed.Session.Revision;
         network.Send(peer, Capture(changed.Session).WithPresentation(revision, changed.Menu, changed.FinishEncounter,
             changed.RefreshPresentation, menuSettlementId, changed.IsFinalizing));
