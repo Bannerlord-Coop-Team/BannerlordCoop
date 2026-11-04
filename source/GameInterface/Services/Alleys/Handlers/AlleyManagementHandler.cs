@@ -6,7 +6,9 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -36,6 +38,7 @@ internal class AlleyManagementHandler : IHandler
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
+    private readonly IPlayerManager playerManager;
 
     public AlleyManagementHandler(
         IMessageBroker messageBroker,
@@ -43,7 +46,8 @@ internal class AlleyManagementHandler : IHandler
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
-        IAlleyGarrisonData garrisonData)
+        IAlleyGarrisonData garrisonData,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -51,6 +55,7 @@ internal class AlleyManagementHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
@@ -115,8 +120,9 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Clearer, out var clearerId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Alley.Owner, out var gangOwnerId)) return;
 
-        network.SendAll(new RequestClearAlley(alleyId, clearerId));
+        network.SendAll(new RequestClearAlley(alleyId, clearerId, gangOwnerId));
     }
 
     private void Handle_ChangeAlleyOverseerRequested(MessagePayload<ChangeAlleyOverseerRequested> payload)
@@ -178,8 +184,8 @@ internal class AlleyManagementHandler : IHandler
     }
 
     /// <summary>
-    /// Replays vanilla OnAlleyOccupiedByPlayer's relation hits (server authoritative; relation is not
-    /// itself networked): the displaced gang leader loses 5, and if the settlement isn't the new owner's
+    /// Replays vanilla OnAlleyOccupiedByPlayer's relation hits on the server, which replicates each
+    /// relation change to clients: the displaced gang leader loses 5, and if the settlement isn't the new owner's
     /// own, its owner loses 2 and its non-gang-leader notables lose 1 each. Keyed off the acquiring
     /// owner rather than Hero.MainHero, which is null on the host.
     /// </summary>
@@ -243,14 +249,53 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(sender, data.ClearerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClearerId, out var clearer)) return;
 
+            // A repeat or stale request finds the gang already gone or a player in the alley, and must not
+            // give the relation changes again or free a player's alley.
+            if (!IsExpectedGangOwner(alley.Owner, data.GangOwnerId))
+            {
+                Logger.Warning("Ignoring a clear of alley {AlleyId}: it is no longer held by gang leader {GangOwnerId}",
+                    data.AlleyId, data.GangOwnerId);
+                return;
+            }
+
             ApplyClearRelationChanges(clearer, alley);
+            ClearAttacksFromAlley(alley, data.AlleyId);
             alley.SetOwner(null);
         });
+    }
+
+    // Same gang test as AlleyHandler.StartAttack, plus a player check so a clear can never free a player's alley.
+    private bool IsExpectedGangOwner(Hero owner, string expectedOwnerId)
+    {
+        if (owner == null || !owner.IsGangLeader) return false;
+        if (owner.IsPlayerHero() || owner.Clan.IsPlayerClan()) return false;
+        return objectManager.TryGetId(owner, out var ownerId) && ownerId == expectedOwnerId;
+    }
+
+    /// <summary>
+    /// Vanilla drops the main hero's alley attack by the cleared gang. Done here for every player alley,
+    /// otherwise the attack deadline in AlleyHandler's daily tick would still hand the player's alley over.
+    /// Attacks only come from a rival alley in the same settlement (AlleyHandler.StartAttack).
+    /// </summary>
+    private void ClearAttacksFromAlley(Alley clearedAlley, string clearedAlleyId)
+    {
+        if (clearedAlley.Settlement?.Alleys == null) return;
+        foreach (var playerAlley in clearedAlley.Settlement.Alleys)
+        {
+            if (playerAlley == null || !objectManager.TryGetId(playerAlley, out var playerAlleyId)) continue;
+            if (!sessionInterface.TryGetManagementData(playerAlleyId, out var data) ||
+                data.UnderAttackByAlleyId != clearedAlleyId) continue;
+
+            sessionInterface.ClearUnderAttackByAi(playerAlleyId);
+            network.SendAll(new NetworkAlleyUnderAttack(playerAlleyId, null, default, showNotification: false));
+        }
     }
 
     /// <summary>
