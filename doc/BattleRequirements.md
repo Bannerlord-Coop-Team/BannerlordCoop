@@ -96,6 +96,13 @@ Armies shall be able to join the battle with the same join restrictions as mobil
 The first player to become **mission-ready** — to finish loading the battle mission, as observed
 by the campaign server — shall become the mission host.
 
+When the server's `preferredBattleHosts` mod-config list is set, a listed player who is
+mission-ready shall be elected instead, the highest-ranked first. If the first mission-ready
+player is not listed but a connected listed player in the battle is still loading, the server
+shall hold the election for a bounded wait (5 seconds) and elect the best-ranked listed player
+that becomes mission-ready in that time, otherwise the first mission-ready player. The wait never
+blocks the battle beyond that bound. With the list unset the election is unchanged.
+
 The campaign server shall arbitrate the election (BR-101) and shall issue the unowned (NPC) troop
 reserves to the elected host together with the election, so that the host fields the NPC troops
 as soon as it is able to spawn them.
@@ -123,6 +130,10 @@ The campaign server shall maintain, for each battle instance, an ordered list of
 the sequence in which they became mission-ready in the mission instance, as observed by the
 server. A player still on the loading screen has not yet joined for the purposes of this
 ordering, so the first entry in the list is the initially elected host (BR-010).
+
+When `preferredBattleHosts` is set, listed players are ordered ahead of unlisted ones by their
+rank in the list, and players of equal standing keep their mission-ready order. This only orders
+the successor line; migration (BR-014, BR-015) is unchanged.
 
 ### BR-014 — Host Migration
 

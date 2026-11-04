@@ -37,9 +37,9 @@ namespace Missions.Battles;
 /// mission has FINISHED LOADING (<see cref="BattleMissionReady"/>, published by
 /// <c>CoopBattleController.AfterStart</c>) it asks the server to elect via
 /// <see cref="NetworkRequestBattleHost"/>, and stores the reply (<see cref="NetworkBattleHostAssigned"/>).
-/// Server: the first MISSION-READY client becomes the battle's host (BR-010); later ready clients append to
-/// the successor line in mission-ready order (BR-013), so migration promotes the earliest still in the
-/// mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
+/// Server: the first MISSION-READY client becomes the battle's host (BR-010), unless the server lists preferred
+/// hosts (<see cref="IPreferredBattleHosts"/>); later ready clients join the successor line in mission-ready
+/// order, preferred ones first (BR-013), so migration promotes the earliest still in the mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
 /// ready client's reply includes its sides with explicit empties so its spawn sizing can proceed. The result
 /// is cached, so a duplicate request just re-confirms, and every change is broadcast to all clients.
 /// The server also supports an explicitly non-withdrawing absence: that member is marked absent so its
@@ -65,6 +65,7 @@ internal class BattleHostHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
     private readonly IBattleSizeProvider battleSizeProvider;
+    private readonly IPreferredBattleHosts preferredHosts;
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -128,6 +129,29 @@ internal class BattleHostHandler : IHandler
     /// Internal-settable so tests can drive the deadline without wall-clock waits.
     /// </summary>
     internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
+
+    /// <summary>
+    /// [Server] How long the first election waits for a preferred host that is still loading before the
+    /// first mission-ready player is elected anyway. Internal-settable so tests can expire it.
+    /// </summary>
+    internal TimeSpan PreferredHostWait { get; set; } = TimeSpan.FromSeconds(5);
+
+    // [Server] Elections held for a loading preferred host, keyed by battle. Requests queue in mission-ready
+    // order and are replayed when a preferred host is ready or the wait expires. Game thread only.
+    private readonly Dictionary<string, PendingElection> pendingElections = new Dictionary<string, PendingElection>();
+
+    private sealed class PendingElection
+    {
+        public DateTime DeadlineUtc;
+        public readonly List<HeldHostRequest> Requests = new List<HeldHostRequest>();
+    }
+
+    private sealed class HeldHostRequest
+    {
+        public string ControllerId;
+        public NetPeer Peer;
+        public bool HideoutStateReady;
+    }
 
     // [Server] Return grants are deferred behind the shrunk host's flush acks (BR-033 handshake).
     // The ledger only holds the host's last THROTTLED progress report, so the returner must not be served
@@ -225,7 +249,8 @@ internal class BattleHostHandler : IHandler
         IControllerIdProvider controllerIdProvider,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleTroopLedger ledger,
-        IBattleSizeProvider battleSizeProvider)
+        IBattleSizeProvider battleSizeProvider,
+        IPreferredBattleHosts preferredHosts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -236,6 +261,7 @@ internal class BattleHostHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.ledger = ledger;
         this.battleSizeProvider = battleSizeProvider;
+        this.preferredHosts = preferredHosts;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -367,53 +393,130 @@ internal class BattleHostHandler : IHandler
 
             MarkPresent(mapEventId, requesterId);
 
-            if (hostRegistry.TryGet(mapEventId, out var existing))
-            {
-                // Host already elected. Record this player in the successor line in join order (idempotent),
-                // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
-                if ((!mapEvent.IsHideoutBattle || payload.What.HideoutStateReady) &&
-                    TryAppendSuccessor(existing, requesterId, out var updated))
-                {
-                    SetServerAssignment(mapEventId, updated);
-                    Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
-                        requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
-                }
-                else if (requester != null)
-                {
-                    network.Send(requester, ToMessage(mapEventId, existing));
-                }
-            }
-            else
-            {
-                // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
-                // battle, or one past the last generation if this map event was abandoned and re-entered.
-                var epoch = NextEpoch(mapEventId);
-                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
-                SetServerAssignment(mapEventId, assignment);
-
-                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
-                    requesterId, mapEventId, epoch);
-            }
-
-            // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
-            // leave the host's scope) before serving, and refresh the shrunk holder. Normally a no-op here —
-            // the entry-time reserve request (below) arrives first and already handled the return. When the
-            // return's flush handshake is (still) in flight, the grant is deferred: fold this election-time
-            // request into the pending grant (upgrading it to carry explicit empties) instead of serving
-            // early from a ledger the host has not caught up yet.
-            if (DeferHealthGrant(mapEventId, requesterId, requester, includeEmptySides: true)) return;
-            bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester,
-                includeEmptySides: true);
-            RememberHostPeer(mapEventId, requesterId, requester);
-            if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: true))
+            if (TryHoldElection(mapEventId, mapEvent, requesterId, requester, payload.What.HideoutStateReady))
                 return;
 
-            // Feed the ready client the troop reserves it owns — its own parties, plus the unowned (NPC)
-            // parties when it is the elected host (BR-010: the NPC grant travels WITH the election). Empties
-            // are included here so a side this client owns nothing on is explicitly final and its joint spawn
-            // sizing can proceed. Buffered client-side until the supplier exists.
-            SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
+            ProcessHostRequest(mapEventId, mapEvent, requesterId, requester, payload.What.HideoutStateReady);
         });
+    }
+
+    // [Server, game thread] Elects or joins the requester and serves its election-time reserves.
+    private void ProcessHostRequest(string mapEventId, MapEvent mapEvent, string requesterId, NetPeer requester,
+        bool hideoutStateReady)
+    {
+        if (hostRegistry.TryGet(mapEventId, out var existing))
+        {
+            // Host already elected. Record this player in the successor line in join order (idempotent),
+            // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
+            if ((!mapEvent.IsHideoutBattle || hideoutStateReady) &&
+                TryAppendSuccessor(existing, requesterId, out var updated))
+            {
+                SetServerAssignment(mapEventId, updated);
+                Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
+                    requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
+            }
+            else if (requester != null)
+            {
+                network.Send(requester, ToMessage(mapEventId, existing));
+            }
+        }
+        else
+        {
+            // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
+            // battle, or one past the last generation if this map event was abandoned and re-entered.
+            var epoch = NextEpoch(mapEventId);
+            var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
+            SetServerAssignment(mapEventId, assignment);
+
+            Logger.Information("[BattleHost] Elected host {Host} for battle {MapEventId} at epoch {Epoch}",
+                requesterId, mapEventId, epoch);
+        }
+
+        // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
+        // leave the host's scope) before serving, and refresh the shrunk holder. Normally a no-op here —
+        // the entry-time reserve request (below) arrives first and already handled the return. When the
+        // return's flush handshake is (still) in flight, the grant is deferred: fold this election-time
+        // request into the pending grant (upgrading it to carry explicit empties) instead of serving
+        // early from a ledger the host has not caught up yet.
+        if (DeferHealthGrant(mapEventId, requesterId, requester, includeEmptySides: true)) return;
+        bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester,
+            includeEmptySides: true);
+        RememberHostPeer(mapEventId, requesterId, requester);
+        if (deferred || TryDeferToPendingReturn(mapEventId, requesterId, requester, includeEmptySides: true))
+            return;
+
+        // Feed the ready client the troop reserves it owns — its own parties, plus the unowned (NPC)
+        // parties when it is the elected host (BR-010: the NPC grant travels WITH the election). Empties
+        // are included here so a side this client owns nothing on is explicitly final and its joint spawn
+        // sizing can proceed. Buffered client-side until the supplier exists.
+        SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
+    }
+
+    // [Server, game thread] Holds the first election while a connected preferred host in this battle is still
+    // loading, so a slower preferred player can host instead of whoever loaded first. Bounded by PreferredHostWait.
+    private bool TryHoldElection(string mapEventId, MapEvent mapEvent, string requesterId, NetPeer requester,
+        bool hideoutStateReady)
+    {
+        var request = new HeldHostRequest { ControllerId = requesterId, Peer = requester, HideoutStateReady = hideoutStateReady };
+        if (pendingElections.TryGetValue(mapEventId, out var pending))
+        {
+            pending.Requests.RemoveAll(held => held.ControllerId == requesterId);
+            pending.Requests.Add(request);
+            if (preferredHosts.RankOf(requesterId) >= 0)
+                CompleteHeldElection(mapEventId, "a preferred host is ready");
+            return true;
+        }
+
+        if (preferredHosts.IsEmpty || hostRegistry.TryGet(mapEventId, out _) ||
+            preferredHosts.RankOf(requesterId) >= 0 || !IsPreferredHostLoading(mapEvent, requesterId))
+            return false;
+
+        pending = new PendingElection { DeadlineUtc = DateTime.UtcNow + PreferredHostWait };
+        pending.Requests.Add(request);
+        pendingElections[mapEventId] = pending;
+        Logger.Information("[BattleHost] Holding the election for {MapEventId} up to {Wait} for a preferred host still loading",
+            mapEventId, PreferredHostWait);
+        return true;
+    }
+
+    private bool IsPreferredHostLoading(MapEvent mapEvent, string readyControllerId)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            if (player.ControllerId != readyControllerId && preferredHosts.RankOf(player.ControllerId) >= 0 &&
+                playerManager.IsConnected(player) && IsRequesterInBattle(mapEvent, player.ControllerId))
+                return true;
+        }
+        return false;
+    }
+
+    // [Server, game thread] Elects the best-ranked held requester (the first ready one when none is preferred),
+    // then replays the rest so they join the successor line.
+    private void CompleteHeldElection(string mapEventId, string reason)
+    {
+        if (!pendingElections.TryGetValue(mapEventId, out var pending)) return;
+        pendingElections.Remove(mapEventId);
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent)) return;
+
+        var requests = pending.Requests.Where(held => IsRequesterInBattle(mapEvent, held.ControllerId)).ToList();
+        if (requests.Count == 0) return;
+
+        var host = requests.OrderBy(held => SuccessorRank(held.ControllerId)).First();
+        Logger.Information("[BattleHost] Releasing the held election for {MapEventId} ({Reason}); host {Host}",
+            mapEventId, reason, host.ControllerId);
+
+        ProcessHostRequest(mapEventId, mapEvent, host.ControllerId, host.Peer, host.HideoutStateReady);
+        foreach (var held in requests)
+        {
+            if (held != host)
+                ProcessHostRequest(mapEventId, mapEvent, held.ControllerId, held.Peer, held.HideoutStateReady);
+        }
+    }
+
+    private int SuccessorRank(string controllerId)
+    {
+        int rank = preferredHosts.RankOf(controllerId);
+        return rank >= 0 ? rank : int.MaxValue;
     }
 
     /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own
@@ -911,9 +1014,13 @@ internal class BattleHostHandler : IHandler
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsClient) return;
-        if (battleRuntimeStates.Count == 0) return;
 
         var now = DateTime.UtcNow;
+        foreach (var held in pendingElections.Where(pair => now >= pair.Value.DeadlineUtc).Select(pair => pair.Key).ToList())
+            CompleteHeldElection(held, "the preferred host wait expired");
+
+        if (battleRuntimeStates.Count == 0) return;
+
         foreach (var battle in battleRuntimeStates.ToArray())
             foreach (var withdrawal in battle.Value.HealthWithdrawals.ToArray())
                 if (now >= withdrawal.RetryUtc && objectManager.TryGetObject<MapEvent>(battle.Key, out var mapEvent))
@@ -1273,7 +1380,7 @@ internal class BattleHostHandler : IHandler
 
     // Append the requester to the successor line unless it is already the host or already queued. Returns the
     // new immutable assignment via <paramref name="updated"/>, or false when nothing changed.
-    private static bool TryAppendSuccessor(BattleHostAssignment existing, string requesterId, out BattleHostAssignment updated)
+    private bool TryAppendSuccessor(BattleHostAssignment existing, string requesterId, out BattleHostAssignment updated)
     {
         updated = null;
         if (existing.HostControllerId == requesterId)
@@ -1283,7 +1390,11 @@ internal class BattleHostHandler : IHandler
                 return false;
 
         // The host did not change, so the assignment stays in the same hosting generation (BR-102).
-        var successors = new List<string>(existing.SuccessorControllerIds) { requesterId };
+        // Preferred hosts go ahead of everyone ranked below them, otherwise mission-ready order is kept.
+        var successors = new List<string>(existing.SuccessorControllerIds);
+        int rank = SuccessorRank(requesterId);
+        int index = successors.FindIndex(successor => SuccessorRank(successor) > rank);
+        successors.Insert(index < 0 ? successors.Count : index, requesterId);
         updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch);
         return true;
     }
@@ -1379,6 +1490,7 @@ internal class BattleHostHandler : IHandler
     private void ClearBattleRecords(string mapEventId)
     {
         battleRuntimeStates.Remove(mapEventId);
+        pendingElections.Remove(mapEventId);
     }
 
     private bool TryFinalizeAbandonedHideout(string mapEventId, MapEvent mapEvent)
