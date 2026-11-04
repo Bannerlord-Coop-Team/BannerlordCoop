@@ -154,9 +154,10 @@ namespace GameInterface.Services.Heroes.Handlers
 
                 instance._characterObject = character;
 
-                // A client stub from HeroRegistry.OnClientCreated joins the campaign hero lists only now
+                // A client stub from HeroRegistry.OnClientCreated joins the campaign hero lists only now.
+                // OnHeroAdded, not AddHero, because AddHero would give the already registered hero a new id
                 if (!Hero.AllAliveHeroes.Contains(instance) && !Hero.DeadOrDisabledHeroes.Contains(instance))
-                    Campaign.Current?.CampaignObjectManager?.AddHero(instance);
+                    Campaign.Current?.CampaignObjectManager?.OnHeroAdded(instance);
             });
         }
 

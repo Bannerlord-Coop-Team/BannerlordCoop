@@ -200,6 +200,7 @@ public class HeroCreationTests : IDisposable
         Hero? serverHero = null;
         TestEnvironment.Server.Call(() => serverHero = new Hero());
         Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(serverHero!, out var heroId));
+        var stubIds = new Dictionary<object, MBGUID>();
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -208,6 +209,7 @@ public class HeroCreationTests : IDisposable
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var stub));
                 Assert.Null(stub.CharacterObject);
+                stubIds[client] = stub.Id;
                 // The encyclopedia and other list readers dereference CharacterObject on every listed hero
                 Assert.DoesNotContain(stub, Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes));
             });
@@ -230,6 +232,9 @@ public class HeroCreationTests : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.NotNull(hero.CharacterObject);
                 Assert.Single(Hero.AllAliveHeroes.Concat(Hero.DeadOrDisabledHeroes), listed => listed == hero);
+                // Listing the stub must keep the id MBObjectManager already indexed it under
+                Assert.Equal(stubIds[client], hero.Id);
+                Assert.Same(hero, MBObjectManager.Instance.GetObject(hero.Id));
             });
         }
     }
