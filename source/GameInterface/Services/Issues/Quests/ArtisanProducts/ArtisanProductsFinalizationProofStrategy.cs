@@ -59,7 +59,7 @@ internal class ArtisanProductsFinalizationProofStrategy : IFinalizationProofStra
             default:
                 return false;
         }
-        if (artisan.IsOngoing) progress.Send(artisan);
+        if (artisan.IsOngoing && branch != ArtisanProductsBranch.PartialDelivery || branch == ArtisanProductsBranch.PartialDelivery && artisan._deliveredRawGoods > 0) progress.Send(artisan);
         return true;
     }
 }

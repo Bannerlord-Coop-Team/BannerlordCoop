@@ -687,6 +687,9 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionRejected>());
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             Assert.Equal(100, Get<Clan>(Server, clanId).Influence);
+            Assert.True(ownerIssue.IsSolvingWithLordSolution);
+            Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+            Assert.Equal(10000, Get<Hero>(Server, scenario.OwnerHeroId).Gold);
             Assert.Equal(1, ownerIssue.JournalEntries.Count);
             Assert.Empty(observerIssue.JournalEntries);
             ClientA.Call(() => Assert.False(ClientA.Resolve<ILordSolutionCoordinator>().IsDecisionPending(ownerIssue)));

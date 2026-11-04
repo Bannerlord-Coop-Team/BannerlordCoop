@@ -792,6 +792,8 @@ public class ArtisanProductsTests : IDisposable
         Owner.Call(quest.DeliverItemsFullyOnConsequence);
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Server.Call(() => Assert.Equal(before + 30f, Server.GetRegisteredObject<Town>(townId).Prosperity));
+        Owner.Call(() => Assert.Equal(before + 30f, Owner.GetRegisteredObject<Town>(townId).Prosperity));
+        Other.Call(() => Assert.Equal(before + 30f, Other.GetRegisteredObject<Town>(townId).Prosperity));
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));

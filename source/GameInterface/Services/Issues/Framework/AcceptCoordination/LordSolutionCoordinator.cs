@@ -149,6 +149,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                             outcome = IssueOutcome.LordAcceptedCounterOffer;
                             break;
                         case LordSolutionOperation.RefuseCounterOffer:
+                            // Refusal charges influence and pays gold after the delayed merchant conversation.
                             if (!issue.LordSolutionCondition(out _) ||
                                 (issue.CounterOfferHero != null && Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution))
                             {
