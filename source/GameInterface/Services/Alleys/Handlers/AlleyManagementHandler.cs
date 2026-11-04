@@ -9,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -160,8 +161,10 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
+            if (!IsAllowedSender(sender, data.OwnerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
@@ -242,7 +245,25 @@ internal class AlleyManagementHandler : IHandler
 
         var alleyId = payload.What.AlleyId;
         var fromClanScreen = payload.What.FromClanScreen;
-        GameThread.RunSafe(() => AbandonAlley(alleyId, fromClanScreen));
+        var sender = payload.Who;
+        GameThread.RunSafe(() =>
+        {
+            if (!IsSenderOwningAlley(sender, alleyId)) return;
+            AbandonAlley(alleyId, fromClanScreen);
+        });
+    }
+
+    // The server's own debug commands publish these requests with no peer, so only a peer is checked.
+    private bool IsAllowedSender(object sender, string heroId) =>
+        sender is not NetPeer || playerManager.IsSenderControllingHero(sender, heroId);
+
+    // Management requests act on the alley's owner, so only that owner's player may send them.
+    private bool IsSenderOwningAlley(object sender, string alleyId)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return false;
+        string ownerId = null;
+        if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out ownerId);
+        return IsAllowedSender(sender, ownerId);
     }
 
     private void Handle_RequestClearAlley(MessagePayload<RequestClearAlley> payload)
@@ -321,8 +342,10 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
+            if (!IsSenderOwningAlley(sender, data.AlleyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOverseerId, out var newOverseer)) return;
 
@@ -343,9 +366,10 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out _)) return;
+            if (!IsSenderOwningAlley(sender, data.AlleyId)) return;
 
             var newGarrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
             // The alley party screen already moved the troops between the owner's party and the alley
@@ -364,8 +388,10 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
+        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
+            if (!IsSenderOwningAlley(sender, data.AlleyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var managementData)) return;
             var lastRecruitTime = new CampaignTime(managementData.LastRecruitTimeTicks);

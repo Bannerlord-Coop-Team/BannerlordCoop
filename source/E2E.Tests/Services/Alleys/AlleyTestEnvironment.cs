@@ -47,6 +47,9 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         AddHeroToPartyRoster(ownerHeroId, partyIds[0]);
         AddHeroToPartyRoster(overseerHeroId, partyIds[1]);
         SetMainHero(clients[0], ownerHeroId);
+        // The server only applies an alley request from the peer that controls the hero it is about.
+        ConnectRegisteredPlayer(clients[0], "AlleyOwner");
+        ConnectRegisteredPlayer(clients[1], "AlleyOverseer");
         ConfigureTownSettlement(settlementId, ownerHeroId);
 
         string playerAlleyId = CreateAlley(settlementId, "player_alley");
