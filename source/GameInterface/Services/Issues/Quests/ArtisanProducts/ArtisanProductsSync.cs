@@ -2,6 +2,7 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
