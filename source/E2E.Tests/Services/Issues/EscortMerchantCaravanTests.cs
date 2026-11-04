@@ -58,7 +58,6 @@ public class EscortMerchantCaravanTests : IDisposable
         observedMainParty = MobileParty.MainParty;
         observedMainHero = Hero.MainHero;
         __instance.AddLog(new TextObject("Relay route update"));
-        MBInformationManager.AddQuickInformation(new TextObject("Relay route notice"));
         return false;
     }
 
@@ -465,6 +464,8 @@ public class EscortMerchantCaravanTests : IDisposable
             Assert.True(Owner.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
             ownerIssue = Assert.IsType<Issue>(giver.Issue);
             ownerIssue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
         });
         Server.Call(() =>
         {
@@ -946,9 +947,7 @@ public class EscortMerchantCaravanTests : IDisposable
 
             Assert.Equal(1, observedReroutes);
             Assert.Equal(1, observedWarCalls);
-            var progress = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().ToArray();
-            Assert.Single(progress, state => state.Notice != null);
-            Assert.Single(progress, state => state.Notice == null);
+            Assert.Null(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>()).Notice);
         }
         finally
         {
