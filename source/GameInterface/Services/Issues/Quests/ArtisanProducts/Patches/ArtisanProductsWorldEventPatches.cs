@@ -61,4 +61,3 @@ internal class ArtisanProductsServerEventPatch
     [HarmonyPrefix]
     private static bool Before() => ModInformation.IsServer;
 }
-

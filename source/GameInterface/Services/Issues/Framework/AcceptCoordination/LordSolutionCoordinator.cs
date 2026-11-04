@@ -149,7 +149,8 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                             outcome = IssueOutcome.LordAcceptedCounterOffer;
                             break;
                         case LordSolutionOperation.RefuseCounterOffer:
-                            if (issue.CounterOfferHero != null && Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                            if (!issue.LordSolutionCondition(out _) ||
+                                (issue.CounterOfferHero != null && Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution))
                             {
                                 Reject(peer, data);
                                 return;

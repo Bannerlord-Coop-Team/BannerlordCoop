@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ArtisanProducts;
 using GameInterface.Services.Players;
+using GameInterface.Services.GameDebug.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -395,18 +396,34 @@ public class ArtisanProductsTests : IDisposable
             }
         });
         var gold = OwnerGold();
+        var influence = originalClan.Influence;
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkLordSolutionRejected>());
+        Assert.Empty(Other.InternalMessages.GetMessages<NetworkLordSolutionRejected>());
+        Assert.Single(Owner.InternalMessages.GetMessages<SendInformationMessage>(), message =>
+            message.Text.Contains("lord solution decision could not be applied"));
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<SendInformationMessage>(), message =>
+            message.Text.Contains("lord solution decision could not be applied"));
+        Server.Call(() =>
+        {
+            Assert.Equal(influence, originalClan.Influence);
+            Assert.True(Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsSolvingWithLordSolution);
+        });
         Assert.Equal(gold, OwnerGold());
         Owner.Call(() =>
         {
             var issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
             Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.False(Owner.Resolve<ILordSolutionCoordinator>().IsDecisionPending(issue));
         });
         Other.Call(() => Assert.Empty(Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries));
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer());
         Owner.Call(() => Assert.Null(Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
         Assert.Equal(gold, OwnerGold());
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.LordAcceptedCounterOffer, finalized.Outcome);
     }
 
     [Fact]
@@ -568,9 +585,11 @@ public class ArtisanProductsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CompanionCompletion_ReturnsTroopsAndKeepsThePaymentWithTheOwner(bool fail)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void CompanionCompletion_ReturnsTroopsAndKeepsThePaymentWithTheOwner(bool fail, bool captive)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -593,6 +612,20 @@ public class ArtisanProductsTests : IDisposable
                 }
             });
         var before = OwnerGold();
+        if (captive)
+        {
+            SetOwnerStateOnServer(Hero.CharacterStates.Prisoner);
+            Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithAlternativeSolution());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.Equal(before, OwnerGold());
+            Server.Call(() =>
+            {
+                Assert.True(Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsSolvingWithAlternative);
+                Assert.Equal(0, OwnerParty(Server).MemberRoster.GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId)));
+                Assert.Equal(0, Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.TotalManCount);
+            });
+            SetOwnerStateOnServer(Hero.CharacterStates.Active);
+        }
         Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithAlternativeSolution());
         Assert.Equal(IssueOutcome.AlternativeSolution, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Equal(fail ? before : before + 2000, OwnerGold());
@@ -669,6 +702,8 @@ public class ArtisanProductsTests : IDisposable
         Server.Call(() => Assert.Equal(0, OwnerParty(Server).MemberRoster.GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId))));
         SetOwnerStateOnServer(Hero.CharacterStates.Active);
         Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
+        Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         environment.FlushCoalescer();
         foreach (var instance in new[] { Server, Owner })
             instance.Call(() => Assert.Equal(9, OwnerParty(instance).MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId))));
