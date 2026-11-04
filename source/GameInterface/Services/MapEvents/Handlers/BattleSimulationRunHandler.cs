@@ -265,17 +265,24 @@ internal class BattleSimulationRunHandler : IHandler
             activeSimulations.Remove(mapEventId);
         }
         
-        GameThread.RunCleanupSafe(() => EndSimulationSession(simulation, completed: false), then: () =>
+        GameThread.RunCleanupSafe(() =>
         {
+            EndSimulationSession(simulation, completed: false);
             if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
             {
                 network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
                 network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
 
-                // Native Retreat finalizes the leader-owned event after the simulation ends. Only
-                // the caller that released the active claim owns that teardown; a late cancel after
-                // destruction must not publish a second finalize attempt and log a false error.
-                messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
+                if (playerManager.TryGetPlayer(requestingPeer, out var player) &&
+                    objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) &&
+                    party.MapEvent == simulation.MapEvent)
+                {
+                    // Pacing a simulation does not make a joining party its side's leader.
+                    if (party.MapEventSide.LeaderParty == party.Party)
+                        messageBroker.Publish(this, new MapEventFinalizeAttempted(simulation.MapEvent));
+                    else
+                        messageBroker.Publish(requestingPeer, new PlayerLeaveBattleAttempted(party.Party));
+                }
             }
             mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
         }, context: nameof(Handle_NetworkCancelBattleSimulation));

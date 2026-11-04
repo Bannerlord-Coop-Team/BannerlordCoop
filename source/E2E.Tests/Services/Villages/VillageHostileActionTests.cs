@@ -3875,6 +3875,76 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void MultiPlayerRaid_BattleSimulationJoinerRetreat_RemovesOnlyJoinerAndKeepsEvent()
+    {
+        var clients = Clients.ToArray();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+        string joinerMobilePartyId = null!;
+        string joinerPartyId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("PlayerTwo", out var joiner));
+            joinerMobilePartyId = joiner.MobilePartyId;
+            joinerPartyId = GetPartyBaseId(joinerMobilePartyId);
+        });
+        var ended = new List<MapEvent>();
+        Server.Call(() => CampaignEvents.MapEventEnded.AddNonSerializedListener(this, ended.Add));
+
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+
+            clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
+                new NetworkBattleStartRequest(
+                    Guid.NewGuid().ToString(),
+                    (int)BattleStartMode.Simulation,
+                    hostileAction.MapEventId,
+                    joinerMobilePartyId)),
+                MapEventDisabledMethods);
+
+            Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()).Accepted);
+
+            Server.NetworkSentMessages.Clear();
+            clients[1].Call(() => clients[1].Resolve<INetwork>().SendAll(
+                new NetworkCancelBattleSimulation(hostileAction.MapEventId)),
+                MapEventDisabledMethods);
+
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationCancelled>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleModeSet>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            Assert.Equal(joinerPartyId,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>()).PartyId);
+            Assert.Empty(ended);
+
+            foreach (var instance in Clients.Append(Server))
+            {
+                AssertHostileActionJoinerLeft(instance, hostileAction.MapEventId,
+                    hostileAction.AttackerPartyId, joinerPartyId);
+                instance.Call(() => Assert.False(instance.GetRegisteredObject<MapEvent>(hostileAction.MapEventId).IsFinalized));
+            }
+            Server.Call(() => Assert.False(ServerBattleModeArbiter.IsClaimed(hostileAction.MapEventId)));
+
+            // The side leader can start another simulation on the still-registered battle.
+            StartBattleSimulation(clients[0], hostileAction);
+            Server.Call(() =>
+            {
+                var mapEvent = Server.GetRegisteredObject<MapEvent>(hostileAction.MapEventId);
+                mapEvent._battleState = BattleState.AttackerVictory;
+                Server.Resolve<IMessageBroker>().Publish(clients[0].NetPeer,
+                    new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1));
+                Assert.True(mapEvent.IsFinalized);
+                Assert.Same(mapEvent, Assert.Single(ended));
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>());
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => CampaignEvents.MapEventEnded.ClearListeners(this));
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
+    [Fact]
     public void MultiPlayerRaid_BattleSimulationCancel_ThatTimesOutBeforeItStarts_EndsTheSessionOnTheNextPump()
     {
         var client = Clients.First();
