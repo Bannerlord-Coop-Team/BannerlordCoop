@@ -15,7 +15,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 internal class HeadmanNeedsGrainWorldEventPatches
 {
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
+    [HarmonyPostfix, HarmonyPriority(Priority.First)]
     private static void CrimeWarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
     {
         if (declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange) return;

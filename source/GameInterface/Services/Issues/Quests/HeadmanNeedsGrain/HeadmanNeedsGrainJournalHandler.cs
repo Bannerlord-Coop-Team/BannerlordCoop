@@ -21,37 +21,23 @@ public readonly struct NetworkHeadmanNeedsGrainEffectsResolved : ICommand
     }
 }
 
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanNeedsGrainAiCompleted : ICommand
-{
-    [ProtoMember(1)] public readonly string GiverId;
-    [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly string SolverId;
-
-    public NetworkHeadmanNeedsGrainAiCompleted(string giverId, string issueId, string solverId)
-    {
-        GiverId = giverId;
-        IssueId = issueId;
-        SolverId = solverId;
-    }
-}
-
 internal class HeadmanNeedsGrainJournalHandler : IHandler
 {
     private readonly IMessageBroker broker;
     private readonly IObjectManager objectManager;
+    private readonly IIssueConversationGuard conversationGuard;
 
-    public HeadmanNeedsGrainJournalHandler(IMessageBroker broker, IObjectManager objectManager)
+    public HeadmanNeedsGrainJournalHandler(IMessageBroker broker, IObjectManager objectManager,
+        IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.objectManager = objectManager;
-        broker.Subscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
         broker.Unsubscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
 
@@ -59,29 +45,14 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
             var issue = giver.Issue;
             if (!(issue is TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue) ||
                 issue.StringId != data.IssueId || !issue.IsSolvingWithAlternative) return;
             issue._areIssueEffectsResolved = true;
-        }, context: nameof(HeadmanNeedsGrainJournalHandler));
-    }
-
-    private void HandleAi(MessagePayload<NetworkHeadmanNeedsGrainAiCompleted> payload)
-    {
-        if (ModInformation.IsServer) return;
-        var data = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver) ||
-                !objectManager.TryGetObjectWithLogging<Hero>(data.SolverId, out var solver)) return;
-            var issue = giver.Issue;
-            if (!(issue is TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue) ||
-                issue.StringId != data.IssueId) return;
-            using (new Common.Util.AllowedThread()) issue.CompleteIssueWithAiLord(solver);
-        }, context: nameof(HeadmanNeedsGrainJournalHandler));
+        }, data.GiverId), context: nameof(HeadmanNeedsGrainJournalHandler));
     }
 
 }

@@ -1,6 +1,6 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Framework.Interface;
 using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -94,4 +94,5 @@ internal class HeadmanNeedsGrainBranchPatches
             }
         }
     }
+
 }

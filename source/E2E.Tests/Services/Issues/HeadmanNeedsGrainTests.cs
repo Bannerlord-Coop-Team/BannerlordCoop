@@ -400,12 +400,12 @@ public class HeadmanNeedsGrainTests : IDisposable
         Server.Call(() => IssueHere(Server).CompleteIssueWithAiLord(Get<Hero>(Server, solverId)));
         if (player)
         {
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainAiCompleted>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             Server.Call(() => Assert.True(IssueHere(Server).IsOngoingWithoutQuest));
             return;
         }
-        var completion = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainAiCompleted>());
-        Assert.Equal(solverId, completion.SolverId);
+        var completion = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.IssueFinishedByAiLord, completion.Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue));
     }

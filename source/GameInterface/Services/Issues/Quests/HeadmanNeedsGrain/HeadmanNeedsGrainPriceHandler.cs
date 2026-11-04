@@ -42,7 +42,8 @@ internal class HeadmanNeedsGrainPriceHandler : IHandler
         if (ModInformation.IsClient || !(payload.Who is NetPeer peer)) return;
         GameThread.RunSafe(() =>
         {
-            var behavior = Campaign.Current.GetCampaignBehavior<HeadmanNeedsGrainIssueBehavior>();
+            var behavior = Campaign.Current?.GetCampaignBehavior<HeadmanNeedsGrainIssueBehavior>();
+            if (behavior == null) return;
             network.Send(peer, new NetworkHeadmanGrainPriceUpdated(behavior._averageGrainPriceInCalradia));
         }, context: nameof(HeadmanNeedsGrainPriceHandler));
     }
@@ -65,6 +66,6 @@ internal class HeadmanNeedsGrainPriceHandler : IHandler
             if (behavior == null) return;
 
             behavior._averageGrainPriceInCalradia = price;
-        });
+        }, context: nameof(HeadmanNeedsGrainPriceHandler));
     }
 }
