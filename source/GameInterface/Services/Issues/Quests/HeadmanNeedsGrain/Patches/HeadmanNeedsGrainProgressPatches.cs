@@ -9,6 +9,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.He
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch(typeof(ItemRoster))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class HeadmanNeedsGrainProgressPatches
 {
     [HarmonyPatch(nameof(ItemRoster.AddToCounts), new[] { typeof(EquipmentElement), typeof(int) })]

@@ -17,6 +17,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.He
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class HeadmanNeedsGrainBranchPatches
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]

@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class HeadmanNeedsGrainPriceCachePatches
 {
     [HarmonyPatch(nameof(HeadmanNeedsGrainIssueBehavior.CacheGrainPrice))]

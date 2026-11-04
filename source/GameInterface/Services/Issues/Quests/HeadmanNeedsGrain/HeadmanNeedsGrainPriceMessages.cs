@@ -19,7 +19,7 @@ public readonly struct HeadmanGrainPriceCached : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanGrainPriceUpdated : IServerToClientCommand
+public readonly struct NetworkHeadmanGrainPriceUpdated : ICommand
 {
     [ProtoMember(1)]
     public readonly int Price;

@@ -27,7 +27,7 @@ The local decompilations are retained under ignored `artifacts/3762-*.cs`.
 - Keep vanilla's live, per-player difficulty estimate until acceptance. Preserve the raw issue
   multiplier at creation; the framework freezes the accepting player's multiplier for both solutions.
 - Direct delivery pays zero gold. Keep the vanilla renown, relations, power and prosperity changes.
-  Grain trait XP is kept by hero and sent to its owner, without using the server's shared trait store.
+  Trait XP uses the shared server-owned player trait store from #3918 under the owner substitution scope.
 - Crime can be reported without an active map event. Keep vanilla penalties and use the giver's
   village for the log when there is no event settlement.
 - The new accept path has no conversation-tracker precondition. The old map-conversation tracking
@@ -83,3 +83,29 @@ There is no lord solution (`IsThereLordSolution == false`), counteroffer, bribe,
 requested-item variant or quest-specific combat mission. Direct reward gold is zero and direct
 delivery consumes all required grain at once. Village-raiding flows must use real campaign actions;
 direct assignment of a completed battle is not evidence.
+
+## Companion Party screen automation
+
+The reusable step block is `headman-needs-grain-party-screen.steps.json`. Insert it in flow D
+after choosing the companion through the real conversation, when the native Party screen opens.
+Use `coop.debug.issues.grain.party_screen status` on the owning client and require
+`left=1` and `done=False`. The companion is already on the left; regular troops still need moving.
+In the standard test save the offer requires four men. Run
+`coop.debug.issues.grain.party_screen move 3`, require `left=4` and `done=False`, then
+`coop.debug.issues.grain.party_screen move 1`, require `left=5` and `done=True`.
+For a different save, use the number stated by the offer and stop one short before the final transfer.
+Take screenshots of both the disabled and enabled Done button. Run
+`coop.debug.issues.grain.party_screen done` and poll the kit's `cont` until `inProgress=False`.
+
+The command calls `PartyCharacterVM.ExecuteTransferSingle` and `PartyVM.ExecuteDone`, the same
+handlers as the arrows and Done button. It does not set issue acceptance, pay gold, or create a
+completed mission. `done` refuses while vanilla `IsDoneActive()` is false. For the cancellation
+case, use `coop.debug.issues.grain.party_screen cancel` before Done and verify no payment or
+missing troops on the server and both clients. Repeat after a partial selection.
+
+Use the handoff's flow D through the first daily tick and the natural return. Read gold, selected
+rosters, traits and journals on all three roles before selecting, after accepting and after return.
+The non-owner has the framework's empty placeholder, with no personal journal archive or rewards.
+Use the current `coop.debug.kingdom.declare_war` command with the owner's controller for the crime
+flow; the historical kit's `war` action lacks that acting-player context and only proved cancellation.
+All of these live checks remain pending until a lane is assigned.

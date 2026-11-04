@@ -5,12 +5,11 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainEffectsResolved : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -23,24 +22,7 @@ public readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClient
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanNeedsGrainLog : IServerToClientCommand
-{
-    [ProtoMember(1)] public readonly string GiverId;
-    [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly TextObject Text;
-    [ProtoMember(4)] public readonly bool IsQuestLog;
-
-    public NetworkHeadmanNeedsGrainLog(string giverId, string issueId, TextObject text, bool isQuestLog)
-    {
-        GiverId = giverId;
-        IssueId = issueId;
-        Text = text;
-        IsQuestLog = isQuestLog;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkHeadmanNeedsGrainAiCompleted : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainAiCompleted : ICommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -58,24 +40,17 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
 {
     private readonly IMessageBroker broker;
     private readonly IObjectManager objectManager;
-    private readonly IIssueOwnershipRegistry ownership;
-    private readonly IControllerIdProvider controller;
 
-    public HeadmanNeedsGrainJournalHandler(IMessageBroker broker, IObjectManager objectManager,
-        IIssueOwnershipRegistry ownership, IControllerIdProvider controller)
+    public HeadmanNeedsGrainJournalHandler(IMessageBroker broker, IObjectManager objectManager)
     {
         this.broker = broker;
         this.objectManager = objectManager;
-        this.ownership = ownership;
-        this.controller = controller;
-        broker.Subscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Subscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
         broker.Subscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Unsubscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
         broker.Unsubscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
@@ -109,18 +84,4 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
         }, context: nameof(HeadmanNeedsGrainJournalHandler));
     }
 
-    private void Handle(MessagePayload<NetworkHeadmanNeedsGrainLog> payload)
-    {
-        if (ModInformation.IsServer) return;
-        var data = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controller.ControllerId) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
-            var issue = giver.Issue;
-            if (issue == null || issue.StringId != data.IssueId) return;
-            if (data.IsQuestLog) issue.IssueQuest?.AddLog(data.Text);
-            else issue.AddLog(new JournalLog(CampaignTime.Now, data.Text));
-        }, context: nameof(HeadmanNeedsGrainJournalHandler));
-    }
 }

@@ -69,7 +69,11 @@ public class HeadmanNeedsGrainTests : IDisposable
         otherPlayerClanId = environment.CreateRegisteredObject<Clan>();
         grainCategoryId = environment.CreateRegisteredObject<ItemCategory>();
         otherNotableId = environment.CreateRegisteredObject<Hero>();
-        scenario = new QuestScenario(environment, hero => new Issue(hero), ConfigureGiver);
+        scenario = new QuestScenario(environment, (instance, hero) =>
+        {
+            ConfigureGiver(instance, hero);
+            return new Issue(hero);
+        });
 
         foreach (var instance in Instances)
         {
@@ -83,7 +87,7 @@ public class HeadmanNeedsGrainTests : IDisposable
                     foreach (var player in new[] { scenario.PlayerA, scenario.PlayerB })
                     {
                         var hero = Get<Hero>(instance, player.HeroId);
-                        hero._partyBelongedTo = Get<MobileParty>(instance, player.PartyId);
+                        hero._partyBelongedTo = Get<MobileParty>(instance, player.MobilePartyId);
                         hero.Clan = Get<Clan>(instance, player.HeroId == scenario.PlayerA.HeroId ? playerClanId : otherPlayerClanId);
                         hero.Clan.SetLeader(hero);
                         hero.Clan.Renown = 0;
@@ -94,7 +98,7 @@ public class HeadmanNeedsGrainTests : IDisposable
                     {
                         var player = instance == ClientA ? scenario.PlayerA : scenario.PlayerB;
                         Game.Current.PlayerTroop = Get<Hero>(instance, player.HeroId).CharacterObject;
-                        Campaign.Current.MainParty = Get<MobileParty>(instance, player.PartyId);
+                        Campaign.Current.MainParty = Get<MobileParty>(instance, player.MobilePartyId);
                         Campaign.Current.PlayerDefaultFaction = Get<Hero>(instance, player.HeroId).Clan;
                     }
                 }
@@ -105,14 +109,23 @@ public class HeadmanNeedsGrainTests : IDisposable
         Server.Call(() =>
         {
             foreach (var player in new[] { scenario.PlayerA, scenario.PlayerB })
-                Get<MobileParty>(Server, player.PartyId).ItemRoster.Clear();
+                Get<MobileParty>(Server, player.MobilePartyId).ItemRoster.Clear();
         });
-        foreach (var instance in Instances)
+        var traitHandles = new Dictionary<string, uint>();
+        Server.Call(() =>
+        {
+            foreach (var trait in new[] { DefaultTraits.Mercy, DefaultTraits.Generosity, DefaultTraits.Honor })
+            {
+                Assert.True(Server.ObjectManager.AddExisting(trait.StringId, trait));
+                Assert.True(Server.ObjectManager.TryGetHandle(trait, out var handle));
+                traitHandles.Add(trait.StringId, handle);
+            }
+        });
+        foreach (var instance in new[] { ClientA, ClientB })
             instance.Call(() =>
             {
                 foreach (var trait in new[] { DefaultTraits.Mercy, DefaultTraits.Generosity, DefaultTraits.Honor })
-                    if (!instance.ObjectManager.TryGetId(trait, out _))
-                        Assert.True(instance.ObjectManager.AddExisting(trait.StringId, trait));
+                    Assert.True(instance.ObjectManager.AddExisting(trait.StringId, trait, traitHandles[trait.StringId]));
             });
         environment.FlushCoalescer();
     }
@@ -217,7 +230,7 @@ public class HeadmanNeedsGrainTests : IDisposable
             instance.Call(() =>
             {
                 Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue);
-                Assert.Equal(0, Get<MobileParty>(instance, scenario.PlayerA.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
+                Assert.Equal(0, Get<MobileParty>(instance, scenario.PlayerA.MobilePartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
                 Assert.True(Get<Town>(instance, townId).Prosperity == 1050f, $"{instance.GetType().Name} prosperity {Get<Town>(instance, townId).Prosperity}");
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerB.HeroId).Gold);
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerA.HeroId).Gold);
@@ -411,7 +424,7 @@ public class HeadmanNeedsGrainTests : IDisposable
             Assert.True(ClientA.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
                 scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
         }, Texts);
-        Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.PartyId).ItemRoster.Clear());
+        Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).ItemRoster.Clear());
         environment.FlushCoalescer();
         ClientA.Call(() =>
         {
@@ -508,7 +521,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         {
             Assert.True(secondQuest.IsOngoing);
             Assert.Equal(0, secondQuest._playerAcceptedQuestLog.CurrentProgress);
-            Assert.Equal(0, Get<MobileParty>(ClientB, scenario.PlayerB.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
+            Assert.Equal(0, Get<MobileParty>(ClientB, scenario.PlayerB.MobilePartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
             Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Honor));
             Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Generosity));
             Assert.Same(secondQuest, Get<Hero>(ClientB, secondGiverId).Issue.IssueQuest);
@@ -589,10 +602,13 @@ public class HeadmanNeedsGrainTests : IDisposable
                     troop.UpgradeTargets = Array.Empty<CharacterObject>();
                     var issue = IssueHere(instance);
                     issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
                 }
             });
         }
+
+        Server.Call(() => Get<MobileParty>(Server, scenario.OwnerPartyId).MemberRoster
+            .AddToCounts(Get<CharacterObject>(Server, troopId), 6));
+        environment.FlushCoalescer();
 
         if (poor)
         {
@@ -605,6 +621,9 @@ public class HeadmanNeedsGrainTests : IDisposable
         {
             var issue = IssueHere(ClientA);
             funding = issue.AlternativeSolutionNeededGold;
+            var owner = Get<Hero>(ClientA, scenario.OwnerHeroId);
+            AlternativeSolutionPickerDriver.Commit(ClientA, issue, owner, owner.PartyBelongedTo,
+                Get<CharacterObject>(ClientA, troopId), 6);
             issue.AlternativeSolutionStartConsequence();
             issue.StartIssueWithAlternativeSolution();
         }, Texts);
@@ -674,7 +693,7 @@ public class HeadmanNeedsGrainTests : IDisposable
             instance.Call(() =>
             {
                 Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue);
-                var party = Get<MobileParty>(instance, scenario.PlayerA.PartyId);
+                var party = Get<MobileParty>(instance, scenario.PlayerA.MobilePartyId);
                 Assert.Equal(6, party.MemberRoster.GetTroopCount(Get<CharacterObject>(instance, troopId)));
                 Assert.True(party.MemberRoster.Contains(Get<Hero>(instance, companionId).CharacterObject));
                 Assert.True(Get<Hero>(instance, companionId).HeroState == Hero.CharacterStates.Active,
@@ -741,7 +760,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     {
         Server.Call(() =>
         {
-            var party = Get<MobileParty>(Server, scenario.PlayerA.PartyId);
+            var party = Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId);
             using (new AllowedThread()) party.CurrentSettlement = atVillage ? Get<Settlement>(Server, villageSettlementId) : null;
             party.ItemRoster.Clear();
             party.ItemRoster.AddToCounts(DefaultItems.Grain, QuestHere(Server)._neededGrainAmount - (enoughGrain ? 0 : 1));
@@ -785,7 +804,8 @@ public class HeadmanNeedsGrainTests : IDisposable
         var value = 0;
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetId(trait, out var traitId));
+            var serverTrait = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<TraitObject>(trait.StringId);
+            Assert.True(Server.ObjectManager.TryGetId(serverTrait, out var traitId));
             var data = Server.Resolve<GameInterface.CoopSessionData.ICoopSessionProvider>()
                 .CoopSession.PlayerTraitData.PlayerTraitXp;
             if (data.TryGetValue(heroId, out var traits)) traits.TryGetValue(traitId, out value);

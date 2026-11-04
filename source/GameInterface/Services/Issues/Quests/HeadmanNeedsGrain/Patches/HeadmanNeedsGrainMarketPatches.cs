@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue), nameof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue.NearbySuitableSettlement), MethodType.Getter)]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal sealed class HeadmanNeedsGrainMarketPatches
 {
     [HarmonyPrefix]

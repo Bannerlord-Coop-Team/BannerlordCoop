@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior))]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class HeadmanNeedsGrainPricePersistencePatches
 {
     private const string SaveKey = "_coop_headman_needs_grain_average_price";

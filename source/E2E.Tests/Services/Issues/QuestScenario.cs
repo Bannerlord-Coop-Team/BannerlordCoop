@@ -35,8 +35,7 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
     public QuestScenario(E2ETestEnvironment testEnvironment,
-        Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null,
-        Action<EnvironmentInstance, Hero>? configureGiver = null)
+        Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null)
     {
         this.testEnvironment = testEnvironment;
 
@@ -47,11 +46,6 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(NotableId, out var giver));
-                configureGiver?.Invoke(instance, giver);
-            });
             AddIssue(instance, NotableId, IssueId, createIssue);
         }
     }

@@ -5,13 +5,13 @@ using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Localization;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 internal class HeadmanNeedsGrainJournalPatches
 {
     // A client whose own daily tick misses the clearing day still clears the village's effects
@@ -29,34 +29,8 @@ internal class HeadmanNeedsGrainJournalPatches
         }
     }
 
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
-    [HarmonyPostfix]
-    private static void QuestLogPostfix(QuestBase __instance, TextObject text)
-    {
-        if (ModInformation.IsServer && __instance is Quest)
-            Publish(IssueManager.GetIssueOfQuest(__instance), text, true);
-    }
-
-    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.AddLog))]
-    [HarmonyPostfix]
-    private static void IssueLogPostfix(IssueBase __instance, JournalLog log)
-    {
-        // The owner's accept replay and its own daily tick already add the return-days and returning logs.
-        if (ModInformation.IsServer && __instance is Issue && __instance.JournalEntries.Count > 1 &&
-            log.LogText?.Value != __instance.AlternativeSolutionEndLogDefault.Value)
-            Publish(__instance, log.LogText, false);
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
     private static bool TimeoutPrefix() => ModInformation.IsServer;
 
-    private static void Publish(IssueBase issue, TextObject text, bool questLog)
-    {
-        if (issue == null || text == null) return;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
-            !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network)) return;
-        network.SendAll(new NetworkHeadmanNeedsGrainLog(giverId, issue.StringId, text, questLog));
-    }
 }
