@@ -19,6 +19,8 @@ internal sealed class PlayerPartyInteractionSession
     public bool IsHostile { get; }
     public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
     public ClanJoinUnavailableReason ClanJoinUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason PatrilinealMarriageUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason MatrilinealMarriageUnavailableReason { get; set; }
     public PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason { get; set; }
     public int MercenaryAwardMultiplier { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
@@ -42,7 +44,6 @@ internal sealed class PlayerPartyInteractionSession
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
-    public PlayerPartyInteractionOption[] ResponderClanOptions { get; set; } = System.Array.Empty<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,
