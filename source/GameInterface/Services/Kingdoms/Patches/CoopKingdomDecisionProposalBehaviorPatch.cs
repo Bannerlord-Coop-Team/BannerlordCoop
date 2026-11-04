@@ -76,8 +76,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                 return false;
             }
 
-            // Every proposal builds kingdom elections, for this or another kingdom, that read each voting clan's leader
-            if (Clan.All.Any(other => other.Leader == null && IsLeaderlessVoter(other)))
+            if (HasLeaderlessVoter())
             {
                 return false;
             }
@@ -141,7 +140,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         }
 
         // A clan can lose its leader mid-session while LeaderlessClanResolver otherwise runs only on load and retirement.
-        // Runs once a day outside the per-clan ticker, so closing a clan cant change the Clan.All being ticked.
+        // Runs once a day from DailyTickEvent, not from the per-clan ticker, so closing a clan doesnt change the Clan.All being ticked.
         [HarmonyPatch("DailyTick")]
         [HarmonyPostfix]
         public static void DailyTickPostfix()
@@ -150,22 +149,36 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             // Player clans are left to their heir flow
             var leaderless = Clan.All.Where(clan => IsLeaderlessVoter(clan) && !clan.IsPlayerClan()).ToList();
-            if (leaderless.Count == 0) return;
-
-            if (!ContainerProvider.TryResolve<ILeaderlessClanResolver>(out var resolver)) return;
-
-            foreach (var clan in leaderless)
+            if (leaderless.Count > 0 && ContainerProvider.TryResolve<ILeaderlessClanResolver>(out var resolver))
             {
-                try
+                foreach (var clan in leaderless)
                 {
-                    resolver.Resolve(clan);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to resolve leaderless kingdom clan {ClanId}", clan.StringId);
+                    try
+                    {
+                        resolver.Resolve(clan);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Error(e, "Failed to resolve leaderless kingdom clan {ClanId}", clan.StringId);
+                    }
                 }
             }
+
+            // Otherwise a failed repair stops AI kingdom proposals without a trace
+            var stillLeaderless = Clan.All
+                .Where(clan => clan.Leader == null && IsLeaderlessVoter(clan))
+                .Select(clan => clan.StringId)
+                .ToList();
+            if (stillLeaderless.Count > 0)
+            {
+                Logger.Warning("Voting clans {ClanIds} still have no leader", stillLeaderless);
+            }
         }
+
+        // Every proposal builds kingdom elections, for this or another kingdom, that read each voting clan's leader.
+        // Player clans are skipped like in the repair, otherwise one waiting on its heir would stop every kingdom's proposals.
+        internal static bool HasLeaderlessVoter() =>
+            Clan.All.Any(clan => clan.Leader == null && IsLeaderlessVoter(clan) && !clan.IsPlayerClan());
 
         private static bool IsLeaderlessVoter(Clan clan) =>
             LeaderlessClanResolver.NeedsLeader(clan) && !clan.IsUnderMercenaryService;

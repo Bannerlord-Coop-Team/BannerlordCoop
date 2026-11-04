@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using Common.Util;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Kingdoms.Patches;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -262,10 +263,16 @@ public class LeaderlessClanResolverTests : IDisposable
             proposerClan.SetLeader(proposerLeader);
             proposerClan.Influence = 1000f;
             Assert.Null(leaderlessClan.Leader);
+            Assert.True(CoopKingdomDecisionProposalBehaviorPatch.HasLeaderlessVoter());
+            Assert.Throws<NullReferenceException>(() =>
+                new KingdomElection(new KingdomPolicyDecision(proposerClan, DefaultPolicies.Serfdom, false))
+                    .GetLikelihoodForSponsor(proposerClan));
 
             var behavior = ObjectHelper.SkipConstructor<KingdomDecisionProposalBehavior>();
             behavior._kingdomDecisionsList = new List<KingdomDecision>();
             behavior.DailyTick();
+
+            Assert.False(CoopKingdomDecisionProposalBehaviorPatch.HasLeaderlessVoter());
 
             // The proposer tick builds elections like this one, which read every voting clan's leader
             var election = new KingdomElection(new KingdomPolicyDecision(proposerClan, DefaultPolicies.Serfdom, false));
