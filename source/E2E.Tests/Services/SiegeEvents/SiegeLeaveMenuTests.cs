@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players;
-using Common.Util;
+﻿using Common.Util;
 using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
@@ -9,6 +7,8 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Helpers;

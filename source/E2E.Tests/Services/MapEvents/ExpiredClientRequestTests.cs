@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players;
-using Common;
+﻿using Common;
 using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -8,6 +6,8 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using LiteNetLib;
 using System.Reflection;

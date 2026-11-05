@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Autofac;
 using Common.Logging;
 using Common.Network;
@@ -23,6 +22,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;

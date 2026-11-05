@@ -924,6 +924,24 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false, 50, false)]
+    [InlineData(true, -50, false)]
+    [InlineData(true, 50, true)]
+    public void InfluenceSpend_AppliesOnlyToTheSendersOwnClanAndOnlyAsASpend(bool ownClan, int influence, bool applied)
+    {
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var other = CreateSyncedPlayerContext("InfluenceOther", Clients.Last());
+        var clanId = ownClan ? player.ClanId : other.ClanId;
+        Server.Call(() => Server.GetRegisteredObject<Clan>(clanId).Influence = 100f);
+
+        Server.SimulateMessage(client.NetPeer, new NetworkChangeClanInfluence(clanId, influence));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Equal(applied ? 50f : 100f, Server.GetRegisteredObject<Clan>(clanId).Influence, precision: 2));
+    }
+
     [Fact]
     public void ClanChangedFactionNotification_AllowsNullKingdomEndpoints()
     {

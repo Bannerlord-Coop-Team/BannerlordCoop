@@ -7,7 +7,6 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -95,8 +94,8 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-            // The army leader adds members and a party may join itself. Clients get this from the server, so only the server checks a peer.
-            if (ModInformation.IsServer && payload.Who is NetPeer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
+            // The army leader adds members and a party may join itself. Clients also get this from the server, so only the server checks the sender.
+            if (ModInformation.IsServer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
                 (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
 
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
@@ -138,8 +137,8 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-            // The army leader removes members and a party may leave itself. Clients get this from the server, so only the server checks a peer.
-            if (ModInformation.IsServer && payload.Who is NetPeer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
+            // The army leader removes members and a party may leave itself. Clients also get this from the server, so only the server checks the sender.
+            if (ModInformation.IsServer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
                 (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
             MobileParty clientMobileParty = null;
             if (!string.IsNullOrEmpty(data.ClientMobilePartyId))

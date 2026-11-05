@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
@@ -13,6 +12,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -243,6 +243,20 @@ public class SiegeDisconnectTests : SiegeTestBase
                 hasPlayerEncounter && !finishLocalMenus,
                 PlayerEncounter.Current != null));
         Clients.Last().Call(() => Assert.Null(PlayerEncounter.Current));
+    }
+
+    [Fact]
+    public void BreakSiegeRequest_ForAnotherPlayersParty_IsRefused()
+    {
+        var (_, ownerPartyId) = CreatePlayerHeroParty("SiegeOwner");
+        CreatePlayerHeroParty("OtherPlayer");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "OtherPlayer");
+        Server.NetworkSentMessages.Clear();
+
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBreakSiege(ownerPartyId));
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
     }
 
     [Fact]

@@ -3,7 +3,10 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -47,6 +50,7 @@ public class ArmyRemovalReceiveTests : IDisposable
         var army = recipient.GetRegisteredObject<Army>(armyId);
         var party = recipient.GetRegisteredObject<MobileParty>(partyId);
         Assert.Contains(party, army.Parties);
+        object sender = server ? LeaderPeer(armyId) : this;
         int removalMessagesBefore = environment.Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>().Count();
         var writes = new List<(bool Server, bool Allowed)>();
         var setter = AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.AttachedTo));
@@ -57,7 +61,7 @@ public class ArmyRemovalReceiveTests : IDisposable
         harmony.Patch(collectionRemoval, prefix: new HarmonyMethod(typeof(ArmyRemovalReceiveTests), nameof(RecordAttachmentWrite)));
         try
         {
-            recipient.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, partyId, string.Empty), markGameThread: false);
+            recipient.SimulateMessage(sender, new NetworkRemovePartyInArmy(armyId, partyId, string.Empty), markGameThread: false);
             Assert.True(recipient.PendingGameThreadActionCount > 0);
             Assert.Contains(party, army.Parties);
             Assert.Empty(writes);
@@ -125,7 +129,7 @@ public class ArmyRemovalReceiveTests : IDisposable
             });
         }
 
-        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, memberId, string.Empty), markGameThread: false);
+        environment.Server.SimulateMessage(LeaderPeer(armyId), new NetworkRemovePartyInArmy(armyId, memberId, string.Empty), markGameThread: false);
         environment.Server.PumpGameThread();
         foreach (var client in environment.Clients)
             client.PumpGameThread();
@@ -158,7 +162,7 @@ public class ArmyRemovalReceiveTests : IDisposable
         });
 
         // a late removal for an army the party already left must not touch its current one
-        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(oldArmyId, memberId, string.Empty), markGameThread: false);
+        environment.Server.SimulateMessage(LeaderPeer(oldArmyId), new NetworkRemovePartyInArmy(oldArmyId, memberId, string.Empty), markGameThread: false);
         environment.Server.PumpGameThread();
         foreach (var client in environment.Clients)
             client.PumpGameThread();
@@ -260,7 +264,7 @@ public class ArmyRemovalReceiveTests : IDisposable
 
         var events = CountLeaveEvents(() =>
         {
-            environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, leaderId, string.Empty), markGameThread: false);
+            environment.Server.SimulateMessage(LeaderPeer(armyId), new NetworkRemovePartyInArmy(armyId, leaderId, string.Empty), markGameThread: false);
             environment.Server.PumpGameThread();
         });
 
@@ -295,7 +299,7 @@ public class ArmyRemovalReceiveTests : IDisposable
 
         var events = CountLeaveEvents(() =>
         {
-            environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, memberId, leaderId), markGameThread: false);
+            environment.Server.SimulateMessage(LeaderPeer(armyId), new NetworkRemovePartyInArmy(armyId, memberId, leaderId), markGameThread: false);
             environment.Server.PumpGameThread();
         });
 
@@ -347,7 +351,7 @@ public class ArmyRemovalReceiveTests : IDisposable
         }
         else
         {
-            environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(oldArmyId, memberId, string.Empty), markGameThread: false);
+            environment.Server.SimulateMessage(LeaderPeer(oldArmyId), new NetworkRemovePartyInArmy(oldArmyId, memberId, string.Empty), markGameThread: false);
             environment.Server.PumpGameThread();
         }
         foreach (var client in environment.Clients)
@@ -364,6 +368,62 @@ public class ArmyRemovalReceiveTests : IDisposable
                 Assert.Null(member.AttachedTo);
             });
         }
+    }
+
+    // A party joins or leaves an army itself or by its leader, never by another player.
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    public void MemberChange_IsAppliedOnlyFromTheArmyLeaderOrThePartyItself(bool add, bool fromParty)
+    {
+        var armyId = environment.CreateRegisteredObject<Army>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var outsiderId = environment.CreateRegisteredObject<MobileParty>();
+        if (!add)
+        {
+            environment.Server.Call(() =>
+            {
+                var army = environment.Server.GetRegisteredObject<Army>(armyId);
+                var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+                party.Army = army;
+                party.AttachedTo = army.LeaderParty;
+            });
+        }
+        var sender = RegisterPlayer(fromParty ? partyId : outsiderId);
+
+        if (add)
+            environment.Server.SimulateMessage(sender, new NetworkAddMobilePartyInArmy(armyId, partyId, false));
+        else
+            environment.Server.SimulateMessage(sender, new NetworkRemovePartyInArmy(armyId, partyId, string.Empty));
+        environment.Server.PumpGameThread();
+
+        var inArmy = environment.Server.GetRegisteredObject<MobileParty>(partyId).Army != null;
+        Assert.Equal(add == fromParty, inArmy);
+    }
+
+    // The server takes a member change only from a player, so these come from the army leader's player.
+    private NetPeer LeaderPeer(string armyId)
+    {
+        string? leaderId = null;
+        environment.Server.Call(() => Assert.True(
+            environment.Server.ObjectManager.TryGetId(environment.Server.GetRegisteredObject<Army>(armyId).LeaderParty, out leaderId)));
+        return RegisterPlayer(leaderId!);
+    }
+
+    private NetPeer RegisterPlayer(string partyId)
+    {
+        var client = environment.Clients.First();
+        environment.Server.Call(() =>
+        {
+            var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.True(environment.Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+            var playerManager = environment.Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Sender", heroId, partyId, null, null)));
+            playerManager.SetPeer("Sender", client.NetPeer);
+        });
+        return client.NetPeer;
     }
 
     private static void RecordAttachmentWrite()
