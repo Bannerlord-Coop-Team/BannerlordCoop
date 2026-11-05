@@ -1,4 +1,4 @@
-\xef\xbb\xbfusing Common.Logging;
+﻿using Common.Logging;
 using Serilog;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
