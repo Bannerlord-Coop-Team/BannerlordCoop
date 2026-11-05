@@ -484,12 +484,20 @@ internal class AlleyHandler : IHandler
         if (data.UnderAttackByAlleyId != null &&
             objectManager.TryGetObject<Alley>(data.UnderAttackByAlleyId, out var attacker) && attacker.Owner == victim)
         {
-            sessionInterface.ClearUnderAttackByAi(alleyId);
-            network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
+            EndAttack(alleyId);
         }
     }
 
     // --- AI attack/defense flow ---
+
+    /// <summary>
+    /// Ends the attack on this alley on the server and tells every client, so none keeps showing an attack the server dropped.
+    /// </summary>
+    internal void EndAttack(string alleyId)
+    {
+        sessionInterface.ClearUnderAttackByAi(alleyId);
+        network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
+    }
 
     private void Handle_NetworkAlleyUnderAttack(MessagePayload<NetworkAlleyUnderAttack> payload)
     {

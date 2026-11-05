@@ -2,6 +2,7 @@
 using Common;
 using Common.Network;
 using Common.Network.Coalescing;
+using GameInterface.Services.Alleys.Handlers;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
@@ -73,7 +74,8 @@ public class AlleyRecruitDebugCommand
             if (!TryGetAlley(resolver, args[0], args[1], out var alley, out var error)) return Failed(error);
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
                 !ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
-                !ContainerProvider.TryResolve<INetwork>(out var network))
+                !ContainerProvider.TryResolve<INetwork>(out var network) ||
+                !ContainerProvider.TryResolve<AlleyHandler>(out var alleyHandler))
                 return Failed("Unable to resolve the alley recruit fixture services.");
             if (!resolver.TryResolveHero(args[2], out var owner, out var ownerError)) return Failed(ownerError);
             if (owner.PartyBelongedTo == null) return Failed($"Hero '{args[2]}' has no party.");
@@ -98,7 +100,6 @@ public class AlleyRecruitDebugCommand
                     alleyId,
                     ownerId,
                     new[] { new TroopRosterElementData(ownerCharacterId, 1, 0, 0) });
-                sessionInterface.ClearUnderAttackByAi(alleyId);
                 sessionInterface.SetLastRecruitTimeTicks(alleyId, 0);
                 if (!sessionInterface.TryGetManagementData(alleyId, out var managementData))
                     throw new InvalidOperationException("The fixture management data was not stored.");
@@ -108,7 +109,7 @@ public class AlleyRecruitDebugCommand
                     managementData.OverseerId,
                     managementData.Garrison,
                     managementData.LastRecruitTimeTicks));
-                network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
+                alleyHandler.EndAttack(alleyId);
 
                 return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={alley.Settlement.StringId} alley={args[1]} " +
                        $"owner={owner.StringId} party={owner.PartyBelongedTo.StringId} " +
