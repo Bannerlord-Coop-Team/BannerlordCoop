@@ -13,6 +13,8 @@
 - **Don't invent new patterns or naming schemes.** Find how the codebase already solves the same problem and match it, reusing the existing suffixes (`*Handler`, `*Patches`, `*Registry`, `*Interface`) and mechanisms.
 - A novel concept such as a `SomeFeatureSentinel` class, or a homegrown mechanism next to an existing one, makes the code harder to navigate and gets flagged in review. If nothing existing fits, ask before introducing something new.
 - Before adding a helper, grep for an existing one of the same shape and reuse it.
+- Don't add a private method that only wraps one or two existing calls. Write the guards inline at the call site, like `if (!playerManager.IsSenderControllingParty(payload.Who, data.MobilePartyId)) return;`.
+- When several handlers need the same check, add it once to the shared service, like `IPlayerManager`, instead of a private copy in each handler.
 
 Use the existing framework for each of these instead of building a parallel one:
 
@@ -61,6 +63,12 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 - Validate only where bad data can actually arrive, like network message contents or game state that can really be gone by the time a message applies.
 - When a check is warranted, use the statement form `if (x == null) throw ...`, not `x ?? throw new ArgumentNullException(...)`.
 - Data and message types just assign.
+- Don't add a role check to a handler that only runs on one side. A message only clients send only reaches the server, so `ModInformation.IsServer` in its handler doesn't do anything.
+
+## Tests
+
+- Test a shared guard once, at the shared method, not again for every handler that calls it. Add a handler test only when that handler has its own logic around the guard.
+- A test has to reach the behavior it's named for. One that stops at an earlier reply only shows the request got through.
 
 ## Campaign Behaviors
 
