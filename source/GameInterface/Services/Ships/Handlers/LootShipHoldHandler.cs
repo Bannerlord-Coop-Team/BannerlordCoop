@@ -44,15 +44,13 @@ internal class LootShipHoldHandler : IHandler
     // Arrives with the join save, before the campaign loads and registers its objects.
     private void Handle_InitializeClientHeldLootShips(MessagePayload<InitializeClientHeldLootShips> payload)
     {
-        if (ModInformation.IsServer) return;
-
         heldLootShipIds = payload.What.HeldLootShipIds ?? Array.Empty<string>();
     }
 
     // The save carried the held loot ships in their looter's list so they register under the server's ids; take them out again
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
     {
-        if (ModInformation.IsServer || heldLootShipIds.Length == 0) return;
+        if (heldLootShipIds.Length == 0) return;
 
         var shipIds = heldLootShipIds;
         heldLootShipIds = Array.Empty<string>();
