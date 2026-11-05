@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+using Common.Logging;
+using Serilog;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.IO;
@@ -11,6 +13,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrategy
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<HeadmanNeedsGrainCreationCaptureStrategy>();
     private readonly IObjectManager objectManager;
 
     public HeadmanNeedsGrainCreationCaptureStrategy(IObjectManager objectManager)
@@ -63,14 +66,9 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
                 grainIssue.IssueDueTime = dueTime;
             }
         }
-        catch (EndOfStreamException)
+        catch (Exception exception) when (exception is EndOfStreamException || exception is IOException || exception is FormatException)
         {
-        }
-        catch (IOException)
-        {
-        }
-        catch (FormatException)
-        {
+            Logger.Warning(exception, "Ignoring malformed grain creation capture for {Issue}", issue.StringId);
         }
     }
 

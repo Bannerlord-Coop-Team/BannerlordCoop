@@ -41,6 +41,9 @@ internal class HeadmanNeedsGrainWorldEventPatches
     private static bool WarPrefix(Quest __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
     {
         if (ModInformation.IsClient) return false;
+        // The dedicated host has no player hero. The framework relay invokes this
+        // listener again inside each owner's substitution scope.
+        if (Hero.MainHero == null) return false;
         if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
             !((faction1 == Hero.MainHero.MapFaction && faction2 == __instance.QuestGiver.MapFaction) ||
             (faction2 == Hero.MainHero.MapFaction && faction1 == __instance.QuestGiver.MapFaction))) return false;
@@ -62,13 +65,14 @@ internal class HeadmanNeedsGrainWorldEventPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
     [HarmonyPrefix]
-    private static bool KingdomPrefix() => ModInformation.IsServer;
+    private static bool KingdomPrefix() => ModInformation.IsServer && Hero.MainHero != null;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageBeingRaided))]
     [HarmonyPrefix]
     private static bool RaidPrefix(Quest __instance, Village village)
     {
         if (ModInformation.IsClient) return false;
+        if (Hero.MainHero == null) return false;
         var party = Hero.MainHero?.PartyBelongedTo;
         var ownerIsRaiding = party?.MapEvent?.IsRaid == true && party.CurrentSettlement == village.Settlement;
         if (village == __instance.QuestGiver.CurrentSettlement.Village && !ownerIsRaiding)
