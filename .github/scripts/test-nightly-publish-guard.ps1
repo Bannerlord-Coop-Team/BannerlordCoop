@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
 $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../workflows/nightly-release.yml') -Raw
+if (-not $workflow.Contains('Invalidate the legacy client manifest')) { throw 'Legacy client manifest invalidation was not found' }
+if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manifest path was not found' }
 $match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a completed nightly publication.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
 if (-not $match.Success) { throw 'Nightly publish guard was not found' }
 $guardText = $match.Groups[1].Value -replace '(?m)^ {10}', ''
