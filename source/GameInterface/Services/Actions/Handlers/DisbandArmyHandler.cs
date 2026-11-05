@@ -55,14 +55,10 @@ public class DisbandArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.ArmyId, out Army army) == false) return;
             if (objectManager.TryGetObjectWithLogging(obj.ClientPartyId, out MobileParty clientParty) == false) return;
-            try
+            // Vanilla's disband cost reads Clan.PlayerClan, which the server doesn't have, so run it as the disbanding player.
+            using (new MainHeroSubstitutionScope(clientParty.LeaderHero, clientParty))
             {
-                ResolvedMainHeroContext.ResolvedMainHero = clientParty.LeaderHero;
                 DisbandArmyActionPatches.DisbandArmyApplyInternal(army, clientParty);
-            }
-            finally
-            {
-                ResolvedMainHeroContext.ResolvedMainHero = null;
             }
         });
     }
