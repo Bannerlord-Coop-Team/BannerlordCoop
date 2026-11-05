@@ -14,6 +14,7 @@ using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.OrderOfBattle.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
+using GameInterface.Services.Ships.Messages;
 using GameInterface.Services.Workshops.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
@@ -73,6 +74,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientNavalData(saveDataMessage.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(saveDataMessage.OrderOfBattlePlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
+        messageBroker.Publish(this, new InitializeClientHeldLootShips(saveDataMessage.HeldLootShipIds));
         // Add any other CoopSession data initialisations for clients here
     }
 }

@@ -85,6 +85,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(16)]
     public readonly NavalPlayerData NavalPlayerData;
 
+    [ProtoMember(17)]
+    public readonly string[] HeldLootShipIds;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -101,7 +104,8 @@ public readonly struct GameSaveDataPacket : IPacket
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        string[] heldLootShipIds = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -119,5 +123,6 @@ public readonly struct GameSaveDataPacket : IPacket
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        HeldLootShipIds = heldLootShipIds;
     }
 }

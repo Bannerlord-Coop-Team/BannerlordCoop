@@ -31,6 +31,18 @@ public interface ILootShipHold
     /// screen never closed, the long fallback ran out.
     /// </summary>
     void Sweep();
+
+    /// <summary>
+    /// [Server] Puts each unclaimed held ship back in its looter's ship list without replicating it, so the join save and the id map
+    /// carry it to the joining client; returns their ids for the snapshot.
+    /// </summary>
+    string[] AttachForJoinSnapshot();
+
+    /// <summary>
+    /// [Server and joining client] Takes the listed ships back out of their owner's ship list without replicating it: on the
+    /// server once the join snapshot is taken, and on the joining client once it registered the save's objects.
+    /// </summary>
+    void DetachFromJoinSnapshot(IEnumerable<string> shipIds);
 }
 
 /// <inheritdoc cref="ILootShipHold"/>
@@ -105,6 +117,36 @@ public class LootShipHold : ILootShipHold
 
             held.Remove(ship);
             DestroyUnclaimed(ship, entry.Value, IsLooterGone(entry.Value.Looter) ? "its looter left or disconnected" : "the fallback hold ran out");
+        }
+    }
+
+    public string[] AttachForJoinSnapshot()
+    {
+        var shipIds = new List<string>();
+        foreach (var entry in held)
+        {
+            var ship = entry.Key;
+            var looter = entry.Value.Looter;
+            // A claimed ship is already in a party's list, and a removed looter's party isn't in the save
+            if (ship.Owner != null || looter.MobileParty?.IsActive != true || !objectManager.TryGetId(ship, out var shipId)) continue;
+
+            // Skips the Owner setter, which would replicate the owner and reset the unlocked pieces
+            ship._owner = looter;
+            looter.AddShipInternal(ship);
+            shipIds.Add(shipId);
+        }
+
+        return shipIds.ToArray();
+    }
+
+    public void DetachFromJoinSnapshot(IEnumerable<string> shipIds)
+    {
+        foreach (var shipId in shipIds)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Ship>(shipId, out var ship) || ship.Owner == null) continue;
+
+            ship.Owner.RemoveShipInternal(ship);
+            ship._owner = null;
         }
     }
 

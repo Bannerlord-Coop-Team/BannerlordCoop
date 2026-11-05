@@ -122,7 +122,8 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions,
             completedTransfer.ClanFinance,
-            completedTransfer.OrderOfBattlePlayerData));
+            completedTransfer.OrderOfBattlePlayerData,
+            completedTransfer.HeldLootShipIds));
     }
 
     private sealed class PendingTransfer
@@ -150,6 +151,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             ServerOptions = firstChunk.ServerOptions;
             ClanFinance = firstChunk.ClanFinance;
             OrderOfBattlePlayerData = firstChunk.OrderOfBattlePlayerData;
+            HeldLootShipIds = firstChunk.HeldLootShipIds;
         }
 
         public int TransferId { get; }
@@ -170,6 +172,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public ServerOptions ServerOptions { get; }
         public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
         public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+        public string[] HeldLootShipIds { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {
