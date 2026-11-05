@@ -352,7 +352,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         var sender = fromOwner ? Clients.First() : Clients.Last();
 
         sender.Call(() => sender.Resolve<Common.Network.INetwork>().SendAll(
-            new ChangeProductionTypeOfWorkshop(state.WorkshopId, newTypeId, ignoreCost: false)));
+            new ChangeProductionTypeOfWorkshop(state.WorkshopId, newTypeId)));
 
         Server.Call(() => Assert.Equal(fromOwner,
             Server.GetRegisteredObject<Workshop>(state.WorkshopId).WorkshopType == Server.GetRegisteredObject<WorkshopType>(newTypeId)));

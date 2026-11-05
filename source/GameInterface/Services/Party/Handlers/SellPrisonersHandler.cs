@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
@@ -8,6 +9,7 @@ using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using static GameInterface.Services.ObjectManager.ObjectManager;
@@ -16,6 +18,8 @@ namespace GameInterface.Services.Party.Handlers;
 
 internal class SellPrisonersHandler : IHandler
 {
+    private static readonly ILogger logger = LogManager.GetLogger<SellPrisonersHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -66,7 +70,12 @@ internal class SellPrisonersHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
-            if (ModInformation.IsServer && !IsSenderControllingParty(obj.Who, sellingParty)) return;
+            // Only the selling player's own party sells its prisoners
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.Party != sellingParty)
+            {
+                logger.Warning("Ignoring a prisoner sale for {PartyId} from a peer whose party it is not", obj.What.SellingPartyId);
+                return;
+            }
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
@@ -79,13 +88,5 @@ internal class SellPrisonersHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
             network.Send(obj.Who as NetPeer, new RefreshGameMenu(heroId, "town_backstreet"));
         });
-    }
-
-    // Only the selling player's own party sells its prisoners.
-    private bool IsSenderControllingParty(object sender, PartyBase party)
-    {
-        string partyId = null;
-        if (party.MobileParty != null) objectManager.TryGetId(party.MobileParty, out partyId);
-        return playerManager.IsSenderControllingParty(sender, partyId);
     }
 }

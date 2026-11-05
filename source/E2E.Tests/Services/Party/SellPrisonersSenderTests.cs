@@ -12,7 +12,6 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
-/// <summary>The server only sells the prisoners of the sending player's own party.</summary>
 public class SellPrisonersSenderTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
@@ -25,45 +24,32 @@ public class SellPrisonersSenderTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    // The server sells only the prisoners of the sender's own party; a completed sale refreshes its backstreet menu.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void SellPrisoners_AppliesOnlyForTheSendersOwnParty(bool fromOwner)
+    public void SellPrisoners_AppliesOnlyForTheSendersOwnParty(bool ownParty)
     {
-        var owner = environment.Clients.First();
-        var outsider = environment.Clients.Last();
-        string ownerPartyId = RegisterPlayerParty(owner, "Owner");
-        RegisterPlayerParty(outsider, "Outsider");
-
+        var client = environment.Clients.First();
         SellPrisoners sale = default;
         Server.Call(() =>
         {
-            var party = Server.GetRegisteredObject<MobileParty>(ownerPartyId);
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var otherParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(party, out var partyId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Seller", heroId, partyId, null, null)));
+            playerManager.SetPeer("Seller", client.NetPeer);
+
             var rosterData = Server.Resolve<ITroopRosterInterface>().PackTroopRosterData(TroopRoster.CreateDummyTroopRoster());
-            sale = new SellPrisoners(Server.GetHandle(party.Party), rosterData);
+            sale = new SellPrisoners(Server.GetHandle((ownParty ? party : otherParty).Party), rosterData);
         });
         Server.NetworkSentMessages.Clear();
 
-        Server.SimulateMessage((fromOwner ? owner : outsider).NetPeer, sale);
+        Server.SimulateMessage(client.NetPeer, sale);
         Server.PumpGameThread();
 
-        // A completed sale refreshes the seller's backstreet menu
-        Assert.Equal(fromOwner ? 1 : 0, Server.NetworkSentMessages.GetMessages<RefreshGameMenu>().Count());
-    }
-
-    private string RegisterPlayerParty(EnvironmentInstance client, string controllerId)
-    {
-        string partyId = null;
-        Server.Call(() =>
-        {
-            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
-            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
-
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player(controllerId, heroId, partyId, null, null)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
-        });
-        return partyId;
+        Assert.Equal(ownParty ? 1 : 0, Server.NetworkSentMessages.GetMessages<RefreshGameMenu>().Count());
     }
 }

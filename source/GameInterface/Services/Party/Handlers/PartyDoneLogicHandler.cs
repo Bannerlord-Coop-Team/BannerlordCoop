@@ -268,7 +268,7 @@ internal class PartyDoneLogicHandler : IHandler
             // so keep the troops in the party too instead of losing them
             if (message.GarrisonDonationSettlementId != null &&
                 (!objectManager.TryGetObjectWithLogging<Settlement>(message.GarrisonDonationSettlementId, out var garrisonDonationSettlement) ||
-                !PartyScreenHelperHandler.IsPartyIn(mainHero, garrisonDonationSettlement, requireOwnClan: false)))
+                mainHero.PartyBelongedTo?.CurrentSettlement != garrisonDonationSettlement))
             {
                 logger.Warning(
                     "Rejected Party screen garrison donation because {MainHeroId} is no longer at {SettlementId}",

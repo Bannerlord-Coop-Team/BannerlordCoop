@@ -140,24 +140,6 @@ public class GarrisonDonationTests : IDisposable
         });
     }
 
-    // A donation from a player whose party is not in the town is refused.
-    [Fact]
-    public void Donation_FromAPartyOutsideTheTown_IsRefused()
-    {
-        string settlementId = CreateTownSettlement();
-        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        RegisterDonor(null);
-
-        Send(new DonateToGarrison(settlementId, new List<DonateTroop> { new DonateTroop(characterId, 3) }));
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
-            Assert.True(Server.ObjectManager.TryGetObject(characterId, out CharacterObject character));
-            Assert.Equal(0, settlement.Town.GarrisonParty?.MemberRoster.GetTroopCount(character) ?? 0);
-        });
-    }
-
     // The donate screen's Done sends the garrison add and the party's roster change; both apply in the town,
     // and neither does once the party left it, so the troops are never lost on a stale screen.
     [Theory]

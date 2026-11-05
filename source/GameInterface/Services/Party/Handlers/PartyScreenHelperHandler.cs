@@ -168,7 +168,11 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: false)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.CurrentSettlement != currentSettlement)
+            {
+                logger.Warning("Ignoring a garrison donation to {SettlementId} from a peer whose party is not there", obj.What.CurrentSettlementId);
+                return;
+            }
             MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
             if (garrisonParty == null)
             {
@@ -215,7 +219,17 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: true)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.CurrentSettlement != currentSettlement)
+            {
+                logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not there", obj.What.CurrentSettlementId);
+                return;
+            }
+            // Only the town's own clan manages its garrison
+            if (senderHero.Clan == null || currentSettlement.OwnerClan != senderHero.Clan)
+            {
+                logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose clan does not own it", obj.What.CurrentSettlementId);
+                return;
+            }
             for (int i = 0; i < leftMemberRoster.Count; i++)
             {
                 TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
@@ -234,21 +248,6 @@ internal class PartyScreenHelperHandler : IHandler
             }
         });
     }
-
-    // Donating needs the sender's party in the town; managing the garrison also needs the town to be its clan's.
-    private bool IsSenderPartyIn(object sender, Settlement settlement, bool requireOwnClan)
-    {
-        if (playerManager.TryGetSenderHero(sender, out var hero) &&
-            IsPartyIn(hero, settlement, requireOwnClan)) return true;
-
-        logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not allowed there", settlement.StringId);
-        return false;
-    }
-
-    // Shared with the Party screen Done, which takes donated troops from the party only when this lets the garrison add them.
-    internal static bool IsPartyIn(Hero hero, Settlement settlement, bool requireOwnClan)
-        => hero.PartyBelongedTo?.CurrentSettlement == settlement &&
-            (!requireOwnClan || (hero.Clan != null && settlement.OwnerClan == hero.Clan));
 
     private void Handle_PrisonersReleasedAndTaken(MessagePayload<PrisonersReleasedAndTaken> obj)
     {

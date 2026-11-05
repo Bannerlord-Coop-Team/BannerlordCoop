@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
@@ -48,7 +47,7 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.WorkshopType, out var workshopTypeId)) return;
 
-        var message = new ChangeProductionTypeOfWorkshop(workshopId, workshopTypeId, obj.What.IgnoreCost);
+        var message = new ChangeProductionTypeOfWorkshop(workshopId, workshopTypeId);
         network.SendAll(message);
     }
     
@@ -57,23 +56,14 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-        bool ignoreCost = obj.What.IgnoreCost;
-        if (ModInformation.IsServer)
+        if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
         {
-            if (!IsSenderOwner(obj.Who, workshop)) return;
-            // Every vanilla client path (workshop conversation, clan finance screen) pays for the change.
-            ignoreCost = false;
+            Logger.Warning("Ignoring a production change for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
+            return;
         }
 
-        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, ignoreCost);
+        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType);
 
         messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
-    }
-
-    private bool IsSenderOwner(object sender, Workshop workshop)
-    {
-        string ownerId = null;
-        if (workshop.Owner != null) objectManager.TryGetId(workshop.Owner, out ownerId);
-        return playerManager.IsSenderControllingHero(sender, ownerId);
     }
 }

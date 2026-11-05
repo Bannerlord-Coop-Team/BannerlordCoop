@@ -184,7 +184,11 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (ModInformation.IsServer && !IsSenderOwner(obj.Who, workshop)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
+            {
+                Logger.Warning("Ignoring a warehouse setting for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
+                return;
+            }
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
@@ -221,7 +225,11 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (ModInformation.IsServer && !IsSenderOwner(obj.Who, workshop)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
+            {
+                Logger.Warning("Ignoring a warehouse setting for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
+                return;
+            }
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 
@@ -240,14 +248,6 @@ internal class WorkshopDataHandler : IHandler
                 Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
             }
         }, context: nameof(WorkshopDataHandler));
-    }
-
-    // Warehouse settings belong to the workshop's owner.
-    private bool IsSenderOwner(object sender, Workshop workshop)
-    {
-        string ownerId = null;
-        if (workshop.Owner != null) objectManager.TryGetId(workshop.Owner, out ownerId);
-        return playerManager.IsSenderControllingHero(sender, ownerId);
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

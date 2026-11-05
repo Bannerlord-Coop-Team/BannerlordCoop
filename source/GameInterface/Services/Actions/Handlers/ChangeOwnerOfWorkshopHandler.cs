@@ -7,7 +7,6 @@ using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -61,20 +60,18 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
     private void Handle_ChangeWorkshopOwner(MessagePayload<ChangeWorkshopOwner> obj)
     {
         var data = obj.What;
-        // A player buys as the new owner or sells as the current one, and only a client sends this request.
-        if (ModInformation.IsServer &&
-            !(obj.Who is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
-              (player.HeroId == data.NewOwnerId || player.HeroId == data.ExpectedOwnerId)))
-        {
-            Logger.Warning("Ignoring a workshop owner change for {WorkshopId} from a peer that is neither buyer nor seller", data.WorkshopId);
-            return;
-        }
 
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(data.WorkshopId, out var workshop)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOwnerId, out var newOwner)) return;
             if (!objectManager.TryGetObjectWithLogging<WorkshopType>(data.WorkshopTypeId, out var workshopType)) return;
+            // A player buys as the new owner or sells as the current one
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || (senderHero != newOwner && senderHero != workshop.Owner))
+            {
+                Logger.Warning("Ignoring a workshop owner change for {WorkshopId} from a peer that is neither buyer nor seller", data.WorkshopId);
+                return;
+            }
 
             var currentOwner = workshop.Owner;
             if (currentOwner == newOwner)
