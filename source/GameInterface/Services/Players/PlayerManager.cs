@@ -88,11 +88,12 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
-    /// Checks whether a message sender's hero rules the given kingdom, logging a warning when it
-    /// doesn't, so a handler can ignore a request only the ruler may make. Reads the kingdom's live
-    /// leader, so call it on the game thread.
+    /// Checks whether the peer currently standing for a player leads a clan serving the given kingdom
+    /// as a mercenary, or rules it when <paramref name="allowRuler"/> is set, logging a warning when it
+    /// doesn't. Vanilla accepts trade and alliance offers straight away only for those senders, every
+    /// other member puts them to a vote. Reads the live clan and leader, so call it on the game thread.
     /// </summary>
-    bool IsSenderRuling(object sender, Kingdom kingdom);
+    bool IsSenderMercenaryOrRuler(object sender, Kingdom kingdom, bool allowRuler);
 
     /// <summary>
     /// Checks whether a message sender is the peer controlling the given party, logging a warning
@@ -438,11 +439,14 @@ public class PlayerManager : IPlayerManager
         return false;
     }
 
-    public bool IsSenderRuling(object sender, Kingdom kingdom)
+    public bool IsSenderMercenaryOrRuler(object sender, Kingdom kingdom, bool allowRuler)
     {
-        if (kingdom != null && TryGetSenderHero(sender, out var hero) && kingdom.Leader == hero) return true;
+        if (kingdom != null && sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObject(player.HeroId, out Hero hero) &&
+            ((allowRuler && kingdom.Leader == hero) ||
+             (hero.Clan is { IsUnderMercenaryService: true } clan && clan.Kingdom == kingdom && clan.Leader == hero))) return true;
 
-        logger.Warning("Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which does not rule it", kingdom?.StringId, (sender as NetPeer)?.Id);
+        logger.Warning("Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which may not accept for it", kingdom?.StringId, (sender as NetPeer)?.Id);
         return false;
     }
 

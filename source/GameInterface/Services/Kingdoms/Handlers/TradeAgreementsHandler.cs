@@ -126,8 +126,8 @@ internal class TradeAgreementsHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.FromKingdomId, out var fromKingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.PlayerKingdomId, out var playerKingdom)) return;
-            // Only the kingdom ruler's player may accept an offer here, so one member cannot sign a trade agreement for the whole kingdom.
-            if (!playerManager.IsSenderRuling(sender, playerKingdom)) return;
+            // Vanilla only accepts straight away for a mercenary (OnTradeAgreementOfferedToPlayer), every other member and the ruler get a vote.
+            if (!playerManager.IsSenderMercenaryOrRuler(sender, playerKingdom, allowRuler: false)) return;
 
             tradeAgreementsBehavior.MakeTradeAgreement(
                 fromKingdom,

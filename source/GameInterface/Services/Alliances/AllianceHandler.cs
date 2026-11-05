@@ -177,8 +177,8 @@ public class AllianceHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ProposerKingdomId, out var proposer)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ReceiverKingdomId, out var receiver)) return;
-            // A client accepts an offer made to its own kingdom (vanilla AcceptStartingAlliance), so it must rule the receiver.
-            if (!playerManager.IsSenderRuling(sender, receiver)) return;
+            // Vanilla AcceptStartingAlliance runs for the ruler of a one clan kingdom or a mercenary (ConfirmAllianceOffer), so one of those must send it.
+            if (!playerManager.IsSenderMercenaryOrRuler(sender, receiver, allowRuler: true)) return;
 
             var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
             behavior?.StartAlliance(proposer, receiver);
