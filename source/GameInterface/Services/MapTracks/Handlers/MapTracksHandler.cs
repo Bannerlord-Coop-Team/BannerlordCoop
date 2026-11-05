@@ -133,7 +133,7 @@ internal class MapTracksHandler : IHandler
             if (!TryGetMapTracksBehavior(out var mapTracksBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.PlayerPartyId, out var playerParty)) return;
             // After a hero switch a late request can still name the old party, which may be another player's now.
-            if (obj.Who is NetPeer && !playerManager.IsSenderControllingParty(obj.Who, obj.What.PlayerPartyId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.PlayerPartyId)) return;
             
             // Don't initialise tracks for joining players as they won't be granted xp for nearby tracks
             if (mapTracksCampaignBehaviorInterface.AddPlayerPartyKeys(obj.What.PlayerPartyId)) return;
