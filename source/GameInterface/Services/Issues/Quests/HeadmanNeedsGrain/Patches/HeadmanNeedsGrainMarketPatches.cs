@@ -16,6 +16,7 @@ internal sealed class HeadmanNeedsGrainMarketPatches
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
 
         // Player trade perks can select a different market from the server's cached offer.
+        if (__instance._nearbySuitableSettlementCache == null) return true;
         __result = __instance._nearbySuitableSettlementCache;
         return false;
     }

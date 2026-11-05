@@ -20,10 +20,11 @@ internal class HeadmanNeedsGrainWorldEventPatches
     {
         if (declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange) return;
 
-        var instigator = Hero.MainHero;
         RunAsOwners(quest =>
         {
-            if (Hero.MainHero == instigator) return;
+            if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
+                ((faction1 == Hero.MainHero.MapFaction && faction2 == quest.QuestGiver.MapFaction) ||
+                 (faction2 == Hero.MainHero.MapFaction && faction1 == quest.QuestGiver.MapFaction))) return;
             QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
                 quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
         });

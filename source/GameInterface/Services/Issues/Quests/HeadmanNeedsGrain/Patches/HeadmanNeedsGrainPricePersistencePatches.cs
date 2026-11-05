@@ -31,7 +31,8 @@ internal class HeadmanNeedsGrainPricePersistencePatches
             markets = new Dictionary<HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue, Settlement>();
             foreach (var entry in Campaign.Current.IssueManager.Issues)
             {
-                if (entry.Value is HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue issue)
+                if (entry.Value is HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue issue &&
+                    issue._nearbySuitableSettlementCache != null)
                     markets[issue] = issue._nearbySuitableSettlementCache;
             }
         }
