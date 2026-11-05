@@ -24,7 +24,6 @@ concurrency:
 env:
   R2_PRIVATE_BUCKET: bannerlordcoop-build-inputs
   R2_NIGHTLY_BUCKET: bannerlordcoop-patron-nightlies
-  NIGHTLY_GATEWAY_ORIGIN: https://bannerlordcoop-nightly-gateway.garrett-luskey.workers.dev
 
 jobs:
   guard:
@@ -191,7 +190,7 @@ jobs:
                 job.name === 'sign-and-publish'
                 && job.conclusion === 'success'
                 && (job.steps ?? []).some((step) =>
-                  step.name === 'Publish latest client to private Patron R2'
+                  step.name === 'Publish client archive to private Patron R2'
                   && step.conclusion === 'success'));
               if (published) return run.head_sha;
             }
@@ -510,12 +509,14 @@ jobs:
           FILE_NAME: ${{ needs.build.outputs.file_name }}
           HEAD_SHA: ${{ needs.build.outputs.head_sha }}
           BASE_SHA: ${{ needs.build.outputs.base_sha }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
         run: |
           $ErrorActionPreference = 'Stop'
           if ($env:GITHUB_REF -ne 'refs/heads/development') { throw 'Nightly publication requires development' }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
           if ($env:HEAD_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Head SHA is invalid' }
           if ($env:BASE_SHA -and $env:BASE_SHA -notmatch '^[a-f0-9]{40}$') { throw 'Base SHA is invalid' }
+          if ($env:WORKFLOW_RUN_ID -notmatch '^[1-9][0-9]{0,19}$') { throw 'Workflow run id is invalid' }
           if ($env:R2_PRIVATE_BUCKET -ne 'bannerlordcoop-build-inputs') { throw 'Private bucket is invalid' }
           if ($env:R2_NIGHTLY_BUCKET -ne 'bannerlordcoop-patron-nightlies') { throw 'Patron bucket is invalid' }
 
@@ -545,23 +546,8 @@ jobs:
             branch = 'development'
             headSha = $env:HEAD_SHA
             baseSha = $baseSha
+            workflowRunId = [string]$env:WORKFLOW_RUN_ID
             serverInput = $serverInput
-          }
-          $builtAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
-          $clientManifest = [ordered]@{
-            version = 1
-            releaseDate = $env:RELEASE_DATE
-            headSha = $env:HEAD_SHA
-            baseSha = $baseSha
-            workflowRunId = [long]$env:GITHUB_RUN_ID
-            builtAt = $builtAt
-            client = [ordered]@{
-              fileName = $env:FILE_NAME
-              key = $clientKey
-              bytes = $archiveBytes
-              sha256 = $archiveSha256
-              publicUrl = "$env:NIGHTLY_GATEWAY_ORIGIN/v1/artifacts/$clientKey"
-            }
           }
           $utf8 = [Text.UTF8Encoding]::new($false)
           [IO.File]::WriteAllText(
@@ -569,12 +555,7 @@ jobs:
             (($handoffManifest | ConvertTo-Json -Depth 5 -Compress) + "`n"),
             $utf8
           )
-          [IO.File]::WriteAllText(
-            (Join-Path $PWD 'artifact/client-release.json'),
-            (($clientManifest | ConvertTo-Json -Depth 5 -Compress) + "`n"),
-            $utf8
-          )
-          foreach ($manifestPath in @('artifact/manifest.json', 'artifact/client-release.json')) {
+          foreach ($manifestPath in @('artifact/manifest.json')) {
             $manifest = Get-Item -LiteralPath $manifestPath
             if ($manifest.Length -le 0 -or $manifest.Length -gt 4096) { throw "$manifestPath size is invalid" }
             Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json | Out-Null
@@ -583,7 +564,7 @@ jobs:
           "archive_sha256=$archiveSha256" >> $env:GITHUB_OUTPUT
           "client_key=$clientKey" >> $env:GITHUB_OUTPUT
 
-      - name: Skip scheduled overwrite of a published nightly
+      - name: Skip scheduled overwrite of a completed nightly publication
         id: published
         shell: pwsh
         env:
@@ -599,7 +580,7 @@ jobs:
           if ($env:GITHUB_EVENT_NAME -ne 'schedule') { return }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
           $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
-          $metadataJson = & (Join-Path $PWD 'rclone.exe') lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          $metadataJson = & (Join-Path $PWD 'rclone.exe') lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/release.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($metadataJson -join "`n"))) { throw 'Published nightly manifest lookup failed' }
           if (-not ($metadataJson -join "`n").TrimStart().StartsWith('[')) { throw 'Published nightly manifest lookup failed' }
           $entries = ($metadataJson -join "`n") | ConvertFrom-Json
@@ -608,18 +589,54 @@ jobs:
             return
           }
           $entries = @($entries)
-          if ($entries.Count -ne 1 -or $entries[0].Path -ne 'nightly/client.json') { throw 'Published nightly manifest lookup failed' }
+          if ($entries.Count -ne 1 -or $entries[0].Path -ne 'nightly/release.json') { throw 'Published nightly manifest lookup failed' }
           $metadata = $entries[0]
           if ($metadata.IsDir -or $metadata.Size -le 0 -or $metadata.Size -gt 4096) { throw 'Published nightly manifest size is invalid' }
-          $manifest = Join-Path $env:RUNNER_TEMP 'published-client.json'
-          & (Join-Path $PWD 'rclone.exe') copyto "patron:$env:R2_NIGHTLY_BUCKET/nightly/client.json" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          $manifest = Join-Path $env:RUNNER_TEMP 'published-release.json'
+          & (Join-Path $PWD 'rclone.exe') copyto "patron:$env:R2_NIGHTLY_BUCKET/nightly/release.json" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Published nightly manifest download failed' }
           if ((Get-Item -LiteralPath $manifest).Length -ne $metadata.Size) { throw 'Published nightly manifest size is invalid' }
           $published = Get-Content -LiteralPath $manifest -Raw -Encoding utf8 | ConvertFrom-Json
           if ([string]$published.releaseDate -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Published nightly manifest release date is invalid' }
           if ([string]$published.releaseDate -eq $env:RELEASE_DATE) {
-            Write-Host "Scheduled nightly will not overwrite the published $($env:RELEASE_DATE) client."
+            Write-Host "Scheduled nightly will not overwrite the completed $($env:RELEASE_DATE) publication."
             'overwrite=false' | Add-Content $env:GITHUB_OUTPUT
+          }
+
+      - name: Invalidate the legacy client manifest
+        shell: pwsh
+        env:
+          RCLONE_CONFIG_PATRON_TYPE: s3
+          RCLONE_CONFIG_PATRON_PROVIDER: Cloudflare
+          RCLONE_CONFIG_PATRON_ACCESS_KEY_ID: ${{ secrets.R2_PATRON_NIGHTLY_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_PATRON_SECRET_ACCESS_KEY: ${{ secrets.R2_PATRON_NIGHTLY_SECRET_ACCESS_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:R2_ACCOUNT_ID -notmatch '^[a-f0-9]{32}$') { throw 'R2 account id is invalid' }
+          $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          $rclone = Join-Path $PWD 'rclone.exe'
+          $remote = "patron:$env:R2_NIGHTLY_BUCKET/nightly/client.json"
+          & $rclone deletefile $remote --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          if ($LASTEXITCODE -ne 0) {
+            $metadata = & $rclone lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+            $metadataText = ($metadata -join "`n").Trim()
+            if ($LASTEXITCODE -ne 0 -or -not $metadataText.StartsWith('[')) {
+              throw 'Legacy client manifest invalidation failed'
+            }
+            $metadataEntries = $metadataText | ConvertFrom-Json
+            if ($null -ne $metadataEntries -and @($metadataEntries).Count -ne 0) {
+              throw 'Legacy client manifest invalidation failed'
+            }
+          }
+          $remaining = & $rclone lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          $remainingText = ($remaining -join "`n").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $remainingText.StartsWith('[')) {
+            throw 'Legacy client manifest remains after invalidation'
+          }
+          $remainingEntries = $remainingText | ConvertFrom-Json
+          if ($null -ne $remainingEntries -and @($remainingEntries).Count -ne 0) {
+            throw 'Legacy client manifest remains after invalidation'
           }
 
       - name: Publish dedicated-server client input
@@ -644,7 +661,7 @@ jobs:
           test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
           test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
 
-          # The manifest is uploaded last and acts as the completed handoff marker.
+          # The private handoff manifest is uploaded last and acts as the completed handoff marker.
           ./rclone.exe copyto "$archive" "private:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           remote_bytes=$(./rclone.exe lsl "private:$R2_PRIVATE_BUCKET/$prefix/Coop.7z" | awk '{print $1}')
@@ -654,7 +671,7 @@ jobs:
           ./rclone.exe copyto artifact/manifest.json "private:$R2_PRIVATE_BUCKET/$prefix/manifest.json" \
             --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
-      - name: Publish latest client to private Patron R2
+      - name: Publish client archive to private Patron R2
         if: steps.published.outputs.overwrite == 'true'
         shell: bash
         env:
@@ -676,17 +693,12 @@ jobs:
           archive="artifact/$FILE_NAME"
           test "$(stat -c %s "$archive")" = "$ARCHIVE_BYTES"
           test "$(sha256sum "$archive" | awk '{print $1}')" = "$ARCHIVE_SHA256"
-          test "$(stat -c %s artifact/client-release.json)" -le 4096
-
           ./rclone.exe copyto "$archive" "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" \
             --checksum --immutable --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           remote_bytes=$(./rclone.exe lsl "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" | awk '{print $1}')
           test "$remote_bytes" = "$ARCHIVE_BYTES"
           remote_sha256=$(./rclone.exe cat "patron:$R2_NIGHTLY_BUCKET/$CLIENT_KEY" | sha256sum | awk '{print $1}')
           test "$remote_sha256" = "$ARCHIVE_SHA256"
-          # Publish the manifest last so installers never observe incomplete client bytes.
-          ./rclone.exe copyto artifact/client-release.json "patron:$R2_NIGHTLY_BUCKET/nightly/client.json" \
-            --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
 
   cleanup-private-handoff:
     needs: [build, sign-and-publish]

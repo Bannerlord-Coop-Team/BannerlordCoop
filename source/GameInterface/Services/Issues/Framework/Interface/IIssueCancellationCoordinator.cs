@@ -12,6 +12,7 @@ public interface IIssueCancellationCoordinator
     bool IsPending(IssueBase issue);
     bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner);
     bool BeforeGiverDeath(Hero victim, out IDisposable owner);
+    bool BeforeGiverOwnerChange(IssueBase issue, Hero deadOwner);
     void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty);
     void Retry();
 }
