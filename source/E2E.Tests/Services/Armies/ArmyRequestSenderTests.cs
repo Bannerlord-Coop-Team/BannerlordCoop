@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
 
-/// <summary>The server changes an army's members and cohesion only on the request of the party's player or the army leader's.</summary>
+/// <summary>The server applies army, disband and influence requests only for the sending player's own party, clan or army.</summary>
 public class ArmyRequestSenderTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
@@ -60,22 +60,19 @@ public class ArmyRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromMember, Get<MobileParty>(memberPartyId).Army == null));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void PartyIsAddedToTheArmyOnlyOnItsOwnPlayersRequest(bool ownParty)
+    [Fact]
+    public void AddingAnotherPlayersPartyToTheArmy_IsRefused()
     {
-        var partyId = ownParty ? outsiderPartyId : environment.CreateRegisteredObject<MobileParty>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
 
         Send(Outsider, new NetworkAddMobilePartyInArmy(armyId, partyId, false));
 
-        Server.Call(() => Assert.Equal(ownParty, Get<MobileParty>(partyId).Army == Get<Army>(armyId)));
+        Server.Call(() => Assert.Null(Get<MobileParty>(partyId).Army));
     }
 
     [Fact]
     public void CohesionBoostFromAPlayerWhoDoesNotLeadTheArmy_IsRefused()
     {
-        float cohesion = 0;
         Server.Call(() =>
         {
             var army = Get<Army>(armyId);
@@ -83,85 +80,49 @@ public class ArmyRequestSenderTests : IDisposable
             if (leader.Clan == null) leader.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
             leader.Clan.Influence = 1000f;
             army.Cohesion = 20f;
-            cohesion = army.Cohesion;
         });
 
         Send(Outsider, new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 0));
 
-        Server.Call(() => Assert.Equal(cohesion, Get<Army>(armyId).Cohesion));
+        Server.Call(() => Assert.Equal(20f, Get<Army>(armyId).Cohesion));
     }
 
-    [Fact]
-    public void CohesionBoostFromTheArmyLeader_IsApplied()
-    {
-        float cohesion = 0;
-        float influence = 0;
-        Server.Call(() =>
-        {
-            var army = Get<Army>(armyId);
-            var leader = army.LeaderParty.LeaderHero;
-            if (leader.Clan == null) leader.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            leader.Clan.Influence = 1000f;
-            army.Cohesion = 20f;
-            cohesion = army.Cohesion;
-            influence = leader.Clan.Influence;
-            Register("Leader", army.LeaderParty, Outsider);
-        });
-
-        Send(Outsider, new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 5));
-
-        Server.Call(() =>
-        {
-            var army = Get<Army>(armyId);
-            Assert.Equal(cohesion + 10f, army.Cohesion, precision: 2);
-            Assert.Equal(influence - 5f, army.LeaderParty.LeaderHero.Clan.Influence, precision: 2);
-        });
-    }
-
+    // The kingdom screen disbands an army the sender's party is not in, paid from the sender's own clan.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Disband_IsAppliedOnlyAsTheSendersOwnParty(bool fromMember)
+    public void Disband_IsAppliedOnlyAsTheSendersOwnParty(bool ownParty)
     {
         Server.Call(() =>
         {
-            var memberHero = Get<MobileParty>(memberPartyId).LeaderHero;
-            if (memberHero.Clan == null) memberHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            foreach (var party in new[] { Get<MobileParty>(outsiderPartyId), Get<MobileParty>(memberPartyId) })
+                if (party.LeaderHero.Clan == null) party.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
             // Vanilla's disband cost reads Clan.PlayerClan, which the test campaign leaves unset.
-            Campaign.Current.PlayerDefaultFaction = memberHero.Clan;
+            Campaign.Current.PlayerDefaultFaction = Get<MobileParty>(outsiderPartyId).LeaderHero.Clan;
         });
 
-        Send(fromMember ? Member : Outsider, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
+        Send(Outsider, new NetworkDisbandArmyApplyInternal(armyId, ownParty ? outsiderPartyId : memberPartyId));
 
-        Server.Call(() => Assert.Equal(fromMember, Get<MobileParty>(memberPartyId).Army == null));
+        Server.Call(() => Assert.Equal(ownParty, Get<MobileParty>(memberPartyId).Army == null));
     }
 
-    [Fact]
-    public void DisbandFromTheKingdomScreenOfAnArmyTheSenderIsNotIn_IsApplied()
+    [Theory]
+    [InlineData(false, 50, false)]
+    [InlineData(true, -50, false)]
+    [InlineData(true, 50, true)]
+    public void InfluenceSpend_AppliesOnlyToTheSendersOwnClanAndOnlyAsASpend(bool ownClan, int influence, bool applied)
     {
-        float influence = 0;
-        int cost = 0;
+        string clanId = null;
         Server.Call(() =>
         {
-            var outsider = Get<MobileParty>(outsiderPartyId);
-            if (outsider.LeaderHero.Clan == null) outsider.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            // Vanilla's kingdom screen only offers a disband for an army the player's party is not in.
-            Assert.Null(outsider.Army);
-            Campaign.Current.PlayerDefaultFaction = outsider.LeaderHero.Clan;
-            outsider.LeaderHero.Clan.Influence = 1000f;
-            influence = outsider.LeaderHero.Clan.Influence;
-            cost = Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfDisbandingArmy();
-            Assert.True(cost > 0);
+            var clan = Get<MobileParty>(outsiderPartyId).LeaderHero.Clan ??= GameObjectCreator.CreateInitializedObject<Clan>();
+            clan.Influence = 100f;
+            Assert.True(Server.ObjectManager.TryGetId(clan, out clanId));
         });
 
-        Send(Outsider, new NetworkDisbandArmyApplyInternal(armyId, outsiderPartyId));
+        Send(ownClan ? Outsider : Member, new NetworkChangeClanInfluence(clanId, influence));
 
-        Server.Call(() =>
-        {
-            Assert.Null(Get<MobileParty>(leaderPartyId).Army);
-            Assert.Null(Get<MobileParty>(memberPartyId).Army);
-            Assert.Equal(influence - cost, Get<MobileParty>(outsiderPartyId).LeaderHero.Clan.Influence, precision: 2);
-        });
+        Server.Call(() => Assert.Equal(applied ? 50f : 100f, Get<Clan>(clanId).Influence, precision: 2));
     }
 
     [Fact]

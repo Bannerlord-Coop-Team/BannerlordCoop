@@ -95,7 +95,9 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-            if (!IsAllowedArmyMemberChange(payload.Who, army, mobileParty)) return;
+            // The army leader adds members and a party may join itself. Clients get this from the server, so only the server checks a peer.
+            if (ModInformation.IsServer && payload.Who is NetPeer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
+                (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
 
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
 
@@ -136,7 +138,9 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-            if (!IsAllowedArmyMemberChange(payload.Who, army, mobileParty)) return;
+            // The army leader removes members and a party may leave itself. Clients get this from the server, so only the server checks a peer.
+            if (ModInformation.IsServer && payload.Who is NetPeer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
+                (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
             MobileParty clientMobileParty = null;
             if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
             {
@@ -257,9 +261,8 @@ public class ArmyHandler : IHandler
         var obj = payload.What;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.ArmyLeaderPartyId, out var leaderParty)) return;
         // Only the army's leader boosts its cohesion, and vanilla only ever spends here, so a negative amount isn't applied.
-        if (ModInformation.IsServer &&
-            (!playerManager.IsSenderControllingParty(payload.Who, obj.ArmyLeaderPartyId) ||
-             obj.CohesionToGain < 0 || obj.InfluenceCost < 0)) return;
+        if (obj.CohesionToGain < 0 || obj.InfluenceCost < 0 ||
+            !playerManager.IsSenderControllingParty(payload.Who, obj.ArmyLeaderPartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -279,34 +282,13 @@ public class ArmyHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
-            if (ModInformation.IsServer && !IsAllowedInfluenceSpend(payload.Who, playerClan, payload.What.Influence)) return;
+            // A player spends its own clan's influence, or a ruler clears the debt it just paid a mercenary clan serving
+            // its kingdom. Every vanilla caller sends a cost, so a negative amount isn't applied.
+            if (payload.What.Influence < 0 || !playerManager.TryGetSenderHero(payload.Who, out var senderHero) ||
+                (senderHero.Clan != playerClan && !(playerClan.IsUnderMercenaryService && playerClan.Kingdom?.Leader == senderHero))) return;
             ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
         });
     }
-    // The army leader changes its members, and a member may take its own party in or out.
-    private bool IsAllowedArmyMemberChange(object sender, Army army, MobileParty party)
-    {
-        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
-        if (!playerManager.TryGetPlayer(peer, out var player)) return false;
-        if (objectManager.TryGetId(party, out var partyId) && partyId == player.MobilePartyId) return true;
-        if (army.LeaderParty != null && objectManager.TryGetId(army.LeaderParty, out var leaderId) && leaderId == player.MobilePartyId) return true;
-
-        Logger.Warning("Ignoring an army change for party {PartyId} from a peer that leads neither it nor the army", party.StringId);
-        return false;
-    }
-
-    // A client spends its own clan's influence, or a ruler clears the debt it just paid a mercenary clan serving its
-    // kingdom. Every vanilla caller sends a cost, so the amount must be a spend of zero or more. Only the amount is
-    // checked, not the clan's balance.
-    private bool IsAllowedInfluenceSpend(object sender, Clan clan, float influence)
-    {
-        if (influence >= 0 && playerManager.TryGetSenderHero(sender, out var hero) &&
-            (hero.Clan == clan || (clan.IsUnderMercenaryService && clan.Kingdom != null && clan.Kingdom.Leader == hero))) return true;
-
-        Logger.Warning("Ignoring an influence change of {Influence} for clan {ClanId} from a peer that may not spend it", influence, clan.StringId);
-        return false;
-    }
-
     private void HandleSetArmyKingdom(MessagePayload<SetArmyKingdom> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.Army, out var armyId)) return;

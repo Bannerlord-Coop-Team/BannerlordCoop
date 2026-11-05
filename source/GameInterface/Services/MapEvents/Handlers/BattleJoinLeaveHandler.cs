@@ -411,8 +411,7 @@ internal class BattleJoinLeaveHandler : IHandler
             payload.What.PartyId,
             payload.What.FinishLocalMenus,
             payload.Who as NetPeer,
-            payload.What.BreakSiege,
-            requireRequesterParty: true);
+            payload.What.BreakSiege);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
@@ -422,15 +421,15 @@ internal class BattleJoinLeaveHandler : IHandler
         string partyId,
         bool finishLocalMenus = true,
         NetPeer requestingPeer = null,
-        bool breakSiege = false,
-        bool requireRequesterParty = false)
+        bool breakSiege = false)
     {
         GameThread.RunCleanupSafe(
             () =>
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
-                // A client may only take its own party out of a battle.
-                if (requireRequesterParty && requestingPeer != null && !IsPeerControllingParty(requestingPeer, party)) return;
+                // A requesting peer only takes its own party out of a battle.
+                if (requestingPeer != null && (party.MobileParty == null || !objectManager.TryGetId(party.MobileParty, out var mobilePartyId) ||
+                    !playerManager.IsSenderControllingParty(requestingPeer, mobilePartyId))) return;
 
                 var mapEvent = party.MapEvent;
                 bool leaveSiege = IsBesiegerInSiegeBattle(party, breakSiege);
@@ -515,13 +514,6 @@ internal class BattleJoinLeaveHandler : IHandler
         messageBroker.Publish(
             requestingPeer,
             new BattleJoinCancelled(mapEventId, controllerId, reservationId));
-    }
-
-    private bool IsPeerControllingParty(NetPeer peer, PartyBase party)
-    {
-        string mobilePartyId = null;
-        if (party.MobileParty != null) objectManager.TryGetId(party.MobileParty, out mobilePartyId);
-        return playerManager.IsSenderControllingParty(peer, mobilePartyId);
     }
 
     private bool TryGetRequestingPlayer(

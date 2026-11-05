@@ -7,7 +7,6 @@ using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -56,8 +55,7 @@ public class DisbandArmyHandler : IHandler
     {
         var obj = payload.What;
         // A client disbands as its own party.
-        if (ModInformation.IsServer &&
-            !playerManager.IsSenderControllingParty(payload.Who, obj.ClientPartyId)) return;
+        if (!playerManager.IsSenderControllingParty(payload.Who, obj.ClientPartyId)) return;
         GameThread.RunSafe(() =>
         {
             if (objectManager.TryGetObjectWithLogging(obj.ArmyId, out Army army) == false) return;

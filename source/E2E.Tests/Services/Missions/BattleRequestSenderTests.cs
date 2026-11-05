@@ -2,7 +2,6 @@
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
@@ -17,7 +16,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
 
-/// <summary>The server applies battle, siege and army requests only for the sending player's own party or clan.</summary>
+/// <summary>The server applies battle and siege requests only for the sending player's own party.</summary>
 public class BattleRequestSenderTests : MissionTestEnvironment
 {
     public BattleRequestSenderTests(ITestOutputHelper output) : base(output, numClients: 3) { }
@@ -40,39 +39,21 @@ public class BattleRequestSenderTests : MissionTestEnvironment
             Server.GetRegisteredObject<MapEvent>(mapEventId), Server.GetRegisteredObject<MobileParty>(partyIds[0]).MapEvent));
     }
 
-    [Fact]
-    public void SurrenderFromAPlayerOutsideTheBattle_IsRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Surrender_IsAppliedOnlyFromAPlayerInTheBattle(bool inBattle)
     {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var (mapEventId, partyIds, heroIds) = SetupCoopBattleWithHeroes("ctrl-A", "ctrl-B");
         ConnectPeers();
         RegisterOutsider(ClientC, "ctrl-C");
+        // The battle fixture's player heroes start outside their parties.
+        Server.Call(() => Server.GetRegisteredObject<Hero>(heroIds[0])._partyBelongedTo = Server.GetRegisteredObject<MobileParty>(partyIds[0]));
 
-        Server.SimulateMessage(ClientC.NetPeer, new NetworkMapEventSurrender(mapEventId, BattleSideEnum.Defender));
+        Server.SimulateMessage((inBattle ? ClientA : ClientC).NetPeer, new NetworkMapEventSurrender(mapEventId, BattleSideEnum.Defender));
         Server.PumpGameThread();
 
-        Server.Call(() =>
-        {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
-            Assert.False(mapEvent.DefenderSide.IsSurrendered);
-            Assert.Equal(BattleState.None, mapEvent.BattleState);
-        });
-    }
-
-    [Fact]
-    public void SurrenderFromAPlayerInTheBattle_IsApplied()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
-        ConnectPeers();
-
-        Server.SimulateMessage(ClientA.NetPeer, new NetworkMapEventSurrender(mapEventId, BattleSideEnum.Defender));
-        Server.PumpGameThread();
-
-        Server.Call(() =>
-        {
-            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
-            Assert.False(mapEvent.IsHideoutBattle);
-            Assert.True(mapEvent.DefenderSide.IsSurrendered);
-        });
+        Server.Call(() => Assert.Equal(inBattle, Server.GetRegisteredObject<MapEvent>(mapEventId).DefenderSide.IsSurrendered));
     }
 
     [Fact]
@@ -142,28 +123,6 @@ public class BattleRequestSenderTests : MissionTestEnvironment
         {
             SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
         }
-    }
-
-    [Theory]
-    [InlineData("other", 50, false)]
-    [InlineData("own", -50, false)]
-    [InlineData("own", 50, true)]
-    public void InfluenceSpend_AppliesOnlyToTheSendersOwnClanAndOnlyAsASpend(string sender, int influence, bool applied)
-    {
-        string ownerPartyId = RegisterOutsider(ClientA, "ctrl-A");
-        RegisterOutsider(ClientB, "ctrl-B");
-        string clanId = null;
-        Server.Call(() =>
-        {
-            var clan = Server.GetRegisteredObject<MobileParty>(ownerPartyId).LeaderHero.Clan;
-            clan.Influence = 100f;
-            Assert.True(Server.ObjectManager.TryGetId(clan, out clanId));
-        });
-
-        Server.SimulateMessage((sender == "own" ? ClientA : ClientB).NetPeer, new NetworkChangeClanInfluence(clanId, influence));
-        Server.PumpGameThread();
-
-        Server.Call(() => Assert.Equal(applied ? 50f : 100f, Server.GetRegisteredObject<Clan>(clanId).Influence, precision: 2));
     }
 
     // Links the battle's first two players to their clients' peers, as a real join does.

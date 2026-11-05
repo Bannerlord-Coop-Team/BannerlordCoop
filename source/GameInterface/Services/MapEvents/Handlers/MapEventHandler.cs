@@ -11,7 +11,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -252,7 +251,7 @@ internal class MapEventHandler : IHandler
                 }
 
                 // A surrender comes from a player whose party fights in this battle.
-                if (payload.Who is not NetPeer surrenderingPeer || !IsPeerInMapEvent(surrenderingPeer, mapEvent))
+                if (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo?.MapEvent != mapEvent)
                 {
                     Logger.Warning("Ignoring a surrender in {MapEventId} from a peer whose party is not in it", mapEventId);
                     return;
@@ -270,12 +269,5 @@ internal class MapEventHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkMapEventSurrender));
             }
         });
-    }
-
-    private bool IsPeerInMapEvent(NetPeer peer, MapEvent mapEvent)
-    {
-        return playerManager.TryGetPlayer(peer, out var player) &&
-            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
-            party.MapEvent == mapEvent;
     }
 }
