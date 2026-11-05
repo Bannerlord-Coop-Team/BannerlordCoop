@@ -207,7 +207,8 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
-            if (!IsSenderClanLeader(payload.Who, clan)) return;
+            // Leaving takes the whole clan out of its kingdom, so only the clan leader's player may ask.
+            if (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || !permissions.CanManageClan(senderHero, clan)) return;
             ChangeKingdomAction.ApplyByLeaveKingdom(clan, true);
         });
     }
@@ -222,17 +223,9 @@ internal class VassalServiceHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.ClanId, out var clan)) return;
-            if (!IsSenderClanLeader(payload.Who, clan)) return;
+            // Rebelling takes the whole clan out of its kingdom, so only the clan leader's player may ask.
+            if (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || !permissions.CanManageClan(senderHero, clan)) return;
             ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan, true);
         });
-    }
-
-    // Leaving or rebelling takes the whole clan out of its kingdom, so only the clan leader's player may ask.
-    private bool IsSenderClanLeader(object sender, Clan clan)
-    {
-        if (playerManager.TryGetSenderHero(sender, out var hero) && permissions.CanManageClan(hero, clan)) return true;
-
-        Logger.Warning("Ignoring a kingdom leave for clan {ClanId} from a peer that does not lead it", clan.StringId);
-        return false;
     }
 }

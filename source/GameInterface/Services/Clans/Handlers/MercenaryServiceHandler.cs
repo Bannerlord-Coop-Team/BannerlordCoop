@@ -93,7 +93,7 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
         // A ruler hires a clan into its own kingdom from the hire conversation, so it needn't lead that clan.
-        if (kingdom.Leader != hero && !IsLeaderOf(hero, clan)) return;
+        if (kingdom.Leader != hero && !permissions.CanManageClan(hero, clan)) return;
 
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
@@ -139,7 +139,7 @@ internal class MercenaryServiceHandler : IHandler
         // A ruler ends a mercenary clan's service from the conversation, to fire one serving its own kingdom or to hire
         // one away from another kingdom, so it needn't lead that clan.
         bool rulerEndsService = clan.IsUnderMercenaryService && hero.Clan?.Kingdom != null && hero.Clan.Kingdom.Leader == hero;
-        if (!rulerEndsService && !IsLeaderOf(hero, clan)) return;
+        if (!rulerEndsService && !permissions.CanManageClan(hero, clan)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
@@ -150,16 +150,6 @@ internal class MercenaryServiceHandler : IHandler
         // Leaving the kingdom clears the clan's own influence, as vanilla's Clan.LeaveKingdomInternal does, so a
         // fired mercenary's unpaid debt goes with it and the requester's influence is never read here.
         ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan, true);
-    }
-
-    // Mercenary service binds the whole clan, so apart from a ruler's hire or firing only the clan leader's player
-    // may take or end it.
-    private bool IsLeaderOf(Hero hero, Clan clan)
-    {
-        if (permissions.CanManageClan(hero, clan)) return true;
-
-        Logger.Warning("Ignoring a mercenary service change for clan {ClanId} from a player who does not lead it", clan.StringId);
-        return false;
     }
     private void HandlePlayerRelationChange(MessagePayload<PlayerRelationChange> payload)
     {
