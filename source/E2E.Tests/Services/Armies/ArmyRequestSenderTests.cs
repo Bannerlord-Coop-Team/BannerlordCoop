@@ -1,11 +1,15 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -157,6 +161,43 @@ public class ArmyRequestSenderTests : IDisposable
             Assert.Null(Get<MobileParty>(leaderPartyId).Army);
             Assert.Null(Get<MobileParty>(memberPartyId).Army);
             Assert.Equal(influence - cost, Get<MobileParty>(outsiderPartyId).LeaderHero.Clan.Influence, precision: 2);
+        });
+    }
+
+    [Fact]
+    public void DisbandFromTheKingdomScreenOfAnArmyInABattle_IsIgnored()
+    {
+        float influence = 0;
+        Server.Call(() =>
+        {
+            var outsider = Get<MobileParty>(outsiderPartyId);
+            if (outsider.LeaderHero.Clan == null) outsider.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            Campaign.Current.PlayerDefaultFaction = outsider.LeaderHero.Clan;
+            outsider.LeaderHero.Clan.Influence = 1000f;
+            influence = outsider.LeaderHero.Clan.Influence;
+
+            // A stale kingdom screen can still send the disband after the army's leader joined a battle.
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            mapEvent.Initialize(
+                GameObjectCreator.CreateInitializedObject<MobileParty>().Party,
+                GameObjectCreator.CreateInitializedObject<MobileParty>().Party,
+                new FieldBattleEventComponent(mapEvent),
+                MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+            Get<MobileParty>(leaderPartyId).Party.MapEventSide = mapEvent.AttackerSide;
+            Assert.NotNull(Get<MobileParty>(leaderPartyId).MapEvent);
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+
+        Send(Outsider, new NetworkDisbandArmyApplyInternal(armyId, outsiderPartyId));
+
+        Server.Call(() =>
+        {
+            var army = Get<Army>(armyId);
+            Assert.Same(army, Get<MobileParty>(leaderPartyId).Army);
+            Assert.Same(army, Get<MobileParty>(memberPartyId).Army);
+            Assert.Contains(Get<MobileParty>(memberPartyId), army.Parties);
+            Assert.Equal(influence, Get<MobileParty>(outsiderPartyId).LeaderHero.Clan.Influence, precision: 2);
         });
     }
 
