@@ -1,5 +1,9 @@
-﻿using TaleWorlds.CampaignSystem.MapEvents;
+﻿using GameInterface.Services.PartyBases.Extensions;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Extensions;
 
@@ -46,5 +50,18 @@ public static class MapEventExtensions
 
         int total = side.CalculateTotalContribution();
         return total == 0 ? 0f : (float)mapEventParty.ContributionToBattle / total;
+    }
+
+    public static MBReadOnlyList<MapEventParty> GetPlayerPartiesOnSide(this MapEvent mapEvent, BattleSideEnum battleSideEnum)
+    {
+        var playerParties = new MBReadOnlyList<MapEventParty>();
+        foreach (var mapEventParty in mapEvent.PartiesOnSide(battleSideEnum))
+        {
+            if (mapEventParty.Party?.IsPlayerParty() == true)
+            {
+                playerParties.Add(mapEventParty);
+            }
+        }
+        return playerParties;
     }
 }
