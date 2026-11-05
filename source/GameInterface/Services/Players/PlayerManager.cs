@@ -88,12 +88,18 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
-    /// Checks whether the peer currently standing for a player leads a clan serving the given kingdom
-    /// as a mercenary, or rules it when <paramref name="allowRuler"/> is set, logging a warning when it
-    /// doesn't. Vanilla accepts trade and alliance offers straight away only for those senders, every
-    /// other member puts them to a vote. Reads the live clan and leader, so call it on the game thread.
+    /// Checks whether the peer currently standing for a player rules the given kingdom. Does not log,
+    /// so a handler that allows more than one sender logs once when it refuses. Reads the kingdom's
+    /// live leader, so call it on the game thread.
     /// </summary>
-    bool IsSenderMercenaryOrRuler(object sender, Kingdom kingdom, bool allowRuler);
+    bool IsSenderRuling(object sender, Kingdom kingdom);
+
+    /// <summary>
+    /// Checks whether the peer currently standing for a player leads a clan serving the given kingdom
+    /// as a mercenary. Does not log, so a handler that allows more than one sender logs once when it
+    /// refuses. Reads the live clan, so call it on the game thread.
+    /// </summary>
+    bool IsSenderMercenaryOf(object sender, Kingdom kingdom);
 
     /// <summary>
     /// Checks whether a message sender is the peer controlling the given party, logging a warning
@@ -439,15 +445,23 @@ public class PlayerManager : IPlayerManager
         return false;
     }
 
-    public bool IsSenderMercenaryOrRuler(object sender, Kingdom kingdom, bool allowRuler)
+    public bool IsSenderRuling(object sender, Kingdom kingdom)
     {
-        if (kingdom != null && sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
-            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObject(player.HeroId, out Hero hero) &&
-            ((allowRuler && kingdom.Leader == hero) ||
-             (hero.Clan is { IsUnderMercenaryService: true } clan && clan.Kingdom == kingdom && clan.Leader == hero))) return true;
+        return kingdom != null && TryGetCurrentSenderHero(sender, out var hero) && kingdom.Leader == hero;
+    }
 
-        logger.Warning("Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which may not accept for it", kingdom?.StringId, (sender as NetPeer)?.Id);
-        return false;
+    public bool IsSenderMercenaryOf(object sender, Kingdom kingdom)
+    {
+        return kingdom != null && TryGetCurrentSenderHero(sender, out var hero) &&
+            hero.Clan is { IsUnderMercenaryService: true } clan && clan.Kingdom == kingdom && clan.Leader == hero;
+    }
+
+    // Unlike TryGetSenderHero, an old peer kept in the peer map after a reconnect resolves no hero.
+    private bool TryGetCurrentSenderHero(object sender, out Hero hero)
+    {
+        hero = null;
+        return sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObject(player.HeroId, out hero);
     }
 
     public bool IsSenderControllingParty(object sender, string mobilePartyId)

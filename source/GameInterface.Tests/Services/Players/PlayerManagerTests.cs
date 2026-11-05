@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using LiteNetLib;
 using Moq;
 using Serilog;
 using System;
@@ -312,7 +313,60 @@ public class PlayerManagerTests
     }
 
     [Fact]
-    public void IsSenderMercenaryOrRuler_OnlyTheCurrentMercenaryOrRulerPeerPasses()
+    public void IsSenderRuling_OnlyTheRulersCurrentPeerPasses()
+    {
+        var senders = CreateKingdomSenders();
+        try
+        {
+            var playerManager = senders.PlayerManager;
+            Assert.True(playerManager.IsSenderRuling(senders.RulerPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderRuling(senders.MemberPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderRuling(senders.MercenaryPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, senders.OtherKingdom));
+            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, null));
+
+            // After a reconnect the old peer stays in the peer map but no longer speaks for the ruler.
+            var reconnectedPeer = senders.Network.CreatePeer("10.0.0.10");
+            playerManager.SetPeer(ControllerId, reconnectedPeer);
+            Assert.True(playerManager.IsSenderRuling(reconnectedPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, senders.Kingdom));
+            // The handler logs once when it refuses, so a miss here must stay quiet.
+            Assert.DoesNotContain(senders.Logger.Invocations, invocation => invocation.Method.Name == nameof(ILogger.Warning));
+        }
+        finally
+        {
+            senders.Cleanup();
+        }
+    }
+
+    [Fact]
+    public void IsSenderMercenaryOf_OnlyTheMercenaryLeadersCurrentPeerPasses()
+    {
+        var senders = CreateKingdomSenders();
+        try
+        {
+            var playerManager = senders.PlayerManager;
+            Assert.True(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderMercenaryOf(senders.RulerPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderMercenaryOf(senders.MemberPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.OtherKingdom));
+            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, null));
+
+            // After a reconnect the old peer stays in the peer map but no longer speaks for the mercenary.
+            var reconnectedPeer = senders.Network.CreatePeer("10.0.0.11");
+            playerManager.SetPeer("PlayerThree", reconnectedPeer);
+            Assert.True(playerManager.IsSenderMercenaryOf(reconnectedPeer, senders.Kingdom));
+            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.Kingdom));
+            Assert.DoesNotContain(senders.Logger.Invocations, invocation => invocation.Method.Name == nameof(ILogger.Warning));
+        }
+        finally
+        {
+            senders.Cleanup();
+        }
+    }
+
+    // A ruler, a plain member and a mercenary of one kingdom, each with its own peer.
+    private KingdomSenders CreateKingdomSenders()
     {
         var logger = new Mock<ILogger>();
         var objectManager = new Mock<IObjectManager>();
@@ -324,9 +378,7 @@ public class PlayerManagerTests
         objectManager.Setup(o => o.TryGetObject("HeroTwo", out member)).Returns(true);
         objectManager.Setup(o => o.TryGetObject("HeroThree", out mercenary)).Returns(true);
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
-        var otherKingdom = ObjectHelper.SkipConstructor<Kingdom>();
-        var rulingClan = CreateClanInKingdom(ruler, kingdom, isMercenary: false);
-        kingdom._rulingClan = rulingClan;
+        kingdom._rulingClan = CreateClanInKingdom(ruler, kingdom, isMercenary: false);
         CreateClanInKingdom(member, kingdom, isMercenary: false);
         CreateClanInKingdom(mercenary, kingdom, isMercenary: true);
         var network = new TestNetwork();
@@ -342,36 +394,17 @@ public class PlayerManagerTests
         playerManager.SetPeer("PlayerTwo", memberPeer);
         playerManager.SetPeer("PlayerThree", mercenaryPeer);
 
-        try
-        {
-            Assert.True(playerManager.IsSenderMercenaryOrRuler(mercenaryPeer, kingdom, allowRuler: false));
-            Assert.True(playerManager.IsSenderMercenaryOrRuler(mercenaryPeer, kingdom, allowRuler: true));
-            Assert.True(playerManager.IsSenderMercenaryOrRuler(rulerPeer, kingdom, allowRuler: true));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(rulerPeer, kingdom, allowRuler: false));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(memberPeer, kingdom, allowRuler: true));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(mercenaryPeer, otherKingdom, allowRuler: true));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(rulerPeer, null, allowRuler: true));
-            logger.Verify(log => log.Warning(
-                "Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which may not accept for it",
-                It.IsAny<string>(), (int?)memberPeer.Id), Times.Once());
-
-            // After a reconnect the old peers stay in the peer map but no longer speak for their players.
-            var reconnectedRulerPeer = network.CreatePeer("10.0.0.10");
-            var reconnectedMercenaryPeer = network.CreatePeer("10.0.0.11");
-            playerManager.SetPeer(ControllerId, reconnectedRulerPeer);
-            playerManager.SetPeer("PlayerThree", reconnectedMercenaryPeer);
-            Assert.True(playerManager.IsSenderMercenaryOrRuler(reconnectedRulerPeer, kingdom, allowRuler: true));
-            Assert.True(playerManager.IsSenderMercenaryOrRuler(reconnectedMercenaryPeer, kingdom, allowRuler: false));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(rulerPeer, kingdom, allowRuler: true));
-            Assert.False(playerManager.IsSenderMercenaryOrRuler(mercenaryPeer, kingdom, allowRuler: false));
-        }
-        finally
-        {
-            GetPlayerObjects().Remove(ruler);
-            GetPlayerObjects().Remove(member);
-            GetPlayerObjects().Remove(mercenary);
-        }
+        return new KingdomSenders(logger, playerManager, network, kingdom, ObjectHelper.SkipConstructor<Kingdom>(),
+            rulerPeer, memberPeer, mercenaryPeer, () =>
+            {
+                GetPlayerObjects().Remove(ruler);
+                GetPlayerObjects().Remove(member);
+                GetPlayerObjects().Remove(mercenary);
+            });
     }
+
+    private sealed record KingdomSenders(Mock<ILogger> Logger, PlayerManager PlayerManager, TestNetwork Network,
+        Kingdom Kingdom, Kingdom OtherKingdom, NetPeer RulerPeer, NetPeer MemberPeer, NetPeer MercenaryPeer, Action Cleanup);
 
     private static Clan CreateClanInKingdom(Hero leader, Kingdom kingdom, bool isMercenary)
     {

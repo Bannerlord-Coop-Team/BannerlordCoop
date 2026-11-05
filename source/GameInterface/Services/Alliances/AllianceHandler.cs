@@ -1,9 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Alliances.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using LiteNetLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -12,6 +15,7 @@ namespace GameInterface.Services.Alliances;
 
 public class AllianceHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AllianceHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -178,7 +182,12 @@ public class AllianceHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ProposerKingdomId, out var proposer)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ReceiverKingdomId, out var receiver)) return;
             // Vanilla AcceptStartingAlliance runs for the ruler of a one clan kingdom or a mercenary (ConfirmAllianceOffer), so one of those must send it.
-            if (!playerManager.IsSenderMercenaryOrRuler(sender, receiver, allowRuler: true)) return;
+            if (!playerManager.IsSenderRuling(sender, receiver) && !playerManager.IsSenderMercenaryOf(sender, receiver))
+            {
+                Logger.Warning("Ignoring an alliance accept for kingdom {KingdomId} from peer {PeerId}, which neither rules it nor serves it as a mercenary",
+                    receiver.StringId, (sender as NetPeer)?.Id);
+                return;
+            }
 
             var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
             behavior?.StartAlliance(proposer, receiver);
