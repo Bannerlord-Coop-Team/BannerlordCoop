@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -92,8 +93,9 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
-        // A ruler hires a clan into its own kingdom from the hire conversation, so it needn't lead that clan.
-        if (kingdom.Leader != hero && !permissions.CanManageClan(hero, clan)) return;
+        // A ruler hires a clan into its own kingdom from the hire conversation, which vanilla only holds with an AI
+        // clan leader, so it needn't lead that clan. A player clan leader hires their own clan.
+        if ((kingdom.Leader != hero || clan.Leader?.IsPlayerHero() == true) && !permissions.CanManageClan(hero, clan)) return;
 
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
@@ -137,8 +139,9 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         // A ruler ends a mercenary clan's service from the conversation, to fire one serving its own kingdom or to hire
-        // one away from another kingdom, so it needn't lead that clan.
-        bool rulerEndsService = clan.IsUnderMercenaryService && hero.Clan?.Kingdom != null && hero.Clan.Kingdom.Leader == hero;
+        // one away from another kingdom, which vanilla only offers to an AI clan leader, so it needn't lead that clan.
+        bool rulerEndsService = clan.IsUnderMercenaryService && hero.Clan?.Kingdom != null && hero.Clan.Kingdom.Leader == hero &&
+            (clan.Kingdom == hero.Clan.Kingdom || clan.Leader?.IsPlayerHero() != true);
         if (!rulerEndsService && !permissions.CanManageClan(hero, clan)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)

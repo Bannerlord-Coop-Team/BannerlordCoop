@@ -650,40 +650,62 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             fromLeader, Server.GetRegisteredObject<Clan>(leader.ClanId).Kingdom != Server.GetRegisteredObject<Kingdom>(kingdomId)));
     }
 
-    // Hiring a mercenary from the ruler's conversation asks to join for a clan the ruler doesn't lead.
+    // A clan leader hires their own clan. A ruler hires a clan it doesn't lead from the hire conversation, which vanilla
+    // only holds with an AI clan leader.
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void MercenaryServiceRequest_ForAnotherClan_IsAppliedOnlyForTheKingdomsRuler(bool fromRuler)
+    [InlineData("Leader", true, true)]
+    [InlineData("Ruler", false, true)]
+    [InlineData("Ruler", true, false)]
+    [InlineData("Member", false, false)]
+    public void MercenaryServiceRequest_IsAppliedForTheClanLeaderOrTheRulerHiringAnAiClan(string sender, bool playerClan, bool applied)
     {
         var (_, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
-        var mercenary = CreateSyncedPlayerContext("HiredMercenary", _ => false);
+        var mercenaryClanId = CreateMercenaryClan(sender, playerClan);
 
-        Server.SimulateMessage((fromRuler ? Clients.First() : member).NetPeer, new RequestMercenaryService(kingdomId, 1, mercenary.ClanId));
+        Server.SimulateMessage((sender == "Ruler" ? Clients.First() : member).NetPeer, new RequestMercenaryService(kingdomId, 1, mercenaryClanId));
         Server.PumpGameThread();
 
-        Server.Call(() => Assert.Equal(fromRuler, Server.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService));
+        Server.Call(() => Assert.Equal(applied, Server.GetRegisteredObject<Clan>(mercenaryClanId).IsUnderMercenaryService));
     }
 
-    // Firing a mercenary from the ruler's conversation sends a dismissal for the mercenary's clan, which the ruler doesn't lead.
+    // A clan leader ends their own service. A ruler fires a clan serving its kingdom, or hires an AI led clan away
+    // from another kingdom, from the conversation.
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void MercenaryDismissalRequest_ForAnotherClan_IsAppliedOnlyForTheRuler(bool fromRuler)
+    [InlineData("Leader", false, true, true)]
+    [InlineData("Ruler", false, true, true)]
+    [InlineData("Ruler", true, false, true)]
+    [InlineData("Ruler", true, true, false)]
+    [InlineData("Member", false, true, false)]
+    public void MercenaryDismissalRequest_IsAppliedForTheClanLeaderOrARulerItConcerns(string sender, bool otherKingdom, bool playerClan, bool applied)
     {
         var (_, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
-        var mercenary = CreateSyncedPlayerContext("MercenaryClanLeader", _ => false);
-        ConfigureClanInKingdom(mercenary.ClanId, kingdomId);
+        var mercenaryClanId = CreateMercenaryClan(sender, playerClan);
+        var servingKingdomId = kingdomId;
+        if (otherKingdom)
+        {
+            servingKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+            ConfigureClanInKingdom(TestEnvironment.CreateRegisteredObject<Clan>(), servingKingdomId);
+        }
+        ConfigureClanInKingdom(mercenaryClanId, servingKingdomId);
         Server.Call(() =>
         {
             using (new AllowedThread())
-                Server.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
+                Server.GetRegisteredObject<Clan>(mercenaryClanId).IsUnderMercenaryService = true;
         });
 
-        Server.SimulateMessage((fromRuler ? Clients.First() : member).NetPeer, new RequestMercenaryDismissalService(kingdomId, mercenary.ClanId));
+        Server.SimulateMessage((sender == "Ruler" ? Clients.First() : member).NetPeer, new RequestMercenaryDismissalService(servingKingdomId, mercenaryClanId));
         Server.PumpGameThread();
 
-        Server.Call(() => Assert.Equal(fromRuler, Server.GetRegisteredObject<Clan>(mercenary.ClanId).Kingdom == null));
+        Server.Call(() => Assert.Equal(applied, Server.GetRegisteredObject<Clan>(mercenaryClanId).Kingdom == null));
+    }
+
+    // The clan leader's case plays the mercenary clan's leader on the member's client.
+    private string CreateMercenaryClan(string sender, bool playerClan)
+    {
+        if (!playerClan) return CreateSyncedNpcClan();
+        var mercenary = CreateSyncedPlayerContext("MercenaryClanLeader", _ => false);
+        if (sender == "Leader") TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "MercenaryClanLeader");
+        return mercenary.ClanId;
     }
 
     // The member plays a hero in the leader's clan but doesn't lead it.
