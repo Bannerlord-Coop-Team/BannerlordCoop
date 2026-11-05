@@ -2,6 +2,7 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing.Messages;
@@ -13,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
 
-/// <summary>The server applies smithy and clan support requests only for the sending player's own party and clan.</summary>
+/// <summary>The server applies smithy, clan support and patrol requests only for the sending player's own party and clan.</summary>
 public class SmithyClanSupportRequestSenderTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
@@ -22,6 +23,7 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
     private EnvironmentInstance Outsider => environment.Clients.Last();
 
     private string ownerHeroId;
+    private string ownerPartyId;
     private string clanId;
     private string outsiderClanId;
 
@@ -68,6 +70,37 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(1000f, Get<Clan>(clanId).Influence, precision: 2));
     }
 
+    // A hostile action against a party of a faction at peace declares war, which shows whether it was applied.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PatrolHostileAction_IsAppliedOnlyForTheSendersParty(bool fromOwner)
+    {
+        string ownerPartyBaseId = null, patrolPartyBaseId = null, patrolClanId = null;
+        Server.Call(() =>
+        {
+            var ownerClan = Get<Clan>(clanId);
+            var ownerKingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            ownerClan.Kingdom = ownerKingdom;
+
+            var patrol = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var patrolClan = patrol.LeaderHero.Clan ?? GameObjectCreator.CreateInitializedObject<Clan>();
+            patrol.LeaderHero.Clan = patrolClan;
+            patrol.ActualClan = patrolClan;
+            patrolClan.Kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            Assert.False(FactionManager.IsAtWarAgainstFaction(ownerClan.MapFaction, patrolClan.MapFaction));
+
+            Assert.True(Server.ObjectManager.TryGetId(Get<MobileParty>(ownerPartyId).Party, out ownerPartyBaseId));
+            Assert.True(Server.ObjectManager.TryGetId(patrol.Party, out patrolPartyBaseId));
+            Assert.True(Server.ObjectManager.TryGetId(patrolClan, out patrolClanId));
+        });
+
+        Send(fromOwner, new NetworkPatrolPartyHostileAction(ownerPartyBaseId, patrolPartyBaseId));
+
+        Server.Call(() => Assert.Equal(fromOwner,
+            FactionManager.IsAtWarAgainstFaction(Get<Clan>(clanId).MapFaction, Get<Clan>(patrolClanId).MapFaction)));
+    }
+
     // With no stamina left the smithy only reports the unchanged stamina, which is enough to see the request was applied.
     private void AddSmithyWithNoStamina()
     {
@@ -83,7 +116,7 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
     // The owner leads a clan and plays its party; the outsider plays a party in another clan.
     private void SetUp()
     {
-        string ownerPartyId = null, outsiderHeroId = null, outsiderPartyId = null;
+        string outsiderHeroId = null, outsiderPartyId = null;
         Server.Call(() =>
         {
             var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
