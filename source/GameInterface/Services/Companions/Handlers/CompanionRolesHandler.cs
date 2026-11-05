@@ -8,6 +8,7 @@ using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
@@ -38,6 +39,7 @@ internal class CompanionRolesHandler : IHandler
     private readonly ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
     private readonly ISendCoalescer sendCoalescer;
     private string pendingFireCompanionRequestId;
     private string pendingFireCompanionHeroId;
@@ -49,6 +51,7 @@ internal class CompanionRolesHandler : IHandler
         ICompanionRolesCampaignBehaviorInterface companionRolesCampaignBehaviorInterface,
         ITroopRosterInterface troopRosterInterface,
         IPlayerManager playerManager,
+        ICoopClanPermissions permissions,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -57,6 +60,7 @@ internal class CompanionRolesHandler : IHandler
         this.companionRolesCampaignBehaviorInterface = companionRolesCampaignBehaviorInterface;
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
+        this.permissions = permissions;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<ClanNameSelectionDone>(Handle_ClanNameSelectionDone);
@@ -232,6 +236,9 @@ internal class CompanionRolesHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId,
                     out var oneToOneConversationHero))
                     throw new InvalidOperationException("The requested companion could not be resolved.");
+                if (!playerManager.TryGetSenderHero(requester, out var actor) ||
+                    !permissions.CanManageHero(actor, oneToOneConversationHero))
+                    throw new InvalidOperationException("The requesting player cannot manage this companion.");
                 if (oneToOneConversationHero.CompanionOf == null ||
                     !objectManager.TryGetIdWithLogging(oneToOneConversationHero.CompanionOf, out var currentClanId) ||
                     currentClanId != data.ExpectedClanId)

@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
@@ -141,6 +143,28 @@ public class CompanionDismissalSyncTests : IDisposable
     }
 
     [Fact]
+    public void FireCompanion_FromAPlayerWhoCannotManageIt_ReturnsFailureWithoutMutatingCompanion()
+    {
+        var context = CreateCompanion(1, 0, includeParty: true);
+        var outsider = Clients[1];
+        string requestId = Guid.NewGuid().ToString("N");
+
+        outsider.Call(() => outsider.Resolve<INetwork>().SendAll(new FireCompanion(
+            requestId, context.HeroId, context.ClanId, context.PartyId)));
+
+        var completion = outsider.InternalMessages.OfType<FireCompanionCompleted>()
+            .Single(message => message.RequestId == requestId);
+        Assert.False(completion.Success);
+        Assert.Equal(1, GetTroopCount(Server, context.PartyId, context.CharacterId));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(context.HeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(context.ClanId, out var clan));
+            Assert.Same(clan, companion.CompanionOf);
+        });
+    }
+
+    [Fact]
     public void FireCompanion_WithStaleOwnership_ReturnsFailureWithoutMutatingCompanion()
     {
         var context = CreateCompanion(1, 0, includeParty: true);
@@ -226,12 +250,19 @@ public class CompanionDismissalSyncTests : IDisposable
         string clanId = null;
         string heroId = null;
         string characterId = null;
+        string leaderId = null;
 
         Server.Call(() =>
         {
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var companion = GameObjectCreator.CreateInitializedObject<Hero>();
             MobileParty party = null;
+
+            // The requesting client plays the clan's leader, who may dismiss its companions.
+            var leader = GameObjectCreator.CreateInitializedObject<Hero>();
+            leader.Clan = clan;
+            clan.SetLeader(leader);
+            Assert.True(Server.ObjectManager.TryGetId(leader, out leaderId));
 
             var companionName = new TextObject("Dismissal Test Companion");
             companion.SetName(companionName, companionName);
@@ -253,6 +284,13 @@ public class CompanionDismissalSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(companion.CharacterObject, out characterId));
         });
         testEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("ClanLeader", leaderId, null, clanId, null)));
+            playerManager.SetPeer("ClanLeader", Clients[0].NetPeer);
+        });
 
         return new CompanionContext(partyId, clanId, heroId, characterId);
     }
