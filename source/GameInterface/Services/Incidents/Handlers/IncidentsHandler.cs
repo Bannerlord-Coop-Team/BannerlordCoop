@@ -51,6 +51,7 @@ internal class IncidentsHandler : IHandler
         messageBroker.Subscribe<NetworkIncidentOptionInvoked>(Handle_NetworkIncidentOptionInvoked);
 
         messageBroker.Subscribe<NetworkIncidentInvoked>(Handle_NetworkIncidentInvoked);
+        messageBroker.Subscribe<NetworkIncidentDismissed>(Handle_NetworkIncidentDismissed);
     }
 
     public void Dispose()
@@ -59,6 +60,7 @@ internal class IncidentsHandler : IHandler
         messageBroker.Unsubscribe<NetworkIncidentOptionInvoked>(Handle_NetworkIncidentOptionInvoked);
 
         messageBroker.Unsubscribe<NetworkIncidentInvoked>(Handle_NetworkIncidentInvoked);
+        messageBroker.Unsubscribe<NetworkIncidentDismissed>(Handle_NetworkIncidentDismissed);
     }
 
     private void Handle_IncidentOptionInvoked(MessagePayload<IncidentOptionInvoked> obj)
@@ -122,18 +124,38 @@ internal class IncidentsHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            // Drop an invoked incident if in a conversation client-side since the server can't see this
-            if (Campaign.Current.ConversationManager.IsConversationFlowActive) return;
-
-            if (!objectManager.TryGetObjectWithLogging<Incident>(data.IncidentId, out var incident)) return;
-
-            incidentsInterface.PrepareIncidentText(incident, data.ActiveIncidentSeed);
-
             MapState mapState = GameStateManager.Current.LastOrDefault<MapState>();
-            if (mapState != null)
+            if (mapState == null)
             {
-                mapState.NextIncident = incident;
+                // Stays pending on the server, so it's sent again the next time this player joins
+                Logger.Warning("Not showing incident {IncidentId} because there is no map state yet", data.IncidentId);
+                return;
             }
+
+            // Drop an invoked incident if in a conversation client-side since the server can't see this
+            // Also check if conditions no longer hold so a client isn't left with a pending incident
+            if (Campaign.Current.ConversationManager.IsConversationFlowActive ||
+                !objectManager.TryGetObjectWithLogging<Incident>(data.IncidentId, out var incident) ||
+                !incidentsInterface.TryPrepareIncidentText(incident, data.ActiveIncidentSeed))
+            {
+                network.SendAll(new NetworkIncidentDismissed(data.IncidentId));
+                return;
+            }
+
+            mapState.NextIncident = incident;
+        });
+    }
+
+    private void Handle_NetworkIncidentDismissed(MessagePayload<NetworkIncidentDismissed> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
+
+            // Same as vanilla dropping an incident it can't show, so no cooldown is applied
+            sessionIncidentsPlayerDataInterface.TryConsumePendingIncident(player.HeroId, data.IncidentId);
         });
     }
 }

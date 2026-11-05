@@ -18,6 +18,8 @@ public interface ISessionIncidentsPlayerDataInterface : IGameAbstraction
     long GetActiveIncidentSeed(string playerHeroId);
     void SetPendingIncident(string playerHeroId, string incidentId);
     bool TryConsumePendingIncident(string playerHeroId, string incidentId);
+    bool TryGetPendingIncident(string playerHeroId, out string incidentId);
+    void ClearPendingIncident(string playerHeroId);
     void AddPlayerKeys(string playerHeroId, CampaignTime initialGlobalCooldown);
 }
 
@@ -119,6 +121,16 @@ public class SessionIncidentsPlayerDataInterface : ISessionIncidentsPlayerDataIn
 
         IncidentsPlayerData.PlayerPendingIncident.Remove(playerHeroId);
         return true;
+    }
+
+    public bool TryGetPendingIncident(string playerHeroId, out string incidentId)
+    {
+        return IncidentsPlayerData.PlayerPendingIncident.TryGetValue(playerHeroId, out incidentId);
+    }
+
+    public void ClearPendingIncident(string playerHeroId)
+    {
+        IncidentsPlayerData.PlayerPendingIncident.Remove(playerHeroId);
     }
 
     public void AddPlayerKeys(string playerHeroId, CampaignTime initialGlobalCooldown)

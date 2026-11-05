@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -35,6 +36,7 @@ public interface IIncidentsCampaignBehaviourInterface : IGameAbstraction
     void OnIncidentResolved(string playerHeroId, string incidentId, CampaignTime incidentCooldown);
     void AddPlayerKeys(string playerHeroId);
     void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentsCampaignBehaviour.IncidentTrigger trigger);
+    void ResendPendingIncident(Player player);
     List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero);
     bool TryDebugInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, Incident incident, out string error);
 }
@@ -51,6 +53,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMissionMembershipRegistry missionMembershipRegistry;
+
+    private readonly HashSet<string> heldBattleRollHeroIds = new();
 
     public IncidentsCampaignBehaviourInterface(
         IPlayerManager playerManager,
@@ -74,6 +78,14 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             if (partyLeader == null) continue;
 
             if (!playerManager.TryGetPlayer(playerParty, out var player)) continue;
+
+            // Roll for players whose battle ended while they were still in its mission once they've left it
+            if (heldBattleRollHeroIds.Contains(player.HeroId) && !IsInMission(player))
+            {
+                heldBattleRollHeroIds.Remove(player.HeroId);
+                TryInvokeIncident(player, playerParty, partyLeader, IncidentTrigger.LeavingBattle);
+                continue;
+            }
 
             float randomChance = playerParty.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks);
             if (playerParty.SiegeEvent != null && randomChance < Campaign.Current.Models.IncidentModel.GetIncidentTriggerProbabilityDuringSiege())
@@ -201,7 +213,17 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentTrigger trigger)
     {
+        // Hold the roll for a battle that ends before its player has left the mission
+        if (trigger == IncidentTrigger.LeavingBattle && IsInMission(player))
+        {
+            heldBattleRollHeroIds.Add(player.HeroId);
+            return;
+        }
+
         if (!IsPlayerAvailableForIncident(player, playerParty, playerHero)) return;
+
+        // Skip if a pending incident exists
+        if (sessionIncidentsPlayerDataInterface.TryGetPendingIncident(player.HeroId, out _)) return;
 
         // Run vanilla checks for invoking incidents
         bool isEnteringSettlement = (trigger & EnteringSettlementTriggers) != 0;
@@ -230,18 +252,38 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         }
     }
 
+    // A player who disconnects with an incident open is sent it again on rejoin, so leaving can't skip its outcome
+    public void ResendPendingIncident(Player player)
+    {
+        if (!sessionIncidentsPlayerDataInterface.TryGetPendingIncident(player.HeroId, out var incidentId)) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+
+        // Nothing rolls while an incident is pending, so the stored seed is still the one it was rolled with
+        network.Send(peer, new NetworkIncidentInvoked(incidentId, sessionIncidentsPlayerDataInterface.GetActiveIncidentSeed(player.HeroId)));
+    }
+
     public List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero)
     {
         List<Incident> incidents = new();
         if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return incidents;
 
-        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
+        // Only the behaviour's seed, so listing doesn't replace the stored seed of a pending incident
+        incidentsBehavior._activeIncidentSeed = CampaignTime.Now.NumTicks;
 
         using (new MainHeroSubstitutionScope(playerHero, playerParty))
         {
             foreach (Incident incident in MBObjectManager.Instance.GetObjectTypeList<Incident>())
             {
-                if (incident.CanIncidentBeInvoked()) incidents.Add(incident);
+                // Every incident is checked regardless of trigger, and some vanilla conditions assume their trigger's state,
+                // e.g. incident_love_marriage reads LastVisitedSettlement without a null check
+                try
+                {
+                    if (incident.CanIncidentBeInvoked()) incidents.Add(incident);
+                }
+                catch (Exception e)
+                {
+                    Logger.Debug(e, "Skipping {IncidentId} because its conditions threw for this player", incident.StringId);
+                }
             }
         }
 
@@ -256,6 +298,12 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         if (!IsPlayerAvailableForIncident(player, playerParty, playerHero))
         {
             error = "Player is disconnected, dead, a prisoner, in a battle or in a mission";
+            return false;
+        }
+
+        if (sessionIncidentsPlayerDataInterface.TryGetPendingIncident(player.HeroId, out var pendingIncidentId))
+        {
+            error = $"Player still has {pendingIncidentId} pending. Answer it or run coop.debug.incident.clear_cooldowns";
             return false;
         }
 
@@ -290,9 +338,14 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         if (playerManager.IsOwnerOfHeroDisconnected(playerHero)) return false;
         if (!playerHero.IsAlive || playerHero.IsPrisoner) return false;
         if (playerParty.MapEvent?.IsFinalized == false) return false;
-        if (missionMembershipRegistry?.IsControllerInMission(player.ControllerId) == true) return false;
+        if (IsInMission(player)) return false;
 
         return true;
+    }
+
+    private bool IsInMission(Player player)
+    {
+        return missionMembershipRegistry?.IsControllerInMission(player.ControllerId) == true;
     }
 
     // Vanilla conditions and effects pick their targets with the behaviour's seed, so evaluate them with this player's seed
@@ -322,14 +375,13 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private void InvokeIncident(Player player, Incident incident)
     {
         if (!objectManager.TryGetIdWithLogging(incident, out var incidentId)) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
 
         // IncidentsHandler only applies an option for the incident the player was last sent
         sessionIncidentsPlayerDataInterface.SetPendingIncident(player.HeroId, incidentId);
 
         // The client fills in the incident's text with the same seed the server rolled it with
         var message = new NetworkIncidentInvoked(incidentId, sessionIncidentsPlayerDataInterface.GetActiveIncidentSeed(player.HeroId));
-
-        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
         network.Send(peer, message);
     }
 

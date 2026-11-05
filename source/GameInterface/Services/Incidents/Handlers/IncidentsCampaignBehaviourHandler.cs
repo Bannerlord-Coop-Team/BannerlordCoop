@@ -173,6 +173,10 @@ internal class IncidentsCampaignBehaviourHandler : IHandler
             if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
 
             incidentsCampaignBehaviourInterface.AddPlayerKeys(data.PlayerHeroId);
+
+            // Sent when the player takes control of their hero, which includes rejoining with an incident still open
+            if (obj.Who is NetPeer peer && playerManager.TryGetPlayer(peer, out var player))
+                incidentsCampaignBehaviourInterface.ResendPendingIncident(player);
         });
     }
 

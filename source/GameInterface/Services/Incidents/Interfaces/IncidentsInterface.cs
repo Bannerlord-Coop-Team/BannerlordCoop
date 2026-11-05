@@ -12,20 +12,20 @@ namespace GameInterface.Services.Incidents.Interfaces;
 public interface IIncidentsInterface : IGameAbstraction
 {
     bool TryInvokeOption(Hero mainHero, MobileParty mainParty, Incident.IncidentOption selectedOption, long activeIncidentSeed, out List<TextObject> incidentOutcomes);
-    void PrepareIncidentText(Incident incident, long activeIncidentSeed);
+    bool TryPrepareIncidentText(Incident incident, long activeIncidentSeed);
 }
 
 public class IncidentsInterface : IIncidentsInterface
 {
-    public void PrepareIncidentText(Incident incident, long activeIncidentSeed)
+    public bool TryPrepareIncidentText(Incident incident, long activeIncidentSeed)
     {
         var incidentsBehavior = Campaign.Current?.GetCampaignBehavior<IncidentsCampaignBehaviour>();
-        if (incidentsBehavior == null) return;
+        if (incidentsBehavior == null) return false;
 
         // Same seed the server rolled with, so the text names the same targets the server applies effects to
         incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
 
-        incident.CanIncidentBeInvoked();
+        return incident.CanIncidentBeInvoked();
     }
 
     public bool TryInvokeOption(Hero mainHero, MobileParty mainParty, Incident.IncidentOption selectedOption, long activeIncidentSeed, out List<TextObject> incidentOutcomes)

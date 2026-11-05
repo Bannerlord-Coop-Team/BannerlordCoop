@@ -189,7 +189,7 @@ internal class IncidentDebugCommands
 
         public string Name => "clear_cooldowns";
 
-        public string Description => "Clears a player's global and per-incident cooldowns so the normal triggers can roll again.";
+        public string Description => "Clears a player's global and per-incident cooldowns and pending incident so the normal triggers can roll again.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
@@ -204,8 +204,9 @@ internal class IncidentDebugCommands
 
             sessionIncidentsPlayerDataInterface.ClearIncidentCooldowns(player.HeroId);
             sessionIncidentsPlayerDataInterface.SetGlobalCooldown(player.HeroId, CampaignTime.Zero);
+            sessionIncidentsPlayerDataInterface.ClearPendingIncident(player.HeroId);
 
-            return Succeeded($"Cleared incident cooldowns for {hero.Name}");
+            return Succeeded($"Cleared incident cooldowns and pending incident for {hero.Name}");
         }
     }
 }
