@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Messages;
