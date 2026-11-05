@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using GameInterface.Services.Players;
 using Missions.Messages;
 using Xunit.Abstractions;
 
@@ -110,5 +112,31 @@ public class HostElectionTests : MissionTestEnvironment
         EnterBattle(Clients.First(), mapEventId);
 
         Assert.True(assignmentWasQueued);
+    }
+
+    // The second client switched seats and still sends the first player's controller id.
+    [Fact]
+    public void HostRequestCarryingAnotherSeatsControllerId_ElectsNoHost()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", Clients.Last().NetPeer));
+
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBattleHost(mapEventId, "ctrl-A"));
+        Server.PumpGameThread();
+
+        AssertNoHost(Server, mapEventId);
+    }
+
+    [Fact]
+    public void ReserveRequestCarryingAnotherSeatsControllerId_SendsNoReserves()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", Clients.Last().NetPeer));
+        Server.NetworkSentMessages.Clear();
+
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBattleReserves(mapEventId, "ctrl-A"));
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkBattleTroopReserve>());
     }
 }

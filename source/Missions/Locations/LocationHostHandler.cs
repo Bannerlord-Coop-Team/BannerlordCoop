@@ -97,10 +97,6 @@ internal class LocationHostHandler : IHandler
         Logger.Information("[LocationHost] Mission ready — requested host election for location {InstanceId}", instanceId);
     }
 
-    // A peer already linked to another controller (it switched seats) sends a stale controller id.
-    private bool IsSenderController(NetPeer requester, string controllerId) =>
-        requester == null || !playerManager.TryGetPlayer(requester, out var player) || player.ControllerId == controllerId;
-
     /// <summary>[Server] Elect the host (first MISSION-READY requester wins, SR-010) and append later
     /// ready requesters to the successor line in arrival order; broadcast the assignment. A duplicate/late
     /// requester just gets a re-confirm.</summary>
@@ -120,7 +116,8 @@ internal class LocationHostHandler : IHandler
             if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(requesterId))
                 return;
 
-            if (!IsSenderController(requester, requesterId))
+            // A peer linked to another controller (it switched seats) sends a stale controller id.
+            if (playerManager.TryGetPlayer(requester, out var senderPlayer) && senderPlayer.ControllerId != requesterId)
             {
                 Logger.Warning("[LocationHost] Ignoring host request for {InstanceId} from '{Requester}' (the sending peer controls another seat now)",
                     instanceId, requesterId);

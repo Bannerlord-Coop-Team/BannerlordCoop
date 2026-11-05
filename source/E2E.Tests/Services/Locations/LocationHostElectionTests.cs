@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Players;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
@@ -263,5 +264,18 @@ public class LocationHostElectionTests : LocationHostTestEnvironment
         DepartBattle("B", mapEventId, wasRetreat: true);
         AssertHost(Server, mapEventId, "A");
         AssertLocationHost(Server, instanceId, "B");
+    }
+
+    // The second client switched seats and still sends the first player's controller id.
+    [Fact]
+    public void HostRequestCarryingAnotherSeatsControllerId_ElectsNoHost()
+    {
+        var (instanceId, _) = SetupSettlementLocation("A", "B");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("B", Clients.ElementAt(1).NetPeer));
+
+        Server.SimulateMessage(Clients.ElementAt(1).NetPeer, new NetworkRequestLocationHost(instanceId, "A"));
+        Server.PumpGameThread();
+
+        AssertNoLocationHost(Server, instanceId);
     }
 }
