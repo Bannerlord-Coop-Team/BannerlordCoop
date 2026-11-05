@@ -2,13 +2,18 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Barbers.Messages;
+using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.CharacterDevelopers.Messages;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -88,6 +93,79 @@ public class PartyHeroRequestSenderTests : IDisposable
         Send(fromOwner, new UpdatePartyBehaviorOnSelection(clanPartyId, MobileParty.PartyObjective.Aggressive));
 
         Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(clanPartyId).Objective == MobileParty.PartyObjective.Aggressive));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WageLimit_IsSetOnlyByTheClanLeader(bool fromOwner)
+    {
+        Server.Call(() => Assert.NotEqual(123, Get<MobileParty>(clanPartyId).PaymentLimit));
+
+        Send(fromOwner, new SetWagePaymentLimit(clanPartyId, 123));
+
+        Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(clanPartyId).PaymentLimit == 123));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TownAutoRecruit_IsSetOnlyByTheOwnerClansLeader(bool fromOwner)
+    {
+        string settlementId = null;
+        bool initial = false;
+        Server.Call(() =>
+        {
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            settlement.Town = town;
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = Get<Clan>(clanId);
+            town.IsOwnerUnassigned = false;
+            initial = town.GarrisonAutoRecruitmentIsEnabled;
+            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+        });
+
+        Send(fromOwner, new ChangeAutoRecruitForSettlement(settlementId, !initial));
+
+        Server.Call(() => Assert.Equal(fromOwner, Get<Settlement>(settlementId).Town.GarrisonAutoRecruitmentIsEnabled != initial));
+    }
+
+    [Fact]
+    public void HeroRenameOfAnotherPlayersHero_IsRefused()
+    {
+        string originalName = null;
+        HeroChangeNameData data = null;
+        Server.Call(() =>
+        {
+            var owner = Get<Hero>(ownerHeroId);
+            originalName = owner.Name.ToString();
+            data = new HeroChangeNameData(owner, new TextObject("Renamed Hero"), new TextObject("Renamed"));
+        });
+
+        Send(fromOwner: false, new NetworkChangeHeroName(data));
+
+        Server.Call(() => Assert.Equal(originalName, Get<Hero>(ownerHeroId).Name.ToString()));
+    }
+
+    [Fact]
+    public void AttributePointsOnAnotherPlayersHero_AreRefused()
+    {
+        var developerId = environment.CreateRegisteredObject<HeroDeveloper>();
+        var attributeId = environment.CreateRegisteredObject<CharacterAttribute>();
+        int initial = 0;
+        Server.Call(() =>
+        {
+            var developer = Get<HeroDeveloper>(developerId);
+            developer.Hero = Get<Hero>(ownerHeroId);
+            developer.UnspentAttributePoints = 5;
+            initial = developer.Hero.GetAttributeValue(Get<CharacterAttribute>(attributeId));
+        });
+
+        Send(fromOwner: false, new NetworkApplyChanges(developerId,
+            new List<string>(), new List<string> { attributeId }, new List<int> { 1 }, new List<string>(), new List<int>()));
+
+        Server.Call(() => Assert.Equal(initial, Get<Hero>(ownerHeroId).GetAttributeValue(Get<CharacterAttribute>(attributeId))));
     }
 
     // The owner leads a clan with a second, AI-led party; the outsider plays a party of its own.
