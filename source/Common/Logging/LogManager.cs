@@ -14,6 +14,7 @@ public static class LogManager
 
 	// Built from Configuration on the first event, not the first GetLogger, because a static Logger field can be
 	// initialized before the mod adds its file sink (parsing /autoconnect host:port touches CoopConnectMenuVM first).
+	// Configuration is still frozen at that first event, so finish configuring before anything logs.
 	private static Lazy<ILogger> _logger = new Lazy<ILogger>(() =>
     {
         var configuration = Configuration
