@@ -35,6 +35,8 @@ public interface IIncidentsCampaignBehaviourInterface : IGameAbstraction
     void OnIncidentResolved(string playerHeroId, string incidentId, CampaignTime incidentCooldown);
     void AddPlayerKeys(string playerHeroId);
     void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentsCampaignBehaviour.IncidentTrigger trigger);
+    List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero);
+    bool TryDebugInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, Incident incident, out string error);
 }
 
 public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourInterface
@@ -199,11 +201,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
     public void TryInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, IncidentTrigger trigger)
     {
-        // Incidents only show on the world map, so skip players who are disconnected, dead, in a battle or in a mission
-        if (playerManager.IsOwnerOfHeroDisconnected(playerHero)) return;
-        if (!playerHero.IsAlive) return;
-        if (playerParty.MapEvent?.IsFinalized == false) return;
-        if (missionMembershipRegistry?.IsControllerInMission(player.ControllerId) == true) return;
+        if (!IsPlayerAvailableForIncident(player, playerParty, playerHero)) return;
 
         // Run vanilla checks for invoking incidents
         bool isEnteringSettlement = (trigger & EnteringSettlementTriggers) != 0;
@@ -212,20 +210,13 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         bool isLeavingSettlement = (trigger & LeavingSettlementTriggers) != 0;
         if (isLeavingSettlement && playerParty.LastVisitedSettlement.IsSettlementBusy(this)) return;
 
-        // Vanilla's conversation check is done by the client in IncidentsHandler, since the server never has one
-        if (playerHero.IsPrisoner) return;
-
         if (sessionIncidentsPlayerDataInterface.IsOnGlobalCooldown(player.HeroId)) return;
 
         if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return;
 
         sessionIncidentsPlayerDataInterface.CheckIncidentsOnCooldown(player.HeroId);
 
-        long activeIncidentSeed = CampaignTime.Now.NumTicks;
-        sessionIncidentsPlayerDataInterface.SetActiveIncidentSeed(player.HeroId, activeIncidentSeed);
-
-        // Vanilla conditions pick their targets with the behaviour's seed, so evaluate them with this player's seed
-        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
 
         var occurableEventsForTrigger = new List<Incident>();
         using (new MainHeroSubstitutionScope(playerHero, playerParty))
@@ -237,6 +228,79 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
             Incident randomElement = occurableEventsForTrigger.GetRandomElement();
             InvokeIncident(player, randomElement);
         }
+    }
+
+    public List<Incident> GetDebugInvokableIncidents(Player player, MobileParty playerParty, Hero playerHero)
+    {
+        List<Incident> incidents = new();
+        if (!TryGetIncidentsBehavior(out var incidentsBehavior)) return incidents;
+
+        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
+
+        using (new MainHeroSubstitutionScope(playerHero, playerParty))
+        {
+            foreach (Incident incident in MBObjectManager.Instance.GetObjectTypeList<Incident>())
+            {
+                if (incident.CanIncidentBeInvoked()) incidents.Add(incident);
+            }
+        }
+
+        return incidents;
+    }
+
+    // Skips the trigger, probability and cooldowns, but keeps the availability guards and the incident's own conditions
+    public bool TryDebugInvokeIncident(Player player, MobileParty playerParty, Hero playerHero, Incident incident, out string error)
+    {
+        error = null;
+
+        if (!IsPlayerAvailableForIncident(player, playerParty, playerHero))
+        {
+            error = "Player is disconnected, dead, a prisoner, in a battle or in a mission";
+            return false;
+        }
+
+        if (!TryGetIncidentsBehavior(out var incidentsBehavior))
+        {
+            error = "IncidentsCampaignBehaviour is unavailable";
+            return false;
+        }
+
+        RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
+
+        bool canBeInvoked;
+        using (new MainHeroSubstitutionScope(playerHero, playerParty))
+        {
+            canBeInvoked = incident.CanIncidentBeInvoked();
+        }
+
+        if (!canBeInvoked)
+        {
+            error = $"{incident.StringId} conditions don't hold for this player";
+            return false;
+        }
+
+        InvokeIncident(player, incident);
+        return true;
+    }
+
+    // Incidents only show on the world map, so skip players who are disconnected, dead, a prisoner, in a battle or in a mission.
+    // Vanilla's conversation check is done by the client in IncidentsHandler, since the server never has one.
+    private bool IsPlayerAvailableForIncident(Player player, MobileParty playerParty, Hero playerHero)
+    {
+        if (playerManager.IsOwnerOfHeroDisconnected(playerHero)) return false;
+        if (!playerHero.IsAlive || playerHero.IsPrisoner) return false;
+        if (playerParty.MapEvent?.IsFinalized == false) return false;
+        if (missionMembershipRegistry?.IsControllerInMission(player.ControllerId) == true) return false;
+
+        return true;
+    }
+
+    // Vanilla conditions and effects pick their targets with the behaviour's seed, so evaluate them with this player's seed
+    private void RollActiveIncidentSeed(string playerHeroId, IncidentsCampaignBehaviour incidentsBehavior)
+    {
+        long activeIncidentSeed = CampaignTime.Now.NumTicks;
+        sessionIncidentsPlayerDataInterface.SetActiveIncidentSeed(playerHeroId, activeIncidentSeed);
+        incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
     }
 
     private List<Incident> GetOccurableEventsForTrigger(string playerHeroId, IncidentTrigger trigger)
