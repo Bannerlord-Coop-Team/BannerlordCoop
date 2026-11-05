@@ -7,7 +7,6 @@ using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -128,7 +127,7 @@ internal class TradeAgreementsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.FromKingdomId, out var fromKingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.PlayerKingdomId, out var playerKingdom)) return;
             // Only the kingdom ruler's player may accept an offer here, so one member cannot sign a trade agreement for the whole kingdom.
-            if (sender is NetPeer && !IsSenderRuling(sender, playerKingdom)) return;
+            if (!IsSenderRuling(sender, playerKingdom)) return;
 
             tradeAgreementsBehavior.MakeTradeAgreement(
                 fromKingdom,

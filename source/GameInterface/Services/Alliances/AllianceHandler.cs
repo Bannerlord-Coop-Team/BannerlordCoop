@@ -4,7 +4,6 @@ using Common.Network;
 using GameInterface.Services.Alliances.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -179,7 +178,7 @@ public class AllianceHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ProposerKingdomId, out var proposer)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ReceiverKingdomId, out var receiver)) return;
             // A client accepts an offer made to its own kingdom (vanilla AcceptStartingAlliance), so it must rule the receiver.
-            if (sender is NetPeer && !IsSenderRuling(sender, receiver)) return;
+            if (!IsSenderRuling(sender, receiver)) return;
 
             var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
             behavior?.StartAlliance(proposer, receiver);

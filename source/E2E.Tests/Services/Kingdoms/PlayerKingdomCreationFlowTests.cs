@@ -3804,7 +3804,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(initialInfluence, clientInfluenceAfterProposal, precision: 4);
         Assert.NotNull(decisionData);
         Server.SimulateMessage(
-            this,
+            client1.NetPeer,
             new NetworkAddDecision(kingdomId, decisionData, ignoreInfluenceCost: false, randomNumber: 0.5f));
         Server.Call(() =>
         {
@@ -5110,7 +5110,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     isAbstain: false,
                     isFinal: true);
                 Server.Resolve<IMessageBroker>().Publish(
-                    this, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+                    client1.NetPeer, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
             });
         });
 

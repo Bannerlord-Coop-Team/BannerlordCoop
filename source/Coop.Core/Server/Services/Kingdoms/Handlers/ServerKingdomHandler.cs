@@ -71,7 +71,7 @@ public class ServerKingdomHandler : IHandler
     {
         var payload = obj.What;
         var partyId = payload.PartyId;
-        if (!TryGetSenderControllerId(obj.Who, payload.ControllerId, out var controllerId)) return;
+        if (!TryGetSenderControllerId(obj.Who, out var controllerId)) return;
 
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
@@ -95,18 +95,18 @@ public class ServerKingdomHandler : IHandler
         messageBroker.Publish(this, new CreateKingdom(controllerId, payload.KingdomName, payload.CultureId));
     }
 
-    // A peer always acts as its own controller, whatever id the message carries; server-published requests keep theirs.
-    private bool TryGetSenderControllerId(object sender, string requestedControllerId, out string controllerId)
+    // A peer always acts as its own controller, whatever id the message carries. Only clients send these requests.
+    private bool TryGetSenderControllerId(object sender, out string controllerId)
     {
-        controllerId = requestedControllerId;
-        if (sender is not NetPeer peer) return true;
-        if (playerManager.TryGetPlayer(peer, out var player))
+        controllerId = null;
+        var peer = sender as NetPeer;
+        if (peer != null && playerManager.TryGetPlayer(peer, out var player))
         {
             controllerId = player.ControllerId;
             return true;
         }
 
-        Logger.Warning("Ignoring a kingdom request from peer {PeerId} with no registered player", peer.Id);
+        Logger.Warning("Ignoring a kingdom request from peer {PeerId} with no registered player", peer?.Id);
         return false;
     }
 
@@ -266,7 +266,7 @@ public class ServerKingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
-        if (!TryGetSenderControllerId(obj.Who, payload.ControllerId, out var controllerId)) return;
+        if (!TryGetSenderControllerId(obj.Who, out var controllerId)) return;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
@@ -286,26 +286,26 @@ public class ServerKingdomHandler : IHandler
 
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
+        if (obj.Who is not NetPeer peer) return;
         var payload = obj.What;
-        if (obj.Who is NetPeer && !IsSenderInKingdom(obj.Who, payload.KingdomId)) return;
 
-        messageBroker.Publish(
-            this,
-            new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
-
-        var message = new NetworkAddDecision(
-            payload.KingdomId,
-            payload.Data,
-            payload.IgnoreInfluenceCost,
-            payload.RandomNumber);
-
-        if (obj.Who is NetPeer peer)
+        // The sender's clan and the kingdom are game state, so the check runs on the game thread with the apply.
+        GameThread.RunSafe(() =>
         {
-            network.SendAllBut(peer, message);
-            return;
-        }
+            if (!IsSenderInKingdom(peer, payload.KingdomId)) return;
 
-        network.SendAll(message);
+            messageBroker.Publish(
+                this,
+                new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
+
+            var message = new NetworkAddDecision(
+                payload.KingdomId,
+                payload.Data,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber);
+
+            network.SendAllBut(peer, message);
+        }, context: nameof(HandleNetworkAddDecision));
     }
 
     // Only a member clan can propose a decision to its kingdom. The client's IgnoreInfluenceCost stays, because
