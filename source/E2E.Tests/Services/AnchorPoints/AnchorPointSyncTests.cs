@@ -1,4 +1,6 @@
 ﻿using E2E.Tests.Util;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -147,11 +149,18 @@ public class AnchorPointSyncTests : SyncTestBase
         Server.Call(() =>
         {
             UseSeaMap();
-            Server.GetRegisteredObject<MobileParty>(partyId).Anchor.SetPosition(new CampaignVec2(AnchorPosition, isOnLand: false)
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            party.Anchor.SetPosition(new CampaignVec2(AnchorPosition, isOnLand: false)
             {
                 _faceCache = new PathFaceRecord(1, 0, 0),
                 _isPositionCacheValid = true,
             });
+
+            // The first client controls the party, which stands where its fleet last dropped it off
+            party.Anchor.SetLastUsedDisembarkPosition(party.Position);
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.AddPlayer(new Player("anchor_owner", null, partyId, null, null)));
+            players.SetPeer("anchor_owner", Clients.First().NetPeer);
         });
 
         foreach (var client in Clients)
