@@ -1,12 +1,12 @@
-﻿using GameInterface.Services.Players;
-using GameInterface.Services.Clans;
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -355,5 +355,4 @@ internal class PartyRolesHandler : IHandler
     {
         network.SendAll(new NetworkRefreshAfterRoleAssignment(mobilePartyId));
     }
-
 }

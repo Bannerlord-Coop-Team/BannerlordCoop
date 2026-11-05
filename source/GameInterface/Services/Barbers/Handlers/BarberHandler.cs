@@ -1,9 +1,9 @@
-﻿using GameInterface.Services.Clans;
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Barbers.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using SandBox.CampaignBehaviors;
