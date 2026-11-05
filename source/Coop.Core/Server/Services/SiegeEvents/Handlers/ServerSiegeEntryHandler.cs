@@ -249,6 +249,8 @@ internal class ServerSiegeEntryHandler : IHandler
     private void HandleAssault(MessagePayload<NetworkRequestSiegeAssault> payload)
     {
         var obj = payload.What;
+        // A player orders the assault from its own party in the camp.
+        if (payload.Who is NetPeer && !playerManager.IsSenderControllingParty(payload.Who, obj.PartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -484,6 +486,7 @@ internal class ServerSiegeEntryHandler : IHandler
     {
         var obj = payload.What;
         var peer = (NetPeer)payload.Who;
+        if (peer != null && !playerManager.IsSenderControllingParty(peer, obj.PartyId)) return;
 
         GameThread.RunSafe(() =>
         {

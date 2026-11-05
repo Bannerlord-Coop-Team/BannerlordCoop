@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.Players.Data;
+using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
@@ -208,6 +209,13 @@ public class SiegeDisconnectTests : SiegeTestBase
             AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
         using var siegeDeactivation = new MethodCallRecorder(
             AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
+        // The server only breaks the siege of the requesting player's own party.
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Breaker", null, partyId, null, null)));
+            playerManager.SetPeer("Breaker", requestingClient.NetPeer);
+        });
         Server.SimulateMessage(
             requestingClient.NetPeer,
             new NetworkRequestBreakSiege(partyId, finishLocalMenus));

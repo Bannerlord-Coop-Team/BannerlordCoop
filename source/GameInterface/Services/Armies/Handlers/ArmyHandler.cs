@@ -7,6 +7,7 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -94,6 +95,7 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+            if (!IsAllowedArmyMemberChange(payload.Who, army, mobileParty)) return;
 
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
 
@@ -134,6 +136,7 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
+            if (!IsAllowedArmyMemberChange(payload.Who, army, mobileParty)) return;
             MobileParty clientMobileParty = null;
             if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
             {
@@ -253,6 +256,10 @@ public class ArmyHandler : IHandler
     {
         var obj = payload.What;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.ArmyLeaderPartyId, out var leaderParty)) return;
+        // The army's leader boosts its cohesion; the amounts come from that client, so neither may be negative.
+        if (ModInformation.IsServer && payload.Who is NetPeer &&
+            (!playerManager.IsSenderControllingParty(payload.Who, obj.ArmyLeaderPartyId) ||
+             obj.CohesionToGain < 0 || obj.InfluenceCost < 0)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -272,9 +279,31 @@ public class ArmyHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
+            if (ModInformation.IsServer && payload.Who is NetPeer && !IsSenderSpendingOwnInfluence(payload.Who, playerClan, payload.What.Influence)) return;
             ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
         });
     }
+    // The army leader changes its members, and a member may take its own party in or out.
+    private bool IsAllowedArmyMemberChange(object sender, Army army, MobileParty party)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return false;
+        if (objectManager.TryGetId(party, out var partyId) && partyId == player.MobilePartyId) return true;
+        if (army.LeaderParty != null && objectManager.TryGetId(army.LeaderParty, out var leaderId) && leaderId == player.MobilePartyId) return true;
+
+        Logger.Warning("Ignoring an army change for party {PartyId} from a peer that leads neither it nor the army", party.StringId);
+        return false;
+    }
+
+    // A client only spends its own clan's influence; the amount can't be recomputed here, so it must be a spend.
+    private bool IsSenderSpendingOwnInfluence(object sender, Clan clan, float influence)
+    {
+        if (influence >= 0 && playerManager.TryGetSenderHero(sender, out var hero) && hero.Clan == clan) return true;
+
+        Logger.Warning("Ignoring an influence change of {Influence} for clan {ClanId} from a peer outside it", influence, clan.StringId);
+        return false;
+    }
+
     private void HandleSetArmyKingdom(MessagePayload<SetArmyKingdom> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.Army, out var armyId)) return;

@@ -5,6 +5,7 @@ using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using LiteNetLib;
@@ -24,9 +25,11 @@ internal class ServerSiegeAftermathHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IPlayerManager playerManager;
 
-    public ServerSiegeAftermathHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
+    public ServerSiegeAftermathHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface, IPlayerManager playerManager)
     {
+        this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
@@ -74,6 +77,8 @@ internal class ServerSiegeAftermathHandler : IHandler
     private void HandleRequest(MessagePayload<NetworkRequestSiegeAftermath> payload)
     {
         var obj = payload.What;
+        // The aftermath choice belongs to the capturing leader's player.
+        if (payload.Who is NetPeer && !playerManager.IsSenderControllingParty(payload.Who, obj.PartyId)) return;
 
         GameThread.RunSafe(() =>
         {

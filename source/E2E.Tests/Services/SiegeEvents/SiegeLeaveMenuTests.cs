@@ -1,4 +1,6 @@
-﻿using Common.Util;
+﻿using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players;
+using Common.Util;
 using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
@@ -793,13 +795,24 @@ public class SiegeLeaveMenuTests : IDisposable
 
     /// <summary>Makes the party the instance's <see cref="MobileParty.MainParty"/>. Runs in the
     /// instance's static scope, where <c>Campaign.Current</c> resolves to that instance.</summary>
-    private static void SetMainParty(EnvironmentInstance instance, string partyId)
+    private void SetMainParty(EnvironmentInstance instance, string partyId)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Campaign.Current.MainParty = party;
             Assert.Same(party, MobileParty.MainParty);
+        });
+
+        // The server only applies a leave from the peer that plays the leaving party.
+        if (instance == TestEnvironment.Server) return;
+        TestEnvironment.Server.Call(() =>
+        {
+            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+            string controllerId = "leaver-" + partyId;
+            if (!playerManager.TryGetPlayer(controllerId, out _))
+                Assert.True(playerManager.AddPlayer(new Player(controllerId, null, partyId, null, null)));
+            playerManager.SetPeer(controllerId, instance.NetPeer);
         });
     }
 

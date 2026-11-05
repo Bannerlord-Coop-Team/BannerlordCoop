@@ -1,4 +1,5 @@
-﻿using Common.Tests.Utils;
+﻿using GameInterface.Services.Players;
+using Common.Tests.Utils;
 using Coop.Core.Server.Services.SiegeEvents.Handlers;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Tests.Mocks;
@@ -37,7 +38,7 @@ public sealed class ServerSiegeAftermathHandlerTests
         siegeEventInterface.Setup(service => service.GetPendingSiegeAftermathPrompts())
             .Returns(new[] { new PendingSiegeAftermathPrompt(leaderParty, settlement, previousOwnerClan) });
         using var handler = new ServerSiegeAftermathHandler(
-            broker, network, objectManager.Object, siegeEventInterface.Object);
+            broker, network, objectManager.Object, siegeEventInterface.Object, Mock.Of<IPlayerManager>());
 
         handler.SendPendingAftermathPrompts(peer);
 
@@ -64,7 +65,7 @@ public sealed class ServerSiegeAftermathHandlerTests
         siegeEventInterface.Setup(service => service.GetPendingSiegeAftermathPrompts())
             .Returns(new[] { new PendingSiegeAftermathPrompt(leaderParty, settlement, CreateUninitialized<Clan>()) });
         using var handler = new ServerSiegeAftermathHandler(
-            broker, network, objectManager.Object, siegeEventInterface.Object);
+            broker, network, objectManager.Object, siegeEventInterface.Object, Mock.Of<IPlayerManager>());
 
         handler.SendPendingAftermathPrompts(peer);
 
@@ -84,7 +85,7 @@ public sealed class ServerSiegeAftermathHandlerTests
         string settlementId = "settlement-1";
         objectManager.Setup(manager => manager.TryGetIdWithLogging(settlement, out settlementId)).Returns(true);
         using var handler = new ServerSiegeAftermathHandler(
-            broker, network, objectManager.Object, Mock.Of<ISiegeEventInterface>());
+            broker, network, objectManager.Object, Mock.Of<ISiegeEventInterface>(), Mock.Of<IPlayerManager>());
 
         broker.Publish(this, new SiegeAftermathDiscarded(settlement));
 

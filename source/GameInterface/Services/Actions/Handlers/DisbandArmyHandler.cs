@@ -6,6 +6,8 @@ using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -21,9 +23,11 @@ public class DisbandArmyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
 
-    public DisbandArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public DisbandArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IPlayerManager playerManager)
     {
+        this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
@@ -51,6 +55,9 @@ public class DisbandArmyHandler : IHandler
     private void HandleNetworkDisbandArmyApplyInternal(MessagePayload<NetworkDisbandArmyApplyInternal> payload)
     {
         var obj = payload.What;
+        // A client disbands as its own party.
+        if (ModInformation.IsServer && payload.Who is NetPeer &&
+            !playerManager.IsSenderControllingParty(payload.Who, obj.ClientPartyId)) return;
         GameThread.RunSafe(() =>
         {
             if (objectManager.TryGetObjectWithLogging(obj.ArmyId, out Army army) == false) return;

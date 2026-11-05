@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.Players.Data;
+using Common.Messaging;
 using Autofac;
 using Common.Logging;
 using Common.Network;
@@ -866,12 +867,23 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
     }
 
-    private static void SetMainParty(EnvironmentInstance instance, string partyId)
+    private void SetMainParty(EnvironmentInstance instance, string partyId)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Campaign.Current.MainParty = party;
+        });
+
+        // The server only applies a leave from the peer that plays the leaving party.
+        if (instance == TestEnvironment.Server) return;
+        TestEnvironment.Server.Call(() =>
+        {
+            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+            string controllerId = "leaver-" + partyId;
+            if (!playerManager.TryGetPlayer(controllerId, out _))
+                Assert.True(playerManager.AddPlayer(new Player(controllerId, null, partyId, null, null)));
+            playerManager.SetPeer(controllerId, instance.NetPeer);
         });
     }
 

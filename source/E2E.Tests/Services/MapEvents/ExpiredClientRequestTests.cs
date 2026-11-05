@@ -1,4 +1,6 @@
-﻿using Common;
+﻿using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players;
+using Common;
 using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -133,6 +135,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
     {
         var partyBaseId = JoinPartyToNewBattle();
         var client = Clients.First();
+        RegisterLeaver(client, partyBaseId);
         var request = new NetworkRequestLeaveBattle(partyBaseId);
 
         // A client that broke its siege camp waits for this leave to finish its menus.
@@ -156,6 +159,7 @@ public class ExpiredClientRequestTests : MapEventTestBase
     {
         var partyBaseId = JoinPartyToNewBattle();
         var client = Clients.First();
+        RegisterLeaver(client, partyBaseId);
         var request = new NetworkRequestLeaveBattle(partyBaseId);
 
         Server.NetworkSentMessages.Clear();
@@ -242,6 +246,19 @@ public class ExpiredClientRequestTests : MapEventTestBase
 
         Assert.NotNull(partyBaseId);
         return partyBaseId!;
+    }
+
+    // The server only applies a leave from the peer that plays the leaving party.
+    private void RegisterLeaver(EnvironmentInstance client, string partyBaseId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var party));
+            Assert.True(Server.ObjectManager.TryGetId(party.MobileParty, out var partyId));
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Leaver", null, partyId, null, null)));
+            playerManager.SetPeer("Leaver", client.NetPeer);
+        });
     }
 
     // The campaign-map locatable scan is unavailable headlessly.
