@@ -196,9 +196,10 @@ internal class AlleyManagementHandler : IHandler
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 
             // The client left the chosen troops in its party, so they leave it here like vanilla's done button,
-            // wounded ones as wounded, and only if the party still has them all. A troop listed twice counts once.
+            // wounded ones as wounded, and only if the party still has them all. A troop listed twice is added up,
+            // as longs so huge counts can't wrap past the party check.
             var party = owner.PartyBelongedTo;
-            var troops = new Dictionary<CharacterObject, (int count, int wounded)>();
+            var troops = new Dictionary<CharacterObject, (long count, long wounded)>();
             foreach (var element in garrison)
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(element.CharacterId, out var character)) return;
@@ -224,7 +225,7 @@ internal class AlleyManagementHandler : IHandler
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             foreach (var troop in troops)
-                party.MemberRoster.AddToCounts(troop.Key, -troop.Value.count, false, -troop.Value.wounded);
+                party.MemberRoster.AddToCounts(troop.Key, -(int)troop.Value.count, false, -(int)troop.Value.wounded);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);

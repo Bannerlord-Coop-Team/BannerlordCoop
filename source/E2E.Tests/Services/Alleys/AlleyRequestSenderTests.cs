@@ -118,12 +118,14 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         }
     }
 
-    [Fact]
-    public void TakeOverListingATroopTwice_ChangesNothing()
+    [Theory]
+    [InlineData(6)]
+    [InlineData(int.MaxValue)]
+    public void TakeOverListingATroopTwice_ChangesNothing(int number)
     {
         var scenario = CreateAlleyDomainScenario();
         var (troopId, _) = AddTroopsAndCompanion(scenario);
-        var twice = new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopId), 6, 0, 0);
+        var twice = new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopId), number, 0, 0);
 
         OwnerClient.Call(() => OwnerClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
             scenario.PlayerAlleyId, scenario.OwnerHeroId, scenario.OwnerHeroId, new[] { twice, twice }, previousOwnerId: null)));
@@ -236,6 +238,9 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     public void SecondAcquireByTheOwner_IsRefused()
     {
         var scenario = AcquiredByOwner();
+        // An overseer the clan check allows, so only the alley being taken already refuses it.
+        Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId).Clan =
+            Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan);
 
         AcquireAlley(OwnerClient, scenario, scenario.OverseerHeroId);
 
