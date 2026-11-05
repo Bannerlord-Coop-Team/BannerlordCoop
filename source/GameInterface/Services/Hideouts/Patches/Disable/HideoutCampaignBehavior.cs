@@ -5,6 +5,7 @@ using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -265,14 +266,19 @@ internal class HideoutJoinEncounterOptionsPatch
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(ref bool __result)
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
         if (ModInformation.IsServer) return true;
 
-        // Native reads EncounteredBattle, which throws without an encountered party, so there is nothing to join yet
+        // Native reads EncounteredBattle, which throws without an encountered party, so grey the option until the server sets it up
         if (PlayerEncounter.Current?._encounteredParty == null)
         {
             __result = false;
+            if (args != null)
+            {
+                args.IsEnabled = false;
+                args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
+            }
             return false;
         }
 
