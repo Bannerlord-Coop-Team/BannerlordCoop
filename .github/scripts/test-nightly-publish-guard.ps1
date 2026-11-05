@@ -10,6 +10,13 @@ $guardText = $guardText.Replace("& (Join-Path `$PWD 'rclone.exe')", 'Invoke-Test
 if ($guardText.Contains('rclone.exe')) { throw 'Unmocked rclone invocation in nightly publish guard' }
 $guard = [scriptblock]::Create($guardText)
 
+$invalidationMatch = [regex]::Match($workflow, '(?ms)      - name: Invalidate the legacy client manifest.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
+if (-not $invalidationMatch.Success) { throw 'Legacy client manifest invalidation was not found' }
+$invalidationText = $invalidationMatch.Groups[1].Value -replace '(?m)^ {10}', ''
+$invalidationText = $invalidationText.Replace('& $rclone', 'Invoke-TestInvalidationRclone')
+if ($invalidationText.Contains('& $rclone')) { throw 'Unmocked rclone invocation in legacy client invalidation' }
+$invalidation = [scriptblock]::Create($invalidationText)
+
 function Invoke-TestRclone {
     param([string]$Command, [string]$Source, [string]$Destination)
     $expectedSource = if ($Command -eq 'lsjson') { 'patron:test-nightlies' } else { 'patron:test-nightlies/nightly/release.json' }
@@ -31,6 +38,21 @@ function Invoke-TestRclone {
     }
 }
 
+function Invoke-TestInvalidationRclone {
+    param([string]$Command, [string]$Source)
+
+    $expectedSource = if ($Command -eq 'lsjson') { 'patron:test-nightlies' } else { 'patron:test-nightlies/nightly/client.json' }
+    if ($Source -ne $expectedSource) { throw 'Unexpected legacy manifest source' }
+    $script:commands += $Command
+    if ($Command -eq 'deletefile') {
+        $global:LASTEXITCODE = $script:invalidationScenario.DeleteExit
+        return
+    }
+    if ($Command -ne 'lsjson') { throw "Unexpected legacy storage command: $Command" }
+    $global:LASTEXITCODE = $script:invalidationScenario.LookupExit
+    return $script:invalidationScenario.LookupText
+}
+
 $cases = @(
     @{ Name = 'missing manifest'; Missing = $true; WriteFile = $false; Expected = 'true' },
     @{ Name = 'older nightly'; Expected = 'true' },
@@ -48,6 +70,22 @@ $cases = @(
     @{ Name = 'empty manifest'; Manifest = ''; Error = 'Published nightly manifest size is invalid' },
     @{ Name = 'changed manifest size'; MetadataSize = 100; Error = 'Published nightly manifest size is invalid' },
     @{ Name = 'oversized manifest'; Manifest = ('x' * 4097); Error = 'Published nightly manifest size is invalid' }
+)
+
+$invalidationCases = @(
+    @{ Name = 'deleted legacy manifest returns empty array' },
+    @{ Name = 'deleted legacy manifest returns multiline empty array'; LookupText = @('[', ']') },
+    @{ Name = 'already absent legacy manifest returns empty array'; DeleteExit = 1 },
+    @{ Name = 'legacy manifest remains after deletion'; LookupText = '[{"Path":"nightly/client.json"}]'; Error = 'Legacy client manifest remains after invalidation' },
+    @{ Name = 'failed deletion leaves legacy manifest'; DeleteExit = 1; LookupText = '[{"Path":"nightly/client.json"}]'; Error = 'Legacy client manifest invalidation failed' },
+    @{ Name = 'legacy readback lookup fails'; LookupExit = 3; Error = 'Legacy client manifest remains after invalidation' },
+    @{ Name = 'failed deletion lookup fails'; DeleteExit = 1; LookupExit = 3; Error = 'Legacy client manifest invalidation failed' },
+    @{ Name = 'legacy readback is empty'; LookupText = ''; Error = '*' },
+    @{ Name = 'failed deletion lookup is empty'; DeleteExit = 1; LookupText = ''; Error = '*' },
+    @{ Name = 'legacy readback is malformed JSON'; LookupText = '['; Error = '*' },
+    @{ Name = 'failed deletion lookup is malformed JSON'; DeleteExit = 1; LookupText = '['; Error = '*' },
+    @{ Name = 'legacy readback is not an array'; LookupText = '{}'; Error = '*' },
+    @{ Name = 'failed deletion lookup is not an array'; DeleteExit = 1; LookupText = '{}'; Error = '*' }
 )
 
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('nightly-publish-guard-' + [guid]::NewGuid().ToString('N'))
@@ -79,6 +117,24 @@ try {
         }
         if (($case.Missing -or $case.Event -eq 'workflow_dispatch' -or $case.LookupExit -or $case.Name -eq 'oversized manifest') -and $script:commands -contains 'copyto') {
             throw "$($case.Name): unexpected download"
+        }
+        Write-Host "PASS: $($case.Name)"
+    }
+    $env:R2_ACCOUNT_ID = '00000000000000000000000000000000'
+    foreach ($case in $invalidationCases) {
+        $script:invalidationScenario = @{ DeleteExit = 0; LookupExit = 0; LookupText = '[]' }
+        foreach ($key in $case.Keys) { $script:invalidationScenario[$key] = $case[$key] }
+        $script:commands = @()
+        $failure = $null
+        try { & $invalidation } catch { $failure = $_.Exception.Message }
+        if ($case.Error) {
+            if (-not $failure -or ($case.Error -ne '*' -and $failure -ne $case.Error)) {
+                throw "$($case.Name): expected '$($case.Error)', got '$failure'"
+            }
+        } else {
+            if ($failure) { throw "$($case.Name): $failure" }
+            $expectedCommands = if ($case.DeleteExit) { 'deletefile,lsjson,lsjson' } else { 'deletefile,lsjson' }
+            if (($script:commands -join ',') -ne $expectedCommands) { throw "$($case.Name): unexpected storage commands" }
         }
         Write-Host "PASS: $($case.Name)"
     }
