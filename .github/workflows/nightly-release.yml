@@ -14,6 +14,7 @@ on:
 permissions:
   actions: read
   contents: read
+  packages: read
 
 concurrency:
   group: nightly-release
@@ -136,7 +137,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
     env:
       BANNERLORD_DIR: /home/mb2

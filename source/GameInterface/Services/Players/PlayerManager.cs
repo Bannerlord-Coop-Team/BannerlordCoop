@@ -88,6 +88,12 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
+    /// Checks whether a message sender is the peer controlling the given party, logging a warning
+    /// when it isn't, so a handler can ignore a request made with a stale or wrong party id.
+    /// </summary>
+    bool IsSenderControllingParty(object sender, string mobilePartyId);
+
+    /// <summary>
     /// Resolves the hero controlled by the peer that sent a message, so a handler can check what
     /// that player may do. Reads the object registry, so call it on the game thread.
     /// </summary>
@@ -422,6 +428,16 @@ public class PlayerManager : IPlayerManager
         if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
+        return false;
+    }
+
+    public bool IsSenderControllingParty(object sender, string mobilePartyId)
+    {
+        var peer = sender as NetPeer;
+        if (peer != null && !string.IsNullOrEmpty(mobilePartyId) && TryGetCurrentController(peer, out var controllerId) &&
+            TryGetPlayer(controllerId, out var player) && player.MobilePartyId == mobilePartyId) return true;
+
+        logger.Warning("Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it", mobilePartyId, peer?.Id);
         return false;
     }
 

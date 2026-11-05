@@ -9,6 +9,7 @@ using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
@@ -85,6 +86,9 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(19)]
     public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
 
+    [ProtoMember(20)]
+    public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
+
     public GameSaveDataChunkPacket(
         int transferId,
         int chunkIndex,
@@ -104,7 +108,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -125,5 +130,6 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
+        OrderOfBattlePlayerData = orderOfBattlePlayerData;
     }
 }
