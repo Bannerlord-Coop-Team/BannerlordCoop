@@ -151,6 +151,7 @@ public class LocationHostTestEnvironment : MissionTestEnvironment
     /// </summary>
     protected void MakeLocationMissionReady(EnvironmentInstance client, string instanceId)
     {
+        LinkJoinedPeer(client);
         client.Call(() =>
         {
             client.Resolve<IMessageBroker>().Publish(this, new LocationMissionReady(instanceId));

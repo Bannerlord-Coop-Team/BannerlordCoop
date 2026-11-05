@@ -165,6 +165,21 @@ public class MissionTestEnvironment : E2ETestEnvironment
             Register(client);
     }
 
+    /// <summary>A client that reaches a mission has joined, which links its peer to its player on the server.
+    /// A peer or player that is already linked (a seat switch, a reconnect) is left as the test set it.</summary>
+    protected void LinkJoinedPeer(EnvironmentInstance client)
+    {
+        string? controllerId = null;
+        client.Call(() => controllerId = client.Resolve<IControllerIdProvider>().ControllerId);
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            if (string.IsNullOrEmpty(controllerId) || !playerManager.TryGetPlayer(controllerId, out _) ||
+                playerManager.TryGetPlayer(client.NetPeer, out _) || playerManager.TryGetPeer(controllerId, out _)) return;
+            playerManager.SetPeer(controllerId, client.NetPeer);
+        });
+    }
+
     /// <summary>
     /// Simulates <paramref name="client"/> joining the battle. Publishes <see cref="PlayerEnteredBattle"/>
     /// (opening the mission — its <c>BattleHostHandler</c> requests this client's OWN reserves) and, by
@@ -175,6 +190,7 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// </summary>
     protected void EnterBattle(EnvironmentInstance client, string mapEventId, bool missionReady = true)
     {
+        LinkJoinedPeer(client);
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
@@ -192,6 +208,7 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// </summary>
     protected void MakeMissionReady(EnvironmentInstance client, string mapEventId)
     {
+        LinkJoinedPeer(client);
         client.Call(() =>
         {
             client.Resolve<IMessageBroker>().Publish(this, new BattleMissionReady(mapEventId));

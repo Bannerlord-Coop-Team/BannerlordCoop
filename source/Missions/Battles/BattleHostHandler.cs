@@ -391,10 +391,10 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            // A peer linked to another controller (it switched seats) sends a stale controller id.
-            if (!string.IsNullOrEmpty(requesterId) && playerManager.TryGetPlayer(requester, out var senderPlayer) && senderPlayer.ControllerId != requesterId)
+            // A peer linked to another controller (it switched seats) or one that already left sends a stale controller id.
+            if (!string.IsNullOrEmpty(requesterId) && (!playerManager.TryGetPlayer(requester, out var senderPlayer) || senderPlayer.ControllerId != requesterId))
             {
-                Logger.Warning("[BattleHost] Ignoring host request for {MapEventId} from '{Requester}' (the sending peer controls another seat now)",
+                Logger.Warning("[BattleHost] Ignoring host request for {MapEventId} from '{Requester}' (the sending peer no longer controls that seat)",
                     mapEventId, requesterId);
                 return;
             }
@@ -613,10 +613,10 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            // A peer linked to another controller (it switched seats) sends a stale controller id.
-            if (!string.IsNullOrEmpty(requesterId) && playerManager.TryGetPlayer(requester, out var senderPlayer) && senderPlayer.ControllerId != requesterId)
+            // A peer linked to another controller (it switched seats) or one that already left sends a stale controller id.
+            if (!string.IsNullOrEmpty(requesterId) && (!playerManager.TryGetPlayer(requester, out var senderPlayer) || senderPlayer.ControllerId != requesterId))
             {
-                Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (the sending peer controls another seat now)",
+                Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (the sending peer no longer controls that seat)",
                     mapEventId, requesterId);
                 return;
             }

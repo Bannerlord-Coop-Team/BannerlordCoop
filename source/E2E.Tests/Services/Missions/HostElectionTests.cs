@@ -139,4 +139,19 @@ public class HostElectionTests : MissionTestEnvironment
 
         Assert.Empty(Server.NetworkSentMessages.OfType<NetworkBattleTroopReserve>());
     }
+
+    // The sender left before its queued request ran, so its peer no longer stands for any seat.
+    [Fact]
+    public void HostRequestFromAPeerThatLeftBeforeItRan_ElectsNoHost()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var playerManager = Server.Resolve<IPlayerManager>();
+        Server.Call(() => playerManager.SetPeer("ctrl-A", Clients.First().NetPeer));
+
+        Server.SimulateMessage(Clients.First().NetPeer, new NetworkRequestBattleHost(mapEventId, "ctrl-A"), markGameThread: false);
+        Server.Call(() => playerManager.ClearPeer(Clients.First().NetPeer));
+        Server.PumpGameThread();
+
+        AssertNoHost(Server, mapEventId);
+    }
 }
