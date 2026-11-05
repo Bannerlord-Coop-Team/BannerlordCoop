@@ -2,8 +2,10 @@
 using Common.Commands;
 using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -77,20 +79,17 @@ internal class UnstuckCommand
         private readonly IObjectManager objectManager;
         private readonly IServerPlayerUnstuck serverPlayerUnstuck;
         private readonly IBattleHostRegistry battleHostRegistry;
-        private readonly IPlayerUnstuckRequester playerUnstuckRequester;
 
         public UnstuckCoopCommand(
             IPlayerManager playerManager,
             IObjectManager objectManager,
             IServerPlayerUnstuck serverPlayerUnstuck,
-            IBattleHostRegistry battleHostRegistry,
-            IPlayerUnstuckRequester playerUnstuckRequester)
+            IBattleHostRegistry battleHostRegistry)
         {
             this.playerManager = playerManager;
             this.objectManager = objectManager;
             this.serverPlayerUnstuck = serverPlayerUnstuck;
             this.battleHostRegistry = battleHostRegistry;
-            this.playerUnstuckRequester = playerUnstuckRequester;
         }
 
         public string Prefix => "coop";
@@ -118,7 +117,10 @@ internal class UnstuckCommand
             if (args.Count > 0)
                 return InvalidArguments("On a client coop.unstuck takes no player, it always unsticks your own party. Usage: coop.unstuck");
 
-            if (!playerUnstuckRequester.TryRequest()) return Failed("No main party on this client.");
+            var mainParty = MobileParty.MainParty;
+            if (mainParty == null) return Failed("No main party on this client.");
+
+            MessageBroker.Instance.Publish(mainParty, new PlayerUnstuckRequested(mainParty));
 
             return Succeeded("Unstuck request sent to the server. Captivity, map event, siege camp, and " +
                    "settlement exits apply on the server. Player-led armies are preserved; followers leave their army. " +

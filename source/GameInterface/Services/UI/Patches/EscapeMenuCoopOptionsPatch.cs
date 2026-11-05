@@ -1,5 +1,6 @@
 ﻿using Common;
-using GameInterface.Services.MobileParties;
+using Common.Messaging;
+using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using HarmonyLib;
@@ -12,6 +13,7 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 using TaleWorlds.ScreenSystem;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -31,7 +33,7 @@ internal class EscapeMenuCoopOptionsPatch
     private static readonly TextObject UnstuckText = new TextObject("I'm stuck");
 
     private static readonly TextObject UnstuckConfirmText = new TextObject(
-        "Get your party out of whatever it is stuck in? This does the same as typing coop.unstuck in the console.");
+        "Force your party out of any captivity, battle, siege camp, settlement or followed army?");
 
     [HarmonyPostfix]
     static void AddCoopOptionsItem(MapScreen __instance, List<EscapeMenuItemVM> __result)
@@ -60,15 +62,12 @@ internal class EscapeMenuCoopOptionsPatch
                 isPositiveBehaviored: false));
         }
 
-        if (ContainerProvider.TryResolve(out IPlayerUnstuckRequester unstuckRequester))
-        {
-            __result.Insert(nextIndex, new EscapeMenuItemVM(
-                UnstuckText,
-                _ => OpenUnstuckConfirm(__instance, unstuckRequester),
-                identifier: null,
-                getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
-                isPositiveBehaviored: false));
-        }
+        __result.Insert(nextIndex, new EscapeMenuItemVM(
+            UnstuckText,
+            _ => OpenUnstuckConfirm(__instance),
+            identifier: null,
+            getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
+            isPositiveBehaviored: false));
 
         EscapeMenuPanelHeightPatch.CustomButtonInserted = true;
     }
@@ -105,13 +104,13 @@ internal class EscapeMenuCoopOptionsPatch
         overlay.Open();
     }
 
-    private static void OpenUnstuckConfirm(MapScreen mapScreen, IPlayerUnstuckRequester requester)
+    private static void OpenUnstuckConfirm(MapScreen mapScreen)
     {
         mapScreen.OnEscapeMenuToggled(false);
-        ShowUnstuckConfirm(requester);
+        ShowUnstuckConfirm();
     }
 
-    internal static void ShowUnstuckConfirm(IPlayerUnstuckRequester requester)
+    internal static void ShowUnstuckConfirm()
     {
         InformationManager.ShowInquiry(new InquiryData(
             UnstuckText.ToString(),
@@ -119,7 +118,15 @@ internal class EscapeMenuCoopOptionsPatch
             true, true,
             GameTexts.FindText("str_yes").ToString(),
             GameTexts.FindText("str_no").ToString(),
-            () => requester.TryRequest(), null));
+            RequestUnstuck, null));
+    }
+
+    private static void RequestUnstuck()
+    {
+        var mainParty = MobileParty.MainParty;
+        if (mainParty == null) return;
+
+        MessageBroker.Instance.Publish(mainParty, new PlayerUnstuckRequested(mainParty));
     }
 }
 

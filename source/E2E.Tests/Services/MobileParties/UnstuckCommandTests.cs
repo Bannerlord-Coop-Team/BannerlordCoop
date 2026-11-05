@@ -88,7 +88,7 @@ public class UnstuckCommandTests : MapEventTestBase
         showInquiryEvent.AddEventHandler(null, onShowInquiry);
         try
         {
-            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm(Client.Resolve<IPlayerUnstuckRequester>()));
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
 
             var inquiry = Assert.Single(shownInquiries);
             Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());

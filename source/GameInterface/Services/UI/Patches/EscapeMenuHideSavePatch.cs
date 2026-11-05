@@ -27,16 +27,11 @@ namespace GameInterface.Services.UI.Patches
         {
             if (!ModInformation.IsClient) return;
 
-            HideItems(__result);
-        }
-
-        internal static void HideItems(List<EscapeMenuItemVM> items)
-        {
             // Matched by text since Invite Friends is optional and inserted before these entries, so their indices vary
             foreach (var buttonText in HiddenButtonTexts)
             {
                 string actionText = buttonText.ToString();
-                items.RemoveAll(item => item.ActionText == actionText);
+                __result.RemoveAll(item => item.ActionText == actionText);
             }
         }
     }
