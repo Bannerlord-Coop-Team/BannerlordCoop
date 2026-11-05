@@ -116,13 +116,8 @@ internal class LocationHostHandler : IHandler
             if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(requesterId))
                 return;
 
-            // A peer linked to another controller (it switched seats) or one that already left sends a stale controller id.
-            if (!playerManager.TryGetPlayer(requester, out var senderPlayer) || senderPlayer.ControllerId != requesterId)
-            {
-                Logger.Warning("[LocationHost] Ignoring host request for {InstanceId} from '{Requester}' (the sending peer no longer controls that seat)",
-                    instanceId, requesterId);
-                return;
-            }
+            // A peer that switched seats or already left still sends its old controller id.
+            if (!playerManager.IsSenderController(requester, requesterId)) return;
 
             if (!IsRequesterInInstanceSettlement(instanceId, requesterId))
             {

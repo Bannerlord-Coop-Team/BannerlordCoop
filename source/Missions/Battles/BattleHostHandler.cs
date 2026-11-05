@@ -391,13 +391,8 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            // A peer linked to another controller (it switched seats) or one that already left sends a stale controller id.
-            if (!string.IsNullOrEmpty(requesterId) && (!playerManager.TryGetPlayer(requester, out var senderPlayer) || senderPlayer.ControllerId != requesterId))
-            {
-                Logger.Warning("[BattleHost] Ignoring host request for {MapEventId} from '{Requester}' (the sending peer no longer controls that seat)",
-                    mapEventId, requesterId);
-                return;
-            }
+            // A peer that switched seats or already left still sends its old controller id.
+            if (!playerManager.IsSenderController(requester, requesterId)) return;
 
             if (string.IsNullOrEmpty(requesterId) || !IsRequesterInBattle(mapEvent, requesterId))
             {
@@ -613,13 +608,8 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            // A peer linked to another controller (it switched seats) or one that already left sends a stale controller id.
-            if (!string.IsNullOrEmpty(requesterId) && (!playerManager.TryGetPlayer(requester, out var senderPlayer) || senderPlayer.ControllerId != requesterId))
-            {
-                Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (the sending peer no longer controls that seat)",
-                    mapEventId, requesterId);
-                return;
-            }
+            // A peer that switched seats or already left still sends its old controller id.
+            if (!playerManager.IsSenderController(requester, requesterId)) return;
 
             if (string.IsNullOrEmpty(requesterId) || !IsRequesterInBattle(mapEvent, requesterId))
             {

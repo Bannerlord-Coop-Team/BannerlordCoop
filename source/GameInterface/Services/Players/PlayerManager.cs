@@ -82,6 +82,12 @@ public interface IPlayerManager
     bool TryGetPlayer(Hero hero, out Player player);
 
     /// <summary>
+    /// Checks whether a message sender is the peer currently standing for the given controller, logging
+    /// a warning when it isn't, so a handler can ignore a request left over from a seat switch or a reconnect.
+    /// </summary>
+    bool IsSenderController(object sender, string controllerId);
+
+    /// <summary>
     /// Checks whether a message sender is the peer controlling the given hero, logging a warning
     /// when it isn't, so a handler can ignore a request made for another player's hero.
     /// </summary>
@@ -421,6 +427,16 @@ public class PlayerManager : IPlayerManager
         player = null;
         return hero != null && TryGetControlledObjectInfo(hero, out var control)
             && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
+    public bool IsSenderController(object sender, string controllerId)
+    {
+        var peer = sender as NetPeer;
+        if (peer != null && !string.IsNullOrEmpty(controllerId) && TryGetCurrentController(peer, out var currentControllerId) &&
+            currentControllerId == controllerId) return true;
+
+        logger.Warning("Ignoring a request for controller {ControllerId} from peer {PeerId}, which does not stand for it", controllerId, peer?.Id);
+        return false;
     }
 
     public bool IsSenderControllingHero(object sender, string heroId)

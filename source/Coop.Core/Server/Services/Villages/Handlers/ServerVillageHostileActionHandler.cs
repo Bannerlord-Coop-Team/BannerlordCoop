@@ -80,15 +80,15 @@ internal class ServerVillageHostileActionHandler : IHandler
         }
 
         var request = payload.What;
-        // The controller id has to be the sender's own, otherwise a request left over from a reconnect could act for another player.
-        if (!playerManager.TryGetCurrentController(peer, out var senderControllerId) || senderControllerId != request.ControllerId ||
-            !TryValidateRequester(request.ControllerId, request.MobilePartyId))
+        // The controller id comes from the sender, not the message, so a request left over from a reconnect can't act for another player.
+        if (!playerManager.IsSenderControllingParty(peer, request.MobilePartyId) ||
+            !playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             Deny(peer, VillageHostileActionDeniedReason.InvalidRequester);
             return;
         }
 
-        GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
+        GameThread.RunSafe(() => TryStartHostileAction(peer, request, controllerId), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
     }
 
     private bool TryValidateRequester(string controllerId, string mobilePartyId)
@@ -102,7 +102,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         return player.MobilePartyId == mobilePartyId;
     }
 
-    private void TryStartHostileAction(NetPeer peer, NetworkRequestVillageHostileAction request)
+    private void TryStartHostileAction(NetPeer peer, NetworkRequestVillageHostileAction request, string controllerId)
     {
         try
         {
@@ -131,11 +131,11 @@ internal class ServerVillageHostileActionHandler : IHandler
             }
 
             if (request.Action == VillageHostileAction.Raid)
-                KickOtherPlayersOutOfVillage(request.ControllerId, mobileParty, settlement);
+                KickOtherPlayersOutOfVillage(controllerId, mobileParty, settlement);
 
             villageHostileActionInterface.ApplyHostileAction(mobileParty, settlement, request.Action);
             villageHostileActionInterface.ApproveMapEventStart(mobileParty.Party, settlement, request.Action);
-            NoteForceTransferRequester(peer, request);
+            NoteForceTransferRequester(peer, request, controllerId);
 
             Logger.Information(
                 "Approved hostile action {Action} (Party={PartyId}, Settlement={SettlementId})",
@@ -151,7 +151,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         }
     }
 
-    private void NoteForceTransferRequester(NetPeer peer, NetworkRequestVillageHostileAction request)
+    private void NoteForceTransferRequester(NetPeer peer, NetworkRequestVillageHostileAction request, string controllerId)
     {
         if (request.Action != VillageHostileAction.ForceVolunteers &&
             request.Action != VillageHostileAction.ForceSupplies)
@@ -175,7 +175,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         }
         pendingForceRequesters[GetRequesterKey(request.MobilePartyId, request.SettlementId, request.Action)] = new PendingForceTransferRequester(
             peer,
-            request.ControllerId,
+            controllerId,
             request.MobilePartyId,
             request.Action,
             request.SettlementId,

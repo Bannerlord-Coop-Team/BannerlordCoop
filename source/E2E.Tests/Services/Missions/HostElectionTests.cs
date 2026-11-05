@@ -1,7 +1,12 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.Players;
 using Missions.Messages;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -127,17 +132,41 @@ public class HostElectionTests : MissionTestEnvironment
         AssertNoHost(Server, mapEventId);
     }
 
-    [Fact]
-    public void ReserveRequestCarryingAnotherSeatsControllerId_SendsNoReserves()
+    // The second client switched seats and still sends the first player's controller id; with its own id it gets its party's reserves.
+    [Theory]
+    [InlineData("ctrl-B", true)]
+    [InlineData("ctrl-A", false)]
+    public void ReserveRequest_SendsReservesOnlyForTheSendersOwnControllerId(string requestedControllerId, bool sendsReserves)
     {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var (mapEventId, partyIds) = SetupCoopBattle("ctrl-A", "ctrl-B");
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("ctrl-B", Clients.Last().NetPeer));
-        Server.NetworkSentMessages.Clear();
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        try
+        {
+            // Known rosters, so both parties have reserves to grant and an empty grant means a refusal.
+            Server.Call(() =>
+            {
+                var troop = Server.CreateRegisteredObject<CharacterObject>("reserve_request_troop");
+                foreach (var partyId in partyIds)
+                {
+                    var party = Server.GetRegisteredObject<MobileParty>(partyId);
+                    var mep = Server.GetRegisteredObject<MapEvent>(mapEventId).FindMapEventParty(party.Party);
+                    mep.Party.MemberRoster.Clear();
+                    mep.Party.MemberRoster.AddToCounts(troop, 3);
+                    mep.Update();
+                }
+            }, MapEventDisabledMethods);
+            Server.NetworkSentMessages.Clear();
 
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBattleReserves(mapEventId, "ctrl-A"));
-        Server.PumpGameThread();
+            Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBattleReserves(mapEventId, requestedControllerId));
+            Server.PumpGameThread();
 
-        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkBattleTroopReserve>());
+            Assert.Equal(sendsReserves, Server.NetworkSentMessages.OfType<NetworkBattleTroopReserve>().Any());
+        }
+        finally
+        {
+            CoopTroopSupplierRegistry.ClearBattle(mapEventId);
+        }
     }
 
     // The sender left before its queued request ran, so its peer no longer stands for any seat.
@@ -150,6 +179,24 @@ public class HostElectionTests : MissionTestEnvironment
 
         Server.SimulateMessage(Clients.First().NetPeer, new NetworkRequestBattleHost(mapEventId, "ctrl-A"), markGameThread: false);
         Server.Call(() => playerManager.ClearPeer(Clients.First().NetPeer));
+        Server.PumpGameThread();
+
+        AssertNoHost(Server, mapEventId);
+    }
+
+    // The first player reconnected on a new peer, and a delayed request still arrives from its old one.
+    [Fact]
+    public void HostRequestFromTheOldPeerOfAReconnectedPlayer_ElectsNoHost()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var playerManager = Server.Resolve<IPlayerManager>();
+        Server.Call(() =>
+        {
+            playerManager.SetPeer("ctrl-A", Clients.First().NetPeer);
+            playerManager.SetPeer("ctrl-A", Clients.Last().NetPeer);
+        });
+
+        Server.SimulateMessage(Clients.First().NetPeer, new NetworkRequestBattleHost(mapEventId, "ctrl-A"));
         Server.PumpGameThread();
 
         AssertNoHost(Server, mapEventId);
