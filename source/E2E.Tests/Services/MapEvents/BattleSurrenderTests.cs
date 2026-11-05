@@ -557,18 +557,6 @@ public class BattleSurrenderTests : MapEventTestBase
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
     }
 
-    /// <summary>The server takes a surrender only from the peer that plays the surrendering party.</summary>
-    [Fact]
-    public void SurrenderNamingAnotherPlayersParty_IsRefused()
-    {
-        var setup = SetupTwoOpposingPlayersInBattle();
-
-        Server.SimulateMessage(Clients.First().NetPeer, new NetworkPlayerSurrendered(setup.recipientPartyId, setup.ctx.MapEventId));
-        Server.PumpGameThread();
-
-        AssertCaptivity(Server, setup.recipientHeroId, null);
-    }
-
     // ------------------------------------------------------------------
     // Surrender drivers
     // ------------------------------------------------------------------

@@ -239,7 +239,13 @@ internal class CompanionRolesHandler : IHandler
                     throw new InvalidOperationException("The requested companion could not be resolved.");
                 if (!playerManager.TryGetSenderHero(requester, out var actor) ||
                     !permissions.CanManageHero(actor, oneToOneConversationHero))
-                    throw new InvalidOperationException("The requesting player cannot manage this companion.");
+                {
+                    // The finally block still sends the failed completion, so the requester's UI doesn't wait.
+                    error = "The requesting player cannot manage this companion.";
+                    logger.Warning("Refused companion dismissal request {RequestId} for {HeroId} from a player who cannot manage it",
+                        data.RequestId, data.OneToOneConversationHeroId);
+                    return;
+                }
                 if (oneToOneConversationHero.CompanionOf == null ||
                     !objectManager.TryGetIdWithLogging(oneToOneConversationHero.CompanionOf, out var currentClanId) ||
                     currentClanId != data.ExpectedClanId)

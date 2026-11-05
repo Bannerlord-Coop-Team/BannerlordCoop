@@ -79,9 +79,17 @@ internal class TeleportHeroHandler : IHandler
             if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
 
             // Same rule as the client gate in TeleportHeroActionPatches, checked for the hero the sending peer plays.
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) ||
-                (!permissions.CanRecallHero(senderHero, hero) &&
-                 !(targetSettlement != null && targetParty == null && permissions.CanManageHero(senderHero, hero))))
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero))
+            {
+                Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that plays no hero", hero.StringId);
+                return;
+            }
+
+            // A hero that may be managed but not recalled can still be sent to a settlement.
+            bool movesToSettlementOnly = targetSettlement != null && targetParty == null;
+            bool canRecall = permissions.CanRecallHero(senderHero, hero);
+            bool canSendToSettlement = movesToSettlementOnly && permissions.CanManageHero(senderHero, hero);
+            if (!canRecall && !canSendToSettlement)
             {
                 Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that cannot manage it", hero.StringId);
                 return;
