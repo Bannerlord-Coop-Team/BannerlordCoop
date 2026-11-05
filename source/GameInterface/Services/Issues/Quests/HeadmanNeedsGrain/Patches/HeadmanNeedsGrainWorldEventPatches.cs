@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Helpers;
@@ -20,10 +20,10 @@ internal class HeadmanNeedsGrainWorldEventPatches
     {
         if (declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange) return;
 
+        var instigator = Hero.MainHero;
         RunAsOwners(quest =>
         {
-            if (((faction1 == Hero.MainHero.MapFaction && faction2 == quest.QuestGiver.MapFaction) ||
-                 (faction2 == Hero.MainHero.MapFaction && faction1 == quest.QuestGiver.MapFaction))) return;
+            if (Hero.MainHero == instigator) return;
             QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
                 quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
         });
