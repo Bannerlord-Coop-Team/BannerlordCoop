@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 
 namespace Coop.Tests.Steam
 {
@@ -86,7 +87,15 @@ namespace Coop.Tests.Steam
 
         public void ListenForClients(int virtualPort) => Listening = true;
 
-        public void StopListening() => Listening = false;
+        public Action OnStopListening;
+        public int ReceiveCalls => Volatile.Read(ref receiveCalls);
+        private int receiveCalls;
+
+        public void StopListening()
+        {
+            OnStopListening?.Invoke();
+            Listening = false;
+        }
 
         public void AcceptConnection(uint connection) => AcceptedConnections.Add(connection);
 
@@ -127,6 +136,7 @@ namespace Coop.Tests.Steam
 
         public int ReceiveDatagram(uint connection, byte[] buffer)
         {
+            Interlocked.Increment(ref receiveCalls);
             lock (gate)
             {
                 if (!pendingReceives.TryGetValue(connection, out var queue) || queue.Count == 0) return 0;
