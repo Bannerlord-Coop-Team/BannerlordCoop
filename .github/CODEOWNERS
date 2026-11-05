@@ -3,6 +3,8 @@
 # Owners are the top two authors of each service folder from the last 12 months, with write access.
 # The last matching line wins.
 
+/.github/ @garrettluskey
+
 /source/Common/ @garrettluskey
 /source/Coop.Core/ @garrettluskey
 
