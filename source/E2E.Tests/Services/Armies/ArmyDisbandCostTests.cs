@@ -1,10 +1,12 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -27,6 +29,7 @@ public class ArmyDisbandCostTests : IDisposable
     [Fact]
     public void DisbandRequest_DisbandsTheArmyAndChargesTheDisbandingClan()
     {
+        var dispersals = new List<bool>();
         var armyId = environment.CreateRegisteredObject<Army>();
         var memberPartyId = environment.CreateRegisteredObject<MobileParty>();
         float influenceBefore = 0;
@@ -48,6 +51,10 @@ public class ArmyDisbandCostTests : IDisposable
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("Member", heroId, memberPartyId, null, null)));
             playerManager.SetPeer("Member", Member.NetPeer);
+
+            // The dedicated server runs vanilla's army wait behavior, which opens a menu for its own player's army
+            ObjectHelper.SkipConstructor<PlayerArmyWaitBehavior>().RegisterEvents();
+            CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, (_, _, isPlayersArmy) => dispersals.Add(isPlayersArmy));
         });
 
         Server.SimulateMessage(Member.NetPeer, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
@@ -59,6 +66,9 @@ public class ArmyDisbandCostTests : IDisposable
             Assert.Null(member.Army);
             Assert.True(member.LeaderHero.Clan.Influence < influenceBefore);
             Assert.Null(Clan.PlayerClan);
+            // A menu on the server zeroes the campaign dt before TickPartialHourlyAi, so lord and bandit AI stop thinking
+            Assert.Null(Campaign.Current.GameMenuManager.NextGameMenuId);
+            Assert.False(Assert.Single(dispersals));
         });
     }
 }

@@ -56,7 +56,8 @@ public class DisbandArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging(obj.ArmyId, out Army army) == false) return;
             if (objectManager.TryGetObjectWithLogging(obj.ClientPartyId, out MobileParty clientParty) == false) return;
             // Vanilla's disband cost reads Clan.PlayerClan, which the server doesn't have, so run it as the disbanding player.
-            using (new MainHeroSubstitutionScope(clientParty.LeaderHero, clientParty))
+            // MainParty stays as it is, or the server counts the army as its own and opens the army_dispersed menu that stops its AI
+            using (new MainHeroSubstitutionScope(clientParty.LeaderHero, null))
             {
                 DisbandArmyActionPatches.DisbandArmyApplyInternal(army, clientParty);
             }
