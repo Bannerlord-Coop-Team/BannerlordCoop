@@ -13,6 +13,7 @@ using Coop.Tests.Mocks;
 using GameInterface.AutoSync;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Clans;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
@@ -172,6 +173,7 @@ internal abstract class TestComponentBase
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
+        RegisterMock<ICoopClanPermissions>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

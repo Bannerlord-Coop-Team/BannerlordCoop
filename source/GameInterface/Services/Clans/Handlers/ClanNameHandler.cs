@@ -1,3 +1,6 @@
+﻿using LiteNetLib;
+using GameInterface.Services.Players;
+using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
 using Common.Messaging;
@@ -20,15 +23,21 @@ public class ClanNameHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public ClanNameHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<ChangeClanName>(Handle_ChangeClanName);
         messageBroker.Subscribe<NetworkChangeClanName>(Handle_NetworkChangeClanName);
@@ -67,6 +76,7 @@ public class ClanNameHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+            if (!CanSenderRename(obj.Who, clan)) return;
 
             ClanNameChangePatch.ChangeClanNameOverride(clan, data.Name, data.InformalName);
 
@@ -92,5 +102,15 @@ public class ClanNameHandler : IHandler
                 clanScreen._dataSource?.RefreshValues();
             }
         });
+    }
+
+    // Only the clan leader renames the clan.
+    private bool CanSenderRename(object sender, Clan target)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, target)) return true;
+
+        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
+        return false;
     }
 }

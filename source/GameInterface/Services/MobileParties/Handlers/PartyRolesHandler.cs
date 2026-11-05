@@ -1,4 +1,7 @@
-﻿using Common;
+﻿using LiteNetLib;
+using GameInterface.Services.Players;
+using GameInterface.Services.Clans;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -18,15 +21,21 @@ internal class PartyRolesHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public PartyRolesHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<RemoveAllPartyRolesOfHero>(Handle_RemoveAllPartyRolesOfHero);
         messageBroker.Subscribe<NetworkRemoveAllPartyRolesOfHero>(Handle_NetworkRemoveAllPartyRolesOfHero);
@@ -101,6 +110,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
             UpdateClientVM(data.MobilePartyId);
@@ -122,6 +132,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
@@ -144,6 +155,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.RemoveOnePartyRoleOfHero(hero);
 
@@ -166,6 +178,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartyScout(hero);
             mobileParty.ResetCached();
@@ -189,6 +202,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartyQuartermaster(hero);
             mobileParty.ResetCached(); // Ensure new party size
@@ -212,6 +226,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartyEngineer(hero);
             mobileParty.ResetCached();
@@ -235,6 +250,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartySurgeon(hero);
             mobileParty.ResetCached();
@@ -258,6 +274,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartyFirstMate(hero);
             mobileParty.ResetCached();
@@ -281,6 +298,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
 
             mobileParty.SetPartyNavigator(hero);
             mobileParty.ResetCached();
@@ -317,5 +335,15 @@ internal class PartyRolesHandler : IHandler
     private void UpdateClientVM(string mobilePartyId)
     {
         network.SendAll(new NetworkRefreshAfterRoleAssignment(mobilePartyId));
+    }
+
+    // Roles are assigned by the party leader, or by the clan leader for a clan party.
+    private bool CanSenderAssignRoles(object sender, MobileParty target)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (playerManager.TryGetSenderHero(sender, out var actor) && (permissions.CanAssignRoles(actor, target) || permissions.CanManageParty(actor, target))) return true;
+
+        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
+        return false;
     }
 }

@@ -1,4 +1,6 @@
-﻿using Common;
+﻿using LiteNetLib;
+using GameInterface.Services.Clans;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -22,13 +24,16 @@ internal class BarberHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public BarberHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
+        this.permissions = permissions;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
@@ -90,6 +95,7 @@ internal class BarberHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(obj.What.CharacterToChangeId, out var characterToChange)) return;
+            if (!CanSenderRestyle(obj.Who, characterToChange.HeroObject)) return;
 
             characterToChange.HeroObject.StaticBodyProperties = obj.What.CurrentBodyProperties.StaticProperties;
             characterToChange.HeroObject.Build = obj.What.CurrentBodyProperties.DynamicProperties.Build;
@@ -133,5 +139,15 @@ internal class BarberHandler : IHandler
                 agent.EquipItemsFromSpawnEquipment(false, false, false, 0);
             }
         }
+    }
+
+    // The barber changes a hero the sender may manage.
+    private bool CanSenderRestyle(object sender, Hero target)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageHero(actor, target)) return true;
+
+        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
+        return false;
     }
 }

@@ -1,4 +1,7 @@
-﻿using Common;
+﻿using LiteNetLib;
+using GameInterface.Services.Players;
+using GameInterface.Services.Clans;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -18,15 +21,21 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IPlayerManager playerManager;
+        private readonly ICoopClanPermissions permissions;
 
         public CharacterDeveloperHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            INetwork network)
+            INetwork network,
+            IPlayerManager playerManager,
+            ICoopClanPermissions permissions)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.playerManager = playerManager;
+            this.permissions = permissions;
 
             messageBroker.Subscribe<ApplyChanges>(Handle_ApplyChanges);
             messageBroker.Subscribe<NetworkApplyChanges>(Handle_NetworkApplyChanges);
@@ -98,6 +107,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             GameThread.RunSafe(() =>
             {
                 if (!objectManager.TryGetObjectWithLogging<HeroDeveloper>(data.HeroDeveloperId, out var heroDeveloper)) return;
+                if (!CanSenderDevelop(obj.Who, heroDeveloper.Hero)) return;
 
                 AddPerks(data.PerkIds, heroDeveloper);
                 AddAttributes(data.AttributeIds, data.AttributeIncreases, heroDeveloper);
@@ -183,6 +193,16 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                     heroDeveloper.AddFocus(focusChange.Skill, 1);
                 }
             }
+        }
+
+        // Perks and attributes are spent on a hero the sender may manage.
+        private bool CanSenderDevelop(object sender, Hero target)
+        {
+            if (!ModInformation.IsServer || sender is not NetPeer) return true;
+            if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageHero(actor, target)) return true;
+
+            Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
+            return false;
         }
     }
 }
