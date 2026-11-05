@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -84,6 +85,24 @@ public class ArmyRequestSenderTests : IDisposable
         Send(Outsider, new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 0));
 
         Server.Call(() => Assert.Equal(cohesion, Get<Army>(armyId).Cohesion));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Disband_IsAppliedOnlyAsTheSendersOwnParty(bool fromMember)
+    {
+        Server.Call(() =>
+        {
+            var memberHero = Get<MobileParty>(memberPartyId).LeaderHero;
+            if (memberHero.Clan == null) memberHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            // Vanilla's disband cost reads Clan.PlayerClan, which the test campaign leaves unset.
+            Campaign.Current.PlayerDefaultFaction = memberHero.Clan;
+        });
+
+        Send(fromMember ? Member : Outsider, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
+
+        Server.Call(() => Assert.Equal(fromMember, Get<MobileParty>(memberPartyId).Army == null));
     }
 
     private void Register(string controllerId, MobileParty party, EnvironmentInstance client)
