@@ -600,7 +600,7 @@ public class PlayerManagerTests
         var playerManager = CreatePlayerManager(out var objectManager);
         var ownClan = ObjectHelper.SkipConstructor<Clan>();
         var hero = ObjectHelper.SkipConstructor<Hero>();
-        AccessTools.Field(typeof(Hero), "_clan").SetValue(hero, ownClan);
+        hero._clan = ownClan;
         objectManager.Setup(o => o.TryGetObject(HeroId, out hero)).Returns(true);
         var peer = new TestNetwork().CreatePeer();
 

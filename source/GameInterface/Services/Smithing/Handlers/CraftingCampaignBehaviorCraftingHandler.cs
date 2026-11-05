@@ -96,7 +96,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Get required objects using interface & objectManager
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo)
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo == null || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo)
             {
                 Logger.Warning("Ignoring a smithy request for {Hero}, who is not in the sending player's party", craftingHero.StringId);
                 return;
@@ -164,7 +164,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Get required objects using interface & objectManager
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo)
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo == null || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo)
             {
                 Logger.Warning("Ignoring a smithy request for {Hero}, who is not in the sending player's party", craftingHero.StringId);
                 return;
@@ -256,7 +256,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // A crafting hero outside the sender's party gets the usual failure reply so the client drops its
             // pending item. A missing crafting hero fails in TryCreateCraftedWeapon with the same reply.
             var refused = objectManager.TryGetObject(data.CraftingHeroId, out Hero craftingHero) &&
-                (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo);
+                (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo == null || craftingHero.PartyBelongedTo != senderHero.PartyBelongedTo);
             if (refused) Logger.Warning("Ignoring a smithy request for {Hero}, who is not in the sending player's party", craftingHero.StringId);
 
             if (refused || !TryCreateCraftedWeapon(data))

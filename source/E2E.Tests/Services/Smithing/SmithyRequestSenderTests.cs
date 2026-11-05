@@ -63,6 +63,21 @@ public class SmithyRequestSenderTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.OfType<NetworkSetHeroCraftingStamina>());
     }
 
+    // A sender captured with the smithy screen still open has no party, which must not match another partyless hero
+    [Fact]
+    public void SmeltingFromASenderWithNoParty_IsRefused()
+    {
+        Server.Call(() =>
+        {
+            Get<Hero>(ownerHeroId)._partyBelongedTo = null;
+            Get<Hero>(otherHeroId)._partyBelongedTo = null;
+        });
+
+        Send(new NetworkDoSmelting(otherHeroId, default));
+
+        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkSetHeroCraftingStamina>());
+    }
+
     // A refused crafting hero gets the usual failure reply, so the sender's client drops its pending crafted item.
     // The template doesn't exist either, so the refusal warning is what tells the refusal apart.
     [Fact]
