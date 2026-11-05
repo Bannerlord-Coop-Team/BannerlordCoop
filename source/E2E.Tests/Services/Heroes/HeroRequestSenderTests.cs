@@ -13,6 +13,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
@@ -30,6 +31,8 @@ public class HeroRequestSenderTests : IDisposable
     private string ownerPartyBaseId;
     private string captiveId;
     private string freeHeroId;
+    private string outsiderHeroId;
+    private string otherLordId;
 
     public HeroRequestSenderTests(ITestOutputHelper output)
     {
@@ -64,6 +67,14 @@ public class HeroRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(ownerPartyId) == Get<Hero>(freeHeroId).PartyBelongedTo));
     }
 
+    [Fact]
+    public void TakeAnotherClansHeroIntoTheOwnersParty_IsRefused()
+    {
+        Send(Owner, new MenuTakeHeroToParty(otherLordId, ownerPartyId));
+
+        Server.Call(() => Assert.NotSame(Get<MobileParty>(ownerPartyId), Get<Hero>(otherLordId).PartyBelongedTo));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -72,6 +83,14 @@ public class HeroRequestSenderTests : IDisposable
         Send(fromOwner ? Owner : Outsider, new DoCompanionRejoinAfterEmprisonment(freeHeroId, ownerPartyId));
 
         Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(ownerPartyId) == Get<Hero>(freeHeroId).PartyBelongedTo));
+    }
+
+    [Fact]
+    public void CompanionRejoinOfAnotherClansHero_IsRefused()
+    {
+        Send(Owner, new DoCompanionRejoinAfterEmprisonment(otherLordId, ownerPartyId));
+
+        Server.Call(() => Assert.NotSame(Get<MobileParty>(ownerPartyId), Get<Hero>(otherLordId).PartyBelongedTo));
     }
 
     [Fact]
@@ -100,6 +119,22 @@ public class HeroRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromOwner, Get<Hero>(freeHeroId).IsPrisoner));
     }
 
+    [Fact]
+    public void TakeAnAILordPrisoner_IsApplied()
+    {
+        Send(Owner, new NetworkTakeLordPrisoner(ownerPartyBaseId, otherLordId));
+
+        Server.Call(() => Assert.True(Get<Hero>(otherLordId).IsPrisoner));
+    }
+
+    [Fact]
+    public void TakeAPlayerHeroPrisoner_IsRefused()
+    {
+        Send(Owner, new NetworkTakeLordPrisoner(ownerPartyBaseId, outsiderHeroId));
+
+        Server.Call(() => Assert.False(Get<Hero>(outsiderHeroId).IsPrisoner));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -121,9 +156,35 @@ public class HeroRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(ownerPartyId) == Get<Hero>(freeHeroId).PartyBelongedTo));
     }
 
+    // The owner isn't the clan leader here, so only the rule for sending a member out of its own party allows it.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SendAMemberOfTheOwnersPartyToASettlement_IsAppliedOnlyFromTheOwner(bool fromOwner)
+    {
+        string settlementId = null;
+        Server.Call(() =>
+        {
+            var freeHero = Get<Hero>(freeHeroId);
+            var leader = GameObjectCreator.CreateInitializedObject<Hero>();
+            leader.Clan = freeHero.Clan;
+            freeHero.Clan.SetLeader(leader);
+            Assert.NotSame(Get<Hero>(ownerHeroId), freeHero.Clan.Leader);
+            AddHeroToPartyAction.Apply(freeHero, Get<MobileParty>(ownerPartyId), true);
+
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+        });
+
+        Send(fromOwner ? Owner : Outsider, new TeleportHero(freeHeroId, settlementId, null,
+            TeleportHeroAction.TeleportationDetail.ImmediateTeleportToSettlement));
+
+        Server.Call(() => Assert.Equal(fromOwner, Get<MobileParty>(ownerPartyId) != Get<Hero>(freeHeroId).PartyBelongedTo));
+    }
+
     private void SetUp()
     {
-        string outsiderHeroId = null, outsiderPartyId = null;
+        string outsiderPartyId = null;
         Server.Call(() =>
         {
             var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
@@ -136,6 +197,10 @@ public class HeroRequestSenderTests : IDisposable
             var captive = CreateCompanion(clan);
             TakePrisonerAction.Apply(captorParty.Party, captive);
             var freeHero = CreateCompanion(clan);
+            // An AI lord of another clan, like the one a player captures after a battle.
+            var otherLord = GameObjectCreator.CreateInitializedObject<Hero>();
+            Assert.NotSame(clan, otherLord.Clan);
+            Assert.True(Server.ObjectManager.TryGetId(otherLord, out otherLordId));
 
             Assert.True(Server.ObjectManager.TryGetId(ownerParty.LeaderHero, out ownerHeroId));
             Assert.True(Server.ObjectManager.TryGetId(ownerParty, out ownerPartyId));

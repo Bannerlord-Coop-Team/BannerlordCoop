@@ -165,6 +165,43 @@ public class CompanionDismissalSyncTests : IDisposable
     }
 
     [Fact]
+    public void FireCompanion_FromAClanMemberWhoseOwnPartyHoldsIt_Succeeds()
+    {
+        var context = CreateCompanion(1, 0, includeParty: true);
+        var member = Clients[1];
+
+        // A player of the clan who isn't its leader, travelling in the party that holds the companion.
+        string memberId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(context.ClanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+            var memberHero = GameObjectCreator.CreateInitializedObject<Hero>();
+            memberHero.Clan = clan;
+            AddHeroToPartyAction.Apply(memberHero, party, true);
+            Assert.NotSame(memberHero, clan.Leader);
+            Assert.True(Server.ObjectManager.TryGetId(memberHero, out memberId));
+        });
+        testEnvironment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("ClanMember", memberId, context.PartyId, context.ClanId, null)));
+            playerManager.SetPeer("ClanMember", member.NetPeer);
+        });
+
+        string requestId = Guid.NewGuid().ToString("N");
+        member.Call(() => member.Resolve<INetwork>().SendAll(new FireCompanion(
+                requestId, context.HeroId, context.ClanId, context.PartyId)),
+            new[] { CreateObituaryMethod });
+
+        var completion = member.InternalMessages.OfType<FireCompanionCompleted>()
+            .Single(message => message.RequestId == requestId);
+        Assert.True(completion.Success, completion.Error);
+        Assert.Equal(0, GetTroopCount(Server, context.PartyId, context.CharacterId));
+    }
+
+    [Fact]
     public void FireCompanion_WithStaleOwnership_ReturnsFailureWithoutMutatingCompanion()
     {
         var context = CreateCompanion(1, 0, includeParty: true);

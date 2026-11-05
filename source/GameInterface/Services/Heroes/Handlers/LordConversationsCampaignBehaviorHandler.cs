@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.LordConversations;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
@@ -114,6 +115,12 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
             if (ModInformation.IsServer && !IsSenderControllingParty(obj.Who, mainParty)) return;
+            // Players are taken through player captivity, so this conversation only ever holds an AI lord.
+            if (ModInformation.IsServer && conversationHero.IsPlayerHero())
+            {
+                Logger.Warning("Ignoring taking player hero {HeroId} prisoner from a lord conversation", conversationHero.StringId);
+                return;
+            }
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },

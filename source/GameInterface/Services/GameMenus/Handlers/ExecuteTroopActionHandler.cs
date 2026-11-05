@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
@@ -55,6 +56,7 @@ internal class ExecuteTroopActionHandler : IHandler
         if (ModInformation.IsServer && !playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+        if (ModInformation.IsServer && !IsSenderInHerosClan(obj.Who, hero)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -64,5 +66,15 @@ internal class ExecuteTroopActionHandler : IHandler
             }
             AddHeroToPartyAction.Apply(hero, mainParty, true);
         });
+    }
+
+    // The menu only offers the player's own clan members, and never another player's hero.
+    private bool IsSenderInHerosClan(object sender, Hero hero)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var actor) && actor.Clan != null && actor.Clan == hero.Clan &&
+            !hero.IsPlayerHero()) return true;
+
+        Logger.Warning("Ignoring taking hero {HeroId} into a party from a peer outside its clan", hero.StringId);
+        return false;
     }
 }
