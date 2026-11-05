@@ -11,8 +11,10 @@ using LiteNetLib;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Incidents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Incidents.Handlers;
 
@@ -47,12 +49,16 @@ internal class IncidentsHandler : IHandler
 
         messageBroker.Subscribe<IncidentOptionInvoked>(Handle_IncidentOptionInvoked);
         messageBroker.Subscribe<NetworkIncidentOptionInvoked>(Handle_NetworkIncidentOptionInvoked);
+
+        messageBroker.Subscribe<NetworkIncidentInvoked>(Handle_NetworkIncidentInvoked);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<IncidentOptionInvoked>(Handle_IncidentOptionInvoked);
         messageBroker.Unsubscribe<NetworkIncidentOptionInvoked>(Handle_NetworkIncidentOptionInvoked);
+
+        messageBroker.Unsubscribe<NetworkIncidentInvoked>(Handle_NetworkIncidentInvoked);
     }
 
     private void Handle_IncidentOptionInvoked(MessagePayload<IncidentOptionInvoked> obj)
@@ -107,6 +113,27 @@ internal class IncidentsHandler : IHandler
             // Send outcome quick information messages to display on client
             var message = new NetworkNotifyIncidentOutcomes(outcomes);
             network.Send(obj.Who as NetPeer, message);
+        });
+    }
+
+    private void Handle_NetworkIncidentInvoked(MessagePayload<NetworkIncidentInvoked> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            // Drop an invoked incident if in a conversation client-side since the server can't see this
+            if (Campaign.Current.ConversationManager.IsConversationFlowActive) return;
+
+            if (!objectManager.TryGetObjectWithLogging<Incident>(data.IncidentId, out var incident)) return;
+
+            incidentsInterface.PrepareIncidentText(incident, data.ActiveIncidentSeed);
+
+            MapState mapState = GameStateManager.Current.LastOrDefault<MapState>();
+            if (mapState != null)
+            {
+                mapState.NextIncident = incident;
+            }
         });
     }
 }

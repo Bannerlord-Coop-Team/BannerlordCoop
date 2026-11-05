@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
+using Common.Network;
 using GameInterface.Extentions;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Incidents.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.Missions;
@@ -45,17 +47,20 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private readonly IPlayerManager playerManager;
     private readonly ISessionIncidentsPlayerDataInterface sessionIncidentsPlayerDataInterface;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
     private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
     public IncidentsCampaignBehaviourInterface(
         IPlayerManager playerManager,
         ISessionIncidentsPlayerDataInterface sessionIncidentsPlayerDataInterface,
         IObjectManager objectManager,
+        INetwork network,
         IMissionMembershipRegistry missionMembershipRegistry = null)
     {
         this.playerManager = playerManager;
         this.sessionIncidentsPlayerDataInterface = sessionIncidentsPlayerDataInterface;
         this.objectManager = objectManager;
+        this.network = network;
         this.missionMembershipRegistry = missionMembershipRegistry;
     }
 
@@ -207,8 +212,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         bool isLeavingSettlement = (trigger & LeavingSettlementTriggers) != 0;
         if (isLeavingSettlement && playerParty.LastVisitedSettlement.IsSettlementBusy(this)) return;
 
-        // TODO: Move the conversation flow active check to be client-side when receiving incident??
-        if (playerHero.IsPrisoner || Campaign.Current.ConversationManager.IsConversationFlowActive) return;
+        // Vanilla's conversation check is done by the client in IncidentsHandler, since the server never has one
+        if (playerHero.IsPrisoner) return;
 
         if (sessionIncidentsPlayerDataInterface.IsOnGlobalCooldown(player.HeroId)) return;
 
@@ -257,13 +262,11 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         // IncidentsHandler only applies an option for the incident the player was last sent
         sessionIncidentsPlayerDataInterface.SetPendingIncident(player.HeroId, incidentId);
 
-        // TODO: Replace with a coop system instead of using map state on server
+        // The client fills in the incident's text with the same seed the server rolled it with
+        var message = new NetworkIncidentInvoked(incidentId, sessionIncidentsPlayerDataInterface.GetActiveIncidentSeed(player.HeroId));
 
-        //MapState mapState = GameStateManager.Current.LastOrDefault<MapState>();
-        //if (mapState != null)
-        //{
-        //    mapState.NextIncident = incident;
-        //}
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        network.Send(peer, message);
     }
 
     private bool TryGetIncidentsBehavior(out IncidentsCampaignBehaviour incidentsCampaignBehavior)
