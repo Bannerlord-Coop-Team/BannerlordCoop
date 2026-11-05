@@ -164,7 +164,8 @@ internal class AlleyManagementHandler : IHandler
         var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!IsAllowedSender(sender, data.OwnerId)) return;
+            // The alley debug command also publishes this on the server, where the sender is not a peer.
+            if (sender is NetPeer && !playerManager.IsSenderControllingHero(sender, data.OwnerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
@@ -248,23 +249,11 @@ internal class AlleyManagementHandler : IHandler
         var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!IsSenderOwningAlley(sender, alleyId, serverMayPublish: true)) return;
+            if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return;
+            // The alley debug command also publishes this on the server, where the sender is not a peer.
+            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero)) return;
             AbandonAlley(alleyId, fromClanScreen);
         });
-    }
-
-    // The debug commands publish acquire and abandon and ClanLeaveRules publishes an overseer change on the server
-    // with no peer, so those requests check only a peer. The other requests only ever come from a client.
-    private bool IsAllowedSender(object sender, string heroId) =>
-        sender is not NetPeer || playerManager.IsSenderControllingHero(sender, heroId);
-
-    // Management requests act on the alley's owner, so only that owner's player may send them.
-    private bool IsSenderOwningAlley(object sender, string alleyId, bool serverMayPublish)
-    {
-        if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return false;
-        string ownerId = null;
-        if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out ownerId);
-        return serverMayPublish ? IsAllowedSender(sender, ownerId) : playerManager.IsSenderControllingHero(sender, ownerId);
     }
 
     private void Handle_RequestClearAlley(MessagePayload<RequestClearAlley> payload)
@@ -346,8 +335,9 @@ internal class AlleyManagementHandler : IHandler
         var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!IsSenderOwningAlley(sender, data.AlleyId, serverMayPublish: true)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            // ClanLeaveRules also publishes this on the server, where the sender is not a peer.
+            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOverseerId, out var newOverseer)) return;
 
             // Swap the overseer hero in the stored garrison the way vanilla ChangeTheLeaderOfAlleyInternal does.
@@ -370,7 +360,8 @@ internal class AlleyManagementHandler : IHandler
         var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!IsSenderOwningAlley(sender, data.AlleyId, serverMayPublish: false)) return;
+            if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
 
             var newGarrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
             // The alley party screen already moved the troops between the owner's party and the alley
@@ -392,8 +383,8 @@ internal class AlleyManagementHandler : IHandler
         var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!IsSenderOwningAlley(sender, data.AlleyId, serverMayPublish: false)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var managementData)) return;
             var lastRecruitTime = new CampaignTime(managementData.LastRecruitTimeTicks);
             if (lastRecruitTime.ElapsedDaysUntilNow <= CampaignTime.DaysInWeek) return;

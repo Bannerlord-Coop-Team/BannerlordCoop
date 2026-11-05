@@ -554,9 +554,7 @@ internal class AlleyHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             // Only the owner's player fights the defense, so a resolve from anyone else is refused.
-            string ownerId = null;
-            if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out ownerId);
-            if (!playerManager.IsSenderControllingHero(sender, ownerId)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var mgmt)) return;
 
             // Ignore a stale/duplicate resolve: the attack may already have timed out and destroyed the alley.
