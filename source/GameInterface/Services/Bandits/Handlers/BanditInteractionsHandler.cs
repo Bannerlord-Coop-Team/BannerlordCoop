@@ -342,12 +342,12 @@ internal class BanditInteractionsHandler : IHandler
     // Bandit encounter results apply to the sender's own party, clan and battle; a request about another one is stale.
     private bool IsSenderParty(object sender, string mobilePartyId)
     {
-        return !ModInformation.IsServer || sender is not NetPeer || playerManager.IsSenderControllingParty(sender, mobilePartyId);
+        return !ModInformation.IsServer || playerManager.IsSenderControllingParty(sender, mobilePartyId);
     }
 
     private bool IsSenderClan(object sender, Clan clan)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && actor.Clan == clan) return true;
 
         Logger.Warning("Ignoring a bandit encounter request for clan {Clan} from a peer outside it", clan.StringId);
@@ -356,8 +356,8 @@ internal class BanditInteractionsHandler : IHandler
 
     private bool IsSenderOnBattleSide(object sender, MapEvent battle, BattleSideEnum side)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
-        if (playerManager.TryGetPlayer(peer, out var player) &&
+        if (!ModInformation.IsServer) return true;
+        if (sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
             objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
             party.MapEvent == battle && party.Party.MapEventSide == battle.GetMapEventSide(side)) return true;
 

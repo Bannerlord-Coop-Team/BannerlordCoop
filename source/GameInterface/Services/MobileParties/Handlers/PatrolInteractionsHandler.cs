@@ -6,7 +6,6 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -145,7 +144,7 @@ internal class PatrolInteractionsHandler : IHandler
     // The hostile action belongs to the party that talked to the patrol, which is the sender's own party.
     private bool IsSenderParty(object sender, PartyBase party)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
 
         objectManager.TryGetId(party.MobileParty, out var mobilePartyId);
         return playerManager.IsSenderControllingParty(sender, mobilePartyId);

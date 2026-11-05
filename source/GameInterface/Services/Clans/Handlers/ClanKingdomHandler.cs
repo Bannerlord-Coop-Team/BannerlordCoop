@@ -143,7 +143,6 @@ internal class ClanKingdomHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupporterClanId, out var supporterClan)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupportedClanId, out var supportedClan)) return;
-            if (!CanSenderManageClan(payload.Who, supporterClan)) return;
             DiplomacyModel diplomacyModel = Campaign.Current.Models.DiplomacyModel;
             int influenceCostOfSupportingClan = diplomacyModel.GetInfluenceCostOfSupportingClan();
             if (!(payload.Who is NetPeer peer))
@@ -151,6 +150,7 @@ internal class ClanKingdomHandler : IHandler
                 Logger.Error("Received {Message} without a registered peer", nameof(NetworkOnClanSupported));
                 return;
             }
+            if (!CanSenderManageClan(peer, supporterClan)) return;
             if (supporterClan.Influence >= (float)influenceCostOfSupportingClan)
             {
                 int influenceValueOfSupportingClan = diplomacyModel.GetInfluenceValueOfSupportingClan();
@@ -167,7 +167,7 @@ internal class ClanKingdomHandler : IHandler
     // Supporting a clan spends the supporter clan's influence, so it's only applied for that clan's leader.
     private bool CanSenderManageClan(object sender, Clan clan)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, clan)) return true;
 
         Logger.Warning("Ignoring a clan support request for {Clan} from a peer that doesn't lead it", clan.StringId);

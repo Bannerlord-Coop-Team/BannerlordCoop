@@ -185,8 +185,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     // The smithy only offers heroes in the player's own party, so a request for anyone else comes from a stale screen.
     private bool IsCraftingHeroInSenderParty(object sender, Hero craftingHero)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
-        if (playerManager.TryGetPlayer(peer, out var player) &&
+        if (!ModInformation.IsServer) return true;
+        if (sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
             objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var senderParty) &&
             craftingHero.PartyBelongedTo == senderParty) return true;
 

@@ -1417,9 +1417,11 @@ public class MerchantOutlawsTests : IDisposable
             Get<MobileParty>(Server, targetId), Get<MobileParty>(Server, player.MobilePartyId).Party), TextHelpers);
     }
 
+    // The recruitment arrives from the client of the player whose encounter it was
     private void Recruit(string targetId, Player player)
     {
-        Server.SimulateMessage(this, new NetworkRosterScreenAfterBanditEncounter(new List<string> { targetId }, player.MobilePartyId));
+        var sender = ReferenceEquals(player, scenario.PlayerA) ? ClientA.NetPeer : ClientB.NetPeer;
+        Server.SimulateMessage(sender, new NetworkRosterScreenAfterBanditEncounter(new List<string> { targetId }, player.MobilePartyId));
     }
 
     private Quest Quest(EnvironmentInstance instance) => Assert.IsType<Quest>(Get<Hero>(instance, scenario.NotableId).Issue.IssueQuest);
