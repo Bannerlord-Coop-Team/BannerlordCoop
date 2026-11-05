@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -26,6 +27,7 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
     private string ownerPartyId;
     private string clanId;
     private string outsiderClanId;
+    private string outsiderHeroId;
 
     public SmithyClanSupportRequestSenderTests(ITestOutputHelper output)
     {
@@ -58,6 +60,21 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
         Send(fromOwner, new NetworkDoSmelting(ownerHeroId, default));
 
         Assert.Equal(fromOwner ? 1 : 0, Server.NetworkSentMessages.OfType<NetworkSetHeroCraftingStamina>().Count());
+    }
+
+    // The template doesn't exist, so a request that gets past the sender checks ends in the usual failure reply.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WeaponCrafting_GoesAheadOnlyForAHeroInTheSendersParty(bool ownHero)
+    {
+        AddSmithyWithNoStamina();
+
+        Send(fromOwner: true, new NetworkCreateCraftedWeaponInternalServer(true, ownHero ? ownerHeroId : outsiderHeroId,
+            new TextObject("Test Sword"), null, "missing_template", "Test Sword", new List<string>(), new List<int>(),
+            "", ownerHeroId, null, null, null, "request"));
+
+        Assert.Equal(ownHero ? 1 : 0, Server.NetworkSentMessages.OfType<NetworkCreateCraftedWeaponInternalClients>().Count());
     }
 
     [Fact]
@@ -116,7 +133,7 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
     // The owner leads a clan and plays its party; the outsider plays a party in another clan.
     private void SetUp()
     {
-        string outsiderHeroId = null, outsiderPartyId = null;
+        string outsiderPartyId = null;
         Server.Call(() =>
         {
             var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();

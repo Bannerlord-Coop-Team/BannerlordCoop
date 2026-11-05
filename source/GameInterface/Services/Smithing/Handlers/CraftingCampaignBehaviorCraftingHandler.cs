@@ -258,6 +258,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
+            // A missing crafting hero still fails below with the usual reply.
+            if (objectManager.TryGetObject(data.CraftingHeroId, out Hero craftingHero) &&
+                !IsCraftingHeroInSenderParty(obj.Who, craftingHero)) return;
 
             if (!TryCreateCraftedWeapon(data))
             {
