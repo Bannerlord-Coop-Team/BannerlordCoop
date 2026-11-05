@@ -221,6 +221,41 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void MergedDatagram_SendsUnreliablePacketsOnTheDroppableLane()
+        {
+            using var serverSocket = CreateServerSocket();
+            IPEndPoint peerRelayEndpoint = ConnectPeerAndObserveServerEndpoint(serverSocket, 7, 0);
+
+            serverSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, peerRelayEndpoint);
+
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            var droppable = Assert.Single(sent, datagram => datagram.Droppable);
+            var reliable = Assert.Single(sent, datagram => !datagram.Droppable);
+            Assert.Equal(SteamTunnelTests.MergedUnreliable, droppable.Data);
+            Assert.Equal(SteamTunnelTests.MergedChanneled, reliable.Data);
+        }
+
+        [Fact]
+        public void MergedDatagram_UnderBackpressure_ParksOnlyTheReliablePart()
+        {
+            using var serverSocket = CreateServerSocket();
+            IPEndPoint peerRelayEndpoint = ConnectPeerAndObserveServerEndpoint(serverSocket, 7, 0);
+
+            // Refuses the unreliable part, which drops, then the reliable part, which parks.
+            transport.FailSendsRemaining = 2;
+            serverSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, peerRelayEndpoint);
+            SteamTunnelClientTests.WaitUntil(() => transport.RejectedSends >= 2);
+            serverSocket.SendTo(new byte[] { 1, 8 }, peerRelayEndpoint);
+
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            Assert.Equal(SteamTunnelTests.MergedChanneled, sent[0].Data);
+            Assert.False(sent[0].Droppable);
+            Assert.Equal(new byte[] { 1, 8 }, sent[1].Data);
+        }
+
+        [Fact]
         public void TwoPeers_GetDistinctRelayPorts()
         {
             using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);

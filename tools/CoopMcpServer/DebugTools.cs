@@ -37,7 +37,7 @@ public sealed class DebugTools : IDebugTools
     [McpServerTool(Name = "list_saves", ReadOnly = true, UseStructuredContent = true), Description("List local graphical Bannerlord save basenames for a configured profile, from the redirected Windows Documents save folder. Metadata only, 64 per page and 512 catalog entries maximum. Pass nextOffset until unchanged. Use an exact name as start_run save_name; no save parsing/copy/delete/write, no hotload. Missing co-op .json sidecar is reported, not created.")]
     public SavePage ListSaves(string profile, int offset = 0) => runs.ListSaves(profile, offset);
 
-    [McpServerTool(Name = "preflight_run", ReadOnly = true, UseStructuredContent = true), Description("Read-only system commit headroom and deployed DEBUG bridge metadata check for a server plus client_count new clients. No launch, deployment, allocation, or configuration changes. Budgets are configurable estimates, not guarantees.")]
+    [McpServerTool(Name = "preflight_run", ReadOnly = true, UseStructuredContent = true), Description("Read-only system commit headroom and deployed DEBUG bridge metadata check for a server plus client_count new clients. No launch, deployment, allocation, or configuration changes. Budgets are configurable estimates, not guarantees. A profile with externalServer counts clients only.")]
     public PreflightReport PreflightRun(string profile, int client_count) => runs.Preflight(profile, client_count);
 
     [McpServerTool(Name = "start_client", UseStructuredContent = true), Description("Add one deferred client to an existing owned run using a configured client_index (1..16). Prefer start_run with client_count=0, wait for server, then add clients as needed. Slot is reserved once: repeated calls report existing_running/existing_exited/launch_failed/outcome_unknown, never relaunch. Preflight rejection has no launch side effect. Launching is not joining; wait readyToJoin, join_client, then wait readyForCampaignTests.")]
@@ -48,7 +48,7 @@ public sealed class DebugTools : IDebugTools
     public Task<CallToolResult> CaptureScreenshot(string run_id, string instance, int timeout_seconds, CancellationToken cancellationToken) =>
         screenshots.CaptureAsync(run_id, instance, timeout_seconds, cancellationToken);
 
-    [McpServerTool(Name = "start_run", UseStructuredContent = true), Description("Launch a configured in-game server and 0..16 deferred clients. Returns booting, NOT connected or ready. Next wait for server readyForCampaignTests, each client readyToJoin, join_client each, then wait each client readyForCampaignTests. Only one active run per MCP session. Optional save_name must be an exact list_saves basename; server uses /coopsave without default fallback. Omit to retain normal startup. MCP never modifies save bytes; normal game autosaves are not disabled.")]
+    [McpServerTool(Name = "start_run", UseStructuredContent = true), Description("Launch a configured in-game server and 0..16 deferred clients. Returns booting, NOT connected or ready. Next wait for server readyForCampaignTests, each client readyToJoin, join_client each, then wait each client readyForCampaignTests. Only one active run per MCP session. Optional save_name must be an exact list_saves basename; server uses /coopsave without default fallback. Omit to retain normal startup. MCP never modifies save bytes; normal game autosaves are not disabled. A profile with externalServer launches clients only: the operator owns the dedicated server, instance server does not exist and save_name is rejected.")]
     public Task<RunView> StartRun(string profile, int client_count, CancellationToken cancellationToken, string save_name = null) =>
         runs.StartAsync(profile, client_count, cancellationToken, save_name);
 
@@ -67,7 +67,7 @@ public sealed class DebugTools : IDebugTools
     public Task<LiveTestResponse> ExecuteCommand(string run_id, string instance, string name, string[] arguments, CancellationToken cancellationToken) =>
         runs.RequestAsync(run_id, instance, "command", new { name, arguments }, true, cancellationToken);
 
-    [McpServerTool(Name = "join_client", UseStructuredContent = true), Description("Attempt one deferred client join after server readyForCampaignTests and client readyToJoin. This schedules joining, not completion. Then wait for client readyForCampaignTests. Do not retry uncertain outcomes.")]
+    [McpServerTool(Name = "join_client", UseStructuredContent = true), Description("Attempt one deferred client join after server readyForCampaignTests and client readyToJoin. This schedules joining, not completion. Then wait for client readyForCampaignTests. Do not retry uncertain outcomes. A profile with externalServer sends no server check: the operator must confirm the dedicated server is serving, otherwise the client never reaches readyForCampaignTests and the wait ends at its deadline.")]
     public Task<LiveTestResponse> JoinClient(string run_id, string instance, CancellationToken cancellationToken) =>
         runs.RequestAsync(run_id, instance, "join", new { }, true, cancellationToken);
 

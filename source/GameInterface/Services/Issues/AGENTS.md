@@ -32,8 +32,8 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))`. Clients replay what the
    server announced and never roll or pay anything again.
 2. A quest with a `FinalizationProofStrategy` ends through its branch, not a generic `QuestSuccess`, which skips
-   the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
-   `QuestSuccess` for your descriptor.
+   the branch method where vanilla pays. The framework rejects generic `QuestSuccess` for proof quests, so each
+   descriptor still needs a finalization proof strategy and branch implementation.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
    `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`. A client sets or moves its mirror when it

@@ -20,7 +20,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>
@@ -283,6 +282,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
             data.Captured,
             issue.IssueQuest?.QuestDueTime.NumTicks ?? 0,
             issue.IssueQuest != null));
+        messageBroker.Publish(this, new QuestSolutionAcceptedOnServer(
+            data.IssueOwnerId, data.IssueId, player.ControllerId));
     }
 
     // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
@@ -369,6 +370,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler, IQuestSolutionAcceptCo
 
             if (data.HasQuestDueTime && issue.IssueQuest != null)
                 issue.IssueQuest.ChangeQuestDueTime(new CampaignTime(data.QuestDueTimeTicks));
+
+            messageBroker.Publish(this, new QuestSolutionAcceptedOnClient(issue, data.ControllerId));
         }, data.IssueOwnerId), context: nameof(QuestSolutionAcceptCoordinator));
     }
 
