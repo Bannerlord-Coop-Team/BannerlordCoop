@@ -10,7 +10,6 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
-using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -557,7 +556,7 @@ internal class AlleyHandler : IHandler
             // Only the owner's player fights the defense, so a resolve from anyone else is refused.
             string ownerId = null;
             if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out ownerId);
-            if (sender is NetPeer && !playerManager.IsSenderControllingHero(sender, ownerId)) return;
+            if (!playerManager.IsSenderControllingHero(sender, ownerId)) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var mgmt)) return;
 
             // Ignore a stale/duplicate resolve: the attack may already have timed out and destroyed the alley.
