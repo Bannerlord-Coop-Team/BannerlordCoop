@@ -330,6 +330,7 @@ namespace GameInterface.Services.GameDebug.Commands
                 new ExpectedArgs("clan_id", "The player clan name or id; quote names with spaces."),
                 new ExpectedArgs("count", "The number of heirs to create, from 1 through 10."),
                 new ExpectedArgs("parent", "Optional player hero name or id; quote names with spaces. Defaults to the clan leader.", false),
+                new ExpectedArgs("female", "Optional true to create female heirs. Defaults to false.", false),
             };
 
             private readonly ICommandObjectResolver resolver;
@@ -353,18 +354,27 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!playerClan.IsPlayerClan())
                     return Failed("Targeted clan is not a player clan. Only add new heirs to player clans.");
 
+                bool isFemale = false;
+                if (args.Count == 4 && !bool.TryParse(args[3], out isFemale))
+                    return Failed($"Female must be true or false: {args[3]}.");
+
                 Hero playerHero = playerClan.Leader;
-                if (args.Count == 3)
+                if (args.Count >= 3)
                 {
                     if (!resolver.TryResolve(args[2], playerClan.Heroes.Where(hero => hero.IsPlayerHero()), hero => hero.Name?.ToString(), out playerHero, out error))
                         return Failed(error);
                 }
 
-                var templates = playerHero.Culture?.LordTemplates?
+                // Culture lord templates are all male, so female heirs use the culture's female wanderer templates.
+                IEnumerable<CharacterObject> templateSource = isFemale
+                    ? CharacterObject.All.Where(character => character.IsTemplate && character.IsFemale &&
+                        character.Occupation == Occupation.Wanderer && character.Culture == playerHero.Culture)
+                    : playerHero.Culture?.LordTemplates;
+                var templates = templateSource?
                     .Where(template => template != null)
                     .ToList();
                 if (templates == null || templates.Count == 0)
-                    return Failed($"Player hero '{playerHero.StringId}' has no culture lord templates.");
+                    return Failed($"Player hero '{playerHero.StringId}' has no culture {(isFemale ? "female wanderer" : "lord")} templates.");
 
                 int minimumAge = Campaign.Current.Models.AgeModel.HeroComesOfAge;
                 int maximumAge = Math.Max(minimumAge, 40);
@@ -404,7 +414,7 @@ namespace GameInterface.Services.GameDebug.Commands
                     if (eligible) eligibleCount++;
 
                     output.AppendLine(
-                        $"HEIR hero={resolver.DisplayId(relative)} name='{relative.Name}' age={relative.Age:F0} " +
+                        $"HEIR hero={resolver.DisplayId(relative)} name='{relative.Name}' age={relative.Age:F0} female={relative.IsFemale} " +
                         $"relation=child eligible={eligible} points={(eligible ? selectionPoints : 0)}");
                 }
 
