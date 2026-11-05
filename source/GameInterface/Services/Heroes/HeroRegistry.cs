@@ -65,16 +65,16 @@ internal class HeroRegistry : AutoRegistryBase<Hero>
             obj._characterAttributes = new PropertyOwner<CharacterAttribute>();
         }
 
-        // The campaign hero lists get the stub once its CharacterObject syncs, every list reader dereferences it
+        // The campaign hero lists get the stub once its CharacterObject syncs. Every list reader dereferences it
         GameThread.RunSafe(() =>
         {
-            // Vanilla AddHero gives the hero its id and then lists it. Only the id is taken here, the list part waits for the CharacterObject.
-            // A running campaign has no Hero record in MBObjectManager, so the register call below gives no id of its own
-            var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-            if (campaignObjectManager != null)
-                obj.Id = new MBGUID(32u, campaignObjectManager.GetNextUniqueObjectIdOfType<Hero>());
-
             MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, presumed: false, out _);
+
+            // A running campaign has no Hero record in MBObjectManager, so the register call above gives no id there.
+            // Vanilla AddHero gives the hero its id and then lists it. Only the id is taken here, the list part waits for the CharacterObject
+            var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+            if (obj.Id.InternalValue == 0 && campaignObjectManager != null)
+                obj.Id = new MBGUID(32u, campaignObjectManager.GetNextUniqueObjectIdOfType<Hero>());
         });
     }
 
