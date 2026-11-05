@@ -106,7 +106,8 @@ internal class PatrolInteractionsHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.ConversationPartyId, out var conversationParty)) return;
-            if (!IsSenderParty(obj.Who, mainParty)) return;
+            objectManager.TryGetId(mainParty.MobileParty, out var mobilePartyId);
+            if (!playerManager.IsSenderControllingParty(obj.Who, mobilePartyId)) return;
 
             BeHostileAction.ApplyEncounterHostileAction(mainParty, conversationParty);
         });
@@ -139,15 +140,6 @@ internal class PatrolInteractionsHandler : IHandler
 
             patrolPartiesBehavior._interactedPatrolParties.Remove(patrolHomeSettlement);
         });
-    }
-
-    // The hostile action belongs to the party that talked to the patrol, which is the sender's own party.
-    private bool IsSenderParty(object sender, PartyBase party)
-    {
-        if (!ModInformation.IsServer) return true;
-
-        objectManager.TryGetId(party.MobileParty, out var mobilePartyId);
-        return playerManager.IsSenderControllingParty(sender, mobilePartyId);
     }
 
     private bool TryGetPatrolPartiesBehavior(out PatrolPartiesCampaignBehavior patrolPartiesBehavior)

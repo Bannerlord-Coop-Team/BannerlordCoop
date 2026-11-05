@@ -94,6 +94,13 @@ public interface IPlayerManager
     bool IsSenderControllingParty(object sender, string mobilePartyId);
 
     /// <summary>
+    /// Checks whether a message sender's hero is in the given clan, logging a warning when it
+    /// isn't, so a handler can ignore a request made for another clan. Reads the hero's live clan,
+    /// so call it on the game thread.
+    /// </summary>
+    bool IsSenderControllingClan(object sender, Clan clan);
+
+    /// <summary>
     /// Resolves the hero controlled by the peer that sent a message, so a handler can check what
     /// that player may do. Reads the object registry, so call it on the game thread.
     /// </summary>
@@ -438,6 +445,14 @@ public class PlayerManager : IPlayerManager
             TryGetPlayer(controllerId, out var player) && player.MobilePartyId == mobilePartyId) return true;
 
         logger.Warning("Ignoring a request for party {PartyId} from peer {PeerId}, which does not control it", mobilePartyId, peer?.Id);
+        return false;
+    }
+
+    public bool IsSenderControllingClan(object sender, Clan clan)
+    {
+        if (clan != null && TryGetSenderHero(sender, out var hero) && hero.Clan == clan) return true;
+
+        logger.Warning("Ignoring a request for clan {ClanId} from peer {PeerId}, which is not in it", clan?.StringId, (sender as NetPeer)?.Id);
         return false;
     }
 

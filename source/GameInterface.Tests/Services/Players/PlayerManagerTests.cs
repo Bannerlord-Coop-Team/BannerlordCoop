@@ -594,6 +594,31 @@ public class PlayerManagerTests
         Assert.Null(notAPeerHero);
     }
 
+    [Fact]
+    public void IsSenderControllingClan_OnlyForTheSendersOwnClan()
+    {
+        var playerManager = CreatePlayerManager(out var objectManager);
+        var ownClan = ObjectHelper.SkipConstructor<Clan>();
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        AccessTools.Field(typeof(Hero), "_clan").SetValue(hero, ownClan);
+        objectManager.Setup(o => o.TryGetObject(HeroId, out hero)).Returns(true);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        try
+        {
+            Assert.True(playerManager.IsSenderControllingClan(peer, ownClan));
+            Assert.False(playerManager.IsSenderControllingClan(peer, ObjectHelper.SkipConstructor<Clan>()));
+            Assert.False(playerManager.IsSenderControllingClan(new object(), ownClan));
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
