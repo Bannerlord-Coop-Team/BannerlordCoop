@@ -3,6 +3,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Barbers.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Common.Network;
 using GameInterface.Services.CharacterDevelopers.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Data;
@@ -62,8 +63,14 @@ public class PartyHeroRequestSenderTests : IDisposable
         Send(fromOwner: false, new NetworkRemoveAllPartyRolesOfHero(clanPartyLeaderId, clanPartyId));
 
         Server.Call(() => Assert.Same(Get<Hero>(clanPartyLeaderId), Get<MobileParty>(clanPartyId).Scout));
-        Assert.Contains(Server.NetworkSentMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
+        Server.Call(() => Server.Resolve<INetwork>().FlushPendingMessages());
+
+        // Only the client that sent the echo gets the refresh, so N clients don't each get N-1 copies.
+        Assert.Single(Server.NetworkSentMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
             message => message.MobilePartyId == clanPartyId);
+        Assert.Single(Outsider.InternalMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
+            message => message.MobilePartyId == clanPartyId);
+        Assert.Empty(Owner.InternalMessages.OfType<NetworkRefreshAfterRoleAssignment>());
     }
 
     [Theory]

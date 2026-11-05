@@ -7,6 +7,7 @@ using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -354,7 +355,8 @@ internal class PartyRolesHandler : IHandler
         if (IsAllowedToChangeRoles(sender, target)) return true;
 
         Logger.Debug("Skipping a role clear for {Target} from a peer that may not change it", target?.StringId);
-        UpdateClientVM(mobilePartyId);
+        // Every client sends this echo, so each one only refreshes its own screens.
+        if (sender is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(mobilePartyId));
         return false;
     }
 
