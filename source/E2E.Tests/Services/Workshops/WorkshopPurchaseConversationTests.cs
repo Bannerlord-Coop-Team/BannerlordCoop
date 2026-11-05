@@ -350,6 +350,9 @@ public class WorkshopPurchaseConversationTests : IDisposable
         var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 1000, sellerGold: 0);
         var newTypeId = TestEnvironment.CreateRegisteredObject<WorkshopType>();
         var sender = fromOwner ? Clients.First() : Clients.Last();
+        // The other peer plays the seller, a known hero that does not own the workshop
+        RegisterPlayerHero(Server, state.SellerId, "WorkshopSeller");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("WorkshopSeller", Clients.Last().NetPeer));
 
         sender.Call(() => sender.Resolve<Common.Network.INetwork>().SendAll(
             new ChangeProductionTypeOfWorkshop(state.WorkshopId, newTypeId)));

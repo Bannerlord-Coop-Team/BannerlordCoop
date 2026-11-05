@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
@@ -53,17 +54,20 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
     
     private void Handle_ChangeProductionTypeOfWorkshop(MessagePayload<ChangeProductionTypeOfWorkshop> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-        if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
-
-        if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
+        GameThread.RunSafe(() =>
         {
-            Logger.Warning("Ignoring a production change for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType);
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
+            {
+                Logger.Warning("Ignoring a production change for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
+                return;
+            }
 
-        messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
+            ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType);
+
+            messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
+        }, context: nameof(ChangeProductionTypeOfWorkshopHandler));
     }
 }
