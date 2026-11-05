@@ -145,7 +145,7 @@ namespace Coop.Tests.Steam
         {
             host.Start(4200);
             RaiseConnectedPeer(7);
-            SpinWait.SpinUntil(() => transport.ReceiveCalls > 0, TimeSpan.FromSeconds(2));
+            Assert.True(SpinWait.SpinUntil(() => transport.ReceiveCalls > 0, TimeSpan.FromSeconds(2)));
 
             // Closing the listener closes its accepted connections inside Steam, so no pump tick may run past it
             int receivesDuringClose = -1;
