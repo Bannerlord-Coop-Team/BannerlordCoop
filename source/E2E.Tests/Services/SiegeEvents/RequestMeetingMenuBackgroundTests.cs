@@ -93,6 +93,9 @@ public class RequestMeetingMenuBackgroundTests : IDisposable
     public void ForgetIt_WithoutAnEncounter_SetsLeaveEncounterOnlyWhenOneIsOpen(string consequence)
     {
         var original = AccessTools.Method(typeof(EncounterGameMenuBehavior), consequence);
+        Assert.Contains(Harmony.GetPatchInfo(original).Transpilers,
+            patch => patch.PatchMethod.DeclaringType == typeof(RequestMeetingLeavePatch));
+
         var setLeaveEncounter = AccessTools.PropertySetter(typeof(PlayerEncounter), nameof(PlayerEncounter.LeaveEncounter));
         var instructions = PatchProcessor.GetOriginalInstructions(original);
         Assert.Contains(instructions, instruction => instruction.Calls(setLeaveEncounter));

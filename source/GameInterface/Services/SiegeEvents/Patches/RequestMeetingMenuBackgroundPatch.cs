@@ -39,8 +39,8 @@ internal class RequestMeetingLeavePatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_request_meeting_town_leave_on_consequence");
-        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_request_meeting_castle_leave_on_consequence");
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_request_meeting_town_leave_on_consequence));
+        yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_request_meeting_castle_leave_on_consequence));
     }
 
     [HarmonyTranspiler]
