@@ -140,7 +140,7 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         // A ruler ends a mercenary clan's service from the conversation, to fire one serving its own kingdom or to hire
         // one away from another kingdom, which vanilla only offers to an AI clan leader, so it needn't lead that clan.
-        bool rulerEndsService = clan.IsUnderMercenaryService && hero.Clan?.Kingdom != null && hero.Clan.Kingdom.Leader == hero &&
+        bool rulerEndsService = clan.IsUnderMercenaryService && hero.IsKingdomLeader &&
             (clan.Kingdom == hero.Clan.Kingdom || clan.Leader?.IsPlayerHero() != true);
         if (!rulerEndsService && !permissions.CanManageClan(hero, clan)) return;
 
