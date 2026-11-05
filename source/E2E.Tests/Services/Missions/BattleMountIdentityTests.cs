@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Autofac;
 using Common.Messaging;
 using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Mock;
@@ -16,6 +17,7 @@ using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -134,6 +136,35 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             controller.Dispose();
 
             Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+        });
+    }
+
+    // A controller whose constructor throws is never disposed, so it must not leave its authority attached.
+    [Fact]
+    public void MountAuthority_WarmUpThrows_LeavesNoAuthorityAttached()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "attacker");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var agentRegistry = client.Resolve<INetworkAgentRegistry>();
+            var (_, puppetHorse) = RegisterMountedRider(
+                mock, agentRegistry, "owner", Guid.NewGuid(), Guid.NewGuid(), AgentControllerType.None);
+
+            var voiceHandler = new Mock<IAgentVoiceHandler>();
+            voiceHandler.Setup(handler => handler.WarmUp()).Throws(new InvalidOperationException("warm-up failed"));
+            var component = new Mock<ICoopMissionComponent> { DefaultValue = DefaultValue.Mock };
+            component.SetupGet(value => value.AgentRegistry).Returns(agentRegistry);
+            component.SetupGet(value => value.AgentVoiceHandler).Returns(voiceHandler.Object);
+
+            Assert.ThrowsAny<Exception>(() => client.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(ICoopMissionComponent), component.Object)));
+
+            voiceHandler.Verify(handler => handler.WarmUp(), Times.Once);
+            Assert.Null(client.Resolve<IBattleAgentAuthorityRegistry>().IsMountRemotelyOwned(puppetHorse));
         });
     }
 

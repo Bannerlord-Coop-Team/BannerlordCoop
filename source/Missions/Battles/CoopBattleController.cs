@@ -235,13 +235,14 @@ public class CoopBattleController : CoopMissionController
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
+        // Decode order clips during battle setup so the first issued order does not hitch.
+        coopMissionComponent.AgentVoiceHandler.WarmUp();
+
         // Answers GameInterface ownership questions (mount blow routing, hero health) for this battle's lifetime.
+        // Attached last, otherwise a throwing constructor leaves it attached with no dispose to detach it.
         this.agentAuthorityRegistry = agentAuthorityRegistry;
         agentAuthority = new BattleAgentAuthority(coopMissionComponent.AgentRegistry, session);
         agentAuthorityRegistry.Attach(agentAuthority);
-
-        // Decode order clips during battle setup so the first issued order does not hitch.
-        coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
     protected override void DisposeMission()
