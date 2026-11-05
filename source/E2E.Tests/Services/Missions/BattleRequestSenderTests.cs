@@ -59,6 +59,23 @@ public class BattleRequestSenderTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void SurrenderFromAPlayerInTheBattle_IsApplied()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        ConnectPeers();
+
+        Server.SimulateMessage(ClientA.NetPeer, new NetworkMapEventSurrender(mapEventId, BattleSideEnum.Defender));
+        Server.PumpGameThread();
+
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
+            Assert.False(mapEvent.IsHideoutBattle);
+            Assert.True(mapEvent.DefenderSide.IsSurrendered);
+        });
+    }
+
+    [Fact]
     public void FinalizeFromAnUnregisteredPeer_IsRefusedWhileAHostIsElected()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");

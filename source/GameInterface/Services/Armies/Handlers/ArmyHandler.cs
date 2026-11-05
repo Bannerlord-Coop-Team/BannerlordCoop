@@ -296,8 +296,8 @@ public class ArmyHandler : IHandler
     }
 
     // A client spends its own clan's influence, or a ruler clears the debt it just paid a mercenary clan serving its
-    // kingdom. Every vanilla caller sends a cost of zero or more, so the amount must be a spend. That checks the
-    // amount and not the balance, so a clan already below zero still pays its costs.
+    // kingdom. Every vanilla caller sends a cost, so the amount must be a spend of zero or more. Only the amount is
+    // checked, not the clan's balance.
     private bool IsAllowedInfluenceSpend(object sender, Clan clan, float influence)
     {
         if (influence >= 0 && playerManager.TryGetSenderHero(sender, out var hero) &&
