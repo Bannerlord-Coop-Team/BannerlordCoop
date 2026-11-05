@@ -156,7 +156,7 @@ internal class TradeHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
-            if (ModInformation.IsServer && peer != null && !CanSenderUseInventory(peer, message.OwnerPartyId, ownerParty)) return;
+            if (ModInformation.IsServer && !CanSenderUseInventory(peer, message.OwnerPartyId, ownerParty)) return;
 
             SettlementComponent currentSettlementComponent = null;
             if (!message.IsSettlementComponentNull &&
@@ -456,7 +456,7 @@ internal class TradeHandler : IHandler
     // The inventory is the sender's own party's, or a clan party its leader manages.
     private bool CanSenderUseInventory(NetPeer peer, string ownerPartyId, MobileParty ownerParty)
     {
-        if (playerManager.TryGetPlayer(peer, out var player) && player.MobilePartyId == ownerPartyId) return true;
+        if (peer != null && playerManager.TryGetPlayer(peer, out var player) && player.MobilePartyId == ownerPartyId) return true;
         if (playerManager.TryGetSenderHero(peer, out var hero) && permissions.CanManageParty(hero, ownerParty)) return true;
 
         logger.Warning("Ignoring a trade for party {PartyId} from a peer that cannot use its inventory", ownerPartyId);

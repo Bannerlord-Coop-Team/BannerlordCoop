@@ -66,7 +66,7 @@ internal class SellPrisonersHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
-            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderControllingParty(obj.Who, sellingParty)) return;
+            if (ModInformation.IsServer && !IsSenderControllingParty(obj.Who, sellingParty)) return;
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);

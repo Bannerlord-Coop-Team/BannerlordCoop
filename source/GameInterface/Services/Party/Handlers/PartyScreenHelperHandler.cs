@@ -168,7 +168,7 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: false)) return;
+            if (ModInformation.IsServer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: false)) return;
             MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
             if (garrisonParty == null)
             {
@@ -215,7 +215,7 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: true)) return;
+            if (ModInformation.IsServer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: true)) return;
             for (int i = 0; i < leftMemberRoster.Count; i++)
             {
                 TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);

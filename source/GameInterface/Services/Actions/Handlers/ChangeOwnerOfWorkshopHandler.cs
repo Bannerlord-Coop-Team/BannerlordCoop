@@ -61,9 +61,9 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
     private void Handle_ChangeWorkshopOwner(MessagePayload<ChangeWorkshopOwner> obj)
     {
         var data = obj.What;
-        // A player buys as the new owner or sells as the current one; owner changes the server makes itself have no peer.
-        if (ModInformation.IsServer && obj.Who is NetPeer peer &&
-            !(playerManager.TryGetPlayer(peer, out var player) &&
+        // A player buys as the new owner or sells as the current one, and only a client sends this request.
+        if (ModInformation.IsServer &&
+            !(obj.Who is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
               (player.HeroId == data.NewOwnerId || player.HeroId == data.ExpectedOwnerId)))
         {
             Logger.Warning("Ignoring a workshop owner change for {WorkshopId} from a peer that is neither buyer nor seller", data.WorkshopId);

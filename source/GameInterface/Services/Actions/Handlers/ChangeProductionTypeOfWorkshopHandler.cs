@@ -58,7 +58,7 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
         bool ignoreCost = obj.What.IgnoreCost;
-        if (ModInformation.IsServer && obj.Who is NetPeer)
+        if (ModInformation.IsServer)
         {
             if (!IsSenderOwner(obj.Who, workshop)) return;
             // Every vanilla client path (workshop conversation, clan finance screen) pays for the change.

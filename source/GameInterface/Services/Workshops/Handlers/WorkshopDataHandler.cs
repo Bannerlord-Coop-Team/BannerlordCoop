@@ -5,7 +5,6 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -185,7 +184,7 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderOwner(obj.Who, workshop)) return;
+            if (ModInformation.IsServer && !IsSenderOwner(obj.Who, workshop)) return;
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
@@ -222,7 +221,7 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderOwner(obj.Who, workshop)) return;
+            if (ModInformation.IsServer && !IsSenderOwner(obj.Who, workshop)) return;
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 
