@@ -15,7 +15,7 @@ internal class LootShipHoldHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly ILootShipHold lootShipHold;
-    private string[] heldLootShipIds = Array.Empty<string>();
+    private volatile string[] heldLootShipIds = Array.Empty<string>();
 
     public LootShipHoldHandler(IMessageBroker messageBroker, ILootShipHold lootShipHold)
     {
