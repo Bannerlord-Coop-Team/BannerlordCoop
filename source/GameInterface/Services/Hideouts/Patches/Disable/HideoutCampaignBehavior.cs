@@ -284,7 +284,7 @@ internal class HideoutJoinEncounterOptionsPatch
     {
         if (ModInformation.IsServer) return true;
 
-        // Native reads EncounteredBattle, which throws without an encountered party, so grey the option until the server sets it up
+        // Native reads EncounteredBattle, which throws without an encountered party, so hide the option until the server sets it up (the args match the finalizer and tests)
         if (PlayerEncounter.Current?._encounteredParty == null)
         {
             __result = false;
