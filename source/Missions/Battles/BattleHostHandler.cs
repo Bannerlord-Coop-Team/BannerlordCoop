@@ -479,8 +479,9 @@ internal class BattleHostHandler : IHandler
             return true;
         }
 
-        if (preferredHosts.IsEmpty || hostRegistry.TryGet(mapEventId, out _) ||
-            !IsHigherRankedHostLoading(mapEventId, mapEvent, SuccessorRank(requesterId), requesterId, null, null))
+        // With no list everyone is unlisted, so nobody outranks the requester and the first ready player is elected.
+        if (hostRegistry.TryGet(mapEventId, out _) ||
+            !IsHigherRankedHostLoading(mapEventId, mapEvent, preferredHosts.RankOf(requesterId), null, requesterId))
             return false;
 
         pending = new PendingElection { DeadlineUtc = DateTime.UtcNow + PreferredHostWait };
@@ -492,16 +493,16 @@ internal class BattleHostHandler : IHandler
     }
 
     // True while a listed player ranked above `rank` is in the battle and connected but has not sent its own
-    // host request yet. Departed, withdrawn and absent players, and the one just leaving, are not waited for.
-    private bool IsHigherRankedHostLoading(string mapEventId, MapEvent mapEvent, int rank, string readyControllerId,
-        PendingElection pending, string leftControllerId)
+    // host request yet. Departed, withdrawn and absent players, and the excluded one (the requester just ready
+    // or the player just leaving), are not waited for.
+    private bool IsHigherRankedHostLoading(string mapEventId, MapEvent mapEvent, int rank, PendingElection pending,
+        string excludedControllerId)
     {
         battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState);
         foreach (var player in playerManager.Players)
         {
             var controllerId = player.ControllerId;
-            int playerRank = preferredHosts.RankOf(controllerId);
-            if (playerRank < 0 || playerRank >= rank || controllerId == readyControllerId || controllerId == leftControllerId)
+            if (preferredHosts.RankOf(controllerId) >= rank || controllerId == excludedControllerId)
                 continue;
             if (pending != null && pending.Requests.Exists(request => request.ControllerId == controllerId))
                 continue;
@@ -526,8 +527,8 @@ internal class BattleHostHandler : IHandler
             return;
         }
 
-        int bestReadyRank = pending.Requests.Min(request => SuccessorRank(request.ControllerId));
-        if (IsHigherRankedHostLoading(mapEventId, mapEvent, bestReadyRank, null, pending, leftControllerId))
+        int bestReadyRank = pending.Requests.Min(request => preferredHosts.RankOf(request.ControllerId));
+        if (IsHigherRankedHostLoading(mapEventId, mapEvent, bestReadyRank, pending, leftControllerId))
             return;
 
         CompleteHeldElection(mapEventId, leftControllerId == null
@@ -572,7 +573,7 @@ internal class BattleHostHandler : IHandler
         }
 
         // OrderBy is stable, so equal ranks keep mission-ready order.
-        var host = requests.OrderBy(held => SuccessorRank(held.ControllerId)).First();
+        var host = requests.OrderBy(held => preferredHosts.RankOf(held.ControllerId)).First();
         Logger.Information("[BattleHost] Releasing the held election for {MapEventId} ({Reason}); host {Host}",
             mapEventId, reason, host.ControllerId);
 
@@ -582,12 +583,6 @@ internal class BattleHostHandler : IHandler
             if (held != host)
                 ProcessHostRequest(mapEventId, mapEvent, held.ControllerId, held.Peer, held.HideoutStateReady);
         }
-    }
-
-    private int SuccessorRank(string controllerId)
-    {
-        int rank = preferredHosts.RankOf(controllerId);
-        return rank >= 0 ? rank : int.MaxValue;
     }
 
     /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own
@@ -1477,8 +1472,8 @@ internal class BattleHostHandler : IHandler
         // The host did not change, so the assignment stays in the same hosting generation (BR-102).
         // Preferred hosts go ahead of everyone ranked below them, otherwise mission-ready order is kept.
         var successors = new List<string>(existing.SuccessorControllerIds);
-        int rank = SuccessorRank(requesterId);
-        int index = successors.FindIndex(successor => SuccessorRank(successor) > rank);
+        int rank = preferredHosts.RankOf(requesterId);
+        int index = successors.FindIndex(successor => preferredHosts.RankOf(successor) > rank);
         successors.Insert(index < 0 ? successors.Count : index, requesterId);
         updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch);
         return true;
