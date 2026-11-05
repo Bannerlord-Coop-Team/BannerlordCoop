@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -9,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
 
-/// <summary>The server removes a party from an army only on the request of that party's player or the army leader's.</summary>
+/// <summary>The server changes an army's members and cohesion only on the request of the party's player or the army leader's.</summary>
 public class ArmyRequestSenderTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
@@ -20,13 +21,14 @@ public class ArmyRequestSenderTests : IDisposable
     private readonly string armyId;
     private string leaderPartyId;
     private readonly string memberPartyId;
+    private readonly string outsiderPartyId;
 
     public ArmyRequestSenderTests(ITestOutputHelper output)
     {
         environment = new E2ETestEnvironment(output);
         armyId = environment.CreateRegisteredObject<Army>();
         memberPartyId = environment.CreateRegisteredObject<MobileParty>();
-        var outsiderPartyId = environment.CreateRegisteredObject<MobileParty>();
+        outsiderPartyId = environment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             var army = Get<Army>(armyId);
@@ -51,6 +53,37 @@ public class ArmyRequestSenderTests : IDisposable
         Send(fromMember ? Member : Outsider, new NetworkRemovePartyInArmy(armyId, memberPartyId, string.Empty));
 
         Server.Call(() => Assert.Equal(fromMember, Get<MobileParty>(memberPartyId).Army == null));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PartyIsAddedToTheArmyOnlyOnItsOwnPlayersRequest(bool ownParty)
+    {
+        var partyId = ownParty ? outsiderPartyId : environment.CreateRegisteredObject<MobileParty>();
+
+        Send(Outsider, new NetworkAddMobilePartyInArmy(armyId, partyId, false));
+
+        Server.Call(() => Assert.Equal(ownParty, Get<MobileParty>(partyId).Army == Get<Army>(armyId)));
+    }
+
+    [Fact]
+    public void CohesionBoostFromAPlayerWhoDoesNotLeadTheArmy_IsRefused()
+    {
+        float cohesion = 0;
+        Server.Call(() =>
+        {
+            var army = Get<Army>(armyId);
+            var leader = army.LeaderParty.LeaderHero;
+            if (leader.Clan == null) leader.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            leader.Clan.Influence = 1000f;
+            army.Cohesion = 20f;
+            cohesion = army.Cohesion;
+        });
+
+        Send(Outsider, new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 0));
+
+        Server.Call(() => Assert.Equal(cohesion, Get<Army>(armyId).Cohesion));
     }
 
     private void Register(string controllerId, MobileParty party, EnvironmentInstance client)
