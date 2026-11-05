@@ -82,6 +82,17 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         string overseerId,
         params TroopRosterElementData[] garrison)
     {
+        // The take over moves the chosen troops out of the owner's party, so the party needs them first.
+        Server.Call(() =>
+        {
+            MobileParty party = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            foreach (var element in garrison)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(element.CharacterId, out var character));
+                if (!character.IsHero) party.MemberRoster.AddToCounts(character, element.Number);
+            }
+        });
+
         client.Call(() =>
         {
             Alley alley = client.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);

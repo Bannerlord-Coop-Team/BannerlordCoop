@@ -6,6 +6,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
@@ -39,6 +40,7 @@ internal class AlleyManagementHandler : IHandler
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
     private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
     private readonly AlleyHandler alleyHandler;
 
     public AlleyManagementHandler(
@@ -49,6 +51,7 @@ internal class AlleyManagementHandler : IHandler
         IAlleyCampaignBehaviorInterface behaviorInterface,
         IAlleyGarrisonData garrisonData,
         IPlayerManager playerManager,
+        ICoopClanPermissions permissions,
         AlleyHandler alleyHandler)
     {
         this.messageBroker = messageBroker;
@@ -58,6 +61,7 @@ internal class AlleyManagementHandler : IHandler
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
         this.playerManager = playerManager;
+        this.permissions = permissions;
         this.alleyHandler = alleyHandler;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
@@ -183,13 +187,22 @@ internal class AlleyManagementHandler : IHandler
             {
                 Logger.Warning("Ignoring a take over of alley {AlleyId}: it is no longer held by {PreviousOwnerId}",
                     data.AlleyId, data.PreviousOwnerId);
-                // The troop screen's Done right after this request still takes the garrison out of the party,
-                // so hand it back unless this player already holds the alley with it.
-                if (alley.Owner != owner) ReturnGarrisonToOwner(owner, data.Garrison);
                 return;
             }
 
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
+
+            // The client left the chosen troops in its party, so they leave it here like vanilla's done button,
+            // and only if the party still has them all.
+            var party = owner.PartyBelongedTo;
+            var troops = new List<(CharacterObject character, int count)>();
+            foreach (var element in garrison)
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(element.CharacterId, out var character)) return;
+                if (character.IsHero) continue;
+                if (party == null || party.MemberRoster.GetTroopCount(character) < element.Number) return;
+                troops.Add((character, element.Number));
+            }
 
             // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
             // run by the chosen clan member (overseer). The garrison + overseer are stored, the overseer
@@ -198,6 +211,8 @@ internal class AlleyManagementHandler : IHandler
             var displacedOwner = alley.Owner;
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
+            foreach (var troop in troops)
+                party.MemberRoster.RemoveTroop(troop.character, troop.count);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);
@@ -270,7 +285,9 @@ internal class AlleyManagementHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return;
             // The alley debug command also publishes this on the server, where the sender is not a peer.
-            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero)) return;
+            // The clan screen also lets the clan leader abandon a member's alley.
+            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) ||
+                (alley.Owner != senderHero && !permissions.CanManageClan(senderHero, alley.Owner?.Clan)))) return;
             AbandonAlley(alleyId, fromClanScreen);
         });
     }
