@@ -1,6 +1,8 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -64,7 +66,14 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     private static void RecordBirth(Hero mother, List<Hero> aliveOffsprings, int stillbornCount)
         => Births.Add((mother, aliveOffsprings.Count, stillbornCount));
 
-    private static void CountJoinedArmy() => joinedArmyCalls++;
+    // The server only has to send the notification on, so it skips the vanilla text there
+    private static bool CountJoinedArmy()
+    {
+        if (ModInformation.IsServer) return false;
+
+        joinedArmyCalls++;
+        return true;
+    }
 
     private static void CountAttachedParty() => attachedPartyCalls++;
 
@@ -167,6 +176,30 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         Client.SimulateMessage(this, new NetworkNotifyPartyJoinedArmy(partyId));
         Client.PumpGameThread();
 
+        Assert.Empty(JoinedArmyExceptions);
+        Assert.Equal(1, joinedArmyCalls);
+    }
+
+    [Fact]
+    public void PartyJoinedArmy_JoinAClientStarts_ReachesClientsAfterTheArmyAdd()
+    {
+        string armyId = TestEnvironment.CreateRegisteredObject<Army>();
+        string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        TestEnvironment.Server.Call(() =>
+        {
+            var behavior = new DefaultNotificationsCampaignBehavior();
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
+            behavior.RegisterEvents();
+        });
+
+        TestEnvironment.Server.SimulateMessage(this, new NetworkAddMobilePartyInArmy(armyId, partyId, false));
+        TestEnvironment.Server.PumpGameThread();
+        Client.PumpGameThread();
+
+        var sent = TestEnvironment.Server.NetworkSentMessages.ToList();
+        int addIndex = sent.FindIndex(message => message is NetworkAddMobilePartyInArmy add && add.MobilePartyId == partyId);
+        int notifyIndex = sent.FindIndex(message => message is NetworkNotifyPartyJoinedArmy);
+        Assert.True(addIndex >= 0 && notifyIndex > addIndex, $"add at {addIndex}, notification at {notifyIndex}");
         Assert.Empty(JoinedArmyExceptions);
         Assert.Equal(1, joinedArmyCalls);
     }

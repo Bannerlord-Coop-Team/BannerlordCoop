@@ -1032,8 +1032,7 @@ internal class DefaultNotificationsHandler : IHandler
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             // Vanilla compares party.Army with MainParty.Army and then reads Army.LeaderParty, so two null armies throw.
-            // A join a client starts reaches the other clients before the army add, since the server fires this event
-            // inside AddMobilePartyInArmy before it sends the add on
+            // The server sends the army add first, so this only skips when this client could not apply that add
             if (mobileParty.Army == null)
             {
                 Logger.Debug("Skipping party joined army notification because party {partyId} has no army", mobileParty.StringId);

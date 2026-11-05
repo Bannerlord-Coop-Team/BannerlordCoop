@@ -95,6 +95,13 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
+            // Sent before the add because the add fires the joined and attached notifications, and clients
+            // need the party in the army when those arrive
+            if (ModInformation.IsServer)
+            {
+                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
+            }
+
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
 
             if (obj.AddPartyToMergedPartiesBool && mobileParty.AttachedTo != army.LeaderParty) 
@@ -103,10 +110,6 @@ public class ArmyHandler : IHandler
                 {
                     army.AddPartyToMergedParties(mobileParty);
                 }
-            }
-            if (ModInformation.IsServer)
-            {
-                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
             }
         });
     }
