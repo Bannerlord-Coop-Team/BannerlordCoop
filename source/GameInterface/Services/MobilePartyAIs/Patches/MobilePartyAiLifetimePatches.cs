@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using HarmonyLib;
 using Serilog;
@@ -33,13 +34,15 @@ class MobilePartyAiLifetimePatches
 
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]
     [HarmonyPostfix]
-    private static void RemoveParty_Postfix(ref MobileParty __instance)
+    internal static void RemoveParty_Postfix(ref MobileParty __instance)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
+            // #3588: the caller shows which client code removed a party the server still counts.
+            Logger.Error("Client destroyed unmanaged {name} {PartyId}. Caller: {Caller}",
+                typeof(MobileParty), PartyRemovalDiagnosticsPatches.GetPartyId(__instance), System.Environment.StackTrace);
             return;
         }
 

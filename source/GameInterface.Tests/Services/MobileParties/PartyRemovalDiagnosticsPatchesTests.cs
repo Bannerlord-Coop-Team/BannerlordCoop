@@ -3,7 +3,7 @@ using Common;
 using Common.Logging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using System;
@@ -19,59 +19,39 @@ public class PartyRemovalDiagnosticsPatchesTests
     private const string PartyId = "Created_186155";
 
     [Fact]
-    public void ClientRemovalOfRegisteredPartyOutsideTheReceivePath_Warns()
+    public void ClientRemovalOutsideTheReceivePath_LogsThePartyIdAndCaller()
     {
-        var messages = RemoveParty(isServer: false, isRegistered: true, scopeName: "none", out _);
+        var messages = RemoveParty(isRegistered: true, scopeName: "none", out _);
 
-        Assert.Contains(PartyId, Assert.Single(messages, IsRemovalWarning));
+        string error = Assert.Single(messages, IsClientRemovalError);
+        Assert.Contains(PartyId, error);
+        Assert.Contains(nameof(PartyRemovalDiagnosticsPatchesTests), error);
     }
 
     [Fact]
-    public void ClientRemovalOfUnregisteredParty_DoesNotWarn()
+    public void ClientRemovalOfUnregisteredParty_SaysItIsUnregistered()
     {
-        var messages = RemoveParty(isServer: false, isRegistered: false, scopeName: "none", out _);
+        var messages = RemoveParty(isRegistered: false, scopeName: "none", out _);
 
-        Assert.DoesNotContain(messages, IsRemovalWarning);
+        Assert.Contains("(unregistered)", Assert.Single(messages, IsClientRemovalError));
     }
 
     [Theory]
     [InlineData("allowed-thread")]
     [InlineData("save-load")]
     [InlineData("local-operation")]
-    public void ClientRemovalWhileOriginalsAreAllowed_DoesNotWarnOrLookUpTheParty(string scopeName)
+    public void ClientRemovalWhileOriginalsAreAllowed_DoesNotLogOrLookUpTheParty(string scopeName)
     {
-        var messages = RemoveParty(isServer: false, isRegistered: true, scopeName, out var objectManager);
+        var messages = RemoveParty(isRegistered: true, scopeName, out var objectManager);
 
-        Assert.DoesNotContain(messages, IsRemovalWarning);
+        Assert.DoesNotContain(messages, IsClientRemovalError);
         string id;
         objectManager.Verify(m => m.TryGetId(It.IsAny<object>(), out id), Times.Never);
     }
 
-    [Fact]
-    public void ServerRemoval_DoesNotWarnOrLookUpTheParty()
-    {
-        var messages = RemoveParty(isServer: true, isRegistered: true, scopeName: "none", out var objectManager);
+    private static bool IsClientRemovalError(string message) => message.Contains("Client destroyed unmanaged");
 
-        Assert.DoesNotContain(messages, IsRemovalWarning);
-        string id;
-        objectManager.Verify(m => m.TryGetId(It.IsAny<object>(), out id), Times.Never);
-    }
-
-    [Theory]
-    [InlineData(false, true, false, true)]
-    [InlineData(false, false, false, false)]
-    [InlineData(false, true, true, false)]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, false, true, false)]
-    public void ShouldWarn_OnlyForAClientRemovingARegisteredPartyOutsideAllowedOriginals(
-        bool isServer, bool isRegistered, bool originalsAllowed, bool expected)
-    {
-        Assert.Equal(expected, PartyRemovalDiagnosticsPatches.ShouldWarn(isServer, isRegistered, originalsAllowed));
-    }
-
-    private static bool IsRemovalWarning(string message) => message.Contains("without a server destroy message");
-
-    private static ConcurrentQueue<string> RemoveParty(bool isServer, bool isRegistered, string scopeName,
+    private static ConcurrentQueue<string> RemoveParty(bool isRegistered, string scopeName,
         out Mock<IObjectManager> objectManager)
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
@@ -91,7 +71,7 @@ public class PartyRemovalDiagnosticsPatchesTests
         OutputSinkManager.AddLogCallback(callback);
         try
         {
-            ModInformation.IsServer = isServer;
+            ModInformation.IsServer = false;
             using (ContainerProvider.UseContainerThreadSafe(container))
             using (IDisposable? scope = scopeName switch
             {
@@ -101,7 +81,7 @@ public class PartyRemovalDiagnosticsPatchesTests
                 _ => null,
             })
             {
-                PartyRemovalDiagnosticsPatches.RemovePartyPrefix(party);
+                MobilePartyAiLifetimePatches.RemoveParty_Postfix(ref party);
             }
         }
         finally
