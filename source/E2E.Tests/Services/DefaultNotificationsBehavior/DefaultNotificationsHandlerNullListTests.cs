@@ -180,8 +180,10 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         Assert.Equal(1, joinedArmyCalls);
     }
 
-    [Fact]
-    public void PartyJoinedArmy_JoinAClientStarts_ReachesClientsAfterTheArmyAdd()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PartyJoinedArmy_JoinAClientStarts_ReachesClientsAfterTheArmyAdd(bool merged)
     {
         string armyId = TestEnvironment.CreateRegisteredObject<Army>();
         string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -192,16 +194,20 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
             behavior.RegisterEvents();
         });
 
-        TestEnvironment.Server.SimulateMessage(this, new NetworkAddMobilePartyInArmy(armyId, partyId, false));
+        TestEnvironment.Server.SimulateMessage(this, new NetworkAddMobilePartyInArmy(armyId, partyId, merged));
         TestEnvironment.Server.PumpGameThread();
         Client.PumpGameThread();
 
         var sent = TestEnvironment.Server.NetworkSentMessages.ToList();
-        int addIndex = sent.FindIndex(message => message is NetworkAddMobilePartyInArmy add && add.MobilePartyId == partyId);
-        int notifyIndex = sent.FindIndex(message => message is NetworkNotifyPartyJoinedArmy);
-        Assert.True(addIndex >= 0 && notifyIndex > addIndex, $"add at {addIndex}, notification at {notifyIndex}");
+        int addIndex = sent.IndexOf(Assert.Single(sent, message => message is NetworkAddMobilePartyInArmy add && add.MobilePartyId == partyId));
+        Assert.True(sent.FindIndex(message => message is NetworkNotifyPartyJoinedArmy) > addIndex);
         Assert.Empty(JoinedArmyExceptions);
         Assert.Equal(1, joinedArmyCalls);
+        Client.Call(() =>
+        {
+            var army = Client.GetRegisteredObject<Army>(armyId);
+            Assert.Equal(merged, Client.GetRegisteredObject<MobileParty>(partyId).AttachedTo == army.LeaderParty);
+        });
     }
 
     [Fact]
