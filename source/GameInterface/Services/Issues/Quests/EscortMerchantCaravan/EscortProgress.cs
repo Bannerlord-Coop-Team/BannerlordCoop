@@ -7,6 +7,7 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
@@ -179,6 +180,7 @@ internal sealed class EscortProgressHandler : IHandler
             var logs = ReadJournal(state.Journal);
 
             using (new AllowedThread())
+            using (var journalReplay = new QuestJournalReplay())
             {
                 quest._questCaravanMobileParty = caravan;
                 quest._questBanditMobileParty = bandit;

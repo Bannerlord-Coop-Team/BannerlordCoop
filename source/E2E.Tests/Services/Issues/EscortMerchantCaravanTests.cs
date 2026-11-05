@@ -340,6 +340,25 @@ public class EscortMerchantCaravanTests : IDisposable
     }
 
     [Fact]
+    public void ReceivedServerProgressDoesNotEchoTheJournalBack()
+    {
+        Accept();
+        environment.FlushCoalescer();
+        var previous = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().Last();
+        var before = Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        var state = new NetworkEscortProgress(previous.GiverId, previous.IssueId, previous.ControllerId,
+            caravanId: previous.CaravanId, days: 4, journal: previous.Journal,
+            dueTimeTicks: previous.DueTimeTicks);
+        Owner.SimulateMessage(Server.NetPeer, state);
+        environment.FlushCoalescer();
+        Owner.Call(() =>
+        {
+            Assert.Equal(4, QuestOn(Owner)._daysSpentForEscorting);
+        });
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(before));
+    }
+
+    [Fact]
     public void CancellationBeforeTheNpcConsequenceCleansUpTheUnstartedQuest()
     {
         Quest pending = null!;
