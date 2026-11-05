@@ -333,6 +333,10 @@ public class WorkshopPurchaseConversationTests : IDisposable
     {
         var state = CreatePurchaseState(workshopOwnedByBuyer: false, buyerGold: 1000, sellerGold: 0);
         var outsider = Clients.Last();
+        // The outsider is a known player hero, so only the buyer or seller comparison refuses it
+        var outsiderId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterPlayerHero(Server, outsiderId, "WorkshopOutsider");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("WorkshopOutsider", outsider.NetPeer));
 
         outsider.Call(() => outsider.Resolve<Common.Network.INetwork>().SendAll(new ChangeWorkshopOwner(
             state.WorkshopId, state.SellerId, state.BuyerId, state.WorkshopTypeId, WorkshopCapital, WorkshopCost)));
@@ -377,6 +381,9 @@ public class WorkshopPurchaseConversationTests : IDisposable
             data.StockProductionInWarehouseRatio = 0f;
         });
         var sender = fromOwner ? Clients.First() : Clients.Last();
+        // The other peer plays the seller, a known hero that does not own the workshop
+        RegisterPlayerHero(Server, state.SellerId, "WorkshopSeller");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("WorkshopSeller", Clients.Last().NetPeer));
 
         sender.Call(() =>
         {
