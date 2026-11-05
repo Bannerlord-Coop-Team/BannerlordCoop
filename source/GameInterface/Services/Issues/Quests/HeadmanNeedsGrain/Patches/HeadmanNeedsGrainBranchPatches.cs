@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Messages;
@@ -80,9 +80,6 @@ internal class HeadmanNeedsGrainBranchPatches
         {
             return false;
         }
-        if (TaleWorlds.CampaignSystem.Hero.MainHero.Gold < __instance.AlternativeSolutionNeededGold)
-            throw new System.InvalidOperationException("The grain solution owner cannot fund the companion");
-        return true;
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
