@@ -75,6 +75,9 @@ it once the user agrees:
 - **Per quest handlers apply at once.** `*PartyCreatedHandler`, `*JournalHandler`, `ScoutEnemyGarrisonsTargetsHandler`
   and `MerchantOutlawsProgressHandler` resolve the issue by giver and id without the guard, so behind held work for
   that giver they can miss an issue that hasn't arrived yet. Route a new one through `RunInOrder`. (#4162)
+- **Suppress journal replay echoes.** Replacing a quest's journal and calling `OnQuestLogAdded` while applying a
+  received progress snapshot can send a `RequestQuestJournal` back to the server. Wrap both operations in
+  `QuestJournalReplay`. (#3953)
 
 ## Review learnings
 
@@ -82,4 +85,6 @@ it once the user agrees:
   does, or the client keeps waiting. (#3795)
 - **Reading a capture fails cleanly on truncated data.** Check lengths before `BinaryReader.ReadString()`. (#3798)
 - **Log skipped cases** in a finalization proof the way `ArmyNeedsSuppliesFinalizationProofStrategy` does. (#3795)
+- **Preserve labels in Harmony transpilers.** When replacing a matched instruction, move its labels to the replacement
+  and assert the expected match count so a changed vanilla method fails loudly. (#3953)
 - **Keep `README.md` and `AGENTS.md` current** when a PR adds a registered quest or closes a known gap. (#3832)
