@@ -130,7 +130,7 @@ public class HeadmanHerdAlternativeProgressTests
         scenario.Server.Call(() =>
         {
             baselineA = Get<Hero>(scenario.Server, scenario.NotableId).Issue.JournalEntries
-                .Select(log => new AlternativeSolutionJournalEntry(log).ToJournalLog()).ToArray();
+                .Select(log => new IssueJournalEntry(log).ToJournalLog()).ToArray();
             var issueB = Get<Hero>(scenario.Server, otherGiver).Issue;
             sentXp = StackXp(issueB.AlternativeSolutionSentTroops, Get<CharacterObject>(scenario.Server, troop));
             Assert.True(sentXp > 0);
