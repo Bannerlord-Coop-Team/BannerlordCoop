@@ -95,8 +95,8 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
-            // Sent before the add because the add fires the joined and attached notifications, and clients
-            // need the party in the army when those arrive
+            // Sent before the add because the add fires the joined army notification, and clients
+            // need the party in the army when it arrives
             if (ModInformation.IsServer)
             {
                 network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
