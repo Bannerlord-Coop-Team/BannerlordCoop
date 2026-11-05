@@ -123,7 +123,7 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
-        // SteamTunnelHost.Stop closes the listener before its pump stops, and Steam closes the accepted connections with it
+        // Closing the listener makes Steam close its accepted connections, so a late receive must not reach Steam
         [Fact]
         public void Receive_AfterListenerStops_NeverReachesSteam()
         {
