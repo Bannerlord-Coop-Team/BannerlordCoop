@@ -65,7 +65,7 @@ public class ConnectionLogic : IConnectionLogic
                 return newState;
             }
 
-            Logger.Debug("Connection is changing to {state} State", newState.GetType().Name);
+            Logger.Information("Connection is changing to {state} State", newState.GetType().Name);
             _state?.Dispose();
             _state = newState;
         }
