@@ -359,6 +359,47 @@ public class EscortMerchantCaravanTests : IDisposable
     }
 
     [Fact]
+    public void ReceivedServerProgressWithEmptyCollectionsKeepsTheOwnerTracked()
+    {
+        Accept();
+        environment.FlushCoalescer();
+        var previous = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().Last();
+        var state = new NetworkEscortProgress(previous.GiverId, previous.IssueId, previous.ControllerId,
+            caravanId: previous.CaravanId, journal: previous.Journal,
+            visitedIds: Array.Empty<string>(), trackedParties: Array.Empty<string>(),
+            trackedSettlements: Array.Empty<string>(), dueTimeTicks: previous.DueTimeTicks);
+
+        Owner.SimulateMessage(Server.NetPeer, state);
+        Owner.Call(() =>
+        {
+            var quest = QuestOn(Owner);
+            Assert.Empty(quest._visitedSettlements);
+            Assert.True(quest.IsTracked(quest.QuestGiver));
+        });
+    }
+
+    [Fact]
+    public void PartyHourlyBurstDoesNotRepublishUnchangedProgress()
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            var caravan = Server.GetRegisteredObject<MobileParty>(caravanId);
+            var ownerParty = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            quest._questCaravanMobileParty = caravan;
+            caravan._targetSettlement = quest.QuestGiver.CurrentSettlement;
+            Server.NetworkSentMessages.Clear();
+
+            for (var i = 0; i < 200; i++)
+                CampaignEventDispatcher.Instance.HourlyTickParty(ownerParty);
+
+            Assert.True(quest.IsOngoing);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>());
+        });
+    }
+
+    [Fact]
     public void CancellationBeforeTheNpcConsequenceCleansUpTheUnstartedQuest()
     {
         Quest pending = null!;
