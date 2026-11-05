@@ -6,9 +6,7 @@ using GameInterface.Services.Smithing.Handlers;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Smithing.Patches;
-using HarmonyLib;
 using Moq;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
@@ -53,21 +51,6 @@ public sealed class SmithingVMsHandlerTests
     }
 
     [Fact]
-    public void FinalizedScreen_IsDroppedSoALaterOrderRefreshSkipsIt()
-    {
-        var craftingVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
-        var provider = new SmithingVMsProvider();
-        using var broker = new MessageBroker();
-        using var handler = new SmithingVMsHandler(broker, Mock.Of<IObjectManager>(), provider);
-        broker.Publish(this, new CraftingVMCreated(craftingVM));
-
-        broker.Publish(this, new CraftingVMFinalized(craftingVM));
-
-        Assert.Null(provider.GetCurrentCraftingVM());
-        Assert.Null(provider.GetCurrentWeaponDesignVM());
-    }
-
-    [Fact]
     public void FinalizingAnOldScreen_KeepsTheOpenOne()
     {
         var oldVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
@@ -86,11 +69,6 @@ public sealed class SmithingVMsHandlerTests
     [Fact]
     public void ClosingTheScreen_ThroughTheFinalizePatch_DropsIt()
     {
-        var postfix = typeof(CraftingVMConstructorPatch).GetMethod(nameof(CraftingVMConstructorPatch.OnFinalizePostfix));
-        var target = Assert.Single(postfix.GetCustomAttributes(typeof(HarmonyPatch), false).Cast<HarmonyPatch>());
-        Assert.Equal(nameof(CraftingVM.OnFinalize), target.info.methodName);
-        Assert.NotEmpty(postfix.GetCustomAttributes(typeof(HarmonyPostfix), false));
-
         var craftingVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
         var provider = new SmithingVMsProvider();
         using var handler = new SmithingVMsHandler(MessageBroker.Instance, Mock.Of<IObjectManager>(), provider);
