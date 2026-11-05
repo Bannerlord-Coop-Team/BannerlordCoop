@@ -358,6 +358,39 @@ public class WorkshopPurchaseConversationTests : IDisposable
             Server.GetRegisteredObject<Workshop>(state.WorkshopId).WorkshopType == Server.GetRegisteredObject<WorkshopType>(newTypeId)));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WarehouseSettings_ApplyOnlyFromTheWorkshopsOwner(bool fromOwner)
+    {
+        var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 1000, sellerGold: 0);
+        Server.Call(() =>
+        {
+            var workshopsBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
+            var workshop = Server.GetRegisteredObject<Workshop>(state.WorkshopId);
+            if (workshopsBehavior.GetDataOfWorkshop(workshop) == null) workshopsBehavior.AddNewWorkshopData(workshop);
+            var data = workshopsBehavior.GetDataOfWorkshop(workshop);
+            data.IsGettingInputsFromWarehouse = false;
+            data.StockProductionInWarehouseRatio = 0f;
+        });
+        var sender = fromOwner ? Clients.First() : Clients.Last();
+
+        sender.Call(() =>
+        {
+            var network = sender.Resolve<Common.Network.INetwork>();
+            network.SendAll(new GameInterface.Services.Workshops.Messages.SetIsGettingInputsFromWarehouse(state.WorkshopId, true));
+            network.SendAll(new GameInterface.Services.Workshops.Messages.SetStockProductionInWarehouseRatio(state.WorkshopId, 0.5f));
+        });
+
+        Server.Call(() =>
+        {
+            var data = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>()
+                .GetDataOfWorkshop(Server.GetRegisteredObject<Workshop>(state.WorkshopId));
+            Assert.Equal(fromOwner, data.IsGettingInputsFromWarehouse);
+            Assert.Equal(fromOwner ? 0.5f : 0f, data.StockProductionInWarehouseRatio);
+        });
+    }
+
     private PurchaseState CreatePurchaseState(bool workshopOwnedByBuyer, int buyerGold, int sellerGold)
     {
         var workshopId = TestEnvironment.CreateRegisteredObject<Workshop>();
