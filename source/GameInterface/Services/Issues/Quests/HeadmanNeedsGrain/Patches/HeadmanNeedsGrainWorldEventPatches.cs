@@ -22,7 +22,7 @@ internal class HeadmanNeedsGrainWorldEventPatches
 
         RunAsOwners(quest =>
         {
-            if (declareWarDetail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
+            if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
                 ((faction1 == Hero.MainHero.MapFaction && faction2 == quest.QuestGiver.MapFaction) ||
                  (faction2 == Hero.MainHero.MapFaction && faction1 == quest.QuestGiver.MapFaction))) return;
             QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
@@ -45,7 +45,7 @@ internal class HeadmanNeedsGrainWorldEventPatches
         // The dedicated host has no player hero. The framework relay invokes this
         // listener again inside each owner's substitution scope.
         if (Hero.MainHero == null) return false;
-        if (declareWarDetail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
+        if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
             !((faction1 == Hero.MainHero.MapFaction && faction2 == __instance.QuestGiver.MapFaction) ||
             (faction2 == Hero.MainHero.MapFaction && faction1 == __instance.QuestGiver.MapFaction))) return false;
         var mapEvent = Hero.MainHero?.PartyBelongedTo?.MapEvent;
