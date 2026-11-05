@@ -1,5 +1,4 @@
-﻿using LiteNetLib;
-using GameInterface.Services.Players;
+﻿using GameInterface.Services.Players;
 using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
@@ -69,7 +68,7 @@ internal class PartyWageLimitHandler : IHandler
     // Wage limits of a clan party are set by its clan leader.
     private bool CanSenderManage(object sender, MobileParty target)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageParty(actor, target)) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);

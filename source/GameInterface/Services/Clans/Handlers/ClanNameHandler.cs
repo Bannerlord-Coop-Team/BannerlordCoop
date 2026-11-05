@@ -1,4 +1,3 @@
-﻿using LiteNetLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Clans;
 using Common;
@@ -107,7 +106,7 @@ public class ClanNameHandler : IHandler
     // Only the clan leader renames the clan.
     private bool CanSenderRename(object sender, Clan target)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, target)) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);

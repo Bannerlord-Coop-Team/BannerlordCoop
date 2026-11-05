@@ -1,5 +1,4 @@
-﻿using LiteNetLib;
-using GameInterface.Services.Players;
+﻿using GameInterface.Services.Players;
 using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
@@ -103,7 +102,7 @@ internal class ClanPartyItemVMHandler : IHandler
     // A clan party's objective is set by its clan leader.
     private bool CanSenderManage(object sender, MobileParty target)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageParty(actor, target)) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
@@ -113,7 +112,7 @@ internal class ClanPartyItemVMHandler : IHandler
     // A town's garrison recruitment is set by its owner clan's leader.
     private bool CanSenderManageTown(object sender, Settlement target)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, target.OwnerClan)) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);

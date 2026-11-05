@@ -1,5 +1,4 @@
-﻿using LiteNetLib;
-using GameInterface.Services.Players;
+﻿using GameInterface.Services.Players;
 using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
@@ -198,7 +197,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
         // Perks and attributes are spent on a hero the sender may manage.
         private bool CanSenderDevelop(object sender, Hero target)
         {
-            if (!ModInformation.IsServer || sender is not NetPeer) return true;
+            if (!ModInformation.IsServer) return true;
             if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageHero(actor, target)) return true;
 
             Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);

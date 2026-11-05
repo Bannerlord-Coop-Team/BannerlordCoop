@@ -13,7 +13,6 @@ using Coop.Tests.Mocks;
 using GameInterface.AutoSync;
 using GameInterface.Configuration;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.Clans;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;

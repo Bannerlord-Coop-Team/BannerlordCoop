@@ -1,5 +1,4 @@
-﻿using LiteNetLib;
-using GameInterface.Services.Players;
+﻿using GameInterface.Services.Players;
 using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
@@ -340,7 +339,7 @@ internal class PartyRolesHandler : IHandler
     // Roles are assigned by the party leader, or by the clan leader for a clan party.
     private bool CanSenderAssignRoles(object sender, MobileParty target)
     {
-        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (!ModInformation.IsServer) return true;
         if (playerManager.TryGetSenderHero(sender, out var actor) && (permissions.CanAssignRoles(actor, target) || permissions.CanManageParty(actor, target))) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);

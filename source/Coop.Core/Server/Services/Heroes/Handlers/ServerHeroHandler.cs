@@ -7,7 +7,6 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 
@@ -61,7 +60,7 @@ internal class ServerHeroHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (sender is NetPeer && !CanSenderRename(sender, data.HeroStringId)) return;
+            if (!CanSenderRename(sender, data.HeroStringId)) return;
 
             messageBroker.Publish(this, new ChangeHeroName(data));
 
