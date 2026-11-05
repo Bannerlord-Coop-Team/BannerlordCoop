@@ -9,6 +9,7 @@ using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 using System;
@@ -36,6 +37,7 @@ public interface ICoopSession
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     PlayerTraitData PlayerTraitData { get; }
     OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    ViewDataPlayerData ViewDataPlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -85,6 +87,8 @@ public class CoopSession : ICoopSession
     public PlayerTraitData PlayerTraitData { get; }
     [ProtoMember(14)]
     public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    [ProtoMember(15)]
+    public ViewDataPlayerData ViewDataPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -100,7 +104,8 @@ public class CoopSession : ICoopSession
         AgingPlayerData agingPlayerData,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         PlayerTraitData playerTraitData = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -116,5 +121,6 @@ public class CoopSession : ICoopSession
         ClanFinance = clanFinance ?? new();
         PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
         OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
+        ViewDataPlayerData = viewDataPlayerData ?? new ViewDataPlayerData(new());
     }
 }

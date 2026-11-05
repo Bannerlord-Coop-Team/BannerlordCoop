@@ -11,6 +11,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
@@ -82,6 +83,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(15)]
     public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
 
+    [ProtoMember(16)]
+    public readonly ViewDataPlayerData ViewDataPlayerData;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -97,7 +101,8 @@ public readonly struct GameSaveDataPacket : IPacket
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -114,5 +119,6 @@ public readonly struct GameSaveDataPacket : IPacket
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        ViewDataPlayerData = viewDataPlayerData;
     }
 }

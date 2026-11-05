@@ -11,6 +11,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
@@ -89,6 +90,9 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(20)]
     public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
 
+    [ProtoMember(21)]
+    public readonly ViewDataPlayerData ViewDataPlayerData;
+
     public GameSaveDataChunkPacket(
         int transferId,
         int chunkIndex,
@@ -109,7 +113,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -131,5 +136,6 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        ViewDataPlayerData = viewDataPlayerData;
     }
 }

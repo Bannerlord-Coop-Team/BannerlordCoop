@@ -13,6 +13,7 @@ using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.OrderOfBattle.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
+using GameInterface.Services.ViewData.Messages;
 using GameInterface.Services.Workshops.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler;
@@ -70,6 +71,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientAgingData(saveDataMessage.AgingPlayerData));
         messageBroker.Publish(this, new InitializeClientClanFinance(saveDataMessage.ClanFinance));
         messageBroker.Publish(this, new InitializeClientOrderOfBattleData(saveDataMessage.OrderOfBattlePlayerData));
+        messageBroker.Publish(this, new InitializeClientViewData(saveDataMessage.ViewDataPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         // Add any other CoopSession data initialisations for clients here
     }

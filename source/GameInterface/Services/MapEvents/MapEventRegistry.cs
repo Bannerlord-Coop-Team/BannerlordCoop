@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
@@ -81,6 +82,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         bool hasStagedResults = localPartyWasInvolved &&
             StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
+        if (localPartyWasInvolved && obj.IsRaid)
+            Campaign.Current.GetCampaignBehavior<ViewDataTrackerCampaignBehavior>()?._plunderItems.Clear();
         var preservedParty = localPartyWasInvolved &&
             (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
             ? MobileParty.MainParty?.Party
