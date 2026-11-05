@@ -623,8 +623,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.PumpGameThread();
     }
     
-    [Fact]
-    public void AllianceAcceptRequest_FromANonRuler_IsRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AllianceAcceptRequest_AppliesOnlyFromTheReceivingKingdomsRuler(bool fromRuler)
     {
         var scenario = CreateRulerAndOutsiderScenario();
         AllianceCampaignBehavior behavior = null;
@@ -634,15 +636,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
         });
 
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestStartAlliance(scenario.OtherKingdomId, scenario.KingdomId));
+        Server.SimulateMessage((fromRuler ? Clients.First() : Clients.Last()).NetPeer, new NetworkRequestStartAlliance(scenario.OtherKingdomId, scenario.KingdomId));
         Server.PumpGameThread();
 
-        Server.Call(() => Assert.False(behavior.IsAllyWithKingdom(
+        Server.Call(() => Assert.Equal(fromRuler, behavior.IsAllyWithKingdom(
             Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId))));
     }
 
-    [Fact]
-    public void TradeAgreementAcceptRequest_FromANonRuler_IsRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TradeAgreementAcceptRequest_AppliesOnlyFromTheKingdomsRuler(bool fromRuler)
     {
         var scenario = CreateRulerAndOutsiderScenario();
         TradeAgreementsCampaignBehavior behavior = null;
@@ -652,10 +656,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
         });
 
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkClientAcceptsTradeAgreementOffer(scenario.OtherKingdomId, scenario.KingdomId));
+        Server.SimulateMessage((fromRuler ? Clients.First() : Clients.Last()).NetPeer, new NetworkClientAcceptsTradeAgreementOffer(scenario.OtherKingdomId, scenario.KingdomId));
         Server.PumpGameThread();
 
-        Server.Call(() => Assert.False(behavior.TryGetTradeAgreement(
+        Server.Call(() => Assert.Equal(fromRuler, behavior.TryGetTradeAgreement(
             Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId), out _)));
     }
 
