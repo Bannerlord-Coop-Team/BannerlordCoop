@@ -32,7 +32,7 @@ internal sealed class ArtisanProductsInheritanceCoopCommand : ICoopCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (ModInformation.IsClient) return Failed("Run this command on the server.");
+        if (!ModInformation.IsServer) return Failed("Run this command on the server.");
         if (!resolver.TryResolveHero(args[0], out var oldOwner, out var oldError)) return Failed(oldError);
         if (!resolver.TryResolveHero(args[1], out var heir, out var heirError)) return Failed(heirError);
         if (oldOwner.Issue is not Issue issue) return Failed($"{oldOwner.Name} does not offer Artisan Products.");
@@ -42,6 +42,10 @@ internal sealed class ArtisanProductsInheritanceCoopCommand : ICoopCommand
         if (heir.Issue != null) return Failed($"Heir {heir.Name} already offers {heir.Issue.GetType().Name}.");
         if (!objectManager.TryGetId(issue, out var issueId) || !objectManager.TryGetId(oldOwner, out var oldId) ||
             !objectManager.TryGetId(heir, out var heirId)) return Failed("The issue or hero is not registered.");
+        if (!objectManager.TryGetObjectWithLogging<Hero>(oldId, out var registeredOldOwner) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(heirId, out var registeredHeir) ||
+            registeredOldOwner != oldOwner || registeredHeir != heir)
+            return Failed("The resolved hero is not the registered hero instance.");
 
         Campaign.Current.IssueManager.ChangeIssueOwner(issue, heir);
         if (issue.IssueOwner != heir || oldOwner.Issue != null || heir.Issue != issue)
