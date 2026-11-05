@@ -1,12 +1,15 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Network;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.GameMenus.Messages;
 using GameInterface.Services.Heroes.Messages.LordConversations;
+using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -35,6 +38,21 @@ public class HeroRequestSenderTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+    // The obituary text needs encyclopedia data the test heroes don't have, so it's skipped like in CompanionDismissalSyncTests.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ExecutionAsTheOwnersHero_IsAppliedOnlyFromTheOwner(bool fromOwner)
+    {
+        var sender = fromOwner ? Owner : Outsider;
+        sender.Call(() => sender.Resolve<INetwork>().SendAll(new NetworkExecuteHero(
+                captiveId, ownerHeroId, KillCharacterAction.KillCharacterActionDetail.Executed, isForced: true)),
+            new[] { AccessTools.Method(typeof(KillCharacterAction), "CreateObituary") });
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Equal(!fromOwner, Get<Hero>(captiveId).IsAlive), new[] { AccessTools.Method(typeof(KillCharacterAction), "CreateObituary") });
+    }
 
     [Fact]
     public void TakeHeroIntoAnotherPlayersParty_IsRefused()
