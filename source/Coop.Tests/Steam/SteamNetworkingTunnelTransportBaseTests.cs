@@ -116,6 +116,24 @@ namespace Coop.Tests.Steam
             Assert.EndsWith("route=unknown", description);
         }
 
+        // A join that fails before finding a route has no Relayed flag, which must not read as direct.
+        [Theory]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_FindingRoute)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)]
+        public void DescribeConnection_ReportsUnknownRouteWhenNotConnected(ESteamNetworkingConnectionState state)
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = 0,
+                ConnectionInfoState = state,
+            };
+
+            Assert.EndsWith("route=unknown", transport.DescribeConnection(42));
+        }
+
         private static void SeedOwnedConnection(
             SteamNetworkingTunnelTransportBase transport,
             uint connection,
@@ -150,6 +168,8 @@ namespace Coop.Tests.Steam
 
             public EResult RealTimeStatusResult { get; set; } = EResult.k_EResultFail;
             public int? ConnectionInfoFlags { get; set; }
+            public ESteamNetworkingConnectionState ConnectionInfoState { get; set; } =
+                ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected;
             public List<uint> RawClosedConnections { get; } = new List<uint>();
             public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
                 ConfiguredValues { get; } =
@@ -223,7 +243,7 @@ namespace Coop.Tests.Steam
             // Scripts the route flags, where null stands for Steam refusing the read.
             protected override bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info)
             {
-                info = new SteamNetConnectionInfo_t { m_nFlags = ConnectionInfoFlags ?? 0 };
+                info = new SteamNetConnectionInfo_t { m_nFlags = ConnectionInfoFlags ?? 0, m_eState = ConnectionInfoState };
                 return ConnectionInfoFlags.HasValue;
             }
 

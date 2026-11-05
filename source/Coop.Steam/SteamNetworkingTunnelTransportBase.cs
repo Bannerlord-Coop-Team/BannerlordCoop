@@ -87,9 +87,11 @@ public abstract class SteamNetworkingTunnelTransportBase :
     }
 
     // Names the current route, so a ping change in the stats can be matched to a route switch.
+    // Only a connected connection has a route, otherwise a missing Relayed flag would read as direct.
     private string DescribeRoute(uint connection)
     {
         if (!GetConnectionInfo(new HSteamNetConnection(connection), out var info)) return "unknown";
+        if (info.m_eState != ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected) return "unknown";
 
         return (info.m_nFlags & Constants.k_nSteamNetworkConnectionInfoFlags_Relayed) != 0 ? "relayed" : "direct";
     }
