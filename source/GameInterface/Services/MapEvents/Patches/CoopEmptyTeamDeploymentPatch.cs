@@ -86,6 +86,9 @@ internal class CoopEmptyTeamDeploymentPatch
         return result;
     }
 
+    // The one place the rule lives, the transpiler above calls it too. The postfix still covers Mission.SpawnAgent and
+    // BattleDeploymentHandler.AutoDeployTeamUsingDeploymentPlan, which read IsPlanMade through IMissionDeploymentPlan so
+    // the JIT cannot inline it. PhaseTick needs no override, an unplanned team has no plan for it to clear
     [HarmonyPatch(typeof(DefaultMissionDeploymentPlan), nameof(DefaultMissionDeploymentPlan.IsPlanMade), new[] { typeof(Team) })]
     [HarmonyPostfix]
     private static void IsPlanMade_Postfix(Team team, ref bool __result)
