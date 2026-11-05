@@ -123,6 +123,10 @@ internal class PartyDoneLogicHandler : IHandler
                 objectManager);
         }
 
+        string garrisonDonationSettlementId = null;
+        if (obj.What.GarrisonDonationSettlement != null &&
+            !objectManager.TryGetIdWithLogging(obj.What.GarrisonDonationSettlement, out garrisonDonationSettlementId)) return;
+
         string issueOwnerId = null;
         string issueId = null;
         picker.TryGetIssue(obj.What.LeftMemberRoster, out issueOwnerId, out issueId);
@@ -150,7 +154,8 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId, issueOwnerId, issueId
+            obj.What.ForceTransferId, issueOwnerId, issueId,
+            garrisonDonationSettlementId
         );
 
         network.SendAll(message);
@@ -256,6 +261,19 @@ internal class PartyDoneLogicHandler : IHandler
                     "Rejected Party screen prisoner donation because {MainHeroId} is no longer at {SettlementId}",
                     message.MainHeroId,
                     message.DonationSettlementId);
+                return;
+            }
+
+            // The garrison side of a troop donation is refused once the party left the town (stale screen),
+            // so keep the troops in the party too instead of losing them
+            if (message.GarrisonDonationSettlementId != null &&
+                (!objectManager.TryGetObjectWithLogging<Settlement>(message.GarrisonDonationSettlementId, out var garrisonDonationSettlement) ||
+                !PartyScreenHelperHandler.IsPartyIn(mainHero, garrisonDonationSettlement, requireOwnClan: false)))
+            {
+                logger.Warning(
+                    "Rejected Party screen garrison donation because {MainHeroId} is no longer at {SettlementId}",
+                    message.MainHeroId,
+                    message.GarrisonDonationSettlementId);
                 return;
             }
 

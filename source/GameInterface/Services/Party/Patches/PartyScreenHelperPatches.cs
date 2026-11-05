@@ -23,6 +23,8 @@ internal class PartyScreenHelperPatches
     private static Settlement _donationSettlement;
     [ThreadStatic]
     private static FlattenedTroopRoster _donatedPrisonersRoster;
+    [ThreadStatic]
+    private static Settlement _garrisonDonationSettlement;
 
     internal static void ResetReleasedAndTakenPrisonerActionsRequest()
         => _releasedAndTakenPrisonerActionsRequested = false;
@@ -40,6 +42,9 @@ internal class PartyScreenHelperPatches
         _donatedPrisonersRoster = null;
     }
 
+    internal static void ResetGarrisonDonationRequest()
+        => _garrisonDonationSettlement = null;
+
     internal static bool ConsumePrisonerDonationRequest(
         out Settlement settlement,
         out FlattenedTroopRoster donatedPrisonersRoster)
@@ -48,6 +53,14 @@ internal class PartyScreenHelperPatches
         donatedPrisonersRoster = _donatedPrisonersRoster;
         ResetPrisonerDonationRequest();
         return settlement != null && donatedPrisonersRoster != null;
+    }
+
+    // The town troops were donated to on this Done, so the server takes them from the party only if the town takes them too
+    internal static Settlement ConsumeGarrisonDonationSettlement()
+    {
+        var settlement = _garrisonDonationSettlement;
+        _garrisonDonationSettlement = null;
+        return settlement;
     }
 
     [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
@@ -94,6 +107,8 @@ internal class PartyScreenHelperPatches
     public static bool DonateGarrisonDoneHandlerPrefix(ref bool __result, TroopRoster leftMemberRoster)
     {
         Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
+
+        if (leftMemberRoster.Count > 0) _garrisonDonationSettlement = currentSettlement;
 
         var message = new GarrisonDonated(currentSettlement, leftMemberRoster);
         MessageBroker.Instance.Publish(null, message);

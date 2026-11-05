@@ -239,12 +239,16 @@ internal class PartyScreenHelperHandler : IHandler
     private bool IsSenderPartyIn(object sender, Settlement settlement, bool requireOwnClan)
     {
         if (playerManager.TryGetSenderHero(sender, out var hero) &&
-            hero.PartyBelongedTo?.CurrentSettlement == settlement &&
-            (!requireOwnClan || (hero.Clan != null && settlement.OwnerClan == hero.Clan))) return true;
+            IsPartyIn(hero, settlement, requireOwnClan)) return true;
 
         logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not allowed there", settlement.StringId);
         return false;
     }
+
+    // Shared with the Party screen Done, which takes donated troops from the party only when this lets the garrison add them.
+    internal static bool IsPartyIn(Hero hero, Settlement settlement, bool requireOwnClan)
+        => hero.PartyBelongedTo?.CurrentSettlement == settlement &&
+            (!requireOwnClan || (hero.Clan != null && settlement.OwnerClan == hero.Clan));
 
     private void Handle_PrisonersReleasedAndTaken(MessagePayload<PrisonersReleasedAndTaken> obj)
     {

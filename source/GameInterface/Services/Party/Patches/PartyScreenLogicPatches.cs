@@ -97,6 +97,7 @@ internal class PartyScreenLogicPatches
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ResetPrisonerDonationRequest();
+        PartyScreenHelperPatches.ResetGarrisonDonationRequest();
         var partyScreenMode = __instance._partyScreenMode;
         if (Game.Current.GameStateManager.ActiveState is PartyState activePartyState)
         {
@@ -108,6 +109,7 @@ internal class PartyScreenLogicPatches
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
             out var donationSettlement,
             out var donatedPrisonersRoster);
+        var garrisonDonationSettlement = PartyScreenHelperPatches.ConsumeGarrisonDonationSettlement();
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
@@ -141,7 +143,8 @@ internal class PartyScreenLogicPatches
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
                 donatedPrisonersRoster,
-                forceTransferId
+                forceTransferId,
+                garrisonDonationSettlement
             );
 
             MessageBroker.Instance.Publish(__instance, message);
