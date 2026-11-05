@@ -27,7 +27,6 @@ internal class HeadmanNeedsGrainWorldEventPatches
             QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
                 quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
         });
-        });
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
