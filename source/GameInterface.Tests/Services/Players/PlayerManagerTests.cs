@@ -312,6 +312,46 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void IsSenderRuling_OnlyTheRulersPeerPasses()
+    {
+        var logger = new Mock<ILogger>();
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new PlayerManager(logger.Object, objectManager.Object, new ControllerIdProvider());
+        var ruler = ObjectHelper.SkipConstructor<Hero>();
+        var member = ObjectHelper.SkipConstructor<Hero>();
+        objectManager.Setup(o => o.TryGetObject(HeroId, out ruler)).Returns(true);
+        objectManager.Setup(o => o.TryGetObject("HeroTwo", out member)).Returns(true);
+        var rulingClan = ObjectHelper.SkipConstructor<Clan>();
+        rulingClan._leader = ruler;
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        kingdom._rulingClan = rulingClan;
+        var network = new TestNetwork();
+        // Test peers share one endpoint, and peers compare by endpoint, so the second peer gets its own address.
+        var rulerPeer = network.CreatePeer();
+        var memberPeer = network.CreatePeer("10.0.0.8");
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+        Assert.True(playerManager.AddPlayer(new Player("PlayerTwo", "HeroTwo", string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, rulerPeer);
+        playerManager.SetPeer("PlayerTwo", memberPeer);
+
+        try
+        {
+            Assert.True(playerManager.IsSenderRuling(rulerPeer, kingdom));
+            Assert.False(playerManager.IsSenderRuling(memberPeer, kingdom));
+            Assert.False(playerManager.IsSenderRuling(rulerPeer, null));
+            logger.Verify(log => log.Warning(
+                "Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which does not rule it",
+                It.IsAny<string>(), (int?)memberPeer.Id), Times.Once());
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(ruler);
+            GetPlayerObjects().Remove(member);
+        }
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);

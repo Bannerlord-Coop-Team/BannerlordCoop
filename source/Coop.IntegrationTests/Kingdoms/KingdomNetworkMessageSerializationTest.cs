@@ -12,7 +12,6 @@ public class KingdomNetworkMessageSerializationTest
     public void NetworkRequestCreateKingdom_RoundTrips()
     {
         var original = new NetworkRequestCreateKingdom(
-            "Player",
             "Real Kingdom",
             "empire",
             "main_party",
@@ -20,7 +19,6 @@ public class KingdomNetworkMessageSerializationTest
 
         var copy = RoundTrip(original);
 
-        Assert.Equal("Player", copy.ControllerId);
         Assert.Equal("Real Kingdom", copy.KingdomName);
         Assert.Equal("empire", copy.CultureId);
         Assert.Equal("main_party", copy.PartyId);
@@ -54,7 +52,6 @@ public class KingdomNetworkMessageSerializationTest
     public void NetworkRequestKingdomDecisionVote_RoundTrips()
     {
         var original = new NetworkRequestKingdomDecisionVote(
-            "Player",
             new KingdomDecisionVoteData(
                 "Kingdom_empire",
                 2,
@@ -66,7 +63,6 @@ public class KingdomNetworkMessageSerializationTest
 
         var copy = RoundTrip(original);
 
-        Assert.Equal("Player", copy.ControllerId);
         AssertVoteData(original.VoteData, copy.VoteData);
     }
 

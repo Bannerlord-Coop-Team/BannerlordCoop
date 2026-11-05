@@ -12,6 +12,7 @@ using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
+using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
@@ -367,7 +368,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(KingdomName, request.KingdomName);
         Assert.False(string.IsNullOrWhiteSpace(request.CultureId));
 
@@ -685,7 +685,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var vote = new KingdomDecisionVoteData(scenario.KingdomId, decisionIndex: 0, outcomeIndex: 0,
             supportWeight: (int)Supporter.SupportWeights.FullyPush, isAbstain: false, isFinal: true);
 
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestKingdomDecisionVote(vote));
 
         Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<ChangeKingdomDecisionVote>()).ControllerId);
     }
@@ -696,9 +696,27 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         CreateRulerAndOutsiderScenario();
         Server.InternalMessages.Clear();
 
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestCreateKingdom(ControllerId, KingdomName, null, null, null));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestCreateKingdom(KingdomName, null, null, null));
 
         Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<CreateKingdom>()).ControllerId);
+    }
+
+    [Fact]
+    public void KingdomRequests_FromAPeerLeftBehindByAReconnect_AreRefused()
+    {
+        var scenario = CreateRulerAndOutsiderScenario();
+        var stalePeer = Clients.Last().NetPeer;
+        // The second player reconnected on a new peer, so a late request on the old one stands for nobody.
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(SecondControllerId, NetPeerExtensions.CreatePeer()));
+        Server.InternalMessages.Clear();
+        var vote = new KingdomDecisionVoteData(scenario.KingdomId, decisionIndex: 0, outcomeIndex: 0,
+            supportWeight: (int)Supporter.SupportWeights.FullyPush, isAbstain: false, isFinal: true);
+
+        Server.SimulateMessage(stalePeer, new NetworkRequestCreateKingdom(KingdomName, null, null, null));
+        Server.SimulateMessage(stalePeer, new NetworkRequestKingdomDecisionVote(vote));
+
+        Assert.Empty(Server.InternalMessages.GetMessages<CreateKingdom>());
+        Assert.Empty(Server.InternalMessages.GetMessages<ChangeKingdomDecisionVote>());
     }
 
     // The first client rules a kingdom; the second plays a clan outside it.
@@ -4347,7 +4365,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(settlementId, request.SettlementId);
 
@@ -4403,7 +4420,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Null(request.PartyId);
         Assert.Null(request.SettlementId);
 
@@ -4649,7 +4665,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.SimulateMessage(
             client.NetPeer,
-            new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
+            new NetworkRequestCreateKingdom(KingdomName, player.CultureId, player.PartyId, settlementId));
         Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(
             Server.GetHandle<MobileParty>(player.PartyId)));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
@@ -5098,7 +5114,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     isAbstain: false,
                     isFinal: true);
                 Server.Resolve<IMessageBroker>().Publish(
-                    client1.NetPeer, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+                    client1.NetPeer, new NetworkRequestKingdomDecisionVote(vote));
             });
         });
 

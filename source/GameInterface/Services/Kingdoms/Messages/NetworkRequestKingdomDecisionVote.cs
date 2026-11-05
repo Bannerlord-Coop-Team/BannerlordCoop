@@ -8,13 +8,10 @@ namespace GameInterface.Services.Kingdoms.Messages
     public class NetworkRequestKingdomDecisionVote : ICommand
     {
         [ProtoMember(1)]
-        public string ControllerId { get; }
-        [ProtoMember(2)]
         public KingdomDecisionVoteData VoteData { get; }
 
-        public NetworkRequestKingdomDecisionVote(string controllerId, KingdomDecisionVoteData voteData)
+        public NetworkRequestKingdomDecisionVote(KingdomDecisionVoteData voteData)
         {
-            ControllerId = controllerId;
             VoteData = voteData;
         }
     }

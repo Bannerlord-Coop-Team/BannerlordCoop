@@ -38,7 +38,6 @@ public class KingdomCreationRequestSyncTest
         Assert.Equal(1, server.InternalMessages.GetMessageCount<CreateKingdom>());
 
         var networkRequest = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal("player1", networkRequest.ControllerId);
         Assert.Equal("Real Kingdom", networkRequest.KingdomName);
         Assert.Equal("empire", networkRequest.CultureId);
         Assert.Null(networkRequest.PartyId);
@@ -67,7 +66,7 @@ public class KingdomCreationRequestSyncTest
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 TestEnvironment.Clients.First().NetPeer,
-                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
+                new NetworkRequestCreateKingdom("Real Kingdom", "empire", "party1", "settlement1")));
 
         Assert.Same(settlement, party.CurrentSettlement);
         Assert.True(server.ObjectManager.TryGetHandle(party, out var partyHandle));
@@ -87,7 +86,7 @@ public class KingdomCreationRequestSyncTest
         playerManager.SetPeer("player1", client1.NetPeer);
 
         GameThreadTestRunner.Run(() =>
-            server.SimulateMessage(client1.NetPeer, new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire")));
+            server.SimulateMessage(client1.NetPeer, new NetworkRequestCreateKingdom("Real Kingdom", "empire")));
 
         var serverCommand = Assert.Single(server.InternalMessages.GetMessages<CreateKingdom>());
         Assert.Equal("player1", serverCommand.ControllerId);
@@ -138,7 +137,7 @@ public class KingdomCreationRequestSyncTest
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
                 TestEnvironment.Clients.First().NetPeer,
-                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
+                new NetworkRequestCreateKingdom("Real Kingdom", "empire", "party1", "settlement1")));
 
         using (new AllowedThread())
         {

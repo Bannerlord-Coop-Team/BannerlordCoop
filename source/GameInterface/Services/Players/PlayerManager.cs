@@ -88,6 +88,13 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
+    /// Checks whether a message sender's hero rules the given kingdom, logging a warning when it
+    /// doesn't, so a handler can ignore a request only the ruler may make. Reads the kingdom's live
+    /// leader, so call it on the game thread.
+    /// </summary>
+    bool IsSenderRuling(object sender, Kingdom kingdom);
+
+    /// <summary>
     /// Checks whether a message sender is the peer controlling the given party, logging a warning
     /// when it isn't, so a handler can ignore a request made with a stale or wrong party id.
     /// </summary>
@@ -428,6 +435,14 @@ public class PlayerManager : IPlayerManager
         if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
+        return false;
+    }
+
+    public bool IsSenderRuling(object sender, Kingdom kingdom)
+    {
+        if (kingdom != null && TryGetSenderHero(sender, out var hero) && kingdom.Leader == hero) return true;
+
+        logger.Warning("Ignoring a request for kingdom {KingdomId} from peer {PeerId}, which does not rule it", kingdom?.StringId, (sender as NetPeer)?.Id);
         return false;
     }
 

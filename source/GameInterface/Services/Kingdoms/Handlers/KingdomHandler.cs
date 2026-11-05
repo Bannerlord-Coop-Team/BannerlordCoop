@@ -813,9 +813,8 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
         var partyId = payload.PartyId;
-        // A peer always acts as its own controller, whatever id the message carries.
-        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var senderPlayer)) return;
-        var controllerId = senderPlayer.ControllerId;
+        // A peer acts as the controller it currently stands for, so a stale peer left by a reconnect is refused.
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId)) return;
 
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
@@ -964,8 +963,7 @@ public class KingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
-        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var senderPlayer)) return;
-        var controllerId = senderPlayer.ControllerId;
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId)) return;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
@@ -1044,7 +1042,6 @@ public class KingdomHandler : IHandler
         }
 
         var message = new NetworkRequestCreateKingdom(
-            controllerIdProvider.ControllerId,
             payload.KingdomName,
             payload.CultureId,
             partyId,
@@ -1248,7 +1245,7 @@ public class KingdomHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var payload = obj.What;
-        var message = new NetworkRequestKingdomDecisionVote(controllerIdProvider.ControllerId, payload.VoteData);
+        var message = new NetworkRequestKingdomDecisionVote(payload.VoteData);
         network.SendAll(message);
     }
 
