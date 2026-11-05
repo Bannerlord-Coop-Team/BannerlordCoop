@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Statistics;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes;
@@ -36,6 +37,7 @@ public interface ICoopSession
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
     PlayerTraitData PlayerTraitData { get; }
     OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    StatisticsPlayerData StatisticsPlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -85,6 +87,8 @@ public class CoopSession : ICoopSession
     public PlayerTraitData PlayerTraitData { get; }
     [ProtoMember(14)]
     public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    [ProtoMember(15)]
+    public StatisticsPlayerData StatisticsPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -100,7 +104,8 @@ public class CoopSession : ICoopSession
         AgingPlayerData agingPlayerData,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         PlayerTraitData playerTraitData = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        StatisticsPlayerData statisticsPlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -116,5 +121,6 @@ public class CoopSession : ICoopSession
         ClanFinance = clanFinance ?? new();
         PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
         OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
+        StatisticsPlayerData = statisticsPlayerData ?? new StatisticsPlayerData(new());
     }
 }
