@@ -7,9 +7,11 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -81,6 +83,48 @@ public class BattleRequestSenderTests : MissionTestEnvironment
         Server.PumpGameThread();
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
+    }
+
+    // An applied aftermath choice takes the settlement's pending aftermath, so a refused one leaves it pending.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SiegeAftermathChoice_IsAppliedOnlyForTheSendersParty(bool fromOwner)
+    {
+        string ownerPartyId = RegisterOutsider(ClientA, "ctrl-A");
+        RegisterOutsider(ClientB, "ctrl-B");
+        string settlementId = null;
+        Settlement settlement = null;
+        Server.Call(() =>
+        {
+            settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            var captor = GameObjectCreator.CreateInitializedObject<Clan>();
+            settlement.Town = town;
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = captor;
+            town.IsOwnerUnassigned = false;
+            town.LastCapturedBy = captor;
+
+            var pending = new SiegeAftermathPatches.PendingAftermath(
+                Server.GetRegisteredObject<MobileParty>(ownerPartyId), GameObjectCreator.CreateInitializedObject<Clan>(), new Dictionary<MobileParty, float>());
+            Assert.True(pending.TryRestoreCaptureBinding(captor, captor));
+            Assert.True(pending.MatchesCurrentCapture(settlement));
+            SiegeAftermathPatches.PendingAftermaths[settlement] = pending;
+            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+        });
+
+        try
+        {
+            Server.SimulateMessage((fromOwner ? ClientA : ClientB).NetPeer, new NetworkRequestSiegeAftermath(ownerPartyId, settlementId, 0));
+            Server.PumpGameThread();
+
+            Assert.Equal(!fromOwner, SiegeAftermathPatches.PendingAftermaths.ContainsKey(settlement));
+        }
+        finally
+        {
+            SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
+        }
     }
 
     [Theory]
