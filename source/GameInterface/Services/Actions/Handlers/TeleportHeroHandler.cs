@@ -78,7 +78,7 @@ internal class TeleportHeroHandler : IHandler
             MobileParty targetParty = null;
             if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
 
-            if (ModInformation.IsServer && obj.Who is NetPeer && !CanSenderTeleport(obj.Who, hero, targetSettlement, targetParty)) return;
+            if (ModInformation.IsServer && !CanSenderTeleport(obj.Who, hero, targetSettlement, targetParty)) return;
 
             TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 

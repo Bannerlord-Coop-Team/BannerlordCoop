@@ -868,6 +868,13 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         RegisterAsPlayerParty("1", initiatorHeroId, ctx.AttackerPartyId);
         RegisterAsPlayerParty("2", recipientHeroId, ctx.DefenderPartyId);
         PreparePlayerPartyForCapture(recipientHeroId, ctx.DefenderPartyId);
+        // The server takes a surrender only from the peer that plays the party.
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            playerManager.SetPeer("1", Clients.First().NetPeer);
+            playerManager.SetPeer("2", Clients.Last().NetPeer);
+        });
 
         SetMainPartyInBattle(Clients.First(), ctx.AttackerPartyId);
         SetMainPartyInBattle(Clients.Last(), ctx.DefenderPartyId);

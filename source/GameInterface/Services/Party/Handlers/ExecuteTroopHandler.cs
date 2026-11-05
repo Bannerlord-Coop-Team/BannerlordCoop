@@ -5,7 +5,6 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -59,8 +58,8 @@ internal class ExecuteTroopHandler : IHandler
     private void Handle_NetworkExecuteHero(MessagePayload<NetworkExecuteHero> obj)
     {
         var data = obj.What;
-        // A client may only execute as its own hero; the server's own executions reach clients from the server peer.
-        if (ModInformation.IsServer && obj.Who is NetPeer &&
+        // Only clients send this to the server, and a client may only execute as its own hero.
+        if (ModInformation.IsServer &&
             !playerManager.IsSenderControllingHero(obj.Who, data.ExecutorId)) return;
 
         GameThread.RunSafe(() =>

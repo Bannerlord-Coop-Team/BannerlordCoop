@@ -272,7 +272,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     private void Handle_NetworkPlayerSurrendered(MessagePayload<NetworkPlayerSurrendered> payload)
     {
         if (ModInformation.IsClient) return;
-        if (payload.Who is NetPeer && !playerManager.IsSenderControllingParty(payload.Who, payload.What.PlayerParty)) return;
+        if (!playerManager.IsSenderControllingParty(payload.Who, payload.What.PlayerParty)) return;
 
         GameThread.RunSafe(() =>
         {
