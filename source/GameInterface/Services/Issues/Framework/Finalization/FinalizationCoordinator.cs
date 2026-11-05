@@ -5,7 +5,9 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -13,6 +15,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -35,7 +38,14 @@ internal class FinalizationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
     private readonly IAlternativeSolutionCommitments commitments;
+    private readonly ConditionalWeakTable<IssueBase, object> announcedIssues = new();
+    private readonly object announcedIssuesLock = new();
+    private readonly ConditionalWeakTable<IssueBase, OwnerIdentity> ownerIdentities = new();
+    private readonly object ownerIdentitiesLock = new();
+    private readonly ConditionalWeakTable<IssueBase, NetPeer> ownerPeers = new();
+    private readonly object ownerPeersLock = new();
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -46,7 +56,8 @@ internal class FinalizationCoordinator : IHandler
         IPlayerManager playerManager,
         IControllerIdProvider controller,
         IAlternativeSolutionCommitments commitments,
-        IIssueConversationGuard conversationGuard)
+        IIssueConversationGuard conversationGuard,
+        IQuestSolutionAcceptCoordinator acceptCoordinator)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -57,11 +68,15 @@ internal class FinalizationCoordinator : IHandler
         this.controller = controller;
         this.commitments = commitments;
         this.conversationGuard = conversationGuard;
+        this.acceptCoordinator = acceptCoordinator;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Subscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Subscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Subscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Subscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Subscribe<IssueOwnerChanged>(Handle_IssueOwnerChanged);
         messageBroker.Subscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Subscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Subscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -74,6 +89,9 @@ internal class FinalizationCoordinator : IHandler
         messageBroker.Unsubscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
         messageBroker.Unsubscribe<RequestQuestOutcome>(Handle_RequestQuestOutcome);
         messageBroker.Unsubscribe<RequestQuestBranch>(Handle_RequestQuestBranch);
+        messageBroker.Unsubscribe<QuestSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Unsubscribe<AlternativeSolutionAcceptedOnServer>(RememberOwnerIdentity);
+        messageBroker.Unsubscribe<IssueOwnerChanged>(Handle_IssueOwnerChanged);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(Handle_IssueOutcomeObserved);
         messageBroker.Unsubscribe<IssueJournalObserved>(Handle_IssueJournalObserved);
         messageBroker.Unsubscribe<NetworkIssueJournal>(Handle_NetworkIssueJournal);
@@ -94,7 +112,11 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestOutcome(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.Log));
+        });
     }
 
     // Client only.
@@ -111,7 +133,11 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        acceptCoordinator.RunWhenAccepted(issue, () =>
+        {
+            messageBroker.Publish(this, new QuestAcceptanceFinished(payload.What.Quest));
+            network.SendAll(new RequestQuestBranch(issueOwnerId, issue.StringId, payload.What.Proof));
+        });
     }
 
     // Server only.
@@ -133,6 +159,13 @@ internal class FinalizationCoordinator : IHandler
         {
             if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
+                return;
+            }
+
+            if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
+                && playerHero.PartyBelongedTo == null)
+            {
+                Logger.Warning("Cannot run outcome {Outcome} for {IssueId}: the owner has no party", data.Outcome, data.IssueId);
                 return;
             }
 
@@ -165,6 +198,13 @@ internal class FinalizationCoordinator : IHandler
                 return;
             }
 
+            if (descriptor.FinalizationProofStrategy is IOwnerPartyRequiredFinalizationProofStrategy
+                && playerHero.PartyBelongedTo == null)
+            {
+                Logger.Warning("Cannot run branch {Proof} for {IssueId}: the owner has no party", data.Proof, data.IssueId);
+                return;
+            }
+
             var quest = issue.IssueQuest;
             var proofStrategy = descriptor.FinalizationProofStrategy;
 
@@ -188,15 +228,26 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithAlternative ||
-            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
-            !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
-            !playerManager.TryGetPeer(owner, out var peer)) return;
+        if (issue.IsSolvingWithAlternative) return;
+        var giverId = TryGetRememberedOwnerId(issue);
+        if (string.IsNullOrEmpty(giverId) && !objectManager.TryGetIdWithLogging(issue.IssueOwner, out giverId)) return;
+        NetPeer peer;
+        if (ownership.TryGetOwner(giverId, issue.StringId, out var owner) && playerManager.TryGetPeer(owner, out peer))
+        {
+        }
+        else
+        {
+            lock (ownerPeersLock)
+                if (!ownerPeers.TryGetValue(issue, out peer) || peer.ConnectionState != ConnectionState.Connected) return;
+        }
+        if (issue.IssueQuest != null && issueResolver.TryResolve(giverId, issue.StringId,
+            out _, out _, out var descriptor) && descriptor is ISuppressEndingJournalSnapshotDescriptor)
+            return;
 
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
-            entries.Select(log => log.LogText).Where(text => text != null).ToArray()));
+            entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -206,30 +257,94 @@ internal class FinalizationCoordinator : IHandler
         GameThread.RunSafe(() =>
         {
             if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
+                !issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor)) return;
 
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
-            if (!data.IsQuestJournal && quest != null) return;
+            if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
-            var entries = quest?.JournalEntries ?? issue.JournalEntries;
-            var existing = entries.Where(log => log.LogText != null).GroupBy(log => log.LogText.ToString())
-                .ToDictionary(group => group.Key, group => group.Count());
-            foreach (var text in data.Logs ?? Array.Empty<TextObject>())
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
-                if (text == null) continue;
-                var key = text.ToString();
-                if (existing.TryGetValue(key, out var count) && count > 0)
+                if (quest != null)
                 {
-                    existing[key] = count - 1;
-                    continue;
+                    var logs = data.Logs ?? Array.Empty<IssueJournalEntry>();
+                    if (descriptor is ISpecializedEndingJournalDescriptor)
+                    {
+                        var remaining = quest.JournalEntries.ToList();
+                        foreach (var log in logs)
+                        {
+                            var matches = remaining.Where(existing =>
+                                existing.Type == log.Type && existing.Range == log.Range &&
+                                SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
+                            if (matches.Length == 0)
+                                matches = remaining.Where(existing =>
+                                    existing.Type == log.Type && existing.Range == log.Range &&
+                                    SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
+                            var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
+                            if (existing == null && matches.Length == 1) existing = matches[0];
+                            if (existing == null && matches.Length > 0)
+                            {
+                                Logger.Warning("Ambiguous specialized journal row for {issue}; using journal order", data.IssueId);
+                                existing = matches[0];
+                            }
+                            if (existing != null)
+                            {
+                                existing.UpdateCurrentProgress(Math.Max(existing.CurrentProgress, log.Progress));
+                                remaining.Remove(existing);
+                            }
+                            else if (matches.Length == 0)
+                            {
+                                quest._journalEntries.Add(log.ToJournalLog());
+                            }
+                        }
+                    }
+                    else
+                    {
+                        quest._journalEntries.Clear();
+                        foreach (var log in logs)
+                            quest._journalEntries.Add(log.ToJournalLog());
+                    }
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
                 }
-                if (quest != null) quest.AddLog(text);
-                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
+                else
+                {
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    {
+                        if (log.Text == null) continue;
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
+                    }
+                }
             }
         }, context: nameof(FinalizationCoordinator));
     }
+
+    private static bool SameText(TextObject first, TextObject second)
+    {
+        if (ReferenceEquals(first, second)) return true;
+        if (first == null || second == null || first.Value != second.Value ||
+            (first.Attributes == null) != (second.Attributes == null) ||
+            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
+        if (first.Attributes == null) return true;
+        foreach (var pair in first.Attributes)
+        {
+            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
+            if (pair.Value is TextObject text)
+            {
+                if (!(value is TextObject other) || !SameText(text, other)) return false;
+            }
+            else if (!Equals(pair.Value, value)) return false;
+        }
+        return true;
+    }
+
+    private static bool SameKey(TextObject first, TextObject second) =>
+        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
@@ -241,15 +356,88 @@ internal class FinalizationCoordinator : IHandler
 
         var issue = payload.What.Issue;
 
-        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
+        var issueOwnerId = payload.What.IssueOwnerId;
+        if (string.IsNullOrEmpty(issueOwnerId) && !objectManager.TryGetId(issue.IssueOwner, out issueOwnerId))
+        {
+            ownership.TryGetIssueOwnerId(issue.StringId, out issueOwnerId);
+        }
+        if (string.IsNullOrEmpty(issueOwnerId))
+        {
+            lock (ownerIdentitiesLock)
+                if (ownerIdentities.TryGetValue(issue, out var identity)) issueOwnerId = identity.IssueOwnerId;
+        }
+        if (string.IsNullOrEmpty(issueOwnerId))
         {
             return;
+        }
+
+        lock (announcedIssuesLock)
+        {
+            if (announcedIssues.TryGetValue(issue, out _)) return;
+            announcedIssues.Add(issue, new object());
         }
 
         commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
+    }
+
+    private void RememberOwnerIdentity(MessagePayload<QuestSolutionAcceptedOnServer> payload)
+    {
+        if (ModInformation.IsClient) return;
+        RememberOwnerIdentity(payload.What.IssueOwnerId, payload.What.IssueId, payload.What.ControllerId);
+    }
+
+    private void RememberOwnerIdentity(MessagePayload<AlternativeSolutionAcceptedOnServer> payload)
+    {
+        if (ModInformation.IsClient) return;
+        RememberOwnerIdentity(payload.What.IssueOwnerId, payload.What.IssueId, payload.What.ControllerId);
+    }
+
+    private void Handle_IssueOwnerChanged(MessagePayload<IssueOwnerChanged> payload)
+    {
+        if (ModInformation.IsClient || !objectManager.TryGetIdWithLogging(payload.What.Issue.IssueOwner, out var issueOwnerId))
+            return;
+
+        lock (ownerIdentitiesLock)
+        {
+            ownerIdentities.Remove(payload.What.Issue);
+            ownerIdentities.Add(payload.What.Issue, new OwnerIdentity(issueOwnerId));
+        }
+    }
+
+    private void RememberOwnerIdentity(string issueOwnerId, string issueId, string controllerId)
+    {
+        if (!issueResolver.TryResolve(issueOwnerId, issueId, out _, out var issue, out _))
+        {
+            issue = Campaign.Current?.IssueManager?.Issues.Values.FirstOrDefault(candidate => candidate.StringId == issueId);
+            if (issue == null) return;
+        }
+        lock (ownerIdentitiesLock)
+        {
+            ownerIdentities.Remove(issue);
+            ownerIdentities.Add(issue, new OwnerIdentity(issueOwnerId));
+        }
+        if (playerManager.TryGetPeer(controllerId, out var peer))
+            lock (ownerPeersLock)
+            {
+                ownerPeers.Remove(issue);
+                ownerPeers.Add(issue, peer);
+            }
+    }
+
+    private string TryGetRememberedOwnerId(IssueBase issue)
+    {
+        lock (ownerIdentitiesLock)
+            return ownerIdentities.TryGetValue(issue, out var identity) ? identity.IssueOwnerId : null;
+    }
+
+    private sealed class OwnerIdentity
+    {
+        public readonly string IssueOwnerId;
+
+        public OwnerIdentity(string issueOwnerId) => IssueOwnerId = issueOwnerId;
     }
 
     // Client only.
@@ -289,6 +477,7 @@ internal class FinalizationCoordinator : IHandler
 
         using (new AllowedThread())
         using (new QuestEndingReplay())
+        using (new QuestJournalReplay())
         {
             Replay(issue, data.Outcome, isOwner);
         }
