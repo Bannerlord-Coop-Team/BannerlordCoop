@@ -620,12 +620,22 @@ jobs:
           & $rclone deletefile $remote --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
           if ($LASTEXITCODE -ne 0) {
             $metadata = & $rclone lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-            if ($LASTEXITCODE -ne 0 -or -not [string]::IsNullOrWhiteSpace(($metadata -join "`n"))) {
+            $metadataText = ($metadata -join "`n").Trim()
+            if ($LASTEXITCODE -ne 0 -or -not $metadataText.StartsWith('[')) {
+              throw 'Legacy client manifest invalidation failed'
+            }
+            $metadataEntries = $metadataText | ConvertFrom-Json
+            if ($null -ne $metadataEntries -and @($metadataEntries).Count -ne 0) {
               throw 'Legacy client manifest invalidation failed'
             }
           }
           $remaining = & $rclone lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          if ($LASTEXITCODE -ne 0 -or -not [string]::IsNullOrWhiteSpace(($remaining -join "`n"))) {
+          $remainingText = ($remaining -join "`n").Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $remainingText.StartsWith('[')) {
+            throw 'Legacy client manifest remains after invalidation'
+          }
+          $remainingEntries = $remainingText | ConvertFrom-Json
+          if ($null -ne $remainingEntries -and @($remainingEntries).Count -ne 0) {
             throw 'Legacy client manifest remains after invalidation'
           }
 
