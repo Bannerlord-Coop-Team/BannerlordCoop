@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms.Messages;
