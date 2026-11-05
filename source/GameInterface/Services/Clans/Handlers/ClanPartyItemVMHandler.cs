@@ -64,7 +64,7 @@ internal class ClanPartyItemVMHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             if (mobileParty.IsPlayerParty()) return;
-            if (!CanSenderManage(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageParty(senderHero, mobileParty)) return;
             mobileParty.SetPartyObjective(obj.What.PartyObjective);
         });
     }
@@ -82,7 +82,8 @@ internal class ClanPartyItemVMHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
             if (homeSettlement.Town == null) return;
-            if (!CanSenderManageTown(obj.Who, homeSettlement)) return;
+            if (!playerManager.IsSenderControllingClan(obj.Who, homeSettlement.OwnerClan)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageClan(senderHero, homeSettlement.OwnerClan)) return;
 
             homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
             network.SendAll(new ChangeAutoRecruitForSettlementClients(obj.What.HomeSettlementId, obj.What.Value));
@@ -96,25 +97,5 @@ internal class ClanPartyItemVMHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
             homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
         });
-    }
-
-    // A clan party's objective is set by its clan leader.
-    private bool CanSenderManage(object sender, MobileParty target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageParty(actor, target)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
-    }
-
-    // A town's garrison recruitment is set by its owner clan's leader.
-    private bool CanSenderManageTown(object sender, Settlement target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, target.OwnerClan)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
     }
 }

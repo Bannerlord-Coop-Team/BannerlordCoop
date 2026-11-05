@@ -59,19 +59,9 @@ internal class PartyWageLimitHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             if (mobileParty.IsPlayerParty()) return;
-            if (!CanSenderManage(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageParty(senderHero, mobileParty)) return;
 
             mobileParty.SetWagePaymentLimit(obj.What.NewValue);
         });
-    }
-
-    // Wage limits of a clan party are set by its clan leader.
-    private bool CanSenderManage(object sender, MobileParty target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageParty(actor, target)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
     }
 }

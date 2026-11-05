@@ -106,7 +106,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             GameThread.RunSafe(() =>
             {
                 if (!objectManager.TryGetObjectWithLogging<HeroDeveloper>(data.HeroDeveloperId, out var heroDeveloper)) return;
-                if (!CanSenderDevelop(obj.Who, heroDeveloper.Hero)) return;
+                if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageHero(senderHero, heroDeveloper.Hero)) return;
 
                 AddPerks(data.PerkIds, heroDeveloper);
                 AddAttributes(data.AttributeIds, data.AttributeIncreases, heroDeveloper);
@@ -192,16 +192,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                     heroDeveloper.AddFocus(focusChange.Skill, 1);
                 }
             }
-        }
-
-        // Perks and attributes are spent on a hero the sender may manage.
-        private bool CanSenderDevelop(object sender, Hero target)
-        {
-            if (!ModInformation.IsServer) return true;
-            if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageHero(actor, target)) return true;
-
-            Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-            return false;
         }
     }
 }

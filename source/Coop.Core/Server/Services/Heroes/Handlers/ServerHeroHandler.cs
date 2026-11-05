@@ -56,25 +56,15 @@ internal class ServerHeroHandler : IHandler
     private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> obj)
     {
         var data = obj.What.Data;
-        var sender = obj.Who;
 
         GameThread.RunSafe(() =>
         {
-            if (!CanSenderRename(sender, data.HeroStringId)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroStringId, out var hero)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanRenameHero(senderHero, hero)) return;
 
             messageBroker.Publish(this, new ChangeHeroName(data));
 
             server.SendAll(new NetworkChangeHeroName(data));
         }, context: nameof(NetworkChangeHeroName));
-    }
-
-    // Same rule as the client's rename gate, for the hero the sending peer plays.
-    private bool CanSenderRename(object sender, string heroId)
-    {
-        if (objectManager.TryGetObject<Hero>(heroId, out var hero) &&
-            playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanRenameHero(actor, hero)) return true;
-
-        Logger.Warning("Ignoring a rename of hero {HeroId} from a peer that may not rename it", heroId);
-        return false;
     }
 }

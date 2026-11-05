@@ -94,7 +94,7 @@ internal class BarberHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(obj.What.CharacterToChangeId, out var characterToChange)) return;
-            if (!CanSenderRestyle(obj.Who, characterToChange.HeroObject)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageHero(senderHero, characterToChange.HeroObject)) return;
 
             characterToChange.HeroObject.StaticBodyProperties = obj.What.CurrentBodyProperties.StaticProperties;
             characterToChange.HeroObject.Build = obj.What.CurrentBodyProperties.DynamicProperties.Build;
@@ -138,15 +138,5 @@ internal class BarberHandler : IHandler
                 agent.EquipItemsFromSpawnEquipment(false, false, false, 0);
             }
         }
-    }
-
-    // The barber changes a hero the sender may manage.
-    private bool CanSenderRestyle(object sender, Hero target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageHero(actor, target)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
     }
 }

@@ -110,7 +110,14 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
+            // Every client runs vanilla's role clear when a hero's party change replicates, and the server already ran
+            // the same clear itself. Those echoes are dropped quietly, and only the sender's role screens refresh.
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
+            {
+                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
+                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
+                return;
+            }
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
             UpdateClientVM(data.MobilePartyId);
@@ -132,7 +139,13 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
+            // A role clear echo, dropped quietly like above.
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
+            {
+                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
+                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
+                return;
+            }
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
@@ -155,7 +168,13 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
+            // A role clear echo, dropped quietly like above.
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
+            {
+                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
+                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
+                return;
+            }
 
             mobileParty.RemoveOnePartyRoleOfHero(hero);
 
@@ -178,7 +197,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartyScout(hero);
             mobileParty.ResetCached();
@@ -202,7 +221,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartyQuartermaster(hero);
             mobileParty.ResetCached(); // Ensure new party size
@@ -226,7 +245,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartyEngineer(hero);
             mobileParty.ResetCached();
@@ -250,7 +269,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartySurgeon(hero);
             mobileParty.ResetCached();
@@ -274,7 +293,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartyFirstMate(hero);
             mobileParty.ResetCached();
@@ -298,7 +317,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.SetPartyNavigator(hero);
             mobileParty.ResetCached();
@@ -337,32 +356,4 @@ internal class PartyRolesHandler : IHandler
         network.SendAll(new NetworkRefreshAfterRoleAssignment(mobilePartyId));
     }
 
-    // Roles are assigned by the party leader, or by the clan leader for a clan party.
-    private bool CanSenderAssignRoles(object sender, MobileParty target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (IsAllowedToChangeRoles(sender, target)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
-    }
-
-    // Every client runs vanilla's role clear when a hero's party change replicates, and the server already ran
-    // the same clear itself. Those echoes are dropped quietly, but open role screens still get their refresh.
-    private bool CanSenderClearRoles(object sender, MobileParty target, string mobilePartyId)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (IsAllowedToChangeRoles(sender, target)) return true;
-
-        Logger.Debug("Skipping a role clear for {Target} from a peer that may not change it", target?.StringId);
-        // Every client sends this echo, so each one only refreshes its own screens.
-        if (sender is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(mobilePartyId));
-        return false;
-    }
-
-    private bool IsAllowedToChangeRoles(object sender, MobileParty target)
-    {
-        return playerManager.TryGetSenderHero(sender, out var actor) &&
-            (permissions.CanAssignRoles(actor, target) || permissions.CanManageParty(actor, target));
-    }
 }

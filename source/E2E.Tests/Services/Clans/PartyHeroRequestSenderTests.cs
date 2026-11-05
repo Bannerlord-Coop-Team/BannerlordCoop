@@ -30,6 +30,7 @@ public class PartyHeroRequestSenderTests : IDisposable
     private EnvironmentInstance Outsider => environment.Clients.Last();
 
     private string ownerHeroId;
+    private string ownerPartyId;
     private string clanId;
     private string clanPartyId;
     private string clanPartyLeaderId;
@@ -42,34 +43,31 @@ public class PartyHeroRequestSenderTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
+    // Only the party leader assigns roles, like the client's clan screen gate. The owner leads the clan but not its AI party.
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void PartyRole_IsSetOnlyByAPlayerWhoMayManageTheParty(bool fromOwner)
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void PartyRole_IsSetOnlyByThePartyLeader(bool fromOwner, bool ownersParty, bool applied)
     {
-        Send(fromOwner, new NetworkSetPartyScout(clanPartyLeaderId, clanPartyId));
+        var partyId = ownersParty ? ownerPartyId : clanPartyId;
+        var heroId = ownersParty ? ownerHeroId : clanPartyLeaderId;
+        Send(fromOwner, new NetworkSetPartyScout(heroId, partyId));
 
-        Server.Call(() => Assert.Equal(fromOwner,
-            Get<MobileParty>(clanPartyId).Scout == Get<Hero>(clanPartyLeaderId)));
+        Server.Call(() => Assert.Equal(applied, Get<MobileParty>(partyId).Scout == Get<Hero>(heroId)));
     }
 
-    // Every client echoes vanilla's role clear when a party change replicates; the server keeps the roles but still refreshes screens.
+    // Every client echoes vanilla's role clear when a party change replicates. The server keeps the roles and refreshes only the sender.
     [Fact]
-    public void PartyRoleClear_FromAPlayerWhoMayNotManageTheParty_KeepsRolesAndRefreshesScreens()
+    public void PartyRoleClearEcho_KeepsRolesAndRefreshesOnlyTheSender()
     {
         Server.Call(() => Get<MobileParty>(clanPartyId).SetPartyScout(Get<Hero>(clanPartyLeaderId)));
-        Server.NetworkSentMessages.Clear();
 
         Send(fromOwner: false, new NetworkRemoveAllPartyRolesOfHero(clanPartyLeaderId, clanPartyId));
-
-        Server.Call(() => Assert.Same(Get<Hero>(clanPartyLeaderId), Get<MobileParty>(clanPartyId).Scout));
         Server.Call(() => Server.Resolve<INetwork>().FlushPendingMessages());
 
-        // Only the client that sent the echo gets the refresh, so N clients don't each get N-1 copies.
-        Assert.Single(Server.NetworkSentMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
-            message => message.MobilePartyId == clanPartyId);
-        Assert.Single(Outsider.InternalMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
-            message => message.MobilePartyId == clanPartyId);
+        Server.Call(() => Assert.Same(Get<Hero>(clanPartyLeaderId), Get<MobileParty>(clanPartyId).Scout));
+        Assert.Single(Outsider.InternalMessages.OfType<NetworkRefreshAfterRoleAssignment>());
         Assert.Empty(Owner.InternalMessages.OfType<NetworkRefreshAfterRoleAssignment>());
     }
 
@@ -198,7 +196,7 @@ public class PartyHeroRequestSenderTests : IDisposable
     // The owner leads a clan with a second, AI-led party; the outsider plays a party of its own.
     private void SetUp()
     {
-        string ownerPartyId = null, outsiderHeroId = null, outsiderPartyId = null;
+        string outsiderHeroId = null, outsiderPartyId = null;
         Server.Call(() =>
         {
             var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();

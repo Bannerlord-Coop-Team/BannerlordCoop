@@ -74,7 +74,8 @@ public class ClanNameHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
-            if (!CanSenderRename(obj.Who, clan)) return;
+            if (!playerManager.IsSenderControllingClan(obj.Who, clan)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageClan(senderHero, clan)) return;
 
             ClanNameChangePatch.ChangeClanNameOverride(clan, data.Name, data.InformalName);
 
@@ -100,15 +101,5 @@ public class ClanNameHandler : IHandler
                 clanScreen._dataSource?.RefreshValues();
             }
         });
-    }
-
-    // Only the clan leader renames the clan.
-    private bool CanSenderRename(object sender, Clan target)
-    {
-        if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, target)) return true;
-
-        Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
-        return false;
     }
 }
