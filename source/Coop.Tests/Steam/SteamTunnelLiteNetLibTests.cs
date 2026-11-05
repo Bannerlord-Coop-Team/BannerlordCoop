@@ -38,9 +38,10 @@ namespace Coop.Tests.Steam
 
         public void Dispose()
         {
+            // Relay first, otherwise it forwards to the stopped server and the ICMP refusal throws on the relay thread, which kills the test host
+            relay?.Dispose();
             client.Stop();
             server.Stop();
-            relay?.Dispose();
         }
 
         [Fact]
@@ -155,7 +156,7 @@ namespace Coop.Tests.Steam
             public void Dispose()
             {
                 running = false;
-                thread.Join(TimeSpan.FromSeconds(1));
+                thread.Join();
                 clientSide.Close();
                 serverSide.Close();
             }
