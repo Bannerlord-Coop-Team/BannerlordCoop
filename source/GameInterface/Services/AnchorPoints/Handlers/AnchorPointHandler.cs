@@ -4,6 +4,8 @@ using Common.Network;
 using GameInterface.Services.AnchorPoints.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -13,18 +15,24 @@ namespace GameInterface.Services.AnchorPoints.Handlers;
 
 internal class AnchorPointHandler : IHandler
 {
+    // Same slack as SettlementEncounterDistanceValidator, since the client and server each simulate the party's move
+    private const float PositionSyncDriftSlack = 0.5f;
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public AnchorPointHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<CallFleetRequested>(Handle_CallFleetRequested);
         messageBroker.Subscribe<NetworkCallFleet>(Handle_NetworkCallFleet);
@@ -61,10 +69,15 @@ internal class AnchorPointHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingParty(obj.Who, data.MobilePartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
 
+            // The request waited in the queue, so check vanilla AnchorPoint.CanPartyInteract against the party as it is now
             var anchor = mobileParty.Anchor;
-            if (anchor == null || !anchor.IsValid || mobileParty.IsCurrentlyAtSea) return;
+            if (anchor == null || !anchor.IsValid || anchor.IsDisabled || mobileParty.IsCurrentlyAtSea) return;
+            if (mobileParty.MapEvent != null || mobileParty.CurrentSettlement != null) return;
+            float maximumDistance = Campaign.Current.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty + PositionSyncDriftSlack;
+            if (mobileParty.Position.Distance(anchor.GetInteractionPosition(mobileParty)) >= maximumDistance) return;
 
             // Vanilla clears the interaction, targets the anchor and sets sail there
             anchor.OnPartyInteraction(mobileParty);
@@ -89,10 +102,16 @@ internal class AnchorPointHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingParty(obj.Who, data.MobilePartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
 
-            mobileParty.Anchor.CallFleet(settlement);
+            // The request waited in the queue, so check vanilla's call_fleet_condition against the party as it is now
+            var anchor = mobileParty.Anchor;
+            if (anchor == null || mobileParty.CurrentSettlement != settlement || !settlement.HasPort || !mobileParty.HasNavalNavigationCapability) return;
+            if (anchor.IsAtSettlement(settlement) || (anchor.IsMovingToPoint && anchor.IsTargetingSettlement(settlement))) return;
+
+            anchor.CallFleet(settlement);
         });
     }
 
