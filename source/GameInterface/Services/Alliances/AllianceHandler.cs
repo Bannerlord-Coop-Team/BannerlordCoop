@@ -182,9 +182,9 @@ public class AllianceHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ProposerKingdomId, out var proposer)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ReceiverKingdomId, out var receiver)) return;
             // Vanilla AcceptStartingAlliance runs for the ruler of a one clan kingdom or a mercenary (ConfirmAllianceOffer), so one of those must send it.
-            if (!playerManager.IsSenderRuling(sender, receiver) && !playerManager.IsSenderMercenaryOf(sender, receiver))
+            if (!((playerManager.IsSenderRuling(sender, receiver) && receiver.Clans.Count == 1) || playerManager.IsSenderMercenaryOf(sender, receiver)))
             {
-                Logger.Warning("Ignoring an alliance accept for kingdom {KingdomId} from peer {PeerId}, which neither rules it nor serves it as a mercenary",
+                Logger.Warning("Ignoring an alliance accept for kingdom {KingdomId} from peer {PeerId}, which neither rules it as its only clan nor serves it as a mercenary",
                     receiver.StringId, (sender as NetPeer)?.Id);
                 return;
             }

@@ -628,6 +628,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [InlineData("Mercenary", true)]
     [InlineData("Member", false)]
     [InlineData("Outsider", false)]
+    [InlineData("RulerWithSecondClan", false)]
     public void AllianceAcceptRequest_AppliesOnlyFromTheReceivingKingdomsRulerOrMercenary(string sender, bool applies)
     {
         var scenario = CreateRulerAndOutsiderScenario();
@@ -669,6 +670,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     // Vanilla only accepts these offers straight away for a mercenary, or for the ruler of a one clan kingdom
     // with alliances, so the second player joins the kingdom as a mercenary or a plain member, or stays outside.
+    // RulerWithSecondClan has the ruler send while the second player's clan makes it a two clan kingdom.
     private EnvironmentInstance GetKingdomOfferSender(string sender, string kingdomId)
     {
         if (sender == "Ruler") return Clients.First();
@@ -688,7 +690,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             });
         }
 
-        return Clients.Last();
+        return sender == "RulerWithSecondClan" ? Clients.First() : Clients.Last();
     }
 
     [Fact]
