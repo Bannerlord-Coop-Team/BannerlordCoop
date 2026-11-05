@@ -7,6 +7,7 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -21,15 +22,21 @@ internal class ClanKingdomHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public ClanKingdomHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     { 
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<SetClanKingdom>(HandleSetClanKingdom);
         messageBroker.Subscribe<NetworkSetClanKingdom>(HandleNetworkSetClanKingdom);
@@ -136,6 +143,7 @@ internal class ClanKingdomHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupporterClanId, out var supporterClan)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.SupportedClanId, out var supportedClan)) return;
+            if (!CanSenderManageClan(payload.Who, supporterClan)) return;
             DiplomacyModel diplomacyModel = Campaign.Current.Models.DiplomacyModel;
             int influenceCostOfSupportingClan = diplomacyModel.GetInfluenceCostOfSupportingClan();
             if (!(payload.Who is NetPeer peer))
@@ -154,6 +162,16 @@ internal class ClanKingdomHandler : IHandler
                 network.Send(peer, new NetworkOnClanSupportedApplied());
             }
         });
+    }
+
+    // Supporting a clan spends the supporter clan's influence, so it's only applied for that clan's leader.
+    private bool CanSenderManageClan(object sender, Clan clan)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (playerManager.TryGetSenderHero(sender, out var actor) && permissions.CanManageClan(actor, clan)) return true;
+
+        Logger.Warning("Ignoring a clan support request for {Clan} from a peer that doesn't lead it", clan.StringId);
+        return false;
     }
 
     private void HandleNetworkOnClanSupportedApplied(MessagePayload<NetworkOnClanSupportedApplied> payload)

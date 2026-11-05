@@ -14,6 +14,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CraftingSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -96,6 +97,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Get required objects using interface & objectManager
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
+            if (!IsCraftingHeroInSenderParty(obj.Who, craftingHero)) return;
 
             // Replace original TaleWorlds implementation
             var newHeroCraftingStamina = craftingCampaignBehaviorInterface.DoSmelting(
@@ -159,6 +161,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Get required objects using interface & objectManager
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
+            if (!IsCraftingHeroInSenderParty(obj.Who, craftingHero)) return;
 
             // Rebuild formula on server
             var formula = new Crafting.RefiningFormula(
@@ -177,6 +180,18 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             FlushCoalescer(craftingHero.PartyBelongedTo.ItemRoster);
             network.Send(obj.Who as NetPeer, new NetworkRefreshRefinement(data.CraftingHeroId));
         });
+    }
+
+    // The smithy only offers heroes in the player's own party, so a request for anyone else comes from a stale screen.
+    private bool IsCraftingHeroInSenderParty(object sender, Hero craftingHero)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
+        if (playerManager.TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var senderParty) &&
+            craftingHero.PartyBelongedTo == senderParty) return true;
+
+        Logger.Warning("Ignoring a smithy request for {Hero}, who is not in the sending player's party", craftingHero.StringId);
+        return false;
     }
 
     private void Handle_CreatedCraftedWeaponInternal(MessagePayload<CreatedCraftedWeaponInternal> obj)

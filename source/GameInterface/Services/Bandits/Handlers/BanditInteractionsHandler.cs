@@ -221,6 +221,8 @@ internal class BanditInteractionsHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.PlayerClanId, out var playerClan)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+            if (!IsSenderParty(obj.Who, data.MainPartyId)) return;
+            if (!IsSenderClan(obj.Who, playerClan)) return;
 
             if (data.PartiesIds == null) return;
 
@@ -281,6 +283,7 @@ internal class BanditInteractionsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+            if (!IsSenderParty(obj.Who, data.MainPartyId)) return;
 
             if (data.PartiesIds == null) return;
 
@@ -315,6 +318,7 @@ internal class BanditInteractionsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.PlayerBattleId, out var playerBattle)) return;
+            if (!IsSenderOnBattleSide(obj.Who, playerBattle, data.PlayerSide)) return;
 
             var enemySide = data.PlayerSide == BattleSideEnum.Attacker ? BattleSideEnum.Defender : BattleSideEnum.Attacker;
 
@@ -333,6 +337,32 @@ internal class BanditInteractionsHandler : IHandler
         {
             PlayerEncounter.Update();
         });
+    }
+
+    // Bandit encounter results apply to the sender's own party, clan and battle; a request about another one is stale.
+    private bool IsSenderParty(object sender, string mobilePartyId)
+    {
+        return !ModInformation.IsServer || sender is not NetPeer || playerManager.IsSenderControllingParty(sender, mobilePartyId);
+    }
+
+    private bool IsSenderClan(object sender, Clan clan)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer) return true;
+        if (playerManager.TryGetSenderHero(sender, out var actor) && actor.Clan == clan) return true;
+
+        Logger.Warning("Ignoring a bandit encounter request for clan {Clan} from a peer outside it", clan.StringId);
+        return false;
+    }
+
+    private bool IsSenderOnBattleSide(object sender, MapEvent battle, BattleSideEnum side)
+    {
+        if (!ModInformation.IsServer || sender is not NetPeer peer) return true;
+        if (playerManager.TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
+            party.MapEvent == battle && party.Party.MapEventSide == battle.GetMapEventSide(side)) return true;
+
+        Logger.Warning("Ignoring a bandit surrender for a battle side the sending player isn't on");
+        return false;
     }
 
     private bool TryGetBanditInteractionsBehavior(out BanditInteractionsCampaignBehavior banditInteractionsBehavior)
