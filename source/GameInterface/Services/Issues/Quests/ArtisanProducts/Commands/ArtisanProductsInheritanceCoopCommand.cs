@@ -32,7 +32,11 @@ internal sealed class ArtisanProductsInheritanceCoopCommand : ICoopCommand
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (!ModInformation.IsServer) return Failed("Run this command on the server.");
+        if (ModInformation.IsServer)
+        {
+            // Console commands execute on the game thread; keep the authoritative action below.
+        }
+        else return Failed("Run this command on the server.");
         if (!resolver.TryResolveHero(args[0], out var oldOwner, out var oldError)) return Failed(oldError);
         if (!resolver.TryResolveHero(args[1], out var heir, out var heirError)) return Failed(heirError);
         if (oldOwner.Issue is not Issue issue) return Failed($"{oldOwner.Name} does not offer Artisan Products.");
