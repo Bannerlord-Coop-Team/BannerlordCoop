@@ -119,6 +119,7 @@ internal class VillagersConversationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -158,6 +159,7 @@ internal class VillagersConversationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -182,6 +184,7 @@ internal class VillagersConversationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -220,6 +223,7 @@ internal class VillagersConversationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
@@ -265,6 +269,7 @@ internal class VillagersConversationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
             if (!TryGetVillagerBehavior(out var villagerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;

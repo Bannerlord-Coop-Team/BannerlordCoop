@@ -1,4 +1,7 @@
-﻿using Common.Network;
+﻿using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players;
+using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -82,6 +85,7 @@ public class GarrisonDonationTests : IDisposable
     {
         string settlementId = CreateTownSettlement();
         string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        RegisterDonor(settlementId);
 
         Send(new DonateToGarrison(settlementId, new List<DonateTroop> { new DonateTroop(characterId, 3) }));
 
@@ -91,6 +95,40 @@ public class GarrisonDonationTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject(characterId, out CharacterObject character));
             Assert.NotNull(settlement.Town.GarrisonParty);
             Assert.Equal(3, settlement.Town.GarrisonParty.MemberRoster.GetTroopCount(character));
+        });
+    }
+
+    // A donation from a player whose party is not in the town is refused.
+    [Fact]
+    public void Donation_FromAPartyOutsideTheTown_IsRefused()
+    {
+        string settlementId = CreateTownSettlement();
+        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        RegisterDonor(null);
+
+        Send(new DonateToGarrison(settlementId, new List<DonateTroop> { new DonateTroop(characterId, 3) }));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+            Assert.True(Server.ObjectManager.TryGetObject(characterId, out CharacterObject character));
+            Assert.Equal(0, settlement.Town.GarrisonParty?.MemberRoster.GetTroopCount(character) ?? 0);
+        });
+    }
+
+    // The donor is the client's player, with its party in the given town (or nowhere for null).
+    private void RegisterDonor(string settlementId)
+    {
+        Server.Call(() =>
+        {
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            if (settlementId != null) party._currentSettlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            Assert.True(Server.ObjectManager.TryGetId(party, out var partyId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Donor", heroId, partyId, null, null)));
+            playerManager.SetPeer("Donor", Client.NetPeer);
         });
     }
 

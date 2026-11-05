@@ -5,6 +5,7 @@ using Common.Network.Coalescing;
 using GameInterface.Services.GameMenus.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem.Party;
@@ -20,6 +21,7 @@ internal class SellPrisonersHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleProcessor prisonerSaleProcessor;
+    private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
 
     public SellPrisonersHandler(
@@ -28,6 +30,7 @@ internal class SellPrisonersHandler : IHandler
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleProcessor prisonerSaleProcessor,
+        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -35,6 +38,7 @@ internal class SellPrisonersHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.prisonerSaleProcessor = prisonerSaleProcessor;
+        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<PrisonersSold>(Handle_PrisonersSold);
@@ -62,6 +66,7 @@ internal class SellPrisonersHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderControllingParty(obj.Who, sellingParty)) return;
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
@@ -74,5 +79,13 @@ internal class SellPrisonersHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;
             network.Send(obj.Who as NetPeer, new RefreshGameMenu(heroId, "town_backstreet"));
         });
+    }
+
+    // Only the selling player's own party sells its prisoners.
+    private bool IsSenderControllingParty(object sender, PartyBase party)
+    {
+        string partyId = null;
+        if (party.MobileParty != null) objectManager.TryGetId(party.MobileParty, out partyId);
+        return playerManager.IsSenderControllingParty(sender, partyId);
     }
 }

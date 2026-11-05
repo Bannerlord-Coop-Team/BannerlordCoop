@@ -4,6 +4,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -19,15 +21,18 @@ internal class WorkshopDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public WorkshopDataHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         // Server => Clients
         messageBroker.Subscribe<NewWorkshopDataAdded>(Handle_NewWorkshopDataAdded);
@@ -180,6 +185,7 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderOwner(obj.Who, workshop)) return;
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
@@ -216,6 +222,7 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderOwner(obj.Who, workshop)) return;
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 
@@ -234,6 +241,14 @@ internal class WorkshopDataHandler : IHandler
                 Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
             }
         }, context: nameof(WorkshopDataHandler));
+    }
+
+    // Warehouse settings belong to the workshop's owner.
+    private bool IsSenderOwner(object sender, Workshop workshop)
+    {
+        string ownerId = null;
+        if (workshop.Owner != null) objectManager.TryGetId(workshop.Owner, out ownerId);
+        return playerManager.IsSenderControllingHero(sender, ownerId);
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

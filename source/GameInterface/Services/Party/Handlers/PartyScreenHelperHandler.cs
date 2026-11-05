@@ -168,6 +168,7 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: false)) return;
             MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
             if (garrisonParty == null)
             {
@@ -214,6 +215,7 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (ModInformation.IsServer && obj.Who is NetPeer && !IsSenderPartyIn(obj.Who, currentSettlement, requireOwnClan: true)) return;
             for (int i = 0; i < leftMemberRoster.Count; i++)
             {
                 TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
@@ -231,6 +233,17 @@ internal class PartyScreenHelperHandler : IHandler
                 }
             }
         });
+    }
+
+    // Donating needs the sender's party in the town; managing the garrison also needs the town to be its clan's.
+    private bool IsSenderPartyIn(object sender, Settlement settlement, bool requireOwnClan)
+    {
+        if (playerManager.TryGetSenderHero(sender, out var hero) &&
+            hero.PartyBelongedTo?.CurrentSettlement == settlement &&
+            (!requireOwnClan || (hero.Clan != null && settlement.OwnerClan == hero.Clan))) return true;
+
+        logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not allowed there", settlement.StringId);
+        return false;
     }
 
     private void Handle_PrisonersReleasedAndTaken(MessagePayload<PrisonersReleasedAndTaken> obj)

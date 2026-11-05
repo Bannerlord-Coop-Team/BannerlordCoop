@@ -208,6 +208,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         {
             RegisterPlayerHero(client, secondBuyerId, "WorkshopBuyerTwo");
         }
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("WorkshopBuyerTwo", secondClient.NetPeer));
         PrepareBuyer(secondBuyerId, 1000);
         ClearMessages(Server);
         foreach (var client in Clients)
@@ -327,6 +328,36 @@ public class WorkshopPurchaseConversationTests : IDisposable
         AssertClanWorkshopDataReadyForClanMenu(client, state);
     }
 
+    [Fact]
+    public void PurchaseFromAPeerThatIsNeitherBuyerNorSeller_IsRefused()
+    {
+        var state = CreatePurchaseState(workshopOwnedByBuyer: false, buyerGold: 1000, sellerGold: 0);
+        var outsider = Clients.Last();
+
+        outsider.Call(() => outsider.Resolve<Common.Network.INetwork>().SendAll(new ChangeWorkshopOwner(
+            state.WorkshopId, state.SellerId, state.BuyerId, state.WorkshopTypeId, WorkshopCapital, WorkshopCost)));
+
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Hero>(state.SellerId), Server.GetRegisteredObject<Workshop>(state.WorkshopId).Owner));
+        AssertHeroGold(Server, state.BuyerId, 1000);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ProductionTypeChange_AppliesOnlyFromTheWorkshopsOwner(bool fromOwner)
+    {
+        var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 1000, sellerGold: 0);
+        var newTypeId = TestEnvironment.CreateRegisteredObject<WorkshopType>();
+        var sender = fromOwner ? Clients.First() : Clients.Last();
+
+        sender.Call(() => sender.Resolve<Common.Network.INetwork>().SendAll(
+            new ChangeProductionTypeOfWorkshop(state.WorkshopId, newTypeId, ignoreCost: false)));
+
+        Server.Call(() => Assert.Equal(fromOwner,
+            Server.GetRegisteredObject<Workshop>(state.WorkshopId).WorkshopType == Server.GetRegisteredObject<WorkshopType>(newTypeId)));
+    }
+
     private PurchaseState CreatePurchaseState(bool workshopOwnedByBuyer, int buyerGold, int sellerGold)
     {
         var workshopId = TestEnvironment.CreateRegisteredObject<Workshop>();
@@ -340,6 +371,8 @@ public class WorkshopPurchaseConversationTests : IDisposable
         {
             RegisterPlayerHero(client, buyerId);
         }
+        // The server only applies a purchase from the buyer's own peer.
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(BuyerControllerId, Clients.First().NetPeer));
 
         PrepareInstance(Server, state, workshopOwnedByBuyer, buyerGold, sellerGold);
         foreach (var client in Clients)

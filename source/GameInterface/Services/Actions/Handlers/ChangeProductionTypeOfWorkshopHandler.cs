@@ -1,9 +1,11 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Actions;
@@ -18,15 +20,18 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public ChangeProductionTypeOfWorkshopHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<ProductionTypeOfWorkshopChanged>(Handle_ProductionTypeOfWorkshopChanged);
         messageBroker.Subscribe<ChangeProductionTypeOfWorkshop>(Handle_ChangeProductionTypeOfWorkshop);
@@ -52,8 +57,23 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
         if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, obj.What.IgnoreCost);
+        bool ignoreCost = obj.What.IgnoreCost;
+        if (ModInformation.IsServer && obj.Who is NetPeer)
+        {
+            if (!IsSenderOwner(obj.Who, workshop)) return;
+            // Every vanilla client path (workshop conversation, clan finance screen) pays for the change.
+            ignoreCost = false;
+        }
+
+        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, ignoreCost);
 
         messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
+    }
+
+    private bool IsSenderOwner(object sender, Workshop workshop)
+    {
+        string ownerId = null;
+        if (workshop.Owner != null) objectManager.TryGetId(workshop.Owner, out ownerId);
+        return playerManager.IsSenderControllingHero(sender, ownerId);
     }
 }
