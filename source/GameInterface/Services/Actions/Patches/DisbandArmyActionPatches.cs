@@ -75,10 +75,11 @@ internal class DisbandArmyActionPatches
     
     public static void DisbandArmyApplyInternal(Army army, MobileParty clientParty)
     {
-        // A stale disband screen can name an army the party already left.
-        if (clientParty.Army != army)
+        // The kingdom screen disbands an army the party is not in, but never one in a battle.
+        // A stale screen can still send it after the army's leader joined one.
+        if (army.LeaderParty?.MapEvent != null)
         {
-            Logger.Warning("Ignoring a disband of the army led by {LeaderPartyId} from party {PartyId}, which is not in it", army.LeaderParty?.StringId, clientParty.StringId);
+            Logger.Warning("Ignoring a disband of the army led by {LeaderPartyId} from party {PartyId} while it is in a battle", army.LeaderParty.StringId, clientParty.StringId);
             return;
         }
 

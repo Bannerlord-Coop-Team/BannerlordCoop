@@ -133,26 +133,30 @@ public class ArmyRequestSenderTests : IDisposable
     }
 
     [Fact]
-    public void DisbandOfAnArmyTheSendersPartyAlreadyLeft_IsRefused()
+    public void DisbandFromTheKingdomScreenOfAnArmyTheSenderIsNotIn_IsApplied()
     {
-        var otherArmyId = environment.CreateRegisteredObject<Army>();
+        float influence = 0;
+        int cost = 0;
         Server.Call(() =>
         {
-            var member = Get<MobileParty>(memberPartyId);
-            if (member.LeaderHero.Clan == null) member.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            Campaign.Current.PlayerDefaultFaction = member.LeaderHero.Clan;
-            // The member left for another army, but its stale disband screen still names the first one.
-            var other = Get<Army>(otherArmyId);
-            member.Army = other;
-            member.AttachedTo = other.LeaderParty;
+            var outsider = Get<MobileParty>(outsiderPartyId);
+            if (outsider.LeaderHero.Clan == null) outsider.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            // Vanilla's kingdom screen only offers a disband for an army the player's party is not in.
+            Assert.Null(outsider.Army);
+            Campaign.Current.PlayerDefaultFaction = outsider.LeaderHero.Clan;
+            outsider.LeaderHero.Clan.Influence = 1000f;
+            influence = outsider.LeaderHero.Clan.Influence;
+            cost = Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfDisbandingArmy();
+            Assert.True(cost > 0);
         });
 
-        Send(Member, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
+        Send(Outsider, new NetworkDisbandArmyApplyInternal(armyId, outsiderPartyId));
 
         Server.Call(() =>
         {
-            Assert.Same(Get<Army>(armyId), Get<MobileParty>(leaderPartyId).Army);
-            Assert.Same(Get<Army>(otherArmyId), Get<MobileParty>(memberPartyId).Army);
+            Assert.Null(Get<MobileParty>(leaderPartyId).Army);
+            Assert.Null(Get<MobileParty>(memberPartyId).Army);
+            Assert.Equal(influence - cost, Get<MobileParty>(outsiderPartyId).LeaderHero.Clan.Influence, precision: 2);
         });
     }
 
