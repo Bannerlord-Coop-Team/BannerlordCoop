@@ -3,6 +3,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.TroopRosters.Data;
@@ -11,6 +12,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Party.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,6 +46,41 @@ public class GarrisonDonationTests : IDisposable
         PublishGarrisonDonated(settlementId, TroopRoster.CreateDummyTroopRoster());
 
         Assert.Empty(Client.NetworkSentMessages.GetMessages<DonateToGarrison>());
+    }
+
+    // A donate screen Done after the client saw its party leave the town is cancelled, since no garrison would take the troops.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DonationDone_IsCancelledOnceThePartyLeftTheTown(bool inTown)
+    {
+        string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+            Assert.True(Client.ObjectManager.TryGetObject(partyId, out MobileParty party));
+            Assert.True(Client.ObjectManager.TryGetObject(characterId, out CharacterObject character));
+            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
+            using (new AllowedThread())
+            {
+                Hero.MainHero.PartyBelongedTo = party;
+                party._currentSettlement = inTown ? settlement : null;
+                roster.AddToCounts(character, 3);
+            }
+
+            PartyScreenHelperPatches.ResetGarrisonDonationRequest();
+            bool result = false;
+            Assert.False(PartyScreenHelperPatches.DonateGarrisonDoneHandlerPrefix(ref result, roster));
+
+            Assert.Equal(inTown, result);
+            Assert.Same(inTown ? settlement : null, PartyScreenHelperPatches.ConsumeGarrisonDonationSettlement());
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(inTown ? 1 : 0, Client.NetworkSentMessages.GetMessages<DonateToGarrison>().Count());
     }
 
     // Moved troops are sent to the server with their ids and counts.
