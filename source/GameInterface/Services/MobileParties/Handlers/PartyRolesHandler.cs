@@ -7,7 +7,6 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -110,14 +109,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            // Every client runs vanilla's role clear when a hero's party change replicates, and the server already ran
-            // the same clear itself. Those echoes are dropped quietly, and only the sender's role screens refresh.
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
-            {
-                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
-                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
-                return;
-            }
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
             UpdateClientVM(data.MobilePartyId);
@@ -139,13 +131,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            // A role clear echo, dropped quietly like above.
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
-            {
-                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
-                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
-                return;
-            }
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
@@ -168,13 +154,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            // A role clear echo, dropped quietly like above.
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty))
-            {
-                Logger.Debug("Skipping a role clear for {PartyId} from a peer that may not change it", data.MobilePartyId);
-                if (obj.Who is NetPeer peer) network.Send(peer, new NetworkRefreshAfterRoleAssignment(data.MobilePartyId));
-                return;
-            }
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanAssignRoles(senderHero, mobileParty)) return;
 
             mobileParty.RemoveOnePartyRoleOfHero(hero);
 
