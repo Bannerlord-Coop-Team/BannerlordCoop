@@ -391,8 +391,14 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            if (string.IsNullOrEmpty(requesterId) || !IsSenderController(requester, requesterId) ||
-                !IsRequesterInBattle(mapEvent, requesterId))
+            if (!string.IsNullOrEmpty(requesterId) && !IsSenderController(requester, requesterId))
+            {
+                Logger.Warning("[BattleHost] Ignoring host request for {MapEventId} from '{Requester}' (the sending peer controls another seat now)",
+                    mapEventId, requesterId);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(requesterId) || !IsRequesterInBattle(mapEvent, requesterId))
             {
                 Logger.Warning("[BattleHost] Ignoring host request for {MapEventId} from '{Requester}' (not a participant)",
                     mapEventId, requesterId);
@@ -610,8 +616,14 @@ internal class BattleHostHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
-            if (string.IsNullOrEmpty(requesterId) || !IsSenderController(requester, requesterId) ||
-                !IsRequesterInBattle(mapEvent, requesterId))
+            if (!string.IsNullOrEmpty(requesterId) && !IsSenderController(requester, requesterId))
+            {
+                Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (the sending peer controls another seat now)",
+                    mapEventId, requesterId);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(requesterId) || !IsRequesterInBattle(mapEvent, requesterId))
             {
                 Logger.Warning("[BattleHost] Ignoring reserve request for {MapEventId} from '{Requester}' (not a participant)",
                     mapEventId, requesterId);

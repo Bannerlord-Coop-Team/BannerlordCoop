@@ -120,7 +120,14 @@ internal class LocationHostHandler : IHandler
             if (string.IsNullOrEmpty(instanceId) || string.IsNullOrEmpty(requesterId))
                 return;
 
-            if (!IsSenderController(requester, requesterId) || !IsRequesterInInstanceSettlement(instanceId, requesterId))
+            if (!IsSenderController(requester, requesterId))
+            {
+                Logger.Warning("[LocationHost] Ignoring host request for {InstanceId} from '{Requester}' (the sending peer controls another seat now)",
+                    instanceId, requesterId);
+                return;
+            }
+
+            if (!IsRequesterInInstanceSettlement(instanceId, requesterId))
             {
                 Logger.Warning("[LocationHost] Ignoring host request for {InstanceId} from '{Requester}' (party not in the settlement)",
                     instanceId, requesterId);
