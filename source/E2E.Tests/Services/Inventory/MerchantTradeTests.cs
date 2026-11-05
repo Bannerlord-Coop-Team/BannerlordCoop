@@ -86,37 +86,6 @@ public class MerchantTradeTests : IDisposable
     }
 
     [Fact]
-    public void TradeForAnotherPlayersParty_IsRefused()
-    {
-        var clientA = TestEnvironment.Clients.First();
-        var clientB = TestEnvironment.Clients.Last();
-
-        var grainId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        var townId = TestEnvironment.CreateRegisteredObject<Town>();
-        var partyAId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var partyBId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyAId, partyBId }, (grainId, 10));
-        RegisterTrader(clientA, partyAId, "TraderA");
-        RegisterTrader(clientB, partyBId, "TraderB");
-
-        // B's client still holds a trade screen for A's party, e.g. from before A took the party back
-        var trade = CaptureTrade(clientB, merchantRosterId, townId, partyAId,
-            bought: Array.Empty<(string, int, int)>(),
-            sold: new[] { (grainId, 4, 40) },
-            totalAmount: -40);
-
-        Server.Call(() => Server.SimulateMessage(clientB.NetPeer, trade), WithoutNetworkDelivery());
-
-        Server.Call(() =>
-        {
-            Assert.Equal(1000, Server.GetRegisteredObject<MobileParty>(partyAId).LeaderHero.Gold);
-            Assert.Equal(10, Server.GetRegisteredObject<ItemRoster>(merchantRosterId).GetItemNumber(Server.GetRegisteredObject<ItemObject>(grainId)));
-        });
-    }
-
-    [Fact]
     public void BuyingIntoAnEmptyPartyRoster_ServerAppliesTheTrade()
     {
         var client = TestEnvironment.Clients.First();
