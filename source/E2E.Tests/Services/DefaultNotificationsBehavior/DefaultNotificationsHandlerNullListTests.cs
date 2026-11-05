@@ -3,6 +3,8 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -192,9 +194,16 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
             var behavior = new DefaultNotificationsCampaignBehavior();
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
             behavior.RegisterEvents();
+
+            // A player whose hero leads the joining party sends the add, like a real client
+            var party = TestEnvironment.Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Joiner", heroId, partyId, null, null)));
+            playerManager.SetPeer("Joiner", Client.NetPeer);
         });
 
-        TestEnvironment.Server.SimulateMessage(this, new NetworkAddMobilePartyInArmy(armyId, partyId, merged));
+        TestEnvironment.Server.SimulateMessage(Client.NetPeer, new NetworkAddMobilePartyInArmy(armyId, partyId, merged));
         TestEnvironment.Server.PumpGameThread();
         Client.PumpGameThread();
 
