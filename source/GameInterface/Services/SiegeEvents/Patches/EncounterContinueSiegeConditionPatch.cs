@@ -14,11 +14,11 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
 internal class EncounterContinueSiegeConditionPatch
 {
-    [HarmonyPatch("game_menu_town_besiege_continue_siege_on_condition")]
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_town_besiege_continue_siege_on_condition))]
     [HarmonyPrefix]
     private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
-        if (PartyBase.MainParty?.Side != BattleSideEnum.None) return true;
+        if (PartyBase.MainParty.Side != BattleSideEnum.None) return true;
 
         args.optionLeaveType = GameMenuOption.LeaveType.Continue;
         __result = false;
