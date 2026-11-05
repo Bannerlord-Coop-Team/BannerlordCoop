@@ -1,0 +1,35 @@
+name: PR Limit
+
+# pull_request_target runs this file and script from the base branch and never checks out PR code,
+# which lets it post statuses on fork PRs too. The hourly run covers anything an event missed.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+# One group per author, so a queued run is only ever replaced by a newer run for the same author.
+concurrency:
+  group: pr-limit-${{ github.event.pull_request.user.login || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  pr-limit:
+    name: Post PR limit statuses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Post statuses
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_REPO: ${{ github.repository }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: bash .github/scripts/pr-limit.sh
