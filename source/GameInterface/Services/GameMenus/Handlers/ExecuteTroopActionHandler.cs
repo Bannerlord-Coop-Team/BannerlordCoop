@@ -54,12 +54,13 @@ internal class ExecuteTroopActionHandler : IHandler
     private void Handle_MenuTakeHeroToParty(MessagePayload<MenuTakeHeroToParty> obj)
     {
         if (ModInformation.IsServer && !playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-        if (ModInformation.IsServer && !IsSenderInHerosClan(obj.Who, hero)) return;
 
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
+            if (ModInformation.IsServer && !IsSenderInHerosClan(obj.Who, hero)) return;
+
             if (hero.CurrentSettlement != null && hero.CurrentSettlement.Notables?.Contains(hero) == true)
             {
                 LeaveSettlementAction.ApplyForCharacterOnly(hero);
