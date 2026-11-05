@@ -71,7 +71,9 @@ public class ServerKingdomHandler : IHandler
     {
         var payload = obj.What;
         var partyId = payload.PartyId;
-        if (!TryGetSenderControllerId(obj.Who, out var controllerId)) return;
+        // A peer always acts as its own controller, whatever id the message carries.
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var senderPlayer)) return;
+        var controllerId = senderPlayer.ControllerId;
 
         if (playerManager.TryGetPlayer(controllerId, out var player))
         {
@@ -93,21 +95,6 @@ public class ServerKingdomHandler : IHandler
         }
 
         messageBroker.Publish(this, new CreateKingdom(controllerId, payload.KingdomName, payload.CultureId));
-    }
-
-    // A peer always acts as its own controller, whatever id the message carries. Only clients send these requests.
-    private bool TryGetSenderControllerId(object sender, out string controllerId)
-    {
-        controllerId = null;
-        var peer = sender as NetPeer;
-        if (peer != null && playerManager.TryGetPlayer(peer, out var player))
-        {
-            controllerId = player.ControllerId;
-            return true;
-        }
-
-        Logger.Warning("Ignoring a kingdom request from peer {PeerId} with no registered player", peer?.Id);
-        return false;
     }
 
     private void HandleNetworkRequestChangeKingdomName(MessagePayload<NetworkRequestChangeKingdomName> obj)
@@ -266,7 +253,8 @@ public class ServerKingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
-        if (!TryGetSenderControllerId(obj.Who, out var controllerId)) return;
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var senderPlayer)) return;
+        var controllerId = senderPlayer.ControllerId;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
@@ -286,13 +274,16 @@ public class ServerKingdomHandler : IHandler
 
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
-        if (obj.Who is not NetPeer peer) return;
         var payload = obj.What;
+        var sender = obj.Who;
 
         // The sender's clan and the kingdom are game state, so the check runs on the game thread with the apply.
         GameThread.RunSafe(() =>
         {
-            if (!IsSenderInKingdom(peer, payload.KingdomId)) return;
+            // Only a member clan can propose a decision to its kingdom. The client's IgnoreInfluenceCost stays, because
+            // vanilla adds accepted trade, peace and alliance offers to the player's kingdom for free.
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.KingdomId, out var kingdom) || senderHero.Clan?.Kingdom != kingdom) return;
 
             messageBroker.Publish(
                 this,
@@ -304,20 +295,8 @@ public class ServerKingdomHandler : IHandler
                 payload.IgnoreInfluenceCost,
                 payload.RandomNumber);
 
-            network.SendAllBut(peer, message);
+            network.SendAllBut((NetPeer)sender, message);
         }, context: nameof(HandleNetworkAddDecision));
-    }
-
-    // Only a member clan can propose a decision to its kingdom. The client's IgnoreInfluenceCost stays, because
-    // vanilla adds accepted trade, peace and alliance offers to the player's kingdom for free.
-    private bool IsSenderInKingdom(object sender, string kingdomId)
-    {
-        if (playerManager.TryGetSenderHero(sender, out var hero) &&
-            objectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom) &&
-            hero.Clan?.Kingdom == kingdom) return true;
-
-        Logger.Warning("Ignoring a decision for kingdom {KingdomId} from a peer whose clan is not in it", kingdomId);
-        return false;
     }
 
     private void HandleLocalKingdomPolicyChanged(MessagePayload<KingdomPolicyChanged> obj)

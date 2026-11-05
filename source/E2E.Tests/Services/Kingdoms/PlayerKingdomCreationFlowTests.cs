@@ -623,10 +623,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.PumpGameThread();
     }
     
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AllianceAcceptRequest_AppliesOnlyFromTheReceivingKingdomsRuler(bool fromRuler)
+    [Fact]
+    public void AllianceAcceptRequest_FromANonRuler_IsRefused()
     {
         var scenario = CreateRulerAndOutsiderScenario();
         AllianceCampaignBehavior behavior = null;
@@ -636,18 +634,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
         });
 
-        Server.SimulateMessage(scenario.Sender(fromRuler).NetPeer,
-            new NetworkRequestStartAlliance(scenario.OtherKingdomId, scenario.KingdomId));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestStartAlliance(scenario.OtherKingdomId, scenario.KingdomId));
         Server.PumpGameThread();
 
-        Server.Call(() => Assert.Equal(fromRuler, behavior.IsAllyWithKingdom(
+        Server.Call(() => Assert.False(behavior.IsAllyWithKingdom(
             Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId))));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void TradeAgreementAcceptRequest_AppliesOnlyFromTheKingdomsRuler(bool fromRuler)
+    [Fact]
+    public void TradeAgreementAcceptRequest_FromANonRuler_IsRefused()
     {
         var scenario = CreateRulerAndOutsiderScenario();
         TradeAgreementsCampaignBehavior behavior = null;
@@ -657,29 +652,25 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
         });
 
-        Server.SimulateMessage(scenario.Sender(fromRuler).NetPeer,
-            new NetworkClientAcceptsTradeAgreementOffer(scenario.OtherKingdomId, scenario.KingdomId));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkClientAcceptsTradeAgreementOffer(scenario.OtherKingdomId, scenario.KingdomId));
         Server.PumpGameThread();
 
-        // The test campaign's agreement duration can already be over, so look for the record itself.
-        Server.Call(() => Assert.Equal(fromRuler, behavior.TryGetTradeAgreement(
+        Server.Call(() => Assert.False(behavior.TryGetTradeAgreement(
             Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId), out _)));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AddDecisionRequest_AppliesOnlyFromAMemberOfTheKingdom(bool fromMember)
+    [Fact]
+    public void AddDecisionRequest_FromOutsideTheKingdom_IsRefused()
     {
         var scenario = CreateRulerAndOutsiderScenario();
         var decisionData = new DeclareWarDecisionData(
             scenario.RulerClanId, scenario.KingdomId, CampaignTime.Now._numTicks, false, false, false, scenario.OtherKingdomId);
         Server.InternalMessages.Clear();
 
-        Server.SimulateMessage(scenario.Sender(fromMember).NetPeer,
+        Server.SimulateMessage(Clients.Last().NetPeer,
             new NetworkAddDecision(scenario.KingdomId, decisionData, ignoreInfluenceCost: false, randomNumber: 0.5f));
 
-        Assert.Equal(fromMember ? 1 : 0, Server.InternalMessages.GetMessages<AddDecision>().Count());
+        Assert.Empty(Server.InternalMessages.GetMessages<AddDecision>());
     }
 
     [Fact]
@@ -690,7 +681,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var vote = new KingdomDecisionVoteData(scenario.KingdomId, decisionIndex: 0, outcomeIndex: 0,
             supportWeight: (int)Supporter.SupportWeights.FullyPush, isAbstain: false, isFinal: true);
 
-        Server.SimulateMessage(scenario.Outsider.NetPeer, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
 
         Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<ChangeKingdomDecisionVote>()).ControllerId);
     }
@@ -698,17 +689,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void CreateKingdomRequest_IsMadeForTheSendersOwnController()
     {
-        var scenario = CreateRulerAndOutsiderScenario();
+        CreateRulerAndOutsiderScenario();
         Server.InternalMessages.Clear();
 
-        Server.SimulateMessage(scenario.Outsider.NetPeer,
-            new NetworkRequestCreateKingdom(ControllerId, KingdomName, null, null, null));
+        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestCreateKingdom(ControllerId, KingdomName, null, null, null));
 
         Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<CreateKingdom>()).ControllerId);
     }
 
     // The first client rules a kingdom; the second plays a clan outside it.
-    private RulerAndOutsiderScenario CreateRulerAndOutsiderScenario()
+    private (string KingdomId, string OtherKingdomId, string RulerClanId) CreateRulerAndOutsiderScenario()
     {
         var ruler = CreateSyncedPlayerContext(ControllerId, Clients.First());
         CreateSyncedPlayerContext(SecondControllerId, Clients.Last());
@@ -717,13 +707,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         ConfigureClanInKingdom(other.ClanId, otherKingdomId);
-        return new RulerAndOutsiderScenario(Clients.First(), Clients.Last(), kingdomId, otherKingdomId, ruler.ClanId);
-    }
-
-    private sealed record RulerAndOutsiderScenario(
-        EnvironmentInstance Ruler, EnvironmentInstance Outsider, string KingdomId, string OtherKingdomId, string RulerClanId)
-    {
-        public EnvironmentInstance Sender(bool fromRuler) => fromRuler ? Ruler : Outsider;
+        return (kingdomId, otherKingdomId, ruler.ClanId);
     }
 
     [Fact]

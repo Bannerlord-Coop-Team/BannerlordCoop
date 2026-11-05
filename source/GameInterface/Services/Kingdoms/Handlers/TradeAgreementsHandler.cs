@@ -127,20 +127,13 @@ internal class TradeAgreementsHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.FromKingdomId, out var fromKingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.PlayerKingdomId, out var playerKingdom)) return;
             // Only the kingdom ruler's player may accept an offer here, so one member cannot sign a trade agreement for the whole kingdom.
-            if (!IsSenderRuling(sender, playerKingdom)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || playerKingdom.Leader != senderHero) return;
 
             tradeAgreementsBehavior.MakeTradeAgreement(
                 fromKingdom,
                 playerKingdom,
                 Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(fromKingdom, playerKingdom));
         });
-    }
-
-    private bool IsSenderRuling(object sender, Kingdom kingdom)
-    {
-        string leaderId = null;
-        if (kingdom.Leader != null) objectManager.TryGetId(kingdom.Leader, out leaderId);
-        return playerManager.IsSenderControllingHero(sender, leaderId);
     }
 
     private void Handle_TradeGoldDistributedInKingdom(MessagePayload<TradeGoldDistributedInKingdom> obj)

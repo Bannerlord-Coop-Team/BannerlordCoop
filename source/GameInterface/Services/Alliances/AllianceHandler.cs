@@ -178,18 +178,11 @@ public class AllianceHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ProposerKingdomId, out var proposer)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.ReceiverKingdomId, out var receiver)) return;
             // A client accepts an offer made to its own kingdom (vanilla AcceptStartingAlliance), so it must rule the receiver.
-            if (!IsSenderRuling(sender, receiver)) return;
+            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || receiver.Leader != senderHero) return;
 
             var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
             behavior?.StartAlliance(proposer, receiver);
         });
-    }
-
-    private bool IsSenderRuling(object sender, Kingdom kingdom)
-    {
-        string leaderId = null;
-        if (kingdom.Leader != null) objectManager.TryGetId(kingdom.Leader, out leaderId);
-        return playerManager.IsSenderControllingHero(sender, leaderId);
     }
 
     private void Handle_CallToWarAcceptRequested(MessagePayload<CallToWarAcceptRequested> payload)
