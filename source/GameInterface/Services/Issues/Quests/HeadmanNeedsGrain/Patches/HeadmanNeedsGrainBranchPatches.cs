@@ -78,7 +78,8 @@ internal class HeadmanNeedsGrainBranchPatches
     {
         if (ModInformation.IsClient)
         {
-            return false;
+        }
+        return true;
         return true;
         }
     }
