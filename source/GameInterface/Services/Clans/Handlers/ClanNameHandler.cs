@@ -1,5 +1,3 @@
-using GameInterface.Services.Players;
-using GameInterface.Services.Clans;
 using Common;
 using Common.Logging;
 using Common.Messaging;
@@ -8,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using SandBox.GauntletUI;
 using Serilog;
 using TaleWorlds.CampaignSystem;

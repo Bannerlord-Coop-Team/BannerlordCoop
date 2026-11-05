@@ -52,6 +52,20 @@ public class PartyHeroRequestSenderTests : IDisposable
             Get<MobileParty>(clanPartyId).Scout == Get<Hero>(clanPartyLeaderId)));
     }
 
+    // Every client echoes vanilla's role clear when a party change replicates; the server keeps the roles but still refreshes screens.
+    [Fact]
+    public void PartyRoleClear_FromAPlayerWhoMayNotManageTheParty_KeepsRolesAndRefreshesScreens()
+    {
+        Server.Call(() => Get<MobileParty>(clanPartyId).SetPartyScout(Get<Hero>(clanPartyLeaderId)));
+        Server.NetworkSentMessages.Clear();
+
+        Send(fromOwner: false, new NetworkRemoveAllPartyRolesOfHero(clanPartyLeaderId, clanPartyId));
+
+        Server.Call(() => Assert.Same(Get<Hero>(clanPartyLeaderId), Get<MobileParty>(clanPartyId).Scout));
+        Assert.Contains(Server.NetworkSentMessages.OfType<NetworkRefreshAfterRoleAssignment>(),
+            message => message.MobilePartyId == clanPartyId);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -64,8 +78,10 @@ public class PartyHeroRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromOwner, Get<Clan>(clanId).Name.ToString() == "Renamed Test Clan"));
     }
 
-    [Fact]
-    public void BarberChangeOfAnotherPlayersHero_IsRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BarberChange_IsAppliedOnlyToTheSendersOwnHero(bool fromOwner)
     {
         string characterId = null;
         float weight = 0;
@@ -78,9 +94,9 @@ public class PartyHeroRequestSenderTests : IDisposable
             properties = new BodyProperties(new DynamicBodyProperties(30f, weight > 0.5f ? 0.1f : 0.9f, 0.5f), owner.StaticBodyProperties);
         });
 
-        Send(fromOwner: false, new NetworkSaveCurrentCharacter(characterId, properties, 0, false));
+        Send(fromOwner, new NetworkSaveCurrentCharacter(characterId, properties, 0, false));
 
-        Server.Call(() => Assert.Equal(weight, Get<Hero>(ownerHeroId).Weight));
+        Server.Call(() => Assert.Equal(fromOwner, Get<Hero>(ownerHeroId).Weight != weight));
     }
 
     [Theory]
@@ -131,8 +147,10 @@ public class PartyHeroRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(fromOwner, Get<Settlement>(settlementId).Town.GarrisonAutoRecruitmentIsEnabled != initial));
     }
 
-    [Fact]
-    public void HeroRenameOfAnotherPlayersHero_IsRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HeroRename_IsAppliedOnlyToTheSendersOwnHero(bool fromOwner)
     {
         string originalName = null;
         HeroChangeNameData data = null;
@@ -143,13 +161,15 @@ public class PartyHeroRequestSenderTests : IDisposable
             data = new HeroChangeNameData(owner, new TextObject("Renamed Hero"), new TextObject("Renamed"));
         });
 
-        Send(fromOwner: false, new NetworkChangeHeroName(data));
+        Send(fromOwner, new NetworkChangeHeroName(data));
 
-        Server.Call(() => Assert.Equal(originalName, Get<Hero>(ownerHeroId).Name.ToString()));
+        Server.Call(() => Assert.Equal(fromOwner, Get<Hero>(ownerHeroId).Name.ToString() != originalName));
     }
 
-    [Fact]
-    public void AttributePointsOnAnotherPlayersHero_AreRefused()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AttributePoints_AreSpentOnlyOnTheSendersOwnHero(bool fromOwner)
     {
         var developerId = environment.CreateRegisteredObject<HeroDeveloper>();
         var attributeId = environment.CreateRegisteredObject<CharacterAttribute>();
@@ -162,10 +182,10 @@ public class PartyHeroRequestSenderTests : IDisposable
             initial = developer.Hero.GetAttributeValue(Get<CharacterAttribute>(attributeId));
         });
 
-        Send(fromOwner: false, new NetworkApplyChanges(developerId,
+        Send(fromOwner, new NetworkApplyChanges(developerId,
             new List<string>(), new List<string> { attributeId }, new List<int> { 1 }, new List<string>(), new List<int>()));
 
-        Server.Call(() => Assert.Equal(initial, Get<Hero>(ownerHeroId).GetAttributeValue(Get<CharacterAttribute>(attributeId))));
+        Server.Call(() => Assert.Equal(fromOwner ? initial + 1 : initial, Get<Hero>(ownerHeroId).GetAttributeValue(Get<CharacterAttribute>(attributeId))));
     }
 
     // The owner leads a clan with a second, AI-led party; the outsider plays a party of its own.

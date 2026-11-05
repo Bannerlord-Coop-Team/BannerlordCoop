@@ -109,7 +109,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
             UpdateClientVM(data.MobilePartyId);
@@ -131,7 +131,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
@@ -154,7 +154,7 @@ internal class PartyRolesHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
-            if (!CanSenderAssignRoles(obj.Who, mobileParty)) return;
+            if (!CanSenderClearRoles(obj.Who, mobileParty, data.MobilePartyId)) return;
 
             mobileParty.RemoveOnePartyRoleOfHero(hero);
 
@@ -340,9 +340,27 @@ internal class PartyRolesHandler : IHandler
     private bool CanSenderAssignRoles(object sender, MobileParty target)
     {
         if (!ModInformation.IsServer) return true;
-        if (playerManager.TryGetSenderHero(sender, out var actor) && (permissions.CanAssignRoles(actor, target) || permissions.CanManageParty(actor, target))) return true;
+        if (IsAllowedToChangeRoles(sender, target)) return true;
 
         Logger.Warning("Ignoring a request for {Target} from a peer that may not change it", target?.StringId);
         return false;
+    }
+
+    // Every client runs vanilla's role clear when a hero's party change replicates, and the server already ran
+    // the same clear itself. Those echoes are dropped quietly, but open role screens still get their refresh.
+    private bool CanSenderClearRoles(object sender, MobileParty target, string mobilePartyId)
+    {
+        if (!ModInformation.IsServer) return true;
+        if (IsAllowedToChangeRoles(sender, target)) return true;
+
+        Logger.Debug("Skipping a role clear for {Target} from a peer that may not change it", target?.StringId);
+        UpdateClientVM(mobilePartyId);
+        return false;
+    }
+
+    private bool IsAllowedToChangeRoles(object sender, MobileParty target)
+    {
+        return playerManager.TryGetSenderHero(sender, out var actor) &&
+            (permissions.CanAssignRoles(actor, target) || permissions.CanManageParty(actor, target));
     }
 }
