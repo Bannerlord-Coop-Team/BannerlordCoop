@@ -3,6 +3,8 @@ using Common.Network.Coalescing;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.CharacterDevelopers.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -19,7 +21,8 @@ public class HeroDeveloperSyncTests : SyncTestBase
     public HeroDeveloperSyncTests(ITestOutputHelper output) : base(output)
     {
         HeroDeveloperId = TestEnvironment.CreateRegisteredObject<HeroDeveloper>();
-        TestEnvironment.CreateRegisteredObject<Hero>();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterFirstClientAsDeveloperHero(heroId);
     }
 
     [Fact]
@@ -148,6 +151,21 @@ public class HeroDeveloperSyncTests : SyncTestBase
             AssertFocusState(client, firstSkillId, focusLevel: 1, unspentFocusPoints: 1);
             AssertFocusState(client, secondSkillId, focusLevel: 1, unspentFocusPoints: 1);
         }
+    }
+
+    // The server applies focus requests only from the player who controls the developer's hero.
+    private void RegisterFirstClientAsDeveloperHero(string heroId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(HeroDeveloperId, out HeroDeveloper heroDeveloper));
+            Assert.True(Server.ObjectManager.TryGetObject(heroId, out Hero hero));
+            heroDeveloper.Hero = hero;
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("DeveloperHeroPlayer", heroId, null, null, null)));
+            playerManager.SetPeer("DeveloperHeroPlayer", Clients.First().NetPeer);
+        });
     }
 
     private void SetServerFocusState(IEnumerable<string> skillIds, int focusLevel, int unspentFocusPoints)
