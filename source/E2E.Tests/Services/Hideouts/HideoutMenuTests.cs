@@ -160,9 +160,11 @@ public class HideoutMenuTests : MapEventTestBase
                 var canJoin = AccessTools.Method(typeof(HideoutCampaignBehaviorPatch), "CanJoinHideout");
                 Assert.False((bool)canJoin.Invoke(null, new object[] { args }));
 
-                // The prefix hands the help attackers and help defenders options back to native
+                // The prefix hides the help attackers and help defenders options itself instead of letting native throw
                 var encounterOptions = AccessTools.Method(typeof(HideoutJoinEncounterOptionsPatch), "Prefix");
-                Assert.True((bool)encounterOptions.Invoke(null, new object[] { false }));
+                var prefixArguments = new object[] { true };
+                Assert.False((bool)encounterOptions.Invoke(null, prefixArguments));
+                Assert.False((bool)prefixArguments[0]);
             }
             finally
             {

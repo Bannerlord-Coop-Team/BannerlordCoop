@@ -281,9 +281,16 @@ internal class HideoutJoinEncounterOptionsPatch
     [HarmonyPrefix]
     private static bool Prefix(ref bool __result)
     {
-        if (ModInformation.IsServer || PlayerEncounter.Current?._encounteredParty == null ||
-            PlayerEncounter.EncounteredBattle?.IsHideoutBattle != true)
-            return true;
+        if (ModInformation.IsServer) return true;
+
+        // Native reads EncounteredBattle, which throws without an encountered party, so there is nothing to join yet
+        if (PlayerEncounter.Current?._encounteredParty == null)
+        {
+            __result = false;
+            return false;
+        }
+
+        if (PlayerEncounter.EncounteredBattle?.IsHideoutBattle != true) return true;
 
         // Hideouts join through the shared troop selection.
         __result = false;
