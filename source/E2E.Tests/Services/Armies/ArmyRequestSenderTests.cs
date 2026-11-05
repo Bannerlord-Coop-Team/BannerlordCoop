@@ -87,6 +87,33 @@ public class ArmyRequestSenderTests : IDisposable
         Server.Call(() => Assert.Equal(cohesion, Get<Army>(armyId).Cohesion));
     }
 
+    [Fact]
+    public void CohesionBoostFromTheArmyLeader_IsApplied()
+    {
+        float cohesion = 0;
+        float influence = 0;
+        Server.Call(() =>
+        {
+            var army = Get<Army>(armyId);
+            var leader = army.LeaderParty.LeaderHero;
+            if (leader.Clan == null) leader.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            leader.Clan.Influence = 1000f;
+            army.Cohesion = 20f;
+            cohesion = army.Cohesion;
+            influence = leader.Clan.Influence;
+            Register("Leader", army.LeaderParty, Outsider);
+        });
+
+        Send(Outsider, new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 5));
+
+        Server.Call(() =>
+        {
+            var army = Get<Army>(armyId);
+            Assert.Equal(cohesion + 10f, army.Cohesion, precision: 2);
+            Assert.Equal(influence - 5f, army.LeaderParty.LeaderHero.Clan.Influence, precision: 2);
+        });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -103,6 +130,30 @@ public class ArmyRequestSenderTests : IDisposable
         Send(fromMember ? Member : Outsider, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
 
         Server.Call(() => Assert.Equal(fromMember, Get<MobileParty>(memberPartyId).Army == null));
+    }
+
+    [Fact]
+    public void DisbandOfAnArmyTheSendersPartyAlreadyLeft_IsRefused()
+    {
+        var otherArmyId = environment.CreateRegisteredObject<Army>();
+        Server.Call(() =>
+        {
+            var member = Get<MobileParty>(memberPartyId);
+            if (member.LeaderHero.Clan == null) member.LeaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            Campaign.Current.PlayerDefaultFaction = member.LeaderHero.Clan;
+            // The member left for another army, but its stale disband screen still names the first one.
+            var other = Get<Army>(otherArmyId);
+            member.Army = other;
+            member.AttachedTo = other.LeaderParty;
+        });
+
+        Send(Member, new NetworkDisbandArmyApplyInternal(armyId, memberPartyId));
+
+        Server.Call(() =>
+        {
+            Assert.Same(Get<Army>(armyId), Get<MobileParty>(leaderPartyId).Army);
+            Assert.Same(Get<Army>(otherArmyId), Get<MobileParty>(memberPartyId).Army);
+        });
     }
 
     private void Register(string controllerId, MobileParty party, EnvironmentInstance client)
