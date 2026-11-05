@@ -116,6 +116,35 @@ public class GarrisonDonationTests : IDisposable
         });
     }
 
+    // Managing the garrison moves the screen's heroes into the town only for a player whose clan owns it.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ManageGarrison_IsAppliedOnlyInTheSendersOwnClanTown(bool ownsTown)
+    {
+        string settlementId = CreateTownSettlement();
+        RegisterDonor(settlementId);
+        string heroId = null, memberRosterId = null, prisonerRosterId = null;
+        Server.Call(() =>
+        {
+            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("Donor", out var donor));
+            if (ownsTown) Server.GetRegisteredObject<Hero>(donor.HeroId).Clan = settlement.OwnerClan;
+
+            var leftParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(leftParty.LeaderHero, out heroId));
+            Assert.True(Server.ObjectManager.TryGetId(leftParty.MemberRoster, out memberRosterId));
+            Assert.True(Server.ObjectManager.TryGetId(leftParty.PrisonRoster, out prisonerRosterId));
+        });
+
+        Client.Call(() => Client.Resolve<INetwork>().SendAll(new DoManageGarrison(settlementId, memberRosterId, prisonerRosterId)));
+        TestEnvironment.FlushCoalescer();
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Equal(ownsTown,
+            Server.GetRegisteredObject<Hero>(heroId).StayingInSettlement == Server.GetRegisteredObject<Settlement>(settlementId)));
+    }
+
     // The donor is the client's player, with its party in the given town (or nowhere for null).
     private void RegisterDonor(string settlementId)
     {
