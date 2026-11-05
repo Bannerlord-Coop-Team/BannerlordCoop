@@ -1031,8 +1031,14 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-            // Vanilla compares party.Army with MainParty.Army and then reads Army.LeaderParty, so two null armies throw
-            if (mobileParty.Army == null) return;
+            // Vanilla compares party.Army with MainParty.Army and then reads Army.LeaderParty, so two null armies throw.
+            // A join a client starts reaches the other clients before the army add, since the server fires this event
+            // inside AddMobilePartyInArmy before it sends the add on
+            if (mobileParty.Army == null)
+            {
+                Logger.Debug("Skipping party joined army notification because party {partyId} has no army", mobileParty.StringId);
+                return;
+            }
 
             notificationsBehavior.OnPartyJoinedArmy(mobileParty);
         });
@@ -1055,7 +1061,11 @@ internal class DefaultNotificationsHandler : IHandler
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             // Same vanilla Army.LeaderParty read as OnPartyJoinedArmy
-            if (mobileParty.Army == null) return;
+            if (mobileParty.Army == null)
+            {
+                Logger.Debug("Skipping party attached notification because party {partyId} has no army", mobileParty.StringId);
+                return;
+            }
 
             notificationsBehavior.OnPartyAttachedAnotherParty(mobileParty);
         });

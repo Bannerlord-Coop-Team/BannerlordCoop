@@ -7,6 +7,9 @@ using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.DefaultNotificationsBehavior;
@@ -22,6 +25,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     private static readonly List<Exception> JoinedArmyExceptions = new();
     private static int joinedArmyCalls;
     private static int attachedPartyCalls;
+    private static readonly List<int> TournamentParticipantCounts = new();
 
     private readonly Harmony harmony = new Harmony("e2e.notifications.null-lists");
     private E2ETestEnvironment TestEnvironment { get; }
@@ -34,6 +38,7 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         JoinedArmyExceptions.Clear();
         joinedArmyCalls = 0;
         attachedPartyCalls = 0;
+        TournamentParticipantCounts.Clear();
 
         harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnGivenBirth"),
             postfix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordBirth)));
@@ -43,6 +48,8 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnPartyAttachedAnotherParty"),
             prefix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(CountAttachedParty)),
             finalizer: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordJoinedArmyException)));
+        harmony.Patch(AccessTools.Method(typeof(DefaultNotificationsCampaignBehavior), "OnTournamentFinished"),
+            prefix: new HarmonyMethod(typeof(DefaultNotificationsHandlerNullListTests), nameof(RecordTournamentFinished)));
 
         Client.Call(() => Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
             new CampaignBehaviorBase[] { new DefaultNotificationsCampaignBehavior() })));
@@ -60,6 +67,13 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     private static void CountJoinedArmy() => joinedArmyCalls++;
 
     private static void CountAttachedParty() => attachedPartyCalls++;
+
+    // Skips the vanilla text, the test only needs to see the handler got this far
+    private static bool RecordTournamentFinished(MBReadOnlyList<CharacterObject> participants)
+    {
+        TournamentParticipantCounts.Add(participants.Count);
+        return false;
+    }
 
     private static Exception RecordJoinedArmyException(Exception __exception)
     {
@@ -109,6 +123,22 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
         var birth = Assert.Single(Births);
         Assert.Equal(1, birth.Offspring);
         Assert.Equal(0, birth.Stillborn);
+    }
+
+    [Fact]
+    public void TournamentFinished_NoParticipants_ArrivesWithANullListAndStillNotifies()
+    {
+        string winnerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string townId = TestEnvironment.CreateRegisteredObject<Town>();
+        string prizeId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        var message = Client.EnsureSerializable(
+            new NetworkNotifyTournamentFinished(winnerId, new MBReadOnlyList<string>(), townId, prizeId));
+        Assert.Null(message.ParticipantsIds);
+
+        Client.SimulateMessage(this, message);
+        Client.PumpGameThread();
+
+        Assert.Equal(0, Assert.Single(TournamentParticipantCounts));
     }
 
     [Fact]
