@@ -38,6 +38,7 @@ internal class AlleyManagementHandler : IHandler
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
     private readonly IPlayerManager playerManager;
+    private readonly AlleyHandler alleyHandler;
 
     public AlleyManagementHandler(
         IMessageBroker messageBroker,
@@ -46,7 +47,8 @@ internal class AlleyManagementHandler : IHandler
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
         IAlleyGarrisonData garrisonData,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        AlleyHandler alleyHandler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -55,6 +57,7 @@ internal class AlleyManagementHandler : IHandler
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
         this.playerManager = playerManager;
+        this.alleyHandler = alleyHandler;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
@@ -293,8 +296,7 @@ internal class AlleyManagementHandler : IHandler
             if (!sessionInterface.TryGetManagementData(playerAlleyId, out var data) ||
                 data.UnderAttackByAlleyId != clearedAlleyId) continue;
 
-            sessionInterface.ClearUnderAttackByAi(playerAlleyId);
-            network.SendAll(new NetworkAlleyUnderAttack(playerAlleyId, null, default, showNotification: false));
+            alleyHandler.EndAttack(playerAlleyId);
         }
     }
 

@@ -1,12 +1,10 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -28,8 +26,6 @@ namespace GameInterface.Services.Alleys.Patches;
 [HarmonyPatch(typeof(AlleyCampaignBehavior))]
 internal class AlleyCampaignBehaviorPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<AlleyCampaignBehaviorPatches>();
-
     // Client-only. The host has no main hero, so these are either client UI/scene wiring or guard on
     // Hero.MainHero (no-ops on the server); only the client should run them.
 
@@ -75,11 +71,6 @@ internal class AlleyCampaignBehaviorPatches
     private static bool OnAlleyClearedByPlayerPrefix(Alley alley)
     {
         if (ModInformation.IsServer || alley == null) return false;
-        if (Hero.MainHero == null)
-        {
-            Logger.Error("Could not clear alley {Alley}: the client has no main hero", alley.Tag);
-            return false;
-        }
 
         MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero));
         return false;
