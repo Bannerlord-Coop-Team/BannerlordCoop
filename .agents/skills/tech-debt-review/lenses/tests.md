@@ -7,7 +7,7 @@ Review whether the change's tests add more value than they cost to maintain, and
 Read each new or changed test next to the code it covers.
 
 **High value:**
-- a bug fix comes with a test that fails without the fix;
+- a bug fix comes with a test that fails without the fix, unless it only repeats a test of the same shared guard;
 - serialization round-trips, including null and empty values;
 - state transitions;
 - sync behavior across instances (E2E).
@@ -15,7 +15,8 @@ Read each new or changed test next to the code it covers.
 **Upkeep without value:**
 - tests that restate the implementation (mock every call, then verify every call);
 - tests of getters, constructors, or framework behavior;
-- coverage that duplicates another test of the same path;
+- coverage that duplicates another test of the same path, including one shared guard tested again for every handler that calls it;
+- a test that stops short of the behavior it's named for;
 - heavy setup for a trivial assertion;
 - coupling to private details, so a refactor breaks the test without a behavior change;
 - waits on timing;
