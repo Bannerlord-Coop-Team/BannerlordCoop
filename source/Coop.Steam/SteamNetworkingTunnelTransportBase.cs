@@ -47,6 +47,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
         ref SteamNetConnectionRealTimeStatus_t status, int lanes,
         ref SteamNetConnectionRealTimeLaneStatus_t laneStatus);
 
+    // Reads the connection's info block, whose flags say which route it is using.
+    protected abstract bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info);
+
     protected abstract HSteamNetConnection ConnectP2P(ref SteamNetworkingIdentity identity, int virtualPort,
         int options, SteamNetworkingConfigValue_t[] optionValues);
 
@@ -80,7 +83,15 @@ public abstract class SteamNetworkingTunnelTransportBase :
         return $"sendRate={status.m_nSendRateBytesPerSecond}B/s out={status.m_flOutBytesPerSec:F0}B/s " +
             $"in={status.m_flInBytesPerSec:F0}B/s pendingReliable={status.m_cbPendingReliable} " +
             $"unacked={status.m_cbSentUnackedReliable} ping={status.m_nPing}ms " +
-            $"quality={status.m_flConnectionQualityLocal:F2}";
+            $"quality={status.m_flConnectionQualityLocal:F2} route={DescribeRoute(connection)}";
+    }
+
+    // Names the current route, so a ping change in the stats can be matched to a route switch.
+    private string DescribeRoute(uint connection)
+    {
+        if (!GetConnectionInfo(new HSteamNetConnection(connection), out var info)) return "unknown";
+
+        return (info.m_nFlags & Constants.k_nSteamNetworkConnectionInfoFlags_Relayed) != 0 ? "relayed" : "direct";
     }
 
     // The per-call options on ConnectP2P/CreateListenSocketP2P should already cover this,
