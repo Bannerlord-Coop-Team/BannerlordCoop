@@ -258,11 +258,12 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
-            // A missing crafting hero still fails below with the usual reply.
-            if (objectManager.TryGetObject(data.CraftingHeroId, out Hero craftingHero) &&
-                !IsCraftingHeroInSenderParty(obj.Who, craftingHero)) return;
+            // A crafting hero outside the sender's party gets the usual failure reply so the client drops its
+            // pending item. A missing crafting hero fails in TryCreateCraftedWeapon with the same reply.
+            var refused = objectManager.TryGetObject(data.CraftingHeroId, out Hero craftingHero) &&
+                !IsCraftingHeroInSenderParty(obj.Who, craftingHero);
 
-            if (!TryCreateCraftedWeapon(data))
+            if (refused || !TryCreateCraftedWeapon(data))
             {
                 network.Send(peer, new NetworkCreateCraftedWeaponInternalClients(data, null, false));
             }

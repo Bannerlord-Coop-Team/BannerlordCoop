@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Network;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Clans.Messages;
@@ -63,18 +64,24 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
     }
 
     // The template doesn't exist, so a request that gets past the sender checks ends in the usual failure reply.
+    // A refused crafting hero gets that same reply, so the sender's client drops its pending crafted item.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void WeaponCrafting_GoesAheadOnlyForAHeroInTheSendersParty(bool ownHero)
+    public void WeaponCrafting_RepliesWithAFailureToTheSender(bool ownHero)
     {
         AddSmithyWithNoStamina();
 
         Send(fromOwner: true, new NetworkCreateCraftedWeaponInternalServer(true, ownHero ? ownerHeroId : outsiderHeroId,
             new TextObject("Test Sword"), null, "missing_template", "Test Sword", new List<string>(), new List<int>(),
             "", ownerHeroId, null, null, null, "request"));
+        Server.Call(() => Server.Resolve<INetwork>().FlushPendingMessages());
 
-        Assert.Equal(ownHero ? 1 : 0, Server.NetworkSentMessages.OfType<NetworkCreateCraftedWeaponInternalClients>().Count());
+        var reply = Assert.Single(Server.NetworkSentMessages.OfType<NetworkCreateCraftedWeaponInternalClients>());
+        Assert.False(reply.Success);
+        Assert.Equal("request", reply.ClientRequestId);
+        Assert.Single(Owner.InternalMessages.OfType<NetworkCreateCraftedWeaponInternalClients>());
+        Assert.Empty(Outsider.InternalMessages.OfType<NetworkCreateCraftedWeaponInternalClients>());
     }
 
     [Fact]
