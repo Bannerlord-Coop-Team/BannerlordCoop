@@ -245,15 +245,7 @@ public class AlleyClearTests : AlleyTestEnvironment
         }
     }
 
-    // Each client's peer controls its own player hero, so the server accepts its requests.
-    private AlleyDomainScenario CreateClearScenario()
-    {
-        var scenario = CreateAlleyDomainScenario();
-        var clients = Clients.ToArray();
-        ConnectRegisteredPlayer(clients[0], "AlleyOwner");
-        ConnectRegisteredPlayer(clients[1], "AlleyOverseer");
-        return scenario;
-    }
+    private AlleyDomainScenario CreateClearScenario() => CreateAlleyDomainScenario();
 
     // The listener MissionAlleyHandler.OnLeaveItEmpty reaches once the gang leader is beaten
     private static void LeaveItEmpty(EnvironmentInstance client, string alleyId)

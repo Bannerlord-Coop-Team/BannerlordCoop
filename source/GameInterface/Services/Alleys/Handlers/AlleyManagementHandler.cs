@@ -103,8 +103,10 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
+        string previousOwnerId = null;
+        if (payload.What.Alley.Owner != null && !objectManager.TryGetIdWithLogging(payload.What.Alley.Owner, out previousOwnerId)) return;
 
-        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison)));
+        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison), previousOwnerId));
     }
 
     private void Handle_AbandonAlleyRequested(MessagePayload<AbandonAlleyRequested> payload)
@@ -169,6 +171,17 @@ internal class AlleyManagementHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
+
+            // A double click or a second player racing the first finds the alley already taken, and must not
+            // take it again or give the relation changes and xp twice.
+            string currentOwnerId = null;
+            if (alley.Owner != null) objectManager.TryGetId(alley.Owner, out currentOwnerId);
+            if (alley.Owner == owner || currentOwnerId != data.PreviousOwnerId)
+            {
+                Logger.Warning("Ignoring a take over of alley {AlleyId}: it is no longer held by {PreviousOwnerId}",
+                    data.AlleyId, data.PreviousOwnerId);
+                return;
+            }
 
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 

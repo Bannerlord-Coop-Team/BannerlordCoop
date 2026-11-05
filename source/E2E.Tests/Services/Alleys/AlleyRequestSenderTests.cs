@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.TroopRosters.Data;
@@ -62,6 +63,43 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
 
         AssertOwnedByOwner(scenario);
         Assert.Equal(scenario.AttackerAlleyId, GetManagementData(scenario.PlayerAlleyId).UnderAttackByAlleyId);
+    }
+
+    [Fact]
+    public void AcquireRacedByAnotherPlayer_IsRefused()
+    {
+        var scenario = AcquiredByOwner();
+
+        // The other player won the same fight before the owner's take over reached it, so it still saw the alley empty.
+        OtherClient.Call(() => OtherClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
+            scenario.PlayerAlleyId, scenario.OverseerHeroId, scenario.OverseerHeroId,
+            Array.Empty<TroopRosterElementData>(), previousOwnerId: null)));
+
+        AssertOwnedByOwner(scenario);
+        Assert.Equal(scenario.OwnerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
+    }
+
+    [Fact]
+    public void SecondAcquireByTheOwner_IsRefused()
+    {
+        var scenario = AcquiredByOwner();
+
+        AcquireAlley(OwnerClient, scenario, scenario.OverseerHeroId);
+
+        AssertOwnedByOwner(scenario);
+        Assert.Equal(scenario.OwnerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
+    }
+
+    [Fact]
+    public void OverseerChangePublishedOnServer_Applies()
+    {
+        var scenario = AcquiredByOwner();
+
+        // ClanLeaveRules publishes this on the server with no peer when an overseer leaves the clan.
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(
+            this, new RequestChangeAlleyOverseer(scenario.PlayerAlleyId, scenario.OverseerHeroId)));
+
+        Assert.Equal(scenario.OverseerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
     }
 
     private AlleyDomainScenario AcquiredByOwner()

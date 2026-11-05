@@ -107,12 +107,16 @@ public readonly struct RequestAcquireAlley : ICommand
     public readonly string OverseerId;
     [ProtoMember(4)]
     public readonly TroopRosterElementData[] Garrison;
-    public RequestAcquireAlley(string alleyId, string ownerId, string overseerId, TroopRosterElementData[] garrison)
+    /// <summary>The owner the sender saw holding the alley before the take over, the beaten gang leader after a fight.</summary>
+    [ProtoMember(5)]
+    public readonly string PreviousOwnerId;
+    public RequestAcquireAlley(string alleyId, string ownerId, string overseerId, TroopRosterElementData[] garrison, string previousOwnerId)
     {
         AlleyId = alleyId;
         OwnerId = ownerId;
         OverseerId = overseerId;
         Garrison = garrison;
+        PreviousOwnerId = previousOwnerId;
     }
 }
 
