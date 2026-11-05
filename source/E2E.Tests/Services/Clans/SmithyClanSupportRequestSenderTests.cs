@@ -1,4 +1,5 @@
-﻿using Common.Network;
+﻿using Common.Logging;
+using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -65,17 +66,38 @@ public class SmithyClanSupportRequestSenderTests : IDisposable
 
     // The template doesn't exist, so a request that gets past the sender checks ends in the usual failure reply.
     // A refused crafting hero gets that same reply, so the sender's client drops its pending crafted item.
+    // The refusal warning tells the two cases apart.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void WeaponCrafting_RepliesWithAFailureToTheSender(bool ownHero)
     {
         AddSmithyWithNoStamina();
+        var craftingHeroId = ownHero ? ownerHeroId : outsiderHeroId;
+        string craftingHeroStringId = null;
+        Server.Call(() => craftingHeroStringId = Get<Hero>(craftingHeroId).StringId);
 
-        Send(fromOwner: true, new NetworkCreateCraftedWeaponInternalServer(true, ownHero ? ownerHeroId : outsiderHeroId,
-            new TextObject("Test Sword"), null, "missing_template", "Test Sword", new List<string>(), new List<int>(),
-            "", ownerHeroId, null, null, null, "request"));
-        Server.Call(() => Server.Resolve<INetwork>().FlushPendingMessages());
+        var refusals = new List<string>();
+        void CaptureRefusal(string message)
+        {
+            if (message.Contains($"Ignoring a smithy request for \"{craftingHeroStringId}\""))
+                refusals.Add(message);
+        }
+
+        OutputSinkManager.AddLogCallback(CaptureRefusal);
+        try
+        {
+            Send(fromOwner: true, new NetworkCreateCraftedWeaponInternalServer(true, craftingHeroId,
+                new TextObject("Test Sword"), null, "missing_template", "Test Sword", new List<string>(), new List<int>(),
+                "", ownerHeroId, null, null, null, "request"));
+            Server.Call(() => Server.Resolve<INetwork>().FlushPendingMessages());
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(CaptureRefusal);
+        }
+
+        Assert.Equal(ownHero ? 0 : 1, refusals.Count);
 
         var reply = Assert.Single(Server.NetworkSentMessages.OfType<NetworkCreateCraftedWeaponInternalClients>());
         Assert.False(reply.Success);
