@@ -10,6 +10,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 
 namespace Coop.Core.Server.Connections;
 
@@ -41,7 +42,8 @@ public class ConnectionContext
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
-        IJoinValidationDenialLog joinValidationDenialLog)
+        IJoinValidationDenialLog joinValidationDenialLog,
+        ILootShipHold lootShipHold)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -64,6 +66,7 @@ public class ConnectionContext
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
+        LootShipHold = lootShipHold;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -87,4 +90,5 @@ public class ConnectionContext
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
+    public ILootShipHold LootShipHold { get; }
 }

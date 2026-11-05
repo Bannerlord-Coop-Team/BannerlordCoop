@@ -91,6 +91,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
     [ProtoMember(21)]
     public readonly NavalPlayerData NavalPlayerData;
+    [ProtoMember(22)]
+    public readonly string[] HeldLootShipIds;
 
     public GameSaveDataChunkPacket(
         int transferId,
@@ -113,7 +115,8 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
-        OrderOfBattlePlayerData orderOfBattlePlayerData = null)
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        string[] heldLootShipIds = null)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -136,5 +139,6 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        HeldLootShipIds = heldLootShipIds;
     }
 }
