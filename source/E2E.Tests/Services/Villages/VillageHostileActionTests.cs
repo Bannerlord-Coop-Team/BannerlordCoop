@@ -3321,6 +3321,38 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BattleSimulationAdvance_IsAppliedOnlyFromThePeerRunningIt(bool fromPacer)
+    {
+        var clients = Clients.ToArray();
+        var hostileAction = CreateHostileActionWithTwoPlayerParties(VillageHostileAction.Raid);
+
+        try
+        {
+            StartBattleSimulation(clients[0], hostileAction);
+            // Simulation rounds can't resolve in the test campaign, so decide the battle and let the advance finish it.
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(hostileAction.MapEventId, out var mapEvent));
+                mapEvent._battleState = BattleState.AttackerVictory;
+            }, MapEventDisabledMethods);
+            Server.NetworkSentMessages.Clear();
+
+            var sender = fromPacer ? clients[0] : clients[1];
+            sender.Call(() => sender.Resolve<INetwork>().SendAll(
+                new NetworkAdvanceBattleSimulation(hostileAction.MapEventId, 1)), MapEventDisabledMethods);
+            Server.PumpGameThread();
+
+            Assert.Equal(fromPacer ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkBattleSimulationFinished>().Count());
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(hostileAction.MapEventId));
+        }
+    }
+
     [Fact]
     public void RaidSimulation_WhenSecondPlayerJoins_OpensSimulationForJoiner()
     {
