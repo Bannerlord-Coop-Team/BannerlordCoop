@@ -31,13 +31,6 @@ namespace Coop
             catch { }
         }
 
-        // Formats the exception inside the try, so an exception whose ToString throws can't escape the caller.
-        internal static void FileLog(string message, Exception exception)
-        {
-            try { FileLog($"{message}: {exception}"); }
-            catch { }
-        }
-
         // FontFactory.DefaultFont returns TaleWorlds.TwoDimension.Font, which is not a direct reference.
         // Use reflection to check it without requiring that assembly reference.
         private static readonly PropertyInfo _defaultFontProp =
