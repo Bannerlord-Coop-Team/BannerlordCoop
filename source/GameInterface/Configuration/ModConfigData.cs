@@ -126,6 +126,8 @@ public sealed class ModOptionsData
 
     public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
 
+    public List<string> PreferredBattleHosts { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }

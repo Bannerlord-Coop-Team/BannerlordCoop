@@ -230,6 +230,14 @@
     // Set what happens to clans when their kingdom is destroyed.
     // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
     // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
-    "clansAfterKingdomDestruction": "Vanilla"
+    "clansAfterKingdomDestruction": "Vanilla",
+
+    // Players the server prefers as battle host, highest priority first, by controller id
+    // (the player's Steam id on Steam builds). The battle host runs the battle simulation and
+    // uploads it to everyone else, so list players with a fast, stable upload.
+    // If a player higher in the list than everyone ready is still loading, the server waits up to 5 seconds for them.
+    // (Default) []: The first player to finish loading hosts, as before.
+    // e.g. ["76561198000000001", "76561198000000002"]
+    "preferredBattleHosts": []
   }
 }

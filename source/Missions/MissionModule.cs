@@ -204,6 +204,9 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .SingleInstance();
+        builder.RegisterType<PreferredBattleHosts>()
+            .As<IPreferredBattleHosts>()
+            .InstancePerDependency();
         builder.RegisterType<BattleSizeProvider>()
             .As<IBattleSizeProvider>()
             .InstancePerDependency();
