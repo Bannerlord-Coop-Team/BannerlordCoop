@@ -58,9 +58,8 @@ internal class ExecuteTroopHandler : IHandler
     private void Handle_NetworkExecuteHero(MessagePayload<NetworkExecuteHero> obj)
     {
         var data = obj.What;
-        // Only clients send this to the server, and a client may only execute as its own hero.
-        if (ModInformation.IsServer &&
-            !playerManager.IsSenderControllingHero(obj.Who, data.ExecutorId)) return;
+        // A client may only execute as its own hero.
+        if (!playerManager.IsSenderControllingHero(obj.Who, data.ExecutorId)) return;
 
         GameThread.RunSafe(() =>
         {

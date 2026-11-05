@@ -396,11 +396,10 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && !playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
+            if (!playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
-            if (ModInformation.IsServer &&
-                (oneToOneConversationHero.IsPlayerHero() || !IsSenderInHerosClan(obj.Who, oneToOneConversationHero, "rejoin"))) return;
+            if (oneToOneConversationHero.IsPlayerHero() || !playerManager.IsSenderControllingClan(obj.Who, oneToOneConversationHero.Clan)) return;
 
             AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
         });
@@ -680,15 +679,6 @@ internal class CompanionRolesHandler : IHandler
         network.SendImmediate(requester, completion);
     }
 
-    // A player only rescues or takes back a companion of its own clan.
-    private bool IsSenderInHerosClan(object sender, Hero hero, string action)
-    {
-        if (playerManager.TryGetSenderHero(sender, out var actor) && actor.Clan != null && actor.Clan == hero.Clan) return true;
-
-        logger.Warning("Ignoring a {Action} of companion {HeroId} from a peer outside its clan", action, hero.StringId);
-        return false;
-    }
-
     private void Handle_CompanionRescued(MessagePayload<CompanionRescued> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.OneToOneConversationHero, out var oneToOneConversationHeroId)) return;
@@ -706,7 +696,7 @@ internal class CompanionRolesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!oneToOneConversationHero.IsPrisoner) return;
-            if (ModInformation.IsServer && !IsSenderInHerosClan(obj.Who, oneToOneConversationHero, "rescue")) return;
+            if (!playerManager.IsSenderControllingClan(obj.Who, oneToOneConversationHero.Clan)) return;
 
             EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
         }, context: nameof(RescueCompanion));

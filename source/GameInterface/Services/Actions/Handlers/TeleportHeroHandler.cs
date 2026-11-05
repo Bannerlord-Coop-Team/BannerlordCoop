@@ -78,22 +78,18 @@ internal class TeleportHeroHandler : IHandler
             MobileParty targetParty = null;
             if (data.TargetPartyId != null && !objectManager.TryGetObjectWithLogging(data.TargetPartyId, out targetParty)) return;
 
-            if (ModInformation.IsServer && !CanSenderTeleport(obj.Who, hero, targetSettlement, targetParty)) return;
+            // Same rule as the client gate in TeleportHeroActionPatches, checked for the hero the sending peer plays.
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) ||
+                (!permissions.CanRecallHero(senderHero, hero) &&
+                 !(targetSettlement != null && targetParty == null && permissions.CanManageHero(senderHero, hero))))
+            {
+                Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that cannot manage it", hero.StringId);
+                return;
+            }
 
             TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 
             messageBroker.Publish(this, new ClanManagementChanged(hero.Clan, ClanManagementRefresh.Members));
         });
-    }
-
-    // Same rule as the client gate in TeleportHeroActionPatches, checked for the hero the sending peer plays.
-    private bool CanSenderTeleport(object sender, Hero hero, Settlement targetSettlement, MobileParty targetParty)
-    {
-        if (playerManager.TryGetSenderHero(sender, out var actor) &&
-            (permissions.CanRecallHero(actor, hero) ||
-             (targetSettlement != null && targetParty == null && permissions.CanManageHero(actor, hero)))) return true;
-
-        Logger.Warning("Ignoring a teleport of hero {HeroId} from a peer that cannot manage it", hero.StringId);
-        return false;
     }
 }

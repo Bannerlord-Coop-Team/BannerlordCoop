@@ -114,9 +114,13 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
-            if (ModInformation.IsServer && !IsSenderControllingParty(obj.Who, mainParty)) return;
+            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.Party != mainParty)
+            {
+                Logger.Warning("Ignoring taking hero {HeroId} prisoner into a party the sender is not in", conversationHero.StringId);
+                return;
+            }
             // Players are taken through player captivity, so this conversation only ever holds an AI lord.
-            if (ModInformation.IsServer && conversationHero.IsPlayerHero())
+            if (conversationHero.IsPlayerHero())
             {
                 Logger.Warning("Ignoring taking player hero {HeroId} prisoner from a lord conversation", conversationHero.StringId);
                 return;
@@ -125,14 +129,6 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },
         context: nameof(Handle_NetworkTakeLordPrisoner));
-    }
-
-    // The conversation's captor is the requesting player's own party.
-    private bool IsSenderControllingParty(object sender, PartyBase party)
-    {
-        string partyId = null;
-        if (party.MobileParty != null) objectManager.TryGetId(party.MobileParty, out partyId);
-        return playerManager.IsSenderControllingParty(sender, partyId);
     }
 
     private void Handle_LordHelpedInBattle(MessagePayload<LordHelpedInBattle> obj)
@@ -149,7 +145,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (ModInformation.IsServer && !playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 
