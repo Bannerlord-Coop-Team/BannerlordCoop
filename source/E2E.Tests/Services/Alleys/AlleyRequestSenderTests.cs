@@ -92,7 +92,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     }
 
     [Fact]
-    public void TakeOver_MovesTheTroopsOnEveryPeer()
+    public void TakeOver_MovesTheTroopsAndTheirWoundedOnEveryPeer()
     {
         var scenario = CreateAlleyDomainScenario();
         var (troopId, companionId) = AddTroopsAndCompanion(scenario);
@@ -100,17 +100,50 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         PressDoneOnTakeOverScreen(scenario, troopId, companionId, beforeDone: null);
 
         AssertOwnedByOwner(scenario);
-        Assert.Equal(companionId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
+        var management = GetManagementData(scenario.PlayerAlleyId);
+        Assert.Equal(companionId, management.OverseerId);
+        var stored = management.Garrison.Single(element => element.CharacterId == Server.GetHandle<CharacterObject>(troopId));
+        Assert.Equal((6, 2), (stored.Number, stored.WoundedNumber));
         foreach (var instance in Clients.Prepend(Server))
         {
             instance.Call(() =>
             {
                 Assert.Same(instance.GetRegisteredObject<Hero>(scenario.OwnerHeroId),
                     instance.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner);
-                Assert.Equal(4, instance.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster
-                    .GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId)));
+                // The two wounded went to the alley with the troops.
+                var roster = instance.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster;
+                int index = roster.FindIndexOfTroop(instance.GetRegisteredObject<CharacterObject>(troopId));
+                Assert.Equal((4, 0), (roster.GetElementNumber(index), roster.GetElementWoundedNumber(index)));
             });
         }
+    }
+
+    [Fact]
+    public void TakeOverListingATroopTwice_ChangesNothing()
+    {
+        var scenario = CreateAlleyDomainScenario();
+        var (troopId, _) = AddTroopsAndCompanion(scenario);
+        var twice = new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopId), 6, 0, 0);
+
+        OwnerClient.Call(() => OwnerClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
+            scenario.PlayerAlleyId, scenario.OwnerHeroId, scenario.OwnerHeroId, new[] { twice, twice }, previousOwnerId: null)));
+
+        Server.Call(() =>
+        {
+            Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner);
+            Assert.Equal(10, Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster
+                .GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId)));
+        });
+    }
+
+    [Fact]
+    public void TakeOverWithAnOverseerFromAnotherClan_IsRefused()
+    {
+        var scenario = CreateAlleyDomainScenario();
+
+        AcquireAlley(OwnerClient, scenario, scenario.OverseerHeroId);
+
+        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
     }
 
     [Fact]
@@ -127,7 +160,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
     }
 
-    // Ten troops and a clan member in the owner's party on every peer.
+    // Ten troops, two of them wounded, and a clan member in the owner's party on every peer.
     private (string troopId, string companionId) AddTroopsAndCompanion(AlleyDomainScenario scenario)
     {
         string troopId = CreateRegisteredObject<CharacterObject>();
@@ -144,13 +177,13 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         Server.Call(() =>
         {
             var roster = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster;
-            roster.AddToCounts(Server.GetRegisteredObject<CharacterObject>(troopId), 10);
+            roster.AddToCounts(Server.GetRegisteredObject<CharacterObject>(troopId), 10, false, 2);
             roster.AddToCounts(Server.GetRegisteredObject<Hero>(companionId).CharacterObject, 1);
         });
         return (troopId, companionId);
     }
 
-    // Wins the alley fight and moves six troops on the take over screen the way vanilla opens it, then presses Done.
+    // Wins the alley fight and moves six troops, two wounded, on the take over screen the way vanilla opens it, then presses Done.
     private void PressDoneOnTakeOverScreen(AlleyDomainScenario scenario, string troopId, string companionId, Action beforeDone)
     {
         var mission = new Mock<ICampaignMission>();
@@ -185,7 +218,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
                 });
                 var command = new PartyScreenLogic.PartyCommand();
                 command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member,
-                    OwnerClient.GetRegisteredObject<CharacterObject>(troopId), 6, 0, -1);
+                    OwnerClient.GetRegisteredObject<CharacterObject>(troopId), 6, 2, -1);
                 using (new AllowedThread()) logic.TransferTroop(command, false);
             });
 

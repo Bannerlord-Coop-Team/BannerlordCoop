@@ -188,6 +188,9 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var ownerClient = Clients.First();
         string overseerCharacterId = GetCharacterId(scenario.OverseerHeroId);
+        // The overseer has to be in the owner's clan.
+        Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId).Clan =
+            Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan);
 
         AcquireAlley(
             ownerClient,

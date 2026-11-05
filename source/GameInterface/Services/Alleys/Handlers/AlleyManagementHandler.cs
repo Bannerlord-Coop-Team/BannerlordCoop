@@ -190,18 +190,30 @@ internal class AlleyManagementHandler : IHandler
                 return;
             }
 
+            // Vanilla only offers a member of the owner's clan. The debug command makes the owner the overseer.
+            if (overseer != owner && (overseer.Clan == null || overseer.Clan != owner.Clan)) return;
+
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 
             // The client left the chosen troops in its party, so they leave it here like vanilla's done button,
-            // and only if the party still has them all.
+            // wounded ones as wounded, and only if the party still has them all. A troop listed twice counts once.
             var party = owner.PartyBelongedTo;
-            var troops = new List<(CharacterObject character, int count)>();
+            var troops = new Dictionary<CharacterObject, (int count, int wounded)>();
             foreach (var element in garrison)
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(element.CharacterId, out var character)) return;
                 if (character.IsHero) continue;
-                if (party == null || party.MemberRoster.GetTroopCount(character) < element.Number) return;
-                troops.Add((character, element.Number));
+                if (element.Number <= 0 || element.WoundedNumber < 0 || element.WoundedNumber > element.Number) return;
+                troops.TryGetValue(character, out var total);
+                troops[character] = (total.count + element.Number, total.wounded + element.WoundedNumber);
+            }
+            foreach (var troop in troops)
+            {
+                int index = party?.MemberRoster.FindIndexOfTroop(troop.Key) ?? -1;
+                if (index < 0) return;
+                int number = party.MemberRoster.GetElementNumber(index);
+                int wounded = party.MemberRoster.GetElementWoundedNumber(index);
+                if (wounded < troop.Value.wounded || number - wounded < troop.Value.count - troop.Value.wounded) return;
             }
 
             // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
@@ -212,7 +224,7 @@ internal class AlleyManagementHandler : IHandler
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             foreach (var troop in troops)
-                party.MemberRoster.RemoveTroop(troop.character, troop.count);
+                party.MemberRoster.AddToCounts(troop.Key, -troop.Value.count, false, -troop.Value.wounded);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);

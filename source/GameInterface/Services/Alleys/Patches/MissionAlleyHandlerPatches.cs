@@ -49,10 +49,11 @@ internal class MissionAlleyHandlerPatches
 
         // The right roster is this screen's copy of the party. Putting the chosen troops back on it keeps the
         // screen's own Done from sending the troop move, which the server makes itself on an accepted take over.
+        // TransferTroop never took the xp off the right roster, so the troops go back without it.
         foreach (var element in leftMemberRoster.GetTroopRoster())
         {
             if (element.Character != null && !element.Character.IsHero)
-                rightMemberRoster?.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp);
+                rightMemberRoster?.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, 0);
         }
 
         // The acquiring player owns the alley (like vanilla's SetOwner(Hero.MainHero)); the chosen
@@ -64,7 +65,9 @@ internal class MissionAlleyHandlerPatches
             .FirstOrDefault(e => e.Character != null && e.Character.IsHero).Character?.HeroObject;
         if (overseer == null) return false;
 
-        MessageBroker.Instance.Publish(alley, new AlleyAcquiredRequested(alley, owner, overseer, leftMemberRoster, ownerWhenFightWon));
+        var previousOwner = ownerWhenFightWon;
+        ownerWhenFightWon = null;
+        MessageBroker.Instance.Publish(alley, new AlleyAcquiredRequested(alley, owner, overseer, leftMemberRoster, previousOwner));
         return false;
     }
 }
