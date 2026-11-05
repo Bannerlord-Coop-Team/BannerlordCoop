@@ -18,9 +18,17 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Battle host election with the server's "preferredBattleHosts" mod-config list (BR-010, BR-013).</summary>
-public class PreferredBattleHostTests : MissionTestEnvironment
+public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
 {
+    private readonly ModOptions previousOptions = ModConfigProvider.ModOptions;
+
     public PreferredBattleHostTests(ITestOutputHelper output) : base(output, numClients: 3) { }
+
+    public new void Dispose()
+    {
+        ModConfigProvider.ModOptions = previousOptions;
+        base.Dispose();
+    }
 
     [Fact]
     public void PreferredHostStillLoading_IsElectedOverTheFirstReadyPlayer()
@@ -363,7 +371,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment
 
     private void SetPreferredHosts(params string[] controllerIds)
     {
-        Server.Call(() => Server.Resolve<IModConfig>().Data.ModOptions.PreferredBattleHosts = controllerIds.ToList());
+        ModConfigProvider.LoadModConfig(new ModOptionsData { PreferredBattleHosts = controllerIds.ToList() });
     }
 
     private void ConnectPeers(EnvironmentInstance[] clients, params string[] controllerIds)

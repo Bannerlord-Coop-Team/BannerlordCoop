@@ -1,4 +1,6 @@
 ﻿using ProtoBuf;
+using System;
+using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
@@ -79,6 +81,11 @@ public readonly struct ModOptions
     [ProtoMember(28)]
     public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
 
+    // No ProtoMember: only the server elects battle hosts, so clients never receive other players' ids.
+    // A struct received from the server leaves the field null, which reads back as empty.
+    private readonly IReadOnlyList<string> preferredBattleHosts;
+    public IReadOnlyList<string> PreferredBattleHosts => preferredBattleHosts ?? Array.Empty<string>();
+
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
         this = previous;
@@ -115,5 +122,8 @@ public readonly struct ModOptions
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
+        preferredBattleHosts = modOptionsData.PreferredBattleHosts is { Count: > 0 } hosts
+            ? hosts.ToArray()
+            : Array.Empty<string>();
     }
 }

@@ -1,16 +1,24 @@
 ﻿using GameInterface.Configuration;
 using Missions.Battles;
+using System;
 using System.Collections.Generic;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
-public class PreferredBattleHostsTests
+public class PreferredBattleHostsTests : IDisposable
 {
+    private readonly ModOptions previousOptions = ModConfigProvider.ModOptions;
+
+    public void Dispose()
+    {
+        ModConfigProvider.ModOptions = previousOptions;
+    }
+
     [Fact]
     public void Unset_RanksEveryoneUnlisted()
     {
-        var hosts = new PreferredBattleHosts(new TestModConfig(null));
+        var hosts = Load(null);
 
         Assert.Equal(PreferredBattleHosts.Unlisted, hosts.RankOf("76561198000000001"));
     }
@@ -18,7 +26,7 @@ public class PreferredBattleHostsTests
     [Fact]
     public void BlankEntriesOnly_RankEveryoneUnlisted()
     {
-        var hosts = new PreferredBattleHosts(new TestModConfig(new List<string> { "", "  " }));
+        var hosts = Load(new List<string> { "", "  " });
 
         Assert.Equal(PreferredBattleHosts.Unlisted, hosts.RankOf("76561198000000001"));
         Assert.Equal(PreferredBattleHosts.Unlisted, hosts.RankOf(""));
@@ -27,8 +35,7 @@ public class PreferredBattleHostsTests
     [Fact]
     public void ListedPlayers_RankInListOrder()
     {
-        var hosts = new PreferredBattleHosts(new TestModConfig(
-            new List<string> { "76561198000000002", " 76561198000000001 ", "Ctrl-A" }));
+        var hosts = Load(new List<string> { "76561198000000002", " 76561198000000001 ", "Ctrl-A" });
 
         Assert.Equal(0, hosts.RankOf("76561198000000002"));
         Assert.Equal(1, hosts.RankOf("76561198000000001"));
@@ -37,13 +44,9 @@ public class PreferredBattleHostsTests
         Assert.Equal(PreferredBattleHosts.Unlisted, hosts.RankOf(null));
     }
 
-    private sealed class TestModConfig : IModConfig
+    private static PreferredBattleHosts Load(List<string> preferredBattleHosts)
     {
-        public TestModConfig(List<string> preferredBattleHosts)
-        {
-            Data.ModOptions.PreferredBattleHosts = preferredBattleHosts;
-        }
-
-        public ModConfigData Data { get; } = new ModConfigData();
+        ModConfigProvider.LoadModConfig(new ModOptionsData { PreferredBattleHosts = preferredBattleHosts });
+        return new PreferredBattleHosts();
     }
 }
