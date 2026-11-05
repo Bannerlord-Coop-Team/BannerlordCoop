@@ -20,7 +20,7 @@ internal class HeadmanNeedsGrainWorldEventPatches
     {
         if (declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange) return;
 
-        RunAsOwners(quest =>
+            if (declareWarDetail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
         {
             if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
                 ((faction1 == Hero.MainHero.MapFaction && faction2 == quest.QuestGiver.MapFaction) ||
