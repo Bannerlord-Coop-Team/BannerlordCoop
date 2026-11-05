@@ -677,6 +677,28 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
+    // Firing a mercenary from the ruler's conversation sends a dismissal for the mercenary's clan, which the ruler doesn't lead.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MercenaryDismissalRequest_ForAnotherClan_IsAppliedOnlyForTheRuler(bool fromRuler)
+    {
+        var (ruler, member, kingdomId) = CreateClanLeaderAndMemberInKingdom();
+        var mercenary = CreateSyncedPlayerContext("MercenaryClanLeader", _ => false);
+        ConfigureClanInKingdom(mercenary.ClanId, kingdomId);
+        Server.Call(() =>
+        {
+            Assert.Same(Server.GetRegisteredObject<Clan>(ruler.ClanId), Server.GetRegisteredObject<Kingdom>(kingdomId).RulingClan);
+            using (new AllowedThread())
+                Server.GetRegisteredObject<Clan>(mercenary.ClanId).IsUnderMercenaryService = true;
+        });
+
+        Server.SimulateMessage((fromRuler ? Clients.First() : member).NetPeer, new RequestMercenaryDismissalService(kingdomId, mercenary.ClanId));
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Equal(fromRuler, Server.GetRegisteredObject<Clan>(mercenary.ClanId).Kingdom == null));
+    }
+
     [Fact]
     public void MercenaryDismissalRequest_FromAClanMemberWhoDoesNotLeadIt_IsIgnored()
     {

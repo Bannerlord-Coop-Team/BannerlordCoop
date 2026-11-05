@@ -135,7 +135,9 @@ internal class MercenaryServiceHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
-        if (!IsLeaderOf(hero, clan)) return;
+        // The kingdom's ruler fires a mercenary clan it doesn't lead from the mercenary conversation.
+        bool rulerFiresMercenary = clan.IsUnderMercenaryService && clan.Kingdom != null && clan.Kingdom.Leader == hero;
+        if (!rulerFiresMercenary && !IsLeaderOf(hero, clan)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
