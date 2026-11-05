@@ -31,6 +31,7 @@ public class HeroRequestSenderTests : IDisposable
     private string captiveId;
     private string freeHeroId;
     private string outsiderHeroId;
+    private string outsiderPartyId;
     private string otherLordId;
 
     public HeroRequestSenderTests(ITestOutputHelper output)
@@ -57,27 +58,31 @@ public class HeroRequestSenderTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    public void MenuTakeHeroToParty(bool fromOwner, bool ownClanHero, bool applied)
+    [InlineData(true, true, true, true)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    public void MenuTakeHeroToParty(bool fromOwner, bool ownClanHero, bool ownParty, bool applied)
     {
         var heroId = ownClanHero ? freeHeroId : otherLordId;
-        Send(fromOwner ? Owner : Outsider, new MenuTakeHeroToParty(heroId, ownerPartyId));
+        var partyId = ownParty ? ownerPartyId : outsiderPartyId;
+        Send(fromOwner ? Owner : Outsider, new MenuTakeHeroToParty(heroId, partyId));
 
-        Server.Call(() => Assert.Equal(applied, Get<MobileParty>(ownerPartyId) == Get<Hero>(heroId).PartyBelongedTo));
+        Server.Call(() => Assert.Equal(applied, Get<MobileParty>(partyId) == Get<Hero>(heroId).PartyBelongedTo));
     }
 
     [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    public void CompanionRejoin(bool fromOwner, bool ownClanHero, bool applied)
+    [InlineData(true, true, true, true)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    public void CompanionRejoin(bool fromOwner, bool ownClanHero, bool ownParty, bool applied)
     {
         var heroId = ownClanHero ? freeHeroId : otherLordId;
-        Send(fromOwner ? Owner : Outsider, new DoCompanionRejoinAfterEmprisonment(heroId, ownerPartyId));
+        var partyId = ownParty ? ownerPartyId : outsiderPartyId;
+        Send(fromOwner ? Owner : Outsider, new DoCompanionRejoinAfterEmprisonment(heroId, partyId));
 
-        Server.Call(() => Assert.Equal(applied, Get<MobileParty>(ownerPartyId) == Get<Hero>(heroId).PartyBelongedTo));
+        Server.Call(() => Assert.Equal(applied, Get<MobileParty>(partyId) == Get<Hero>(heroId).PartyBelongedTo));
     }
 
     [Theory]
@@ -125,7 +130,6 @@ public class HeroRequestSenderTests : IDisposable
 
     private void SetUp()
     {
-        string outsiderPartyId = null;
         Server.Call(() =>
         {
             var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();

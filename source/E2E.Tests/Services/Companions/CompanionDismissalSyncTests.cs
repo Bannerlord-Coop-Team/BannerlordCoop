@@ -147,10 +147,29 @@ public class CompanionDismissalSyncTests : IDisposable
     {
         var context = CreateCompanion(1, 0, includeParty: true);
         var outsider = Clients[1];
-        string requestId = Guid.NewGuid().ToString("N");
 
+        // A registered player of another clan, so the manage check is what refuses it.
+        string outsiderId = null;
+        string outsiderClanId = null;
+        Server.Call(() =>
+        {
+            var outsiderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+            outsiderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            Assert.True(Server.ObjectManager.TryGetId(outsiderHero, out outsiderId));
+            Assert.True(Server.ObjectManager.TryGetId(outsiderHero.Clan, out outsiderClanId));
+        });
+        testEnvironment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("Outsider", outsiderId, null, outsiderClanId, null)));
+            playerManager.SetPeer("Outsider", outsider.NetPeer);
+        });
+
+        string requestId = Guid.NewGuid().ToString("N");
         outsider.Call(() => outsider.Resolve<INetwork>().SendAll(new FireCompanion(
-            requestId, context.HeroId, context.ClanId, context.PartyId)));
+                requestId, context.HeroId, context.ClanId, context.PartyId)),
+            new[] { CreateObituaryMethod });
 
         var completion = outsider.InternalMessages.OfType<FireCompanionCompleted>()
             .Single(message => message.RequestId == requestId);
