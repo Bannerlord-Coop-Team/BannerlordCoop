@@ -90,7 +90,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             TroopRoster roster = CreateRoster(client, garrison);
             client.Resolve<IMessageBroker>().Publish(
                 this,
-                new AlleyAcquiredRequested(alley, owner, overseer, roster));
+                new AlleyAcquiredRequested(alley, owner, overseer, roster, alley.Owner));
         });
     }
 

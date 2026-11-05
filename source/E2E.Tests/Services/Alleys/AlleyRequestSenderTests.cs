@@ -1,9 +1,13 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Alleys.Patches;
 using GameInterface.Services.TroopRosters.Data;
+using Moq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
@@ -66,17 +70,84 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     }
 
     [Fact]
-    public void AcquireRacedByAnotherPlayer_IsRefused()
+    public void TakeOverRefusedAtDone_LeavesTheTroopsWithTheParty()
     {
-        var scenario = AcquiredByOwner();
+        var scenario = CreateAlleyDomainScenario();
+        string troopId = CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster.AddToCounts(troop, 10);
+            });
+        }
+        TakenByOther(scenario);
 
-        // The other player won the same fight before the owner's take over reached it, so it still saw the alley empty.
-        OtherClient.Call(() => OtherClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
-            scenario.PlayerAlleyId, scenario.OverseerHeroId, scenario.OverseerHeroId,
-            Array.Empty<TroopRosterElementData>(), previousOwnerId: null)));
+        // The other take over had not reached the owner yet, so it still saw the alley empty when it pressed Done.
+        OwnerClient.Call(() =>
+        {
+            var alley = OwnerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);
+            var owner = OwnerClient.GetRegisteredObject<Hero>(scenario.OwnerHeroId);
+            var party = OwnerClient.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            var garrison = TroopRoster.CreateDummyTroopRoster();
+            garrison.AddToCounts(owner.CharacterObject, 1);
+            var logic = new PartyScreenLogic();
+            logic.Initialize(new PartyScreenLogicInitializationData
+            {
+                LeftMemberRoster = garrison,
+                LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster(),
+                RightMemberRoster = party.MemberRoster,
+                RightPrisonerRoster = party.PrisonRoster,
+                RightOwnerParty = party.Party,
+                PartyPresentationDoneButtonDelegate = (left, _, _, _, _, _, _, _, _) =>
+                {
+                    MessageBroker.Instance.Publish(this, new AlleyAcquiredRequested(alley, owner, owner, left, previousOwner: null));
+                    return true;
+                },
+            });
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member,
+                OwnerClient.GetRegisteredObject<CharacterObject>(troopId), 10, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(command, false);
+            Assert.True(logic.DoneLogic(false));
+        });
 
-        AssertOwnedByOwner(scenario);
-        Assert.Equal(scenario.OwnerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
+        AssertOwnedByOther(scenario);
+        Server.Call(() => Assert.Equal(10, Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster
+            .GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId))));
+    }
+
+    [Fact]
+    public void TakeOverThatReachedTheTroopScreen_IsRefused()
+    {
+        var scenario = CreateAlleyDomainScenario();
+        var mission = new Mock<ICampaignMission>();
+        OwnerClient.Call(() => mission.SetupGet(value => value.LastVisitedAlley)
+            .Returns(OwnerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId)));
+        OwnerClient.CampaignMissionContext = mission.Object;
+        try
+        {
+            OwnerClient.Call(() => MissionAlleyHandlerPatches.OnAlleyFightEndPrefix(isPlayerSideWon: true));
+            TakenByOther(scenario);
+
+            OwnerClient.Call(() =>
+            {
+                var alley = OwnerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);
+                Assert.Same(OwnerClient.GetRegisteredObject<Hero>(scenario.OverseerHeroId), alley.Owner);
+                var garrison = TroopRoster.CreateDummyTroopRoster();
+                garrison.AddToCounts(OwnerClient.GetRegisteredObject<Hero>(scenario.OwnerHeroId).CharacterObject, 1);
+                MissionAlleyHandlerPatches.OnPartyScreenDoneClickedPostfix(garrison);
+            });
+        }
+        finally
+        {
+            OwnerClient.CampaignMissionContext = null;
+        }
+
+        AssertOwnedByOther(scenario);
     }
 
     [Fact]
@@ -101,6 +172,19 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
 
         Assert.Equal(scenario.OverseerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
     }
+
+    // The other player wins the same alley and takes it over first.
+    private void TakenByOther(AlleyDomainScenario scenario)
+    {
+        OtherClient.Call(() => OtherClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
+            scenario.PlayerAlleyId, scenario.OverseerHeroId, scenario.OverseerHeroId,
+            Array.Empty<TroopRosterElementData>(), previousOwnerId: null)));
+        AssertOwnedByOther(scenario);
+    }
+
+    private void AssertOwnedByOther(AlleyDomainScenario scenario) =>
+        Server.Call(() => Assert.Same(Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId),
+            Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
 
     private AlleyDomainScenario AcquiredByOwner()
     {

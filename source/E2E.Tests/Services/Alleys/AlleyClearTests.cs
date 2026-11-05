@@ -231,7 +231,7 @@ public class AlleyClearTests : AlleyTestEnvironment
             clearingClient.Resolve<IMessageBroker>().Publish(
                 this,
                 new AlleyAcquiredRequested(
-                    clearingClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId), owner, owner, roster));
+                    clearingClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId), owner, owner, roster, previousOwner: null));
         });
 
         Server.Call(() => Assert.Same(

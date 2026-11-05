@@ -107,7 +107,7 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
         string previousOwnerId = null;
-        if (payload.What.Alley.Owner != null && !objectManager.TryGetIdWithLogging(payload.What.Alley.Owner, out previousOwnerId)) return;
+        if (payload.What.PreviousOwner != null && !objectManager.TryGetIdWithLogging(payload.What.PreviousOwner, out previousOwnerId)) return;
 
         network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison), previousOwnerId));
     }
@@ -183,6 +183,9 @@ internal class AlleyManagementHandler : IHandler
             {
                 Logger.Warning("Ignoring a take over of alley {AlleyId}: it is no longer held by {PreviousOwnerId}",
                     data.AlleyId, data.PreviousOwnerId);
+                // The troop screen's Done right after this request still takes the garrison out of the party,
+                // so hand it back unless this player already holds the alley with it.
+                if (alley.Owner != owner) ReturnGarrisonToOwner(owner, data.Garrison);
                 return;
             }
 
