@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
 $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../workflows/nightly-release.yml') -Raw
-$match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a published nightly.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
+if (-not $workflow.Contains('Invalidate the legacy client manifest')) { throw 'Legacy client manifest invalidation was not found' }
+if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manifest path was not found' }
+$match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a completed nightly publication.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
 if (-not $match.Success) { throw 'Nightly publish guard was not found' }
 $guardText = $match.Groups[1].Value -replace '(?m)^ {10}', ''
 $guardText = $guardText.Replace("& (Join-Path `$PWD 'rclone.exe')", 'Invoke-TestRclone')
@@ -10,7 +12,7 @@ $guard = [scriptblock]::Create($guardText)
 
 function Invoke-TestRclone {
     param([string]$Command, [string]$Source, [string]$Destination)
-    $expectedSource = if ($Command -eq 'lsjson') { 'patron:test-nightlies' } else { 'patron:test-nightlies/nightly/client.json' }
+    $expectedSource = if ($Command -eq 'lsjson') { 'patron:test-nightlies' } else { 'patron:test-nightlies/nightly/release.json' }
     if ($Source -ne $expectedSource) { throw 'Unexpected manifest source' }
     $script:commands += $Command
     $global:LASTEXITCODE = 0
@@ -20,7 +22,7 @@ function Invoke-TestRclone {
         if ($null -ne $script:scenario.LookupText) { return $script:scenario.LookupText }
         $size = [Text.Encoding]::UTF8.GetByteCount($script:scenario.Manifest)
         if ($script:scenario.MetadataSize) { $size = $script:scenario.MetadataSize }
-        return ((ConvertTo-Json -InputObject @(@{ Path = 'nightly/client.json'; IsDir = $false; Size = $size })) -split '\r?\n')
+        return ((ConvertTo-Json -InputObject @(@{ Path = 'nightly/release.json'; IsDir = $false; Size = $size })) -split '\r?\n')
     }
     if ($Command -ne 'copyto') { throw "Unexpected storage command: $Command" }
     $global:LASTEXITCODE = $script:scenario.DownloadExit
