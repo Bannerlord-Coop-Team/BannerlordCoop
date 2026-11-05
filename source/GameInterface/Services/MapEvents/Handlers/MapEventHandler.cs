@@ -252,7 +252,7 @@ internal class MapEventHandler : IHandler
                 }
 
                 // A surrender comes from a player whose party fights in this battle.
-                if (payload.Who is NetPeer surrenderingPeer && !IsPeerInMapEvent(surrenderingPeer, mapEvent))
+                if (payload.Who is not NetPeer surrenderingPeer || !IsPeerInMapEvent(surrenderingPeer, mapEvent))
                 {
                     Logger.Warning("Ignoring a surrender in {MapEventId} from a peer whose party is not in it", mapEventId);
                     return;

@@ -78,7 +78,7 @@ internal class ServerSiegeAftermathHandler : IHandler
     {
         var obj = payload.What;
         // The aftermath choice belongs to the capturing leader's player.
-        if (payload.Who is NetPeer && !playerManager.IsSenderControllingParty(payload.Who, obj.PartyId)) return;
+        if (!playerManager.IsSenderControllingParty(payload.Who, obj.PartyId)) return;
 
         GameThread.RunSafe(() =>
         {

@@ -256,8 +256,8 @@ public class ArmyHandler : IHandler
     {
         var obj = payload.What;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.ArmyLeaderPartyId, out var leaderParty)) return;
-        // The army's leader boosts its cohesion; the amounts come from that client, so neither may be negative.
-        if (ModInformation.IsServer && payload.Who is NetPeer &&
+        // Only the army's leader boosts its cohesion, and vanilla only ever spends here, so a negative amount isn't applied.
+        if (ModInformation.IsServer &&
             (!playerManager.IsSenderControllingParty(payload.Who, obj.ArmyLeaderPartyId) ||
              obj.CohesionToGain < 0 || obj.InfluenceCost < 0)) return;
 
@@ -279,7 +279,7 @@ public class ArmyHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
-            if (ModInformation.IsServer && payload.Who is NetPeer && !IsSenderSpendingOwnInfluence(payload.Who, playerClan, payload.What.Influence)) return;
+            if (ModInformation.IsServer && !IsAllowedInfluenceSpend(payload.Who, playerClan, payload.What.Influence)) return;
             ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
         });
     }
@@ -295,12 +295,15 @@ public class ArmyHandler : IHandler
         return false;
     }
 
-    // A client only spends its own clan's influence; the amount can't be recomputed here, so it must be a spend.
-    private bool IsSenderSpendingOwnInfluence(object sender, Clan clan, float influence)
+    // A client spends its own clan's influence, or a ruler clears the debt it just paid a mercenary clan serving its
+    // kingdom. Every vanilla caller sends a cost of zero or more, so the amount must be a spend. That checks the
+    // amount and not the balance, so a clan already below zero still pays its costs.
+    private bool IsAllowedInfluenceSpend(object sender, Clan clan, float influence)
     {
-        if (influence >= 0 && playerManager.TryGetSenderHero(sender, out var hero) && hero.Clan == clan) return true;
+        if (influence >= 0 && playerManager.TryGetSenderHero(sender, out var hero) &&
+            (hero.Clan == clan || (clan.IsUnderMercenaryService && clan.Kingdom != null && clan.Kingdom.Leader == hero))) return true;
 
-        Logger.Warning("Ignoring an influence change of {Influence} for clan {ClanId} from a peer outside it", influence, clan.StringId);
+        Logger.Warning("Ignoring an influence change of {Influence} for clan {ClanId} from a peer that may not spend it", influence, clan.StringId);
         return false;
     }
 

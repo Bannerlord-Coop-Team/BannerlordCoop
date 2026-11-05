@@ -14,6 +14,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Entity;
@@ -825,6 +826,102 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         public void EndMission() { }
         public void FadeOutCharacter(CharacterObject characterObject) { }
         public void OnGameStateChanged() { }
+    }
+
+    // Vanilla firing a mercenary clan that is owed pay clears that clan's influence, paid or not, and leaves the
+    // ruler's own influence alone. Paying first moves the debt in gold and clears it while the clan still serves,
+    // then the dialog takes the no debt line and ends the contract.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RulerFiresMercenaryClan_ClearsTheMercenaryClansInfluenceOnly(bool payDebt)
+    {
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        var mercenary = CreateSyncedPlayerContext("FiredMercenary", _ => false);
+        RemovePlayerRegistration(Server, "FiredMercenary");
+        foreach (var instance in Clients)
+        {
+            RemovePlayerRegistration(instance, "FiredMercenary");
+        }
+        ConfigureClanInKingdom(mercenary.ClanId, kingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var mercenaryClan = instance.GetRegisteredObject<Clan>(mercenary.ClanId);
+                using (new AllowedThread())
+                {
+                    mercenaryClan.IsUnderMercenaryService = true;
+                    mercenaryClan.MercenaryAwardMultiplier = 2;
+                    mercenaryClan.Influence = 40f;
+                    instance.GetRegisteredObject<Clan>(ruler.ClanId).Influence = 100f;
+                    instance.GetRegisteredObject<Hero>(ruler.HeroId).Gold = 1000;
+                    instance.GetRegisteredObject<Hero>(mercenary.HeroId).Gold = 0;
+                }
+            });
+        }
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Hero>(ruler.HeroId), Server.GetRegisteredObject<Kingdom>(kingdomId).Leader));
+
+        var harmony = new Harmony($"e2e.fire-mercenary.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(GetOneToOneConversationHeroPrefix))));
+        try
+        {
+            OneToOneConversationHeroOverride = client.GetRegisteredObject<Hero>(mercenary.HeroId);
+            if (payDebt)
+            {
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryWithPayingDebtOnConsequence");
+                Server.PumpGameThread();
+                Server.Call(() =>
+                {
+                    Assert.Equal(0f, Server.GetRegisteredObject<Clan>(mercenary.ClanId).Influence, precision: 2);
+                    Assert.Equal(920, Server.GetRegisteredObject<Hero>(ruler.HeroId).Gold);
+                    Assert.Equal(80, Server.GetRegisteredObject<Hero>(mercenary.HeroId).Gold);
+                });
+                // With the debt paid the dialog takes the no debt line, which ends the contract.
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryOnConsequencePrefix");
+            }
+            else
+            {
+                client.NetworkSentMessages.Clear();
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryWithoutPayingDebtOnConsequencePrefix");
+                // Leaving the kingdom already clears the debt, so no separate spend goes out.
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkChangeClanInfluence>());
+            }
+            Server.PumpGameThread();
+
+            // A spend that arrives after the clan left, from stale dialog state, no longer reaches the clan.
+            Server.SimulateMessage(client.NetPeer, new NetworkChangeClanInfluence(mercenary.ClanId, 40));
+            Server.PumpGameThread();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            OneToOneConversationHeroOverride = null;
+        }
+
+        Server.Call(() =>
+        {
+            var mercenaryClan = Server.GetRegisteredObject<Clan>(mercenary.ClanId);
+            Assert.Null(mercenaryClan.Kingdom);
+            Assert.False(mercenaryClan.IsUnderMercenaryService);
+            Assert.Equal(0f, mercenaryClan.Influence, precision: 2);
+            Assert.Equal(100f, Server.GetRegisteredObject<Clan>(ruler.ClanId).Influence, precision: 2);
+        });
+    }
+
+    private static void RunMercenaryConsequence(EnvironmentInstance client, string prefixName)
+    {
+        client.Call(() =>
+        {
+            var prefix = AccessTools.Method(typeof(MercenaryServiceConversationPatch), prefixName);
+            Assert.False((bool)prefix.Invoke(null, new object[] { new LordConversationsCampaignBehavior() }));
+        });
     }
 
     [Fact]

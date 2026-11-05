@@ -56,7 +56,7 @@ public class DisbandArmyHandler : IHandler
     {
         var obj = payload.What;
         // A client disbands as its own party.
-        if (ModInformation.IsServer && payload.Who is NetPeer &&
+        if (ModInformation.IsServer &&
             !playerManager.IsSenderControllingParty(payload.Who, obj.ClientPartyId)) return;
         GameThread.RunSafe(() =>
         {
