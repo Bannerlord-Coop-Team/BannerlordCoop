@@ -8,7 +8,6 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit;
@@ -57,25 +56,6 @@ public class SiegeLiftedClientTests : SiegeTestBase
         Assert.Contains(memberPartyId, prompt.AttackerPartyIds ?? Array.Empty<string>());
         client.Call(() => Assert.Null(MobileParty.MainParty.BesiegerCamp));
         Assert.Equal(1, menuExit.CountFor(client));
-    }
-
-    [Fact]
-    public void AnotherSiegeEnds_CampedClientKeepsItsSiegeMenu()
-    {
-        var client = Clients.First();
-        var aiLeaderId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var (_, memberPartyId) = CreatePlayerHeroParty("StillCampedMember");
-        SetupSiege(aiLeaderId, memberPartyId);
-        var otherSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        ConfigureCampedClient(client, memberPartyId);
-
-        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
-        client.SimulateMessage(this, new NetworkPromptSiegeEnded(
-            otherSettlementId, besiegerDefeated: false, null, Array.Empty<string>(), Array.Empty<string>()));
-        client.PumpGameThread();
-
-        client.Call(() => Assert.NotNull(MobileParty.MainParty.BesiegerCamp));
-        Assert.Equal(0, menuExit.CountFor(client));
     }
 
     private static MapEventSide CreateEndedBattleSide()

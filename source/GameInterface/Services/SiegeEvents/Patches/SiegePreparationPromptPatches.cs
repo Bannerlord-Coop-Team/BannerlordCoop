@@ -79,7 +79,7 @@ internal class SiegePreparationPromptPatches
     [HarmonyPrefix]
     private static void RemoveAllSiegePartiesPrefix(BesiegerCamp __instance)
     {
-        if (ModInformation.IsClient || __instance?.SiegeEvent == null) return;
+        if (ModInformation.IsClient || __instance.SiegeEvent == null || FinalizingSieges.Contains(__instance.SiegeEvent)) return;
 
         EmptiedCampParties.Remove(__instance.SiegeEvent);
         EmptiedCampParties.Add(__instance.SiegeEvent, __instance._besiegerParties.ToArray());
