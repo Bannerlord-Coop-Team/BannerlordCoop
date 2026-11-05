@@ -80,7 +80,7 @@ internal class ServerVillageHostileActionHandler : IHandler
         }
 
         var request = payload.What;
-        if (!TryValidateRequester(request.ControllerId, request.MobilePartyId))
+        if (!IsSenderController(peer, request.ControllerId) || !TryValidateRequester(request.ControllerId, request.MobilePartyId))
         {
             Deny(peer, VillageHostileActionDeniedReason.InvalidRequester);
             return;
@@ -88,6 +88,10 @@ internal class ServerVillageHostileActionHandler : IHandler
 
         GameThread.RunSafe(() => TryStartHostileAction(peer, request), blocking: true, context: nameof(Handle_NetworkRequestVillageHostileAction));
     }
+
+    // The controller id has to be the sender's own, otherwise a request left over from a reconnect could act for another player.
+    private bool IsSenderController(NetPeer peer, string controllerId) =>
+        playerManager.TryGetCurrentController(peer, out var senderControllerId) && senderControllerId == controllerId;
 
     private bool TryValidateRequester(string controllerId, string mobilePartyId)
     {

@@ -101,6 +101,30 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
+    public void ClientRequestRaid_WithAnotherPlayersControllerId_IsDenied()
+    {
+        var first = Clients.First();
+        var second = Clients.Last();
+        RegisterPeer(first, "PlayerOne");
+        RegisterPeer(second, "PlayerTwo");
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        CreatePlayerHeroParty("PlayerTwo");
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerTwo", second.NetPeer));
+        var target = CreateVillageTarget();
+
+        Server.NetworkSentMessages.Clear();
+
+        // The second client's request still carries the first player's controller id, like a stale seat after a reconnect.
+        Server.SimulateMessage(second.NetPeer, new NetworkRequestVillageHostileAction(
+            VillageHostileAction.Raid, mobilePartyId, target.SettlementId, "PlayerOne"));
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
+        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
+        Assert.Equal(VillageHostileActionDeniedReason.InvalidRequester, denied.Reason);
+    }
+
+    [Fact]
     public void ApplyHostileAction_WhileAtPeace_DeclaresWarOnAllInstances()
     {
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
@@ -4080,11 +4104,15 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
             .ToList();
 
+        // The tests validate the client before its player exists, so link it here as a real join's validation does.
+        var controllerId = client.Resolve<IControllerIdProvider>().ControllerId;
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
+
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestVillageHostileAction(
             action,
             mobilePartyId,
             settlementId,
-            client.Resolve<IControllerIdProvider>().ControllerId)), disabledMethods);
+            controllerId)), disabledMethods);
     }
 
     private static void SetMapEventCreationTimeout(EnvironmentInstance instance, TimeSpan timeout)
