@@ -98,23 +98,20 @@ public class GarrisonDonationTests : IDisposable
         });
     }
 
-    // The donor is the client's player, with its party in the given town (or nowhere for null).
-    private string RegisterDonor(string settlementId)
+    // The donor is the client's player, with its party in the given town.
+    private void RegisterDonor(string settlementId)
     {
-        string donorHeroId = null;
         Server.Call(() =>
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            if (settlementId != null) party._currentSettlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            party._currentSettlement = Server.GetRegisteredObject<Settlement>(settlementId);
             Assert.True(Server.ObjectManager.TryGetId(party, out var partyId));
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("Donor", heroId, partyId, null, null)));
             playerManager.SetPeer("Donor", Client.NetPeer);
-            donorHeroId = heroId;
         });
-        return donorHeroId;
     }
 
     // Raises the client-side garrison donated event as the patched vanilla handler would.
