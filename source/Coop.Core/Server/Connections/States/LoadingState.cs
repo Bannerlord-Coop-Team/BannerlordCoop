@@ -56,7 +56,7 @@ public class LoadingState : ConnectionStateBase
     private int phase = (int)JoinPhase.WaitingForCampaignEntry;
     private int initialBaselinesSent;
     private int totalBaselinesSent;
-    private int baselineLimitLogged;
+    private int baselinesExhausted;
     private int nextReplayBatchId;
     private readonly Queue<(int Id, int Bytes)> replayBatches = new Queue<(int, int)>();
     private bool replayDrainBlocked;
@@ -103,7 +103,7 @@ public class LoadingState : ConnectionStateBase
     internal bool IsAborted => CurrentPhase == JoinPhase.Aborted;
 
     // Set when a baseline request is denied at the cap, the join watchdog ends the join on it
-    internal bool HasExhaustedBaselines => Volatile.Read(ref baselineLimitLogged) == 1;
+    internal bool HasExhaustedBaselines => Volatile.Read(ref baselinesExhausted) == 1;
 
     internal string JoinPhaseName => CurrentPhase.ToString();
 
@@ -258,7 +258,7 @@ public class LoadingState : ConnectionStateBase
 
                 if (totalBaselinesSent >= MaxBaselinesPerJoin)
                 {
-                    if (Interlocked.Exchange(ref baselineLimitLogged, 1) == 0)
+                    if (Interlocked.Exchange(ref baselinesExhausted, 1) == 0)
                     {
                         Logger.Warning(
                             "Ignored campaign baseline request from peer {PeerId} after {Limit} baselines; " +
