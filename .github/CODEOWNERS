@@ -1,7 +1,4 @@
-# Requests a review from the people who know each area. Doesnt block merging unless
-# "Require review from Code Owners" is turned on for the branch.
-# Owners are the top two authors of each service folder from the last 12 months, with write access.
-# The last matching line wins.
+# Requires a review from the people who know each area.
 
 /.github/ @garrettluskey
 
