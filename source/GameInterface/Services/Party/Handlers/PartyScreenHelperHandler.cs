@@ -224,12 +224,6 @@ internal class PartyScreenHelperHandler : IHandler
                 logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not there", obj.What.CurrentSettlementId);
                 return;
             }
-            // Only the town's own clan manages its garrison
-            if (senderHero.Clan == null || currentSettlement.OwnerClan != senderHero.Clan)
-            {
-                logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose clan does not own it", obj.What.CurrentSettlementId);
-                return;
-            }
             for (int i = 0; i < leftMemberRoster.Count; i++)
             {
                 TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);
