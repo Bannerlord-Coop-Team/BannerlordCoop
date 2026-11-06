@@ -64,7 +64,6 @@ namespace GameInterface.Services.Towns.Handlers
         {
             var obj = payload.What;
 
-
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
@@ -77,7 +76,6 @@ namespace GameInterface.Services.Towns.Handlers
         private void HandleChangeTownGarrisonAutoRecruitmentIsEnabled(MessagePayload<ChangeTownGarrisonAutoRecruitmentIsEnabled> payload)
         {
             var obj = payload.What;
-
 
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
@@ -92,7 +90,6 @@ namespace GameInterface.Services.Towns.Handlers
         {
             var obj = payload.What;
 
-
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
@@ -105,7 +102,6 @@ namespace GameInterface.Services.Towns.Handlers
         private void HandleChangeTownLastCapturedBy(MessagePayload<ChangeTownLastCapturedBy> payload)
         {
             var obj = payload.What;
-
 
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
