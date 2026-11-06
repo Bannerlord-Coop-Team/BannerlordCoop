@@ -1,22 +1,23 @@
 $ErrorActionPreference = 'Stop'
 
 $workflow = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../workflows/nightly-release.yml') -Raw
-if (-not $workflow.Contains('Invalidate the legacy client manifest')) { throw 'Legacy client manifest invalidation was not found' }
-if (-not $workflow.Contains('nightly/client.json')) { throw 'Legacy client manifest path was not found' }
+$cronLines = @("    - cron: '57 4 * * *'", "    - cron: '57 5 * * *'")
+foreach ($cronLine in $cronLines) {
+    if (-not $workflow.Contains($cronLine)) { throw "Missing DST-safe schedule entry: $cronLine" }
+}
+if ($workflow.Contains('timezone: America/Chicago')) { throw 'GitHub Actions timezone key must not be used for cron scheduling' }
+if (-not $workflow.Contains('Retaining the previous legacy client manifest')) { throw 'Legacy client retention guard was not found' }
+$invalidationMatch = [regex]::Match($workflow, '(?ms)      - name: Invalidate the legacy client manifest.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
+if (-not $invalidationMatch.Success) { throw 'Legacy client manifest retention step was not found' }
+if (($invalidationMatch.Groups[1].Value -replace '(?m)^ {10}', '').Contains('deletefile')) {
+    throw 'Legacy client manifest must not be deleted before the replacement is published'
+}
 $match = [regex]::Match($workflow, '(?ms)      - name: Skip scheduled overwrite of a completed nightly publication.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
 if (-not $match.Success) { throw 'Nightly publish guard was not found' }
 $guardText = $match.Groups[1].Value -replace '(?m)^ {10}', ''
 $guardText = $guardText.Replace("& (Join-Path `$PWD 'rclone.exe')", 'Invoke-TestRclone')
 if ($guardText.Contains('rclone.exe')) { throw 'Unmocked rclone invocation in nightly publish guard' }
 $guard = [scriptblock]::Create($guardText)
-
-$invalidationMatch = [regex]::Match($workflow, '(?ms)      - name: Invalidate the legacy client manifest.*?\n        run: \|\r?\n(.*?)(?=\r?\n      - name:)')
-if (-not $invalidationMatch.Success) { throw 'Legacy client manifest invalidation was not found' }
-$invalidationText = $invalidationMatch.Groups[1].Value -replace '(?m)^ {10}', ''
-if ($invalidationText.Contains('deletefile')) { throw 'Legacy client manifest must not be deleted before the replacement is published' }
-if (-not $invalidationText.Contains('Retaining the previous legacy client manifest')) {
-    throw 'Legacy client retention guard was not found'
-}
 
 function Invoke-TestRclone {
     param([string]$Command, [string]$Source, [string]$Destination)
@@ -90,7 +91,6 @@ try {
         }
         Write-Host "PASS: $($case.Name)"
     }
-    Write-Host 'PASS: legacy client manifest is retained until replacement publication'
 } finally {
     Pop-Location
     $resolvedRoot = [IO.Path]::GetFullPath($testRoot)

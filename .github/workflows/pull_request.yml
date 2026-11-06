@@ -33,6 +33,10 @@ jobs:
         shell: pwsh
         run: ./.github/scripts/test-nightly-publish-guard.ps1
 
+      - name: Test nightly date and schedule decisions
+        shell: pwsh
+        run: node --test .github/scripts/nightly-release-guard.test.cjs
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30

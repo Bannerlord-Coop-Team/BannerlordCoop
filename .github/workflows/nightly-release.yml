@@ -2,8 +2,10 @@ name: Nightly Release
 
 on:
   schedule:
-    - cron: '57 23 * * *'
-      timezone: America/Chicago
+    # GitHub Actions cron is UTC. These entries cover 11:57 PM Central in both
+    # DST states; the early entry is held by the guard until the local cutoff.
+    - cron: '57 4 * * *'
+    - cron: '57 5 * * *'
   workflow_dispatch:
     inputs:
       release_date:
@@ -33,103 +35,37 @@ jobs:
     timeout-minutes: 5
     outputs:
       should_publish: ${{ steps.decide.outputs.should_publish }}
+      release_date: ${{ steps.decide.outputs.release_date }}
     steps:
-      - name: Resolve due nightly date
-        id: due
-        env:
-          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
-        run: |
-          set -eu
-          due_epoch=$(date +%s)
-          due_hour=$(TZ=America/Chicago date +%H)
-          due_minute=$(TZ=America/Chicago date +%M)
-          if [ "$due_hour" -lt 23 ] || { [ "$due_hour" -eq 23 ] && [ "$due_minute" -lt 57 ]; }; then
-            due_epoch=$((due_epoch - 86400))
-          fi
-          due_date=$(TZ=America/Chicago date -d "@$due_epoch" +%F)
-          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
-            if ! printf '%s' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-              echo 'release_date must use YYYY-MM-DD' >&2
-              exit 1
-            fi
-            if [ "$REQUESTED_RELEASE_DATE" != "$due_date" ]; then
-              echo 'release_date must be the currently due nightly' >&2
-              exit 1
-            fi
-          fi
-          printf 'release_date=%s\n' "$due_date" >> "$GITHUB_OUTPUT"
+      - name: Checkout nightly guard
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
 
       - name: Keep a late scheduled nightly from overwriting a published one
         id: decide
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
-          RELEASE_DATE: ${{ steps.due.outputs.release_date }}
+          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
         with:
           script: |
-            const releaseDate = process.env.RELEASE_DATE;
-            const cutoffMinutes = (23 * 60) + 57;
-            function centralDateParts(instant) {
-              const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/Chicago',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                hourCycle: 'h23',
-              }).formatToParts(instant);
-              const values = new Map(parts.map((part) => [part.type, part.value]));
-              return {
-                year: values.get('year'),
-                month: values.get('month'),
-                day: values.get('day'),
-                hour: Number(values.get('hour')),
-                minute: Number(values.get('minute')),
-              };
-            }
-            function belongsToNightlyReleaseWindow(timestamp, date) {
-              const instant = new Date(timestamp);
-              if (!Number.isFinite(instant.getTime())) return false;
-              const values = centralDateParts(instant);
-              const localDate = `${values.year}-${values.month}-${values.day}`;
-              const next = new Date(`${date}T12:00:00.000Z`);
-              next.setUTCDate(next.getUTCDate() + 1);
-              const nextDate = next.toISOString().slice(0, 10);
-              const localMinutes = (values.hour * 60) + values.minute;
-              return (
-                (localDate === date && localMinutes >= cutoffMinutes)
-                || (localDate === nextDate && localMinutes < cutoffMinutes)
-              );
-            }
-            if (context.eventName !== 'schedule') {
-              core.setOutput('should_publish', 'true');
-              return;
-            }
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
-              throw new Error('Due nightly date is invalid');
-            }
-            const response = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'nightly-release.yml',
-              branch: 'development',
-              status: 'success',
-              per_page: 30,
+            const guard = require('./.github/scripts/nightly-release-guard.cjs');
+            const now = new Date();
+            const releaseDate = guard.resolveReleaseDate(now, process.env.REQUESTED_RELEASE_DATE);
+            core.setOutput('release_date', releaseDate);
+            const publish = await guard.shouldPublish({
+              github,
+              repo: context.repo,
+              eventName: context.eventName,
+              schedule: context.payload.schedule,
+              currentRunId: context.runId,
+              releaseDate,
+              now,
+              log: core.info,
             });
-            const published = response.data.workflow_runs.find((run) =>
-              run.id !== context.runId
-              && (
-                belongsToNightlyReleaseWindow(run.created_at, releaseDate)
-                || belongsToNightlyReleaseWindow(run.updated_at, releaseDate)
-              ));
-            if (published) {
-              core.info(
-                `Scheduled nightly for ${releaseDate} will not overwrite ${published.html_url} (${published.event}).`,
-              );
-              core.setOutput('should_publish', 'false');
-              return;
-            }
-            core.setOutput('should_publish', 'true');
+            core.setOutput('should_publish', String(publish));
 
   build:
     needs: guard
@@ -163,39 +99,20 @@ jobs:
       - name: Trust checkout directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install timezone data
-        run: apk add --no-cache tzdata >/dev/null
-
       - name: Find previous nightly commit
         id: previous
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           result-encoding: string
           script: |
-            const response = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'nightly-release.yml',
-              branch: 'development',
-              status: 'success',
-              per_page: 20,
+            const guard = require('./.github/scripts/nightly-release-guard.cjs');
+            return guard.findPreviousPublishedSha({
+              github,
+              repo: context.repo,
+              currentRunId: context.runId,
+              now: new Date(),
+              log: core.warning,
             });
-            for (const run of response.data.workflow_runs) {
-              const jobs = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: run.id,
-                per_page: 20,
-              });
-              const published = jobs.data.jobs.some((job) =>
-                job.name === 'sign-and-publish'
-                && job.conclusion === 'success'
-                && (job.steps ?? []).some((step) =>
-                  step.name === 'Publish client archive to private Patron R2'
-                  && step.conclusion === 'success'));
-              if (published) return run.head_sha;
-            }
-            return '';
 
       - name: Restore .NET Framework build inputs
         run: |
@@ -238,36 +155,13 @@ jobs:
         id: release
         env:
           PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
-          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
+          RELEASE_DATE: ${{ needs.guard.outputs.release_date }}
         run: |
           set -eu
-          due_epoch=$(date +%s)
-          due_hour=$(TZ=America/Chicago date +%H)
-          due_minute=$(TZ=America/Chicago date +%M)
-          if [ "$due_hour" -lt 23 ] || { [ "$due_hour" -eq 23 ] && [ "$due_minute" -lt 57 ]; }; then
-            due_epoch=$((due_epoch - 86400))
-          fi
-          due_date=$(TZ=America/Chicago date -d "@$due_epoch" +%F)
-          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
-            if ! printf '%s\n' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-              echo 'release_date must use YYYY-MM-DD' >&2
-              exit 1
-            fi
-            release_epoch=$(TZ=America/Chicago date -d "$REQUESTED_RELEASE_DATE 12:00:00" +%s)
-            if [ "$(TZ=America/Chicago date -d "@$release_epoch" +%F)" != "$REQUESTED_RELEASE_DATE" ]; then
-              echo 'release_date is not a valid calendar date' >&2
-              exit 1
-            fi
-            if [ "$REQUESTED_RELEASE_DATE" != "$due_date" ]; then
-              echo 'release_date must be the currently due nightly' >&2
-              exit 1
-            fi
-          else
-            release_epoch=$due_epoch
-          fi
-          release_date=$(TZ=America/Chicago date -d "@$release_epoch" +%F)
-          display_date=$(TZ=America/Chicago date -d "@$release_epoch" +%m-%d-%Y)
-          file_name="Coop $display_date.7z"
+          printf '%s\n' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          year=${RELEASE_DATE%%-*}
+          month_and_day=${RELEASE_DATE#*-}
+          file_name="Coop $month_and_day-$year.7z"
           head_sha=$(git rev-parse HEAD)
           base_sha="$PREVIOUS_SHA"
           if [ -z "$base_sha" ] || ! git merge-base --is-ancestor "$base_sha" "$head_sha"; then
@@ -275,7 +169,7 @@ jobs:
           fi
 
           printf 'release_date=%s\nfile_name=%s\nhead_sha=%s\nbase_sha=%s\n' \
-            "$release_date" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
+            "$RELEASE_DATE" "$file_name" "$head_sha" "$base_sha" >> "$GITHUB_OUTPUT"
 
       - name: Stage module
         env:
