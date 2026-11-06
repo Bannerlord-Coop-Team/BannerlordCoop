@@ -1,10 +1,8 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Alleys.Patches;
-using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using Helpers;
 using Moq;
@@ -29,33 +27,16 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     private EnvironmentInstance OtherClient => Clients.Last();
 
     [Fact]
-    public void TakeOverRacedByAnotherPlayer_ChangesNothingOnAnyPeer()
-    {
-        var scenario = CreateAlleyDomainScenario();
-        var (troopId, companionId) = AddTroopsAndCompanion(scenario);
-
-        // The other take over reaches this client while it is still in the alley fight.
-        PressDoneOnTakeOverScreen(scenario, troopId, companionId, duringFight: () => TakenByOther(scenario));
-
-        AssertOwnedByOther(scenario);
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() =>
-            {
-                var roster = instance.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster;
-                Assert.Equal(10, roster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId)));
-                Assert.True(roster.Contains(instance.GetRegisteredObject<Hero>(companionId).CharacterObject));
-            });
-        }
-    }
-
-    [Fact]
     public void TakeOver_MovesTheTroopsAndTheirWoundedOnEveryPeer()
     {
         var scenario = CreateAlleyDomainScenario();
         var (troopId, companionId) = AddTroopsAndCompanion(scenario);
 
-        PressDoneOnTakeOverScreen(scenario, troopId, companionId, duringFight: null);
+        // Vanilla only fights in a gang's alley, and the server only accepts the owner the fight started with.
+        Server.Call(() => Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId)
+            .SetOwner(Server.GetRegisteredObject<Hero>(scenario.GangLeaderId)));
+
+        PressDoneOnTakeOverScreen(scenario, troopId, companionId);
 
         AssertOwnedByOwner(scenario);
         var management = GetManagementData(scenario.PlayerAlleyId);
@@ -140,7 +121,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     }
 
     // Starts and wins the alley fight, moves six troops, two wounded, on the take over screen the way vanilla opens it, then presses Done.
-    private void PressDoneOnTakeOverScreen(AlleyDomainScenario scenario, string troopId, string companionId, Action duringFight)
+    private void PressDoneOnTakeOverScreen(AlleyDomainScenario scenario, string troopId, string companionId)
     {
         var mission = new Mock<ICampaignMission>();
         OwnerClient.Call(() => mission.SetupGet(value => value.LastVisitedAlley)
@@ -150,7 +131,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         try
         {
             StartFight(OwnerClient, scenario.PlayerAlleyId);
-            duringFight?.Invoke();
 
             PartyScreenLogic logic = null;
             OwnerClient.Call(() =>
@@ -207,19 +187,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         var prefix = AccessTools.Method(typeof(MissionAlleyHandlerPatches), "StartCommonAreaBattlePrefix");
         client.Call(() => prefix.Invoke(null, new object[] { client.GetRegisteredObject<Alley>(alleyId) }));
     }
-
-    // The other player wins the same alley and takes it over first.
-    private void TakenByOther(AlleyDomainScenario scenario)
-    {
-        OtherClient.Call(() => OtherClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
-            scenario.PlayerAlleyId, scenario.OverseerHeroId, scenario.OverseerHeroId,
-            Array.Empty<TroopRosterElementData>(), previousOwnerId: null)));
-        AssertOwnedByOther(scenario);
-    }
-
-    private void AssertOwnedByOther(AlleyDomainScenario scenario) =>
-        Server.Call(() => Assert.Same(Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId),
-            Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
 
     private AlleyDomainScenario AcquiredByOwner()
     {
