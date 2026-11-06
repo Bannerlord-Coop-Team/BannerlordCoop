@@ -5,6 +5,7 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Heroes;
 using System.Collections.Generic;
@@ -135,6 +136,11 @@ namespace Coop.Tests.Server.Services.Save
                 },
             };
 
+            // A pending marriage offer, and a finished one that still has its cooldown
+            var agingPlayerData = new AgingPlayerData(new());
+            agingPlayerData.PlayerMarriageOffers[players[0].HeroId] = new MarriageOfferData("lord_1_1", "lord_2_1", 4200);
+            agingPlayerData.PlayerMarriageOffers[players[1].HeroId] = new MarriageOfferData(null, null, 3100);
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -146,7 +152,7 @@ namespace Coop.Tests.Server.Services.Save
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(meetingTimes),
-                new AgingPlayerData(new()));
+                agingPlayerData);
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -177,6 +183,12 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.InteractionsPlayerData.PlayerHasMetHermit[playerHeroId], savedSession.InteractionsPlayerData.PlayerHasMetHermit[playerHeroId]);
 
                 Assert.Equal(sessionData.TradePlayerData.PlayerSettlementBribePaid[playerHeroId], savedSession.TradePlayerData.PlayerSettlementBribePaid[playerHeroId]);
+
+                var marriageOffer = sessionData.AgingPlayerData.PlayerMarriageOffers[playerHeroId];
+                var savedMarriageOffer = savedSession.AgingPlayerData.PlayerMarriageOffers[playerHeroId];
+                Assert.Equal(marriageOffer.CurrentOfferedPlayerClanHeroId, savedMarriageOffer.CurrentOfferedPlayerClanHeroId);
+                Assert.Equal(marriageOffer.CurrentOfferedOtherClanHeroId, savedMarriageOffer.CurrentOfferedOtherClanHeroId);
+                Assert.Equal(marriageOffer.LastMarriageOfferTimeNumTicks, savedMarriageOffer.LastMarriageOfferTimeNumTicks);
             }
             Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
         }

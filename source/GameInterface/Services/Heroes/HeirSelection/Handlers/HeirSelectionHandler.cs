@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -47,6 +48,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
     private readonly IIssueCancellationCoordinator issueCancellationCoordinator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
@@ -68,6 +70,7 @@ internal class HeirSelectionHandler : IHandler
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
         ICoopSessionMigrator coopSessionMigrator,
         ITraitLevelingHelperInterface traitLevelingHelperInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface,
         IIssueCancellationCoordinator issueCancellationCoordinator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
@@ -82,6 +85,7 @@ internal class HeirSelectionHandler : IHandler
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
         this.traitLevelingHelperInterface = traitLevelingHelperInterface;
+        this.statisticsInterface = statisticsInterface;
         this.issueCancellationCoordinator = issueCancellationCoordinator;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
@@ -259,7 +263,7 @@ internal class HeirSelectionHandler : IHandler
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
         bool clanSurvives = hero.Clan != null && (hero.Clan.Heroes.Any(member => member.IsAlive && playerManager.Contains(member)) ||
             hero.Clan.GetHeirApparents().Count > 0);
-        var message = new NetworkClientGameOver(player.HeroId, state.AppointedLeaderId, clanSurvives);
+        var message = new NetworkClientGameOver(player.HeroId, state.AppointedLeaderId, clanSurvives, statisticsInterface.GetStatistics(hero));
         sentSelections[player.HeroId] = message;
         sendCoalescer?.Flush(network);
         network.Send(peer, message);
