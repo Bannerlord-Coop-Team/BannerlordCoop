@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Alleys;
@@ -160,6 +161,46 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
             new AbandonAlleyRequested(OwnerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId), fromClanScreen: true)));
 
         Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
+    }
+
+    [Fact]
+    public void TwoClientsWinAFightBeforeDone_EachSendsItsOwnBeatenOwner()
+    {
+        var scenario = CreateAlleyDomainScenario();
+        var fights = new[] { (OwnerClient, scenario.PlayerAlleyId, scenario.OwnerHeroId), (OtherClient, scenario.AttackerAlleyId, scenario.OverseerHeroId) };
+        var sent = new Dictionary<EnvironmentInstance, Hero>();
+        try
+        {
+            foreach (var (client, alleyId, heroId) in fights)
+            {
+                var mission = new Mock<ICampaignMission>();
+                client.Call(() =>
+                {
+                    mission.SetupGet(value => value.LastVisitedAlley).Returns(client.GetRegisteredObject<Alley>(alleyId));
+                    Game.Current.PlayerTroop = client.GetRegisteredObject<Hero>(heroId).CharacterObject;
+                    client.Resolve<IMessageBroker>().Subscribe<AlleyAcquiredRequested>(payload => sent[client] = payload.What.PreviousOwner);
+                });
+                client.CampaignMissionContext = mission.Object;
+                client.Call(() => new MissionAlleyHandler().OnAlleyFightEnd(isPlayerSideWon: true));
+            }
+
+            foreach (var (client, _, heroId) in fights)
+            {
+                client.Call(() =>
+                {
+                    var left = TroopRoster.CreateDummyTroopRoster();
+                    left.AddToCounts(client.GetRegisteredObject<Hero>(heroId).CharacterObject, 1);
+                    new MissionAlleyHandler().OnPartyScreenDoneClicked(left, null, TroopRoster.CreateDummyTroopRoster(), null, null, null, false, null, null);
+                });
+            }
+        }
+        finally
+        {
+            foreach (var (client, _, _) in fights) client.CampaignMissionContext = null;
+        }
+
+        Assert.Null(sent[OwnerClient]);
+        OtherClient.Call(() => Assert.Same(OtherClient.GetRegisteredObject<Hero>(scenario.GangLeaderId), sent[OtherClient]));
     }
 
     // Ten troops, two of them wounded, and a clan member in the owner's party on every peer.

@@ -41,6 +41,8 @@ internal class MissionAlleyHandlerPatches
         // both once it accepts, so this only sends the request and lets the screen close.
         __result = true;
 
+        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return false;
+
         var alley = CampaignMission.Current?.LastVisitedAlley;
         if (alley == null || leftMemberRoster == null) return false;
 
@@ -61,8 +63,6 @@ internal class MissionAlleyHandlerPatches
         Hero overseer = leftMemberRoster.GetTroopRoster()
             .FirstOrDefault(e => e.Character != null && e.Character.IsHero).Character?.HeroObject;
         if (overseer == null) return false;
-
-        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return false;
 
         var previousOwner = fightOwnerTracker.Take();
         MessageBroker.Instance.Publish(alley, new AlleyAcquiredRequested(alley, owner, overseer, leftMemberRoster, previousOwner));
