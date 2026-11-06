@@ -75,8 +75,8 @@ it once the user agrees:
 - **Per quest handlers apply at once.** `*PartyCreatedHandler`, `*JournalHandler`, `ScoutEnemyGarrisonsTargetsHandler`
   and `MerchantOutlawsProgressHandler` resolve the issue by giver and id without the guard, so behind held work for
   that giver they can miss an issue that hasn't arrived yet. Route a new one through `RunInOrder`. (#4162)
-- **Suppress journal replay echoes.** Replacing a quest's journal and calling `OnQuestLogAdded` while applying a
-  received progress snapshot can send a `RequestQuestJournal` back to the server. Wrap both operations in
+- **Suppress journal replay echoes.** Replacing a quest journal and calling `OnQuestLogAdded` while applying a
+  received state snapshot can send a `RequestQuestJournal` back to the server. Wrap both operations in
   `QuestJournalReplay`. (#3953)
 
 ## Review learnings
