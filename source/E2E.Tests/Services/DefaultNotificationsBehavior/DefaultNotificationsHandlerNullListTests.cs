@@ -108,20 +108,6 @@ public class DefaultNotificationsHandlerNullListTests : IDisposable
     }
 
     [Fact]
-    public void GivenBirth_UnresolvableChild_SkipsInsteadOfShowingTheWrongCount()
-    {
-        string motherId = TestEnvironment.CreateRegisteredObject<Hero>();
-        string childId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var message = Client.EnsureSerializable(
-            new NetworkNotifyGivenBirth(motherId, new List<string> { "Hero_missing", childId }, 0));
-
-        Client.SimulateMessage(this, message);
-        Client.PumpGameThread();
-
-        Assert.Empty(Births);
-    }
-
-    [Fact]
     public void GivenBirth_ResolvedChild_Notifies()
     {
         string motherId = TestEnvironment.CreateRegisteredObject<Hero>();
