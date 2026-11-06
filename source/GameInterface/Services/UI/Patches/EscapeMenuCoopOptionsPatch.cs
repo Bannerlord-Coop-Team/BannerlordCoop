@@ -64,7 +64,11 @@ internal class EscapeMenuCoopOptionsPatch
 
         __result.Insert(nextIndex, new EscapeMenuItemVM(
             UnstuckText,
-            _ => OpenUnstuckConfirm(__instance),
+            _ =>
+            {
+                __instance.OnEscapeMenuToggled(false);
+                ShowUnstuckConfirm();
+            },
             identifier: null,
             getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
             isPositiveBehaviored: false));
@@ -102,12 +106,6 @@ internal class EscapeMenuCoopOptionsPatch
         if (!CanOpenBugReport(overlay.IsAvailable, IsConversationInProgress())) return;
         mapScreen.OnEscapeMenuToggled(false);
         overlay.Open();
-    }
-
-    private static void OpenUnstuckConfirm(MapScreen mapScreen)
-    {
-        mapScreen.OnEscapeMenuToggled(false);
-        ShowUnstuckConfirm();
     }
 
     internal static void ShowUnstuckConfirm()
