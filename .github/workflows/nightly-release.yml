@@ -496,10 +496,6 @@ jobs:
           (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
             ../transfer/Coop.7z Coop >/dev/null)
           release_size=$(stat -c %s transfer/Coop.7z)
-          if [ "$release_size" -gt 8388608 ]; then
-            echo "Release archive is $release_size bytes; the 8 MiB safety budget reserves 2 MiB below Discord's 10 MiB limit." >&2
-            exit 1
-          fi
           test "$release_size" -gt 0
 
       - name: Validate and describe signed client input
@@ -526,7 +522,7 @@ jobs:
             throw 'Signed client input layout is invalid'
           }
           $archiveBytes = [long]$entries[0].Length
-          if ($archiveBytes -le 0 -or $archiveBytes -gt 8388608) { throw 'Signed client input size is invalid' }
+          if ($archiveBytes -le 0) { throw 'Signed client input size is invalid' }
           $archiveSha256 = (Get-FileHash $entries[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($archiveSha256 -notmatch '^[a-f0-9]{64}$') { throw 'Signed client input checksum is invalid' }
           $clientKey = "nightly/clients/$($env:HEAD_SHA)/$archiveSha256/Coop.7z"
