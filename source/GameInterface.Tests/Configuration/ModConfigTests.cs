@@ -576,5 +576,4 @@ public class ModConfigTests : IDisposable
         Assert.False(config.ModOptions?.WarSails ?? false);
         Assert.DoesNotContain("modOptions", File.ReadAllText(ConfigPath));
     }
-
 }

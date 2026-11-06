@@ -327,7 +327,6 @@ public class MissionModule : Module
             .InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
-
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
