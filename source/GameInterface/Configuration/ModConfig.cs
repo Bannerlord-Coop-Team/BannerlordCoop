@@ -1,3 +1,4 @@
+using Common;
 using Common.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -110,7 +111,8 @@ internal sealed class ModConfig : IModConfig
             }
 
             MigrateDifficultySettings(path);
-            SeedModOptionSettings(path);
+            // These options are server-only, so a client leaves them out of its file.
+            if (ModInformation.IsServer) SeedModOptionSettings(path);
 
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();

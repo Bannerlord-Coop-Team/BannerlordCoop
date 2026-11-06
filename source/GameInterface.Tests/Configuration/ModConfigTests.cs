@@ -1,4 +1,5 @@
 ﻿using GameInterface.Configuration;
+using Common;
 using GameInterface.Services.Modules;
 using System;
 using System.IO;
@@ -25,8 +26,11 @@ public class ModConfigTests : IDisposable
         Directory.CreateDirectory(tempDir);
     }
 
+    private readonly bool originalIsServer = ModInformation.IsServer;
+
     public void Dispose()
     {
+        ModInformation.IsServer = originalIsServer;
         try { Directory.Delete(tempDir, recursive: true); } catch { }
     }
 
@@ -526,10 +530,11 @@ public class ModConfigTests : IDisposable
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
     }
 
-    // A config made before the key existed gets warSails seeded off, keeping every operator value and comment.
+    // On a server, a config made before the key existed gets warSails seeded off, keeping every operator value and comment.
     [Fact]
     public void ExistingModOptions_WithoutWarSails_IsSeededOffAndIsIdempotent()
     {
+        ModInformation.IsServer = true;
         File.WriteAllText(ConfigPath, @"{
   ""modOptions"": {
     // operator note

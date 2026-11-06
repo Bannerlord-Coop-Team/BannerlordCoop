@@ -129,7 +129,7 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            // Only the hosting side reads warSails from mod-config.json; a mismatch refuses every later host attempt.
+            // Only a server reads warSails from mod-config.json; a mismatch refuses every later host attempt.
             navalSupport = NavalSupportDetector.ForStartup(
                 moduleInfoProvider, System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location), isServer).Decide();
             ModInformation.IsNavalDlcActive = navalSupport.IsActive;

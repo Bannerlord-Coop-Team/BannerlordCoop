@@ -14,7 +14,7 @@ public interface INavalSupportDetector
 {
     /// <summary>
     /// Whether NavalDLC is enabled, the build's feature flag is on, it compiled the naval code and both naval assemblies load.
-    /// The hosting side also needs <c>modOptions.warSails</c> to match NavalDLC, otherwise it gets a refusal.
+    /// A server also needs <c>modOptions.warSails</c> to match NavalDLC, otherwise it gets a refusal. Clients never read it.
     /// </summary>
     NavalSupportDecision Decide();
 }
