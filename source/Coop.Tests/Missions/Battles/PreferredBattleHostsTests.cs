@@ -24,6 +24,15 @@ public class PreferredBattleHostsTests : IDisposable
     }
 
     [Fact]
+    public void NullList_RanksEveryoneUnlisted()
+    {
+        ModConfigProvider.ModOptions = default;
+
+        Assert.Null(ModConfigProvider.ModOptions.PreferredBattleHosts);
+        Assert.Equal(PreferredBattleHosts.Unlisted, new PreferredBattleHosts().RankOf("76561198000000001"));
+    }
+
+    [Fact]
     public void BlankEntriesOnly_RankEveryoneUnlisted()
     {
         var hosts = Load(new List<string> { "", "  " });
