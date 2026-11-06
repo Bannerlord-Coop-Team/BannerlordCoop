@@ -88,20 +88,6 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
-    /// Checks whether the peer currently standing for a player rules the given kingdom. Does not log,
-    /// so a handler that allows more than one sender logs once when it refuses. Reads the kingdom's
-    /// live leader, so call it on the game thread.
-    /// </summary>
-    bool IsSenderRuling(object sender, Kingdom kingdom);
-
-    /// <summary>
-    /// Checks whether the peer currently standing for a player leads a clan serving the given kingdom
-    /// as a mercenary. Does not log, so a handler that allows more than one sender logs once when it
-    /// refuses. Reads the live clan, so call it on the game thread.
-    /// </summary>
-    bool IsSenderMercenaryOf(object sender, Kingdom kingdom);
-
-    /// <summary>
     /// Checks whether a message sender is the peer controlling the given party, logging a warning
     /// when it isn't, so a handler can ignore a request made with a stale or wrong party id.
     /// </summary>
@@ -443,25 +429,6 @@ public class PlayerManager : IPlayerManager
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
         return false;
-    }
-
-    public bool IsSenderRuling(object sender, Kingdom kingdom)
-    {
-        return kingdom != null && TryGetCurrentSenderHero(sender, out var hero) && kingdom.Leader == hero;
-    }
-
-    public bool IsSenderMercenaryOf(object sender, Kingdom kingdom)
-    {
-        return kingdom != null && TryGetCurrentSenderHero(sender, out var hero) &&
-            hero.Clan is { IsUnderMercenaryService: true } clan && clan.Kingdom == kingdom && clan.Leader == hero;
-    }
-
-    // Unlike TryGetSenderHero, an old peer kept in the peer map after a reconnect resolves no hero.
-    private bool TryGetCurrentSenderHero(object sender, out Hero hero)
-    {
-        hero = null;
-        return sender is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
-            TryGetPlayer(controllerId, out var player) && objectManager.TryGetObject(player.HeroId, out hero);
     }
 
     public bool IsSenderControllingParty(object sender, string mobilePartyId)

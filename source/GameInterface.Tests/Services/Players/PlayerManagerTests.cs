@@ -6,7 +6,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
-using LiteNetLib;
 using Moq;
 using Serilog;
 using System;
@@ -310,110 +309,6 @@ public class PlayerManagerTests
 
         Assert.False(playerManager.IsSenderControllingParty(peer, string.Empty));
         Assert.False(playerManager.IsSenderControllingParty(peer, null));
-    }
-
-    [Fact]
-    public void IsSenderRuling_OnlyTheRulersCurrentPeerPasses()
-    {
-        var senders = CreateKingdomSenders();
-        try
-        {
-            var playerManager = senders.PlayerManager;
-            Assert.True(playerManager.IsSenderRuling(senders.RulerPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderRuling(senders.MemberPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderRuling(senders.MercenaryPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, senders.OtherKingdom));
-            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, null));
-
-            // After a reconnect the old peer stays in the peer map but no longer speaks for the ruler.
-            var reconnectedPeer = senders.Network.CreatePeer("10.0.0.10");
-            playerManager.SetPeer(ControllerId, reconnectedPeer);
-            Assert.True(playerManager.IsSenderRuling(reconnectedPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderRuling(senders.RulerPeer, senders.Kingdom));
-            // The handler logs once when it refuses, so a miss here must stay quiet.
-            Assert.DoesNotContain(senders.Logger.Invocations, invocation => invocation.Method.Name == nameof(ILogger.Warning));
-        }
-        finally
-        {
-            senders.Cleanup();
-        }
-    }
-
-    [Fact]
-    public void IsSenderMercenaryOf_OnlyTheMercenaryLeadersCurrentPeerPasses()
-    {
-        var senders = CreateKingdomSenders();
-        try
-        {
-            var playerManager = senders.PlayerManager;
-            Assert.True(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderMercenaryOf(senders.RulerPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderMercenaryOf(senders.MemberPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.OtherKingdom));
-            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, null));
-
-            // After a reconnect the old peer stays in the peer map but no longer speaks for the mercenary.
-            var reconnectedPeer = senders.Network.CreatePeer("10.0.0.11");
-            playerManager.SetPeer("PlayerThree", reconnectedPeer);
-            Assert.True(playerManager.IsSenderMercenaryOf(reconnectedPeer, senders.Kingdom));
-            Assert.False(playerManager.IsSenderMercenaryOf(senders.MercenaryPeer, senders.Kingdom));
-            Assert.DoesNotContain(senders.Logger.Invocations, invocation => invocation.Method.Name == nameof(ILogger.Warning));
-        }
-        finally
-        {
-            senders.Cleanup();
-        }
-    }
-
-    // A ruler, a plain member and a mercenary of one kingdom, each with its own peer.
-    private KingdomSenders CreateKingdomSenders()
-    {
-        var logger = new Mock<ILogger>();
-        var objectManager = new Mock<IObjectManager>();
-        var playerManager = new PlayerManager(logger.Object, objectManager.Object, new ControllerIdProvider());
-        var ruler = ObjectHelper.SkipConstructor<Hero>();
-        var member = ObjectHelper.SkipConstructor<Hero>();
-        var mercenary = ObjectHelper.SkipConstructor<Hero>();
-        objectManager.Setup(o => o.TryGetObject(HeroId, out ruler)).Returns(true);
-        objectManager.Setup(o => o.TryGetObject("HeroTwo", out member)).Returns(true);
-        objectManager.Setup(o => o.TryGetObject("HeroThree", out mercenary)).Returns(true);
-        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
-        kingdom._rulingClan = CreateClanInKingdom(ruler, kingdom, isMercenary: false);
-        CreateClanInKingdom(member, kingdom, isMercenary: false);
-        CreateClanInKingdom(mercenary, kingdom, isMercenary: true);
-        var network = new TestNetwork();
-        // Test peers share one endpoint, and peers compare by endpoint, so each peer gets its own address.
-        var rulerPeer = network.CreatePeer();
-        var memberPeer = network.CreatePeer("10.0.0.8");
-        var mercenaryPeer = network.CreatePeer("10.0.0.9");
-
-        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
-        Assert.True(playerManager.AddPlayer(new Player("PlayerTwo", "HeroTwo", string.Empty, string.Empty, string.Empty)));
-        Assert.True(playerManager.AddPlayer(new Player("PlayerThree", "HeroThree", string.Empty, string.Empty, string.Empty)));
-        playerManager.SetPeer(ControllerId, rulerPeer);
-        playerManager.SetPeer("PlayerTwo", memberPeer);
-        playerManager.SetPeer("PlayerThree", mercenaryPeer);
-
-        return new KingdomSenders(logger, playerManager, network, kingdom, ObjectHelper.SkipConstructor<Kingdom>(),
-            rulerPeer, memberPeer, mercenaryPeer, () =>
-            {
-                GetPlayerObjects().Remove(ruler);
-                GetPlayerObjects().Remove(member);
-                GetPlayerObjects().Remove(mercenary);
-            });
-    }
-
-    private sealed record KingdomSenders(Mock<ILogger> Logger, PlayerManager PlayerManager, TestNetwork Network,
-        Kingdom Kingdom, Kingdom OtherKingdom, NetPeer RulerPeer, NetPeer MemberPeer, NetPeer MercenaryPeer, Action Cleanup);
-
-    private static Clan CreateClanInKingdom(Hero leader, Kingdom kingdom, bool isMercenary)
-    {
-        var clan = ObjectHelper.SkipConstructor<Clan>();
-        clan._leader = leader;
-        clan._kingdom = kingdom;
-        clan.IsUnderMercenaryService = isMercenary;
-        leader._clan = clan;
-        return clan;
     }
 
     [Fact]

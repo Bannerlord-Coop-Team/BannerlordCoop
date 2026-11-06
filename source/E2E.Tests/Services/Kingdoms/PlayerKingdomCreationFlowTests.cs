@@ -1,7 +1,6 @@
 ﻿using Common;
 using GameInterface.Configuration;
 using Common.Commands;
-using GameInterface.Services.Alliances.Messages;
 using Common.Network;
 using Common.Messaging;
 using Common.Logging;
@@ -623,76 +622,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.PumpGameThread();
     }
     
-    [Theory]
-    [InlineData("Ruler", true)]
-    [InlineData("Mercenary", true)]
-    [InlineData("Member", false)]
-    [InlineData("Outsider", false)]
-    [InlineData("RulerWithSecondClan", false)]
-    public void AllianceAcceptRequest_AppliesOnlyFromTheReceivingKingdomsRulerOrMercenary(string sender, bool applies)
-    {
-        var scenario = CreateRulerAndOutsiderScenario();
-        AllianceCampaignBehavior behavior = null;
-        Server.Call(() =>
-        {
-            behavior = new AllianceCampaignBehavior();
-            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
-        });
-
-        Server.SimulateMessage(GetKingdomOfferSender(sender, scenario.KingdomId).NetPeer, new NetworkRequestStartAlliance(scenario.OtherKingdomId, scenario.KingdomId));
-        Server.PumpGameThread();
-
-        Server.Call(() => Assert.Equal(applies, behavior.IsAllyWithKingdom(
-            Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId))));
-    }
-
-    [Theory]
-    [InlineData("Mercenary", true)]
-    [InlineData("Ruler", false)]
-    [InlineData("Member", false)]
-    [InlineData("Outsider", false)]
-    public void TradeAgreementAcceptRequest_AppliesOnlyFromTheKingdomsMercenary(string sender, bool applies)
-    {
-        var scenario = CreateRulerAndOutsiderScenario();
-        TradeAgreementsCampaignBehavior behavior = null;
-        Server.Call(() =>
-        {
-            behavior = new TradeAgreementsCampaignBehavior();
-            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { behavior }));
-        });
-
-        Server.SimulateMessage(GetKingdomOfferSender(sender, scenario.KingdomId).NetPeer, new NetworkClientAcceptsTradeAgreementOffer(scenario.OtherKingdomId, scenario.KingdomId));
-        Server.PumpGameThread();
-
-        Server.Call(() => Assert.Equal(applies, behavior.TryGetTradeAgreement(
-            Server.GetRegisteredObject<Kingdom>(scenario.OtherKingdomId), Server.GetRegisteredObject<Kingdom>(scenario.KingdomId), out _)));
-    }
-
-    // Vanilla only accepts these offers straight away for a mercenary, or for the ruler of a one clan kingdom
-    // with alliances, so the second player joins the kingdom as a mercenary or a plain member, or stays outside.
-    // RulerWithSecondClan has the ruler send while the second player's clan makes it a two clan kingdom.
-    private EnvironmentInstance GetKingdomOfferSender(string sender, string kingdomId)
-    {
-        if (sender == "Ruler") return Clients.First();
-        if (sender == "Outsider") return Clients.Last();
-
-        Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(SecondControllerId, out var player));
-        ConfigureClanInKingdom(player.ClanId, kingdomId);
-        foreach (var instance in new[] { Server }.Concat(Clients))
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
-                using (new AllowedThread())
-                {
-                    clan.IsUnderMercenaryService = sender == "Mercenary";
-                }
-            });
-        }
-
-        return sender == "RulerWithSecondClan" ? Clients.First() : Clients.Last();
-    }
-
     [Fact]
     public void AddDecisionRequest_FromOutsideTheKingdom_IsRefused()
     {

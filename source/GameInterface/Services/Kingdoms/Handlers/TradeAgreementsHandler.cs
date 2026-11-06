@@ -6,8 +6,6 @@ using Common.Util;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -22,18 +20,15 @@ internal class TradeAgreementsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public TradeAgreementsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<UpdateTradeAgreement>(Handle_UpdateTradeAgreement);
         messageBroker.Subscribe<NetworkUpdateTradeAgreement>(Handle_NetworkUpdateTradeAgreement);
@@ -118,7 +113,6 @@ internal class TradeAgreementsHandler : IHandler
     private void Handle_NetworkClientAcceptsTradeAgreementOffer(MessagePayload<NetworkClientAcceptsTradeAgreementOffer> obj)
     {
         var data = obj.What;
-        var sender = obj.Who;
 
         // Run new trade agreement on server to use patch, updating all clients as well
         GameThread.RunSafe(() =>
@@ -127,13 +121,6 @@ internal class TradeAgreementsHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.FromKingdomId, out var fromKingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.PlayerKingdomId, out var playerKingdom)) return;
-            // Vanilla only accepts straight away for a mercenary (OnTradeAgreementOfferedToPlayer), every other member and the ruler get a vote.
-            if (!playerManager.IsSenderMercenaryOf(sender, playerKingdom))
-            {
-                Logger.Warning("Ignoring a trade agreement accept for kingdom {KingdomId} from peer {PeerId}, which is not its mercenary",
-                    playerKingdom.StringId, (sender as NetPeer)?.Id);
-                return;
-            }
 
             tradeAgreementsBehavior.MakeTradeAgreement(
                 fromKingdom,
