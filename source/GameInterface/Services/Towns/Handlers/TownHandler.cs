@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using Serilog;
@@ -44,7 +45,8 @@ namespace GameInterface.Services.Towns.Handlers
                 return;
             }
 
-            var sellLogs = obj.LogList.Select(log =>
+            // Protobuf sends an empty list as null, so null means the server cleared the sold items
+            var sellLogs = (obj.LogList ?? new SellLogData[0]).Select(log =>
             {
                 if (objectManager.TryGetObject(log.CategoryID, out ItemCategory itemCategory) == false)
                 {
