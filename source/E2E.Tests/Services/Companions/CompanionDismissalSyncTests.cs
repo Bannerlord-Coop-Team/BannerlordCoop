@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
@@ -9,6 +7,8 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
