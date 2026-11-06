@@ -1,12 +1,10 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -17,7 +15,6 @@ namespace GameInterface.Services.Actions.Handlers;
 
 public class DisbandArmyHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<DisbandArmyHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;

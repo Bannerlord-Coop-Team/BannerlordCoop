@@ -194,10 +194,12 @@ internal class PlayerArmyWaitBehaviorPatches
             MessageBroker.Instance.Publish(MobileParty.MainParty, new EndSettlementEncounterAttempted(MobileParty.MainParty));
             PartyBase.MainParty.SetVisualAsDirty();
         }
+
         var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }
+
     [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.wait_menu_army_abandon_on_consequence))]
     [HarmonyPrefix]
     private static bool Prefixwait_menu_army_abandon_on_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
@@ -212,8 +214,19 @@ internal class PlayerArmyWaitBehaviorPatches
             GameMenu.ExitToLast();
         }
         var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
-        ArmyPatches.RemoveMobilePartyInArmy(MobileParty.MainParty, MobileParty.MainParty.Army, MobileParty.MainParty);
+        
         MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(PlayerArmyWaitBehavior), nameof(PlayerArmyWaitBehavior.player_kicked_out_from_army_consequence))]
+    [HarmonyPrefix]
+    private static bool Prefixplayer_kicked_out_from_army_consequence(PlayerArmyWaitBehavior __instance, MenuCallbackArgs args)
+    {
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
+
+        MessageBroker.Instance.Publish(__instance, message);
+        PlayerArmyWaitBehavior.army_dispersed_continue_on_consequence(args);
         return false;
     }
 }
