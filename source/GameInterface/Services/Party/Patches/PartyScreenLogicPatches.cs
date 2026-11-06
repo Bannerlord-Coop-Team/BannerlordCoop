@@ -103,6 +103,7 @@ internal class PartyScreenLogicPatches
         {
             partyScreenMode = activePartyState.PartyScreenMode;
         }
+        // Refuse instead of running vanilla, since vanilla would apply the party change on this client only
         if (!ContainerProvider.TryResolve<IGarrisonDonationContext>(out var garrisonDonation))
         {
             Logger.Error("Ignoring a party screen Done because {type} could not be resolved", nameof(IGarrisonDonationContext));

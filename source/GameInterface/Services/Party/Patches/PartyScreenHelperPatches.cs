@@ -105,6 +105,7 @@ internal class PartyScreenHelperPatches
                 return false;
             }
 
+            // Refuse instead of running vanilla, since vanilla would move the troops on this client only
             if (!ContainerProvider.TryResolve<IGarrisonDonationContext>(out var garrisonDonation))
             {
                 Logger.Error("Ignoring a garrison donation Done because {type} could not be resolved", nameof(IGarrisonDonationContext));
