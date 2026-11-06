@@ -21,10 +21,12 @@ namespace Coop
                 string line = $"{DateTime.Now:HH:mm:ss.fff} {message}\n";
                 lock (_fileLogLock)
                 {
-                    for (int attempt = 0; ; attempt++)
+                    for (int attempt = 1; attempt <= 5; attempt++)
                     {
+                        if (attempt > 1) Thread.Sleep(25);
+
                         try { File.AppendAllText("BootPatches.log", line); return; }
-                        catch (IOException) when (attempt < 4) { Thread.Sleep(25); }
+                        catch (IOException) { }
                     }
                 }
             }
