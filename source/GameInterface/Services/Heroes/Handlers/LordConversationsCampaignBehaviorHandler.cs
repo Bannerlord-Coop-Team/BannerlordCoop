@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages.LordConversations;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
@@ -114,17 +113,6 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.Party != mainParty)
-            {
-                Logger.Warning("Ignoring taking hero {HeroId} prisoner into a party the sender is not in", conversationHero.StringId);
-                return;
-            }
-            // Players are taken through player captivity, so this conversation only ever holds an AI lord.
-            if (conversationHero.IsPlayerHero())
-            {
-                Logger.Warning("Ignoring taking player hero {HeroId} prisoner from a lord conversation", conversationHero.StringId);
-                return;
-            }
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },
@@ -145,7 +133,6 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 

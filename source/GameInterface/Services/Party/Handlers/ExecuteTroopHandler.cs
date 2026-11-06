@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -18,18 +17,15 @@ internal class ExecuteTroopHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public ExecuteTroopHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<HeroExecuted>(Handle_HeroExecuted);
         messageBroker.Subscribe<NetworkExecuteHero>(Handle_NetworkExecuteHero);
@@ -58,8 +54,6 @@ internal class ExecuteTroopHandler : IHandler
     private void Handle_NetworkExecuteHero(MessagePayload<NetworkExecuteHero> obj)
     {
         var data = obj.What;
-        // A client may only execute as its own hero.
-        if (!playerManager.IsSenderControllingHero(obj.Who, data.ExecutorId)) return;
 
         GameThread.RunSafe(() =>
         {

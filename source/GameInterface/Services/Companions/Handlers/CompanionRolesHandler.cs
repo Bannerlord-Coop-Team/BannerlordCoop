@@ -6,7 +6,6 @@ using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Clans;
@@ -402,10 +401,8 @@ internal class CompanionRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.IsSenderControllingParty(obj.Who, data.MainPartyId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
-            if (oneToOneConversationHero.IsPlayerHero() || !playerManager.IsSenderControllingClan(obj.Who, oneToOneConversationHero.Clan)) return;
 
             AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
         });
@@ -702,7 +699,6 @@ internal class CompanionRolesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!oneToOneConversationHero.IsPrisoner) return;
-            if (!playerManager.IsSenderControllingClan(obj.Who, oneToOneConversationHero.Clan)) return;
 
             EndCaptivityAction.ApplyByReleasedAfterBattle(oneToOneConversationHero);
         }, context: nameof(RescueCompanion));

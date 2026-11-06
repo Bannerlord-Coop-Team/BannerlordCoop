@@ -6,7 +6,6 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -110,13 +109,6 @@ public class AsymmetricEncounterActionTests : MapEventTestBase
         RegisterAsPlayerParty("initiator", initiatorHeroId, ctx.AttackerPartyId);
         RegisterAsPlayerParty("recipient", recipientHeroId, ctx.DefenderPartyId);
         PreparePlayerPartyForCapture(recipientHeroId, ctx.DefenderPartyId);
-        // The server takes a surrender only from the peer that plays the party.
-        Server.Call(() =>
-        {
-            var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("initiator", Clients.First().NetPeer);
-            playerManager.SetPeer("recipient", Clients.Last().NetPeer);
-        });
 
         SetMainPartyInBattle(Clients.First(), ctx.AttackerPartyId);
         SetMainPartyInBattle(Clients.Last(), ctx.DefenderPartyId);

@@ -3,9 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameMenus.Messages;
-using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -20,18 +18,15 @@ internal class ExecuteTroopActionHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public ExecuteTroopActionHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MenuHeroTakenToParty>(Handle_MenuHeroTakenToParty);
         messageBroker.Subscribe<MenuTakeHeroToParty>(Handle_MenuTakeHeroToParty);
@@ -53,15 +48,11 @@ internal class ExecuteTroopActionHandler : IHandler
 
     private void Handle_MenuTakeHeroToParty(MessagePayload<MenuTakeHeroToParty> obj)
     {
-        if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
-            // The menu only offers the player's own clan members, and never another player's hero.
-            if (!playerManager.IsSenderControllingClan(obj.Who, hero.Clan) || hero.IsPlayerHero()) return;
-
             if (hero.CurrentSettlement != null && hero.CurrentSettlement.Notables?.Contains(hero) == true)
             {
                 LeaveSettlementAction.ApplyForCharacterOnly(hero);
