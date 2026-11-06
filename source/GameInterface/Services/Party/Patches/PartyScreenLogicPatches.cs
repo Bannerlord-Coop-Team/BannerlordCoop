@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using MathF = TaleWorlds.Library.MathF;
 
@@ -97,19 +98,31 @@ internal class PartyScreenLogicPatches
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ResetPrisonerDonationRequest();
-        PartyScreenHelperPatches.ResetGarrisonDonationRequest();
         var partyScreenMode = __instance._partyScreenMode;
         if (Game.Current.GameStateManager.ActiveState is PartyState activePartyState)
         {
             partyScreenMode = activePartyState.PartyScreenMode;
         }
-        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        if (!ContainerProvider.TryResolve<IGarrisonDonationContext>(out var garrisonDonation))
+        {
+            Logger.Error("Ignoring a party screen Done because {type} could not be resolved", nameof(IGarrisonDonationContext));
+            __result = false;
+            return false;
+        }
+
+        bool flag;
+        Settlement garrisonDonationSettlement;
+        // The donate garrison Done handler records its town in this scope, so the server moves the troops in the same Done
+        using (garrisonDonation.BeginDone())
+        {
+            flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+            garrisonDonationSettlement = garrisonDonation.DonationSettlement;
+        }
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
             out var donationSettlement,
             out var donatedPrisonersRoster);
-        var garrisonDonationSettlement = PartyScreenHelperPatches.ConsumeGarrisonDonationSettlement();
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);

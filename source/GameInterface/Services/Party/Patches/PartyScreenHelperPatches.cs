@@ -23,8 +23,6 @@ internal class PartyScreenHelperPatches
     private static Settlement _donationSettlement;
     [ThreadStatic]
     private static FlattenedTroopRoster _donatedPrisonersRoster;
-    [ThreadStatic]
-    private static Settlement _garrisonDonationSettlement;
 
     internal static void ResetReleasedAndTakenPrisonerActionsRequest()
         => _releasedAndTakenPrisonerActionsRequested = false;
@@ -42,9 +40,6 @@ internal class PartyScreenHelperPatches
         _donatedPrisonersRoster = null;
     }
 
-    internal static void ResetGarrisonDonationRequest()
-        => _garrisonDonationSettlement = null;
-
     internal static bool ConsumePrisonerDonationRequest(
         out Settlement settlement,
         out FlattenedTroopRoster donatedPrisonersRoster)
@@ -53,14 +48,6 @@ internal class PartyScreenHelperPatches
         donatedPrisonersRoster = _donatedPrisonersRoster;
         ResetPrisonerDonationRequest();
         return settlement != null && donatedPrisonersRoster != null;
-    }
-
-    // The town troops were donated to on this Done, so the server moves them from the party to its garrison in that same Done
-    internal static Settlement ConsumeGarrisonDonationSettlement()
-    {
-        var settlement = _garrisonDonationSettlement;
-        _garrisonDonationSettlement = null;
-        return settlement;
     }
 
     [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
@@ -118,7 +105,15 @@ internal class PartyScreenHelperPatches
                 return false;
             }
 
-            _garrisonDonationSettlement = currentSettlement;
+            if (!ContainerProvider.TryResolve<IGarrisonDonationContext>(out var garrisonDonation))
+            {
+                Logger.Error("Ignoring a garrison donation Done because {type} could not be resolved", nameof(IGarrisonDonationContext));
+                __result = false;
+                return false;
+            }
+
+            // The server moves the troops from the party to this town's garrison in the same Done
+            garrisonDonation.DonationSettlement = currentSettlement;
         }
 
         __result = true;
