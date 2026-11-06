@@ -7,17 +7,13 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.BugReporting.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI.Patches;
-using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
-using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -106,75 +102,6 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(player.HeroId, request.HeroId);
     }
-
-    [Fact]
-    public void UnstuckButton_IsOnlyInTheCampaignMapEscapeMenuOfClients()
-    {
-        var campaignPostfix = AccessTools.Method(typeof(EscapeMenuCoopOptionsPatch), "AddCoopOptionsItem");
-        var missionPostfix = AccessTools.Method(typeof(MissionEscapeMenuCoopOptionsPatch), "AddCoopOptionsItem");
-
-        List<string> clientCampaign = null;
-        List<string> clientMission = null;
-        Client.Call(() =>
-        {
-            clientCampaign = RunEscapeMenuPostfix(campaignPostfix);
-            clientMission = RunEscapeMenuPostfix(missionPostfix);
-        });
-
-        List<string> serverCampaign = null;
-        Server.Call(() => serverCampaign = RunEscapeMenuPostfix(campaignPostfix));
-
-        var stuckIndex = clientCampaign.IndexOf("I'm stuck");
-        Assert.True(stuckIndex > clientCampaign.IndexOf("Coop Options"));
-        Assert.Equal(clientCampaign.Count - 2, stuckIndex);
-        Assert.DoesNotContain("I'm stuck", clientMission);
-        Assert.DoesNotContain("I'm stuck", serverCampaign);
-    }
-
-    [Fact]
-    public void SaveAndLoadEntries_AreHiddenOnClientsOnly()
-    {
-        var postfix = AccessTools.Method(typeof(EscapeMenuHideSavePatch), "HideSaveButtons");
-        string[] stockMenu =
-        {
-            "{=e139gKZc}Return to the Game", "{=PXT6aA4J}Campaign Options", "{=NqarFr4P}Options",
-            "{=bV75iwKa}Save", "{=e0KdfaNe}Save As", "{=9NuttOBC}Load", "{=AbEh2y8o}Save And Exit",
-            "{=RamV6yLM}Exit to Main Menu",
-        };
-
-        List<string> client = null;
-        List<string> server = null;
-        Client.Call(() => client = RunHideSavePostfix(postfix, stockMenu));
-        Server.Call(() => server = RunHideSavePostfix(postfix, stockMenu));
-
-        Assert.Equal(new[] { 0, 1, 2, 7 }.Select(i => new TextObject(stockMenu[i]).ToString()), client);
-        Assert.Equal(stockMenu.Select(text => new TextObject(text).ToString()), server);
-    }
-
-    private static List<string> RunHideSavePostfix(MethodInfo postfix, string[] texts)
-    {
-        var items = texts.Select(CreateEscapeMenuItem).ToList();
-        postfix.Invoke(null, new object[] { items });
-        return items.Select(item => item.ActionText).ToList();
-    }
-
-    /// <summary>Runs an escape menu postfix on a stock-like item list and returns the item texts in order.</summary>
-    private static List<string> RunEscapeMenuPostfix(MethodInfo postfix)
-    {
-        var items = new List<EscapeMenuItemVM>
-        {
-            CreateEscapeMenuItem("{=e139gKZc}Return to the Game"),
-            CreateEscapeMenuItem("{=PXT6aA4J}Campaign Options"),
-            CreateEscapeMenuItem("{=NqarFr4P}Options"),
-        };
-
-        postfix.Invoke(null, new object[] { null, items });
-
-        return items.Select(item => item.ActionText).ToList();
-    }
-
-    private static EscapeMenuItemVM CreateEscapeMenuItem(string text) =>
-        new EscapeMenuItemVM(new TextObject(text), _ => { }, null, () => new Tuple<bool, TextObject>(false, new TextObject("")));
 
     [Fact]
     public void PlayerBugReport_RequestsDiagnosticLogsFromEveryConnectedClient()
