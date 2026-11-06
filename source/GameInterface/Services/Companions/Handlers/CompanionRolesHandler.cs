@@ -8,6 +8,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Interfaces;
 using GameInterface.Services.Companions.Messages;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -403,12 +404,28 @@ internal class CompanionRolesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
-            // Vanilla offers the rejoin only to a companion outside the main party who leads no party.
-            // A stale dialog must not pull it out of a party it joined meanwhile, like another player's.
-            if (oneToOneConversationHero.PartyBelongedTo != null)
+            // Recheck vanilla's rejoin condition on live state, since a stale dialog may arrive after the companion moved
+            var currentParty = oneToOneConversationHero.PartyBelongedTo;
+            if (oneToOneConversationHero.IsPartyLeader)
             {
-                logger.Warning("Ignored companion rejoin for {HeroId} because it is already in {PartyId}",
-                    data.OneToOneConversationHeroId, oneToOneConversationHero.PartyBelongedTo.StringId);
+                logger.Warning("Ignored companion rejoin for {HeroId} because it leads a party", data.OneToOneConversationHeroId);
+                return;
+            }
+            if (currentParty == mainParty)
+            {
+                logger.Warning("Ignored companion rejoin for {HeroId} because it is already in the party", data.OneToOneConversationHeroId);
+                return;
+            }
+            if (currentParty != null && currentParty.IsCaravan)
+            {
+                logger.Warning("Ignored companion rejoin for {HeroId} because it is in a caravan", data.OneToOneConversationHeroId);
+                return;
+            }
+            // Another player may have taken the companion into their party while this dialog was open
+            if (currentParty != null && currentParty.IsPlayerParty())
+            {
+                logger.Warning("Ignored companion rejoin for {HeroId} because it is in another player's party {PartyId}",
+                    data.OneToOneConversationHeroId, currentParty.StringId);
                 return;
             }
 
