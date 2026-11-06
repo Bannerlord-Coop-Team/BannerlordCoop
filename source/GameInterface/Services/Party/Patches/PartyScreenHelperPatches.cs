@@ -55,7 +55,7 @@ internal class PartyScreenHelperPatches
         return settlement != null && donatedPrisonersRoster != null;
     }
 
-    // The town troops were donated to on this Done, so the server takes them from the party only if the town takes them too
+    // The town troops were donated to on this Done, so the server moves them from the party to its garrison in that same Done
     internal static Settlement ConsumeGarrisonDonationSettlement()
     {
         var settlement = _garrisonDonationSettlement;
@@ -120,9 +120,6 @@ internal class PartyScreenHelperPatches
 
             _garrisonDonationSettlement = currentSettlement;
         }
-
-        var message = new GarrisonDonated(currentSettlement, leftMemberRoster);
-        MessageBroker.Instance.Publish(null, message);
 
         __result = true;
         return false;

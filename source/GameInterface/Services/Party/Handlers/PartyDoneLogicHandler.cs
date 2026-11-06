@@ -264,11 +264,12 @@ internal class PartyDoneLogicHandler : IHandler
                 return;
             }
 
-            // The garrison side of a troop donation is refused once the party left the town (stale screen),
-            // so keep the troops in the party too instead of losing them
+            // Donated troops join the garrison only with this Done, so a stale screen after the party left
+            // the town changes neither the party nor the garrison
+            Settlement garrisonDonationSettlement = null;
             if (message.GarrisonDonationSettlementId != null)
             {
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(message.GarrisonDonationSettlementId, out var garrisonDonationSettlement)) return;
+                if (!objectManager.TryGetObjectWithLogging(message.GarrisonDonationSettlementId, out garrisonDonationSettlement)) return;
 
                 if (mainHero.PartyBelongedTo?.CurrentSettlement != garrisonDonationSettlement)
                 {
@@ -344,6 +345,8 @@ internal class PartyDoneLogicHandler : IHandler
                 ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, applicableTakenPrisonersRoster);
             if (donationSettlement != null)
                 ApplyPrisonerDonationEffects(mainHero, donationSettlement, donatedPrisonersRoster);
+            if (garrisonDonationSettlement != null)
+                ApplyGarrisonDonation(garrisonDonationSettlement, message.LeftMemberRosterData);
             NotifyTakenPrisonersChanged(applicableTakenPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
@@ -683,6 +686,26 @@ internal class PartyDoneLogicHandler : IHandler
             mainHero.PartyBelongedTo,
             donatedPrisonersRoster,
             settlement);
+    }
+
+    // Vanilla DonateGarrisonDoneHandler, run once the Done that took these troops from the party is applied.
+    // The donate screen's left roster starts empty, so its delta is the whole donated roster.
+    private void ApplyGarrisonDonation(Settlement settlement, TroopRosterData donatedTroops)
+    {
+        MobileParty garrisonParty = settlement.Town.GarrisonParty;
+        if (garrisonParty == null)
+        {
+            settlement.AddGarrisonParty();
+            garrisonParty = settlement.Town.GarrisonParty;
+        }
+
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(donatedTroops))
+        {
+            garrisonParty.AddElementToMemberRoster(element.Character, element.Number, false);
+
+            if (element.Character.IsHero)
+                EnterSettlementAction.ApplyForCharacterOnly(element.Character.HeroObject, settlement);
+        }
     }
 
     private static void ApplyReleasedAndTakenPrisonerActions(
