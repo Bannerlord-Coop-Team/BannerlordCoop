@@ -38,6 +38,16 @@ internal class ClanMemberRolesCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnHeroJoinedPartyPrefix() => ModInformation.IsClient;
 
+    // Clients add a joining hero through the roster delta instead of AddHeroToPartyAction, so OnHeroJoinedPartyEvent never fires there.
+    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.OnHeroAdded))]
+    [HarmonyPostfix]
+    private static void OnHeroAddedPostfix(MobileParty __instance, Hero hero)
+    {
+        if (ModInformation.IsServer || !__instance.IsMainParty) return;
+
+        Campaign.Current.GetCampaignBehavior<ClanMemberRolesCampaignBehavior>()?.OnHeroJoinedParty(hero, __instance);
+    }
+
     // Vanilla adjusts the AI of any hero agent in the mission, but another player's companion is a puppet with no AgentNavigator.
     [HarmonyPatch(nameof(ClanMemberRolesCampaignBehavior.OnHeroGetsBusy))]
     [HarmonyPrefix]
@@ -95,11 +105,11 @@ internal class ClanMemberRolesCampaignBehaviorPatches
         if (ModInformation.IsServer) return false;
         if (PlayerEncounter.LocationEncounter == null) return true;
 
-        // Party join and hero busy events only run on the server, so drop followers that have left the party since.
+        // Party join and hero busy events only run on the server, and vanilla never drops wounded followers, so drop any that can no longer spawn.
         bool removed = false;
         foreach (Hero hero in __instance._isFollowingPlayer.ToList())
         {
-            if (hero.PartyBelongedTo == MobileParty.MainParty && !hero.IsPrisoner) continue;
+            if (hero.PartyBelongedTo == MobileParty.MainParty && !hero.IsPrisoner && !hero.IsWounded) continue;
 
             __instance.RemoveAccompanyingHero(hero);
             removed = true;
