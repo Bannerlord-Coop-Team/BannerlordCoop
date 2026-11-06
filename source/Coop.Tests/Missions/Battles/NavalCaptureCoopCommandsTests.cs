@@ -1,5 +1,6 @@
 ﻿#if COOP_NAVAL && DEBUG
 using Common.Commands;
+using Missions.Battles;
 using Missions.Naval;
 using Moq;
 using Xunit;
@@ -75,7 +76,7 @@ public class NavalCaptureCoopCommandsTests
     [InlineData(false, "local", false)]
     public void IsOwnOrphan_OnlyThisClientsOrphan(bool orphaned, string authority, bool expected)
     {
-        var info = new global::Missions.Battles.NetworkShipInfo(System.Guid.NewGuid(), authority, "party", false,
+        var info = new NetworkShipInfo(System.Guid.NewGuid(), authority, "party", false,
             ShipTestHulls.Create(), null);
         if (orphaned) info.MarkOrphaned(TaleWorlds.Core.BattleSideEnum.Attacker, 1);
 

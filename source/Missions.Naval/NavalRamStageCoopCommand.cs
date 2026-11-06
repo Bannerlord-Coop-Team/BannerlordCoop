@@ -11,10 +11,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>Places the invoking owner's hull facing a selected foreign enemy's broadside for a real ram.</summary>
-public interface INavalRamStageCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalRamStageCoopCommand"/>
-public sealed class NavalRamStageCoopCommand : INavalRamStageCoopCommand
+public sealed class NavalRamStageCoopCommand : ICoopCommand
 {
     private readonly INavalDebugHulls hulls;
     private readonly INavalRamStaging staging;

@@ -8,6 +8,7 @@ using Coop.Naval.CampaignBehaviors.Messages;
 using Coop.Naval.PortScreen;
 using Coop.Naval.PortScreen.Data;
 using Coop.Naval.PortScreen.Interfaces;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Interfaces;
 using HarmonyLib;
@@ -62,7 +63,7 @@ public class PortAffordabilityTests
     public void Repair_CostingMoreThanTheServerBalance_IsRefusedAndReplied()
     {
         var messageBroker = new TestMessageBroker();
-        var objectManager = new global::GameInterface.Services.ObjectManager.ObjectManager(Mock.Of<ILogger>());
+        var objectManager = new ObjectManager(Mock.Of<ILogger>());
         var network = new Mock<INetwork>();
         var pricer = new FakePortTransactionPricer { RepairCost = 150 };
         var hero = CreateHero(gold: 100);

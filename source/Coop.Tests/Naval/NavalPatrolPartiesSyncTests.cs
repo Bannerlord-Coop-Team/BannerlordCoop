@@ -7,6 +7,7 @@ using Coop.Naval.CampaignBehaviors.Handlers;
 using Coop.Naval.CampaignBehaviors.Interfaces;
 using Coop.Naval.CampaignBehaviors.Messages;
 using Coop.Naval.CampaignBehaviors.Patches;
+using ObjectManager = GameInterface.Services.ObjectManager.ObjectManager;
 using Moq;
 using Serilog;
 using System;
@@ -29,7 +30,7 @@ public class NavalPatrolPartiesSyncTests : IDisposable
 
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly TestMessageBroker messageBroker = new TestMessageBroker();
-    private readonly global::GameInterface.Services.ObjectManager.ObjectManager objectManager = new(Mock.Of<ILogger>());
+    private readonly ObjectManager objectManager = new(Mock.Of<ILogger>());
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly Mock<INavalPatrolPartiesCampaignBehaviorInterface> patrolInterface = new Mock<INavalPatrolPartiesCampaignBehaviorInterface>();
     private readonly NavalPatrolPartiesCampaignBehavior behavior = (NavalPatrolPartiesCampaignBehavior)FormatterServices.GetUninitializedObject(typeof(NavalPatrolPartiesCampaignBehavior));

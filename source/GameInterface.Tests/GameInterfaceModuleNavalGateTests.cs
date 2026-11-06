@@ -29,10 +29,12 @@ using GameInterface.Services.Ships.ShipUpgradePieces;
 using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Tests.Services.SiegeEvents;
+using GameInterface.Utils;
 using Common.Commands;
 using Common.Messaging;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Xunit;
@@ -66,7 +68,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         typeof(RaftDebugCommands.StrandOnRaftCoopCommand),
         typeof(BattleShipFateLedger),
         typeof(BattleShipFateApplier),
-        typeof(global::GameInterface.Utils.WaterClock),
+        typeof(WaterClock),
 #if DEBUG
         typeof(NavalScenarioClientHandler),
         typeof(NavalScenarioRejoinHandler),
@@ -142,9 +144,9 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Module_GatesNavalRegistrationsAndPatchesTogether(bool navalServicesEnabled)
+    public void Module_GatesNavalRegistrationsAndPatchesTogether(bool isNavalDlcActive)
     {
-        AssertNavalServices(new GameInterfaceModule(navalServicesEnabled), navalServicesEnabled);
+        AssertNavalServices(new GameInterfaceModule(isNavalDlcActive), isNavalDlcActive);
     }
 
     // A naval patch class without the naval category would be installed with naval off.
@@ -176,7 +178,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     {
         var ungated = NavalOnlyTypesInAssembly()
             .Where(type => type.IsClass && !type.IsAbstract && IsScannedRegistration(type))
-            .Where(type => GameInterfaceModule.ShouldRegister(type, navalServicesEnabled: false))
+            .Where(type => GameInterfaceModule.ShouldRegister(type, isNavalDlcActive: false))
             .Select(type => type.FullName);
 
         Assert.Empty(ungated);
@@ -195,21 +197,16 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         Assert.All(ExpectedNavalRegistrations, type => Assert.True(expected == registeredTypes.Contains(type), type.FullName));
         Assert.All(SharedLandRegistrations, type => Assert.True(registeredTypes.Contains(type), type.FullName));
         Assert.Equal(expected, container.IsRegistered<IPlayerRaftFleetInterface>());
-        Assert.Equal(expected, container.IsRegistered<IBattleShipFateApplier>());
 
         var harmony = new Harmony($"{nameof(GameInterfaceModuleNavalGateTests)}.{Guid.NewGuid():N}");
         try
         {
+            // The same two steps as GameInterface.PatchAll, so off must leave no naval-category patch installed at all.
             container.Resolve<IGameInterfacePatchInstaller>().Install(harmony);
+            foreach (var registration in container.Resolve<IEnumerable<HarmonyPatchCategoryRegistration>>())
+                registration.Apply(harmony);
 
-            var installedNavalClasses = harmony.GetPatchedMethods()
-                .Select(Harmony.GetPatchInfo)
-                .SelectMany(info => info.Prefixes.Concat(info.Postfixes).Concat(info.Transpilers).Concat(info.Finalizers))
-                .Where(patch => patch.owner == harmony.Id)
-                .Select(patch => patch.PatchMethod.DeclaringType)
-                .Where(type => ExpectedNavalPatchClasses.Contains(type))
-                .Distinct()
-                .ToList();
+            var installedNavalClasses = GameInterfacePatchInstallerTests.CategoryPatchesOwnedBy(harmony, GameInterface.HARMONY_NAVAL_CATEGORY);
             Assert.Equal(expected, installedNavalClasses.Count > 0);
         }
         finally

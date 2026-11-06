@@ -1,4 +1,5 @@
-﻿using Missions.Messages;
+﻿using Missions.Battles;
+using Missions.Messages;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -218,7 +219,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         c.ElapseCaptureTimer(prize, captorHull);
         c.Tick();
         bool captorHeldIt = c.Ship(prize).CurrentAuthority == "H" && c.Hull(prize).IsCopy;
-        c.Tick(global::Missions.Battles.ShipCaptureApplier.SwapWaitSeconds + 1f);
+        c.Tick(ShipCaptureApplier.SwapWaitSeconds + 1f);
 
         Assert.True(captorHeldIt);
         foreach (var peer in new[] { h, c, o })
@@ -474,7 +475,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             lateJoiner: "O");
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
-        c.Engine.CaptureResult = global::Missions.Battles.CaptureSwapResult.Failed;
+        c.Engine.CaptureResult = CaptureSwapResult.Failed;
         battle.ExpectLoggedFailure("the capture isn't recorded here");
         c.ElapseCaptureTimer(prize, captorHull);
         Assert.Null(c.Ship(prize).CaptorControllerId);

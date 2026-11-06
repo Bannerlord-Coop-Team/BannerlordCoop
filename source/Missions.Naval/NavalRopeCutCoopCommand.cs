@@ -8,10 +8,7 @@ using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine
 namespace Missions.Naval;
 
 /// <summary>Cuts a selected connection on the local hull authority.</summary>
-public interface INavalRopeCutCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalRopeCutCoopCommand"/>
-public sealed class NavalRopeCutCoopCommand : INavalRopeCutCoopCommand
+public sealed class NavalRopeCutCoopCommand : ICoopCommand
 {
     private readonly INavalDebugHulls hulls;
     private readonly INavalRopeRegistry ropes;

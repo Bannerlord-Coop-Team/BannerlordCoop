@@ -7,6 +7,7 @@ using Coop.Naval.PortScreen.Data;
 using Coop.Naval.PortScreen.Handlers;
 using Coop.Naval.PortScreen.Interfaces;
 using Coop.Naval.PortScreen.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Moq;
 using ProtoBuf;
@@ -31,7 +32,7 @@ namespace Coop.Tests.Naval;
 public class PortScreenChangesHandlerTests : IDisposable
 {
     private readonly TestMessageBroker messageBroker = new TestMessageBroker();
-    private readonly global::GameInterface.Services.ObjectManager.ObjectManager objectManager = new(Mock.Of<ILogger>());
+    private readonly ObjectManager objectManager = new(Mock.Of<ILogger>());
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly RecordingPortScreenHandlerInterface portScreenHandlerInterface = new RecordingPortScreenHandlerInterface();
     private readonly Mock<IPlayerManager> playerManager = new Mock<IPlayerManager>();

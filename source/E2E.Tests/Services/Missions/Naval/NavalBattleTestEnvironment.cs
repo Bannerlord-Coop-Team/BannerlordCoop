@@ -46,8 +46,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
     // An in-memory water clock per client, so no naval battle runs the native patch in the test process. The battle runs
     // as a NavalDLC co-op session, so code that checks the startup decision (the ship fate commit) takes the naval path.
-    protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients,
-        builder => builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope())
+    // The factory normally comes from NavalMissionModule, which binds to NavalDLC types this DLC-free host doesn't load.
+    protected NavalBattleTestEnvironment(ITestOutputHelper output, int numClients) : base(output, numClients, builder =>
+    {
+        builder.RegisterType<FakeWaterClock>().AsSelf().As<IWaterClock>().InstancePerLifetimeScope();
+        builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
+    })
     {
         ModInformation.IsNavalDlcActive = true;
     }

@@ -1,5 +1,6 @@
 ﻿#if COOP_NAVAL
 using Autofac;
+using GameInterface;
 using Missions.Naval;
 using System;
 
@@ -20,7 +21,7 @@ internal sealed class NavalClientContainer : IDisposable
         var builder = new ContainerBuilder();
         builder.RegisterModule<NavalMissionModule>();
         container = builder.Build();
-        activeUse = global::GameInterface.ContainerProvider.UseContainerThreadSafe(container);
+        activeUse = ContainerProvider.UseContainerThreadSafe(container);
     }
 
     /// <summary>This client's naval mission tracker.</summary>
@@ -32,7 +33,7 @@ internal sealed class NavalClientContainer : IDisposable
     // Drops the container from ContainerProvider and disposes it.
     public void Dispose()
     {
-        global::GameInterface.ContainerProvider.Clear();
+        ContainerProvider.Clear();
         activeUse.Dispose();
         container.Dispose();
     }

@@ -4,6 +4,9 @@ using GameInterface.Utils;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+#if COOP_NAVAL
+using Missions.Naval;
+#endif
 using Moq;
 using ProtoBuf;
 using System.IO;
@@ -314,7 +317,7 @@ public class BattleWaterClockTests
         clock.AcceptWaterTime(new NetworkBattleWaterTime(1002.5f, 2));
         clock.Tick(0.016f);
 
-        string line = global::Missions.Naval.NavalWaterClockCoopCommand.Describe(waterClock, clock);
+        string line = NavalWaterClockCoopCommand.Describe(waterClock, clock);
 
         Assert.StartsWith("NAVAL_WATER_CLOCK installed=true redirected=true", line);
         Assert.Contains("written=1002.500 vanilla=1000.000 offset=2.500", line);

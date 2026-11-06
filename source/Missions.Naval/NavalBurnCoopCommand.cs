@@ -12,10 +12,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>Burns a registered hull on its authority through the existing fire-hit apply path.</summary>
-public interface INavalBurnCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalBurnCoopCommand"/>
-public sealed class NavalBurnCoopCommand : INavalBurnCoopCommand
+public sealed class NavalBurnCoopCommand : ICoopCommand
 {
     private readonly INavalShipEngine engine;
 

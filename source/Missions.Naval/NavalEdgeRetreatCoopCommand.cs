@@ -11,10 +11,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>Stages a selected owned hull for removal by vanilla's map-edge retreat tick.</summary>
-public interface INavalEdgeRetreatCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalEdgeRetreatCoopCommand"/>
-public sealed class NavalEdgeRetreatCoopCommand : INavalEdgeRetreatCoopCommand
+public sealed class NavalEdgeRetreatCoopCommand : ICoopCommand
 {
     private readonly INavalEdgeRetreatStaging staging;
     private readonly INavalForeignHullRegistry foreignHulls;

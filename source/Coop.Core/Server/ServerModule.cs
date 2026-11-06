@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
@@ -50,17 +51,17 @@ public class ServerModule : CommonModule
         typeof(ServerBattleShipFateHandler),
     };
 
-    private readonly bool navalServicesEnabled;
+    private readonly bool isNavalDlcActive;
 
     // Registers the naval handlers only while NavalDLC co-op is active.
-    public ServerModule() : this(global::Common.ModInformation.IsNavalDlcActive)
+    public ServerModule() : this(ModInformation.IsNavalDlcActive)
     {
     }
 
     // Lets a test harness keep the naval handlers on without loading the optional naval assemblies.
-    public ServerModule(bool navalServicesEnabled)
+    public ServerModule(bool isNavalDlcActive)
     {
-        this.navalServicesEnabled = navalServicesEnabled;
+        this.isNavalDlcActive = isNavalDlcActive;
     }
 
     protected override void Load(ContainerBuilder builder)
@@ -80,7 +81,7 @@ public class ServerModule : CommonModule
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
         // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
         // server resolves IBattleNetwork, so no P2P socket is opened. See MissionModule for what activates.
-        builder.RegisterModule(new MissionModule(navalServicesEnabled));
+        builder.RegisterModule<MissionModule>();
 
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
@@ -174,7 +175,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true,
-            navalServicesEnabled ? null : NavalOnlyTypes);
+            isNavalDlcActive ? null : NavalOnlyTypes);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 

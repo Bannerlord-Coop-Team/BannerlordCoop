@@ -37,31 +37,10 @@ public class GameInterfacePatchInstallerTests
 
         try
         {
-            new GameInterfacePatchInstaller(new TestQuestFeatureFlag(questsOn), navalPatchesEnabled: false).Install(harmony);
+            new GameInterfacePatchInstaller(new TestQuestFeatureFlag(questsOn)).Install(harmony);
 
             Assert.NotEmpty(harmony.GetPatchedMethods());
             Assert.Equal(questsOn, QuestPatchesOwnedBy(harmony).Count > 0);
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
-    }
-
-    // Off must install no naval-category patch at all, otherwise War Sails code runs without NavalDLC co-op.
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Install_AppliesNavalPatchesOnlyWhenNavalIsActive(bool navalActive)
-    {
-        var harmony = new Harmony($"{nameof(GameInterfacePatchInstallerTests)}.{Guid.NewGuid():N}");
-
-        try
-        {
-            new GameInterfacePatchInstaller(TestQuestFeatureFlag.Off, navalActive).Install(harmony);
-
-            Assert.NotEmpty(harmony.GetPatchedMethods());
-            Assert.Equal(navalActive, CategoryPatchesOwnedBy(harmony, GameInterface.HARMONY_NAVAL_CATEGORY).Count > 0);
         }
         finally
         {

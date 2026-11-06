@@ -1,5 +1,6 @@
 ﻿#if COOP_NAVAL
 using Autofac;
+using GameInterface;
 using Missions.Naval;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
@@ -38,15 +39,15 @@ public class NavalClientStateScopeTests
 
         try
         {
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(idle))
+            using (ContainerProvider.UseContainerThreadSafe(idle))
                 Assert.True(CoopOrderOfBattleShipLayoutPatch.Prefix(out _));
 
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(inBattle))
+            using (ContainerProvider.UseContainerThreadSafe(inBattle))
                 Assert.False(CoopOrderOfBattleShipLayoutPatch.Prefix(out _));
         }
         finally
         {
-            global::GameInterface.ContainerProvider.Clear();
+            ContainerProvider.Clear();
         }
     }
 
@@ -80,15 +81,15 @@ public class NavalClientStateScopeTests
 
         try
         {
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(owner))
+            using (ContainerProvider.UseContainerThreadSafe(owner))
                 Assert.True(RopeForcePatch.AllowForce(physics, 0));
 
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(copier))
+            using (ContainerProvider.UseContainerThreadSafe(copier))
                 Assert.False(RopeForcePatch.AllowForce(physics, 0));
         }
         finally
         {
-            global::GameInterface.ContainerProvider.Clear();
+            ContainerProvider.Clear();
             RopeForcePatch.ClearCounters();
         }
     }
@@ -118,15 +119,15 @@ public class NavalClientStateScopeTests
 
         try
         {
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(other))
+            using (ContainerProvider.UseContainerThreadSafe(other))
                 Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
 
-            using (global::GameInterface.ContainerProvider.UseContainerThreadSafe(builder))
+            using (ContainerProvider.UseContainerThreadSafe(builder))
                 Assert.False(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
         }
         finally
         {
-            global::GameInterface.ContainerProvider.Clear();
+            ContainerProvider.Clear();
         }
 
         Assert.Equal(30f, builder.Resolve<ICoopShipSnapshotRegistry>().MitigatedDamageOf(ship));

@@ -8,7 +8,7 @@ using Coop.Naval.Storms.Data;
 using Coop.Naval.Storms.Handlers;
 using Coop.Naval.Storms.Interfaces;
 using Coop.Naval.Storms.Messages;
-using GameInterface.Services.ObjectManager;
+using ObjectManager = GameInterface.Services.ObjectManager.ObjectManager;
 using Moq;
 using NavalDLC.Map;
 using ProtoBuf;
@@ -27,7 +27,7 @@ public class StormSyncHandlerTests : IDisposable
     private const string StormId = "Storm_Created_1";
 
     private readonly TestMessageBroker messageBroker = new TestMessageBroker();
-    private readonly global::GameInterface.Services.ObjectManager.ObjectManager objectManager = new(Mock.Of<ILogger>());
+    private readonly ObjectManager objectManager = new(Mock.Of<ILogger>());
     private readonly Mock<INetwork> network = new Mock<INetwork>();
     private readonly Mock<IStormInterface> stormInterface = new Mock<IStormInterface>();
     private readonly Storm storm = (Storm)FormatterServices.GetUninitializedObject(typeof(Storm));

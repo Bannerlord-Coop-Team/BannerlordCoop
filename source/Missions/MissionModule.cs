@@ -53,19 +53,6 @@ public class MissionModule : Module
     internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
 
-    private readonly bool navalServicesEnabled;
-
-    // Registers the naval battle services only while NavalDLC co-op is active.
-    public MissionModule() : this(ModInformation.IsNavalDlcActive)
-    {
-    }
-
-    // Lets ClientModule and ServerModule pass their naval decision down.
-    public MissionModule(bool navalServicesEnabled)
-    {
-        this.navalServicesEnabled = navalServicesEnabled;
-    }
-
     protected override void Load(ContainerBuilder builder)
     {
 #if DEBUG
@@ -76,6 +63,7 @@ public class MissionModule : Module
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
+        builder.RegisterType<RangedSiegeWeaponPresentation>().As<IRangedSiegeWeaponPresentation>().InstancePerDependency();
         base.Load(builder);
 
         // The container is one co-op session; child scopes own only transient mission graphs.
@@ -160,9 +148,6 @@ public class MissionModule : Module
         builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
         builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
         builder.RegisterType<BattlePlayerPartyResolver>().As<IBattlePlayerPartyResolver>().InstancePerDependency();
-        // Only the Missions.Naval launcher uses it; the ship registry and deck probe above and below are shared with land battles.
-        if (navalServicesEnabled)
-            builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()
             .InstancePerDependency();

@@ -6,10 +6,7 @@ using System.Globalization;
 namespace Missions.Naval;
 
 /// <summary>Stages and observes the late-deployment station checks on the client simulating the chosen agent.</summary>
-public interface INavalLateHullCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalLateHullCoopCommand"/>
-public sealed class NavalLateHullCoopCommand : INavalLateHullCoopCommand
+public sealed class NavalLateHullCoopCommand : ICoopCommand
 {
     internal const string Usage = "Usage: coop.debug.naval.late_hull [shipId-prefix [climb|rope|oar|release <agent-index> [station-index]]]";
     private readonly INavalLateHullProbe probe;

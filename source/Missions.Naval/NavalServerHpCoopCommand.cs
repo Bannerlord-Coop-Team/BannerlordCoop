@@ -10,10 +10,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>Reads accepted server ship reports without requiring a mission or consuming pending campaign fates.</summary>
-public interface INavalServerHpCoopCommand : ICoopCommand { }
-
-/// <inheritdoc cref="INavalServerHpCoopCommand"/>
-public sealed class NavalServerHpCoopCommand : INavalServerHpCoopCommand
+public sealed class NavalServerHpCoopCommand : ICoopCommand
 {
     private readonly IBattleShipFateLedger ledger;
     private readonly INavalShipEngine engine;

@@ -47,6 +47,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<CoopNavalBattleLauncher>()
             .As<ICoopNavalBattleLauncher>()
             .InstancePerDependency();
+        builder.RegisterType<NavalBattleServicesFactory>()
+            .As<INavalBattleServicesFactory>()
+            .InstancePerDependency();
         builder.RegisterType<CoopShipSnapshotBuilder>()
             .As<ICoopShipSnapshotBuilder>()
             .InstancePerDependency();
@@ -82,132 +85,33 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalAgentFormationAssigner>()
             .As<IAgentFormationAssigner>()
             .InstancePerDependency();
-        builder.RegisterType<NavalInspectCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalServerHpCoopCommand>()
-            .As<INavalServerHpCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalRopeStatusCoopCommand>()
+        builder.RegisterAssemblyTypes(typeof(NavalMissionModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
             .As<ICoopCommand>()
             .InstancePerDependency();
 #if DEBUG
-        builder.RegisterType<NavalResultSilenceCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
         builder.RegisterType<NavalRamInspect>()
             .As<INavalRamInspect>()
             .InstancePerDependency();
         builder.RegisterType<NavalEdgeRetreatStaging>()
             .As<INavalEdgeRetreatStaging>()
             .InstancePerDependency();
-        builder.RegisterType<NavalEdgeRetreatCoopCommand>()
-            .As<INavalEdgeRetreatCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
         builder.RegisterType<NavalRamStaging>()
             .As<INavalRamStaging>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalRamStageCoopCommand>()
-            .As<INavalRamStageCoopCommand>()
-            .As<ICoopCommand>()
             .InstancePerDependency();
         builder.RegisterType<NavalLateHullProbe>()
             .As<INavalLateHullProbe>()
             .InstancePerDependency();
-        builder.RegisterType<NavalLateHullCoopCommand>()
-            .As<INavalLateHullCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalDeckRejectCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalFleetFailCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
         builder.RegisterType<NavalWeaponProbe>()
             .As<INavalWeaponProbe>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalWeaponCoopCommand>()
-            .As<ICoopCommand>()
             .InstancePerDependency();
         builder.RegisterType<NavalRollProbe>()
             .As<INavalRollProbe>()
             .InstancePerDependency();
-        builder.RegisterType<NavalRollCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
         builder.RegisterType<NavalDebugHulls>()
             .As<INavalDebugHulls>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalHelmCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalReswapCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalDamageCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalSinkCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalWinCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalLoseCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalRopeDebugCommands.RopeListCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalRopeCutCoopCommand>()
-            .As<INavalRopeCutCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalRopeDebugCommands.RopeThrowCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalScenarioStatusCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalCopySteerCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalWaterProbeCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalBoardCopyCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalImmortalCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalWaterClockCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalTryHelmCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalClearCrewCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalCaptureCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalSwimCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalOrderCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalBurnCoopCommand>()
-            .As<INavalBurnCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalShipFireCoopCommand>()
-            .As<ICoopCommand>()
             .InstancePerDependency();
 #endif
     }

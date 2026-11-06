@@ -6,6 +6,9 @@ using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
+#if COOP_NAVAL
+using Missions.Naval;
+#endif
 using Missions.Services.Network;
 using Moq;
 using Newtonsoft.Json.Linq;
@@ -841,7 +844,7 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(1, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
         Assert.Equal(0, harness.Ledger.DepartedHulls(BattleSideEnum.Attacker));
 #if COOP_NAVAL
-        Assert.True(global::Missions.Naval.CoopNavalBattleEndLogic.KeepsRetreat(harness.Ledger.DepartedHulls(BattleSideEnum.Defender),
+        Assert.True(CoopNavalBattleEndLogic.KeepsRetreat(harness.Ledger.DepartedHulls(BattleSideEnum.Defender),
             hullsLeft: 0));
 #endif
     }
