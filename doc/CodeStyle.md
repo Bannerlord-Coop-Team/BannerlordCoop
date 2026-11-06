@@ -61,6 +61,7 @@ Don't add a `static` class, or a `*Gate`, that other code writes and patches rea
 
 - Don't validate inputs that are always valid, such as constructor-injected dependencies (Autofac never injects null).
 - Validate only where bad data can actually arrive, like network message contents or game state that can really be gone by the time a message applies.
+- Co-op assumes people are playing with their friends, so cheating gets dealt with in house and the mod isn't responsible for anti-cheat. Don't add validation or tests whose only justification is stopping a cheating, malicious or modified client or a forged packet. A check, including one on network message contents, is justified by an honest failure path like a double-click, race, disconnect or stale local state.
 - When a check is warranted, use the statement form `if (x == null) throw ...`, not `x ?? throw new ArgumentNullException(...)`.
 - Data and message types just assign.
 - Don't add a role check to a handler that only runs on one side. A message only clients send only reaches the server, so `ModInformation.IsServer` in its handler doesn't do anything.
