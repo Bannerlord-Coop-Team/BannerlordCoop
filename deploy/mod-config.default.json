@@ -232,11 +232,10 @@
     // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
     "clansAfterKingdomDestruction": "Vanilla",
 
-    // Players the server prefers as battle host, highest priority first, by controller id
-    // (the player's Steam id on Steam builds). The battle host runs the battle simulation and
-    // uploads it to everyone else, so list players with a fast, stable upload.
-    // If a player higher in the list than everyone ready is still loading, the server waits up to 5 seconds for them.
-    // (Default) []: The first player to finish loading hosts, as before.
+    // Players who should host battles, in order of preference, listed by Steam ID.
+    // The battle host runs the battle for everyone else, so list players with a fast and stable upload.
+    // If a higher-priority player is still loading, the server waits up to 5 seconds for them before picking someone else.
+    // (Default) []: The first player to finish loading hosts the battle.
     // e.g. ["76561198000000001", "76561198000000002"]
     "preferredBattleHosts": []
   }
