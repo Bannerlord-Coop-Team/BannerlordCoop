@@ -54,13 +54,11 @@ internal class RaftStateCampaignBehaviorPatches
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
 
         // The hero has already left their party here, so find it through the player registry
-        if (playerManager.TryGetPlayer(hero, out var player)
-            && objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty)
-            && playerParty.IsInRaftState)
-        {
-            RaftStateChangeAction.DeactivateRaftStateForParty(playerParty);
-        }
+        if (!playerManager.TryGetPlayer(hero, out var player)) return false;
+        if (!objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty)) return false;
+        if (!playerParty.IsInRaftState) return false;
 
+        RaftStateChangeAction.DeactivateRaftStateForParty(playerParty);
         return false;
     }
 
