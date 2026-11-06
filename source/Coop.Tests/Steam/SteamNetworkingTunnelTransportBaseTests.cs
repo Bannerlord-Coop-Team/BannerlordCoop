@@ -3,6 +3,7 @@ using Moq;
 using Serilog;
 using Steamworks;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -100,12 +101,14 @@ namespace Coop.Tests.Steam
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public void Receive_AfterConnectionCloses_NeverReachesSteam(bool closedByPeer)
+        public void PumpTick_AfterConnectionCloses_NeverReachesSteam(bool closedByPeer)
         {
             const uint connection = 42;
             using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
             SeedOwnedConnection(transport, connection, 76561198000000042);
-            transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+            PumpTick(transport, connection);
+            Assert.Single(transport.SentConnections);
+            Assert.Single(transport.StatusReadConnections);
 
             if (closedByPeer)
             {
@@ -118,7 +121,10 @@ namespace Coop.Tests.Steam
                 transport.CloseConnection(connection);
             }
 
-            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            // The pump still holds the peer in its snapshot until the host handles the Closed event
+            Assert.Equal(0, PumpTick(transport, connection));
+            Assert.Single(transport.SentConnections);
+            Assert.Single(transport.StatusReadConnections);
             Assert.Single(transport.ReceivedConnections);
             Assert.Single(transport.RawClosedConnections);
         }
@@ -177,6 +183,14 @@ namespace Coop.Tests.Steam
             Assert.Equal(connection, Assert.Single(transport.RawClosedConnections));
         }
 
+        // Same transport calls a host pump tick makes for one peer
+        private static int PumpTick(SteamNetworkingTunnelTransportBase transport, uint connection)
+        {
+            transport.DescribeConnection(connection);
+            Assert.True(transport.SendDatagram(connection, new byte[1], 1, droppable: false));
+            return transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+        }
+
         private static void SeedOwnedConnection(
             SteamNetworkingTunnelTransportBase transport,
             uint connection,
@@ -184,12 +198,12 @@ namespace Coop.Tests.Steam
         {
             const BindingFlags privateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
             var transportType = typeof(SteamNetworkingTunnelTransportBase);
-            var ownedConnections = Assert.IsType<HashSet<uint>>(
+            var ownedConnections = Assert.IsType<ConcurrentDictionary<uint, byte>>(
                 transportType.GetField("ownedConnections", privateInstance)?.GetValue(transport));
             var remoteIdentities = Assert.IsType<TunnelConnectionIdentityRegistry>(
                 transportType.GetField("remoteIdentities", privateInstance)?.GetValue(transport));
 
-            ownedConnections.Add(connection);
+            ownedConnections.TryAdd(connection, 0);
             remoteIdentities.Record(connection, remoteSteamId);
         }
 
@@ -211,6 +225,8 @@ namespace Coop.Tests.Steam
 
             public List<uint> RawClosedConnections { get; } = new List<uint>();
             public List<uint> ReceivedConnections { get; } = new List<uint>();
+            public List<uint> SentConnections { get; } = new List<uint>();
+            public List<uint> StatusReadConnections { get; } = new List<uint>();
             public Action? DuringReceive { get; set; }
             public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
                 ConfiguredValues { get; } =
@@ -284,7 +300,11 @@ namespace Coop.Tests.Steam
                 HSteamNetConnection conn,
                 ref SteamNetConnectionRealTimeStatus_t status,
                 int lanes,
-                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus) => EResult.k_EResultFail;
+                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus)
+            {
+                StatusReadConnections.Add(conn.m_HSteamNetConnection);
+                return EResult.k_EResultFail;
+            }
 
             protected override HSteamNetConnection ConnectP2P(
                 ref SteamNetworkingIdentity identity,
@@ -328,6 +348,7 @@ namespace Coop.Tests.Steam
                 int flags,
                 out long messageNumber)
             {
+                SentConnections.Add(conn.m_HSteamNetConnection);
                 messageNumber = 0;
                 return EResult.k_EResultOK;
             }
