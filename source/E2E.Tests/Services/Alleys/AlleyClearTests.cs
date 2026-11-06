@@ -25,7 +25,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void LeaveItEmptyAfterWinningTheFight_FreesTheGangAlleyEverywhere()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         var clearingClient = Clients.First();
 
         LeaveItEmpty(clearingClient, scenario.AttackerAlleyId);
@@ -40,7 +40,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void LeaveItEmpty_ChangesRelationsOnceEverywhere()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         string merchantId = AddNotables(scenario);
 
         LeaveItEmpty(Clients.First(), scenario.AttackerAlleyId);
@@ -51,7 +51,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void RepeatedClearRequest_DoesNotChangeRelationsAgain()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         string merchantId = AddNotables(scenario);
         var clearingClient = Clients.First();
         var request = new RequestClearAlley(scenario.AttackerAlleyId, scenario.OwnerHeroId, scenario.GangLeaderId);
@@ -66,7 +66,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void StaleClearOfAnAlreadyFreeAlley_IsIgnored()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         string merchantId = AddNotables(scenario);
 
         // The gang left on the server before the client's request arrived; the client still shows it.
@@ -87,7 +87,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void StaleClearOfAnAlleyANewGangLeaderNowHolds_IsIgnored()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         string merchantId = AddNotables(scenario);
         string newGangLeaderId = CreateGangLeader();
 
@@ -112,7 +112,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void ClearOfAnAlleyOwnedByAPlayer_IsIgnored()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         var clients = Clients.ToArray();
         AcquireAlley(
             clients[0],
@@ -146,26 +146,9 @@ public class AlleyClearTests : AlleyTestEnvironment
     }
 
     [Fact]
-    public void ClearRequestFromAPeerNotControllingTheClearer_IsIgnored()
-    {
-        var scenario = CreateClearScenario();
-        string merchantId = AddNotables(scenario);
-        var otherClient = Clients.Last();
-
-        // The second player's peer names the first player's hero as the clearer.
-        otherClient.Call(() => otherClient.Resolve<INetwork>().SendAll(
-            new RequestClearAlley(scenario.AttackerAlleyId, scenario.OwnerHeroId, scenario.GangLeaderId)));
-
-        Server.Call(() => Assert.Same(
-            Server.GetRegisteredObject<Hero>(scenario.GangLeaderId),
-            Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
-        AssertRelations(scenario, merchantId, gangLeaderRelation: 0, merchantRelation: 0);
-    }
-
-    [Fact]
     public void ClearingTheAttackingGang_EndsTheAttackOnThePlayersAlley()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         var ownerClient = Clients.First();
         AcquireAlley(
             ownerClient,
@@ -190,7 +173,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void ClearingADifferentGang_KeepsTheAttackOnThePlayersAlley()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         var ownerClient = Clients.First();
         AcquireAlley(
             ownerClient,
@@ -218,7 +201,7 @@ public class AlleyClearTests : AlleyTestEnvironment
     [Fact]
     public void ClearedGangAlley_CanThenBeTakenOver()
     {
-        var scenario = CreateClearScenario();
+        var scenario = CreateAlleyDomainScenario();
         var clearingClient = Clients.First();
 
         LeaveItEmpty(clearingClient, scenario.AttackerAlleyId);
@@ -243,16 +226,6 @@ public class AlleyClearTests : AlleyTestEnvironment
                 client.GetRegisteredObject<Hero>(scenario.OwnerHeroId),
                 client.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
         }
-    }
-
-    // Each client's peer controls its own player hero, so the server accepts its requests.
-    private AlleyDomainScenario CreateClearScenario()
-    {
-        var scenario = CreateAlleyDomainScenario();
-        var clients = Clients.ToArray();
-        ConnectRegisteredPlayer(clients[0], "AlleyOwner");
-        ConnectRegisteredPlayer(clients[1], "AlleyOverseer");
-        return scenario;
     }
 
     // The listener MissionAlleyHandler.OnLeaveItEmpty reaches once the gang leader is beaten

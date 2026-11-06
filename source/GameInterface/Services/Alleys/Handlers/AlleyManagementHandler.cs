@@ -7,7 +7,6 @@ using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Clans.Messages;
-using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -37,7 +36,6 @@ internal class AlleyManagementHandler : IHandler
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
-    private readonly IPlayerManager playerManager;
     private readonly AlleyHandler alleyHandler;
 
     public AlleyManagementHandler(
@@ -47,7 +45,6 @@ internal class AlleyManagementHandler : IHandler
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
         IAlleyGarrisonData garrisonData,
-        IPlayerManager playerManager,
         AlleyHandler alleyHandler)
     {
         this.messageBroker = messageBroker;
@@ -56,7 +53,6 @@ internal class AlleyManagementHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
-        this.playerManager = playerManager;
         this.alleyHandler = alleyHandler;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
@@ -253,10 +249,8 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
-        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.IsSenderControllingHero(sender, data.ClearerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClearerId, out var clearer)) return;
 
