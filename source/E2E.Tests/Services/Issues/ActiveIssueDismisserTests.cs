@@ -8,11 +8,16 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.SaveSystem;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 using UnregisteredIssue = E2E.Tests.Services.Issues.NeverRegisteredIssue;
@@ -120,6 +125,67 @@ public class ActiveIssueDismisserTests : IDisposable
 
         Assert.False(HasIssue(Server, notableId));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
+    [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
+    public void ServerStart_DiscardsSavedUnendedHistoryOfTheDismissedIssue(IssueBase.IssueState state)
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var issue = AddIssue(Server, notableId, state);
+        Server.Call(() =>
+        {
+            var entry = new PlayerJournalLogEntry(new JournalLogEntry(new TextObject("Saved quest"), null, null, false),
+                ControllerId, issue);
+            entry.Update(new MBList<JournalLog> { new JournalLog(CampaignTime.Zero, new TextObject("Accepted quest")) },
+                IssueBase.IssueUpdateDetails.PlayerStartedIssueQuestClassicSolution);
+            var unrelated = new JournalLogEntry(new TextObject("Earlier completed quest"), null, null, false);
+            unrelated.Update(new MBList<JournalLog>(), QuestBase.QuestCompleteDetails.Success);
+            var history = new LogEntryHistory();
+            history._logs.Add(entry);
+            history._logs.Add(unrelated);
+            var restored = RoundTripHistory(history);
+            Assert.False(Assert.IsType<PlayerJournalLogEntry>(restored.GameActionLogs[0]).IsEnded());
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(restored.GameActionLogs);
+        });
+
+        PublishServerStarted(Server);
+        TestEnvironment.FlushCoalescer();
+        LogEntryHistory serverSave = null!;
+        Server.Call(() => serverSave = RoundTripHistory(Campaign.Current.LogEntryHistory));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                var restored = RoundTripHistory(serverSave);
+                Campaign.Current.LogEntryHistory._logs.Clear();
+                Campaign.Current.LogEntryHistory._logs.AddRange(restored.GameActionLogs);
+            });
+        }
+        TestEnvironment.FlushCoalescer();
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                var entry = Assert.IsType<JournalLogEntry>(Assert.Single(Campaign.Current.LogEntryHistory.GameActionLogs));
+                Assert.Equal("Earlier completed quest", entry.Title.ToString());
+            });
+        }
+        Assert.False(HasIssue(Server, notableId));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    private static LogEntryHistory RoundTripHistory(LogEntryHistory history)
+    {
+        var driver = new InMemDriver();
+        var metadata = new MetaData { ["ApplicationVersion"] = "v1.4.8.0" };
+        var saved = SaveManager.Save(history, metadata, "dismissed_history", driver);
+        Assert.True(saved.Successful);
+        var loaded = SaveManager.Load("dismissed_history", driver);
+        Assert.True(loaded.Successful);
+        return Assert.IsType<LogEntryHistory>(loaded.Root);
     }
 
     [Fact]

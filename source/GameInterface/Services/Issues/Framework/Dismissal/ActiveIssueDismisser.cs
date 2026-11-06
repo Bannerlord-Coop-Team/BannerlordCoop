@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Notifications;
 using Serilog;
 using System;
 using System.Linq;
@@ -33,6 +34,7 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IIssueDismisser issueDismisser;
+    private readonly IQuestJournalOwnerResolver journal;
 
     public ActiveIssueDismisser(
         IMessageBroker messageBroker,
@@ -40,7 +42,8 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IIssueDismisser issueDismisser)
+        IIssueDismisser issueDismisser,
+        IQuestJournalOwnerResolver journal)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
@@ -48,6 +51,7 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.issueDismisser = issueDismisser;
+        this.journal = journal;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -104,13 +108,19 @@ internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
                 if ((issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution) && !OwnerIsConnected(issue))
                 {
                     DismissQuest(issue, announce);
-                    dismissed++;
                 }
                 else if (issue.IsSolvingWithAlternative && !HasOwner(issue))
                 {
                     DismissTroops(issue, announce);
-                    dismissed++;
                 }
+                else
+                {
+                    continue;
+                }
+
+                dismissed++;
+                // Startup dismissal has no client replay to remove the saved unended row.
+                if (!announce) journal.DiscardArchive(issue);
             }
             catch (Exception e)
             {
