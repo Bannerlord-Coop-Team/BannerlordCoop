@@ -21,17 +21,14 @@ namespace GameInterface.Services.Alleys.Patches;
 [HarmonyPatch(typeof(MissionAlleyHandler))]
 internal class MissionAlleyHandlerPatches
 {
-    // Who held the alley when the fight was won. Another player's take over can reach this client while
-    // it sits in the troop screen, and the server must judge the request by the owner this player beat.
-    private static Hero ownerWhenFightWon;
-
     [HarmonyPatch("OnAlleyFightEnd")]
     [HarmonyPrefix]
     private static void OnAlleyFightEndPrefix(bool isPlayerSideWon)
     {
         if (ModInformation.IsServer || !isPlayerSideWon) return;
+        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return;
 
-        ownerWhenFightWon = CampaignMission.Current?.LastVisitedAlley?.Owner;
+        fightOwnerTracker.Set(CampaignMission.Current?.LastVisitedAlley?.Owner);
     }
 
     [HarmonyPatch("OnPartyScreenDoneClicked")]
@@ -65,8 +62,9 @@ internal class MissionAlleyHandlerPatches
             .FirstOrDefault(e => e.Character != null && e.Character.IsHero).Character?.HeroObject;
         if (overseer == null) return false;
 
-        var previousOwner = ownerWhenFightWon;
-        ownerWhenFightWon = null;
+        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return false;
+
+        var previousOwner = fightOwnerTracker.Take();
         MessageBroker.Instance.Publish(alley, new AlleyAcquiredRequested(alley, owner, overseer, leftMemberRoster, previousOwner));
         return false;
     }

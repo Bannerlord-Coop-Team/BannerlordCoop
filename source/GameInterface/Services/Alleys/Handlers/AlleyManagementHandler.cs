@@ -299,8 +299,11 @@ internal class AlleyManagementHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley)) return;
             // The alley debug command also publishes this on the server, where the sender is not a peer.
             // The clan screen also lets the clan leader abandon a member's alley.
-            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) ||
-                (alley.Owner != senderHero && !permissions.CanManageClan(senderHero, alley.Owner?.Clan)))) return;
+            if (sender is NetPeer)
+            {
+                if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
+                if (alley.Owner != senderHero && !permissions.CanManageClan(senderHero, alley.Owner?.Clan)) return;
+            }
             AbandonAlley(alleyId, fromClanScreen);
         });
     }
