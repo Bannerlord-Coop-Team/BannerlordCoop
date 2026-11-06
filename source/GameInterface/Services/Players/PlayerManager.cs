@@ -82,16 +82,9 @@ public interface IPlayerManager
     bool TryGetPlayer(Hero hero, out Player player);
 
     /// <summary>
-    /// Resolves the party of the player controlling the given hero, even when the hero has left it as a prisoner.
-    /// Reads the object registry, so call it on the game thread.
+    /// Resolves the Player controlling the given party.
     /// </summary>
-    bool TryGetPlayerParty(Hero hero, out MobileParty playerParty);
-
-    /// <summary>
-    /// Resolves the hero of the player controlling the given party.
-    /// Reads the object registry, so call it on the game thread.
-    /// </summary>
-    bool TryGetPlayerHero(MobileParty playerParty, out Hero playerHero);
+    bool TryGetPlayer(MobileParty party, out Player player);
 
     /// <summary>
     /// Checks whether a message sender is the peer controlling the given hero, logging a warning
@@ -435,20 +428,12 @@ public class PlayerManager : IPlayerManager
             && TryGetPlayer(control.ObjectControllerId, out player);
     }
 
-    /// <inheritdoc cref="IPlayerManager.TryGetPlayerParty(Hero, out MobileParty)"/>
-    public bool TryGetPlayerParty(Hero hero, out MobileParty playerParty)
+    /// <inheritdoc cref="IPlayerManager.TryGetPlayer(MobileParty, out Player)"/>
+    public bool TryGetPlayer(MobileParty party, out Player player)
     {
-        playerParty = null;
-        return TryGetPlayer(hero, out var player) && objectManager.TryGetObject(player.MobilePartyId, out playerParty);
-    }
-
-    /// <inheritdoc cref="IPlayerManager.TryGetPlayerHero(MobileParty, out Hero)"/>
-    public bool TryGetPlayerHero(MobileParty playerParty, out Hero playerHero)
-    {
-        playerHero = null;
-        return playerParty != null && TryGetControlledObjectInfo(playerParty, out var control)
-            && TryGetPlayer(control.ObjectControllerId, out var player)
-            && objectManager.TryGetObject(player.HeroId, out playerHero);
+        player = null;
+        return party != null && TryGetControlledObjectInfo(party, out var control)
+            && TryGetPlayer(control.ObjectControllerId, out player);
     }
 
     public bool IsSenderControllingHero(object sender, string heroId)

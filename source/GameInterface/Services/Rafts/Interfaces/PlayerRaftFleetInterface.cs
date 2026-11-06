@@ -68,14 +68,14 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         // Same as RaftStateCampaignBehavior.player_raft_state_after_prisoner_on_consequence
         if (party.Ships.Count > 0)
         {
-            if (!TryGetPlayerHeroId(party, out var playerHeroId)) return;
+            if (!playerManager.TryGetPlayer(party, out var player)) return;
 
             // Cached before the ships are removed, same as vanilla
             var anchorPosition = party.Anchor.Position;
             var disembarkPosition = party.Anchor.GetLastUsedDisembarkPosition();
 
             // Vanilla adds to the ships still cached from an earlier stranding instead of replacing them
-            var ships = PlayerCachedFleets.TryGetValue(playerHeroId, out var cachedFleet) && cachedFleet.Ships != null
+            var ships = PlayerCachedFleets.TryGetValue(player.HeroId, out var cachedFleet) && cachedFleet.Ships != null
                 ? new List<CachedShipData>(cachedFleet.Ships)
                 : new List<CachedShipData>();
             for (int i = party.Ships.Count - 1; i >= 0; i--)
@@ -88,7 +88,7 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
                 messageBroker.Publish(this, new InstanceDestroyed<Ship>(ship));
             }
 
-            PlayerCachedFleets[playerHeroId] = new PlayerCachedFleetData(
+            PlayerCachedFleets[player.HeroId] = new PlayerCachedFleetData(
                 ships,
                 anchorPosition.X,
                 anchorPosition.Y,
@@ -103,8 +103,8 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 
     public void ReturnFleet(MobileParty party)
     {
-        if (!TryGetPlayerHeroId(party, out var playerHeroId)) return;
-        if (!TryTakeCachedFleet(playerHeroId, party, out var fleet)) return;
+        if (!playerManager.TryGetPlayer(party, out var player)) return;
+        if (!TryTakeCachedFleet(player.HeroId, party, out var fleet)) return;
 
         // Same as RaftStateCampaignBehavior.player_raft_state_end_continue_on_consequence
         party.Anchor.SetPosition(new CampaignVec2(new Vec2(fleet.AnchorX, fleet.AnchorY), fleet.AnchorIsOnLand));
@@ -155,14 +155,6 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         }
 
         return true;
-    }
-
-    private bool TryGetPlayerHeroId(MobileParty party, out string playerHeroId)
-    {
-        playerHeroId = null;
-        if (!playerManager.TryGetPlayerHero(party, out var playerHero)) return false;
-
-        return objectManager.TryGetIdWithLogging(playerHero, out playerHeroId);
     }
 
     private static CachedShipData CreateShipData(Ship ship)

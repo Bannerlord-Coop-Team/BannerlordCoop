@@ -354,7 +354,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
-        if (!playerManager.TryGetPlayerHero(playerParty, out var playerHero))
+        if (!playerManager.TryGetPlayer(playerParty, out var player) || !objectManager.TryGetObject(player.HeroId, out Hero playerHero))
         {
             Logger.Error("Refused partial surrender of {PartyId}: no registered player hero resolves for it", surrenderedPartyId);
             return;
@@ -489,7 +489,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         var playerHero = payload.What.PrisonerHero;
         if (playerHero == null) return;
 
-        if (!playerManager.TryGetPlayerParty(playerHero, out var playerParty))
+        if (!playerManager.TryGetPlayer(playerHero, out var player) || !objectManager.TryGetObject(player.MobilePartyId, out MobileParty playerParty))
         {
             Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
             return;

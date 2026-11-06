@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Coop.Core;
+using Autofac;
 using Autofac.Builder;
 using Common;
 using Coop.Core.Client;
@@ -66,14 +67,15 @@ public sealed class NavalModuleGateTests : System.IDisposable
         Assert.False(container.IsRegistered<ServerBattleShipFateHandler>());
     }
 
-    // The explicit decision moves the server handler together with the GameInterface services it takes.
+    // The flag moves the server handler together with the GameInterface services it takes.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ServerModule_GatesTheShipFateHandlerWithItsServices(bool isNavalEnabled)
     {
-        using var container = BuildServerContainer(
-            new ServerModule(isNavalEnabled), new GameInterfaceModule(isNavalEnabled));
+        ModInformation.IsNavalEnabled = isNavalEnabled;
+
+        using var container = BuildServerContainer(new ServerModule(), new GameInterfaceModule());
 
         Assert.Equal(isNavalEnabled, container.IsRegistered<ServerBattleShipFateHandler>());
         Assert.Equal(isNavalEnabled, container.IsRegistered<IBattleShipFateLedger>());
@@ -91,13 +93,15 @@ public sealed class NavalModuleGateTests : System.IDisposable
         Assert.False(container.IsRegistered<INavalBattleServicesFactory>());
     }
 
-    // The explicit decision moves the water clock; the ship registry and deck probe serve land battles too.
+    // The flag moves the water clock; the ship registry and deck probe serve land battles too.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ClientModules_GateTheWaterClockOnly(bool isNavalEnabled)
     {
-        using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule(isNavalEnabled));
+        ModInformation.IsNavalEnabled = isNavalEnabled;
+
+        using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule());
 
         Assert.Equal(isNavalEnabled, container.IsRegistered<IWaterClock>());
         Assert.True(container.IsRegistered<INetworkShipRegistry>());
@@ -128,6 +132,7 @@ public sealed class NavalModuleGateTests : System.IDisposable
         var builder = new ContainerBuilder();
         builder.RegisterModule<ClientModule>();
         builder.RegisterModule<GameInterfaceModule>();
+        builder.RegisterModule(new NavalAssemblyModule(ModInformation.CoopNavalAssemblyFile, ModInformation.MissionsNavalAssemblyFile));
         return builder.Build();
     }
 

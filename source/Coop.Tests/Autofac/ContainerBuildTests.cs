@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Commands;
 using Common.LogicStates;
 using Common.Network;
@@ -102,10 +103,21 @@ namespace Coop.Tests.Autofac
             ContainerBuilder builder = new ContainerBuilder();
             // Missions.Naval only loads with NavalDLC co-op active, which also turns GameInterface's naval services on.
             builder.RegisterModule<ClientModule>();
-            builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
+            builder.RegisterModule<GameInterfaceModule>();
             // MissionModule registers it only while NavalDLC is active, which a test process is not.
             builder.RegisterModule<NavalMissionModule>();
-            using var container = builder.Build();
+            bool previousNavalEnabled = ModInformation.IsNavalEnabled;
+            ModInformation.IsNavalEnabled = true;
+            IContainer built;
+            try
+            {
+                built = builder.Build();
+            }
+            finally
+            {
+                ModInformation.IsNavalEnabled = previousNavalEnabled;
+            }
+            using var container = built;
 
             Assert.IsType<CoopNavalBattleLauncher>(container.Resolve<ICoopNavalBattleLauncher>());
             Assert.IsType<NavalShipEngine>(container.Resolve<INavalShipEngine>());

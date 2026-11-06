@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -82,8 +83,7 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        // Naval server handlers stay on here, like GameInterface's naval sync below.
-        builder.RegisterModule(new ServerModule(isNavalEnabled: true));
+        builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -106,13 +106,24 @@ public class TestEnvironment
     {
         // TaleWorlds ViewModel metadata initialization is not thread-safe.
         lock (ContainerBuildLock)
-            return builder.Build();
+        {
+            // Naval sync is tested here too, so the modules register it; the flag goes back for the run itself.
+            bool previous = ModInformation.IsNavalEnabled;
+            ModInformation.IsNavalEnabled = true;
+            try
+            {
+                return builder.Build();
+            }
+            finally
+            {
+                ModInformation.IsNavalEnabled = previous;
+            }
+        }
     }
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        // GameInterface's naval sync is tested here too, without loading the optional naval assemblies.
-        builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
+        builder.RegisterModule<GameInterfaceModule>();
 
         builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();

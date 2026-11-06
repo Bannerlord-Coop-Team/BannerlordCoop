@@ -480,6 +480,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule(new NavalAssemblyModule(ModInformation.CoopNavalAssemblyFile));
             builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
             builder.RegisterInstance(new NetworkConfig
             {
@@ -658,6 +659,7 @@ namespace Coop.Core
                 builder.RegisterInstance(presenceClient).As<IDiscordPresenceClient>().ExternallyOwned();
             }
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule(new NavalAssemblyModule(ModInformation.CoopNavalAssemblyFile, ModInformation.MissionsNavalAssemblyFile));
             builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
 
             if (configuration != null)

@@ -146,7 +146,9 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     [InlineData(true)]
     public void Module_GatesNavalRegistrationsAndPatchesTogether(bool isNavalEnabled)
     {
-        AssertNavalServices(new GameInterfaceModule(isNavalEnabled), isNavalEnabled);
+        ModInformation.IsNavalEnabled = isNavalEnabled;
+
+        AssertNavalServices(new GameInterfaceModule(), isNavalEnabled);
     }
 
     // A naval patch class without the naval category would be installed with naval off.
@@ -176,9 +178,11 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     [Fact]
     public void NavalOnlyNamespaces_ScannedRegistrationsAreAllGated()
     {
+        ModInformation.IsNavalEnabled = false;
+
         var ungated = NavalOnlyTypesInAssembly()
             .Where(type => type.IsClass && !type.IsAbstract && IsScannedRegistration(type))
-            .Where(type => GameInterfaceModule.ShouldRegister(type, isNavalEnabled: false))
+            .Where(type => GameInterfaceModule.ShouldRegister(type))
             .Select(type => type.FullName);
 
         Assert.Empty(ungated);

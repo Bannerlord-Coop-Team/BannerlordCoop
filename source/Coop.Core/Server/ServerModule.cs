@@ -51,19 +51,6 @@ public class ServerModule : CommonModule
         typeof(ServerBattleShipFateHandler),
     };
 
-    private readonly bool isNavalEnabled;
-
-    // Registers the naval handlers only while NavalDLC co-op is active.
-    public ServerModule() : this(ModInformation.IsNavalEnabled)
-    {
-    }
-
-    // Lets a test harness keep the naval handlers on without loading the optional naval assemblies.
-    public ServerModule(bool isNavalEnabled)
-    {
-        this.isNavalEnabled = isNavalEnabled;
-    }
-
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
@@ -175,7 +162,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true,
-            isNavalEnabled ? null : NavalOnlyTypes);
+            ModInformation.IsNavalEnabled ? null : NavalOnlyTypes);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
     }
 

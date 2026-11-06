@@ -328,16 +328,6 @@ public class MissionModule : Module
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
 
-        // Missions.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
-        if (ModInformation.IsNavalEnabled && TryLoadNavalMissionsAssembly(out var navalAssembly))
-            builder.RegisterAssemblyModules(navalAssembly);
-    }
-
-    // Loads Missions.Naval.dll; startup already loaded it to decide naval support, so only a test host that sets the flag can miss it.
-    private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
-    {
-        var loader = new NavalAssemblyLoader(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location));
-        return loader.TryLoad(ModInformation.MissionsNavalAssemblyFile, out assembly);
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

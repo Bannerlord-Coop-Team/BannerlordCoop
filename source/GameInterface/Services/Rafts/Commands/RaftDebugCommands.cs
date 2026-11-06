@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Rafts.Interfaces;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Rafts.Commands;
 
@@ -61,7 +62,7 @@ public class RaftDebugCommands
             if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
                 return Failed($"No hero has id {args[0]}.");
 
-            if (!playerManager.TryGetPlayerParty(hero, out var party))
+            if (!playerManager.TryGetPlayer(hero, out var player) || !objectManager.TryGetObject(player.MobilePartyId, out MobileParty party))
                 return Failed($"{args[0]} is not a registered player hero.");
 
             if (!party.IsCurrentlyAtSea)

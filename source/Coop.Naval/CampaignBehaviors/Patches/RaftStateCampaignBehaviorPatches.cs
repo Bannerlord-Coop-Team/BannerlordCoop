@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
@@ -50,9 +51,12 @@ internal class RaftStateCampaignBehaviorPatches
         if (!hero.IsPlayerHero()) return false;
 
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
 
         // The hero has already left their party here, so find it through the player registry
-        if (playerManager.TryGetPlayerParty(hero, out var playerParty) && playerParty.IsInRaftState)
+        if (playerManager.TryGetPlayer(hero, out var player)
+            && objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty playerParty)
+            && playerParty.IsInRaftState)
         {
             RaftStateChangeAction.DeactivateRaftStateForParty(playerParty);
         }

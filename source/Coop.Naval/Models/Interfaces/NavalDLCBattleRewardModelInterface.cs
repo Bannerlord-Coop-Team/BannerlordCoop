@@ -129,7 +129,8 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
         {
             MobileParty mobileParty = winnerParty.Party.MobileParty;
             if (mobileParty == null || !mobileParty.IsPlayerParty()) continue;
-            if (!playerManager.TryGetPlayerHero(mobileParty, out var playerHero)) continue;
+            if (!playerManager.TryGetPlayer(mobileParty, out var player)) continue;
+            if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero playerHero)) continue;
 
             Figurehead figurehead = GetFigureheadLoot(model, playerHero, defeatedParties, defeatedLeaderParty);
             if (figurehead != null)

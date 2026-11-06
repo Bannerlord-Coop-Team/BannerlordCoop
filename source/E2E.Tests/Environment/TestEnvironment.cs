@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -85,7 +86,7 @@ public class TestEnvironment
         AddSharedDependencies(builder);
 
         configureDependencies?.Invoke(builder);
-        container = builder.Build();
+        container = BuildWithNavalServices(builder);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -99,8 +100,7 @@ public class TestEnvironment
     {
         var builder = new ContainerBuilder();
 
-        // Naval server handlers stay on here, like GameInterface's naval sync below.
-        builder.RegisterModule(new ServerModule(isNavalEnabled: true));
+        builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -111,7 +111,7 @@ public class TestEnvironment
             .SingleInstance();
 
         configureDependencies?.Invoke(builder);
-        container = builder.Build();
+        container = BuildWithNavalServices(builder);
 
         var instance = container.Resolve<ServerInstance>()!;
 
@@ -120,12 +120,26 @@ public class TestEnvironment
         return instance;
     }
 
+    // Naval sync is tested here with fakes, so the modules register it; the flag goes back for the run itself.
+    private static IContainer BuildWithNavalServices(ContainerBuilder builder)
+    {
+        bool previous = ModInformation.IsNavalEnabled;
+        ModInformation.IsNavalEnabled = true;
+        try
+        {
+            return builder.Build();
+        }
+        finally
+        {
+            ModInformation.IsNavalEnabled = previous;
+        }
+    }
+
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
         if (registerGameInterface)
         {
-            // GameInterface's naval sync is tested here with fakes, so it stays on without loading the optional naval assemblies.
-            builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
+            builder.RegisterModule<GameInterfaceModule>();
         }
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
