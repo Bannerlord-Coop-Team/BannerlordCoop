@@ -5,6 +5,7 @@ using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -46,7 +47,7 @@ namespace GameInterface.Services.Towns.Handlers
             }
 
             // Protobuf sends an empty list as null, so null means the server cleared the sold items
-            var sellLogs = (obj.LogList ?? new SellLogData[0]).Select(log =>
+            var sellLogs = (obj.LogList ?? Array.Empty<SellLogData>()).Select(log =>
             {
                 if (objectManager.TryGetObject(log.CategoryID, out ItemCategory itemCategory) == false)
                 {
