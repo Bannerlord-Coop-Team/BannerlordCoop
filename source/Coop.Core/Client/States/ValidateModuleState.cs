@@ -35,10 +35,6 @@ public class ValidateModuleState : ClientStateBase
     /// </summary>
     internal static readonly TimeSpan ValidationTimeout = TimeSpan.FromSeconds(30);
 
-    internal const string NavalIncapableReason =
-        "The server runs War Sails, but this co-op build can't. It needs a tester build made with CoopNavalDlc " +
-        "and the naval assemblies; the co-op log names what is missing. Install the server's War Sails build.";
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -158,17 +154,15 @@ public class ValidateModuleState : ClientStateBase
             return;
         }
 
-        if (!CanRunServerModules())
+        // The server can only see that this client enabled a DLC it accepts, not whether this client can run it.
+        if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out _))
         {
-            RejectModuleValidation(NavalIncapableReason);
+            RejectModuleValidation("The server needs a DLC this co-op build can't run. The co-op log has the details.");
             return;
         }
 
         network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
     }
-
-    // The server only accepts NavalDLC when it runs War Sails, and the same build string can't tell whether this client can too.
-    private bool CanRunServerModules() => moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out _);
 
     private static string GetIncompatibleBuildReason(string? serverBuildVersion)
     {

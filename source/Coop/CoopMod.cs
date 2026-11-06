@@ -14,6 +14,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -160,7 +161,7 @@ namespace Coop
                     exception => Logger.Warning(
                         exception,
                         "Unsupported module wwarning preference could not be saved"),
-                    ModInformation.IsNavalDlcActive);
+                    new ModuleValidator());
             }
 
             if (ManagedServerConfig.IsManagedServer)

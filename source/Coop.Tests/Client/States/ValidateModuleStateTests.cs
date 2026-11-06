@@ -24,8 +24,10 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
+    [Collection(ModInformationRoleCollection.Name)]
     public class ValidateModuleStateTests : IDisposable
     {
+        private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
@@ -45,6 +47,7 @@ namespace Coop.Tests.Client.States
             // the logic (and thus the current state) so that timer is torn down with the test instead of
             // lingering and firing TimeoutValidation on a stale state after the test has finished.
             clientLogic.Dispose();
+            ModInformation.IsNavalDlcActive = previousNavalDlc;
         }
 
         [Fact]
@@ -132,7 +135,7 @@ namespace Coop.Tests.Client.States
 
             Assert.Empty(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
             var notice = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>());
-            Assert.Contains(ValidateModuleState.NavalIncapableReason, notice.Text);
+            Assert.Contains("a DLC this co-op build can't run", notice.Text);
         }
 
         // A client that can run War Sails joins a War Sails server as before.
@@ -157,7 +160,7 @@ namespace Coop.Tests.Client.States
             var featureFlag = new Mock<INavalFeatureFlag>();
             featureFlag.SetupGet(flag => flag.IsEnabled).Returns(testerBuild);
             featureFlag.SetupGet(flag => flag.IsNavalCodeBuilt).Returns(navalCodeBuilt);
-            bool navalActive = new NavalSupportDetector(moduleInfoProvider.Object, featureFlag.Object,
+            ModInformation.IsNavalDlcActive = new NavalSupportDetector(moduleInfoProvider.Object, featureFlag.Object,
                 _ => assembliesShipped, Mock.Of<IWarSailsSetting>(), isHost: false).Decide().IsActive;
 
             var validateState = new ValidateModuleState(
@@ -169,7 +172,7 @@ namespace Coop.Tests.Client.States
                 Mock.Of<IGameStateInterface>(),
                 moduleInfoProvider.Object,
                 clientComponent.Container.Resolve<IModuleNameProvider>(),
-                new ModuleValidator(() => navalActive));
+                new ModuleValidator());
             ((ClientLogic)clientLogic).State = validateState;
             return validateState;
         }

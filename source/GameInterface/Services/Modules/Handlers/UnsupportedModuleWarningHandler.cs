@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using TaleWorlds.Library;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.CoopOptions;
 
 namespace GameInterface.Services.Modules.Handlers;
@@ -26,7 +27,7 @@ public class UnsupportedModuleWarningHandler
     private readonly IModuleNameProvider moduleNameProvider;
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action<Exception> reportError;
-    private readonly bool navalSupported;
+    private readonly IModuleValidator moduleValidator;
 
     private bool optionsLoaded;
     private bool warningsSuppressed; 
@@ -39,14 +40,14 @@ public class UnsupportedModuleWarningHandler
         IModuleNameProvider moduleNameProvider,
         ICoopOptionsStore optionsStore,
         Action<Exception> reportError,
-        bool navalSupported)
+        IModuleValidator moduleValidator)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
         if (moduleNameProvider == null) throw new ArgumentNullException(nameof(moduleNameProvider));
         this.moduleNameProvider = moduleNameProvider;
         this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
         this.reportError = reportError;
-        this.navalSupported = navalSupported;
+        this.moduleValidator = moduleValidator;
     }
 
     public void TryShowPrompt(bool canShow, Action<InquiryData> showInquiry)
@@ -159,7 +160,7 @@ public class UnsupportedModuleWarningHandler
         return $"{name} ({module.Id})";
     }
 
-    // Whether a module belongs in the warning; NavalDLC is left out only by a build that shipped the naval code.
+    // Whether a module belongs in the warning; the validator decides which DLC is unsupported.
     private bool IsUnsupported(ModuleInfo module)
     {
         if (IsCoopVariant(module))
@@ -174,12 +175,7 @@ public class UnsupportedModuleWarningHandler
             return false;
         }
 
-        if (navalSupported && Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc))
-        {
-            return false;
-        }
-
-        return !module.IsOfficial || module.IsDlc;
+        return !module.IsOfficial || moduleValidator.IsUnsupportedDlc(module);
     }
 
     private static bool IsCoopVariant(ModuleInfo module, string moduleId = null)

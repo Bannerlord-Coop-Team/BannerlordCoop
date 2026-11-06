@@ -35,6 +35,18 @@ public class NavalSupportDetectorTests
         }
     }
 
+    // Naval needs both assemblies, so either one alone keeps it off.
+    [Theory]
+    [InlineData(ModInformation.MissionsNavalAssemblyFile)]
+    [InlineData(ModInformation.CoopNavalAssemblyFile)]
+    public void Decide_WithOnlyOneNavalAssembly_StaysOff(string loadableFile)
+    {
+        var detector = new NavalSupportDetector(Modules(true), new FixedFlag(true), file => file == loadableFile,
+            new FixedWarSails(false), isHost: false);
+
+        Assert.False(detector.Decide().IsActive);
+    }
+
     // Naval assemblies left by an earlier naval deploy must not turn naval on in a build made with CoopNavalDlc=false.
     [Fact]
     public void Decide_BuiltWithoutNavalCode_StaysOffEvenWithStaleNavalAssemblies()

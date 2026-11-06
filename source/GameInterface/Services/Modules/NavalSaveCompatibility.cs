@@ -1,5 +1,4 @@
 ﻿using Common;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,27 +16,13 @@ public interface INavalSaveCompatibility
 /// <inheritdoc cref="INavalSaveCompatibility"/>
 public class NavalSaveCompatibility : INavalSaveCompatibility
 {
-    private readonly Func<bool> isWarSailsActive;
-
-    // Reads the startup War Sails decision on each check.
-    public NavalSaveCompatibility() : this(() => ModInformation.IsNavalDlcActive)
-    {
-    }
-
-    // Lets tests pin the War Sails decision.
-    internal NavalSaveCompatibility(Func<bool> isWarSailsActive)
-    {
-        this.isWarSailsActive = isWarSailsActive;
-    }
-
     /// <inheritdoc/>
     public string GetHostRefusal(string saveName, IEnumerable<string> saveModuleIds)
     {
         bool savedWithNaval = (saveModuleIds ?? Enumerable.Empty<string>()).Contains(ModInformation.NavalDlcModuleId);
-        bool warSails = isWarSailsActive();
-        if (savedWithNaval == warSails) return null;
+        if (savedWithNaval == ModInformation.IsNavalDlcActive) return null;
 
-        return warSails
+        return ModInformation.IsNavalDlcActive
             ? $"Save '{saveName}' was made without NavalDLC and a campaign can't gain it later. Host a save made with NavalDLC, or set warSails to false and disable NavalDLC."
             : $"Save '{saveName}' was made with NavalDLC, which War Sails off can't load. Host a save made without NavalDLC, or set warSails to true and enable NavalDLC.";
     }

@@ -1,4 +1,5 @@
 using System;
+using Common;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using System.Collections.Generic;
@@ -7,8 +8,23 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Modules.Validators;
 
-public class ModuleValidatorTests
+[Collection(ModInformationRoleCollection.Name)]
+public class ModuleValidatorTests : IDisposable
 {
+    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+
+    // Starts every test with War Sails off; the tests that need it on turn it on.
+    public ModuleValidatorTests()
+    {
+        ModInformation.IsNavalDlcActive = false;
+    }
+
+    // Puts back the process-wide flag.
+    public void Dispose()
+    {
+        ModInformation.IsNavalDlcActive = previousNavalDlc;
+    }
+
     [Fact]
     public void Validate_ReturnsNull_WhenClientModulesMatchServerModules()
     {
@@ -154,7 +170,7 @@ public class ModuleValidatorTests
         var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
         var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
 
-        var result = new ModuleValidator(() => false).Validate(serverModules, clientModules, out var error);
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
 
         Assert.False(result);
         Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
@@ -163,13 +179,18 @@ public class ModuleValidatorTests
     [Fact]
     public void ValidateNoDlc_RejectsNavalDlc_WhenTheBuildHasNoNavalCode()
     {
-        bool result = new ModuleValidator(() => false).ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var error);
+        bool result = new ModuleValidator().ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var error);
 
         Assert.False(result);
         Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
     }
 
-    private static ModuleValidator NavalBuildValidator() => new ModuleValidator(() => true);
+    // Turns War Sails on for this test and returns a validator that reads it.
+    private static ModuleValidator NavalBuildValidator()
+    {
+        ModInformation.IsNavalDlcActive = true;
+        return new ModuleValidator();
+    }
 
     private static ModuleInfo Native() =>
         new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };

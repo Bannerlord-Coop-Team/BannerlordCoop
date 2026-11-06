@@ -23,6 +23,7 @@ public interface INavalSupportDetector
 public class NavalSupportDetector : INavalSupportDetector
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalSupportDetector>();
+    private static readonly string[] NavalAssemblyFiles = { ModInformation.MissionsNavalAssemblyFile, ModInformation.CoopNavalAssemblyFile };
 
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly INavalFeatureFlag navalFeatureFlag;
@@ -54,8 +55,10 @@ public class NavalSupportDetector : INavalSupportDetector
     {
         bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
             .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
-        bool supported = navalFeatureFlag.IsNavalCodeBuilt
-            && ModInformation.IsNavalSupported(navalModuleEnabled, navalFeatureFlag.IsEnabled, isLoadable);
+        bool supported = navalModuleEnabled
+            && navalFeatureFlag.IsEnabled
+            && navalFeatureFlag.IsNavalCodeBuilt
+            && NavalAssemblyFiles.All(isLoadable);
 
         if (isHost) return DecideForHost(navalModuleEnabled, supported);
 
