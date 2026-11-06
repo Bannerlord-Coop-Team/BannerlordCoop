@@ -2,11 +2,9 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -19,21 +17,15 @@ internal class PartyWageLimitHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
-    private readonly ICoopClanPermissions permissions;
 
     public PartyWageLimitHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager,
-        ICoopClanPermissions permissions)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
-        this.permissions = permissions;
 
         messageBroker.Subscribe<WagePaymentLimitSet>(Handle_WagePaymentLimitSet);
         messageBroker.Subscribe<SetWagePaymentLimit>(Handle_SetWagePaymentLimit);
@@ -59,7 +51,6 @@ internal class PartyWageLimitHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             if (mobileParty.IsPlayerParty()) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageParty(senderHero, mobileParty)) return;
 
             mobileParty.SetWagePaymentLimit(obj.What.NewValue);
         });

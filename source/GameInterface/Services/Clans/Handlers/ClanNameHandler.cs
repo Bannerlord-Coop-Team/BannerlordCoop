@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using SandBox.GauntletUI;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -21,21 +20,15 @@ public class ClanNameHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
-    private readonly ICoopClanPermissions permissions;
 
     public ClanNameHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager,
-        ICoopClanPermissions permissions)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
-        this.permissions = permissions;
 
         messageBroker.Subscribe<ChangeClanName>(Handle_ChangeClanName);
         messageBroker.Subscribe<NetworkChangeClanName>(Handle_NetworkChangeClanName);
@@ -74,8 +67,6 @@ public class ClanNameHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
-            if (!playerManager.IsSenderControllingClan(obj.Who, clan)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageClan(senderHero, clan)) return;
 
             ClanNameChangePatch.ChangeClanNameOverride(clan, data.Name, data.InformalName);
 

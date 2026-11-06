@@ -3,9 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.CharacterDevelopers.Messages;
-using GameInterface.Services.Clans;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -20,21 +18,15 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly IPlayerManager playerManager;
-        private readonly ICoopClanPermissions permissions;
 
         public CharacterDeveloperHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            INetwork network,
-            IPlayerManager playerManager,
-            ICoopClanPermissions permissions)
+            INetwork network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            this.playerManager = playerManager;
-            this.permissions = permissions;
 
             messageBroker.Subscribe<ApplyChanges>(Handle_ApplyChanges);
             messageBroker.Subscribe<NetworkApplyChanges>(Handle_NetworkApplyChanges);
@@ -106,7 +98,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             GameThread.RunSafe(() =>
             {
                 if (!objectManager.TryGetObjectWithLogging<HeroDeveloper>(data.HeroDeveloperId, out var heroDeveloper)) return;
-                if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageHero(senderHero, heroDeveloper.Hero)) return;
 
                 AddPerks(data.PerkIds, heroDeveloper);
                 AddAttributes(data.AttributeIds, data.AttributeIncreases, heroDeveloper);

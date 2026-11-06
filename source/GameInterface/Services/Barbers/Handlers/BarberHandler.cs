@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Barbers.Messages;
-using GameInterface.Services.Clans;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using SandBox.CampaignBehaviors;
@@ -23,16 +22,13 @@ internal class BarberHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
-    private readonly ICoopClanPermissions permissions;
 
     public BarberHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager,
-        ICoopClanPermissions permissions)
+        IPlayerManager playerManager)
     {
-        this.permissions = permissions;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
@@ -94,7 +90,6 @@ internal class BarberHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(obj.What.CharacterToChangeId, out var characterToChange)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageHero(senderHero, characterToChange.HeroObject)) return;
 
             characterToChange.HeroObject.StaticBodyProperties = obj.What.CurrentBodyProperties.StaticProperties;
             characterToChange.HeroObject.Build = obj.What.CurrentBodyProperties.DynamicProperties.Build;

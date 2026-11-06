@@ -5,7 +5,6 @@ using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,21 +18,15 @@ internal class ClanPartyItemVMHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
-    private readonly ICoopClanPermissions permissions;
 
     public ClanPartyItemVMHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager,
-        ICoopClanPermissions permissions)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
-        this.permissions = permissions;
 
         messageBroker.Subscribe<PartyBehaviorUpdatedOnSelection>(Handle_PartyBehaviorUpdatedOnSelection);
         messageBroker.Subscribe<UpdatePartyBehaviorOnSelection>(Handle_UpdatePartyBehaviorOnSelection);
@@ -64,7 +57,6 @@ internal class ClanPartyItemVMHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
             if (mobileParty.IsPlayerParty()) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageParty(senderHero, mobileParty)) return;
             mobileParty.SetPartyObjective(obj.What.PartyObjective);
         });
     }
@@ -82,8 +74,6 @@ internal class ClanPartyItemVMHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
             if (homeSettlement.Town == null) return;
-            if (!playerManager.IsSenderControllingClan(obj.Who, homeSettlement.OwnerClan)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || !permissions.CanManageClan(senderHero, homeSettlement.OwnerClan)) return;
 
             homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
             network.SendAll(new ChangeAutoRecruitForSettlementClients(obj.What.HomeSettlementId, obj.What.Value));
