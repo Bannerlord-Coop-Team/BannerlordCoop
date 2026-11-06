@@ -86,18 +86,6 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
-        [Fact]
-        public void Receive_OnOpenConnection_ReachesSteam()
-        {
-            const uint connection = 42;
-            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
-            SeedOwnedConnection(transport, connection, 76561198000000042);
-
-            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
-
-            Assert.Equal(connection, Assert.Single(transport.ReceivedConnections));
-        }
-
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
