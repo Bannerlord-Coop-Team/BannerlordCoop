@@ -403,6 +403,14 @@ internal class CompanionRolesHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OneToOneConversationHeroId, out var oneToOneConversationHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
+            // Vanilla offers the rejoin only to a companion outside the main party who leads no party.
+            // A stale dialog must not pull it out of a party it joined meanwhile, like another player's.
+            if (oneToOneConversationHero.PartyBelongedTo != null)
+            {
+                logger.Warning("Ignored companion rejoin for {HeroId} because it is already in {PartyId}",
+                    data.OneToOneConversationHeroId, oneToOneConversationHero.PartyBelongedTo.StringId);
+                return;
+            }
 
             AddHeroToPartyAction.Apply(oneToOneConversationHero, mainParty, true);
         });
