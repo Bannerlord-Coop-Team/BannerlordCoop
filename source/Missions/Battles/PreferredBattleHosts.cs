@@ -20,7 +20,6 @@ public class PreferredBattleHosts : IPreferredBattleHosts
 
     public int RankOf(string controllerId)
     {
-        // Null when received with no hosts, since protobuf does not send an empty list.
         var configured = ModConfigProvider.ModOptions.PreferredBattleHosts;
         if (string.IsNullOrEmpty(controllerId) || configured == null) return Unlisted;
 
