@@ -335,7 +335,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
         Assert.Equal(60, config.ModOptions.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(config.ModOptions.CoopClansEnabled);
-        Assert.Equivalent(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
+        Assert.Equivalent(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions), strict: true);
     }
 
     [Fact]
