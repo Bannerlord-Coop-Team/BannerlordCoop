@@ -757,23 +757,29 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        messageBroker.Publish(
-            this,
-            new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
+        var sender = obj.Who;
 
-        var message = new NetworkAddDecision(
-            payload.KingdomId,
-            payload.Data,
-            payload.IgnoreInfluenceCost,
-            payload.RandomNumber);
-
-        if (obj.Who is NetPeer peer)
+        // Apply and relay on the game thread together, so a cancel there can never reach clients before the add.
+        GameThread.RunSafe(() =>
         {
-            network.SendAllBut(peer, message);
-            return;
-        }
+            messageBroker.Publish(
+                this,
+                new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
 
-        network.SendAll(message);
+            var message = new NetworkAddDecision(
+                payload.KingdomId,
+                payload.Data,
+                payload.IgnoreInfluenceCost,
+                payload.RandomNumber);
+
+            if (sender is NetPeer peer)
+            {
+                network.SendAllBut(peer, message);
+                return;
+            }
+
+            network.SendAll(message);
+        }, context: nameof(HandleNetworkAddDecision));
     }
 
     private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
