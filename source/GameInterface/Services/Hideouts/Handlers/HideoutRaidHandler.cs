@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
@@ -80,7 +81,8 @@ internal sealed class HideoutRaidHandler : IHandler
 
     internal void OpenTroopSelection(MenuCallbackArgs args, bool isDirectAssault)
     {
-        var settlement = Settlement.CurrentSettlement ?? PlayerEncounter.EncounteredBattle?.MapEventSettlement;
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        var settlement = Settlement.CurrentSettlement ?? encounteredBattle?.MapEventSettlement;
         if (settlement?.IsHideout != true) return;
         if (MobileParty.MainParty.CurrentSettlement != settlement)
         {
