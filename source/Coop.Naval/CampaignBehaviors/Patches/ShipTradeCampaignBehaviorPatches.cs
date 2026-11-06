@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(ShipTradeCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipTradeCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(ShipTradeCampaignBehavior.DailyTickClan))]

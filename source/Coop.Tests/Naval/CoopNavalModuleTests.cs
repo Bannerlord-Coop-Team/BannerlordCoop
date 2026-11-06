@@ -19,6 +19,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using Xunit;
+using static GameInterface.GameInterface;
 
 namespace Coop.Tests.Naval;
 
@@ -69,13 +70,13 @@ public class CoopNavalModuleTests
     }
 
     [Fact]
-    public void Load_RegistersUncategorizedPatchesForTheAssembly()
+    public void Load_RegistersNavalCategoryPatchesForTheAssembly()
     {
         using var container = BuildContainer();
 
         var registration = Assert.Single(container.Resolve<IEnumerable<HarmonyPatchCategoryRegistration>>());
         Assert.Equal(typeof(CoopNavalModule).Assembly, registration.Assembly);
-        Assert.Null(registration.Category);
+        Assert.Equal(HARMONY_NAVAL_CATEGORY, registration.Category);
     }
 }
 #endif

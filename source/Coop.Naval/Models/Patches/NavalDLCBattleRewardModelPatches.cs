@@ -13,6 +13,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCBattleRewardModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCBattleRewardModelPatches
 {
     // Vanilla gives PartyBase.MainParty an extra share of the ships no other winner took, the server gives it to the winning player

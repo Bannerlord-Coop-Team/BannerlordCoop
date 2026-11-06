@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalDLCFigureheadCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCFigureheadCampaignBehaviorPatches
 {
     // The server has no player to notify, and each player's last loot time is kept in NavalPlayerData

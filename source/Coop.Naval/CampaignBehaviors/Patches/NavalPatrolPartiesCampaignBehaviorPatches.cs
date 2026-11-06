@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalPatrolPartiesCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalPatrolPartiesCampaignBehaviorPatches
 {
     // The daily tick queues, spawns and removes patrols, so its before and after state is compared instead of

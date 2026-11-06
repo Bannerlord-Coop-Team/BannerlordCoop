@@ -14,6 +14,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.PortScreen.Patches;
 
 [HarmonyPatch]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PortScreenHandlerPatches
 {
     private static IEnumerable<MethodBase> TargetMethods()

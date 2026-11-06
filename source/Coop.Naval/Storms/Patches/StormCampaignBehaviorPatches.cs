@@ -7,6 +7,7 @@ using System;
 namespace Coop.Naval.Storms.Patches;
 
 [HarmonyPatch(typeof(StormCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class StormCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(StormCampaignBehavior.HourlyTick))]

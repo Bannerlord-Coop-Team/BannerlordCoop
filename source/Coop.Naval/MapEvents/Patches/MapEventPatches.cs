@@ -10,6 +10,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.MapEvents.Patches;
 
 [HarmonyPatch(typeof(MapEvent))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class MapEventPatches
 {
     // Vanilla only rolls a figurehead for the main party, the server rolls one for each winning player

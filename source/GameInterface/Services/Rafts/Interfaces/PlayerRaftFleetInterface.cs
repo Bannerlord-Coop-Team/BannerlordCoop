@@ -3,7 +3,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players.Interfaces;
+using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -48,16 +48,16 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
 {
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
-    private readonly IPlayerPartyLookup playerPartyLookup;
+    private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
 
     private Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets => coopSessionProvider.CoopSession.NavalPlayerData.PlayerCachedFleets;
 
-    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerPartyLookup playerPartyLookup, IMessageBroker messageBroker)
+    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
-        this.playerPartyLookup = playerPartyLookup;
+        this.playerManager = playerManager;
         this.messageBroker = messageBroker;
     }
 
@@ -160,7 +160,7 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
     private bool TryGetPlayerHeroId(MobileParty party, out string playerHeroId)
     {
         playerHeroId = null;
-        if (!playerPartyLookup.TryGetPlayerHero(party, out var playerHero)) return false;
+        if (!playerManager.TryGetPlayerHero(party, out var playerHero)) return false;
 
         return objectManager.TryGetIdWithLogging(playerHero, out playerHeroId);
     }

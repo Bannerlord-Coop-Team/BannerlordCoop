@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(PiratesCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PiratesCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(PiratesCampaignBehavior.DailyTickClan))]

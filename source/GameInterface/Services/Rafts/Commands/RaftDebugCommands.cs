@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Commands;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players.Interfaces;
+using GameInterface.Services.Players;
 using GameInterface.Services.Rafts.Interfaces;
 using TaleWorlds.CampaignSystem;
 
@@ -22,16 +22,16 @@ public class RaftDebugCommands
     {
         private readonly IPlayerRaftFleetInterface raftFleetInterface;
         private readonly IObjectManager objectManager;
-        private readonly IPlayerPartyLookup playerPartyLookup;
+        private readonly IPlayerManager playerManager;
 
         public StrandOnRaftCoopCommand(
             IPlayerRaftFleetInterface raftFleetInterface,
             IObjectManager objectManager,
-            IPlayerPartyLookup playerPartyLookup)
+            IPlayerManager playerManager)
         {
             this.raftFleetInterface = raftFleetInterface;
             this.objectManager = objectManager;
-            this.playerPartyLookup = playerPartyLookup;
+            this.playerManager = playerManager;
         }
 
         public string Prefix => "coop.debug.naval";
@@ -61,7 +61,7 @@ public class RaftDebugCommands
             if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
                 return Failed($"No hero has id {args[0]}.");
 
-            if (!playerPartyLookup.TryGetPlayerParty(hero, out var party))
+            if (!playerManager.TryGetPlayerParty(hero, out var party))
                 return Failed($"{args[0]} is not a registered player hero.");
 
             if (!party.IsCurrentlyAtSea)

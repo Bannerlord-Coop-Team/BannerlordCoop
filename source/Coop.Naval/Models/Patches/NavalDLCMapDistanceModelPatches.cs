@@ -12,6 +12,7 @@ namespace Coop.Naval.Models.Patches;
 /// map scene registers its caches, and these methods index <c>_navigationCaches</c> directly so they throw.
 /// </summary>
 [HarmonyPatch(typeof(NavalDLCMapDistanceModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCMapDistanceModelPatches
 {
     [HarmonyPatch(nameof(NavalDLCMapDistanceModel.GetDistance),

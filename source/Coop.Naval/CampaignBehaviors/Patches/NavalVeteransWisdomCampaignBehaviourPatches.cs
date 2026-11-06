@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
+using Coop.Naval.Notifications.Messages;
 using GameInterface.Policies;
-using GameInterface.Services.HeroDevelopers.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalVeteransWisdomCampaignBehaviour))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalVeteransWisdomCampaignBehaviourPatches
 {
     [HarmonyPatch(nameof(NavalVeteransWisdomCampaignBehaviour.OnDailyTickParty))]

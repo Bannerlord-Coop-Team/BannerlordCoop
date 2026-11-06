@@ -82,6 +82,18 @@ public interface IPlayerManager
     bool TryGetPlayer(Hero hero, out Player player);
 
     /// <summary>
+    /// Resolves the party of the player controlling the given hero, even when the hero has left it as a prisoner.
+    /// Reads the object registry, so call it on the game thread.
+    /// </summary>
+    bool TryGetPlayerParty(Hero hero, out MobileParty playerParty);
+
+    /// <summary>
+    /// Resolves the hero of the player controlling the given party.
+    /// Reads the object registry, so call it on the game thread.
+    /// </summary>
+    bool TryGetPlayerHero(MobileParty playerParty, out Hero playerHero);
+
+    /// <summary>
     /// Checks whether a message sender is the peer controlling the given hero, logging a warning
     /// when it isn't, so a handler can ignore a request made for another player's hero.
     /// </summary>
@@ -421,6 +433,22 @@ public class PlayerManager : IPlayerManager
         player = null;
         return hero != null && TryGetControlledObjectInfo(hero, out var control)
             && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
+    /// <inheritdoc cref="IPlayerManager.TryGetPlayerParty(Hero, out MobileParty)"/>
+    public bool TryGetPlayerParty(Hero hero, out MobileParty playerParty)
+    {
+        playerParty = null;
+        return TryGetPlayer(hero, out var player) && objectManager.TryGetObject(player.MobilePartyId, out playerParty);
+    }
+
+    /// <inheritdoc cref="IPlayerManager.TryGetPlayerHero(MobileParty, out Hero)"/>
+    public bool TryGetPlayerHero(MobileParty playerParty, out Hero playerHero)
+    {
+        playerHero = null;
+        return playerParty != null && TryGetControlledObjectInfo(playerParty, out var control)
+            && TryGetPlayer(control.ObjectControllerId, out var player)
+            && objectManager.TryGetObject(player.HeroId, out playerHero);
     }
 
     public bool IsSenderControllingHero(object sender, string heroId)

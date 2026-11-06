@@ -11,6 +11,7 @@ namespace Coop.Naval.Models.Patches;
 /// This takes a lot longer to build up to being profitable as they have less money to build up a roster of trade goods.
 /// </summary>
 [HarmonyPatch(typeof(NavalDLCCaravanModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCCaravanModelPatches
 {
     [HarmonyPatch(nameof(NavalDLCCaravanModel.GetInitialTradeGold))]

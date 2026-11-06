@@ -3,15 +3,16 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
-/// Vanilla gives MobileParty.MainParty its own embark and disembark checks and land to sea path cost.
+/// Vanilla gives MobileParty.MainParty its own embark and disembark checks.
 /// Every machine checks IsPlayerParty instead, so the server and other clients move a player's party the way its owner does.
 /// </summary>
 [HarmonyPatch]
@@ -25,27 +26,12 @@ internal class PlayerLandSeaTransitionPatches
     {
         AccessTools.Method(typeof(MobileParty), nameof(MobileParty.CheckTransitionParallel)),
         AccessTools.Method(typeof(MobileParty), nameof(MobileParty.CommonTransitioningPartyTick)),
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.GetRegionSwitchCostFromLandToSea)),
     };
 
+    // Both take the party on the stack and return a bool
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ReplaceIsMainPartyWithIsPlayerParty(instructions);
-
-    internal static IEnumerable<CodeInstruction> ReplaceIsMainPartyWithIsPlayerParty(IEnumerable<CodeInstruction> instructions)
-    {
-        foreach (var instruction in instructions)
-        {
-            // Both take the party on the stack and return a bool
-            if (instruction.Calls(IsMainPartyGetter))
-            {
-                yield return new CodeInstruction(OpCodes.Call, IsPlayerPartyMethod).MoveLabelsFrom(instruction).MoveBlocksFrom(instruction);
-                continue;
-            }
-
-            yield return instruction;
-        }
-    }
+        => instructions.MethodReplacer(IsMainPartyGetter, IsPlayerPartyMethod);
 }
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.FinishNavigationTransitionInternal))]
@@ -87,25 +73,32 @@ internal class PlayerLandSeaTransitionCancelPatch
     }
 }
 
-[HarmonyPatch(typeof(MobileParty), nameof(MobileParty.ComputePath))]
+/// <summary>
+/// Vanilla gives MobileParty.MainParty its own land to sea path cost and keeps it on water when its target allows it.
+/// Every machine gives a player's party the same, so the server and other clients path it the way its owner does.
+/// </summary>
+[HarmonyPatch(typeof(MobileParty))]
 [HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class PlayerLandSeaPathPatch
 {
-    private static readonly MethodInfo MainPartyGetter = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.MainParty));
-
-    // Vanilla checks IsMainParty && MainParty.IsCurrentlyAtSea, so the second check also has to read this party
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    // Gives a player's party the cost vanilla only gives the main party
+    [HarmonyPatch(nameof(MobileParty.GetRegionSwitchCostFromLandToSea))]
+    [HarmonyPostfix]
+    private static void GetRegionSwitchCostFromLandToSeaPostfix(MobileParty __instance, ref int __result)
     {
-        foreach (var instruction in PlayerLandSeaTransitionPatches.ReplaceIsMainPartyWithIsPlayerParty(instructions))
-        {
-            if (instruction.Calls(MainPartyGetter))
-            {
-                yield return new CodeInstruction(OpCodes.Ldarg_0).MoveLabelsFrom(instruction).MoveBlocksFrom(instruction);
-                continue;
-            }
+        if (!__instance.IsPlayerParty()) return;
 
-            yield return instruction;
-        }
+        __result = Campaign.PlayerRegionSwitchCostFromLandToSea;
+    }
+
+    // Same check as vanilla's IsMainParty && MainParty.IsCurrentlyAtSea. Nothing in ComputePath reads navigationType before vanilla's own check.
+    [HarmonyPatch(nameof(MobileParty.ComputePath))]
+    [HarmonyPrefix]
+    private static void ComputePathPrefix(MobileParty __instance, CampaignVec2 newTargetPosition, ref MobileParty.NavigationType navigationType)
+    {
+        if (!__instance.IsPlayerParty() || !__instance.IsCurrentlyAtSea) return;
+        if (!NavigationHelper.IsPositionValidForNavigationType(newTargetPosition, MobileParty.NavigationType.Naval)) return;
+
+        navigationType = MobileParty.NavigationType.Naval;
     }
 }

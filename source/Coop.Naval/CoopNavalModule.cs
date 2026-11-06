@@ -19,7 +19,7 @@ public class CoopNavalModule : Module
     {
         base.Load(builder);
 
-        builder.RegisterInstance(HarmonyPatchCategoryRegistration.Uncategorized(typeof(CoopNavalModule).Assembly));
+        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(typeof(CoopNavalModule).Assembly, GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY));
 
         foreach (var type in GetConcreteTypes<IHandler>())
         {

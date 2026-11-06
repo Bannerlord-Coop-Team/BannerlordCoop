@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalPartyNavigationModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalPartyNavigationModelPatches
 {
     [HarmonyPatch(nameof(NavalPartyNavigationModel.HasNavalNavigationCapability))]

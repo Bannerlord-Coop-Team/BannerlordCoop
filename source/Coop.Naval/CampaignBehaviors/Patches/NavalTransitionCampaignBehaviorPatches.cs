@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalTransitionCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalTransitionCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(NavalTransitionCampaignBehavior.wait_here_on_condition))]

@@ -1,7 +1,7 @@
 ﻿using Common;
 using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
-using GameInterface.Services.Players.Interfaces;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
 using TaleWorlds.CampaignSystem;
@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(RaftStateCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class RaftStateCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(RaftStateCampaignBehavior.OnMapEventEnded))]
@@ -48,10 +49,10 @@ internal class RaftStateCampaignBehaviorPatches
         if (ModInformation.IsClient) return false;
         if (!hero.IsPlayerHero()) return false;
 
-        if (!ContainerProvider.TryResolve<IPlayerPartyLookup>(out var playerPartyLookup)) return false;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
 
         // The hero has already left their party here, so find it through the player registry
-        if (playerPartyLookup.TryGetPlayerParty(hero, out var playerParty) && playerParty.IsInRaftState)
+        if (playerManager.TryGetPlayerParty(hero, out var playerParty) && playerParty.IsInRaftState)
         {
             RaftStateChangeAction.DeactivateRaftStateForParty(playerParty);
         }

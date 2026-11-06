@@ -11,6 +11,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCTroopSacrificeModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCTroopSacrificeModelPatches
 {
     // The server applies a player's leave soldiers behind, which has no PlayerEncounter or MobileParty.MainParty

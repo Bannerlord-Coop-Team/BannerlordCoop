@@ -11,6 +11,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.Storms.Patches;
 
 [HarmonyPatch(typeof(StormManager))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class StormManagerPatches
 {
     [HarmonyPatch(nameof(StormManager.CreateStormAtPosition), new[] { typeof(Vec2) })]

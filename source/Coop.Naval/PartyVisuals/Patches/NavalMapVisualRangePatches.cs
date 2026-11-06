@@ -6,6 +6,7 @@ using NavalDLC.View.Map.Visuals;
 namespace Coop.Naval.PartyVisuals.Patches;
 
 [HarmonyPatch(typeof(NavalMobilePartyVisual), nameof(NavalMobilePartyVisual.ValidateIsDirty))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalMapVisualRangePatches
 {
     [HarmonyPrefix]

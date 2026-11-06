@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalShipDistributionCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalShipDistributionCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(NavalShipDistributionCampaignBehavior.OnPartyDisbanded))]

@@ -9,6 +9,7 @@ namespace Coop.Naval.PartyVisuals.Patches;
 /// Other players' rafts are shown so a player sailing back after escaping captivity can be seen.
 /// </summary>
 [HarmonyPatch(typeof(NavalMobilePartyVisual))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalRaftVisualPatches
 {
     [HarmonyPatch(nameof(NavalMobilePartyVisual.AddRaftVisual))]

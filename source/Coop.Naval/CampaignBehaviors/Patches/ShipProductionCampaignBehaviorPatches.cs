@@ -5,6 +5,7 @@ using NavalDLC.CampaignBehaviors;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(ShipProductionCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipProductionCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(ShipProductionCampaignBehavior.DailyTickTown))]

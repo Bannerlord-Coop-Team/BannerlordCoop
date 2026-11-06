@@ -8,6 +8,7 @@ namespace Coop.Naval.Anchors.Patches;
 /// Hides the zoomed out fleet tracker when the main party has no anchor, like the server's removed main party.
 /// </summary>
 [HarmonyPatch(typeof(GauntletNavalMapAnchorTrackerView))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalMapAnchorTrackerViewPatches
 {
     // Vanilla reads MainParty.Anchor.Position before its own null check, so hide the tracker and skip the update

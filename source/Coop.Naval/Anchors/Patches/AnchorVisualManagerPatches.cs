@@ -20,6 +20,7 @@ namespace Coop.Naval.Anchors.Patches;
 /// seeing range, without the zoomed out tracker icon or map interaction the local player's own fleet has.
 /// </summary>
 [HarmonyPatch(typeof(AnchorVisualManager))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class AnchorVisualManagerPatches
 {
     private static readonly Dictionary<MobileParty, OtherPlayerFleetVisual> OtherPlayerFleets = new();

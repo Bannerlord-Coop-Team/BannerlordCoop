@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Roster;
 
-namespace GameInterface.Services.HeroDevelopers.Messages;
+namespace Coop.Naval.Notifications.Messages;
 
 public readonly struct UpdateItemRosterVersionAfterPerkChange : IEvent
 {

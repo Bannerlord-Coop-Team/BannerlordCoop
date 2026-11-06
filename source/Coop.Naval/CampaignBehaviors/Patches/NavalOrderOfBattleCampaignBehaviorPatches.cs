@@ -9,6 +9,7 @@ using static NavalDLC.CampaignBehaviors.NavalOrderOfBattleCampaignBehavior;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(NavalOrderOfBattleCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalOrderOfBattleCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(NavalOrderOfBattleCampaignBehavior.SetFormationInfos))]

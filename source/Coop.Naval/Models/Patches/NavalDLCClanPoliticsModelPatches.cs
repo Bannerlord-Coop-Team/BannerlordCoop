@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCClanPoliticsModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCClanPoliticsModelPatches
 {
     // The default influence tick is gated for player clans, so also skip the Naval Conjoining Statute bonus

@@ -9,6 +9,7 @@ namespace Coop.Naval.PartyVisuals.Patches;
 /// The naval manager only adds a party's ship visual on MobilePartyCreated, which clients don't fire for parties created by the server.
 /// </summary>
 [HarmonyPatch(typeof(MobilePartyVisualManager))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalPartyVisualLifetimePatches
 {
     [HarmonyPatch(nameof(MobilePartyVisualManager.AddNewPartyVisualForParty))]

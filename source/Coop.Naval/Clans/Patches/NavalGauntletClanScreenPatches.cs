@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 namespace Coop.Naval.Clans.Patches;
 
 [HarmonyPatch(typeof(NavalGauntletClanScreen))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalGauntletClanScreenPatches
 {
     // The naval screen overrides GauntletClanScreen.CreateDataSource, so the coop prefix on the base never runs

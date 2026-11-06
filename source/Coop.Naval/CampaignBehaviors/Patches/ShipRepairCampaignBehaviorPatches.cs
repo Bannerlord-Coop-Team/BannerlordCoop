@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(ShipRepairCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipRepairCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(ShipRepairCampaignBehavior.DailyTickParty))]

@@ -1,10 +1,10 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.HeroDevelopers.Messages;
+namespace Coop.Naval.Notifications.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkUpdateItemRosterVersionAfterPerkChange : ICommand
+internal readonly struct NetworkUpdateItemRosterVersionAfterPerkChange : ICommand
 {
     [ProtoMember(1)]
     public readonly string ItemRosterId;

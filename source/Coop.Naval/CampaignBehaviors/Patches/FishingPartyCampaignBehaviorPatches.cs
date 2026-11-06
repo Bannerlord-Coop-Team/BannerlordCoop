@@ -5,6 +5,7 @@ using NavalDLC.CampaignBehaviors;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(FishingPartyCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class FishingPartyCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(FishingPartyCampaignBehavior.OnDailySettlementTick))]

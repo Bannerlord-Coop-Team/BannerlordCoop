@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCShipDistributionModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCShipDistributionModelPatches
 {
     [HarmonyPatch(nameof(NavalDLCShipDistributionModel.CanSendShipToParty))]

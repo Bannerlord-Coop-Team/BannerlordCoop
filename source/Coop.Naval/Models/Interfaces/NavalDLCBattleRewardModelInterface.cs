@@ -3,7 +3,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players.Interfaces;
+using GameInterface.Services.Players;
 using NavalDLC.GameComponents;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,18 +26,18 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
 {
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
-    private readonly IPlayerPartyLookup playerPartyLookup;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface;
 
     public NavalDLCBattleRewardModelInterface(
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
-        IPlayerPartyLookup playerPartyLookup,
+        IPlayerManager playerManager,
         ISessionNavalPlayerDataInterface sessionNavalPlayerDataInterface)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
-        this.playerPartyLookup = playerPartyLookup;
+        this.playerManager = playerManager;
         this.sessionNavalPlayerDataInterface = sessionNavalPlayerDataInterface;
     }
 
@@ -129,7 +129,7 @@ public class NavalDLCBattleRewardModelInterface : INavalDLCBattleRewardModelInte
         {
             MobileParty mobileParty = winnerParty.Party.MobileParty;
             if (mobileParty == null || !mobileParty.IsPlayerParty()) continue;
-            if (!playerPartyLookup.TryGetPlayerHero(mobileParty, out var playerHero)) continue;
+            if (!playerManager.TryGetPlayerHero(mobileParty, out var playerHero)) continue;
 
             Figurehead figurehead = GetFigureheadLoot(model, playerHero, defeatedParties, defeatedLeaderParty);
             if (figurehead != null)

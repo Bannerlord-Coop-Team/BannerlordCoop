@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCClanFinanceModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCClanFinanceModelPatches
 {
     // The default gold tick is gated for player clans, so also skip the Coastal Guard Edict garrison withdrawals

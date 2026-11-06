@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
 [HarmonyPatch(typeof(ClanFleetManagementCampaignBehavior))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ClanFleetManagementCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(ClanFleetManagementCampaignBehavior.HourlyTick))]

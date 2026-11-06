@@ -5,6 +5,7 @@ using NavalDLC.CampaignBehaviors;
 namespace Coop.Naval.Storms.Patches;
 
 [HarmonyPatch(typeof(NavalStormriderCampaignBehaviour))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalStormriderCampaignBehaviourPatches
 {
     // Grants Stormrider xp to every party with the perk except MobileParty.MainParty, which the server never has

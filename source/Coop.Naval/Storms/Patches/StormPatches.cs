@@ -10,6 +10,7 @@ using NavalDLC.Map;
 namespace Coop.Naval.Storms.Patches;
 
 [HarmonyPatch(typeof(Storm))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class StormPatches
 {
     // Set while StormCampaignBehavior.HourlyTick runs, it sends one snapshot per storm once it finishes

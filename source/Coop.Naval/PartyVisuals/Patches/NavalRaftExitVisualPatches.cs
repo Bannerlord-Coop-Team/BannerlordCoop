@@ -12,6 +12,7 @@ namespace Coop.Naval.PartyVisuals.Patches;
 /// Drops a party's raft model when it leaves raft state, so its naval visual is rebuilt as a ship before it is ticked as one.
 /// </summary>
 [HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalRaftExitVisualPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalRaftExitVisualPatches>();

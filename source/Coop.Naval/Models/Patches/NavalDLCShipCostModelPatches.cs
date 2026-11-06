@@ -13,6 +13,7 @@ using TaleWorlds.Library;
 namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCShipCostModel))]
+[HarmonyPatchCategory(GameInterface.GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class NavalDLCShipCostModelPatches
 {
     // Trade passes the buyer and repair passes the owner as buyer, which is the clan vanilla checks

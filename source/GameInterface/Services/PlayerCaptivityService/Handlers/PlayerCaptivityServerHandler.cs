@@ -16,7 +16,6 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
@@ -62,7 +61,6 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
-    private readonly IPlayerPartyLookup playerPartyLookup;
     private readonly ConversationPartyTracker conversationPartyTracker;
     private readonly Dictionary<Hero, Hero> pendingExecutions = new();
 
@@ -71,14 +69,12 @@ internal class PlayerCaptivityServerHandler : IHandler
         INetwork network,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        IPlayerPartyLookup playerPartyLookup,
         ConversationPartyTracker conversationPartyTracker)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
-        this.playerPartyLookup = playerPartyLookup;
         this.conversationPartyTracker = conversationPartyTracker;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
@@ -185,10 +181,8 @@ internal class PlayerCaptivityServerHandler : IHandler
     // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
     private void ReleaseConversationHold(Hero playerHero)
     {
-        if (!objectManager.TryGetId(playerHero, out var heroId)) return;
-
-        var player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
-        if (player == null || !playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        if (!playerManager.TryGetPlayer(playerHero, out var player)) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
 
         ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
     }
@@ -360,7 +354,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
-        if (!playerPartyLookup.TryGetPlayerHero(playerParty, out var playerHero))
+        if (!playerManager.TryGetPlayerHero(playerParty, out var playerHero))
         {
             Logger.Error("Refused partial surrender of {PartyId}: no registered player hero resolves for it", surrenderedPartyId);
             return;
@@ -495,7 +489,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         var playerHero = payload.What.PrisonerHero;
         if (playerHero == null) return;
 
-        if (!playerPartyLookup.TryGetPlayerParty(playerHero, out var playerParty))
+        if (!playerManager.TryGetPlayerParty(playerHero, out var playerParty))
         {
             Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
             return;
