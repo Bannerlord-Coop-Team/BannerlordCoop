@@ -101,16 +101,15 @@ internal class IncidentsHandler : IHandler
             }
 
             long activeIncidentSeed = sessionIncidentsPlayerDataInterface.GetActiveIncidentSeed(data.MainHeroId);
-            bool isOptionApplied = incidentsInterface.TryInvokeOption(mainHero, mainParty, selectedOption, activeIncidentSeed, out var outcomes);
-
-            // Called outside of InvokeOption to send hero and incident ids directly
-            incidentsCampaignBehaviourInterface.OnIncidentResolved(data.MainHeroId, data.IncidentId, incident.Cooldown);
-
-            if (!isOptionApplied)
+            if (!incidentsInterface.TryInvokeOption(mainHero, mainParty, selectedOption, activeIncidentSeed, out var outcomes))
             {
+                // Same as vanilla dropping an incident whose conditions fail, so no cooldown is applied
                 Logger.Warning("Ignoring option {OptionTextId} for incident {IncidentId} because its conditions no longer hold", data.OptionTextId, data.IncidentId);
                 return;
             }
+
+            // Called outside of InvokeOption to send hero and incident ids directly
+            incidentsCampaignBehaviourInterface.OnIncidentResolved(data.MainHeroId, data.IncidentId, incident.Cooldown);
 
             // Send outcome quick information messages to display on client
             var message = new NetworkNotifyIncidentOutcomes(outcomes);
