@@ -202,12 +202,13 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         var encounter = PlayerEncounter.Current;
         var settlement = MobileParty.MainParty?.CurrentSettlement;
-        return mapEvent != null &&
-               (mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut) &&
-               encounter != null &&
-               encounter._mapEvent != mapEvent &&
-               settlement != null &&
-               encounter.EncounterSettlementAux == settlement;
+        if (mapEvent == null) return false;
+        if (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) return false;
+        if (encounter == null) return false;
+        if (encounter._mapEvent == mapEvent) return false;
+        if (settlement == null) return false;
+
+        return encounter.EncounterSettlementAux == settlement;
     }
 
     private static bool IsBattlePresentationActive()
