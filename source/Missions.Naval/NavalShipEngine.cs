@@ -42,10 +42,11 @@ public class NavalShipEngine : INavalShipEngine
     private readonly INavalRopeRegistry ropeRegistry;
     private readonly ICoopShipSnapshotRegistry snapshots;
     private readonly INavalShipDamageGate damageGate;
+    private readonly IRangedSiegeWeaponPresentation weaponPresentation;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
         INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
-        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate)
+        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate, IRangedSiegeWeaponPresentation weaponPresentation)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
@@ -55,6 +56,7 @@ public class NavalShipEngine : INavalShipEngine
         this.ropeRegistry = ropeRegistry;
         this.snapshots = snapshots;
         this.damageGate = damageGate;
+        this.weaponPresentation = weaponPresentation;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -1003,7 +1005,7 @@ public class NavalShipEngine : INavalShipEngine
         if (previous != null && previous.WeaponState == state.WeaponState) return;
 
         var weaponState = (RangedSiegeWeapon.WeaponState)state.WeaponState;
-        RangedSiegeWeaponPresentation.PlayWeaponStateAnimation(siegeWeapon, weaponState);
+        weaponPresentation.PlayWeaponStateAnimation(siegeWeapon, weaponState);
         ShowLoadedProjectile(siegeWeapon,
             weaponState == RangedSiegeWeapon.WeaponState.Idle || weaponState == RangedSiegeWeapon.WeaponState.WaitingBeforeIdle);
     }
@@ -1014,7 +1016,7 @@ public class NavalShipEngine : INavalShipEngine
         var mission = Mission.Current;
         if (mission == null || !siegeWeapon.GameEntity.IsValid) return false;
 
-        shooter = shooter ?? RangedSiegeWeaponPresentation.FindStandInShooter();
+        shooter = shooter ?? weaponPresentation.FindStandInShooter();
         var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
         if (shooter == null || missileItem == null) return false;
 
@@ -1024,7 +1026,7 @@ public class NavalShipEngine : INavalShipEngine
             shot.Orientation, shot.BaseSpeed, shot.Speed, addRigidBody: false, ignored);
         if (!playLaunchEffects) return true;
 
-        RangedSiegeWeaponPresentation.PlayFireAnimation(siegeWeapon);
+        weaponPresentation.PlayFireAnimation(siegeWeapon);
         ShowLoadedProjectile(siegeWeapon, false);
         if (siegeWeapon.FireSoundIndex >= 0)
             SoundManager.StartOneShotEventWithIndex(siegeWeapon.FireSoundIndex, siegeWeapon.GameEntity.GetGlobalFrame().origin);

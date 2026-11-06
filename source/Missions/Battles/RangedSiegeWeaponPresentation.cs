@@ -5,10 +5,23 @@ namespace Missions.Battles;
 
 /// <summary>[Game thread] The animations and stand-in shooter a client that does not simulate a ranged siege weapon
 /// shows its owner's state and shots with, shared by the siege and ship weapon replicators.</summary>
-internal static class RangedSiegeWeaponPresentation
+public interface IRangedSiegeWeaponPresentation
 {
     /// <summary>[Game thread] The arm animation a non-simulating client plays when a ranged weapon enters a replicated state.</summary>
-    internal static void PlayWeaponStateAnimation(RangedSiegeWeapon rangedWeapon, RangedSiegeWeapon.WeaponState weaponState)
+    void PlayWeaponStateAnimation(RangedSiegeWeapon rangedWeapon, RangedSiegeWeapon.WeaponState weaponState);
+
+    /// <summary>[Game thread] The release swing a non-simulating client plays when a ranged weapon's shot is replayed.</summary>
+    void PlayFireAnimation(RangedSiegeWeapon weapon);
+
+    /// <summary>[Game thread] Any live human puppet no client input drives, which a replayed projectile can be fired by without dealing damage here.</summary>
+    Agent FindStandInShooter();
+}
+
+/// <inheritdoc cref="IRangedSiegeWeaponPresentation"/>
+public class RangedSiegeWeaponPresentation : IRangedSiegeWeaponPresentation
+{
+    /// <inheritdoc/>
+    public void PlayWeaponStateAnimation(RangedSiegeWeapon rangedWeapon, RangedSiegeWeapon.WeaponState weaponState)
     {
         var skeletons = rangedWeapon.SkeletonOwnerObjects;
         if (skeletons == null) return;
@@ -35,9 +48,10 @@ internal static class RangedSiegeWeaponPresentation
         }
     }
 
+    /// <inheritdoc/>
     // Vanilla plays FireAnimations on the machine's skeleton owners when it enters WaitingBeforeProjectileLeaving
     // (RangedSiegeWeapon.OnRangedSiegeWeaponStateChange); a peer never reaches that state, so drive it directly.
-    internal static void PlayFireAnimation(RangedSiegeWeapon weapon)
+    public void PlayFireAnimation(RangedSiegeWeapon weapon)
     {
         var skeletons = weapon.SkeletonOwnerObjects;
         var animations = weapon.FireAnimations;
@@ -50,8 +64,8 @@ internal static class RangedSiegeWeaponPresentation
         }
     }
 
-    // Any live human puppet no client input drives, which a replayed projectile can be fired by without dealing damage here.
-    internal static Agent FindStandInShooter()
+    /// <inheritdoc/>
+    public Agent FindStandInShooter()
     {
         foreach (var agent in Mission.Current.Agents)
         {

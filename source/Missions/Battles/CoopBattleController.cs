@@ -125,6 +125,7 @@ public class CoopBattleController : CoopMissionController
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
         ISiegeGateHitApplier siegeGateHitApplier,
+        IRangedSiegeWeaponPresentation rangedSiegeWeaponPresentation,
         IBattleTeamResolver teamResolver,
         IBattleAgentFader agentFader,
         IBattlePlayerPartyResolver playerParties,
@@ -223,8 +224,8 @@ public class CoopBattleController : CoopMissionController
         // — a superseded hosting generation is dropped consistently across both. The policy is a
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy, rangedSiegeWeaponPresentation);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy, rangedSiegeWeaponPresentation);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;

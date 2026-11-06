@@ -32,6 +32,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     private readonly ISiegeMachineStateReplicator machineState;
     private readonly ISiegeGateHitApplier gateHitApplier;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly IRangedSiegeWeaponPresentation weaponPresentation;
     private readonly Dictionary<int, List<NetworkSiegeWeaponFired>> pendingNetworkFires =
         new Dictionary<int, List<NetworkSiegeWeaponFired>>();
 
@@ -45,7 +46,8 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         IBattleSession session,
         ISiegeMachineStateReplicator machineState,
         ISiegeGateHitApplier gateHitApplier,
-        IHostEpochPolicy hostEpochPolicy)
+        IHostEpochPolicy hostEpochPolicy,
+        IRangedSiegeWeaponPresentation weaponPresentation)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -54,6 +56,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         this.machineState = machineState;
         this.gateHitApplier = gateHitApplier;
         this.hostEpochPolicy = hostEpochPolicy;
+        this.weaponPresentation = weaponPresentation;
 
         machineState.AuthorityChanged += Handle_AuthorityChanged;
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_LocalFire);
@@ -186,7 +189,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             return;
         }
 
-        RangedSiegeWeaponPresentation.PlayFireAnimation(weapon);
+        weaponPresentation.PlayFireAnimation(weapon);
     }
 
     private void BufferNetworkFire(NetworkSiegeWeaponFired msg)
@@ -269,7 +272,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             // The simulator's crew agent may not exist here (an unattributed puppet); the stone must still
             // fly. Any inert puppet keeps the blow-drop guarantee — it keys on Controller.None, not on the
             // shooter's identity. AddCustomMissile cannot take a null shooter.
-            shooter = RangedSiegeWeaponPresentation.FindStandInShooter();
+            shooter = weaponPresentation.FindStandInShooter();
             if (shooter == null) return false;
         }
 
