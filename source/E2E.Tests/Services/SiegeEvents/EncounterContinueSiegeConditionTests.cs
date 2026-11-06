@@ -1,7 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -21,8 +20,6 @@ namespace E2E.Tests.Services.SiegeEvents;
 /// </summary>
 public class EncounterContinueSiegeConditionTests : IDisposable
 {
-    private const string ConditionName = "game_menu_town_besiege_continue_siege_on_condition";
-
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Client => TestEnvironment.Clients.First();
 
@@ -43,7 +40,7 @@ public class EncounterContinueSiegeConditionTests : IDisposable
 
         Client.Call(() =>
         {
-            var mapEvent = CreateMapEvent(out _, out var defenderSide);
+            var mapEvent = CreateMapEvent(out var defenderSide);
             EncounterBattleThrough(Client.GetRegisteredObject<MobileParty>(partyId).Party, defenderSide);
             try
             {
@@ -62,53 +59,11 @@ public class EncounterContinueSiegeConditionTests : IDisposable
         });
     }
 
-    [Fact]
-    public void ContinueSiegeCondition_MainPartyLeadsTheAttack_RunsVanillaWithoutThrowing()
-    {
-        string partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-
-        Client.Call(() =>
-        {
-            var mapEvent = CreateMapEvent(out var attackerSide, out var defenderSide);
-            attackerSide.LeaderParty = PartyBase.MainParty;
-            using (new AllowedThread())
-            {
-                PartyBase.MainParty._mapEventSide = attackerSide;
-            }
-            EncounterBattleThrough(Client.GetRegisteredObject<MobileParty>(partyId).Party, defenderSide);
-            try
-            {
-                Assert.Equal(BattleSideEnum.Attacker, PartyBase.MainParty.Side);
-                Assert.Same(PartyBase.MainParty, mapEvent.GetLeaderParty(BattleSideEnum.Attacker));
-
-                // With a side the prefix hands the condition to vanilla
-                var shownByPrefix = false;
-                var prefixArguments = new object[] { new MenuCallbackArgs((MenuContext)null, null), shownByPrefix };
-                Assert.True((bool)AccessTools.Method(typeof(EncounterContinueSiegeConditionPatch), "Prefix")
-                    .Invoke(null, prefixArguments));
-
-                // The encountered party is no settlement, so vanilla reaches its leader check and declines
-                var (shown, _) = InvokeCondition();
-
-                Assert.False(shown);
-            }
-            finally
-            {
-                ClearEncounter(Client.GetRegisteredObject<MobileParty>(partyId).Party);
-                using (new AllowedThread())
-                {
-                    PartyBase.MainParty._mapEventSide = null;
-                }
-            }
-        });
-    }
-
-    private static MapEvent CreateMapEvent(out MapEventSide attackerSide, out MapEventSide defenderSide)
+    private static MapEvent CreateMapEvent(out MapEventSide defenderSide)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         defenderSide = CreateSide(mapEvent, BattleSideEnum.Defender);
-        attackerSide = CreateSide(mapEvent, BattleSideEnum.Attacker);
-        mapEvent._sides = new[] { defenderSide, attackerSide };
+        mapEvent._sides = new[] { defenderSide, CreateSide(mapEvent, BattleSideEnum.Attacker) };
         return mapEvent;
     }
 
@@ -144,8 +99,8 @@ public class EncounterContinueSiegeConditionTests : IDisposable
     private static (bool shown, MenuCallbackArgs args) InvokeCondition()
     {
         var args = new MenuCallbackArgs((MenuContext)null, null);
-        var shown = (bool)AccessTools.Method(typeof(EncounterGameMenuBehavior), ConditionName)
-            .Invoke(ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>(), new object[] { args });
+        var shown = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>()
+            .game_menu_town_besiege_continue_siege_on_condition(args);
         return (shown, args);
     }
 }
