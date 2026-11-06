@@ -36,7 +36,7 @@ internal class AlleyManagementHandler : IHandler
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
-    private readonly AlleyHandler alleyHandler;
+    private readonly IAlleyAttacks alleyAttacks;
 
     public AlleyManagementHandler(
         IMessageBroker messageBroker,
@@ -45,7 +45,7 @@ internal class AlleyManagementHandler : IHandler
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
         IAlleyGarrisonData garrisonData,
-        AlleyHandler alleyHandler)
+        IAlleyAttacks alleyAttacks)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -53,7 +53,7 @@ internal class AlleyManagementHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
-        this.alleyHandler = alleyHandler;
+        this.alleyAttacks = alleyAttacks;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
@@ -246,8 +246,6 @@ internal class AlleyManagementHandler : IHandler
 
     private void Handle_RequestClearAlley(MessagePayload<RequestClearAlley> payload)
     {
-        if (ModInformation.IsClient) return;
-
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
@@ -290,7 +288,7 @@ internal class AlleyManagementHandler : IHandler
             if (!sessionInterface.TryGetManagementData(playerAlleyId, out var data) ||
                 data.UnderAttackByAlleyId != clearedAlleyId) continue;
 
-            alleyHandler.EndAttack(playerAlleyId);
+            alleyAttacks.EndAttack(playerAlleyId);
         }
     }
 
