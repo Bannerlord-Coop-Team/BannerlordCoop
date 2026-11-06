@@ -174,8 +174,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             MobileParty.MainParty.Party._mapEventSide = null;
 
         // Vanilla's sally out "Return to the settlement" left this battle and pointed the encounter back at the
-        // besieged settlement before the server's finalize arrived. Finish would drop that encounter, and on a
-        // client it cannot take the party out of the settlement either.
+        // besieged settlement before the server's finalize arrived, so Finish would drop that encounter.
         if (IsBackInEncounterSettlement(mapEvent))
             return;
 
@@ -203,7 +202,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
     {
         var encounter = PlayerEncounter.Current;
         var settlement = MobileParty.MainParty?.CurrentSettlement;
-        return encounter != null &&
+        return mapEvent != null &&
+               (mapEvent.IsSallyOut || mapEvent.IsBlockadeSallyOut) &&
+               encounter != null &&
                encounter._mapEvent != mapEvent &&
                settlement != null &&
                encounter.EncounterSettlementAux == settlement;

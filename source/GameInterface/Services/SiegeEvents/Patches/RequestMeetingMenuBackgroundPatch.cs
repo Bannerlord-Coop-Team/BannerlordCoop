@@ -11,8 +11,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 
 /// <summary>
 /// The request_meeting menus take their background from PlayerEncounter.EncounterSettlement, which is null once a
-/// sally out closed the local encounter while the player is still in the besieged settlement, so the init threw and
-/// the menu fell back to the previous one.
+/// battle fallback closed the local encounter while the player is still in the besieged settlement, so the init threw
+/// and the menu fell back to the previous one.
 /// </summary>
 [HarmonyPatch(typeof(DefaultEncounter), nameof(DefaultEncounter.game_menu_town_menu_request_meeting_on_init))]
 internal class RequestMeetingMenuBackgroundPatch
@@ -32,7 +32,7 @@ internal class RequestMeetingMenuBackgroundPatch
 
 /// <summary>
 /// The "Forget it" options of the same menus set PlayerEncounter.LeaveEncounter, whose setter writes to
-/// PlayerEncounter.Current, so cancelling a meeting after a sally out threw once the menu opened without an encounter.
+/// PlayerEncounter.Current, so cancelling a meeting threw once the menu opened without an encounter.
 /// </summary>
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
 internal class RequestMeetingLeavePatch
