@@ -75,7 +75,7 @@ public class AlleyRecruitDebugCommand
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
                 !ContainerProvider.TryResolve<ISessionAlleyPlayerDataInterface>(out var sessionInterface) ||
                 !ContainerProvider.TryResolve<INetwork>(out var network) ||
-                !ContainerProvider.TryResolve<AlleyHandler>(out var alleyHandler))
+                !ContainerProvider.TryResolve<IAlleyAttacks>(out var alleyAttacks))
                 return Failed("Unable to resolve the alley recruit fixture services.");
             if (!resolver.TryResolveHero(args[2], out var owner, out var ownerError)) return Failed(ownerError);
             if (owner.PartyBelongedTo == null) return Failed($"Hero '{args[2]}' has no party.");
@@ -109,7 +109,7 @@ public class AlleyRecruitDebugCommand
                     managementData.OverseerId,
                     managementData.Garrison,
                     managementData.LastRecruitTimeTicks));
-                alleyHandler.EndAttack(alleyId);
+                alleyAttacks.EndAttack(alleyId);
 
                 return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={alley.Settlement.StringId} alley={args[1]} " +
                        $"owner={owner.StringId} party={owner.PartyBelongedTo.StringId} " +

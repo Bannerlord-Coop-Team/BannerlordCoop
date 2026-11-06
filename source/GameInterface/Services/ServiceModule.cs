@@ -3,6 +3,7 @@ using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Alleys.Handlers;
 using GameInterface.Services.Locations.Conversations;
 using Serilog;
 using System;
@@ -26,6 +27,16 @@ internal class ServiceModule : Module
                 builder.RegisterType<LocationConversationTracker>()
                     .AsSelf()
                     .As<ILocationConversationTracker>()
+                    .SingleInstance()
+                    .AutoActivate();
+                continue;
+            }
+
+            if (type == typeof(AlleyHandler))
+            {
+                builder.RegisterType<AlleyHandler>()
+                    .AsSelf()
+                    .As<IAlleyAttacks>()
                     .SingleInstance()
                     .AutoActivate();
                 continue;
