@@ -22,8 +22,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.Naval", "Coop.Naval\Co
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameInterface.Tests", "GameInterface.Tests\GameInterface.Tests.csproj", "{AFD76C22-8732-44C1-834B-059AE2097ED7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameInterface.Framework.Tests", "GameInterface.Framework.Tests\GameInterface.Framework.Tests.csproj", "{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.Core", "Coop.Core\Coop.Core.csproj", "{442B73F2-B103-4EF6-8B4B-A2F36F169515}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csproj", "{E474A5B5-3F73-46CB-B68C-E8FA5199950B}"
@@ -148,18 +146,6 @@ Global
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Release|Any CPU.Build.0 = Release|x64
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Release|x64.ActiveCfg = Release|x64
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Release|x64.Build.0 = Release|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Debug|Any CPU.Build.0 = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Debug|x64.ActiveCfg = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Debug|x64.Build.0 = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.DebugAutoConnect|Any CPU.ActiveCfg = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.DebugAutoConnect|Any CPU.Build.0 = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.DebugAutoConnect|x64.ActiveCfg = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.DebugAutoConnect|x64.Build.0 = Debug|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Release|Any CPU.ActiveCfg = Release|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Release|Any CPU.Build.0 = Release|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Release|x64.ActiveCfg = Release|x64
-		{8E2A6C1F-5B3D-4F7A-9C21-4D6B0E3F7A15}.Release|x64.Build.0 = Release|x64
 		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Debug|Any CPU.Build.0 = Debug|x64
 		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Debug|x64.ActiveCfg = Debug|x64

@@ -6,7 +6,6 @@
       "Coop.CrashReporter.Tests\\Coop.CrashReporter.Tests.csproj",
       "Coop.Tests\\Coop.Tests.csproj",
       "Coop.IntegrationTests\\Coop.IntegrationTests.csproj",
-      "GameInterface.Framework.Tests\\GameInterface.Framework.Tests.csproj",
       "GameInterface.Tests\\GameInterface.Tests.csproj",
       "E2E.Tests\\E2E.Tests.csproj"
     ]

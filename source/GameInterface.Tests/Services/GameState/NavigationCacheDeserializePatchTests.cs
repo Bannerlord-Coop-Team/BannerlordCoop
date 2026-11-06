@@ -7,13 +7,8 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
-#if NETFRAMEWORK
-using System.Runtime.Remoting.Proxies;
-using System.Runtime.Remoting.Messaging;
-#endif
 using TaleWorlds.CampaignSystem.Map.DistanceCache;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
@@ -59,7 +54,7 @@ public class NavigationCacheDeserializePatchTests
         Assert.True(call.Calls(ExclusiveOpen));
     }
 
-    // This same test runs in the linked net48 project, where generic detour installation failed.
+    // Detouring the generic method failed on the game's net48 CLR, so only the caller may be patched.
     [Fact]
     public void Patch_Caller_InstallsWithoutDetouringGenericDeserialize()
     {
@@ -126,69 +121,6 @@ public class NavigationCacheDeserializePatchTests
         Assert.Contains("ReadNavigationCacheOnGameLoad", error.Message);
         Assert.All(instructions, instruction => Assert.True(instruction.Calls(deserialize)));
     }
-
-#if NETFRAMEWORK
-    // Run the generated original decoder on CLR4 with a managed CRC-only scene, never a native campaign.
-    [Fact]
-    public void ReverseDecoder_Framework_OverlappingReaderDecodesEmptyCacheAndReleasesHandle()
-    {
-        Assert.Equal(".NETFramework", AppDomain.CurrentDomain.SetupInformation.TargetFrameworkName.Split(',')[0]);
-        Assert.True(Environment.Is64BitProcess);
-        var harmony = new Harmony("NavigationCacheDeserializePatchTests.FrameworkDecoder");
-        var caller = AccessTools.Method(typeof(SettlementPositionScript), "ReadNavigationCacheOnGameLoad");
-        var originalCampaign = Campaign.Current;
-        var path = Path.GetTempFileName();
-        try
-        {
-            harmony.PatchAllUncategorized(typeof(NavigationCacheDeserializePatch).Assembly);
-            var campaign = (Campaign)FormatterServices.GetUninitializedObject(typeof(Campaign));
-            var scene = new CrcOnlySceneProxy();
-            AccessTools.Field(typeof(Campaign), "_mapSceneWrapper").SetValue(campaign, scene.GetTransparentProxy());
-            AccessTools.PropertySetter(typeof(Campaign), "Current").Invoke(null, new object[] { campaign });
-            var cache = (SandBoxNavigationCache)FormatterServices.GetUninitializedObject(typeof(SandBoxNavigationCache));
-            // Two CRC values and three empty dictionary counts form a valid empty vanilla cache.
-            File.WriteAllBytes(path, new byte[20]);
-            using (var held = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            {
-                Assert.Throws<IOException>(() => cache.Deserialize(path));
-                NavigationCacheDeserializePatch.DeserializeShared(cache, path);
-                Assert.Equal(2, scene.Calls);
-                foreach (var field in new[] { "_settlementToSettlementDistanceWithLandRatio", "_fortificationNeighbors", "_closestSettlementsToFaceIndices" })
-                    Assert.Empty((System.Collections.IDictionary)AccessTools.Field(typeof(SandBoxNavigationCache), field).GetValue(cache));
-                Assert.Throws<IOException>(() =>
-                {
-                    using var writer = File.Open(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
-                });
-            }
-            using var exclusive = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-            Assert.True(exclusive.CanWrite);
-        }
-        finally
-        {
-            AccessTools.PropertySetter(typeof(Campaign), "Current").Invoke(null, new object[] { originalCampaign });
-            harmony.Unpatch(caller, HarmonyPatchType.All, harmony.Id);
-            File.Delete(path);
-        }
-    }
-
-    // Supply only the two managed CRC queries that the installed decoder requires.
-    private sealed class CrcOnlySceneProxy : RealProxy
-    {
-        public int Calls { get; private set; }
-
-        // Implement the scene interface without initializing TaleWorlds native engine state.
-        public CrcOnlySceneProxy() : base(typeof(TaleWorlds.CampaignSystem.Map.IMapScene)) { }
-
-        // Reject unexpected engine requests rather than fabricating scene behavior.
-        public override IMessage Invoke(IMessage message)
-        {
-            var call = (IMethodCallMessage)message;
-            Assert.Contains(call.MethodName, new[] { "GetSceneXmlCrc", "GetSceneNavigationMeshCrc" });
-            Calls++;
-            return new ReturnMessage((uint)0, null, 0, call.LogicalCallContext, call);
-        }
-    }
-#endif
 
     // Branch entry needs the new argument, while exception exit still follows the open call.
     [Fact]

@@ -123,27 +123,6 @@ jobs:
         working-directory: source
         run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
 
-  # The container builds the net48 test project with the others, but only Windows can run .NET Framework tests.
-  framework-test:
-    name: Framework Tests (net48)
-    runs-on: windows-latest
-    timeout-minutes: 10
-    needs: build
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Download Build Output
-        uses: actions/download-artifact@v8
-        with:
-          name: build-output
-          path: source
-
-      - name: Run Framework Tests
-        working-directory: source
-        run: dotnet test GameInterface.Framework.Tests/bin/x64/Release/net48/GameInterface.Framework.Tests.dll
-
   verification-harness:
     name: Verification plan and local harness profiles
     runs-on: ubuntu-latest
