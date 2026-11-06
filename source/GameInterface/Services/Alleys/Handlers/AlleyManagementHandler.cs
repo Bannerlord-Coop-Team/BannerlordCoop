@@ -304,10 +304,8 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
-        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.IsSenderControllingHero(sender, data.ClearerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ClearerId, out var clearer)) return;
 
