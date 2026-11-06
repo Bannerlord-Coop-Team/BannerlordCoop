@@ -104,7 +104,7 @@ namespace Coop.Tests.Autofac
             // Missions.Naval only loads with NavalDLC co-op active, which also turns GameInterface's naval services on.
             builder.RegisterModule<ClientModule>();
             builder.RegisterModule<GameInterfaceModule>();
-            // MissionModule registers it only while NavalDLC is active, which a test process is not.
+            // NavalAssemblyModule registers it in the game; registered directly here to test this module's services alone.
             builder.RegisterModule<NavalMissionModule>();
             bool previousNavalEnabled = ModInformation.IsNavalEnabled;
             ModInformation.IsNavalEnabled = true;

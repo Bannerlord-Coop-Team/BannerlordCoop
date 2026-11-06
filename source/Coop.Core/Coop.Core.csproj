@@ -48,6 +48,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
+  <!-- NavalAssemblyModule registers the naval modules directly wherever War Sails is installed; without it the naval projects build empty. -->
+  <PropertyGroup Condition=" '$(CoopNavalDlc)' == 'true' ">
+    <DefineConstants>$(DefineConstants);COOP_NAVAL</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
     <Compile Remove="Server\Services\Kingdoms\Messages\**" />
@@ -87,6 +91,14 @@
     </ProjectReference>
     <ProjectReference Include="..\Coop.Steam\Coop.Steam.csproj">
       <Name>Coop.Steam</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Condition=" '$(CoopNavalDlc)' == 'true' ">
+    <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj">
+      <Name>Missions.Naval</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Coop.Naval\Coop.Naval.csproj">
+      <Name>Coop.Naval</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

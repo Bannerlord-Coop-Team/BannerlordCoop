@@ -129,9 +129,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - `Missions` holds every replicator and binds to no NavalDLC type. Every hull operation goes through
   `INavalShipEngine` (`Missions/Battles/INavalShipEngine.cs`).
 - `Missions.Naval` implements it (`NavalShipEngine`), holds the launcher, the end logic and the patches, and registers them
-  in `NavalMissionModule`. That module is loaded only while NavalDLC is active.
+  in `NavalMissionModule`. `NavalAssemblyModule` (`Coop.Core`) registers that module and `CoopNavalModule` on the client
+  and the server, only while NavalDLC is active.
 - The `CoopNavalDlc` MSBuild property (`source/Directory.Build.props`, default: War Sails is installed) decides whether
-  `Missions.Naval`/`Coop.Naval` compile and ship. When it's false they build empty and `Coop`/`Coop.Tests` skip them.
+  `Missions.Naval`/`Coop.Naval` compile and ship. When it's false they build empty and `Coop`/`Coop.Core`/`Coop.Tests`
+  skip them.
 - `ModInformation.IsNavalEnabled` is set once at startup, like `IsServer`. `CoopMod` turns it on when NavalDLC is enabled
   and `NavalFeatureFlag` says this build can run it: a `TESTER` build with the naval code and both naval assemblies loading.
   The dedicated server sets it from its own `warSails` setting and refuses to start when this build can't run it. Nothing

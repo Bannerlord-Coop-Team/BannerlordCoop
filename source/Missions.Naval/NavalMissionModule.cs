@@ -7,8 +7,8 @@ using Missions.Battles;
 namespace Missions.Naval;
 
 /// <summary>
-/// Registers the coop naval battle services. Loaded by <see cref="MissionModule"/> only while NavalDLC is active,
-/// so nothing here is resolved by a process that cannot load the NavalDLC assemblies.
+/// Registers the coop naval battle services on the client and the server. Loaded by NavalAssemblyModule only while
+/// NavalDLC is active, so nothing here is resolved by a process that cannot load the NavalDLC assemblies.
 /// </summary>
 public class NavalMissionModule : Module
 {

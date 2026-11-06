@@ -1,8 +1,10 @@
 ﻿using Autofac;
 using Common;
-using GameInterface;
-using GameInterface.Services.Modules;
-using System.IO;
+#if COOP_NAVAL
+using Coop.Naval;
+using Missions.Naval;
+#endif
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core;
 
@@ -11,22 +13,21 @@ namespace Coop.Core;
 /// </summary>
 public class NavalAssemblyModule : Module
 {
-    private readonly string[] assemblyFiles;
-
-    // Takes the naval assemblies this role's container needs.
-    public NavalAssemblyModule(params string[] assemblyFiles)
-    {
-        this.assemblyFiles = assemblyFiles;
-    }
-
+    // Registers nothing unless startup turned War Sails co-op on.
     protected override void Load(ContainerBuilder builder)
     {
         if (!ModInformation.IsNavalEnabled) return;
 
-        var loader = new NavalAssemblyLoader(Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location));
-        foreach (string file in assemblyFiles)
-        {
-            if (loader.TryLoad(file, out var assembly)) builder.RegisterAssemblyModules(assembly);
-        }
+        RegisterNavalModules(builder);
+    }
+
+    // Not inlined, so the runtime only loads the naval assemblies once the flag above is on.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RegisterNavalModules(ContainerBuilder builder)
+    {
+#if COOP_NAVAL
+        builder.RegisterModule<CoopNavalModule>();
+        builder.RegisterModule<NavalMissionModule>();
+#endif
     }
 }

@@ -2,6 +2,7 @@
 using Autofac;
 using Autofac.Builder;
 using Common;
+using Common.Commands;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Instances.Handlers;
@@ -53,6 +54,24 @@ public sealed class NavalModuleGateTests : System.IDisposable
             NavalPatchRegistrations(container).Select(r => r.Assembly.GetName().Name).OrderBy(name => name));
         Assert.True(container.IsRegistered<ICoopNavalBattleLauncher>());
         Assert.True(container.IsRegistered<INavalBattleServicesFactory>());
+    }
+
+    // The server applies hit rewards through NavalSkillLevellingManager, so it needs the Missions.Naval patches and commands too.
+    [Fact]
+    public void ServerContainer_WithNavalActive_RegistersBothNavalPatchSetsAndServerCommands()
+    {
+        ModInformation.IsNavalEnabled = true;
+
+        var builder = new ContainerBuilder();
+        builder.RegisterModule<ServerModule>();
+        builder.RegisterModule<GameInterfaceModule>();
+        builder.RegisterModule<NavalAssemblyModule>();
+        using var container = builder.Build(ContainerBuildOptions.IgnoreStartableComponents);
+
+        Assert.Equal(NavalAssemblyNames.OrderBy(name => name),
+            NavalPatchRegistrations(container).Select(r => r.Assembly.GetName().Name).OrderBy(name => name));
+        Assert.Contains(container.Resolve<IEnumerable<ICoopCommand>>(),
+            command => $"{command.Prefix}.{command.Name}" == "coop.debug.naval.server_hp");
     }
 #endif
 
@@ -132,7 +151,7 @@ public sealed class NavalModuleGateTests : System.IDisposable
         var builder = new ContainerBuilder();
         builder.RegisterModule<ClientModule>();
         builder.RegisterModule<GameInterfaceModule>();
-        builder.RegisterModule(new NavalAssemblyModule(ModInformation.CoopNavalAssemblyFile, ModInformation.MissionsNavalAssemblyFile));
+        builder.RegisterModule<NavalAssemblyModule>();
         return builder.Build();
     }
 
