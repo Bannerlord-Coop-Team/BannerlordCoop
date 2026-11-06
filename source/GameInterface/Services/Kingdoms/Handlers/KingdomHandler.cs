@@ -743,7 +743,6 @@ public class KingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        var sender = obj.Who;
 
         // The server relays a decision to clients, and a client sends its own proposals to the server.
         if (ModInformation.IsClient)
@@ -758,26 +757,23 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        // The sender's clan and the kingdom are game state, so the check runs on the game thread with the apply.
-        GameThread.RunSafe(() =>
+        messageBroker.Publish(
+            this,
+            new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
+
+        var message = new NetworkAddDecision(
+            payload.KingdomId,
+            payload.Data,
+            payload.IgnoreInfluenceCost,
+            payload.RandomNumber);
+
+        if (obj.Who is NetPeer peer)
         {
-            // Only a member clan can propose a decision to its kingdom. The client's IgnoreInfluenceCost stays, because
-            // vanilla adds accepted trade, peace and alliance offers to the player's kingdom for free.
-            if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.KingdomId, out var kingdom) || senderHero.Clan?.Kingdom != kingdom) return;
+            network.SendAllBut(peer, message);
+            return;
+        }
 
-            messageBroker.Publish(
-                this,
-                new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber));
-
-            var message = new NetworkAddDecision(
-                payload.KingdomId,
-                payload.Data,
-                payload.IgnoreInfluenceCost,
-                payload.RandomNumber);
-
-            network.SendAllBut((NetPeer)sender, message);
-        }, context: nameof(HandleNetworkAddDecision));
+        network.SendAll(message);
     }
 
     private bool TryGetKingdomId(Kingdom kingdom, out string kingdomId)
@@ -813,27 +809,25 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
         var partyId = payload.PartyId;
-        // A peer acts as the controller it currently stands for, so a stale peer left by a reconnect is refused.
-        if (obj.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId)) return;
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+        var controllerId = player.ControllerId;
 
-        if (playerManager.TryGetPlayer(controllerId, out var player))
+        if (string.IsNullOrWhiteSpace(partyId))
         {
-            if (string.IsNullOrWhiteSpace(partyId))
-            {
-                partyId = player.MobilePartyId;
-            }
-
-            if (TryCreatePendingSettlementRestore(partyId, payload.SettlementId, out var pending))
-            {
-                pendingKingdomCreationSettlements[controllerId] = pending;
-                settlementTracker.Track(pending.PartyId, pending.SettlementId);
-            }
-
-            RunKingdomMutation(() =>
-            {
-                RestoreCreatingPartySettlement(partyId, payload.SettlementId);
-            });
+            partyId = player.MobilePartyId;
         }
+
+        if (TryCreatePendingSettlementRestore(partyId, payload.SettlementId, out var pending))
+        {
+            pendingKingdomCreationSettlements[controllerId] = pending;
+            settlementTracker.Track(pending.PartyId, pending.SettlementId);
+        }
+
+        RunKingdomMutation(() =>
+        {
+            RestoreCreatingPartySettlement(partyId, payload.SettlementId);
+        });
 
         messageBroker.Publish(this, new CreateKingdom(controllerId, payload.KingdomName, payload.CultureId));
     }
@@ -963,7 +957,9 @@ public class KingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
-        if (obj.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId)) return;
+        if (obj.Who is not NetPeer peer) return;
+        if (!playerManager.TryGetPlayer(peer, out var player)) return;
+        var controllerId = player.ControllerId;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
