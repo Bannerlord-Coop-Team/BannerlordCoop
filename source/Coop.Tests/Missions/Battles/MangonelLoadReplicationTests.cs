@@ -88,7 +88,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         session.SetupGet(s => s.HostEpoch).Returns(3);
         var network = new Mock<IBattleNetwork>();
         var sut = new SiegeMachineStateReplicator(network.Object, Mock.Of<IMessageBroker>(), session.Object,
-            registry.Object, new HostEpochPolicy());
+            registry.Object, new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
         Field<Dictionary<int, UsableMachine>>(sut, "machinesById")[1496] = machine;
         Field<List<UsableMachine>>(sut, "machines").Add(machine);
         Field<Dictionary<int, string>>(sut, "claimedMachines")[1496] = "simulator";

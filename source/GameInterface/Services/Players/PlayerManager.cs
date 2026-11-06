@@ -428,6 +428,7 @@ public class PlayerManager : IPlayerManager
             && TryGetPlayer(control.ObjectControllerId, out player);
     }
 
+    /// <inheritdoc cref="IPlayerManager.TryGetPlayer(MobileParty, out Player)"/>
     public bool TryGetPlayer(MobileParty mobileParty, out Player player)
     {
         player = null;
