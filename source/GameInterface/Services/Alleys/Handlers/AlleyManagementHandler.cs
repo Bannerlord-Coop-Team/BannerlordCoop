@@ -188,7 +188,11 @@ internal class AlleyManagementHandler : IHandler
             }
 
             // Vanilla only offers a member of the owner's clan. The debug command makes the owner the overseer.
-            if (overseer != owner && (overseer.Clan == null || overseer.Clan != owner.Clan)) return;
+            if (overseer != owner)
+            {
+                if (overseer.Clan == null) return;
+                if (overseer.Clan != owner.Clan) return;
+            }
 
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 
@@ -375,7 +379,11 @@ internal class AlleyManagementHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             // ClanLeaveRules also publishes this on the server, where the sender is not a peer.
-            if (sender is NetPeer && (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero)) return;
+            if (sender is NetPeer)
+            {
+                if (!playerManager.TryGetSenderHero(sender, out var senderHero)) return;
+                if (alley.Owner != senderHero) return;
+            }
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOverseerId, out var newOverseer)) return;
 
             // Swap the overseer hero in the stored garrison the way vanilla ChangeTheLeaderOfAlleyInternal does.

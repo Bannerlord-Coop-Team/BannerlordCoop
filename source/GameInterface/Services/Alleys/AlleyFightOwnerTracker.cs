@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Alleys;
 
-/// <summary>Holds the alley owner this client beat until it sends the take over.</summary>
+/// <summary>Holds the alley owner from when this client's fight started until it sends the take over.</summary>
 internal interface IAlleyFightOwnerTracker
 {
     void Set(Hero owner);
@@ -10,20 +10,20 @@ internal interface IAlleyFightOwnerTracker
     Hero Take();
 }
 
-/// <summary>Alley owner this client beat, held until the take over screen's Done. Per client, since E2E clients share a process.</summary>
+/// <summary>Alley owner when this client's fight started, held until the take over screen's Done. Per client, since E2E clients share a process.</summary>
 internal class AlleyFightOwnerTracker : IAlleyFightOwnerTracker
 {
-    private Hero ownerWhenFightWon;
+    private Hero ownerAtFightStart;
 
     public void Set(Hero owner)
     {
-        ownerWhenFightWon = owner;
+        ownerAtFightStart = owner;
     }
 
     public Hero Take()
     {
-        var owner = ownerWhenFightWon;
-        ownerWhenFightWon = null;
+        var owner = ownerAtFightStart;
+        ownerAtFightStart = null;
         return owner;
     }
 }

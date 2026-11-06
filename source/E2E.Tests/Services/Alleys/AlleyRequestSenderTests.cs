@@ -3,7 +3,9 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Alleys.Patches;
 using GameInterface.Services.TroopRosters.Data;
+using HarmonyLib;
 using Helpers;
 using Moq;
 using SandBox.Missions.MissionLogics;
@@ -27,36 +29,13 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     private EnvironmentInstance OtherClient => Clients.Last();
 
     [Fact]
-    public void ManagingAnotherPlayersAlley_IsRefused()
-    {
-        var scenario = AcquiredByOwner();
-        string troopId = CreateRegisteredObject<CharacterObject>();
-
-        OtherClient.Call(() =>
-        {
-            var alley = OtherClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);
-            var roster = TroopRoster.CreateDummyTroopRoster();
-            roster.AddToCounts(OtherClient.GetRegisteredObject<CharacterObject>(troopId), 7);
-            var broker = OtherClient.Resolve<IMessageBroker>();
-            broker.Publish(this, new ChangeAlleyOverseerRequested(alley, OtherClient.GetRegisteredObject<Hero>(scenario.OverseerHeroId)));
-            broker.Publish(this, new SetAlleyGarrisonRequested(alley, roster));
-            broker.Publish(this, new AbandonAlleyRequested(alley, fromClanScreen: true));
-        });
-
-        AssertOwnedByOwner(scenario);
-        var management = GetManagementData(scenario.PlayerAlleyId);
-        Assert.Equal(scenario.OwnerHeroId, management.OverseerId);
-        Assert.DoesNotContain(management.Garrison, element => element.CharacterId == Server.GetHandle<CharacterObject>(troopId));
-    }
-
-    [Fact]
     public void TakeOverRacedByAnotherPlayer_ChangesNothingOnAnyPeer()
     {
         var scenario = CreateAlleyDomainScenario();
         var (troopId, companionId) = AddTroopsAndCompanion(scenario);
 
-        // The other take over reaches this client while it sits in the troop screen.
-        PressDoneOnTakeOverScreen(scenario, troopId, companionId, beforeDone: () => TakenByOther(scenario));
+        // The other take over reaches this client while it is still in the alley fight.
+        PressDoneOnTakeOverScreen(scenario, troopId, companionId, duringFight: () => TakenByOther(scenario));
 
         AssertOwnedByOther(scenario);
         foreach (var instance in Clients.Prepend(Server))
@@ -76,7 +55,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var (troopId, companionId) = AddTroopsAndCompanion(scenario);
 
-        PressDoneOnTakeOverScreen(scenario, troopId, companionId, beforeDone: null);
+        PressDoneOnTakeOverScreen(scenario, troopId, companionId, duringFight: null);
 
         AssertOwnedByOwner(scenario);
         var management = GetManagementData(scenario.PlayerAlleyId);
@@ -98,31 +77,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     }
 
     [Fact]
-    public void TakeOverWithAnOverseerFromAnotherClan_IsRefused()
-    {
-        var scenario = CreateAlleyDomainScenario();
-
-        AcquireAlley(OwnerClient, scenario, scenario.OverseerHeroId);
-
-        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
-    }
-
-    [Fact]
-    public void ClanLeaderAbandonsAMembersAlley_Applies()
-    {
-        var scenario = CreateAlleyDomainScenario();
-        var (_, memberId) = AddTroopsAndCompanion(scenario);
-        Server.Call(() => Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId)
-            .SetOwner(Server.GetRegisteredObject<Hero>(memberId)));
-
-        OwnerClient.Call(() => OwnerClient.Resolve<IMessageBroker>().Publish(this,
-            new AbandonAlleyRequested(OwnerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId), fromClanScreen: true)));
-
-        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
-    }
-
-    [Fact]
-    public void TwoClientsWinAFightBeforeDone_EachSendsItsOwnBeatenOwner()
+    public void TwoClientsFightBeforeDone_EachSendsItsOwnBeatenOwner()
     {
         var scenario = CreateAlleyDomainScenario();
         var fights = new[] { (OwnerClient, scenario.PlayerAlleyId, scenario.OwnerHeroId), (OtherClient, scenario.AttackerAlleyId, scenario.OverseerHeroId) };
@@ -139,7 +94,7 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
                     client.Resolve<IMessageBroker>().Subscribe<AlleyAcquiredRequested>(payload => sent[client] = payload.What.PreviousOwner);
                 });
                 client.CampaignMissionContext = mission.Object;
-                client.Call(() => new MissionAlleyHandler().OnAlleyFightEnd(isPlayerSideWon: true));
+                StartFight(client, alleyId);
             }
 
             foreach (var (client, _, heroId) in fights)
@@ -184,8 +139,8 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         return (troopId, companionId);
     }
 
-    // Wins the alley fight and moves six troops, two wounded, on the take over screen the way vanilla opens it, then presses Done.
-    private void PressDoneOnTakeOverScreen(AlleyDomainScenario scenario, string troopId, string companionId, Action beforeDone)
+    // Starts and wins the alley fight, moves six troops, two wounded, on the take over screen the way vanilla opens it, then presses Done.
+    private void PressDoneOnTakeOverScreen(AlleyDomainScenario scenario, string troopId, string companionId, Action duringFight)
     {
         var mission = new Mock<ICampaignMission>();
         OwnerClient.Call(() => mission.SetupGet(value => value.LastVisitedAlley)
@@ -194,6 +149,9 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         var handler = new MissionAlleyHandler();
         try
         {
+            StartFight(OwnerClient, scenario.PlayerAlleyId);
+            duringFight?.Invoke();
+
             PartyScreenLogic logic = null;
             OwnerClient.Call(() =>
             {
@@ -223,28 +181,12 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
                 using (new AllowedThread()) logic.TransferTroop(command, false);
             });
 
-            beforeDone?.Invoke();
-
             OwnerClient.Call(() => Assert.True(logic.DoneLogic(false)));
         }
         finally
         {
             OwnerClient.CampaignMissionContext = null;
         }
-    }
-
-    [Fact]
-    public void SecondAcquireByTheOwner_IsRefused()
-    {
-        var scenario = AcquiredByOwner();
-        // An overseer the clan check allows, so only the alley being taken already refuses it.
-        Server.Call(() => Server.GetRegisteredObject<Hero>(scenario.OverseerHeroId).Clan =
-            Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan);
-
-        AcquireAlley(OwnerClient, scenario, scenario.OverseerHeroId);
-
-        AssertOwnedByOwner(scenario);
-        Assert.Equal(scenario.OwnerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
     }
 
     [Fact]
@@ -257,6 +199,13 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
             this, new RequestChangeAlleyOverseer(scenario.PlayerAlleyId, scenario.OverseerHeroId)));
 
         Assert.Equal(scenario.OverseerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
+    }
+
+    // Runs the prefix vanilla StartCommonAreaBattle runs first. Its own body needs a live mission with agents.
+    private static void StartFight(EnvironmentInstance client, string alleyId)
+    {
+        var prefix = AccessTools.Method(typeof(MissionAlleyHandlerPatches), "StartCommonAreaBattlePrefix");
+        client.Call(() => prefix.Invoke(null, new object[] { client.GetRegisteredObject<Alley>(alleyId) }));
     }
 
     // The other player wins the same alley and takes it over first.

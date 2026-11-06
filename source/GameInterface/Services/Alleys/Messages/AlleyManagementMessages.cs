@@ -73,7 +73,7 @@ public readonly struct AlleyAcquiredRequested : IEvent
     public readonly Hero Owner;
     public readonly Hero Overseer;
     public readonly TroopRoster Garrison;
-    /// <summary>Who held the alley when the player won the fight, even if a take over reached this client during the troop screen.</summary>
+    /// <summary>Who held the alley when the player started the fight, even if another take over reached this client during the fight or the troop screen.</summary>
     public readonly Hero PreviousOwner;
     public AlleyAcquiredRequested(Alley alley, Hero owner, Hero overseer, TroopRoster garrison, Hero previousOwner)
     {

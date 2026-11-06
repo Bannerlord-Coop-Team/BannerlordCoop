@@ -21,14 +21,14 @@ namespace GameInterface.Services.Alleys.Patches;
 [HarmonyPatch(typeof(MissionAlleyHandler))]
 internal class MissionAlleyHandlerPatches
 {
-    [HarmonyPatch("OnAlleyFightEnd")]
+    [HarmonyPatch(nameof(MissionAlleyHandler.StartCommonAreaBattle))]
     [HarmonyPrefix]
-    private static void OnAlleyFightEndPrefix(bool isPlayerSideWon)
+    private static void StartCommonAreaBattlePrefix(TaleWorlds.CampaignSystem.Settlements.Alley alley)
     {
-        if (ModInformation.IsServer || !isPlayerSideWon) return;
+        if (ModInformation.IsServer) return;
         if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return;
 
-        fightOwnerTracker.Set(CampaignMission.Current?.LastVisitedAlley?.Owner);
+        fightOwnerTracker.Set(alley.Owner);
     }
 
     [HarmonyPatch("OnPartyScreenDoneClicked")]
