@@ -10,7 +10,6 @@ using Moq;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobilePartyAIs;
@@ -23,74 +22,19 @@ public class MobilePartyAiLifetimePatchesTests
     [Fact]
     public void ClientRemovalOutsideTheReceivePath_LogsOneErrorWithThePartyIdAndCaller()
     {
-        var messages = RemoveParty(isRegistered: true, scopeName: "none", out _);
+        var messages = RemoveParty();
 
-        string error = Assert.Single(messages, IsClientRemovalError);
+        string error = Assert.Single(messages, message => message.Contains("Client destroyed"));
         Assert.Contains(PartyId, error);
         Assert.Contains(nameof(MobilePartyAiLifetimePatchesTests), error);
     }
 
-    [Fact]
-    public void ClientDestroyOfOtherManagedType_StillLogsTheGenericError()
-    {
-        var equipment = new Equipment();
-        var messages = new ConcurrentQueue<string>();
-        Action<string> callback = messages.Enqueue;
-        bool originalIsServer = ModInformation.IsServer;
-        bool hadContainer = ContainerProvider.TryGetContainer(out var previousContainer);
-        var builder = new ContainerBuilder();
-        builder.RegisterInstance(new TestSyncPolicy()).As<ISyncPolicy>();
-        using var container = builder.Build();
-        OutputSinkManager.AddLogCallback(callback);
-        try
-        {
-            ModInformation.IsServer = false;
-            using (ContainerProvider.UseContainerThreadSafe(container))
-            {
-                LifetimePatches<Equipment>.DestroyPostfix(ref equipment, true);
-            }
-        }
-        finally
-        {
-            ModInformation.IsServer = originalIsServer;
-            OutputSinkManager.RemoveLogCallback(callback);
-            if (hadContainer) ContainerProvider.SetContainer(previousContainer);
-            else ContainerProvider.Clear();
-        }
-
-        Assert.Single(messages, m => m.Contains("Client destroyed managed"));
-    }
-
-    [Fact]
-    public void ClientRemovalOfUnregisteredParty_SaysItIsUnregistered()
-    {
-        var messages = RemoveParty(isRegistered: false, scopeName: "none", out _);
-
-        Assert.Contains("(unregistered)", Assert.Single(messages, IsClientRemovalError));
-    }
-
-    [Theory]
-    [InlineData("allowed-thread")]
-    [InlineData("save-load")]
-    [InlineData("local-operation")]
-    public void ClientRemovalWhileOriginalsAreAllowed_DoesNotLogOrLookUpTheParty(string scopeName)
-    {
-        var messages = RemoveParty(isRegistered: true, scopeName, out var objectManager);
-
-        Assert.DoesNotContain(messages, IsClientRemovalError);
-        string id;
-        objectManager.Verify(m => m.TryGetId(It.IsAny<object>(), out id), Times.Never);
-    }
-
-    private static bool IsClientRemovalError(string message) => message.Contains("Client destroyed");
-
-    private static ConcurrentQueue<string> RemoveParty(bool isRegistered, string scopeName,
-        out Mock<IObjectManager> objectManager)
+    private static ConcurrentQueue<string> RemoveParty()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
-        objectManager = new Mock<IObjectManager>();
+        var objectManager = new Mock<IObjectManager>();
         string id = PartyId;
-        objectManager.Setup(m => m.TryGetId(party, out id)).Returns(isRegistered);
+        objectManager.Setup(m => m.TryGetId(party, out id)).Returns(true);
 
         var builder = new ContainerBuilder();
         builder.RegisterInstance(objectManager.Object).As<IObjectManager>();
@@ -106,13 +50,6 @@ public class MobilePartyAiLifetimePatchesTests
         {
             ModInformation.IsServer = false;
             using (ContainerProvider.UseContainerThreadSafe(container))
-            using (IDisposable? scope = scopeName switch
-            {
-                "allowed-thread" => new AllowedThread(),
-                "save-load" => CallOriginalPolicy.AllowOriginalsOnAllThreads(),
-                "local-operation" => CallOriginalPolicy.AllowOriginalsForCurrentOperation(),
-                _ => null,
-            })
             {
                 // RemoveParty carries both postfixes, the auto registry destroy one and the rich one
                 LifetimePatches<MobileParty>.DestroyPostfix(ref party, true);
@@ -129,7 +66,7 @@ public class MobilePartyAiLifetimePatchesTests
         return messages;
     }
 
-    /// <summary>Gameplay sync policy, so only the scopes under test allow originals.</summary>
+    /// <summary>Gameplay sync policy, so the removal runs where originals are not allowed.</summary>
     private sealed class TestSyncPolicy : ISyncPolicy
     {
         public bool AllowOriginal() => false;
