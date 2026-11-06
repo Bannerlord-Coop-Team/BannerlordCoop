@@ -118,6 +118,6 @@ public readonly struct ModOptions
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
-        PreferredBattleHosts = modOptionsData.PreferredBattleHosts ?? PreferredBattleHosts;
+        PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
     }
 }
