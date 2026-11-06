@@ -58,10 +58,6 @@ internal class MercenaryServiceConversationPatch
         {
             num *= 3;
             num /= 2;
-            if (Hero.OneToOneConversationHero.Clan.MapFaction.IsKingdomFaction)
-            {
-                MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, clan));
-            }
         }
         MessageBroker.Instance.Publish(__instance, new MercenaryServiceAccepted(kingdom, num, clan));
         return false;

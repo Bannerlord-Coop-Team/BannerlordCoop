@@ -90,6 +90,17 @@ internal class MercenaryServiceHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<Kingdom>(kingdomId, out var kingdom)) return;
 
+        // A ruler hiring another kingdom's mercenary ends its old contract first, as vanilla's
+        // conversation_mercenary_response_accept_on_consqequence does. A repeat hire finds it in this kingdom already.
+        bool hiresAwayMercenary = clan != hero.Clan
+            && clan.IsUnderMercenaryService
+            && clan.MapFaction.IsKingdomFaction
+            && clan.Kingdom != kingdom;
+        if (hiresAwayMercenary)
+        {
+            ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
+        }
+
         if (clan.Kingdom != null || clan.IsUnderMercenaryService)
         {
             Logger.Warning("Rejected mercenary service request because clan {ClanId} already belongs to a kingdom", clanId);
@@ -116,21 +127,20 @@ internal class MercenaryServiceHandler : IHandler
         if (ModInformation.IsClient) return;
 
         // Peer associations use a ConcurrentDictionary and are safe to resolve on the poll thread.
-        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player))
+        if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out _))
         {
             Logger.Error("Received {Message} without a registered player peer", nameof(RequestMercenaryDismissalService));
             return;
         }
 
         GameThread.RunSafe(
-            () => ApplyMercenaryDismissalService(payload.What.ClanId, player.HeroId),
+            () => ApplyMercenaryDismissalService(payload.What.ClanId),
             context: nameof(MercenaryServiceHandler));
     }
 
-    private void ApplyMercenaryDismissalService(string clanId, string heroId)
+    private void ApplyMercenaryDismissalService(string clanId)
     {
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return;
-        if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return;
 
         if (clan.Kingdom == null || !clan.IsUnderMercenaryService)
         {
