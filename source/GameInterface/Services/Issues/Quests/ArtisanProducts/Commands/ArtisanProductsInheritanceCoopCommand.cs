@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
@@ -44,8 +44,9 @@ internal sealed class ArtisanProductsInheritanceCoopCommand : ICoopCommand
         if (!heir.IsAlive || heir.IsPrisoner || heir.IsFugitive || heir.IsReleased || heir.IsTraveling)
             return Failed($"Heir {heir.Name} must be living, free and present.");
         if (heir.Issue != null) return Failed($"Heir {heir.Name} already offers {heir.Issue.GetType().Name}.");
-        if (!objectManager.TryGetId(issue, out var issueId) || !objectManager.TryGetId(oldOwner, out var oldId) ||
-            !objectManager.TryGetId(heir, out var heirId)) return Failed("The issue or hero is not registered.");
+        var issueId = issue.StringId;
+        if (!objectManager.TryGetId(oldOwner, out var oldId) ||
+            !objectManager.TryGetId(heir, out var heirId)) return Failed("The issue owner or heir is not registered.");
         if (!objectManager.TryGetObjectWithLogging<Hero>(oldId, out var registeredOldOwner) ||
             !objectManager.TryGetObjectWithLogging<Hero>(heirId, out var registeredHeir) ||
             registeredOldOwner != oldOwner || registeredHeir != heir)
