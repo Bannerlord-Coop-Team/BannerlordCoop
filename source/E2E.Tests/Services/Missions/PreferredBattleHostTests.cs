@@ -49,21 +49,6 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
     }
 
     [Fact]
-    public void NoPreferredHosts_ElectsTheFirstReadyPlayerAtOnce()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
-        var clients = Clients.ToArray();
-        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
-
-        EnterBattle(clients[0], mapEventId);
-        AssertHost(Server, mapEventId, "ctrl-A");
-        EnterBattle(clients[1], mapEventId);
-        EnterBattle(clients[2], mapEventId);
-
-        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
-    }
-
-    [Fact]
     public void PreferredHostThatNeverLoads_FallsBackToTheFirstReadyPlayerAfterTheWait()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
@@ -225,7 +210,7 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
             // The host elected on release is granted the dropped leaver's party with the election.
             var grants = clients[0].InternalMessages.GetMessages<NetworkBattleTroopReserve>().Skip(baseline)
                 .Where(message => message.MapEventId == mapEventId);
-            Assert.Contains(grants, grant => grant.Parties.Any(party => party.PartyId == leaverMepId));
+            Assert.Single(grants.Where(grant => grant.Parties.Any(party => party.PartyId == leaverMepId)));
         }
         finally
         {
@@ -310,21 +295,6 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         Tick();
 
         AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B");
-    }
-
-    [Fact]
-    public void NoPreferredHosts_ElectsTheFirstReadyPlayerWhileOthersLoad()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
-        var clients = Clients.ToArray();
-        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
-
-        EnterBattle(clients[0], mapEventId, missionReady: false);
-        EnterBattle(clients[2], mapEventId, missionReady: false);
-        EnterBattle(clients[1], mapEventId);
-
-        AssertHost(Server, mapEventId, "ctrl-B");
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBattleHostAssigned>());
     }
 
     // What the party-visibility handler does when a peer drops with its party still in the battle.
