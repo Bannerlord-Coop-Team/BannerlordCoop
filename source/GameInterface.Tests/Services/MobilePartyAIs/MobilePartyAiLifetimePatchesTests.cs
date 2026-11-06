@@ -13,10 +13,10 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 
-namespace GameInterface.Tests.Services.MobileParties;
+namespace GameInterface.Tests.Services.MobilePartyAIs;
 
 [Collection(ModInformationRoleCollection.Name)]
-public class PartyRemovalDiagnosticsPatchesTests
+public class MobilePartyAiLifetimePatchesTests
 {
     private const string PartyId = "Created_186155";
 
@@ -27,7 +27,7 @@ public class PartyRemovalDiagnosticsPatchesTests
 
         string error = Assert.Single(messages, IsClientRemovalError);
         Assert.Contains(PartyId, error);
-        Assert.Contains(nameof(PartyRemovalDiagnosticsPatchesTests), error);
+        Assert.Contains(nameof(MobilePartyAiLifetimePatchesTests), error);
     }
 
     [Fact]
