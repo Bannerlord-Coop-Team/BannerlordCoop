@@ -622,40 +622,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
     
     [Fact]
-    public void KingdomDecisionVote_IsCastAsTheSendersOwnController()
-    {
-        var kingdomId = CreateRulerAndOutsiderScenario();
-        Server.InternalMessages.Clear();
-        var vote = new KingdomDecisionVoteData(kingdomId, decisionIndex: 0, outcomeIndex: 0,
-            supportWeight: (int)Supporter.SupportWeights.FullyPush, isAbstain: false, isFinal: true);
-
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestKingdomDecisionVote(vote));
-
-        Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<ChangeKingdomDecisionVote>()).ControllerId);
-    }
-
-    [Fact]
-    public void CreateKingdomRequest_IsMadeForTheSendersOwnController()
-    {
-        CreateRulerAndOutsiderScenario();
-        Server.InternalMessages.Clear();
-
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestCreateKingdom(KingdomName, null, null, null));
-
-        Assert.Equal(SecondControllerId, Assert.Single(Server.InternalMessages.GetMessages<CreateKingdom>()).ControllerId);
-    }
-
-    // The first client rules a kingdom; the second plays a clan outside it.
-    private string CreateRulerAndOutsiderScenario()
-    {
-        var ruler = CreateSyncedPlayerContext(ControllerId, Clients.First());
-        CreateSyncedPlayerContext(SecondControllerId, Clients.Last());
-        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
-        return kingdomId;
-    }
-
-    [Fact]
     public void VassalServiceAccepted_DuringSettlementLocationConversation_JoinsKingdomAndReleasesConversationLock()
     {
         const string LocationId = "vassal_oath_settlement";

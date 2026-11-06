@@ -816,10 +816,9 @@ public class KingdomHandler : IHandler
         var payload = obj.What;
         var partyId = payload.PartyId;
         if (obj.Who is not NetPeer peer) return;
-        if (!playerManager.TryGetPlayer(peer, out var player)) return;
-        var controllerId = player.ControllerId;
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId)) return;
 
-        if (string.IsNullOrWhiteSpace(partyId))
+        if (string.IsNullOrWhiteSpace(partyId) && playerManager.TryGetPlayer(controllerId, out var player))
         {
             partyId = player.MobilePartyId;
         }
@@ -964,8 +963,7 @@ public class KingdomHandler : IHandler
     {
         var payload = obj.What;
         if (obj.Who is not NetPeer peer) return;
-        if (!playerManager.TryGetPlayer(peer, out var player)) return;
-        var controllerId = player.ControllerId;
+        if (!playerManager.TryGetCurrentController(peer, out var controllerId)) return;
 
         // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
         // reported here.
