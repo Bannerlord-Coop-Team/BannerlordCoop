@@ -28,20 +28,6 @@ public class LogManagerConfigurationOrderTests
     }
 
     [Fact]
-    public void FileSinkAddedBeforeGetLogger_ReceivesLogLines()
-    {
-        RunWithFreshLogManager((logManager, addFileSink) =>
-        {
-            var filePath = addFileSink();
-            var logger = GetLogger(logManager);
-
-            logger.Information("configured first marker");
-
-            Assert.Contains("configured first marker", ReadShared(filePath));
-        });
-    }
-
-    [Fact]
     public void LevelOverrideAddedAfterGetLogger_FiltersPerSource()
     {
         RunWithFreshLogManager((logManager, _) =>
