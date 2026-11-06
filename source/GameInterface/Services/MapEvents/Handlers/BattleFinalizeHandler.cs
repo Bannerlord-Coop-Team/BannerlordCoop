@@ -154,9 +154,9 @@ internal class BattleFinalizeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
             if (requester != null)
-                network.Send(requester, new NetworkMapEventFinalized());
+                network.Send(requester, new NetworkMapEventFinalized(payload.What.MapEventId));
             else
-                messageBroker.Publish(this, new NetworkMapEventFinalized());
+                messageBroker.Publish(this, new NetworkMapEventFinalized(payload.What.MapEventId));
 
             return;
         }
@@ -179,7 +179,7 @@ internal class BattleFinalizeHandler : IHandler
         }
 
         if (requester != null)
-            network.Send(requester, new NetworkMapEventFinalized());
+            network.Send(requester, new NetworkMapEventFinalized(payload.What.MapEventId));
     }
 
     private bool TryLeaveSharedHideout(NetPeer requester, string mapEventId)
@@ -619,13 +619,10 @@ internal class BattleFinalizeHandler : IHandler
             if (Campaign.Current == null) return;
 
             var mainParty = MobileParty.MainParty;
-            // This reply has no event id; an old reply must not close or move a new active raider.
-            if (ModInformation.IsClient && mainParty?.MapEvent is MapEvent activeRaid &&
-                activeRaid.IsRaidHostileAction() && !activeRaid.IsFinalized)
-                return;
-
-            // A late reply cannot identify or close the new village encounter opened by a raid reset.
-            if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
+            var battle = PlayerEncounter.Battle;
+            // A delayed reply must only close the encounter for the battle it finalized.
+            if (battle == null || !objectManager.TryGetId(battle, out var battleId) ||
+                battleId != payload.What.MapEventId)
                 return;
 
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate

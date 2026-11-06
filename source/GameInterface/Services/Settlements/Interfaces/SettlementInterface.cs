@@ -103,7 +103,7 @@ internal class SettlementInterface : ISettlementInterface
         var mainParty = MobileParty.MainParty;
         var mapEvent = PlayerEncounter.Battle;
         // Only an encounter that owns the raid must wait for server battle teardown.
-        if (ModInformation.IsClient && mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized)
+        if (ModInformation.IsClient && mapEvent.IsLiveRaid())
             return;
 
         // Mirror the native leave consequence (game_menu_settlement_leave_on_consequence). The party must

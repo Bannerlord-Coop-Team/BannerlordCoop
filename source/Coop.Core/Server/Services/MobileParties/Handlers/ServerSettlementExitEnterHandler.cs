@@ -215,7 +215,8 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             var leftSettlement = mobileParty.CurrentSettlement;
-            LeaveSettlementMapEvent(mobileParty);
+            LeaveRaidDefenderMapEvent(mobileParty);
+            LeaveHideoutMapEvent(mobileParty);
             settlementInterface.PartyLeaveSettlement(mobileParty);
 
             network.Send(
@@ -232,17 +233,19 @@ public class ServerSettlementExitEnterHandler : IHandler
         }, context: nameof(NetworkRequestEndSettlementEncounter));
     }
 
-    private void LeaveSettlementMapEvent(MobileParty mobileParty)
+    private void LeaveRaidDefenderMapEvent(MobileParty mobileParty)
     {
         var party = mobileParty?.Party;
         var mapEvent = party?.MapEvent;
         // Detach a leaving village defender before the settlement reply closes its menus.
-        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && party.MapEventSide == mapEvent.DefenderSide)
-        {
+        if (mapEvent.IsLiveRaid() && party.MapEventSide == mapEvent.DefenderSide)
             messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party, finishLocalMenus: false));
-            return;
-        }
+    }
 
+    private void LeaveHideoutMapEvent(MobileParty mobileParty)
+    {
+        var party = mobileParty?.Party;
+        var mapEvent = party?.MapEvent;
         if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
         foreach (var player in playerManager.Players)
