@@ -16,7 +16,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Alleys;
 
-/// <summary>The server only applies an alley request from the player whose hero it is about.</summary>
+/// <summary>Alley take overs and management requests from two players, applied on the server.</summary>
 public class AlleyRequestSenderTests : AlleyTestEnvironment
 {
     public AlleyRequestSenderTests(ITestOutputHelper output) : base(output, numClients: 2)
