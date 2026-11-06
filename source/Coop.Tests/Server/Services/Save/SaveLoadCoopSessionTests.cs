@@ -5,6 +5,8 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Heroes;
 using System.Collections.Generic;
@@ -135,6 +137,11 @@ namespace Coop.Tests.Server.Services.Save
                 },
             };
 
+            // A pending marriage offer, and a finished one that still has its cooldown
+            var agingPlayerData = new AgingPlayerData(new());
+            agingPlayerData.PlayerMarriageOffers[players[0].HeroId] = new MarriageOfferData("lord_1_1", "lord_2_1", 4200);
+            agingPlayerData.PlayerMarriageOffers[players[1].HeroId] = new MarriageOfferData(null, null, 3100);
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -146,7 +153,7 @@ namespace Coop.Tests.Server.Services.Save
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(meetingTimes),
-                new AgingPlayerData(new()));
+                agingPlayerData);
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -177,8 +184,69 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.InteractionsPlayerData.PlayerHasMetHermit[playerHeroId], savedSession.InteractionsPlayerData.PlayerHasMetHermit[playerHeroId]);
 
                 Assert.Equal(sessionData.TradePlayerData.PlayerSettlementBribePaid[playerHeroId], savedSession.TradePlayerData.PlayerSettlementBribePaid[playerHeroId]);
+
+                var marriageOffer = sessionData.AgingPlayerData.PlayerMarriageOffers[playerHeroId];
+                var savedMarriageOffer = savedSession.AgingPlayerData.PlayerMarriageOffers[playerHeroId];
+                Assert.Equal(marriageOffer.CurrentOfferedPlayerClanHeroId, savedMarriageOffer.CurrentOfferedPlayerClanHeroId);
+                Assert.Equal(marriageOffer.CurrentOfferedOtherClanHeroId, savedMarriageOffer.CurrentOfferedOtherClanHeroId);
+                Assert.Equal(marriageOffer.LastMarriageOfferTimeNumTicks, savedMarriageOffer.LastMarriageOfferTimeNumTicks);
             }
             Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
+        }
+
+        [Fact]
+        public void SaveLoadSession_PreservesIncidentsPlayerData()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            var empty = CoopSession.Empty;
+
+            var incidentsPlayerData = new IncidentsPlayerData(new(), new(), new(), new(), new());
+            incidentsPlayerData.PlayerIncidentsOnCooldown["MyHero1"] = new() { ["Incident_incident_arrow_proofing"] = 1351L };
+            incidentsPlayerData.PlayerLastGlobalIncidentCooldown["MyHero1"] = 2462L;
+            incidentsPlayerData.PlayerActiveIncidentSeed["MyHero1"] = 9_876_543_210_123L;
+            incidentsPlayerData.PlayerCanInvokeSettlementEvent["MyHero1"] = true;
+            incidentsPlayerData.PlayerPendingIncident["MyHero1"] = "Incident_incident_trade_proposal";
+
+            ICoopSession sessionData = new CoopSession(
+                NewSaveName(),
+                new[] { new Player("MyPlayer1", "MyHero1", "MyParty1", "MyClan1", "MyCharacter1") },
+                empty.CraftingPlayerData,
+                empty.WorkshopPlayerData,
+                empty.CaravansPlayerData,
+                empty.AlleyPlayerData,
+                empty.InteractionsPlayerData,
+                empty.TradePlayerData,
+                empty.InventoryPlayerData,
+                empty.HeroMeetingData,
+                empty.AgingPlayerData,
+                incidentsPlayerData: incidentsPlayerData);
+
+            string saveFile = SAVE_PATH + sessionData.UniqueGameId;
+            saveManager.SaveCoopSession(saveFile, sessionData);
+
+            var loaded = saveManager.LoadCoopSession(saveFile).IncidentsPlayerData;
+
+            Assert.Equal(1351L, loaded.PlayerIncidentsOnCooldown["MyHero1"]["Incident_incident_arrow_proofing"]);
+            Assert.Equal(2462L, loaded.PlayerLastGlobalIncidentCooldown["MyHero1"]);
+            Assert.Equal(9_876_543_210_123L, loaded.PlayerActiveIncidentSeed["MyHero1"]);
+            Assert.True(loaded.PlayerCanInvokeSettlementEvent["MyHero1"]);
+            Assert.Equal("Incident_incident_trade_proposal", loaded.PlayerPendingIncident["MyHero1"]);
+        }
+
+        [Fact]
+        public void LoadSession_WithoutIncidentsPlayerData_DefaultsToEmpty()
+        {
+            // Saves made before incidents were synced have no IncidentsPlayerData
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            ICoopSession sessionData = NewSession(NewSaveName());
+
+            string saveFile = SAVE_PATH + sessionData.UniqueGameId;
+            saveManager.SaveCoopSession(saveFile, sessionData);
+
+            var loaded = saveManager.LoadCoopSession(saveFile);
+
+            Assert.NotNull(loaded.IncidentsPlayerData);
+            Assert.Empty(loaded.IncidentsPlayerData.PlayerPendingIncident);
         }
 
         [Fact]

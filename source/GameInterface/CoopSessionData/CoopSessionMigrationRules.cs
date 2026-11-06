@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.Caravans;
+﻿using GameInterface.Services.CampaignService.Statistics;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -44,6 +46,7 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(OrderOfBattlePlayerData), nameof(OrderOfBattlePlayerData.PlayerOrderOfBattles)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(StatisticsPlayerData), nameof(StatisticsPlayerData.PlayerStatistics)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(ViewDataPlayerData), nameof(ViewDataPlayerData.PlayerViewData)));
 
@@ -67,7 +70,14 @@ internal static class CoopSessionMigrationRules
 
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerIsIllDays)));
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerSuccessions)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerMarriageOffers)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
+
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerIncidentsOnCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerLastGlobalIncidentCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerActiveIncidentSeed)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerCanInvokeSettlementEvent)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerPendingIncident)));
     }
 }

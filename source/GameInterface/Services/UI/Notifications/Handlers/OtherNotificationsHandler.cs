@@ -82,6 +82,8 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Subscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Subscribe<NetworkNotifyIncidentOutcomes>(Handle_NetworkNotifyIncidentOutcomes);
     }
 
     public void Dispose()
@@ -129,6 +131,8 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Unsubscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Unsubscribe<NetworkNotifyIncidentOutcomes>(Handle_NetworkNotifyIncidentOutcomes);
     }
 
     private void Handle_NotifyAnimalsSlaughteredToEat(MessagePayload<NotifyAnimalsSlaughteredToEat> obj)
@@ -519,6 +523,17 @@ internal class OtherNotificationsHandler : IHandler
 
             MBTextManager.SetTextVariable("RELATION_VALUE", obj.What.RelationValue);
             MBInformationManager.AddQuickInformation(new TextObject("{=o0qwDa0q}Your relation increased by {RELATION_VALUE} with nearby notables.", null), 0, null, null, "");
+        });
+    }
+
+    private void Handle_NetworkNotifyIncidentOutcomes(MessagePayload<NetworkNotifyIncidentOutcomes> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            foreach (var outcome in obj.What.Outcomes)
+            {
+                MBInformationManager.AddQuickInformation(outcome, 0, null, null, "");
+            }
         });
     }
 }
