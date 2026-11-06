@@ -22,7 +22,6 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
@@ -833,45 +832,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         }
     }
 
-    // With the assault already live, a request re-broadcasts the assault prompt, which shows whether it was applied.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AssaultRequest_IsAppliedOnlyForTheSendersParty(bool fromOwner)
-    {
-        var mapEventContext = CreateServerMapEvent();
-        var (_, ownerPartyId) = CreatePlayerHeroParty("PlayerOne");
-        CreatePlayerHeroParty("PlayerTwo");
-        var clients = Clients.ToArray();
-        var disabledMethods = SiegeCreationDisabledMethods
-            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
-            .ToList();
-        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
-        string? settlementId = null;
-        Server.Call(() =>
-        {
-            var playerManager = Server.Resolve<IPlayerManager>();
-            playerManager.SetPeer("PlayerOne", clients[0].NetPeer);
-            playerManager.SetPeer("PlayerTwo", clients[1].NetPeer);
-
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            var settlement = siegeEvent.BesiegedSettlement;
-            settlement.SiegeEvent = siegeEvent;
-            settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            siegeEvent.BesiegerCamp._leaderParty = ownerParty;
-            Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
-        }, MapEventDisabledMethods);
-        Server.NetworkSentMessages.Clear();
-
-        Server.SimulateMessage((fromOwner ? clients[0] : clients[1]).NetPeer, new NetworkRequestSiegeAssault(ownerPartyId, settlementId!));
-        Server.PumpGameThread();
-
-        Assert.Equal(fromOwner ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkPromptSiegeAssault>().Count());
-    }
-
     private void SetMapEventType(string mapEventId, MapEvent.BattleTypes battleType)
     {
         foreach (var instance in Clients.Append(Server))
@@ -906,23 +866,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
     }
 
-    private void SetMainParty(EnvironmentInstance instance, string partyId)
+    private static void SetMainParty(EnvironmentInstance instance, string partyId)
     {
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Campaign.Current.MainParty = party;
-        });
-
-        // The server only applies a leave from the peer that plays the leaving party.
-        if (instance == TestEnvironment.Server) return;
-        TestEnvironment.Server.Call(() =>
-        {
-            var playerManager = TestEnvironment.Server.Resolve<IPlayerManager>();
-            string controllerId = "leaver-" + partyId;
-            if (!playerManager.TryGetPlayer(controllerId, out _))
-                Assert.True(playerManager.AddPlayer(new Player(controllerId, null, partyId, null, null)));
-            playerManager.SetPeer(controllerId, instance.NetPeer);
         });
     }
 

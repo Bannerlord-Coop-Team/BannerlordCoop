@@ -94,9 +94,6 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-            // The army leader adds members and a party may join itself. Clients also get this from the server, so only the server checks the sender.
-            if (ModInformation.IsServer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
-                (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
 
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
 
@@ -137,9 +134,6 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-            // The army leader removes members and a party may leave itself. Clients also get this from the server, so only the server checks the sender.
-            if (ModInformation.IsServer && (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo == null ||
-                (senderHero.PartyBelongedTo != mobileParty && senderHero.PartyBelongedTo != army.LeaderParty))) return;
             MobileParty clientMobileParty = null;
             if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
             {
@@ -259,9 +253,6 @@ public class ArmyHandler : IHandler
     {
         var obj = payload.What;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.ArmyLeaderPartyId, out var leaderParty)) return;
-        // Only the army's leader boosts its cohesion, and vanilla only ever spends here, so a negative amount isn't applied.
-        if (obj.CohesionToGain < 0 || obj.InfluenceCost < 0 ||
-            !playerManager.IsSenderControllingParty(payload.Who, obj.ArmyLeaderPartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -281,10 +272,6 @@ public class ArmyHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.What.PlayerClanId, out var playerClan)) return;
-            // A player spends its own clan's influence, or a ruler clears the debt it just paid a mercenary clan serving
-            // its kingdom. Every vanilla caller sends a cost, so a negative amount isn't applied.
-            if (payload.What.Influence < 0 || !playerManager.TryGetSenderHero(payload.Who, out var senderHero) ||
-                (senderHero.Clan != playerClan && !(playerClan.IsUnderMercenaryService && playerClan.Kingdom?.Leader == senderHero))) return;
             ChangeClanInfluenceAction.Apply(playerClan, (float)(-(float)(payload.What.Influence)));
         });
     }

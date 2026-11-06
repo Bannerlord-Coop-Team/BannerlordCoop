@@ -894,10 +894,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkChangeClanInfluence>());
             }
             Server.PumpGameThread();
-
-            // A spend that arrives after the clan left, from stale dialog state, no longer reaches the clan.
-            Server.SimulateMessage(client.NetPeer, new NetworkChangeClanInfluence(mercenary.ClanId, 40));
-            Server.PumpGameThread();
         }
         finally
         {
@@ -922,24 +918,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var prefix = AccessTools.Method(typeof(MercenaryServiceConversationPatch), prefixName);
             Assert.False((bool)prefix.Invoke(null, new object[] { new LordConversationsCampaignBehavior() }));
         });
-    }
-
-    [Theory]
-    [InlineData(false, 50, false)]
-    [InlineData(true, -50, false)]
-    [InlineData(true, 50, true)]
-    public void InfluenceSpend_AppliesOnlyToTheSendersOwnClanAndOnlyAsASpend(bool ownClan, int influence, bool applied)
-    {
-        var client = Clients.First();
-        var player = CreateSyncedPlayerContext(ControllerId, client);
-        var other = CreateSyncedPlayerContext("InfluenceOther", Clients.Last());
-        var clanId = ownClan ? player.ClanId : other.ClanId;
-        Server.Call(() => Server.GetRegisteredObject<Clan>(clanId).Influence = 100f);
-
-        Server.SimulateMessage(client.NetPeer, new NetworkChangeClanInfluence(clanId, influence));
-        Server.PumpGameThread();
-
-        Server.Call(() => Assert.Equal(applied ? 50f : 100f, Server.GetRegisteredObject<Clan>(clanId).Influence, precision: 2));
     }
 
     [Fact]

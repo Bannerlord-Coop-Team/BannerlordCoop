@@ -4,8 +4,6 @@ using E2E.Tests.Util;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using TaleWorlds.CampaignSystem;
@@ -177,27 +175,25 @@ public class ArmyDestructionTests : IDisposable
         }
     }
 
-    // The kingdom screen disbands an army the sender's party is not in, paid from the sender's own clan.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Disband_IsAppliedOnlyAsTheSendersOwnParty(bool ownParty)
-    {
-        var server = TestEnvironment.Server;
-        var (armyId, memberPartyId) = CreateArmyWithMember();
-        var senderPartyId = RegisterDisbandingPlayer();
-
-        Send(new NetworkDisbandArmyApplyInternal(armyId, ownParty ? senderPartyId : memberPartyId));
-
-        server.Call(() => Assert.Equal(ownParty, server.GetRegisteredObject<MobileParty>(memberPartyId).Army == null));
-    }
-
     [Fact]
     public void DisbandFromTheKingdomScreenOfAnArmyInABattle_IsIgnored()
     {
         var server = TestEnvironment.Server;
-        var (armyId, memberPartyId) = CreateArmyWithMember();
-        var senderPartyId = RegisterDisbandingPlayer();
+        var armyId = TestEnvironment.CreateRegisteredObject<Army>();
+        var memberPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        // The kingdom screen disbands an army the sender's party is not in, paid from the sender's own clan.
+        var senderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        server.Call(() =>
+        {
+            var army = server.GetRegisteredObject<Army>(armyId);
+            var member = server.GetRegisteredObject<MobileParty>(memberPartyId);
+            member.Army = army;
+            member.AttachedTo = army.LeaderParty;
+            var clan = server.GetRegisteredObject<MobileParty>(senderPartyId).LeaderHero.Clan ??= GameObjectCreator.CreateInitializedObject<Clan>();
+            clan.Influence = 1000f;
+            // Vanilla's disband cost reads Clan.PlayerClan, which the test campaign leaves unset.
+            Campaign.Current.PlayerDefaultFaction = clan;
+        });
         server.Call(() =>
         {
             // A stale kingdom screen can still send the disband after the army's leader joined a battle.
@@ -212,7 +208,8 @@ public class ArmyDestructionTests : IDisposable
             server.GetRegisteredObject<Army>(armyId).LeaderParty.Party.MapEventSide = mapEvent.AttackerSide;
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
 
-        Send(new NetworkDisbandArmyApplyInternal(armyId, senderPartyId));
+        server.SimulateMessage(TestEnvironment.Clients.First().NetPeer, new NetworkDisbandArmyApplyInternal(armyId, senderPartyId));
+        server.PumpGameThread();
 
         server.Call(() =>
         {
@@ -220,80 +217,5 @@ public class ArmyDestructionTests : IDisposable
             Assert.Same(army, server.GetRegisteredObject<MobileParty>(memberPartyId).Army);
             Assert.Equal(1000f, server.GetRegisteredObject<MobileParty>(senderPartyId).LeaderHero.Clan.Influence, precision: 2);
         });
-    }
-
-    // Only the army's leader boosts its cohesion.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CohesionBoost_IsAppliedOnlyFromTheArmyLeader(bool fromLeader)
-    {
-        var server = TestEnvironment.Server;
-        var (armyId, _) = CreateArmyWithMember();
-        string? leaderPartyId = null;
-        server.Call(() =>
-        {
-            var army = server.GetRegisteredObject<Army>(armyId);
-            var leader = army.LeaderParty.LeaderHero;
-            leader.Clan ??= GameObjectCreator.CreateInitializedObject<Clan>();
-            leader.Clan.Influence = 1000f;
-            army.Cohesion = 20f;
-            Assert.True(server.ObjectManager.TryGetId(army.LeaderParty, out leaderPartyId));
-        });
-        RegisterPlayer(fromLeader ? leaderPartyId! : TestEnvironment.CreateRegisteredObject<MobileParty>());
-
-        Send(new NetworkPlayerBoostedArmyCohesion(leaderPartyId, 10f, 0));
-
-        server.Call(() => Assert.Equal(fromLeader ? 30f : 20f, server.GetRegisteredObject<Army>(armyId).Cohesion));
-    }
-
-    private (string ArmyId, string MemberPartyId) CreateArmyWithMember()
-    {
-        var server = TestEnvironment.Server;
-        var armyId = TestEnvironment.CreateRegisteredObject<Army>();
-        var memberPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        server.Call(() =>
-        {
-            var army = server.GetRegisteredObject<Army>(armyId);
-            var member = server.GetRegisteredObject<MobileParty>(memberPartyId);
-            member.Army = army;
-            member.AttachedTo = army.LeaderParty;
-        });
-        return (armyId, memberPartyId);
-    }
-
-    // A player with its own clan and influence, outside the army.
-    private string RegisterDisbandingPlayer()
-    {
-        var server = TestEnvironment.Server;
-        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        server.Call(() =>
-        {
-            var clan = server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Clan ??= GameObjectCreator.CreateInitializedObject<Clan>();
-            clan.Influence = 1000f;
-            // Vanilla's disband cost reads Clan.PlayerClan, which the test campaign leaves unset.
-            Campaign.Current.PlayerDefaultFaction = clan;
-        });
-        RegisterPlayer(partyId);
-        return partyId;
-    }
-
-    private void RegisterPlayer(string partyId)
-    {
-        var server = TestEnvironment.Server;
-        server.Call(() =>
-        {
-            var party = server.GetRegisteredObject<MobileParty>(partyId);
-            Assert.True(server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
-            var playerManager = server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("Sender", heroId, partyId, null, null)));
-            playerManager.SetPeer("Sender", TestEnvironment.Clients.First().NetPeer);
-        });
-    }
-
-    private void Send<T>(T message) where T : Common.Messaging.IMessage
-    {
-        TestEnvironment.Server.SimulateMessage(TestEnvironment.Clients.First().NetPeer, message);
-        TestEnvironment.Server.PumpGameThread();
     }
 }

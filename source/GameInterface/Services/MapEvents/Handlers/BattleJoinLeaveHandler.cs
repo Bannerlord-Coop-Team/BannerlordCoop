@@ -427,9 +427,6 @@ internal class BattleJoinLeaveHandler : IHandler
             () =>
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
-                // A requesting peer only takes its own party out of a battle.
-                if (requestingPeer != null && (party.MobileParty == null || !objectManager.TryGetId(party.MobileParty, out var mobilePartyId) ||
-                    !playerManager.IsSenderControllingParty(requestingPeer, mobilePartyId))) return;
 
                 var mapEvent = party.MapEvent;
                 bool leaveSiege = IsBesiegerInSiegeBattle(party, breakSiege);

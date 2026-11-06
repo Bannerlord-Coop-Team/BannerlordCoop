@@ -517,24 +517,6 @@ public class BattleSurrenderTests : MapEventTestBase
         });
     }
 
-    [Fact]
-    public void FieldBattleLeave_ForAnotherPlayersParty_IsRefused()
-    {
-        var ctx = CreateServerMapEvent();
-        var leavingPartyId = JoinNewServerPartyToSide(ctx.MapEventId, BattleSideEnum.Defender);
-        RegisterAsPlayerParty("2", TestEnvironment.CreateRegisteredObject<Hero>(), leavingPartyId);
-        CreatePlayerHeroParty("1");
-        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "1");
-        var leavingParty = Server.GetRegisteredObject<MobileParty>(leavingPartyId);
-        string? partyBaseId = null;
-        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(leavingParty.Party, out partyBaseId)));
-
-        Server.SimulateMessage(Clients.First().NetPeer, new NetworkRequestLeaveBattle(partyBaseId!));
-        Server.PumpGameThread();
-
-        Assert.NotNull(leavingParty.MapEvent);
-    }
-
     // A surrender comes from a player whose party fights in the battle.
     [Theory]
     [InlineData(true)]

@@ -12,7 +12,6 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -209,13 +208,6 @@ public class SiegeDisconnectTests : SiegeTestBase
             AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
         using var siegeDeactivation = new MethodCallRecorder(
             AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
-        // The server only breaks the siege of the requesting player's own party.
-        Server.Call(() =>
-        {
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("Breaker", null, partyId, null, null)));
-            playerManager.SetPeer("Breaker", requestingClient.NetPeer);
-        });
         Server.SimulateMessage(
             requestingClient.NetPeer,
             new NetworkRequestBreakSiege(partyId, finishLocalMenus));
@@ -243,20 +235,6 @@ public class SiegeDisconnectTests : SiegeTestBase
                 hasPlayerEncounter && !finishLocalMenus,
                 PlayerEncounter.Current != null));
         Clients.Last().Call(() => Assert.Null(PlayerEncounter.Current));
-    }
-
-    [Fact]
-    public void BreakSiegeRequest_ForAnotherPlayersParty_IsRefused()
-    {
-        var (_, ownerPartyId) = CreatePlayerHeroParty("SiegeOwner");
-        CreatePlayerHeroParty("OtherPlayer");
-        TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "OtherPlayer");
-        Server.NetworkSentMessages.Clear();
-
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestBreakSiege(ownerPartyId));
-        Server.PumpGameThread();
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
     }
 
     [Fact]

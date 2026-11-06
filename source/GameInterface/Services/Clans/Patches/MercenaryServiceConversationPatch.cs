@@ -111,7 +111,6 @@ internal class MercenaryServiceConversationPatch
     {
         int amount = MathF.Max(0, (int)Hero.OneToOneConversationHero.Clan.Influence) * Hero.OneToOneConversationHero.Clan.MercenaryAwardMultiplier;
         MessageBroker.Instance.Publish(__instance, new GiveGold(amount, Hero.OneToOneConversationHero.Clan.Leader));
-        // The paid debt is cleared while the clan still serves, which the server accepts from the kingdom's ruler.
         MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Hero.OneToOneConversationHero.Clan, (int)(Hero.OneToOneConversationHero.Clan.Influence)));
         return false;
     }
