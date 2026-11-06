@@ -329,7 +329,7 @@ public class MissionModule : Module
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
 
         // Missions.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
-        if (ModInformation.IsNavalDlcActive && TryLoadNavalMissionsAssembly(out var navalAssembly))
+        if (ModInformation.IsNavalEnabled && TryLoadNavalMissionsAssembly(out var navalAssembly))
             builder.RegisterAssemblyModules(navalAssembly);
     }
 

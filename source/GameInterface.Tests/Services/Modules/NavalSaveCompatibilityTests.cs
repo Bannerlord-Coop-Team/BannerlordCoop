@@ -14,28 +14,28 @@ public class NavalSaveCompatibilityTests : IDisposable
     private static readonly string[] VanillaSave = { "Native", "SandBoxCore", "Sandbox" };
     private static readonly string[] NavalSave = { "Native", "SandBoxCore", "Sandbox", ModInformation.NavalDlcModuleId };
 
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     // Puts back the process-wide flag.
     public void Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 
     [Fact]
     public void GetHostRefusal_AllowsAMatchingSave()
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
         Assert.Null(new NavalSaveCompatibility().GetHostRefusal("naval", NavalSave));
 
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
         Assert.Null(new NavalSaveCompatibility().GetHostRefusal("vanilla", VanillaSave));
     }
 
     [Fact]
     public void GetHostRefusal_RefusesASaveWithoutNavalDlc_WhenWarSailsIsOn()
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
 
         string refusal = new NavalSaveCompatibility().GetHostRefusal("vanilla", VanillaSave);
 
@@ -45,7 +45,7 @@ public class NavalSaveCompatibilityTests : IDisposable
     [Fact]
     public void GetHostRefusal_RefusesASaveWithNavalDlc_WhenWarSailsIsOff()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
 
         string refusal = new NavalSaveCompatibility().GetHostRefusal("naval", NavalSave);
 

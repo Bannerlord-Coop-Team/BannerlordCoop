@@ -42,7 +42,7 @@ using Xunit;
 namespace GameInterface.Tests;
 
 /// <summary>
-/// Covers that GameInterface's own War Sails patches and registrations follow <see cref="ModInformation.IsNavalDlcActive"/>.
+/// Covers that GameInterface's own War Sails patches and registrations follow <see cref="ModInformation.IsNavalEnabled"/>.
 /// </summary>
 [Collection(nameof(CampaignCurrentCollection))]
 public sealed class GameInterfaceModuleNavalGateTests : IDisposable
@@ -129,13 +129,13 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
         "GameInterface.Services.NavalDLC",
     };
 
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     // The game's own module constructor reads the startup decision, so off must register and install nothing naval.
     [Fact]
     public void DefaultModule_WithNavalInactive_RegistersAndInstallsNothingNaval()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
 
         AssertNavalServices(new GameInterfaceModule(), expected: false);
     }
@@ -144,9 +144,9 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Module_GatesNavalRegistrationsAndPatchesTogether(bool isNavalDlcActive)
+    public void Module_GatesNavalRegistrationsAndPatchesTogether(bool isNavalEnabled)
     {
-        AssertNavalServices(new GameInterfaceModule(isNavalDlcActive), isNavalDlcActive);
+        AssertNavalServices(new GameInterfaceModule(isNavalEnabled), isNavalEnabled);
     }
 
     // A naval patch class without the naval category would be installed with naval off.
@@ -178,7 +178,7 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
     {
         var ungated = NavalOnlyTypesInAssembly()
             .Where(type => type.IsClass && !type.IsAbstract && IsScannedRegistration(type))
-            .Where(type => GameInterfaceModule.ShouldRegister(type, isNavalDlcActive: false))
+            .Where(type => GameInterfaceModule.ShouldRegister(type, isNavalEnabled: false))
             .Select(type => type.FullName);
 
         Assert.Empty(ungated);
@@ -231,6 +231,6 @@ public sealed class GameInterfaceModuleNavalGateTests : IDisposable
 
     public void Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 }

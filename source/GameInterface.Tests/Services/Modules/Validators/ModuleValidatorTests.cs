@@ -11,18 +11,18 @@ namespace GameInterface.Tests.Services.Modules.Validators;
 [Collection(ModInformationRoleCollection.Name)]
 public class ModuleValidatorTests : IDisposable
 {
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     // Starts every test with War Sails off; the tests that need it on turn it on.
     public ModuleValidatorTests()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
     }
 
     // Puts back the process-wide flag.
     public void Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class ModuleValidatorTests : IDisposable
     // Turns War Sails on for this test and returns a validator that reads it.
     private static ModuleValidator NavalBuildValidator()
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
         return new ModuleValidator();
     }
 

@@ -100,7 +100,7 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         // Naval server handlers stay on here, like GameInterface's naval sync below.
-        builder.RegisterModule(new ServerModule(isNavalDlcActive: true));
+        builder.RegisterModule(new ServerModule(isNavalEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -125,7 +125,7 @@ public class TestEnvironment
         if (registerGameInterface)
         {
             // GameInterface's naval sync is tested here with fakes, so it stays on without loading the optional naval assemblies.
-            builder.RegisterModule(new GameInterfaceModule(isNavalDlcActive: true));
+            builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
         }
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();

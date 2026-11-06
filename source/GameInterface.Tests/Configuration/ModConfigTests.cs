@@ -573,15 +573,8 @@ public class ModConfigTests : IDisposable
 
         var config = NewModConfig().Data;
 
-        Assert.False(new WarSailsSetting(new FixedConfig(config)).IsEnabled);
+        Assert.False(config.ModOptions?.WarSails ?? false);
         Assert.DoesNotContain("modOptions", File.ReadAllText(ConfigPath));
     }
 
-    // Hands a loaded config to a consumer.
-    private sealed class FixedConfig : IModConfig
-    {
-        public FixedConfig(ModConfigData data) => Data = data;
-
-        public ModConfigData Data { get; }
-    }
 }

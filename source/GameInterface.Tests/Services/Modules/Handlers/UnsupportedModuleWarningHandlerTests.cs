@@ -15,18 +15,18 @@ namespace GameInterface.Tests.Services.Modules.Handlers;
 [Collection(ModInformationRoleCollection.Name)]
 public class UnsupportedModuleWarningHandlerTests : IDisposable
 {
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     // Starts every test with War Sails off; the test that needs it on turns it on.
     public UnsupportedModuleWarningHandlerTests()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
     }
 
     // Puts back the process-wide flag.
     public void Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 
     [Theory]
@@ -143,7 +143,7 @@ public class UnsupportedModuleWarningHandlerTests : IDisposable
     [Fact]
     public void NavalDlc_DoesNotShowWarning_WhenTheBuildShippedNavalCode()
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
         var provider = new TestModuleInfoProvider(
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false),

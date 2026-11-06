@@ -50,16 +50,16 @@ public class ListShipsCoopCommandTests : SyncTestBase
     private static CoopCommandResult ListShips(EnvironmentInstance instance, string id)
     {
         CoopCommandResult result = null!;
-        bool originalNavalDlcActive = ModInformation.IsNavalDlcActive;
+        bool originalNavalEnabled = ModInformation.IsNavalEnabled;
         try
         {
-            ModInformation.IsNavalDlcActive = true;
+            ModInformation.IsNavalEnabled = true;
             instance.Call(() => result = new PartyShipCommands.ListShipsCoopCommand()
                 .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { id })));
         }
         finally
         {
-            ModInformation.IsNavalDlcActive = originalNavalDlcActive;
+            ModInformation.IsNavalEnabled = originalNavalEnabled;
         }
 
         return result;

@@ -13,9 +13,9 @@ public class PartyShipCommandsTests
     [Theory]
     [InlineData(false, true, "Run this command on the server.")]
     [InlineData(true, false, "NavalDLC is not active on the server.")]
-    public void AddShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalDlcActive, string expectedOutput)
+    public void AddShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalEnabled, string expectedOutput)
     {
-        var result = RunWithRole(isServer, navalDlcActive, new PartyShipCommands.AddShipCoopCommand(), "PlayerOne");
+        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.AddShipCoopCommand(), "PlayerOne");
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedOutput, result.Output);
@@ -58,9 +58,9 @@ public class PartyShipCommandsTests
     [InlineData(true, false, "NavalDLC is not active on the server.", "PlayerOne", "0", "200")]
     [InlineData(true, true, "damage must be a number greater than 0.", "PlayerOne", "0", "0")]
     [InlineData(true, true, "damage must be a number greater than 0.", "PlayerOne", "0", "lots")]
-    public void DamageShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalDlcActive, string expectedOutput, params string[] args)
+    public void DamageShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalEnabled, string expectedOutput, params string[] args)
     {
-        var result = RunWithRole(isServer, navalDlcActive, new PartyShipCommands.DamageShipCoopCommand(), args);
+        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.DamageShipCoopCommand(), args);
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedOutput, result.Output);
@@ -69,9 +69,9 @@ public class PartyShipCommandsTests
     [Theory]
     [InlineData(false, true, "Run this command on the server.")]
     [InlineData(true, false, "NavalDLC is not active on the server.")]
-    public void RemoveShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalDlcActive, string expectedOutput)
+    public void RemoveShip_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, bool navalEnabled, string expectedOutput)
     {
-        var result = RunWithRole(isServer, navalDlcActive, new PartyShipCommands.RemoveShipCoopCommand(), "PlayerOne", "0");
+        var result = RunWithRole(isServer, navalEnabled, new PartyShipCommands.RemoveShipCoopCommand(), "PlayerOne", "0");
 
         Assert.False(result.Succeeded);
         Assert.Equal(expectedOutput, result.Output);
@@ -156,20 +156,20 @@ public class PartyShipCommandsTests
         public string[] Names { get; }
     }
 
-    private static CoopCommandResult RunWithRole(bool isServer, bool navalDlcActive, ICoopCommand command, params string[] args)
+    private static CoopCommandResult RunWithRole(bool isServer, bool navalEnabled, ICoopCommand command, params string[] args)
     {
         bool originalIsServer = ModInformation.IsServer;
-        bool originalNavalDlcActive = ModInformation.IsNavalDlcActive;
+        bool originalNavalEnabled = ModInformation.IsNavalEnabled;
         try
         {
             ModInformation.IsServer = isServer;
-            ModInformation.IsNavalDlcActive = navalDlcActive;
+            ModInformation.IsNavalEnabled = navalEnabled;
             return command.ProcessCommand(new TestArgs(args));
         }
         finally
         {
             ModInformation.IsServer = originalIsServer;
-            ModInformation.IsNavalDlcActive = originalNavalDlcActive;
+            ModInformation.IsNavalEnabled = originalNavalEnabled;
         }
     }
 

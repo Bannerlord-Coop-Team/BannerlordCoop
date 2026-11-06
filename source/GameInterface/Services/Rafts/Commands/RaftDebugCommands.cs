@@ -52,7 +52,7 @@ public class RaftDebugCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
             if (args.Count != 1)

@@ -145,7 +145,7 @@ public class ModuleValidator : IModuleValidator
     {
         if (!module.IsDlc) return false;
 
-        return !ModInformation.IsNavalDlcActive || !ModInformation.IsNavalDlcModule(module.Id, module.IsDlc);
+        return !ModInformation.IsNavalEnabled || !ModInformation.IsNavalDlcModule(module.Id, module.IsDlc);
     }
 
     /// <summary>

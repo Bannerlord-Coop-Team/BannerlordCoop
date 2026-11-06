@@ -85,15 +85,15 @@ public class NavalScenarioTests : SyncTestBase
     private CoopCommandResult RunOnServer(Func<CoopCommandResult?> action)
     {
         CoopCommandResult? result = null;
-        bool originalNavalDlcActive = ModInformation.IsNavalDlcActive;
+        bool originalNavalEnabled = ModInformation.IsNavalEnabled;
         try
         {
-            ModInformation.IsNavalDlcActive = true;
+            ModInformation.IsNavalEnabled = true;
             Server.Call(() => result = action());
         }
         finally
         {
-            ModInformation.IsNavalDlcActive = originalNavalDlcActive;
+            ModInformation.IsNavalEnabled = originalNavalEnabled;
         }
 
         return result!;

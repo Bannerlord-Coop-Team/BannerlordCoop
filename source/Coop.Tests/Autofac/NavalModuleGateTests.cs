@@ -25,13 +25,13 @@ public sealed class NavalModuleGateTests : System.IDisposable
 {
     private static readonly string[] NavalAssemblyNames = { "Coop.Naval", "Missions.Naval" };
 
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     // Off means no patch category from a naval assembly, so GameInterface.PatchAll applies none of their patches.
     [Fact]
     public void ClientContainer_WithNavalInactive_RegistersNoNavalPatchesOrLauncher()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
 
         using var container = BuildClientContainer();
 
@@ -44,7 +44,7 @@ public sealed class NavalModuleGateTests : System.IDisposable
     [Fact]
     public void ClientContainer_WithNavalActive_RegistersBothNavalPatchSets()
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
 
         using var container = BuildClientContainer();
 
@@ -59,7 +59,7 @@ public sealed class NavalModuleGateTests : System.IDisposable
     [Fact]
     public void DefaultServerModule_WithNavalInactive_LeavesTheShipFateHandlerOut()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
 
         using var container = BuildServerContainer(new ServerModule(), new GameInterfaceModule());
 
@@ -70,20 +70,20 @@ public sealed class NavalModuleGateTests : System.IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ServerModule_GatesTheShipFateHandlerWithItsServices(bool isNavalDlcActive)
+    public void ServerModule_GatesTheShipFateHandlerWithItsServices(bool isNavalEnabled)
     {
         using var container = BuildServerContainer(
-            new ServerModule(isNavalDlcActive), new GameInterfaceModule(isNavalDlcActive));
+            new ServerModule(isNavalEnabled), new GameInterfaceModule(isNavalEnabled));
 
-        Assert.Equal(isNavalDlcActive, container.IsRegistered<ServerBattleShipFateHandler>());
-        Assert.Equal(isNavalDlcActive, container.IsRegistered<IBattleShipFateLedger>());
+        Assert.Equal(isNavalEnabled, container.IsRegistered<ServerBattleShipFateHandler>());
+        Assert.Equal(isNavalEnabled, container.IsRegistered<IBattleShipFateLedger>());
     }
 
     // The game's client modules read the startup decision, so off leaves the water clock and naval battle factory out.
     [Fact]
     public void DefaultClientModules_WithNavalInactive_LeaveTheNavalMissionServicesOut()
     {
-        ModInformation.IsNavalDlcActive = false;
+        ModInformation.IsNavalEnabled = false;
 
         using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule());
 
@@ -95,11 +95,11 @@ public sealed class NavalModuleGateTests : System.IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ClientModules_GateTheWaterClockOnly(bool isNavalDlcActive)
+    public void ClientModules_GateTheWaterClockOnly(bool isNavalEnabled)
     {
-        using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule(isNavalDlcActive));
+        using var container = BuildClientRegistrations(new ClientModule(), new GameInterfaceModule(isNavalEnabled));
 
-        Assert.Equal(isNavalDlcActive, container.IsRegistered<IWaterClock>());
+        Assert.Equal(isNavalEnabled, container.IsRegistered<IWaterClock>());
         Assert.True(container.IsRegistered<INetworkShipRegistry>());
         Assert.True(container.IsRegistered<INavalDeckMovementProbe>());
     }
@@ -138,6 +138,6 @@ public sealed class NavalModuleGateTests : System.IDisposable
 
     public void Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 }

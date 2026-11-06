@@ -38,7 +38,7 @@ public sealed class StartNavalCoopCommand : ICoopCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (ModInformation.IsClient) return Failed("Run this command on the server.");
-        if (!ModInformation.IsNavalDlcActive) return Failed("NavalDLC is not active on the server.");
+        if (!ModInformation.IsNavalEnabled) return Failed("NavalDLC is not active on the server.");
 
         var controllerIds = args.ToArray();
         if (controllerIds.Distinct().Count() != controllerIds.Length) return Failed("The players must be different.");

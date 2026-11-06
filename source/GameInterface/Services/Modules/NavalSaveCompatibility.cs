@@ -20,10 +20,10 @@ public class NavalSaveCompatibility : INavalSaveCompatibility
     public string GetHostRefusal(string saveName, IEnumerable<string> saveModuleIds)
     {
         bool savedWithNaval = (saveModuleIds ?? Enumerable.Empty<string>()).Contains(ModInformation.NavalDlcModuleId);
-        if (savedWithNaval == ModInformation.IsNavalDlcActive) return null;
+        if (savedWithNaval == ModInformation.IsNavalEnabled) return null;
 
-        return ModInformation.IsNavalDlcActive
-            ? $"Save '{saveName}' was made without NavalDLC and a campaign can't gain it later. Host a save made with NavalDLC, or set warSails to false and disable NavalDLC."
-            : $"Save '{saveName}' was made with NavalDLC, which War Sails off can't load. Host a save made without NavalDLC, or set warSails to true and enable NavalDLC.";
+        return ModInformation.IsNavalEnabled
+            ? $"Save '{saveName}' was made without NavalDLC and a campaign can't gain it later. Host a save made with NavalDLC, or turn War Sails off."
+            : $"Save '{saveName}' was made with NavalDLC, which War Sails off can't load. Host a save made without NavalDLC, or turn War Sails on.";
     }
 }

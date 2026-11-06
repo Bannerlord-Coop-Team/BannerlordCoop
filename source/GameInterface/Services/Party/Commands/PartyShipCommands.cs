@@ -57,7 +57,7 @@ public class PartyShipCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
             var hullId = args.Count == 2 ? args[1] : DefaultHullId;
@@ -102,7 +102,7 @@ public class PartyShipCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
             if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var damage) || damage <= 0f)
@@ -143,7 +143,7 @@ public class PartyShipCommands
             if (ModInformation.IsClient)
                 return Failed("Run this command on the server.");
 
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active on the server.");
 
             if (!TryGetPlayerShip(args[0], args[1], out var objectManager, out var ship, out var error))
@@ -217,7 +217,7 @@ public class PartyShipCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active.");
 
             if (!TryGetListedParty(args[0], out var objectManager, out var party, out var error))
@@ -257,7 +257,7 @@ public class PartyShipCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ModInformation.IsNavalDlcActive)
+            if (!ModInformation.IsNavalEnabled)
                 return Failed("NavalDLC is not active.");
 
             if (args.Count == 1)

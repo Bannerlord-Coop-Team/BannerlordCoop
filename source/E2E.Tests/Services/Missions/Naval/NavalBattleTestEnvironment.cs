@@ -42,7 +42,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
 
     protected const float TickSeconds = 0.05f;
 
-    private readonly bool previousNavalDlcActive = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalEnabled = ModInformation.IsNavalEnabled;
 
     // An in-memory water clock per client, so no naval battle runs the native patch in the test process. The battle runs
     // as a NavalDLC co-op session, so code that checks the startup decision (the ship fate commit) takes the naval path.
@@ -53,13 +53,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
         builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
     })
     {
-        ModInformation.IsNavalDlcActive = true;
+        ModInformation.IsNavalEnabled = true;
     }
 
     // Puts the startup decision back before the shared environment teardown, so it can't leak into a later test class.
     void IDisposable.Dispose()
     {
-        ModInformation.IsNavalDlcActive = previousNavalDlcActive;
+        ModInformation.IsNavalEnabled = previousNavalEnabled;
         Dispose();
     }
 

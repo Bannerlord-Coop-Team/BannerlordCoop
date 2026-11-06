@@ -29,7 +29,7 @@ internal class PlayerRaftHandler : IHandler
 
     private void Handle_PlayerCharacterChanged(MessagePayload<PlayerCharacterChangedOnServer> obj)
     {
-        if (!ModInformation.IsNavalDlcActive) return;
+        if (!ModInformation.IsNavalEnabled) return;
 
         // Vanilla RaftStateCampaignBehavior.OnPlayerCharacterChanged only looks at MobileParty.MainParty's cache, which the server doesn't have
         raftFleetInterface.OnPlayerCharacterChanged(obj.What.NewPlayerHero, obj.What.NewMainParty);
@@ -37,7 +37,7 @@ internal class PlayerRaftHandler : IHandler
 
     private void Handle(MessagePayload<PlayerPartyReleasedFromCaptivity> obj)
     {
-        if (!ModInformation.IsNavalDlcActive) return;
+        if (!ModInformation.IsNavalEnabled) return;
 
         var party = obj.What.PlayerParty;
 

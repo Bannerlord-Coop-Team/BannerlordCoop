@@ -101,7 +101,7 @@ public class GameInterfaceModule : Module
     internal const string CoopNavalAssemblyName = "Coop.Naval";
 
     // GameInterface's War Sails types that the scanning registrations skip while NavalDLC co-op is off. Load registers its
-    // naval patch category, naval registries and explicit naval registrations behind isNavalDlcActive instead.
+    // naval patch category, naval registries and explicit naval registrations behind isNavalEnabled instead.
     internal static readonly Type[] NavalOnlyTypes =
     {
         typeof(ShipSync),
@@ -130,17 +130,17 @@ public class GameInterfaceModule : Module
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 
-    private readonly bool isNavalDlcActive;
+    private readonly bool isNavalEnabled;
 
     // Turns GameInterface's naval patches and registrations on only while NavalDLC co-op is active.
-    public GameInterfaceModule() : this(ModInformation.IsNavalDlcActive)
+    public GameInterfaceModule() : this(ModInformation.IsNavalEnabled)
     {
     }
 
     // Lets a test harness turn GameInterface's naval services on without loading the optional naval assemblies.
-    public GameInterfaceModule(bool isNavalDlcActive)
+    public GameInterfaceModule(bool isNavalEnabled)
     {
-        this.isNavalDlcActive = isNavalDlcActive;
+        this.isNavalEnabled = isNavalEnabled;
     }
 
     protected override void Load(ContainerBuilder builder)
@@ -164,7 +164,7 @@ public class GameInterfaceModule : Module
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
                            typeof(ICoopCommand).IsAssignableFrom(type) &&
-                           ShouldRegister(type, isNavalDlcActive))
+                           ShouldRegister(type, isNavalEnabled))
             .As(type => type.GetInterfaces()
                 .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
             .As<ICoopCommand>()
@@ -200,7 +200,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         // Only naval battle services use it. Also in the server container, which never opens a naval battle; the patch
         // itself refuses to install on a server.
-        if (isNavalDlcActive)
+        if (isNavalEnabled)
             builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<ChatFactionMembership>().As<IChatFactionMembership>().InstancePerDependency();
@@ -225,7 +225,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
         builder.RegisterType<BattleHostRetentionPolicy>().As<IBattleHostRetentionPolicy>().InstancePerDependency();
-        if (isNavalDlcActive)
+        if (isNavalEnabled)
         {
             builder.RegisterInstance(new HarmonyPatchCategoryRegistration(typeof(GameInterface).Assembly, GameInterface.HARMONY_NAVAL_CATEGORY));
             foreach (var registry in NavalOnlyTypes.Where(RegistryModule.IsAutoRegistry))
@@ -244,7 +244,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
         builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().SingleInstance();
         builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
-        if (isNavalDlcActive)
+        if (isNavalEnabled)
         {
             builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().SingleInstance();
             builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
@@ -315,21 +315,21 @@ public class GameInterfaceModule : Module
 #if DEBUG
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();
 #endif
-        builder.RegisterModule(new ServiceModule(isNavalDlcActive));
+        builder.RegisterModule(new ServiceModule(isNavalEnabled));
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
-        builder.RegisterModule(new AutoSyncModule(isNavalDlcActive));
+        builder.RegisterModule(new AutoSyncModule(isNavalEnabled));
 
         // Coop.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
-        if (ModInformation.IsNavalDlcActive && TryLoadCoopNavalAssembly(out var coopNavalAssembly))
+        if (ModInformation.IsNavalEnabled && TryLoadCoopNavalAssembly(out var coopNavalAssembly))
             builder.RegisterAssemblyModules(coopNavalAssembly);
 
         base.Load(builder);
     }
 
     // Whether a scanned type is registered: everything, except NavalOnlyTypes while NavalDLC co-op is off.
-    internal static bool ShouldRegister(Type type, bool isNavalDlcActive) =>
-        isNavalDlcActive || !NavalOnlyTypes.Contains(type);
+    internal static bool ShouldRegister(Type type, bool isNavalEnabled) =>
+        isNavalEnabled || !NavalOnlyTypes.Contains(type);
 
     // Loads Coop.Naval.dll; startup already loaded it to decide naval support, so only a test host that sets the flag can miss it.
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)

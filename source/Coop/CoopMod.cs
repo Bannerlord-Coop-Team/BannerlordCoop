@@ -95,7 +95,6 @@ namespace Coop
         private static string ClientServerModeMessage = "";
 
         private bool isServer = false;
-        private NavalSupportDecision navalSupport;
         private bool isAutoConnect = false;
         private bool autoConnectArgumentsValid;
         private NetworkConfig autoConnectConfiguration;
@@ -129,10 +128,15 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
-            // Only a server reads warSails from mod-config.json; a mismatch refuses every later host attempt.
-            navalSupport = NavalSupportDetector.ForStartup(
-                moduleInfoProvider, System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location), isServer).Decide();
-            ModInformation.IsNavalDlcActive = navalSupport.IsActive;
+            // The dedicated server sets this itself; without it the module validator refuses NavalDLC on either side.
+            bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
+                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
+            string navalUnsupportedReason = navalModuleEnabled
+                ? new NavalFeatureFlag().GetUnsupportedReason(System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location))
+                : null;
+            if (navalUnsupportedReason != null)
+                Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", navalUnsupportedReason);
+            ModInformation.IsNavalEnabled = navalModuleEnabled && navalUnsupportedReason == null;
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -492,8 +496,7 @@ namespace Coop
             Coop = new CoopartiveMultiplayerExperience(
                 isServer,
                 CrashDiagnostics.SetPhase,
-                activeLogFilePath,
-                navalSupport.HostRefusal);
+                activeLogFilePath);
 
 #if DEBUG
             global::Coop.Core.Common.Commands.JoinDebugCommands.ConfigureClientSessionStarter(

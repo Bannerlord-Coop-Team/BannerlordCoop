@@ -21,7 +21,7 @@ namespace Coop.Tests.Server.States;
 public sealed class InitialServerStateNavalStartupTests : IDisposable
 {
     private readonly bool previousRole = ModInformation.IsServer;
-    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
 
     public InitialServerStateNavalStartupTests()
     {
@@ -31,9 +31,9 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Start_LoadsNavalSaveOnlyWithNavalDlc(bool navalDlcActive)
+    public void Start_LoadsNavalSaveOnlyWithNavalDlc(bool navalEnabled)
     {
-        ModInformation.IsNavalDlcActive = navalDlcActive;
+        ModInformation.IsNavalEnabled = navalEnabled;
         var game = new Mock<IGameStateInterface>();
         using var broker = new MessageBroker();
         using var state = new InitialServerState(Mock.Of<IServerLogic>(), broker, Mock.Of<IRegistryManager>(),
@@ -43,15 +43,15 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
 
         state.Start();
 
-        game.Verify(value => value.LoadGameOrStartNew("MP_Naval"), navalDlcActive ? Times.Once() : Times.Never());
-        game.Verify(value => value.LoadGame("MP"), navalDlcActive ? Times.Never() : Times.Once());
+        game.Verify(value => value.LoadGameOrStartNew("MP_Naval"), navalEnabled ? Times.Once() : Times.Never());
+        game.Verify(value => value.LoadGame("MP"), navalEnabled ? Times.Never() : Times.Once());
         game.VerifyNoOtherCalls();
     }
 
     public void Dispose()
     {
         ModInformation.IsServer = previousRole;
-        ModInformation.IsNavalDlcActive = previousNavalDlc;
+        ModInformation.IsNavalEnabled = previousNavalDlc;
     }
 }
 #endif

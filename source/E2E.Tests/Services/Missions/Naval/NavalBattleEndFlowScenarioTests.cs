@@ -132,16 +132,16 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
             () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalDlcActive = ModInformation.IsNavalDlcActive;
+        bool navalEnabled = ModInformation.IsNavalEnabled;
         try
         {
-            ModInformation.IsNavalDlcActive = true;
+            ModInformation.IsNavalEnabled = true;
             RequestAttack(battle, a, "kept-host-attack");
             RequestAttack(battle, b, "member-attack");
         }
         finally
         {
-            ModInformation.IsNavalDlcActive = navalDlcActive;
+            ModInformation.IsNavalEnabled = navalEnabled;
         }
 
         var replies = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().ToArray();
@@ -172,15 +172,15 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
             () => new MissionInitializerRecord("test-naval")));
         int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
 
-        bool navalDlcActive = ModInformation.IsNavalDlcActive;
+        bool navalEnabled = ModInformation.IsNavalEnabled;
         try
         {
-            ModInformation.IsNavalDlcActive = true;
+            ModInformation.IsNavalEnabled = true;
             RequestAttack(battle, a, "rejoined-host-attack");
         }
         finally
         {
-            ModInformation.IsNavalDlcActive = navalDlcActive;
+            ModInformation.IsNavalEnabled = navalEnabled;
         }
 
         var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()

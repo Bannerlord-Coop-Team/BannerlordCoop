@@ -132,9 +132,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   in `NavalMissionModule`. That module is loaded only while NavalDLC is active.
 - The `CoopNavalDlc` MSBuild property (`source/Directory.Build.props`, default: War Sails is installed) decides whether
   `Missions.Naval`/`Coop.Naval` compile and ship. When it's false they build empty and `Coop`/`Coop.Tests` skip them.
-- `ModInformation.IsNavalDlcActive` is set once at startup: NavalDLC enabled, a `TESTER` build with the naval code, and
-  both naval assemblies loading. A server also needs `warSails` in `mod-config.json` to match NavalDLC, otherwise it
-  refuses to host; clients never read `warSails`. The
+- `ModInformation.IsNavalEnabled` is set once at startup, like `IsServer`. `CoopMod` turns it on when NavalDLC is enabled
+  and `NavalFeatureFlag` says this build can run it: a `TESTER` build with the naval code and both naval assemblies loading.
+  The dedicated server sets it from its own `warSails` setting and refuses to start when this build can't run it. Nothing
+  in Coop reads `warSails`. The
   module validator, the host warning and the server's naval battle gate all read it, so a build without the naval code
   rejects NavalDLC clients as before.
 - `NavalBattleServices` composes the ship services per mission and ticks them in a fixed order: ships, fate reports,

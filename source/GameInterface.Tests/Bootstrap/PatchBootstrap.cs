@@ -39,7 +39,7 @@ internal class PatchBootstrap : IDisposable
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
         // GameInterface's naval sync is tested here too, without loading the optional naval assemblies.
-        builder.RegisterModule(new GameInterfaceModule(isNavalDlcActive: true));
+        builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
 
         builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
 

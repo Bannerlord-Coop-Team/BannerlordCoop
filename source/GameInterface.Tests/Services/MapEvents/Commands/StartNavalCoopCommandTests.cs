@@ -17,14 +17,14 @@ public class StartNavalCoopCommandTests
     [InlineData(true, true, "The players must be different.", "PlayerOne", "PlayerOne")]
     [InlineData(true, true, "The players must be different.", "PlayerOne", "PlayerTwo", "PlayerThree", "PlayerTwo")]
     public void ProcessCommand_RejectsInvalidRequestsBeforeTouchingTheCampaign(
-        bool isServer, bool navalDlcActive, string expectedOutput, params string[] args)
+        bool isServer, bool navalEnabled, string expectedOutput, params string[] args)
     {
         bool originalIsServer = ModInformation.IsServer;
-        bool originalNavalDlcActive = ModInformation.IsNavalDlcActive;
+        bool originalNavalEnabled = ModInformation.IsNavalEnabled;
         try
         {
             ModInformation.IsServer = isServer;
-            ModInformation.IsNavalDlcActive = navalDlcActive;
+            ModInformation.IsNavalEnabled = navalEnabled;
 
             // No staging: a refusal never reaches the campaign moves.
             var result = new StartNavalCoopCommand(staging: null).ProcessCommand(new TestArgs(args));
@@ -35,7 +35,7 @@ public class StartNavalCoopCommandTests
         finally
         {
             ModInformation.IsServer = originalIsServer;
-            ModInformation.IsNavalDlcActive = originalNavalDlcActive;
+            ModInformation.IsNavalEnabled = originalNavalEnabled;
         }
     }
 

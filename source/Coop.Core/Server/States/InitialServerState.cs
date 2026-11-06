@@ -94,7 +94,7 @@ public class InitialServerState : ServerStateBase
         loadingInterface.ShowLoadingScreen();
         // The MP dev save predates NavalDLC, so a NavalDLC server loads MP_Naval instead, or starts a new campaign on a machine
         // that has no MP_Naval save.
-        if (ModInformation.IsNavalDlcActive)
+        if (ModInformation.IsNavalEnabled)
             gameStateInterface.LoadGameOrStartNew("MP_Naval");
         else
             gameStateInterface.LoadGame("MP");

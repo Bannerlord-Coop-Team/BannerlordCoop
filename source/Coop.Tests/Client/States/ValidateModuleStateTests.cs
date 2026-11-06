@@ -27,7 +27,7 @@ namespace Coop.Tests.Client.States
     [Collection(ModInformationRoleCollection.Name)]
     public class ValidateModuleStateTests : IDisposable
     {
-        private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
+        private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
@@ -47,7 +47,7 @@ namespace Coop.Tests.Client.States
             // the logic (and thus the current state) so that timer is torn down with the test instead of
             // lingering and firing TimeoutValidation on a stale state after the test has finished.
             clientLogic.Dispose();
-            ModInformation.IsNavalDlcActive = previousNavalDlc;
+            ModInformation.IsNavalEnabled = previousNavalDlc;
         }
 
         [Fact]
@@ -121,14 +121,10 @@ namespace Coop.Tests.Client.States
         }
 
         // The same build string can come from a build without TESTER or CoopNavalDlc, or with the naval assemblies deleted.
-        [Theory]
-        [InlineData(false, true, true)]
-        [InlineData(true, false, true)]
-        [InlineData(true, true, false)]
-        public void NetworkModuleVersionsValidated_NavalIncapableClient_RefusesWithTheReason(
-            bool testerBuild, bool navalCodeBuilt, bool assembliesShipped)
+        [Fact]
+        public void NetworkModuleVersionsValidated_NavalIncapableClient_RefusesWithTheReason()
         {
-            var validateState = StateWithNavalDlc(testerBuild, navalCodeBuilt, assembliesShipped);
+            var validateState = StateWithNavalDlc(navalEnabled: false);
 
             validateState.Handle_NetworkModuleVersionsValidated(new MessagePayload<NetworkModuleVersionsValidated>(
                 this, new NetworkModuleVersionsValidated(true, null)));
@@ -142,7 +138,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void NetworkModuleVersionsValidated_NavalCapableClient_ContinuesValidation()
         {
-            var validateState = StateWithNavalDlc(testerBuild: true, navalCodeBuilt: true, assembliesShipped: true);
+            var validateState = StateWithNavalDlc(navalEnabled: true);
 
             validateState.Handle_NetworkModuleVersionsValidated(new MessagePayload<NetworkModuleVersionsValidated>(
                 this, new NetworkModuleVersionsValidated(true, null)));
@@ -151,17 +147,13 @@ namespace Coop.Tests.Client.States
             Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>());
         }
 
-        // Builds the state for a client with NavalDLC loaded, with naval support decided by the real startup detector.
-        private ValidateModuleState StateWithNavalDlc(bool testerBuild, bool navalCodeBuilt, bool assembliesShipped)
+        // Builds the state for a client with NavalDLC loaded, with War Sails on or off.
+        private ValidateModuleState StateWithNavalDlc(bool navalEnabled)
         {
             var modules = new[] { new ModuleInfo(ModInformation.NavalDlcModuleId, true, true, default) };
             var moduleInfoProvider = new Mock<IModuleInfoProvider>();
             moduleInfoProvider.Setup(provider => provider.GetModuleInfos()).Returns(modules);
-            var featureFlag = new Mock<INavalFeatureFlag>();
-            featureFlag.SetupGet(flag => flag.IsEnabled).Returns(testerBuild);
-            featureFlag.SetupGet(flag => flag.IsNavalCodeBuilt).Returns(navalCodeBuilt);
-            ModInformation.IsNavalDlcActive = new NavalSupportDetector(moduleInfoProvider.Object, featureFlag.Object,
-                _ => assembliesShipped, Mock.Of<IWarSailsSetting>(), isHost: false).Decide().IsActive;
+            ModInformation.IsNavalEnabled = navalEnabled;
 
             var validateState = new ValidateModuleState(
                 clientLogic,

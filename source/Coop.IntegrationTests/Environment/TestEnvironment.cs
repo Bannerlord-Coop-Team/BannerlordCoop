@@ -83,7 +83,7 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         // Naval server handlers stay on here, like GameInterface's naval sync below.
-        builder.RegisterModule(new ServerModule(isNavalDlcActive: true));
+        builder.RegisterModule(new ServerModule(isNavalEnabled: true));
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 
@@ -112,7 +112,7 @@ public class TestEnvironment
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
         // GameInterface's naval sync is tested here too, without loading the optional naval assemblies.
-        builder.RegisterModule(new GameInterfaceModule(isNavalDlcActive: true));
+        builder.RegisterModule(new GameInterfaceModule(isNavalEnabled: true));
 
         builder.RegisterInstance(Logger).As<ILogger>().SingleInstance();
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();

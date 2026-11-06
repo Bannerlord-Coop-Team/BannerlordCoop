@@ -191,7 +191,7 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "validate naval battle";
-                if (!IsNavalBattleAdmitted(mapEvent.IsNavalMapEvent, ModInformation.IsNavalDlcActive))
+                if (!IsNavalBattleAdmitted(mapEvent.IsNavalMapEvent, ModInformation.IsNavalEnabled))
                 {
                     Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles need NavalDLC and the coop naval code on the server", payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
@@ -964,10 +964,10 @@ internal class BattleMissionStartHandler : IHandler
         if (spawnGateEngaged) BattleSpawnGate.EndBattle();
     }
 
-    // A naval battle opens only where NavalDLC is enabled and the coop naval code shipped (ModInformation.IsNavalDlcActive).
-    internal static bool IsNavalBattleAdmitted(bool isNavalMapEvent, bool navalDlcActive)
+    // A naval battle opens only where NavalDLC is enabled and the coop naval code shipped (ModInformation.IsNavalEnabled).
+    internal static bool IsNavalBattleAdmitted(bool isNavalMapEvent, bool navalEnabled)
     {
-        return !isNavalMapEvent || navalDlcActive;
+        return !isNavalMapEvent || navalEnabled;
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

@@ -17,17 +17,17 @@ internal class ServiceModule : Module
 
     private const string NAMESPACE = "GameInterface";
 
-    private readonly bool isNavalDlcActive;
+    private readonly bool isNavalEnabled;
 
     // Lets GameInterfaceModule pass whether naval handlers and game abstractions are registered.
-    public ServiceModule(bool isNavalDlcActive)
+    public ServiceModule(bool isNavalEnabled)
     {
-        this.isNavalDlcActive = isNavalDlcActive;
+        this.isNavalEnabled = isNavalEnabled;
     }
 
     protected override void Load(ContainerBuilder builder)
     {
-        foreach (var type in GetHandlers().Where(t => GameInterfaceModule.ShouldRegister(t, isNavalDlcActive)))
+        foreach (var type in GetHandlers().Where(t => GameInterfaceModule.ShouldRegister(t, isNavalEnabled)))
         {
             if (type == typeof(LocationConversationTracker))
             {
@@ -47,7 +47,7 @@ internal class ServiceModule : Module
             builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
-        foreach (var type in GetGameAbstractions().Where(t => GameInterfaceModule.ShouldRegister(t, isNavalDlcActive)))
+        foreach (var type in GetGameAbstractions().Where(t => GameInterfaceModule.ShouldRegister(t, isNavalEnabled)))
         {
             var interfaceToRegister = type.GetInterfaces().SingleOrDefault(
                 i => typeof(IGameAbstraction).IsAssignableFrom(i) &&

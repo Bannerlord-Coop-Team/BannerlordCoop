@@ -11,9 +11,9 @@ public class BattleMissionStartHandlerTests
     [InlineData(false, false, true)]
     [InlineData(true, false, false)]
     [InlineData(true, true, true)]
-    public void IsNavalBattleAdmitted_RequiresNavalDlcOnlyForNavalMapEvents(bool isNaval, bool navalDlcActive, bool expected)
+    public void IsNavalBattleAdmitted_RequiresNavalDlcOnlyForNavalMapEvents(bool isNaval, bool navalEnabled, bool expected)
     {
-        Assert.Equal(expected, BattleMissionStartHandler.IsNavalBattleAdmitted(isNaval, navalDlcActive));
+        Assert.Equal(expected, BattleMissionStartHandler.IsNavalBattleAdmitted(isNaval, navalEnabled));
     }
 
     [Fact]

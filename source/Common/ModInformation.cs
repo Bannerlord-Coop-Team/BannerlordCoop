@@ -20,11 +20,8 @@ public static class ModInformation
     /// <summary>The naval campaign assembly, shipped only by a build made with War Sails (CoopNavalDlc).</summary>
     public const string CoopNavalAssemblyFile = "Coop.Naval.dll";
 
-    /// <summary>
-    /// Whether this process supports NavalDLC: the module is enabled, this is a TESTER build and the coop naval code shipped.
-    /// Set once at startup from NavalSupportDetector; the module validator, host warning and battle gate read it.
-    /// </summary>
-    public static bool IsNavalDlcActive { get; set; }
+    /// <summary>Whether War Sails co-op runs in this process. Set at startup by CoopMod or the dedicated server, like <see cref="IsServer"/>.</summary>
+    public static bool IsNavalEnabled { get; set; } = false;
 
     /// <summary>
     /// The mod build stamped on this assembly. Its semantic version comes from the same build

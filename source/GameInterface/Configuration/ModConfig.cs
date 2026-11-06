@@ -69,7 +69,7 @@ internal sealed class ModConfig : IModConfig
     /// <summary>modOptions keys added after configs shipped, seeded with a short comment into a file that has a modOptions block.</summary>
     private static readonly (string Key, JToken Default, string Comment)[] SeededModOptions =
     {
-        ("warSails", false, "// Toggle War Sails (NavalDLC) co-op. Not officially supported yet; see mod-config.default.json."),
+        ("warSails", false, "// Toggle War Sails (NavalDLC) co-op on a dedicated server. Not officially supported yet; see mod-config.default.json."),
     };
 
     private static readonly ILogger Logger = LogManager.GetLogger<ModConfig>();
