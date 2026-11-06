@@ -6,7 +6,6 @@ using Newtonsoft.Json;
 #endif
 using HarmonyLib;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.MountAndBlade;
 
@@ -69,8 +68,7 @@ internal class CoopEmptyTeamDeploymentPatch
 
         foreach (var instruction in instructions)
         {
-            if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
-                && instruction.operand is MethodInfo method && method == isPlanMade)
+            if (instruction.Calls(isPlanMade))
             {
                 instruction.opcode = OpCodes.Call;
                 instruction.operand = spawnGate;
