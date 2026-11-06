@@ -147,7 +147,6 @@ internal class HideoutCampaignBehaviorPatch
 
     private static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        // The menu refreshes after the encounter closes, so the encountered battle may be gone
         PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
         var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? encounteredBattle;
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
@@ -285,7 +284,7 @@ internal class HideoutJoinEncounterOptionsPatch
     {
         if (ModInformation.IsServer) return true;
 
-        // Native reads EncounteredBattle, which throws without an encountered party, so hide the option until the server sets it up
+        // Vanilla throws here until the server sets up the encounter
         if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var battle))
         {
             __result = false;
