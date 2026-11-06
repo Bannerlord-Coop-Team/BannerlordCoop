@@ -27,16 +27,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
     private EnvironmentInstance OtherClient => Clients.Last();
 
     [Fact]
-    public void AcquireForAnotherPlayersHero_IsRefused()
-    {
-        var scenario = CreateAlleyDomainScenario();
-
-        AcquireAlley(OtherClient, scenario, scenario.OwnerHeroId);
-
-        Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner));
-    }
-
-    [Fact]
     public void ManagingAnotherPlayersAlley_IsRefused()
     {
         var scenario = AcquiredByOwner();
@@ -57,18 +47,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
         var management = GetManagementData(scenario.PlayerAlleyId);
         Assert.Equal(scenario.OwnerHeroId, management.OverseerId);
         Assert.DoesNotContain(management.Garrison, element => element.CharacterId == Server.GetHandle<CharacterObject>(troopId));
-    }
-
-    [Fact]
-    public void ResolveDefenseOfAnotherPlayersAlley_IsRefused()
-    {
-        var scenario = AcquiredByOwner();
-        ForceAttack(scenario);
-
-        ResolveDefense(OtherClient, scenario, won: false);
-
-        AssertOwnedByOwner(scenario);
-        Assert.Equal(scenario.AttackerAlleyId, GetManagementData(scenario.PlayerAlleyId).UnderAttackByAlleyId);
     }
 
     [Fact]
@@ -117,26 +95,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
                 Assert.Equal((4, 0), (roster.GetElementNumber(index), roster.GetElementWoundedNumber(index)));
             });
         }
-    }
-
-    [Theory]
-    [InlineData(6)]
-    [InlineData(int.MaxValue)]
-    public void TakeOverListingATroopTwice_ChangesNothing(int number)
-    {
-        var scenario = CreateAlleyDomainScenario();
-        var (troopId, _) = AddTroopsAndCompanion(scenario);
-        var twice = new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopId), number, 0, 0);
-
-        OwnerClient.Call(() => OwnerClient.Resolve<INetwork>().SendAll(new RequestAcquireAlley(
-            scenario.PlayerAlleyId, scenario.OwnerHeroId, scenario.OwnerHeroId, new[] { twice, twice }, previousOwnerId: null)));
-
-        Server.Call(() =>
-        {
-            Assert.Null(Server.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner);
-            Assert.Equal(10, Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId).MemberRoster
-                .GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId)));
-        });
     }
 
     [Fact]

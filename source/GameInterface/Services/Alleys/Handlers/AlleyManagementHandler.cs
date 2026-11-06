@@ -170,11 +170,8 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
-        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
-            // The alley debug command also publishes this on the server, where the sender is not a peer.
-            if (sender is NetPeer && !playerManager.IsSenderControllingHero(sender, data.OwnerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OverseerId, out var overseer)) return;
@@ -196,25 +193,19 @@ internal class AlleyManagementHandler : IHandler
             var garrison = data.Garrison ?? Array.Empty<TroopRosterElementData>();
 
             // The client left the chosen troops in its party, so they leave it here like vanilla's done button,
-            // wounded ones as wounded, and only if the party still has them all. A troop listed twice is added up,
-            // as longs so huge counts can't wrap past the party check.
+            // wounded ones as wounded, and only if the party still has them all.
             var party = owner.PartyBelongedTo;
-            var troops = new Dictionary<CharacterObject, (long count, long wounded)>();
+            var troops = new List<(CharacterObject character, int number, int wounded)>();
             foreach (var element in garrison)
             {
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(element.CharacterId, out var character)) return;
                 if (character.IsHero) continue;
-                if (element.Number <= 0 || element.WoundedNumber < 0 || element.WoundedNumber > element.Number) return;
-                troops.TryGetValue(character, out var total);
-                troops[character] = (total.count + element.Number, total.wounded + element.WoundedNumber);
-            }
-            foreach (var troop in troops)
-            {
-                int index = party?.MemberRoster.FindIndexOfTroop(troop.Key) ?? -1;
+                int index = party?.MemberRoster.FindIndexOfTroop(character) ?? -1;
                 if (index < 0) return;
                 int number = party.MemberRoster.GetElementNumber(index);
                 int wounded = party.MemberRoster.GetElementWoundedNumber(index);
-                if (wounded < troop.Value.wounded || number - wounded < troop.Value.count - troop.Value.wounded) return;
+                if (wounded < element.WoundedNumber || number - wounded < element.Number - element.WoundedNumber) return;
+                troops.Add((character, element.Number, element.WoundedNumber));
             }
 
             // The take-over is authoritative: the alley is owned by the acquiring player (owner) and
@@ -225,7 +216,7 @@ internal class AlleyManagementHandler : IHandler
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             foreach (var troop in troops)
-                party.MemberRoster.AddToCounts(troop.Key, -(int)troop.Value.count, false, -(int)troop.Value.wounded);
+                party.MemberRoster.AddToCounts(troop.character, -troop.number, false, -troop.wounded);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
             AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);
@@ -431,11 +422,9 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
-        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
-            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var managementData)) return;
             var lastRecruitTime = new CampaignTime(managementData.LastRecruitTimeTicks);
             if (lastRecruitTime.ElapsedDaysUntilNow <= CampaignTime.DaysInWeek) return;

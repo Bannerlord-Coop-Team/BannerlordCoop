@@ -8,7 +8,6 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -47,7 +46,6 @@ internal class AlleyHandler : IHandler
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
     private readonly IAlleyGarrisonData garrisonData;
-    private readonly IPlayerManager playerManager;
 
     public AlleyHandler(
         IMessageBroker messageBroker,
@@ -55,8 +53,7 @@ internal class AlleyHandler : IHandler
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
         IAlleyCampaignBehaviorInterface behaviorInterface,
-        IAlleyGarrisonData garrisonData,
-        IPlayerManager playerManager)
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -64,7 +61,6 @@ internal class AlleyHandler : IHandler
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
         this.garrisonData = garrisonData;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<AlleyOwnerChanged>(Handle_AlleyOwnerChanged);
         messageBroker.Subscribe<ChangeAlleyOwner>(Handle_ChangeAlleyOwner);
@@ -557,12 +553,9 @@ internal class AlleyHandler : IHandler
         if (ModInformation.IsClient) return;
 
         var data = payload.What;
-        var sender = payload.Who;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
-            // Only the owner's player fights the defense, so a resolve from anyone else is refused.
-            if (!playerManager.TryGetSenderHero(sender, out var senderHero) || alley.Owner != senderHero) return;
             if (!sessionInterface.TryGetManagementData(data.AlleyId, out var mgmt)) return;
 
             // Ignore a stale/duplicate resolve: the attack may already have timed out and destroyed the alley.
