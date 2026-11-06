@@ -5,7 +5,6 @@ using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Actions;
@@ -20,18 +19,15 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public ChangeProductionTypeOfWorkshopHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<ProductionTypeOfWorkshopChanged>(Handle_ProductionTypeOfWorkshopChanged);
         messageBroker.Subscribe<ChangeProductionTypeOfWorkshop>(Handle_ChangeProductionTypeOfWorkshop);
@@ -58,12 +54,6 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
             if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
-
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
-            {
-                Logger.Warning("Ignoring a production change for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
-                return;
-            }
 
             ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType);
 

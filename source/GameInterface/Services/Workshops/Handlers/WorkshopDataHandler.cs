@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -20,18 +19,15 @@ internal class WorkshopDataHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public WorkshopDataHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         // Server => Clients
         messageBroker.Subscribe<NewWorkshopDataAdded>(Handle_NewWorkshopDataAdded);
@@ -184,11 +180,6 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
-            {
-                Logger.Warning("Ignoring a warehouse setting for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
-                return;
-            }
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetIsGettingInputsFromWarehouse(workshop, obj.What.IsActive);
 
@@ -225,11 +216,6 @@ internal class WorkshopDataHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || workshop.Owner != senderHero)
-            {
-                Logger.Warning("Ignoring a warehouse setting for {WorkshopId} from a peer that does not own it", obj.What.WorkshopId);
-                return;
-            }
 
             Campaign.Current.GetCampaignBehavior<IWorkshopWarehouseCampaignBehavior>().SetStockProductionInWarehouseRatio(workshop, obj.What.ProgressToAdd);
 

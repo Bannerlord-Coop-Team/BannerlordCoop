@@ -166,7 +166,6 @@ internal class CaravansConversationsHandler : IHandler
     private void Handle_NetworkApplyHostileCaravanInteraction(MessagePayload<NetworkApplyHostileCaravanInteraction> obj)
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
-        if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -244,7 +243,6 @@ internal class CaravansConversationsHandler : IHandler
     private void Handle_NetworkCaravanLootedLeaveOnConsequence(MessagePayload<NetworkCaravanLootedLeaveOnConsequence> obj)
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
-        if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -286,7 +284,6 @@ internal class CaravansConversationsHandler : IHandler
     private void Handle_NetworkCaravanSurrenderLeaveOnConsequence(MessagePayload<NetworkCaravanSurrenderLeaveOnConsequence> obj)
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
-        if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
 
         GameThread.RunSafe(() =>
         {
@@ -328,7 +325,6 @@ internal class CaravansConversationsHandler : IHandler
     private void Handle_NetworkCaravanTookPrisonerOnConsequence(MessagePayload<NetworkCaravanTookPrisonerOnConsequence> obj)
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
-        if (!playerManager.IsSenderControllingParty(obj.Who, obj.What.MainPartyId)) return;
 
         GameThread.RunSafe(() =>
         {

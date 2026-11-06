@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Clans;
-using GameInterface.Services.Players;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Handlers;
@@ -445,8 +443,6 @@ public class TradeHandlerTests
             Mock.Of<IMessageBroker>(),
             objectManager,
             Mock.Of<INetwork>(),
-            Mock.Of<IVillageHostileActionInterface>(),
-            Mock.Of<IPlayerManager>(),
-            Mock.Of<ICoopClanPermissions>());
+            Mock.Of<IVillageHostileActionInterface>());
     }
 }

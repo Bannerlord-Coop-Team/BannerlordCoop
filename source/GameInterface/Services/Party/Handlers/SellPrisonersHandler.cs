@@ -1,15 +1,12 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.GameMenus.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
-using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using static GameInterface.Services.ObjectManager.ObjectManager;
@@ -18,14 +15,11 @@ namespace GameInterface.Services.Party.Handlers;
 
 internal class SellPrisonersHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<SellPrisonersHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPrisonerSaleProcessor prisonerSaleProcessor;
-    private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
 
     public SellPrisonersHandler(
@@ -34,7 +28,6 @@ internal class SellPrisonersHandler : IHandler
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
         IPrisonerSaleProcessor prisonerSaleProcessor,
-        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -42,7 +35,6 @@ internal class SellPrisonersHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.prisonerSaleProcessor = prisonerSaleProcessor;
-        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<PrisonersSold>(Handle_PrisonersSold);
@@ -70,12 +62,6 @@ internal class SellPrisonersHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.SellingPartyId, out var sellingParty)) return;
-            // Only the selling player's own party sells its prisoners
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.Party != sellingParty)
-            {
-                logger.Warning("Ignoring a prisoner sale for {PartyId} from a peer whose party it is not", obj.What.SellingPartyId);
-                return;
-            }
 
             TroopRoster leftPrisonerRoster = new();
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);

@@ -208,7 +208,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
         {
             RegisterPlayerHero(client, secondBuyerId, "WorkshopBuyerTwo");
         }
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("WorkshopBuyerTwo", secondClient.NetPeer));
         PrepareBuyer(secondBuyerId, 1000);
         ClearMessages(Server);
         foreach (var client in Clients)
@@ -341,8 +340,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
         {
             RegisterPlayerHero(client, buyerId);
         }
-        // The server only applies a purchase from the buyer's own peer.
-        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(BuyerControllerId, Clients.First().NetPeer));
 
         PrepareInstance(Server, state, workshopOwnedByBuyer, buyerGold, sellerGold);
         foreach (var client in Clients)

@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -51,8 +49,6 @@ public class MerchantTradeTests : IDisposable
         var partyBId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyAId, partyBId }, (grainId, 10), (shieldId, 5));
-        RegisterTrader(clientA, partyAId, "TraderA");
-        RegisterTrader(clientB, partyBId, "TraderB");
 
         // B finishes trading against the opening stock and gold, but its commit reaches the server after A's
         var tradeB = CaptureTrade(clientB, merchantRosterId, townId, partyBId,
@@ -115,7 +111,6 @@ public class MerchantTradeTests : IDisposable
         }
 
         var merchantRosterId = SetUpMerchant(settlementId, townId, new[] { partyId }, (grainId, 10));
-        RegisterTrader(client, partyId, "Trader");
 
         // Buys 1 grain for 10 with nothing in the party's inventory yet
         var trade = CaptureTrade(client, merchantRosterId, townId, partyId,
@@ -156,18 +151,6 @@ public class MerchantTradeTests : IDisposable
                 Assert.Equal(110, instance.GetRegisteredObject<Town>(townId).Gold);
             });
         }
-    }
-
-    // The server only applies a trade from the trading player's own peer.
-    private void RegisterTrader(EnvironmentInstance client, string partyId, string controllerId)
-    {
-        Server.Call(() =>
-        {
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(Server.ObjectManager.TryGetId(Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero, out var heroId));
-            Assert.True(playerManager.AddPlayer(new Player(controllerId, heroId, partyId, null, null)));
-            playerManager.SetPeer(controllerId, client.NetPeer);
-        });
     }
 
     // Gives the merchant the same opening stock and 100 gold everywhere, and each trading party 1000 gold

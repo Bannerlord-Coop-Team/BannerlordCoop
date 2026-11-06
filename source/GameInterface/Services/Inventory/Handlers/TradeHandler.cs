@@ -11,8 +11,6 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Clans;
-using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
@@ -40,8 +38,6 @@ internal class TradeHandler : IHandler
     private readonly INetwork network;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly ISendCoalescer sendCoalescer;
-    private readonly IPlayerManager playerManager;
-    private readonly ICoopClanPermissions permissions;
     private bool warnedMissingCoalescer;
 
     public TradeHandler(
@@ -50,8 +46,6 @@ internal class TradeHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IVillageHostileActionInterface villageHostileActionInterface,
-        IPlayerManager playerManager,
-        ICoopClanPermissions permissions,
         ISendCoalescer sendCoalescer = null)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
@@ -60,8 +54,6 @@ internal class TradeHandler : IHandler
         this.network = network;
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.sendCoalescer = sendCoalescer;
-        this.playerManager = playerManager;
-        this.permissions = permissions;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
@@ -156,13 +148,6 @@ internal class TradeHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
-            // The inventory is the sender's own party's, or a clan party its leader manages
-            if (!playerManager.TryGetSenderHero(peer, out var senderHero) ||
-                (senderHero.PartyBelongedTo != ownerParty && !permissions.CanManageParty(senderHero, ownerParty)))
-            {
-                logger.Warning("Ignoring a trade for party {PartyId} from a peer that cannot use its inventory", message.OwnerPartyId);
-                return;
-            }
 
             SettlementComponent currentSettlementComponent = null;
             if (!message.IsSettlementComponentNull &&

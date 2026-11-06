@@ -6,7 +6,6 @@ using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -20,18 +19,15 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly IPlayerManager playerManager;
 
     public ChangeOwnerOfWorkshopHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network,
-        IPlayerManager playerManager)
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        this.playerManager = playerManager;
 
         messageBroker.Subscribe<WorkshopOwnerChanged>(Handle_WorkshopOwnerChanged);
         messageBroker.Subscribe<ChangeWorkshopOwner>(Handle_ChangeWorkshopOwner);
@@ -66,12 +62,6 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Workshop>(data.WorkshopId, out var workshop)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewOwnerId, out var newOwner)) return;
             if (!objectManager.TryGetObjectWithLogging<WorkshopType>(data.WorkshopTypeId, out var workshopType)) return;
-            // A player buys as the new owner or sells as the current one
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || (senderHero != newOwner && senderHero != workshop.Owner))
-            {
-                Logger.Warning("Ignoring a workshop owner change for {WorkshopId} from a peer that is neither buyer nor seller", data.WorkshopId);
-                return;
-            }
 
             var currentOwner = workshop.Owner;
             if (currentOwner == newOwner)

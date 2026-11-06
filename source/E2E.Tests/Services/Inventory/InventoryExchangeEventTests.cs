@@ -1,6 +1,4 @@
-﻿using GameInterface.Services.Players.Data;
-using GameInterface.Services.Players;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -54,11 +52,6 @@ public class InventoryExchangeEventTests : IDisposable
             hero.Gold = 1000;
             Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
             Server.Resolve<ISessionTradePlayerDataInterface>().AddPlayerKeys(heroId);
-
-            // The server only applies a trade from the trading player's own peer.
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("Trader", heroId, partyId, null, null)));
-            playerManager.SetPeer("Trader", Trader.NetPeer);
 
             var merchantRoster = Server.GetRegisteredObject<ItemRoster>(rosterId!);
             merchantRoster.Clear();
