@@ -1,9 +1,13 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
+using Common.Util;
+using GameInterface;
 using Missions;
 using Moq;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.Engine;
 using Missions.Battles;
@@ -58,8 +62,9 @@ public class SiegeMachineSimulationTests : IDisposable
         session.SetupGet(value => value.HostEpoch).Returns(5);
         session.Setup(value => value.IsHostController(It.IsAny<string>()))
             .Returns((string controller) => controller == "host");
+        var authority = new SiegeMachineAuthorityRegistry();
         using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
-            session.Object, Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+            session.Object, Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), authority);
 #pragma warning disable SYSLIB0050
         var machine = (UsableMachine)FormatterServices.GetUninitializedObject(
             ranged ? typeof(Ballista) : typeof(ManagedStonePile));
@@ -78,51 +83,49 @@ public class SiegeMachineSimulationTests : IDisposable
         int weaponState = (int)RangedSiegeWeapon.WeaponState.ReloadingPaused;
         int id = machine.Id.Id;
         if (machine is ManagedStonePile initialPile) initialPile.SetAmmo(6);
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
-        try
-        {
-            broker.Publish(this, new NetworkSiegeMachineAuthority(id, "claimant", hostEpoch: 5,
-                authorityRevision: 4, senderControllerId: "host"));
-            broker.Publish(this, new NetworkSiegeMachineState(id, -1f, -1, -1, -1, -1f,
-                false, ranged ? weaponState : -1, 0.75f, 0.25f, hostEpoch: 5,
-                stoneAmmo: ranged ? -1 : 7, senderControllerId: "claimant", authorityRevision: 4));
-            GameThread.Run(() => { }, blocking: true);
-            var pending = ReadField<Dictionary<int, NetworkSiegeMachineState>>(replicator, "pendingByMachineId");
-            Assert.Single(pending);
-            Assert.False(SiegeMissionAuthorityGate.TryGetRemoteAim(id, out _, out _));
-            var animations = ReadField<Dictionary<int, int>>(replicator, "peerWeaponState");
-            Assert.Empty(animations);
+        broker.Publish(this, new NetworkSiegeMachineAuthority(id, "claimant", hostEpoch: 5,
+            authorityRevision: 4, senderControllerId: "host"));
+        broker.Publish(this, new NetworkSiegeMachineState(id, -1f, -1, -1, -1, -1f,
+            false, ranged ? weaponState : -1, 0.75f, 0.25f, hostEpoch: 5,
+            stoneAmmo: ranged ? -1 : 7, senderControllerId: "claimant", authorityRevision: 4));
+        GameThread.Run(() => { }, blocking: true);
+        var pending = ReadField<Dictionary<int, NetworkSiegeMachineState>>(replicator, "pendingByMachineId");
+        Assert.Single(pending);
+        Assert.False(authority.TryGetRemoteAim(id, out _, out _));
+        var animations = ReadField<Dictionary<int, int>>(replicator, "peerWeaponState");
+        Assert.Empty(animations);
 
-            ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[id] = machine;
-            var drain = typeof(SiegeMachineStateReplicator).GetMethod("DrainPendingMachineStates",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(drain);
-            GameThread.Run(() => drain.Invoke(replicator, Array.Empty<object>()), blocking: true);
-
-            Assert.Empty(pending);
-            Assert.False(SiegeMissionAuthorityGate.SuppressCapture);
-            Assert.True(SiegeMissionAuthorityGate.TryGetRemoteAim(id, out float direction, out float releaseAngle));
-            Assert.Equal(0.75f, direction);
-            Assert.Equal(0.25f, releaseAngle);
-            if (machine is ManagedStonePile pile) Assert.Equal(7, pile.AmmoCount);
-            else
-            {
-                Assert.Equal(weaponState, animations[id]);
-                Assert.Same(skeleton, Assert.Single(PausedSkeletons));
-            }
-            SiegeMissionAuthorityGate.SetRemoteAim(id, 0.5f, 0.1f);
-            GameThread.Run(() => drain.Invoke(replicator, Array.Empty<object>()), blocking: true);
-            Assert.True(SiegeMissionAuthorityGate.TryGetRemoteAim(id, out direction, out _));
-            Assert.Equal(0.5f, direction);
-            if (ranged) Assert.Same(skeleton, Assert.Single(PausedSkeletons));
-        }
-        finally
+        ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[id] = machine;
+        var drain = typeof(SiegeMachineStateReplicator).GetMethod("DrainPendingMachineStates",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(drain);
+        bool allowedAfterDrain = true;
+        GameThread.Run(() =>
         {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
+            drain.Invoke(replicator, Array.Empty<object>());
+            allowedAfterDrain = AllowedThread.IsThisThreadAllowed();
+        }, blocking: true);
+
+        Assert.Empty(pending);
+        Assert.False(allowedAfterDrain);
+        Assert.True(authority.TryGetRemoteAim(id, out float direction, out float releaseAngle));
+        Assert.Equal(0.75f, direction);
+        Assert.Equal(0.25f, releaseAngle);
+        if (machine is ManagedStonePile pile)
+        {
+            Assert.Equal(7, pile.AmmoCount);
+            Assert.True(pile.LastAmmoMeshUpdateWasAllowed);
         }
+        else
+        {
+            Assert.Equal(weaponState, animations[id]);
+            Assert.Same(skeleton, Assert.Single(PausedSkeletons));
+        }
+        authority.SetRemoteAim(id, 0.5f, 0.1f);
+        GameThread.Run(() => drain.Invoke(replicator, Array.Empty<object>()), blocking: true);
+        Assert.True(authority.TryGetRemoteAim(id, out direction, out _));
+        Assert.Equal(0.5f, direction);
+        if (ranged) Assert.Same(skeleton, Assert.Single(PausedSkeletons));
     }
 
     private static T ReadField<T>(SiegeMachineStateReplicator replicator, string name) =>
@@ -230,24 +233,12 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning restore SYSLIB0050
         pile.SetAmmo(6);
         int machineId = pile.Id.Id;
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.SetClaimedMachines(
-            localSimulator ? new HashSet<int> { machineId } : new HashSet<int>(), new HashSet<int>());
-        try
-        {
-            var snapshot = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, -1f,
-                false, -1, -1000f, -1000f, stoneAmmo: 7);
-            var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(apply);
-            apply.Invoke(null, new object[] { pile, snapshot });
-            Assert.Equal(expectedAmmo, pile.AmmoCount);
-        }
-        finally
-        {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-        }
+        var snapshot = new NetworkSiegeMachineState(machineId, -1f, -1, -1, -1, -1f,
+            false, -1, -1000f, -1000f, stoneAmmo: 7);
+        var apply = typeof(SiegeMachineStateReplicator).GetMethod("Apply", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(apply);
+        apply.Invoke(null, new object[] { pile, snapshot, localSimulator });
+        Assert.Equal(expectedAmmo, pile.AmmoCount);
     }
 
     [Theory]
@@ -260,15 +251,13 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning disable SYSLIB0050
         var ram = (BatteringRam)FormatterServices.GetUninitializedObject(typeof(BatteringRam));
 #pragma warning restore SYSLIB0050
-        bool previousKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        var authority = new SiegeMachineAuthorityRegistry { IsAuthorityKnown = authorityKnown };
+        authority.SetClaimedMachines(
+            localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        using var container = new SiegeAuthorityContainerScope(authority);
         bool previousEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
         BattleSpawnGate.BeginBattle("ram-authority-test");
-        SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.SetClaimedMachines(
-            localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
         try
         {
             Assert.False(GameNetwork.IsClientOrReplay);
@@ -284,10 +273,177 @@ public class SiegeMachineSimulationTests : IDisposable
         {
             BattleSpawnGate.EndBattle();
             BattleSpawnConfig.Enabled = previousEnabled;
-            SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
+    }
+
+    // A non-authority client blocks its own ladder and gate changes, but a received apply runs under
+    // AllowedThread and must reach vanilla.
+    [Fact]
+    public void AuthorityReaders_LetVanillaRunOnlyInsideAllowedThread()
+    {
+#pragma warning disable SYSLIB0050
+        var ladder = (SiegeLadder)FormatterServices.GetUninitializedObject(typeof(SiegeLadder));
+        var gate = (CastleGate)FormatterServices.GetUninitializedObject(typeof(CastleGate));
+#pragma warning restore SYSLIB0050
+        var ladderPrefix = typeof(SiegeLadderAuthorityPatches)
+            .GetMethod("StateSetterPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+        var gateToggle = typeof(SiegeMachineAuthorityPatches)
+            .GetMethod("AllowGateToggle", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(ladderPrefix);
+        Assert.NotNull(gateToggle);
+        using var container = new SiegeAuthorityContainerScope(
+            new SiegeMachineAuthorityRegistry { IsAuthorityKnown = true });
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("authority-readers-test");
+        try
+        {
+            using (new AllowedThread())
+            {
+                Assert.True((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
+                Assert.True((bool)gateToggle.Invoke(null, new object[] { gate }));
+            }
+
+            Assert.False((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
+            Assert.False((bool)gateToggle.Invoke(null, new object[] { gate }));
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+        }
+    }
+
+    // Without a resolvable authority registry every reader falls back to vanilla: prefixes run it, client checks take the server path.
+    [Theory]
+    [InlineData(typeof(SiegeLadderAuthorityPatches), "StateSetterPrefix", typeof(SiegeLadder), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "TickAuxPrefix", typeof(BatteringRam), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "ShootPrefix", typeof(Ballista), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "AllowGateToggle", typeof(CastleGate), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "IsClientForMachine", typeof(BatteringRam), false)]
+    [InlineData(typeof(SiegeLadderAuthorityPatches), "IsClientForSiegeLadder", typeof(SiegeLadder), false)]
+    public void AuthorityReaders_RunVanillaWhenTheRegistryDoesNotResolve(
+        Type patchType, string methodName, Type machineType, bool vanillaResult)
+    {
+        var reader = patchType.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(reader);
+#pragma warning disable SYSLIB0050
+        var machine = FormatterServices.GetUninitializedObject(machineType);
+#pragma warning restore SYSLIB0050
+        var args = reader.GetParameters().Length == 1 ? new[] { machine } : new[] { machine, false };
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("authority-resolve-miss-test");
+        try
+        {
+            using (ContainerProvider.UseContainerThreadSafe(null))
+            {
+                Assert.Equal(vanillaResult, (bool)reader.Invoke(null, args));
+            }
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+        }
+    }
+
+    // The deployer publishes its own placement changes, but not one it re-applies under AllowedThread.
+    [Fact]
+    public void PlacementCapture_SkipsChangesAppliedInsideAllowedThread()
+    {
+#pragma warning disable SYSLIB0050
+        var point = (DeploymentPoint)FormatterServices.GetUninitializedObject(typeof(DeploymentPoint));
+#pragma warning restore SYSLIB0050
+        var publish = typeof(SiegeDeploymentPatches)
+            .GetMethod("PublishPlacement", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(publish);
+        using var container = new SiegeAuthorityContainerScope(
+            new SiegeMachineAuthorityRegistry { IsLocalAuthority = true });
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("placement-capture-test");
+        int published = 0;
+        Action<MessagePayload<SiegeEnginePlacementChanged>> receive = payload =>
+        {
+            if (ReferenceEquals(payload.What.Point, point)) published++;
+        };
+        MessageBroker.Instance.Subscribe(receive);
+        try
+        {
+            using (new AllowedThread())
+            {
+                publish.Invoke(null, new object[] { point });
+            }
+            Assert.Equal(0, published);
+
+            publish.Invoke(null, new object[] { point });
+            Assert.Equal(1, published);
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe(receive);
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+        }
+    }
+
+    // A received placement re-runs vanilla Disband/Deploy under AllowedThread, so the capture patch doesn't echo it.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(nameof(Ballista))]
+    public void ReceivedPlacementApply_RunsVanillaInsideAllowedThread(string? weaponTypeName)
+    {
+        using var mission = new MissionCurrentScope();
+        AccessTools.Property(typeof(Mission), nameof(Mission.CurrentState))
+            .SetValue(mission.Instance, Mission.State.Continuing);
+        var point = Uninitialized<DeploymentPoint>();
+        AccessTools.Property(typeof(DeploymentPoint), nameof(DeploymentPoint.DeployedWeapon))
+            .SetValue(point, Uninitialized<Ballista>());
+        ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(point);
+        disbandRanAllowed = null;
+        deployRanAllowed = null;
+        Stub(AccessTools.Method(typeof(DeploymentPoint), nameof(DeploymentPoint.Disband)), nameof(RecordDisband));
+        Stub(AccessTools.Method(typeof(DeploymentPoint), nameof(DeploymentPoint.Deploy), new[] { typeof(Type) }),
+            nameof(RecordDeploy));
+        Stub(AccessTools.PropertyGetter(typeof(DeploymentPoint), nameof(DeploymentPoint.DeployableWeaponTypes)),
+            nameof(DeployableBallista));
+        var session = new Mock<IBattleSession>();
+        using var replicator = new SiegeEngineDeploymentReplicator(Mock.Of<IBattleNetwork>(),
+            new TestMessageBroker(), session.Object, new HostEpochPolicy());
+        var apply = typeof(SiegeEngineDeploymentReplicator)
+            .GetMethod("TryApplyPlacement", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(apply);
+
+        Assert.True((bool)apply.Invoke(replicator, new object[] { point.Id.Id, weaponTypeName }));
+
+        Assert.True(disbandRanAllowed);
+        Assert.Equal(weaponTypeName == null ? null : (bool?)true, deployRanAllowed);
+        Assert.False(AllowedThread.IsThisThreadAllowed());
+    }
+
+    private static bool? deployRanAllowed;
+    // Records whether the received Deploy ran inside AllowedThread and skips the native deploy.
+    private static bool RecordDeploy()
+    {
+        deployRanAllowed = AllowedThread.IsThisThreadAllowed();
+        return false;
+    }
+
+    // Offers a ballista without reading the uninitialized point's weapon list.
+    private static bool DeployableBallista(ref IEnumerable<Type> __result)
+    {
+        __result = new[] { typeof(Ballista) };
+        return false;
+    }
+
+    private static bool? disbandRanAllowed;
+    // Records whether the received Disband ran inside AllowedThread and skips the native disband.
+    private static bool RecordDisband(ref ScriptComponentBehavior __result)
+    {
+        disbandRanAllowed = AllowedThread.IsThisThreadAllowed();
+        __result = null;
+        return false;
     }
 
     [Fact]
@@ -325,14 +481,11 @@ public class SiegeMachineSimulationTests : IDisposable
         harmony.Patch(tick, transpiler: new HarmonyMethod(AccessTools.Method(
             typeof(SiegeMachineSimulationTests), nameof(RamTickWithoutNativeNavigation))));
 
-        bool oldHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
+        var authority = new SiegeMachineAuthorityRegistry { IsAuthorityKnown = true };
+        using var container = new SiegeAuthorityContainerScope(authority);
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
         BattleSpawnGate.BeginBattle("ram-arrival-test");
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.IsAuthorityKnown = true;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
         try
         {
             var broker = new TestMessageBroker();
@@ -344,7 +497,7 @@ public class SiegeMachineSimulationTests : IDisposable
             session.SetupGet(value => value.HostEpoch).Returns(5);
             session.Setup(value => value.IsHostController("host")).Returns(true);
             using var replicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object,
-                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), authority);
             GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "RefreshMachineCache")
                 .Invoke(replicator, Array.Empty<object>()), blocking: true);
             ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[ram.Id.Id] = ram;
@@ -375,7 +528,7 @@ public class SiegeMachineSimulationTests : IDisposable
             broker.Publish(this, new NetworkSiegeMachineAuthority(ram.Id.Id, "peer", hostEpoch: 5,
                 authorityRevision: 1, senderControllerId: "host"));
             GameThread.Run(() => { }, blocking: true);
-            Assert.True(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ram.Id.Id));
+            Assert.True(authority.IsMachineSimulatedLocally(ram.Id.Id));
             tick.Invoke(ram, new object[] { 0.1f });
             Assert.Equal(1, ramStrikeReads);
             Assert.False(pull.IsDeactivated);
@@ -385,9 +538,6 @@ public class SiegeMachineSimulationTests : IDisposable
         {
             BattleSpawnGate.EndBattle();
             BattleSpawnConfig.Enabled = oldEnabled;
-            SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
-            SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
             ramMovePoint = null;
             ramEntityOwner = null;
         }
@@ -473,14 +623,17 @@ public class SiegeMachineSimulationTests : IDisposable
         int hostEpoch, bool loading, bool liveStateCompletesLoading)
     {
         using var mission = new MissionCurrentScope();
+        var hostAuthority = new SiegeMachineAuthorityRegistry { IsLocalAuthority = true };
+        var peerAuthority = new SiegeMachineAuthorityRegistry();
+        var observerAuthority = new SiegeMachineAuthorityRegistry();
         var hostBroker = new TestMessageBroker();
         var peerBroker = new TestMessageBroker();
         var observerBroker = new TestMessageBroker();
         var hostMessages = new List<IMessage>();
         var peerMessages = new List<IMessage>();
-        using var host = CreateReplica("host", true, hostBroker, hostMessages);
-        using var peer = CreateReplica("peer", false, peerBroker, peerMessages);
-        using var observer = CreateReplica("observer", false, observerBroker, new List<IMessage>());
+        using var host = CreateReplica("host", true, hostBroker, hostMessages, hostAuthority);
+        using var peer = CreateReplica("peer", false, peerBroker, peerMessages, peerAuthority);
+        using var observer = CreateReplica("observer", false, observerBroker, new List<IMessage>(), observerAuthority);
         var hostPile = RegisterPile(host);
         var peerPile = RegisterPile(peer);
         var observerPile = RegisterPile(observer);
@@ -490,114 +643,92 @@ public class SiegeMachineSimulationTests : IDisposable
             ReadField<Dictionary<int, UsableMachine>>(peer, "machinesById").Clear();
             ReadField<Dictionary<int, UsableMachine>>(observer, "machinesById").Clear();
         }
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        try
+        Broadcast(host, hostPile, true, true);
+        var staleTen = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(hostMessages));
+        Assert.Equal(10, staleTen.StoneAmmo);
+        hostMessages.Clear();
+
+        GameThread.Run(() => hostPile.PickUpStone(), blocking: true);
+        Assert.Equal(9, hostPile.AmmoCount);
+        hostBroker.Publish(this, new NetworkSiegeMachineClaim(id, "peer", isRelease: false));
+        GameThread.Run(() => { }, blocking: true);
+
+        var grant = ProtoBuf.Serializer.DeepClone(
+            Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(hostMessages)));
+        Assert.True(grant.HasStoneAmmo);
+        Assert.Equal(9, grant.StoneAmmo);
+        Assert.Equal(1, grant.AuthorityRevision);
+        Assert.False(Capture(hostPile, true, false).HasStoneAmmo);
+
+        ReceiveHandoff(peer, peerBroker, peerPile, peerAuthority, true);
+
+        Broadcast(peer, peerPile, false, true);
+        var firstPeerState = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(peerMessages));
+        Assert.Equal(9, firstPeerState.StoneAmmo);
+        Assert.Equal(grant.AuthorityRevision, firstPeerState.AuthorityRevision);
+        ReceivePeerState(firstPeerState, 9, includeObserver: false);
+        peerMessages.Clear();
+
+        GameThread.Run(() => peerPile.PickUpStone(), blocking: true);
+        Broadcast(peer, peerPile, false, true);
+        var nextPeerState = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(peerMessages));
+        Assert.Equal(8, peerPile.AmmoCount);
+        ReceivePeerState(nextPeerState, 8, includeObserver: false);
+
+        // The observer can receive the claimant's pickup before the host's grant on another connection.
+        observerBroker.Publish(this, nextPeerState);
+        GameThread.Run(() => { }, blocking: true);
+        Assert.Equal(10, observerPile.AmmoCount);
+        ReceiveHandoff(observer, observerBroker, observerPile, observerAuthority, false, expectedAmmo: 8);
+        ReceivePeerState(nextPeerState, 8);
+        peerBroker.Publish(this, grant);
+        GameThread.Run(() => { }, blocking: true);
+        Assert.Equal(8, peerPile.AmmoCount);
+
+        void ReceiveHandoff(SiegeMachineStateReplicator replicator, TestMessageBroker target,
+            ManagedStonePile pile, SiegeMachineAuthorityRegistry authority, bool ownsPile, int expectedAmmo = 9)
         {
-            SiegeMissionAuthorityGate.IsLocalAuthority = true;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-            Broadcast(host, hostPile, true, true);
-            var staleTen = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(hostMessages));
-            Assert.Equal(10, staleTen.StoneAmmo);
-            hostMessages.Clear();
-
-            GameThread.Run(() => hostPile.PickUpStone(), blocking: true);
-            Assert.Equal(9, hostPile.AmmoCount);
-            hostBroker.Publish(this, new NetworkSiegeMachineClaim(id, "peer", isRelease: false));
+            target.Publish(this, grant);
             GameThread.Run(() => { }, blocking: true);
-
-            var grant = ProtoBuf.Serializer.DeepClone(
-                Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(hostMessages)));
-            Assert.True(grant.HasStoneAmmo);
-            Assert.Equal(9, grant.StoneAmmo);
-            Assert.Equal(1, grant.AuthorityRevision);
-            Assert.False(Capture(hostPile, true, false).HasStoneAmmo);
-
-            ReceiveHandoff(peer, peerBroker, peerPile, true);
-
-            SiegeMissionAuthorityGate.IsLocalAuthority = false;
-            SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int> { id }, new HashSet<int>());
-            Broadcast(peer, peerPile, false, true);
-            var firstPeerState = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(peerMessages));
-            Assert.Equal(9, firstPeerState.StoneAmmo);
-            Assert.Equal(grant.AuthorityRevision, firstPeerState.AuthorityRevision);
-            ReceivePeerState(firstPeerState, 9, includeObserver: false);
-            peerMessages.Clear();
-
-            SiegeMissionAuthorityGate.IsLocalAuthority = false;
-            SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int> { id }, new HashSet<int>());
-            GameThread.Run(() => peerPile.PickUpStone(), blocking: true);
-            Broadcast(peer, peerPile, false, true);
-            var nextPeerState = Assert.IsType<NetworkSiegeMachineState>(Assert.Single(peerMessages));
-            Assert.Equal(8, peerPile.AmmoCount);
-            ReceivePeerState(nextPeerState, 8, includeObserver: false);
-
-            // The observer can receive the claimant's pickup before the host's grant on another connection.
-            SiegeMissionAuthorityGate.IsLocalAuthority = false;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-            observerBroker.Publish(this, nextPeerState);
-            GameThread.Run(() => { }, blocking: true);
-            Assert.Equal(10, observerPile.AmmoCount);
-            ReceiveHandoff(observer, observerBroker, observerPile, false, expectedAmmo: 8);
-            ReceivePeerState(nextPeerState, 8);
-            peerBroker.Publish(this, grant);
-            GameThread.Run(() => { }, blocking: true);
-            Assert.Equal(8, peerPile.AmmoCount);
-
-            void ReceiveHandoff(SiegeMachineStateReplicator replicator, TestMessageBroker target,
-                ManagedStonePile pile, bool ownsPile, int expectedAmmo = 9)
+            if (loading)
             {
-                SiegeMissionAuthorityGate.IsLocalAuthority = false;
-                SiegeMissionAuthorityGate.ResetClaimedMachines();
-                target.Publish(this, grant);
-                GameThread.Run(() => { }, blocking: true);
-                if (loading)
+                Assert.Equal(10, pile.AmmoCount);
+                Assert.False(authority.IsMachineSimulatedLocally(id));
+                ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[id] = pile;
+                if (liveStateCompletesLoading)
                 {
-                    Assert.Equal(10, pile.AmmoCount);
-                    Assert.False(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
-                    ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[id] = pile;
-                    if (liveStateCompletesLoading)
-                    {
-                        target.Publish(this, new NetworkSiegeMachineState(id, -1f, -1, -1, -1, -1f,
-                            false, -1, -1000f, -1000f, hostEpoch: hostEpoch,
-                            senderControllerId: "host", authorityRevision: grant.AuthorityRevision));
-                        GameThread.Run(() => { }, blocking: true);
-                    }
-                    else
-                    {
-                        GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "DrainPendingMachineStates")
-                            .Invoke(replicator, Array.Empty<object>()), blocking: true);
-                    }
+                    target.Publish(this, new NetworkSiegeMachineState(id, -1f, -1, -1, -1, -1f,
+                        false, -1, -1000f, -1000f, hostEpoch: hostEpoch,
+                        senderControllerId: "host", authorityRevision: grant.AuthorityRevision));
+                    GameThread.Run(() => { }, blocking: true);
                 }
-                Assert.Equal(expectedAmmo, pile.AmmoCount);
-                Assert.Equal(ownsPile, SiegeMissionAuthorityGate.IsMachineSimulatedLocally(id));
-                target.Publish(this, staleTen);
-                GameThread.Run(() => { }, blocking: true);
-                Assert.Equal(expectedAmmo, pile.AmmoCount);
+                else
+                {
+                    GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "DrainPendingMachineStates")
+                        .Invoke(replicator, Array.Empty<object>()), blocking: true);
+                }
             }
-
-            void ReceivePeerState(NetworkSiegeMachineState state, int expected, bool includeObserver = true)
-            {
-                SiegeMissionAuthorityGate.IsLocalAuthority = true;
-                SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int>(), new HashSet<int> { id });
-                hostBroker.Publish(this, state);
-                GameThread.Run(() => { }, blocking: true);
-                Assert.Equal(expected, hostPile.AmmoCount);
-                if (!includeObserver) return;
-                SiegeMissionAuthorityGate.IsLocalAuthority = false;
-                SiegeMissionAuthorityGate.ResetClaimedMachines();
-                observerBroker.Publish(this, state);
-                GameThread.Run(() => { }, blocking: true);
-                Assert.Equal(expected, observerPile.AmmoCount);
-            }
+            Assert.Equal(expectedAmmo, pile.AmmoCount);
+            Assert.Equal(ownsPile, authority.IsMachineSimulatedLocally(id));
+            target.Publish(this, staleTen);
+            GameThread.Run(() => { }, blocking: true);
+            Assert.Equal(expectedAmmo, pile.AmmoCount);
         }
-        finally
+
+        void ReceivePeerState(NetworkSiegeMachineState state, int expected, bool includeObserver = true)
         {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
+            hostBroker.Publish(this, state);
+            GameThread.Run(() => { }, blocking: true);
+            Assert.Equal(expected, hostPile.AmmoCount);
+            Assert.False(hostAuthority.IsMachineSimulatedLocally(id));
+            if (!includeObserver) return;
+            observerBroker.Publish(this, state);
+            GameThread.Run(() => { }, blocking: true);
+            Assert.Equal(expected, observerPile.AmmoCount);
         }
 
         SiegeMachineStateReplicator CreateReplica(string controller, bool isHost,
-            TestMessageBroker broker, List<IMessage> messages)
+            TestMessageBroker broker, List<IMessage> messages, SiegeMachineAuthorityRegistry authority)
         {
             var session = new Mock<IBattleSession>();
             session.SetupGet(value => value.OwnControllerId).Returns(controller);
@@ -608,7 +739,7 @@ public class SiegeMachineSimulationTests : IDisposable
             var network = new Mock<IBattleNetwork>();
             network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(messages.Add);
             return new SiegeMachineStateReplicator(network.Object, broker, session.Object,
-                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), authority);
         }
 
         ManagedStonePile RegisterPile(SiegeMachineStateReplicator replicator)
@@ -632,10 +763,14 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
+    // A stone pile without native mesh work that records whether its last ammo update ran under AllowedThread.
     private sealed class ManagedStonePile : StonePile
     {
+        public bool LastAmmoMeshUpdateWasAllowed { get; private set; }
+
         public void PickUpStone() => ConsumeAmmo();
-        protected override void UpdateAmmoMesh() { }
+        // Stands in for the native mesh refresh that SetAmmo and ConsumeAmmo run after changing the count.
+        protected override void UpdateAmmoMesh() => LastAmmoMeshUpdateWasAllowed = AllowedThread.IsThisThreadAllowed();
         protected override void CheckAmmo() { }
     }
 }

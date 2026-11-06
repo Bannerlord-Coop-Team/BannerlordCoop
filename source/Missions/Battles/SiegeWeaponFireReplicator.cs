@@ -32,6 +32,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     private readonly ISiegeMachineStateReplicator machineState;
     private readonly ISiegeGateHitApplier gateHitApplier;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly ISiegeMachineAuthorityRegistry siegeAuthority;
     private readonly Dictionary<int, List<NetworkSiegeWeaponFired>> pendingNetworkFires =
         new Dictionary<int, List<NetworkSiegeWeaponFired>>();
 
@@ -45,7 +46,8 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         IBattleSession session,
         ISiegeMachineStateReplicator machineState,
         ISiegeGateHitApplier gateHitApplier,
-        IHostEpochPolicy hostEpochPolicy)
+        IHostEpochPolicy hostEpochPolicy,
+        ISiegeMachineAuthorityRegistry siegeAuthority)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -54,6 +56,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         this.machineState = machineState;
         this.gateHitApplier = gateHitApplier;
         this.hostEpochPolicy = hostEpochPolicy;
+        this.siegeAuthority = siegeAuthority;
 
         machineState.AuthorityChanged += Handle_AuthorityChanged;
         messageBroker.Subscribe<SiegeWeaponFired>(Handle_LocalFire);
@@ -168,7 +171,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
             return;
 
         // The machine's simulator fired natively; everyone else replays it.
-        if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
+        if (siegeAuthority.IsMachineSimulatedLocally(msg.MachineId)) return;
 
         var weapon = FindMissionObject<RangedSiegeWeapon>(msg.MachineId);
         if (weapon == null)
@@ -321,7 +324,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         GameThread.RunSafe(() =>
         {
             if (disposed || Mission.Current == null) return;
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.MachineId)) return;
+            if (siegeAuthority.IsMachineSimulatedLocally(msg.MachineId)) return;
 
             var ram = FindMissionObject<BatteringRam>(msg.MachineId);
             var body = ram?._batteringRamBody?.GetFirstScriptOfType<SynchedMissionObject>();
@@ -396,7 +399,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         }
         if (authorityOrder != 0) return;
 
-        bool ramSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(msg.RamId);
+        bool ramSimulatedLocally = siegeAuthority.IsMachineSimulatedLocally(msg.RamId);
         if (ramSimulatedLocally) return;
 
         if (!gateHitApplier.TryApply(msg, ShouldApplyHostGateDamage(session.IsLocalHost, ramSimulatedLocally)))

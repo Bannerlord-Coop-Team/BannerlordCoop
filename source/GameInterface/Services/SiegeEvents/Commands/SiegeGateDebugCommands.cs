@@ -18,6 +18,14 @@ internal static class SiegeGateDebugCommands
     // coop.debug.siege.gate_state
     public sealed class GateStateCoopCommand : ICoopCommand
     {
+        private readonly ISiegeMachineAuthorityRegistry authority;
+
+        /// <summary>Takes the siege authority the gate report shows.</summary>
+        public GateStateCoopCommand(ISiegeMachineAuthorityRegistry authority)
+        {
+            this.authority = authority;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "gate_state";
         public string Description => "Prints a castle gate's hit points and what its destruction changed locally.";
@@ -31,7 +39,7 @@ internal static class SiegeGateDebugCommands
         {
             if (!TryFindGate(args[0], out var gate, out var error)) return Failed(error);
 
-            string state = DescribeGate(gate);
+            string state = DescribeGate(gate, authority);
             Logger.Information("[GateState] {State}", state);
             return new CoopCommandResult(true, state);
         }
@@ -40,6 +48,14 @@ internal static class SiegeGateDebugCommands
     // coop.debug.siege.gate_melee_hit
     public sealed class GateMeleeHitCoopCommand : ICoopCommand
     {
+        private readonly ISiegeMachineAuthorityRegistry authority;
+
+        /// <summary>Takes the siege authority the gate report shows.</summary>
+        public GateMeleeHitCoopCommand(ISiegeMachineAuthorityRegistry authority)
+        {
+            this.authority = authority;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "gate_melee_hit";
         public string Description => "Hits a castle gate with the local player's wielded weapon, like an infantry strike.";
@@ -77,7 +93,7 @@ internal static class SiegeGateDebugCommands
                 destruction.TriggerOnHit(agent, damage, frame.origin, frame.rotation.f, in weapon, (int)slot, null);
             }
 
-            string state = DescribeGate(gate);
+            string state = DescribeGate(gate, authority);
             Logger.Information("[GateMeleeHit] damage={Damage} count={Count} {State}", damage, count, state);
             return new CoopCommandResult(true, state);
         }
@@ -109,7 +125,8 @@ internal static class SiegeGateDebugCommands
         return false;
     }
 
-    private static string DescribeGate(CastleGate gate)
+    // One-line gate report: hit points, local destruction effects and this client's authority over it.
+    private static string DescribeGate(CastleGate gate, ISiegeMachineAuthorityRegistry authority)
     {
         var destruction = gate.DestructionComponent;
         int points = gate.StandingPoints.Count;
@@ -123,8 +140,8 @@ internal static class SiegeGateDebugCommands
             $" plankVisible={(gate._plank?.GameEntity.IsVisibleIncludeParents() == true ? 1 : 0)}" +
             $" standingPointsDeactivated={(pointsOff == points ? 1 : 0)} ptsOff={pointsOff}/{points}" +
             $" navMeshOpen={(faces > 0 && enabledFaces == faces ? 1 : 0)} navFaces={enabledFaces}/{faces}" +
-            $" isHost={(SiegeMissionAuthorityGate.IsLocalAuthority ? 1 : 0)}" +
-            $" simLocal={(SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id) ? 1 : 0)}";
+            $" isHost={(authority.IsLocalAuthority ? 1 : 0)}" +
+            $" simLocal={(authority.IsMachineSimulatedLocally(gate.Id.Id) ? 1 : 0)}";
     }
 
     // No getter reads a face's ability, so count the gate faces a disabled-skipping lookup still finds.

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents;
 using Missions.Messages;
 using Serilog;
@@ -74,6 +75,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private readonly IBattleSession session;
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly ISiegeMachineAuthorityRegistry siegeAuthority;
 
     // Machine cache + last broadcast state per machine id / deactivated ids (peers).
     // Game-thread only; reset when the mission changes (MissionObjectIds recycle across missions).
@@ -93,7 +95,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // only on a state transition (the state message re-sends whenever any field, e.g. HitPoints, changes).
     private readonly Dictionary<int, int> peerWeaponState = new Dictionary<int, int>();
     // Per-machine simulation claims (machine id -> controller); absent = the mission host. The
-    // patch-visible copies live in SiegeMissionAuthorityGate. Game-thread only.
+    // patch-visible copies live in ISiegeMachineAuthorityRegistry. Game-thread only.
     private readonly Dictionary<int, string> claimedMachines = new Dictionary<int, string>();
     private readonly Dictionary<int, int> authorityEpochs = new Dictionary<int, int>();
     private readonly Dictionary<int, int> authorityRevisions = new Dictionary<int, int>();
@@ -121,13 +123,15 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     private int trackedObjectCount;
     private float pollTimer;
 
-    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IHostEpochPolicy hostEpochPolicy)
+    public SiegeMachineStateReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session, INetworkAgentRegistry agentRegistry, IHostEpochPolicy hostEpochPolicy,
+        ISiegeMachineAuthorityRegistry siegeAuthority)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
         this.agentRegistry = agentRegistry;
         this.hostEpochPolicy = hostEpochPolicy;
+        this.siegeAuthority = siegeAuthority;
 
         messageBroker.Subscribe<NetworkSiegeMachineState>(Handle_NetworkMachineState);
         messageBroker.Subscribe<NetworkSiegeLadderAnimationState>(Handle_NetworkLadderAnimationState);
@@ -174,7 +178,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         DrainPendingMachineStates();
 
         // Until the election result is stored, "not host" means "unknown" — take no irreversible step.
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return;
+        if (!siegeAuthority.IsAuthorityKnown) return;
 
         if (session.IsLocalHost)
         {
@@ -223,7 +227,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             grantStreak.Clear();
             regrantCooldown.Clear();
             grantGrace.Clear();
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
+            siegeAuthority.ResetClaimedMachines();
         }
 
         trackedMission = mission;
@@ -306,7 +310,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         foreach (var machine in machines)
         {
             int machineId = machine.Id.Id;
-            bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
+            bool simulatedLocally = siegeAuthority.IsMachineSimulatedLocally(machineId);
             if (!isHost && !simulatedLocally) continue;
 
             var state = CaptureState(machine, isHost, simulatedLocally);
@@ -422,9 +426,9 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             available = true, machineId, sessionId = session.InstanceId,
             observerControllerId = session.OwnControllerId, hostControllerId = session.HostControllerId,
             hostEpoch = session.HostEpoch, authorityEpoch = GetSnapshotAuthorityEpoch(machineId),
-            authorityRevision = GetAuthorityRevision(machineId), authorityKnown = SiegeMissionAuthorityGate.IsAuthorityKnown,
+            authorityRevision = GetAuthorityRevision(machineId), authorityKnown = siegeAuthority.IsAuthorityKnown,
             simulator = claimed ? claimant : session.HostControllerId, claimed,
-            simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId),
+            simulatedLocally = siegeAuthority.IsMachineSimulatedLocally(machineId),
             localUser, localMover,
             contested = machine is SiegeWeapon weapon && weapon.IsDisabledForBattleSideAI(weapon.Side),
             unusedSeconds = unusedOwnedSeconds.TryGetValue(machineId, out var unused) ? unused : 0f,
@@ -605,7 +609,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!IsGrantableMachine(machine)) continue;
 
             int machineId = machine.Id.Id;
-            bool simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId);
+            bool simulatedLocally = siegeAuthority.IsMachineSimulatedLocally(machineId);
 
             if (!(machine is IPrimarySiegeWeapon))
             {
@@ -851,7 +855,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!IsGrantableMachine(machine)) continue;
 
             int machineId = machine.Id.Id;
-            if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId))
+            if (siegeAuthority.IsMachineSimulatedLocally(machineId))
             {
                 if (HasLocalUserOrMover(machine))
                 {
@@ -1084,7 +1088,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         int stoneAmmo = -1;
         if (!string.IsNullOrEmpty(controllerId)
             && controllerId != session.OwnControllerId
-            && SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId)
+            && siegeAuthority.IsMachineSimulatedLocally(machineId)
             && machinesById.TryGetValue(machineId, out var machine)
             && machine is StonePile stonePile)
         {
@@ -1105,7 +1109,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             claimedMachines[machineId] = controllerId;
         }
 
-        PushClaimsToGate();
+        PushClaimsToRegistry();
         // Every authority revision needs a freshly stamped host-owned snapshot, including a
         // remote claimant replacing another remote claimant while the damage fields stay unchanged.
         lastSent.Remove(machineId);
@@ -1152,7 +1156,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 return;
             }
 
-            bool wasSimulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId);
+            bool wasSimulatedLocally = siegeAuthority.IsMachineSimulatedLocally(obj.MachineId);
 
             if (string.IsNullOrEmpty(obj.ControllerId))
             {
@@ -1180,8 +1184,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 if (obj.HasStoneAmmo) pendingStoneHandoffs[obj.MachineId] = obj;
             }
             DrainPendingMachineStates();
-            PushClaimsToGate();
-            if (authorityOrder > 0 && SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))
+            PushClaimsToRegistry();
+            if (authorityOrder > 0 && siegeAuthority.IsMachineSimulatedLocally(obj.MachineId))
             {
                 lastSent.Remove(obj.MachineId);
                 lastSentLadderAnimations.Remove(obj.MachineId);
@@ -1212,16 +1216,17 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private void ResetSendCacheWhenSimulationMovesHere(int machineId, bool wasSimulatedLocally)
     {
-        if (wasSimulatedLocally || !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId)) return;
+        if (wasSimulatedLocally || !siegeAuthority.IsMachineSimulatedLocally(machineId)) return;
 
         lastSent.Remove(machineId);
         lastSentLadderAnimations.Remove(machineId);
     }
 
-    private void PushClaimsToGate()
+    // Publishes the claim map to the registry, split into this client's claims and everyone else's.
+    private void PushClaimsToRegistry()
     {
-        var locallyClaimed = new HashSet<int>();
-        var remotelyClaimed = new HashSet<int>();
+        var locallyClaimed = new List<int>();
+        var remotelyClaimed = new List<int>();
         foreach (var claim in claimedMachines)
         {
             if (claim.Value == session.OwnControllerId && !pendingStoneHandoffs.ContainsKey(claim.Key))
@@ -1234,7 +1239,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
         }
 
-        SiegeMissionAuthorityGate.SetClaimedMachines(locallyClaimed, remotelyClaimed);
+        siegeAuthority.SetClaimedMachines(locallyClaimed, remotelyClaimed);
     }
 
     private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload)
@@ -1286,7 +1291,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         DrainPendingStoneHandoffs();
         DrainPendingGeneralMachineStates();
         DrainPendingLadderAnimationStates();
-        PushClaimsToGate();
+        PushClaimsToRegistry();
     }
 
     private void DrainPendingStoneHandoffs()
@@ -1303,17 +1308,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
             if (!machinesById.TryGetValue(entry.Key, out var machine)) continue;
 
-            bool wasSuppressed = SiegeMissionAuthorityGate.SuppressCapture;
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
                 // Apply the baseline before any buffered pickup from the new simulator.
                 if (machine is StonePile pile) pile.SetAmmo(handoff.StoneAmmo);
                 pendingStoneHandoffs.Remove(entry.Key);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = wasSuppressed;
             }
         }
     }
@@ -1343,21 +1342,16 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
             if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
 
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
-                Apply(machine, pending.Value);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = false;
+                Apply(machine, pending.Value, siegeAuthority.IsMachineSimulatedLocally(machine.Id.Id));
             }
 
-            if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(pending.Key))
+            if (!siegeAuthority.IsMachineSimulatedLocally(pending.Key))
             {
                 if (pending.Value.AimDirection > AimSentinel + 1f)
                 {
-                    SiegeMissionAuthorityGate.SetRemoteAim(pending.Key, pending.Value.AimDirection, pending.Value.AimReleaseAngle);
+                    siegeAuthority.SetRemoteAim(pending.Key, pending.Value.AimDirection, pending.Value.AimReleaseAngle);
                 }
 
                 ApplyWeaponAnimation(machine, pending.Value.WeaponState);
@@ -1397,7 +1391,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
 
             if (machine is SiegeLadder ladder
-                && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(pending.Key))
+                && !siegeAuthority.IsMachineSimulatedLocally(pending.Key))
             {
                 ApplyLadderAnimation(ladder, pending.Value);
             }
@@ -1496,24 +1490,19 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             DrainPendingStoneHandoffs();
             var stateToApply = ReconcilePendingMachineStateForLiveApply(obj);
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
-                Apply(machine, stateToApply);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = false;
+                Apply(machine, stateToApply, siegeAuthority.IsMachineSimulatedLocally(machine.Id.Id));
             }
 
-            PushClaimsToGate();
+            PushClaimsToRegistry();
             // A machine we simulate runs its own weapon state machine; a stale pre-claim broadcast
             // must not drive its arm animation or aim.
-            if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))
+            if (!siegeAuthority.IsMachineSimulatedLocally(obj.MachineId))
             {
                 if (stateToApply.AimDirection > AimSentinel + 1f)
                 {
-                    SiegeMissionAuthorityGate.SetRemoteAim(
+                    siegeAuthority.SetRemoteAim(
                         obj.MachineId,
                         stateToApply.AimDirection,
                         stateToApply.AimReleaseAngle);
@@ -1564,7 +1553,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             pendingLadderAnimationsById.Remove(obj.LadderId);
             if (machine is SiegeLadder ladder
-                && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.LadderId))
+                && !siegeAuthority.IsMachineSimulatedLocally(obj.LadderId))
             {
                 ApplyLadderAnimation(ladder, obj);
             }
@@ -1684,11 +1673,12 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         Drop,
     }
 
-    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state)
+    // Applies a received machine state; simulatedLocally skips the fields this client's own simulation drives.
+    private static void Apply(UsableMachine machine, NetworkSiegeMachineState state, bool simulatedLocally)
     {
         // The movement simulator ignores movement echoes (a stale pre-grant broadcast must not
         // fight its own tracker); everyone else eases toward the received distance.
-        if (state.MoveDistance >= 0f && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
+        if (state.MoveDistance >= 0f && !simulatedLocally)
         {
             var movement = (machine as BatteringRam)?.MovementComponent ?? (machine as SiegeTower)?.MovementComponent;
             if (movement != null)
@@ -1753,7 +1743,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
         }
 
-        if (state.HasStoneAmmo && !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id)
+        if (state.HasStoneAmmo && !simulatedLocally
             && machine is StonePile stonePile && stonePile.AmmoCount != state.StoneAmmo)
         {
             stonePile.SetAmmo(state.StoneAmmo);
@@ -1990,7 +1980,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             foreach (var machine in machines)
             {
                 if (!(machine is SiegeLadder ladder)
-                    || !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id))
+                    || !siegeAuthority.IsMachineSimulatedLocally(machine.Id.Id))
                 {
                     continue;
                 }

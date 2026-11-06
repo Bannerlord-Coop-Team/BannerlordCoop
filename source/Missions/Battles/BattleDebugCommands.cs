@@ -2578,6 +2578,14 @@ internal static class BattleDebugCommands
 
     public sealed class LadderStateCoopCommand : ICoopCommand
     {
+        private readonly ISiegeMachineAuthorityRegistry authority;
+
+        /// <summary>Takes the siege authority the report shows per ladder.</summary>
+        public LadderStateCoopCommand(ISiegeMachineAuthorityRegistry authority)
+        {
+            this.authority = authority;
+        }
+
         public string Prefix => "coop.debug.battle";
 
         public string Name => "ladder_state";
@@ -2623,8 +2631,8 @@ internal static class BattleDebugCommands
             }
 
             var output = new StringBuilder();
-            output.AppendLine($"ladders={ladders.Length} authority={SiegeMissionAuthorityGate.IsLocalAuthority} " +
-                $"known={SiegeMissionAuthorityGate.IsAuthorityKnown}");
+            output.AppendLine($"ladders={ladders.Length} authority={authority.IsLocalAuthority} " +
+                $"known={authority.IsAuthorityKnown}");
             foreach (var ladder in ladders)
             {
                 int animationIndex = ladder._ladderSkeleton.GetAnimationIndexAtChannel(0);
@@ -2652,7 +2660,7 @@ internal static class BattleDebugCommands
 
                 output.AppendLine($"ladder={ladder.Id.Id:D5} state={ladder.State} animation={ladder._animationState} " +
                     $"animationIndex={animationIndex} progress={animationProgress:0.000} " +
-                    $"simLocal={SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ladder.Id.Id)} " +
+                    $"simLocal={authority.IsMachineSimulatedLocally(ladder.Id.Id)} " +
                     $"points={ladder.StandingPoints.Count} pointsOff={deactivatedPoints} " +
                     $"users={(users.Count > 0 ? string.Join(",", users) : "none")}");
             }

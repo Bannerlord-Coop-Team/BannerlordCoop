@@ -18,7 +18,8 @@ internal static class CastleGateHitCapturePatch
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
         if (!(attackerScriptComponentBehavior is BatteringRam ram)) return;
-        if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ram.Id.Id)) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
+        if (!authority.IsMachineSimulatedLocally(ram.Id.Id)) return;
 
         MessageBroker.Instance.Publish(__instance, new GateHitByRam(__instance, ram, inflictedDamage));
     }

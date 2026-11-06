@@ -11,6 +11,7 @@ using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Voice;
@@ -42,7 +43,6 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
             Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
             Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
-
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
 
@@ -86,6 +86,34 @@ namespace Coop.Tests.Autofac
 #else
             Assert.Equal(15, missionCommands.Length);
 #endif
+        }
+
+        /// <summary>Checks the mission-scoped battle controller writes the same siege authority the session-scoped patches read.</summary>
+        [Fact]
+        public void Client_Container_SharesSiegeAuthorityBetweenMissionAndSession()
+        {
+            using var container = BuildClientContainer();
+            using var otherClient = BuildClientContainer();
+            using var mission = container.BeginLifetimeScope(MissionLifetimeFactory.MissionTag);
+
+            var missionAuthority = mission.Resolve<ISiegeMachineAuthorityRegistry>();
+            missionAuthority.IsLocalAuthority = true;
+            missionAuthority.IsAuthorityKnown = true;
+
+            var sessionAuthority = container.Resolve<ISiegeMachineAuthorityRegistry>();
+            Assert.Same(sessionAuthority, missionAuthority);
+            Assert.True(sessionAuthority.IsLocalAuthority);
+            Assert.True(sessionAuthority.IsAuthorityKnown);
+            Assert.NotSame(sessionAuthority, otherClient.Resolve<ISiegeMachineAuthorityRegistry>());
+        }
+
+        /// <summary>Builds a client container the way the mod composes it.</summary>
+        private static IContainer BuildClientContainer()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<ClientModule>();
+            builder.RegisterModule<GameInterfaceModule>();
+            return builder.Build();
         }
 
         [Fact]

@@ -187,7 +187,7 @@ public class SiegeGateDestroyedReplayTests : IDisposable
     {
         var state = new NetworkSiegeMachineState(GateId, hitPoints, destructionState, gateState, -1, -1f,
             false, -1, -1000f, -1000f, hostEpoch: 1, senderControllerId: "host");
-        ApplySnapshotMethod.Invoke(null, new object[] { gate, state });
+        ApplySnapshotMethod.Invoke(null, new object[] { gate, state, false });
     }
 
     private static NetworkGateHit CosmeticHit() => new NetworkGateHit(GateId, 15, 350, "ram-owner", 1, 0);
