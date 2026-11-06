@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.CampaignService.Statistics;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
@@ -74,5 +75,11 @@ internal static class CoopSessionMigrationRules
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerMarriageOffers)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
+
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerIncidentsOnCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerLastGlobalIncidentCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerActiveIncidentSeed)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerCanInvokeSettlementEvent)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerPendingIncident)));
     }
 }
