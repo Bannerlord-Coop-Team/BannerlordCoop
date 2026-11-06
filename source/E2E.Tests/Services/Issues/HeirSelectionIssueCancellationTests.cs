@@ -3,6 +3,7 @@ using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Handlers;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
@@ -78,7 +79,7 @@ public class HeirSelectionIssueCancellationTests
             using var handler = new HeirSelectionHandler(broker, server.ObjectManager, server.Resolve<INetwork>(),
                 players, restorer.Object, Mock.Of<IApplyHeirSelectionActionInterface>(), behavior.Object,
                 Mock.Of<ICoopSessionMigrator>(), Mock.Of<ITraitLevelingHelperInterface>(),
-                server.Resolve<IIssueCancellationCoordinator>(), null, null);
+                Mock.Of<IStatisticsCampaignBehaviorInterface>(), server.Resolve<IIssueCancellationCoordinator>(), null, null);
 
             broker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(owner, heir));
 

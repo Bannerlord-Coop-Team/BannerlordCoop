@@ -1,0 +1,101 @@
+# Requires a review from the people who know each area.
+
+/.github/ @garrettluskey
+
+/source/Common/ @garrettluskey
+/source/Coop.Core/ @garrettluskey
+/source/Missions @garrettluskey
+
+‎.agents/ @ShoT-UPfps @garrettluskey
+
+/source/GameInterface/Services/Alleys/ @ShoT-UPfps
+/source/GameInterface/Services/Alliances/ @jordanbrymora
+/source/GameInterface/Services/Arenas/ @jordanbrymora
+/source/GameInterface/Services/Armies/ @ShoT-UPfps
+/source/GameInterface/Services/Bandits/ @jordanbrymora @EgardA
+/source/GameInterface/Services/Barbers/ @jordanbrymora
+/source/GameInterface/Services/BasicCharacterObjects/ @garrettluskey
+/source/GameInterface/Services/BasicCultureObjects/ @garrettluskey
+/source/GameInterface/Services/BesiegerCamps/ @ShoT-UPfps
+/source/GameInterface/Services/BugReporting/ @garrettluskey
+/source/GameInterface/Services/Buildings/ @jordanbrymora @garrettluskey
+/source/GameInterface/Services/CharacterAttributes/ @garrettluskey
+/source/GameInterface/Services/CharacterDevelopers/ @jordanbrymora
+/source/GameInterface/Services/CharacterObjects/ @garrettluskey
+/source/GameInterface/Services/CharacterSkills/ @jordanbrymora
+/source/GameInterface/Services/Characters/ @jordanbrymora @EgardA
+/source/GameInterface/Services/Chat/ @rwpace0
+/source/GameInterface/Services/Clans/ @jordanbrymora
+/source/GameInterface/Services/Companions/ @EgardA
+/source/GameInterface/Services/CraftingPieces/ @jordanbrymora
+/source/GameInterface/Services/CraftingService/ @jordanbrymora
+/source/GameInterface/Services/CraftingTemplates/ @jordanbrymora
+/source/GameInterface/Services/Crime/ @jordanbrymora
+/source/GameInterface/Services/CultureObjects/ @garrettluskey
+/source/GameInterface/Services/Education/ @jordanbrymora
+/source/GameInterface/Services/Entity/ @garrettluskey
+/source/GameInterface/Services/EquipmentRoster/ @garrettluskey
+/source/GameInterface/Services/Equipments/ @garrettluskey
+/source/GameInterface/Services/Fiefs/ @jordanbrymora
+/source/GameInterface/Services/GameDebug/ @garrettluskey
+/source/GameInterface/Services/GameMenus/ @garrettluskey
+/source/GameInterface/Services/GameState/ @garrettluskey
+/source/GameInterface/Services/GuantletMapEventVisuals/ @garrettluskey
+/source/GameInterface/Services/HeroDevelopers/ @jordanbrymora
+/source/GameInterface/Services/Heroes/ @jordanbrymora @ShoT-UPfps @garrettluskey
+/source/GameInterface/Services/Hideouts/ @EgardA
+/source/GameInterface/Services/Inventory/ @jordanbrymora
+/source/GameInterface/Services/Issues/ @ShoT-UPfps @casey-johnson
+/source/GameInterface/Services/ItemComponents/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/ItemModifiers/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/ItemObjects/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/ItemRosters/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/Kingdoms/ @ShoT-UPfps @NatteTosti69
+/source/GameInterface/Services/LiveTesting/ @ShoT-UPfps @garrettluskey
+/source/GameInterface/Services/Locations/ @ShoT-UPfps @garrettluskey
+/source/GameInterface/Services/MBBodyProperties/ @garrettluskey
+/source/GameInterface/Services/MapEventComponents/ @garrettluskey
+/source/GameInterface/Services/MapEventParties/ @garrettluskey
+/source/GameInterface/Services/MapEventSides/ @garrettluskey
+/source/GameInterface/Services/MapEvents/ @garrettluskey
+/source/GameInterface/Services/MapTracks/ @jordanbrymora
+/source/GameInterface/Services/Missions/ @garrettluskey @ShoT-UPfps
+/source/GameInterface/Services/MobileParties/ @garrettluskey
+/source/GameInterface/Services/MobilePartyAIs/ @garrettluskey
+/source/GameInterface/Services/Modules/ @garrettluskey
+/source/GameInterface/Services/Monsters/ @garrettluskey
+/source/GameInterface/Services/ObjectManager/ @garrettluskey
+/source/GameInterface/Services/Party/ @garrettluskey
+/source/GameInterface/Services/PartyBases/ @garrettluskey
+/source/GameInterface/Services/PartyComponents/ @garrettluskey
+/source/GameInterface/Services/PartyVisuals/ @garrettluskey
+/source/GameInterface/Services/PlayerCaptivityService/ @garrettluskey
+/source/GameInterface/Services/Players/ @garrettluskey
+/source/GameInterface/Services/PrisonBreaks/ @jordanbrymora
+/source/GameInterface/Services/Save/ @garrettluskey
+/source/GameInterface/Services/SettlementComponents/ @garrettluskey
+/source/GameInterface/Services/Settlements/ @jordanbrymora @garrettluskey
+/source/GameInterface/Services/Ships/ @jordanbrymora @garrettluskey
+/source/GameInterface/Services/SiegeEngineConstructionProgressService/ @ShoT-UPfps
+/source/GameInterface/Services/SiegeEngines/ @ShoT-UPfps
+/source/GameInterface/Services/SiegeEvents/ @ShoT-UPfps
+/source/GameInterface/Services/SiegeStrategies/ @ShoT-UPfps
+/source/GameInterface/Services/SkillObjects/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/Smithing/ @jordanbrymora
+/source/GameInterface/Services/StanceLinks/ @garrettluskey
+/source/GameInterface/Services/Stances/ @garrettluskey
+/source/GameInterface/Services/Template/ @garrettluskey
+/source/GameInterface/Services/Time/ @garrettluskey
+/source/GameInterface/Services/Tournaments/ @zzzzzzzzott
+/source/GameInterface/Services/TownMarketDatas/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/Towns/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/TraitObjects/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/Traits/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/TroopRosters/ @garrettluskey @jordanbrymora
+/source/GameInterface/Services/UI/ @ShoT-UPfps @garrettluskey
+/source/GameInterface/Services/VillageMarketDatas/ @garrettluskey @jordanbrymora @ShoT-UPfps
+/source/GameInterface/Services/VillageTypes/ @garrettluskey @jordanbrymora @ShoT-UPfps
+/source/GameInterface/Services/Villages/ @garrettluskey @jordanbrymora @ShoT-UPfps
+/source/GameInterface/Services/Voice/ @garrettluskey
+/source/GameInterface/Services/WeaponDesigns/ @jordanbrymora
+/source/GameInterface/Services/Workshops/ @jordanbrymora

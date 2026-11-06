@@ -312,6 +312,35 @@ public sealed class ModDeploymentServiceTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(module, "bin")));
     }
 
+    // A Coop build emits these on development; an allowlist miss refuses the whole deployment.
+    [Theory]
+    [InlineData("Microsoft.Win32.Registry")]
+    [InlineData("OggVorbisEncoder")]
+    [InlineData("System.Management")]
+    [InlineData("System.Text.Encoding.CodePages")]
+    public async Task BuiltRuntimeDependenciesAreDeployed(string dependency)
+    {
+        build.Action = path =>
+        {
+            CreateOutputs(path);
+            CopyAssembly(typeof(ModDeploymentServiceTests).Assembly.Location, Path.Combine(path, "source", "Coop", "bin", build.Configuration, dependency + ".dll"));
+        };
+        var report = await Service().DeployAsync(solution, "fixture", default);
+        Assert.Equal("deployed", report.State);
+        Assert.Contains(report.Files, e => e.Target.EndsWith(Path.DirectorySeparatorChar + dependency + ".dll"));
+    }
+
+    // Without these two a real restore fails, with "No solution found" and NU1902/NU1903 errors.
+    [Fact]
+    public void BuildCommandPassesRestoreSolutionDirAndDisablesAudit()
+    {
+        var info = ModBuildService.CreateStartInfo(repository, "MSBuild.exe", GameRoot, durable, "Coop");
+        Assert.Contains("-p:NuGetAudit=false", info.ArgumentList);
+        Assert.Contains("-p:SolutionDir=" + Path.Combine(repository, "source") + Path.DirectorySeparatorChar, info.ArgumentList);
+        var escaped = ModBuildService.CreateStartInfo(repository + ";x", "MSBuild.exe", GameRoot, durable, "Coop");
+        Assert.Contains(escaped.ArgumentList, a => a.StartsWith("-p:SolutionDir=") && a.Contains("%3Bx") && !a.Contains(';'));
+    }
+
     [Fact]
     public async Task DifferentBridgeBuildCannotPassDebugDeploymentVerification()
     {

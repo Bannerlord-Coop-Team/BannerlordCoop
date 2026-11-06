@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -47,6 +49,8 @@ internal sealed class LesserNobleRevoltJournalUpdateHandler : IHandler
                 return;
             }
 
+            using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             if (!data.Notification)
             {
                 LesserNobleRevoltWorldEventService.ApplyClientSettlementProgress(quest, settlement, data.VisitCount);

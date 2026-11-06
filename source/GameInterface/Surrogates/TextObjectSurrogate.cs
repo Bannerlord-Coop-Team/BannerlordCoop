@@ -3,11 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Localization;
 
+using Common.Logging;
+using Serilog;
+
 namespace GameInterface.Surrogates;
 
 [ProtoContract]
 internal struct TextObjectSurrogate
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TextObjectSurrogate>();
     [ProtoMember(1)]
     public string Text { get; set; }
 
@@ -64,6 +68,11 @@ internal struct TextObjectSurrogate
             else if (attribute.Value is float floatVariable)
             {
                 FloatAttributes[attribute.Key] = floatVariable;
+            }
+            else
+            {
+                Logger.Warning("Dropping unsupported TextObject attribute {attribute} of type {type}",
+                    attribute.Key, attribute.Value?.GetType().FullName ?? "null");
             }
         }
     }

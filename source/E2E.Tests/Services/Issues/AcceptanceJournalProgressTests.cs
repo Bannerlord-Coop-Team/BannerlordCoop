@@ -135,7 +135,8 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
         {
             var archive = Archive();
             Assert.True(archive.IsEnded());
-            Assert.Equal(3, Assert.Single(archive.GetEntries()).CurrentProgress);
+            var acceptance = Assert.Single(archive.GetEntries(), entry => entry.Range == 8);
+            Assert.Equal(endInsideCallback ? 3 : 7, acceptance.CurrentProgress);
             var definitions = new DefinitionContext();
             definitions.FillWithCurrentTypes();
             Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
@@ -149,8 +150,14 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
             var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
             var loadedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(FirstIssueId)));
             Assert.NotSame(archive, loadedArchive);
-            AssertMetadata(sent, Assert.Single(loadedArchive.GetEntries()));
-            output.WriteLine("Loaded server archive progress: {0}", Assert.Single(loadedArchive.GetEntries()).CurrentProgress);
+            var loadedAcceptance = Assert.Single(loadedArchive.GetEntries(), entry => entry.Range == 8);
+            Assert.Equal(endInsideCallback ? sent.Progress : 7, loadedAcceptance.CurrentProgress);
+            Assert.Equal(sent.Text.ToString(), loadedAcceptance.LogText.ToString());
+            Assert.Equal(sent.Time, loadedAcceptance.LogTime);
+            Assert.Equal(sent.TaskName.ToString(), loadedAcceptance.TaskName.ToString());
+            Assert.Equal(sent.Range, loadedAcceptance.Range);
+            Assert.Equal(sent.Type, loadedAcceptance.Type);
+            output.WriteLine("Loaded server archive progress: {0}", loadedAcceptance.CurrentProgress);
         });
     }
 

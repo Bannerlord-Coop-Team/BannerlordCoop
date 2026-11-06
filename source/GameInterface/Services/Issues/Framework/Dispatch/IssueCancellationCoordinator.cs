@@ -41,12 +41,37 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
         if (issue == null) return true;
         if (!PrepareCancellation(issue, out owner))
         {
-            if (ModInformation.IsServer && issue.IssueQuest?.IsOngoing == true && registry.IsRegistered(issue.GetType()))
+            if (CanRetry(issue))
                 pending[issue] = BuildGiverDeathLog(issue);
             return false;
         }
 
         return true;
+    }
+
+    public bool BeforeGiverOwnerChange(IssueBase issue, Hero deadOwner)
+    {
+        if (deadOwner == null || !deadOwner.IsDead || issue == null || issue.IssueOwner != deadOwner ||
+            issue.IssueQuest == null || !issue.IssueQuest.IsOngoing || !registry.IsRegistered(issue.GetType()))
+        {
+            return true;
+        }
+
+        if (!PrepareCancellation(issue, out var owner))
+        {
+            if (ModInformation.IsServer && issue.IssueOwner?.Issue == issue && issue.IssueQuest?.IsOngoing == true)
+                pending[issue] = BuildGiverDeathLog(issue);
+
+            // Keep the dead giver attached while the owner-party retry is pending.
+            return false;
+        }
+
+        using (owner)
+        {
+            CancelQuestAndIssue(issue, BuildGiverDeathLog(issue));
+        }
+
+        return false;
     }
 
     public void CancelForPlayerDeath(string controllerId, Hero oldHero, MobileParty originalParty)
@@ -71,7 +96,7 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
     {
         if (!PrepareCancellation(issue, out owner))
         {
-            if (ModInformation.IsServer && log != null) pending[issue] = log;
+            if (log != null && CanRetry(issue)) pending[issue] = log;
             return false;
         }
 
@@ -144,6 +169,11 @@ internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
             if (owner == null) scope.Dispose();
         }
     }
+
+    private bool CanRetry(IssueBase issue) =>
+        ModInformation.IsServer && issue.IssueOwner?.Issue == issue &&
+        registry.IsRegistered(issue.GetType()) &&
+        (issue.IssueQuest?.IsOngoing == true || issue.IsSolvingWithAlternative);
 
     public void Retry()
     {

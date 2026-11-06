@@ -10,6 +10,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Kingdoms.Data;
@@ -20,6 +21,7 @@ using GameInterface.Services.Settlements;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Workshops.Interfaces;
 using HarmonyLib;
+using Moq;
 using SandBox.GauntletUI.Menu;
 using SandBox.View.Menu;
 using TaleWorlds.CampaignSystem.Actions;
@@ -422,6 +424,80 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Same(second, Get<MobileParty>(instance, member.MobilePartyId).LeaderHero);
             });
         }
+    }
+
+    // Divorce must end the vanilla Marriage romance level everywhere, and remarrying must restore it.
+    [Fact]
+    public void Divorce_EndsMarriageRomanceUntilRemarriage()
+    {
+        Server.Call(() =>
+        {
+            var first = Get<Hero>(Server, leader.HeroId);
+            var second = Get<Hero>(Server, member.HeroId);
+            first.IsFemale = false;
+            second.IsFemale = true;
+            Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(first, second, false));
+            Assert.True(Server.Resolve<IPlayerDivorceRules>().TryApply(second, first, leaveClan: false));
+        });
+        Flush();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var first = Get<Hero>(instance, leader.HeroId);
+                var second = Get<Hero>(instance, member.HeroId);
+                Assert.Null(first.Spouse);
+                Assert.Equal(Romance.RomanceLevelEnum.Ended, Romance.GetRomanticLevel(first, second));
+            });
+        }
+
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(
+            Get<Hero>(Server, leader.HeroId), Get<Hero>(Server, member.HeroId), false)));
+        Flush();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() => Assert.Equal(Romance.RomanceLevelEnum.Marriage,
+                Romance.GetRomanticLevel(Get<Hero>(instance, leader.HeroId), Get<Hero>(instance, member.HeroId))));
+        }
+    }
+
+    // A departure that fails after the divorce must not be reported as done, and the member stays in the clan.
+    [Fact]
+    public void DivorceAndLeave_DepartureFails_ReportsFailureAndKeepsMemberInClan()
+    {
+        var leaveRules = new Mock<IClanLeaveRules>();
+        leaveRules.Setup(rules => rules.CanLeaveAfterDivorce(It.IsAny<Hero>())).Returns(true);
+        Server.Call(() =>
+        {
+            var first = Get<Hero>(Server, leader.HeroId);
+            var second = Get<Hero>(Server, member.HeroId);
+            first.IsFemale = false;
+            second.IsFemale = true;
+            Assert.True(Server.Resolve<IPlayerMarriageRules>().TryApply(first, second, false));
+        });
+        Flush();
+        var noticesBefore = Clients.ToDictionary(client => client,
+            client => client.InternalMessages.GetMessages<SendInformationMessage>().Count());
+
+        Server.Call(() => Assert.False(new PlayerDivorceRules(leaveRules.Object, Server.Resolve<IPlayerManager>(),
+                Server.Resolve<IMessageBroker>(), Server.Resolve<INetwork>())
+            .TryApply(Get<Hero>(Server, member.HeroId), Get<Hero>(Server, leader.HeroId), leaveClan: true)));
+        Flush();
+
+        leaveRules.Verify(rules => rules.TryApply(It.IsAny<Hero>(), false), Times.Once);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var first = Get<Hero>(instance, leader.HeroId);
+                var second = Get<Hero>(instance, member.HeroId);
+                Assert.Null(second.Spouse);
+                Assert.Same(first.Clan, second.Clan);
+            });
+        }
+        // Each player hears about the divorce and about the failed departure.
+        foreach (var client in Clients)
+            Assert.Equal(noticesBefore[client] + 2, client.InternalMessages.GetMessages<SendInformationMessage>().Count());
     }
 
     // S01, S02, S17, S21: personal succession must preserve the controller, party and original clan.

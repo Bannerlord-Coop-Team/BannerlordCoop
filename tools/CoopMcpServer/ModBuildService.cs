@@ -45,9 +45,11 @@ public sealed class ModBuildService : IModBuildService
         string scratch = Path.Combine(artifacts, "disabled-deploy");
         // BannerlordDir pins the compile to the profile's install, not whatever BANNERLORD_DIR the server inherited.
         // Rebuild the optional plugin after shared references, without rebuilding those references again.
+        // Restoring packages.config from a project needs SolutionDir, and Scriban's audit advisories fail restore as errors.
         foreach (string argument in new[] { Path.Combine(repository, "source", project, project + ".csproj"),
-            "-t:Rebuild", "-restore", "-p:RestorePackagesConfig=true", "-nr:false", "-m:1", "-nologo",
-            "-p:Configuration=" + configuration, "-p:Platform=AnyCPU", "-p:BannerlordDir=" + EscapeProperty(WithTrailingSeparator(gameRoot)), "-p:ModName=", "-p:PreBuildEvent=", "-p:PostBuildEvent=",
+            "-t:Rebuild", "-restore", "-p:RestorePackagesConfig=true", "-p:NuGetAudit=false", "-nr:false", "-m:1", "-nologo",
+            "-p:Configuration=" + configuration, "-p:Platform=AnyCPU", "-p:SolutionDir=" + EscapeProperty(WithTrailingSeparator(Path.Combine(repository, "source"))),
+            "-p:BannerlordDir=" + EscapeProperty(WithTrailingSeparator(gameRoot)), "-p:ModName=", "-p:PreBuildEvent=", "-p:PostBuildEvent=",
             "-p:ModsRoot=" + EscapeProperty(scratch), "-p:ModDir=" + EscapeProperty(Path.Combine(scratch, "Coop")),
             "-p:ModBinDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "bin")), "-p:ModPrefabDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "prefabs")) })
             info.ArgumentList.Add(argument);

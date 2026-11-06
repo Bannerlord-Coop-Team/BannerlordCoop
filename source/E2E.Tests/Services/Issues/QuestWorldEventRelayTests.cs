@@ -2,7 +2,9 @@
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -74,6 +76,23 @@ public class QuestWorldEventRelayTests : IDisposable
             var missing = (ConcurrentDictionary<(Type, string), byte>)typeof(QuestEventRelay)
                 .GetField("MissingListeners", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
             Assert.True(missing.ContainsKey((typeof(ListenerQuest), "AbsentListener")));
+        });
+    }
+
+    [Fact]
+    public void MapEventStartedKeepsSharedAndRequiredNonForcingRelays()
+    {
+        scenario.Server.Call(() =>
+        {
+            var method = AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted));
+            var patches = Harmony.GetPatchInfo(method);
+
+            Assert.Contains(patches.Postfixes, patch => patch.PatchMethod.DeclaringType?.Name == "QuestWorldEventRelayPatches");
+            Assert.Contains(patches.Postfixes, patch => patch.PatchMethod.DeclaringType?.Name == "LadysKnightOutEventPatches");
+            Assert.Contains(patches.Postfixes, patch => patch.PatchMethod.DeclaringType?.Name == "LesserNobleRevoltWorldEventPatches");
+            Assert.DoesNotContain(patches.Postfixes, patch =>
+                new[] { "MerchantOutlawsEventPatches", "VillageNeedsToolsWorldEventPatches" }
+                    .Contains(patch.PatchMethod.DeclaringType?.Name));
         });
     }
 

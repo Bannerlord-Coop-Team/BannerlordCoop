@@ -22,8 +22,11 @@ internal class LadysKnightOutEventPatches
     private static Hero warInitiator;
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
     [HarmonyPostfix]
-    private static void MapEventPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty) =>
+    private static void MapEventPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) return;
         Run(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
     [HarmonyPrefix]
