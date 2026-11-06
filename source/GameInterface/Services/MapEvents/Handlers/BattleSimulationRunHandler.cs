@@ -414,17 +414,6 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
         }
 
-        // Same rule as cancel: only the client running the simulation paces it.
-#if DEBUG
-        // The debug RaidLootWarningFixture advances the simulation from the server itself.
-        if (observation == null)
-#endif
-        if (payload.Who is not NetPeer advancingPeer || sim.Peer != advancingPeer)
-        {
-            Logger.Warning("Peer attempted to advance a battle simulation it does not own. MapEventId={MapEventId}", mapEventId);
-            return;
-        }
-
 #if DEBUG
         if (observation != null)
         {

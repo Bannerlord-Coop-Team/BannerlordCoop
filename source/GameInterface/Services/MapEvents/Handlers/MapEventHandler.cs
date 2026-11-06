@@ -250,13 +250,6 @@ internal class MapEventHandler : IHandler
                     return;
                 }
 
-                // A surrender comes from a player whose party fights in this battle.
-                if (!playerManager.TryGetSenderHero(payload.Who, out var senderHero) || senderHero.PartyBelongedTo?.MapEvent != mapEvent)
-                {
-                    Logger.Warning("Ignoring a surrender in {MapEventId} from a peer whose party is not in it", mapEventId);
-                    return;
-                }
-
                 // Skip if this side already surrendered — another pipeline (e.g. a PvP loser's
                 // NetworkPlayerSurrendered) may have already applied it.
                 if (mapEvent.GetMapEventSide(side).IsSurrendered)

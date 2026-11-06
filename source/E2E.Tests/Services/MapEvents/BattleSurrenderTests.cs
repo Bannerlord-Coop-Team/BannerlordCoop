@@ -517,34 +517,6 @@ public class BattleSurrenderTests : MapEventTestBase
         });
     }
 
-    // A surrender comes from a player whose party fights in the battle.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void Surrender_IsAppliedOnlyFromAPlayerInTheBattle(bool inBattle)
-    {
-        var setup = SetupTwoOpposingPlayersInBattle();
-        var sender = Clients.First();
-        if (inBattle)
-        {
-            TestEnvironment.ConnectRegisteredPlayer(sender, "1");
-            // The fixture's player heroes start outside their parties.
-            Server.Call(() => Server.GetRegisteredObject<Hero>(setup.initiatorHeroId)._partyBelongedTo =
-                Server.GetRegisteredObject<MobileParty>(setup.initiatorPartyId));
-        }
-        else
-        {
-            CreatePlayerHeroParty("3");
-            TestEnvironment.ConnectRegisteredPlayer(sender, "3");
-        }
-        var mapEvent = Server.GetRegisteredObject<MapEvent>(setup.ctx.MapEventId);
-
-        Server.SimulateMessage(sender.NetPeer, new NetworkMapEventSurrender(setup.ctx.MapEventId, BattleSideEnum.Defender));
-        Server.PumpGameThread();
-
-        Assert.Equal(inBattle, mapEvent.DefenderSide.IsSurrendered);
-    }
-
     /// <summary>
     /// BR-001's exclusivity extended to surrender: while a live mission (or simulation) owns the map event,
     /// a surrender request must not conclude the battle under the players resolving it — the server refuses
