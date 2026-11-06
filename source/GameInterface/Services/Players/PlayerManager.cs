@@ -82,6 +82,11 @@ public interface IPlayerManager
     bool TryGetPlayer(Hero hero, out Player player);
 
     /// <summary>
+    /// Resolves the Player controlling the given party.
+    /// </summary>
+    bool TryGetPlayer(MobileParty mobileParty, out Player player);
+
+    /// <summary>
     /// Checks whether a message sender is the peer controlling the given hero, logging a warning
     /// when it isn't, so a handler can ignore a request made for another player's hero.
     /// </summary>
@@ -420,6 +425,13 @@ public class PlayerManager : IPlayerManager
     {
         player = null;
         return hero != null && TryGetControlledObjectInfo(hero, out var control)
+            && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
+    public bool TryGetPlayer(MobileParty mobileParty, out Player player)
+    {
+        player = null;
+        return mobileParty != null && TryGetControlledObjectInfo(mobileParty, out var control)
             && TryGetPlayer(control.ObjectControllerId, out player);
     }
 
