@@ -147,9 +147,9 @@ internal class HideoutCampaignBehaviorPatch
 
     private static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        // Native EncounteredBattle throws without an encounter, and the menu refreshes after the encounter closes
-        var battle = Settlement.CurrentSettlement?.Party.MapEvent ??
-            (PlayerEncounter.Current?._encounteredParty != null ? PlayerEncounter.EncounteredBattle : null);
+        // The menu refreshes after the encounter closes, so the encountered battle may be gone
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? encounteredBattle;
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
@@ -270,8 +270,8 @@ internal class HideoutJoinEncounterOptionsPatch
     {
         if (ModInformation.IsServer) return true;
 
-        // Native reads EncounteredBattle, which throws without an encountered party, so hide the option until the server sets it up (the args match the finalizer and tests)
-        if (PlayerEncounter.Current?._encounteredParty == null)
+        // Native reads EncounteredBattle, which throws without an encountered party, so hide the option until the server sets it up
+        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var battle))
         {
             __result = false;
             if (args != null)
@@ -282,7 +282,7 @@ internal class HideoutJoinEncounterOptionsPatch
             return false;
         }
 
-        if (PlayerEncounter.EncounteredBattle?.IsHideoutBattle != true) return true;
+        if (!battle.IsHideoutBattle) return true;
 
         // Hideouts join through the shared troop selection.
         __result = false;
