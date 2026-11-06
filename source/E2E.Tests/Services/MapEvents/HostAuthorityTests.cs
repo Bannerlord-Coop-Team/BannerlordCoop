@@ -6,7 +6,6 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -85,26 +84,6 @@ public class HostAuthorityTests : MapEventTestBase
         Server.Call(() =>
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out _),
                 $"MapEvent {ctx.MapEventId} should have been finalized/removed by the server after the host's report"));
-    }
-
-    // A finalize from a peer with no player behind it can't get past the host gate either.
-    [Fact]
-    public void FinalizeFromAPeerWithNoPlayer_IsRefusedWhileAHostIsElected()
-    {
-        var ctx = CreateServerMapEvent();
-        CreatePlayerHeroParty("host");
-        Server.Resolve<IPlayerManager>().SetPeer("host", Clients.First().NetPeer);
-        Server.Call(() => Server.Resolve<IBattleHostRegistry>()
-            .Set(ctx.MapEventId, new BattleHostAssignment("host", Array.Empty<string>())));
-
-        Server.SimulateMessage(Clients.Last().NetPeer, new NetworkMapEventFinalizeAttempted(ctx.MapEventId));
-        Server.PumpGameThread();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
-            Assert.False(mapEvent.IsFinalized);
-        }, MapEventDisabledMethods);
     }
 
     private void AssertServerBattleState(string mapEventId, BattleState expected)

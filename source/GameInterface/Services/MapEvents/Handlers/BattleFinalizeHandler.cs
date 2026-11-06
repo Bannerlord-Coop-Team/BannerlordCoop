@@ -142,13 +142,16 @@ internal class BattleFinalizeHandler : IHandler
         // would tear the battle down under everyone else (forced encounter close mid-mission). No reply
         // on a refusal — the finalized reply would pull the refused client off the menu vanilla parked
         // it on. Server-local publishes (requester null) and battles with no elected host pass.
-        if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment)
-            && (!playerManager.TryGetPlayer(requester, out var requestingPlayer)
-                || requestingPlayer.ControllerId != hostAssignment.HostControllerId))
+        if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment))
         {
-            Logger.Information("Refused finalize of {MapEventId} from non-host peer {PeerId}",
-                payload.What.MapEventId, requester.Id);
-            return;
+            var isHost = playerManager.TryGetPlayer(requester, out var requestingPlayer)
+                && requestingPlayer.ControllerId == hostAssignment.HostControllerId;
+            if (!isHost)
+            {
+                Logger.Information("Refused finalize of {MapEventId} from non-host peer {PeerId}",
+                    payload.What.MapEventId, requester.Id);
+                return;
+            }
         }
 
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
