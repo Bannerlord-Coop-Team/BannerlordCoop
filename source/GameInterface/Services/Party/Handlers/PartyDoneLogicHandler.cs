@@ -266,15 +266,18 @@ internal class PartyDoneLogicHandler : IHandler
 
             // The garrison side of a troop donation is refused once the party left the town (stale screen),
             // so keep the troops in the party too instead of losing them
-            if (message.GarrisonDonationSettlementId != null &&
-                (!objectManager.TryGetObjectWithLogging<Settlement>(message.GarrisonDonationSettlementId, out var garrisonDonationSettlement) ||
-                mainHero.PartyBelongedTo?.CurrentSettlement != garrisonDonationSettlement))
+            if (message.GarrisonDonationSettlementId != null)
             {
-                logger.Warning(
-                    "Rejected Party screen garrison donation because {MainHeroId} is no longer at {SettlementId}",
-                    message.MainHeroId,
-                    message.GarrisonDonationSettlementId);
-                return;
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(message.GarrisonDonationSettlementId, out var garrisonDonationSettlement)) return;
+
+                if (mainHero.PartyBelongedTo?.CurrentSettlement != garrisonDonationSettlement)
+                {
+                    logger.Warning(
+                        "Rejected Party screen garrison donation because {MainHeroId} is no longer at {SettlementId}",
+                        message.MainHeroId,
+                        message.GarrisonDonationSettlementId);
+                    return;
+                }
             }
 
             if (donationSettlement != null &&
