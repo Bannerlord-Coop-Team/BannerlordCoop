@@ -14,7 +14,9 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Incidents;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -55,6 +57,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
     private readonly IMissionMembershipRegistry missionMembershipRegistry;
 
     private readonly HashSet<string> heldBattleRollHeroIds = new();
+    private readonly Dictionary<string, PlayerBattleEndedLogEntry> playerBattleLogs = new();
 
     public IncidentsCampaignBehaviourInterface(
         IPlayerManager playerManager,
@@ -160,6 +163,8 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
                 if (!playerManager.TryGetPlayer(party, out var player)) continue;
 
+                playerBattleLogs[player.HeroId] = CreateBattleLog(mapEvent, party, partyLeader);
+
                 if (party.RandomFloatWithSeed((uint)CampaignTime.Now.NumTicks) >= Campaign.Current.Models.IncidentModel.GetIncidentTriggerGlobalProbability()) continue;
 
                 TryInvokeIncident(player, party, partyLeader, IncidentTrigger.LeavingBattle);
@@ -240,11 +245,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
         RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
 
-        var occurableEventsForTrigger = new List<Incident>();
-        using (new MainHeroSubstitutionScope(playerHero, playerParty))
-        {
-             occurableEventsForTrigger = GetOccurableEventsForTrigger(player.HeroId, trigger);
-        }
+        var occurableEventsForTrigger = EvaluateAsPlayer(player, playerParty, playerHero, () => GetOccurableEventsForTrigger(player.HeroId, trigger));
         if (occurableEventsForTrigger.Count > 0)
         {
             Incident randomElement = occurableEventsForTrigger.GetRandomElement();
@@ -270,7 +271,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         // Only the behaviour's seed, so listing doesn't replace the stored seed of a pending incident
         incidentsBehavior._activeIncidentSeed = CampaignTime.Now.NumTicks;
 
-        using (new MainHeroSubstitutionScope(playerHero, playerParty))
+        return EvaluateAsPlayer(player, playerParty, playerHero, () =>
         {
             foreach (Incident incident in MBObjectManager.Instance.GetObjectTypeList<Incident>())
             {
@@ -285,9 +286,9 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
                     Logger.Debug(e, "Skipping {IncidentId} because its conditions threw for this player", incident.StringId);
                 }
             }
-        }
 
-        return incidents;
+            return incidents;
+        });
     }
 
     // Skips the trigger, probability and cooldowns, but keeps the availability guards and the incident's own conditions
@@ -315,13 +316,7 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
 
         RollActiveIncidentSeed(player.HeroId, incidentsBehavior);
 
-        bool canBeInvoked;
-        using (new MainHeroSubstitutionScope(playerHero, playerParty))
-        {
-            canBeInvoked = incident.CanIncidentBeInvoked();
-        }
-
-        if (!canBeInvoked)
+        if (!EvaluateAsPlayer(player, playerParty, playerHero, incident.CanIncidentBeInvoked))
         {
             error = $"{incident.StringId} conditions don't hold for this player";
             return false;
@@ -354,6 +349,48 @@ public class IncidentsCampaignBehaviourInterface : IIncidentsCampaignBehaviourIn
         long activeIncidentSeed = CampaignTime.Now.NumTicks;
         sessionIncidentsPlayerDataInterface.SetActiveIncidentSeed(playerHeroId, activeIncidentSeed);
         incidentsBehavior._activeIncidentSeed = activeIncidentSeed;
+    }
+
+    // Same entry vanilla CommentOnEndPlayerBattleBehavior logs, which reads the player's side from PlayerEncounter.Current
+    private PlayerBattleEndedLogEntry CreateBattleLog(MapEvent mapEvent, MobileParty playerParty, Hero playerHero)
+    {
+        var campaign = Campaign.Current;
+        var previousEncounter = campaign.PlayerEncounter;
+        try
+        {
+            campaign.PlayerEncounter = new PlayerEncounter { _mapEvent = mapEvent, PlayerSide = playerParty.Party.Side };
+
+            using (new MainHeroSubstitutionScope(playerHero, playerParty))
+            {
+                return new PlayerBattleEndedLogEntry(mapEvent) { GameTime = CampaignTime.Now };
+            }
+        }
+        finally
+        {
+            campaign.PlayerEncounter = previousEncounter;
+        }
+    }
+
+    // Runs vanilla conditions as this player, with their last battle at the end of the log history where FindLastGameActionLog reads it
+    private T EvaluateAsPlayer<T>(Player player, MobileParty playerParty, Hero playerHero, Func<T> evaluate)
+    {
+        var logs = Campaign.Current.LogEntryHistory._logs;
+
+        // Vanilla deletes a log once it's older than its KeepInHistoryTime
+        if (playerBattleLogs.TryGetValue(player.HeroId, out var battleLog) && (battleLog.GameTime + battleLog.KeepInHistoryTime).IsPast) battleLog = null;
+
+        if (battleLog != null) logs.Add(battleLog);
+        try
+        {
+            using (new MainHeroSubstitutionScope(playerHero, playerParty))
+            {
+                return evaluate();
+            }
+        }
+        finally
+        {
+            if (battleLog != null) logs.Remove(battleLog);
+        }
     }
 
     private List<Incident> GetOccurableEventsForTrigger(string playerHeroId, IncidentTrigger trigger)
