@@ -335,12 +335,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
         Assert.Equal(60, config.ModOptions.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(config.ModOptions.CoopClansEnabled);
-        Assert.Empty(config.ModOptions.PreferredBattleHosts);
-
-        // Struct equality compares the list by reference, so the default compared with is given the
-        // template's own list; the line above already checked that list is the empty default.
-        var defaults = new ModOptions(new ModOptionsData { PreferredBattleHosts = config.ModOptions.PreferredBattleHosts });
-        Assert.Equal(defaults, new ModOptions(config.ModOptions));
+        Assert.Equivalent(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
     }
 
     [Fact]
@@ -355,7 +350,7 @@ public class ModConfigTests : IDisposable
   },
   ""modOptions"": {
     ""KINGDOMDECISIONVOTETIMEOUTSECONDS"": 600,
-    ""PreferredBattleHosts"": [""76561198000000002"", ""76561198000000001"",],
+    ""PreferredBattleHosts"": [""76561198000000002"", null, ""76561198000000001"",],
   },
 }");
 
