@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -205,7 +206,8 @@ internal class MapEventSideDataHandler : IHandler
         if (PlayerEncounter.Current == null)
             return;
 
-        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        var encounterMapEvent = PlayerEncounter.Battle ?? encounteredBattle ?? MapEvent.PlayerMapEvent;
         if (encounterMapEvent != mapEvent)
             return;
 

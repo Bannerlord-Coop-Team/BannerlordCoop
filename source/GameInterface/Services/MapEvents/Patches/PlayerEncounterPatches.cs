@@ -241,11 +241,7 @@ internal class PlayerEncounterPatches
             return false;
         }
 
-        var encounteredParty = encounter._encounteredParty;
-        var encounteredBattle = encounteredParty?.MapEvent;
-        if (encounteredBattle == null && encounteredParty?.IsSettlement == true)
-            encounteredBattle = encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
-
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
         if (encounter._mapEvent != null || encounteredBattle != null)
             return true;
 
