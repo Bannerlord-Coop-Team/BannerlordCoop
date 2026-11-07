@@ -38,10 +38,11 @@ internal sealed class MovementWorkload
     private readonly int payloadBudget;
     private readonly int[] preferredCounts;
     private readonly bool encodeOnce;
-    // Each agent's encoding for the current frame, back to back; offset -1 until a candidate first needs it.
+    // Each agent's encoding for the current frame, back to back, indexed by agent id like the production cache.
     private readonly MemoryStream agentEncodings = new MemoryStream();
-    private readonly int[] encodedOffsets;
-    private readonly int[] encodedLengths;
+    private readonly Dictionary<Guid, (int Offset, int Length)> encodings = new Dictionary<Guid, (int Offset, int Length)>();
+    private readonly Guid[] agentIds;
+    private (int Offset, int Length)[] candidateSegments = new (int Offset, int Length)[16];
     private byte[]? envelopeTypeField;
 
     public MovementWorkload(ICommonSerializer serializer, MovementShapeAgent[] agents, bool compactIds, int payloadBudget, int recipients = 1, bool encodeOnce = false)
@@ -52,8 +53,8 @@ internal sealed class MovementWorkload
         this.payloadBudget = payloadBudget;
         this.encodeOnce = encodeOnce;
         preferredCounts = Enumerable.Repeat(InitialBatchSize, recipients).ToArray();
-        encodedOffsets = new int[agents.Length];
-        encodedLengths = new int[agents.Length];
+        // DeterministicGuid repeats every 256 seeds, so the cache gets its own unique keys.
+        agentIds = Enumerable.Range(0, agents.Length).Select(i => new Guid(i, 0, 0, new byte[8])).ToArray();
     }
 
     public MovementFrameStats Stats { get; private set; } = new MovementFrameStats();
@@ -64,7 +65,7 @@ internal sealed class MovementWorkload
     {
         Stats.Frames++;
         agentEncodings.SetLength(0);
-        for (int i = 0; i < encodedOffsets.Length; i++) encodedOffsets[i] = -1;
+        encodings.Clear();
         for (int recipient = 0; recipient < preferredCounts.Length; recipient++)
         {
             bool probeForGrowth = true;
@@ -160,16 +161,29 @@ internal sealed class MovementWorkload
     private byte[] CompressFromCache(int start, int count, MovementShapePacket packet)
     {
         long t0 = Stopwatch.GetTimestamp();
-        int snapshotBytes = 0;
-        for (int i = start; i < start + count; i++)
+        // MovementBatchSender copies each compact candidate's canonical ids; a guid candidate's packet ids are that copy.
+        Guid[] ids = agentIds;
+        int idStart = start;
+        if (packet.AgentGuids == null)
         {
-            if (encodedOffsets[i] < 0)
+            ids = new Guid[count];
+            Array.Copy(agentIds, start, ids, 0, count);
+            idStart = 0;
+        }
+        if (candidateSegments.Length < count)
+            candidateSegments = new (int Offset, int Length)[Math.Max(count, candidateSegments.Length * 2)];
+        int snapshotBytes = 0;
+        for (int i = 0; i < count; i++)
+        {
+            if (!encodings.TryGetValue(ids[idStart + i], out (int Offset, int Length) segment))
             {
-                encodedOffsets[i] = (int)agentEncodings.Length;
-                RuntimeTypeModel.Default.Serialize(agentEncodings, agents[i]);
-                encodedLengths[i] = (int)agentEncodings.Length - encodedOffsets[i];
+                int encodedOffset = (int)agentEncodings.Length;
+                RuntimeTypeModel.Default.Serialize(agentEncodings, agents[start + i]);
+                segment = (encodedOffset, (int)agentEncodings.Length - encodedOffset);
+                encodings.Add(ids[idStart + i], segment);
             }
-            snapshotBytes += 1 + VarintLength((uint)encodedLengths[i]) + encodedLengths[i];
+            candidateSegments[i] = segment;
+            snapshotBytes += 1 + VarintLength((uint)segment.Length) + segment.Length;
         }
 
         var header = new MovementShapePacket(packet.IdentityScopeId, packet.AgentIds, null!, packet.AgentGuids, packet.SenderControllerId, packet.AuthorityRevisions, packet.SampleSequence);
@@ -201,12 +215,13 @@ internal sealed class MovementWorkload
             Buffer.BlockCopy(headerBytes, bodyOffset, original, offset, split - bodyOffset);
             offset += split - bodyOffset;
             byte[] encoded = agentEncodings.GetBuffer();
-            for (int i = start; i < start + count; i++)
+            for (int i = 0; i < count; i++)
             {
+                (int segmentOffset, int segmentLength) = candidateSegments[i];
                 original[offset++] = 0x1A;
-                offset = WriteVarint(original, offset, (uint)encodedLengths[i]);
-                Buffer.BlockCopy(encoded, encodedOffsets[i], original, offset, encodedLengths[i]);
-                offset += encodedLengths[i];
+                offset = WriteVarint(original, offset, (uint)segmentLength);
+                Buffer.BlockCopy(encoded, segmentOffset, original, offset, segmentLength);
+                offset += segmentLength;
             }
             Buffer.BlockCopy(headerBytes, split, original, offset, bodyOffset + bodyLength - split);
             Stats.SerializeTicks += Stopwatch.GetTimestamp() - t0;

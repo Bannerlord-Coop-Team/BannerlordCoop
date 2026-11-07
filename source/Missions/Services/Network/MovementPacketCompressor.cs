@@ -1,4 +1,4 @@
-﻿﻿using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using Common.Serialization;
 using K4os.Compression.LZ4;
 using Missions.Agents.Packets;
@@ -71,7 +71,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         if (!IsMovement(packet))
             return original;
 
-        return Compress(original, original.Length);
+        return Compress(original, original.Length, originalIsOwned: true);
     }
 
     public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
@@ -214,7 +214,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
             int tailLength = bodyOffset + bodyLength - split;
             Buffer.BlockCopy(header, split, buffer, offset, tailLength);
-            return Compress(buffer, length);
+            return Compress(buffer, length, originalIsOwned: false);
         }
         finally
         {
@@ -230,10 +230,11 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     }
 
     // Returns the LZ4 envelope when it is smaller than the first length bytes of original, otherwise those bytes.
-    private byte[] Compress(byte[] original, int length)
+    // A rented original goes back to the pool, so its bytes are always copied out.
+    private byte[] Compress(byte[] original, int length, bool originalIsOwned)
     {
         if (length == 0 || length > MaxUncompressedBytes)
-            return Exact(original, length);
+            return Exact(original, length, originalIsOwned);
 
         int maximumLength = LZ4Codec.MaximumOutputSize(length);
         byte[] buffer = ArrayPool<byte>.Shared.Rent(maximumLength);
@@ -244,9 +245,9 @@ public class MovementPacketCompressor : IMovementPacketCompressor
                 buffer, 0, maximumLength,
                 LZ4Level.L00_FAST);
             if (compressedLength <= 0 || compressedLength >= length)
-                return Exact(original, length);
+                return Exact(original, length, originalIsOwned);
 
-            return WriteEnvelope(length, buffer, compressedLength) ?? Exact(original, length);
+            return WriteEnvelope(length, buffer, compressedLength) ?? Exact(original, length, originalIsOwned);
         }
         finally
         {
@@ -277,9 +278,9 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         return envelope;
     }
 
-    private static byte[] Exact(byte[] source, int length)
+    private static byte[] Exact(byte[] source, int length, bool sourceIsOwned)
     {
-        if (source.Length == length) return source;
+        if (sourceIsOwned && source.Length == length) return source;
 
         var exact = new byte[length];
         Buffer.BlockCopy(source, 0, exact, 0, length);

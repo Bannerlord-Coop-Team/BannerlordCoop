@@ -64,6 +64,29 @@ public partial class MovementTrafficTests
         output.WriteLine(string.Join(System.Environment.NewLine, currentRun.Frames));
     }
 
+    [Fact]
+    public void EncodeOnce_UncompressedPayloadFillingAPooledArrayStaysOwned()
+    {
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        var legacy = new LegacyMovementPacketCompressor(serializer);
+        var compressor = new MovementPacketCompressor(serializer);
+        // 8,192 bytes is one whole pooled array, and too large to compress, so the spliced bytes are the payload.
+        string scope = CreateIncompressibleString(8000);
+        while (legacy.Serialize(CreateOversizedPacket(scope, 11)).Length < 8192)
+            scope += "x";
+        MovementPacket first = CreateOversizedPacket(scope, 11);
+        Assert.Equal(8192, legacy.Serialize(first).Length);
+
+        byte[] firstPayload = compressor.SerializeSnapshots(first, new[] { EquivalenceGuid(1) });
+        string reversed = new string(scope.Reverse().ToArray());
+        compressor.SerializeSnapshots(CreateOversizedPacket(reversed, 12), new[] { EquivalenceGuid(1) });
+
+        Assert.Equal(legacy.Serialize(first), firstPayload);
+    }
+
+    private static MovementPacket CreateOversizedPacket(string scope, long sequence) =>
+        new MovementPacket(scope, new ushort[] { 1 }, new[] { default(AgentData) }, EquivalenceSender, new long[] { 1 }, sequence);
+
     private static EncodeOnceRun RunEncodeOnce(
         ICommonSerializer serializer,
         IMovementPacketCompressor compressor,
