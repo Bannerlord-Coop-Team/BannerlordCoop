@@ -2,7 +2,7 @@
 using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Kingdoms.Messages
+namespace GameInterface.Services.Kingdoms.Messages
 {
     [ProtoContract(SkipConstructor = true)]
     public class NetworkKingdomDecisionRoundStatus : ICommand
