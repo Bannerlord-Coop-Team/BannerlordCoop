@@ -50,8 +50,8 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         => inventoryBaselines.TryGetValue(logic, out var baseline) ? baseline.PlayerEquipment.CharacterEquipments : null;
 
     /// <summary>
-    /// Moves the open screen's equipment baselines to the server's slots, and writes
-    /// the screen's pending slots into <paramref name="received"/> so applying it keeps them.
+    /// Moves the open screen's equipment baselines to the server's slots, except slots with a pending
+    /// change, which are written into <paramref name="received"/> so applying it keeps them.
     /// </summary>
     public void MergeEquipmentUpdate(Dictionary<CharacterObject, Equipment[]> received)
     {
@@ -69,15 +69,22 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         }
     }
 
-    /// <summary>Merges one equipment set. Slaughter can move the backup past the baseline, and a backup moved that way is left alone.</summary>
+    /// <summary>
+    /// Merges one equipment set. A pending slot keeps its baseline, which is what lets the server see a conflict with
+    /// its own slot and settle it with the roster. Slaughter can move the backup past the baseline, and it's left alone then.
+    /// </summary>
     private static void MergeEquipmentSlots(EquipmentElement[] received, EquipmentElement[] live, EquipmentElement[] initial, EquipmentElement[] backup)
     {
         for (int slot = 0; slot < Equipment.EquipmentSlotLength; slot++)
         {
-            var serverSlot = received[slot];
-            if (!live[slot].IsEqualTo(initial[slot])) received[slot] = live[slot];
-            if (backup[slot].IsEqualTo(initial[slot])) backup[slot] = serverSlot;
-            initial[slot] = serverSlot;
+            if (!live[slot].IsEqualTo(initial[slot]))
+            {
+                received[slot] = live[slot];
+                continue;
+            }
+
+            if (backup[slot].IsEqualTo(initial[slot])) backup[slot] = received[slot];
+            initial[slot] = received[slot];
         }
     }
 

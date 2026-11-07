@@ -160,9 +160,9 @@ internal class TradeHandler : IHandler
             MobileParty currentMobileParty = null;
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
+            var slotChanges = RebaseEquipmentData(message.CharacterIdEquipmentsData, message.InitialCharacterIdEquipmentsData);
             var toItemRosterData = RebaseInventoryData(
-                toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
-            RebaseEquipmentData(message.CharacterIdEquipmentsData, message.InitialCharacterIdEquipmentsData);
+                toRoster, message.InitialPlayerRoster, message.ToItemRosterData, slotChanges);
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
@@ -315,20 +315,33 @@ internal class TradeHandler : IHandler
     internal static ItemRosterElement[] RebaseInventoryData(
         ItemRoster authoritativeRoster,
         ItemRosterElement[] initialRoster,
-        ItemRosterElement[] submittedRoster)
+        ItemRosterElement[] submittedRoster,
+        List<EquipmentSlotChange> slotChanges = null)
     {
         initialRoster ??= Array.Empty<ItemRosterElement>();
         submittedRoster ??= Array.Empty<ItemRosterElement>();
+        slotChanges ??= new List<EquipmentSlotChange>();
+
+        long GetDelta(EquipmentElement element) =>
+            (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element) + slotChanges.Sum(change => change.RosterCorrection(element));
+
+        // A slot can only gain what the roster still holds, otherwise the item would exist twice
+        foreach (var change in slotChanges)
+        {
+            if (change.Submitted.Item != null && FindAmount(authoritativeRoster, change.Submitted) + GetDelta(change.Submitted) < 0) change.Reject();
+        }
+
         var elements = new List<EquipmentElement>();
-        AddUniqueElements(elements, initialRoster);
-        AddUniqueElements(elements, submittedRoster);
+        AddUniqueElements(elements, initialRoster.Select(item => item.EquipmentElement));
+        AddUniqueElements(elements, submittedRoster.Select(item => item.EquipmentElement));
+        AddUniqueElements(elements, slotChanges.SelectMany(change => change.Elements));
 
         // ItemRoster(ItemRoster) sizes its array to Count, and an empty copy can never grow
         var rebased = new ItemRoster();
         rebased.Add(authoritativeRoster);
         foreach (var element in elements)
         {
-            long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
+            long delta = GetDelta(element);
             int current = FindAmount(rebased, element);
             int final = (int)Math.Max(0L, Math.Min(int.MaxValue, current + delta));
             if (final != current) rebased.AddToCounts(element, final - current);
@@ -337,12 +350,13 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Keeps the server's slot wherever the screen didn't change it, as RebaseInventoryData does for rosters,
-    /// so a screen opened before the reply to an earlier close can't undo that close.
+    /// Keeps the server's slot wherever the screen didn't change it, so a screen opened before the reply to an
+    /// earlier close can't undo that close, and returns the slots it did change for the roster rebase to settle.
     /// </summary>
-    private void RebaseEquipmentData(Dictionary<string, EquipmentData[]> submitted, Dictionary<string, EquipmentData[]> initial)
+    private List<EquipmentSlotChange> RebaseEquipmentData(Dictionary<string, EquipmentData[]> submitted, Dictionary<string, EquipmentData[]> initial)
     {
-        if (initial == null) return;
+        var slotChanges = new List<EquipmentSlotChange>();
+        if (initial == null) return slotChanges;
 
         foreach (var hero in submitted)
         {
@@ -355,19 +369,22 @@ internal class TradeHandler : IHandler
                 if (live == null) continue;
 
                 var slots = hero.Value[set].ItemSlots;
+                var initialSlots = initialSets[set].ItemSlots;
                 for (int slot = 0; slot < slots.Length; slot++)
                 {
-                    if (SameElement(slots[slot], initialSets[set].ItemSlots[slot])) slots[slot] = live._itemSlots[slot];
+                    if (SameElement(slots[slot], initialSlots[slot])) slots[slot] = live._itemSlots[slot];
+                    else slotChanges.Add(new EquipmentSlotChange(slots, slot, initialSlots[slot], live._itemSlots[slot]));
                 }
             }
         }
+
+        return slotChanges;
     }
 
-    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
+    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<EquipmentElement> roster)
     {
-        foreach (var item in roster)
+        foreach (var element in roster)
         {
-            var element = item.EquipmentElement;
             if (element.Item == null || elements.Any(existing => SameElement(existing, element))) continue;
             elements.Add(element);
         }

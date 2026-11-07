@@ -25,6 +25,9 @@ public class InventoryEquipmentCloseTests : IDisposable
     private readonly string partyId;
     private readonly string armorId;
     private readonly string helmetId;
+    private readonly string plateId;
+    private readonly string mailId;
+    private readonly string swordId;
     private GameStateManager? previousStates;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -39,6 +42,9 @@ public class InventoryEquipmentCloseTests : IDisposable
         partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         armorId = CreateEquippableItem("close_test_armor", ItemObject.ItemTypeEnum.BodyArmor);
         helmetId = CreateEquippableItem("close_test_helmet", ItemObject.ItemTypeEnum.HeadArmor);
+        plateId = CreateEquippableItem("close_test_plate", ItemObject.ItemTypeEnum.BodyArmor);
+        mailId = CreateEquippableItem("close_test_mail", ItemObject.ItemTypeEnum.BodyArmor);
+        swordId = CreateEquippableItem("close_test_sword", ItemObject.ItemTypeEnum.OneHandedWeapon);
 
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
@@ -64,7 +70,8 @@ public class InventoryEquipmentCloseTests : IDisposable
 
             party.ItemRoster.Clear();
             party.ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(armorId), 1);
-            party.ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(helmetId), 1);
+            foreach (var itemId in new[] { helmetId, plateId, mailId, swordId })
+                party.ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(itemId), 1);
         });
         TestEnvironment.FlushCoalescer();
 
@@ -174,6 +181,129 @@ public class InventoryEquipmentCloseTests : IDisposable
         AssertEquippedEverywhere(helmetId, EquipmentIndex.Head);
     }
 
+    [Fact]
+    public void SameSlotEquip_ReplyLandsOnTheOpenScreen_ReturnsTheFirstItemToTheRoster()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(plateId, EquipmentIndex.Body);
+        ResumeNetwork();
+        PauseNetwork();
+
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 0));
+    }
+
+    [Fact]
+    public void SameSlotEquip_BothClosesBeforeAnyReply_ReturnsTheFirstItemToTheRoster()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(plateId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 0));
+    }
+
+    [Fact]
+    public void CancellingASameSlotEquip_KeepsTheAcceptedItemAndReturnsThePendingOne()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(plateId, EquipmentIndex.Body);
+        ResumeNetwork();
+        PauseNetwork();
+
+        CloseScreen(fromCancel: true);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 1));
+    }
+
+    [Fact]
+    public void ReplacingAnEquippedItemTwiceBeforeTheReply_ReturnsBothReplacedItems()
+    {
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        Router.RunUntilIdle();
+        TestEnvironment.FlushCoalescer();
+        AssertEquippedEverywhere(armorId, EquipmentIndex.Body);
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(plateId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(mailId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, mailId, (armorId, 1), (plateId, 1), (mailId, 0));
+    }
+
+    [Fact]
+    public void EquippingTheOnlyCopyInTwoSlotsBeforeTheReply_DoesNotDuplicateIt()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(swordId, EquipmentIndex.Weapon0);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(swordId, EquipmentIndex.Weapon1);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Weapon0, swordId, (swordId, 0));
+        AssertEverywhere(EquipmentIndex.Weapon1, null, (swordId, 0));
+    }
+
+    [Fact]
+    public void EquippingTheOnlyCopyInTheSameSlotTwiceBeforeTheReply_DoesNotDuplicateIt()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEquippedEverywhere(armorId, EquipmentIndex.Body);
+    }
+
+    [Fact]
+    public void ServerSlotWriteUnderAPendingEquip_KeepsThePendingEquipAndReturnsTheWrittenItem()
+    {
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        ServerWritesSlot(plateId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        Router.RunUntilIdle();
+        TestEnvironment.FlushCoalescer();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 2));
+    }
+
     // Registers an item in every instance's native catalog, because equipment slots cross the wire by item id
     private string CreateEquippableItem(string stringId, ItemObject.ItemTypeEnum type)
     {
@@ -250,22 +380,37 @@ public class InventoryEquipmentCloseTests : IDisposable
         Client.Call(() => InventoryScreenHelper.CloseScreen(fromCancel));
     }
 
-    // Compares both machines at once, so a failure shows where the item ended up on each
-    private void AssertEquippedEverywhere(string itemId, EquipmentIndex slot)
+    // Writes a slot through vanilla's equipment setter on the server, the way campaign code changes a hero's gear
+    private void ServerWritesSlot(string itemId, EquipmentIndex slot)
     {
-        var expected = $"server: slot={itemId} roster=0, client: slot={itemId} roster=0";
-        var actual = $"server: {Describe(Server, itemId, slot)}, client: {Describe(Client, itemId, slot)}";
+        Server.Call(() =>
+        {
+            var hero = Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
+            hero.BattleEquipment[slot] = new EquipmentElement(Server.GetRegisteredObject<ItemObject>(itemId));
+        });
+    }
+
+    // Asserts the item is in the slot and out of the party inventory on both machines
+    private void AssertEquippedEverywhere(string itemId, EquipmentIndex slot) => AssertEverywhere(slot, itemId, (itemId, 0));
+
+    // Compares both machines at once, so a failure shows where each item ended up on each
+    private void AssertEverywhere(EquipmentIndex slot, string? slotItemId, params (string itemId, int count)[] roster)
+    {
+        var rosterText = string.Join(" ", roster.Select(item => $"{item.itemId}={item.count}"));
+        var expected = $"server: slot={slotItemId} {rosterText}, client: slot={slotItemId} {rosterText}";
+        var actual = $"server: {Describe(Server, slot, roster)}, client: {Describe(Client, slot, roster)}";
         Assert.True(expected == actual, $"Expected {expected}, actual {actual}");
     }
 
     // Reports what one machine has in the slot and in the party inventory
-    private string Describe(EnvironmentInstance instance, string itemId, EquipmentIndex slot)
+    private string Describe(EnvironmentInstance instance, EquipmentIndex slot, (string itemId, int count)[] roster)
     {
         string description = string.Empty;
         instance.Call(() =>
         {
             var hero = instance.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
-            description = $"slot={ItemIdOf(instance, hero.BattleEquipment[slot])} roster={RosterCount(instance, itemId)}";
+            var counts = roster.Select(item => $"{item.itemId}={RosterCount(instance, item.itemId)}");
+            description = $"slot={ItemIdOf(instance, hero.BattleEquipment[slot])} {string.Join(" ", counts)}";
         });
         return description;
     }
