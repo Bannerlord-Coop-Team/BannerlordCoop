@@ -101,6 +101,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
 
     public IDisposable BeginNativeClose(PartyScreenLogic logic) => new NativeCloseScope(this, logic);
 
+    /// <summary>Holds the screen PartyScreenHelper is closing and restores the previous one on dispose.</summary>
     private sealed class NativeCloseScope : IDisposable
     {
         private readonly AlternativeSolutionPicker picker;
