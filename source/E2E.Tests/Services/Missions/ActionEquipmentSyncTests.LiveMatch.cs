@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
 using Common.Util;
 using E2E.Tests.Environment.MockEngine;
 using Missions.Agents.Packets;
@@ -97,7 +96,7 @@ public partial class ActionEquipmentSyncTests
     }
 
     [Fact]
-    public void ActionPoll_PublishedEquipment_IsTheLiveCaptureWithoutASecondRead()
+    public void ActionPoll_PublishedEquipment_IsTheLiveCapture()
     {
         RunScenario(context =>
         {
@@ -249,12 +248,10 @@ public partial class ActionEquipmentSyncTests
             Assert.Equal(modifierId, modifier.StringId);
         }
 
-        object boxed = new MissionWeapon(item, modifier, null);
-        typeof(MissionWeapon).GetField("_weapons", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-            .SetValue(boxed, new List<WeaponComponentData> { new WeaponComponentData(null, weaponClass, default) });
-        typeof(MissionWeapon).GetField("_modifiedMaxDataValue", BindingFlags.Instance | BindingFlags.NonPublic)
-            .SetValue(boxed, (short)30);
-        var weapon = (MissionWeapon)boxed;
+        var weapon = new MissionWeapon(item, modifier, null);
+        weapon._weapons.Clear();
+        weapon._weapons.Add(new WeaponComponentData(null, weaponClass, default));
+        weapon._modifiedMaxDataValue = 30;
         weapon.Amount = amount;
         return weapon;
     }
