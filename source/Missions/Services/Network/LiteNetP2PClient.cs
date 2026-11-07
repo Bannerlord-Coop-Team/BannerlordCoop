@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -71,6 +72,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
     private readonly Dictionary<NetPeer, IReceivePathDiagnostics> receiveDiagnostics = new();
     private readonly Dictionary<string, IReceivePathDiagnostics> routeDiagnostics = new();
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
     private bool disposed;
 
     private string instanceId = null;
@@ -114,7 +116,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         ISteamMissionBridge steamBridge,
         IMovementPacketCompressor movementPacketCompressor,
         IReliableMessageBatcher<string> reliableMessageBatcher,
-        Func<IReceivePathDiagnostics> diagnosticsFactory)
+        Func<IReceivePathDiagnostics> diagnosticsFactory,
+        // Optional so the tests that build this client directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
         this.diagnosticsFactory = diagnosticsFactory;
@@ -132,6 +136,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.steamBridge = steamBridge;
         this.movementPacketCompressor = movementPacketCompressor;
         this.reliableMessageBatcher = reliableMessageBatcher;
+        this.battleBenchmark = battleBenchmark;
 
         netManager = new NetManager(this)
         {
@@ -1011,6 +1016,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     pendingReliablePayloadCount--;
                     if (pending.Payloads.Count == 0) pendingReliablePayloads.Remove(peer);
                     GetReceiveDiagnostics(peer).Record(ReceivePathEvent.MappedReceive, payload.Length);
+                    // Buffered before the peer was mapped, so OnNetworkReceive didn't count it.
+                    if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                        battleBenchmark.RecordReceived(sender, reliable: true, payload.Length);
                 }
                 HandleReceivedPayload(peer, payload, generation);
             }
@@ -1081,6 +1089,17 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             receiveDiagnostics[peer] = diagnostics;
         }
         return diagnostics;
+    }
+
+    // The campaign connection never turns on MTU discovery, so it keeps LiteNetLib's initial MTU.
+    private static readonly int CampaignMaxSinglePacketBytes = NetConstants.InitialMtu - NetConstants.ChanneledHeaderSize;
+
+    // A relayed send leaves as its own serialized relay packet on the campaign connection; the benchmark counts that.
+    private void RecordRelayedBenchmarkSend(string controllerId, DeliveryMethod deliveryMethod, string relayInstanceId, byte[] data)
+    {
+        int bytes = serializer.Serialize(new RelayPacket(deliveryMethod, relayInstanceId, controllerId, data)).Length;
+        battleBenchmark.RecordSent(controllerId, deliveryMethod != DeliveryMethod.Unreliable, bytes,
+            CampaignMaxSinglePacketBytes, relayed: true);
     }
 
     private void RecordRoute(string controllerId, ReceivePathEvent route, int bytes)
@@ -1175,6 +1194,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (packet is MessagePacket messagePacket)
         {
+            battleBenchmark?.RecordReliableMessageSent(controllerId, messagePacket.Data.Length);
             // Spawn admission must see a bare message before later authority changes reach the game thread.
             if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
             {
@@ -1196,6 +1216,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
             packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
         {
+            battleBenchmark?.RecordReliableMessageSent(controllerId, data.Length);
             reliableMessageBatcher.FlushThen(
                 controllerId,
                 SendReliableMessagePayload,
@@ -1211,6 +1232,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
+            battleBenchmark?.RecordSent(controllerId, packet.DeliveryMethod != DeliveryMethod.Unreliable, data.Length,
+                peer.GetMaxSinglePacketSize(packet.DeliveryMethod), relayed: false);
             Send(peer, packet, data);
             return;
         }
@@ -1241,6 +1264,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
+        if (battleBenchmark?.IsRecording == true)
+            RecordRelayedBenchmarkSend(controllerId, packet.DeliveryMethod, relayInstanceId, data);
         relayNetwork.SendAll(new RelayPacket(
             packet.DeliveryMethod,
             relayInstanceId,
@@ -1253,6 +1278,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
+            battleBenchmark?.RecordSent(controllerId, reliable: true, data.Length,
+                peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered), relayed: false);
             peer.Send(data, DeliveryMethod.ReliableOrdered);
             return;
         }
@@ -1264,6 +1291,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
+        if (battleBenchmark?.IsRecording == true)
+            RecordRelayedBenchmarkSend(controllerId, DeliveryMethod.ReliableOrdered, relayInstanceId, data);
         relayNetwork.SendAll(new RelayPacket(
             DeliveryMethod.ReliableOrdered,
             relayInstanceId,
@@ -1461,6 +1490,10 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 GetReceiveDiagnostics(peer).Record(
                     mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop, bytes);
                 if (!mapped) return;
+                if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                {
+                    battleBenchmark.RecordReceived(sender, reliable, bytes);
+                }
             }
         }
 
