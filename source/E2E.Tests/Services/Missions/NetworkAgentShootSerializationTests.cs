@@ -24,43 +24,103 @@ public class NetworkAgentShootSerializationTests
     [Fact]
     public void NetworkAgentShoot_RoundTripsWeaponIdsAndLaunchData()
     {
+        Mat3 orientation = Mat3.Identity;
+        orientation.RotateAboutUp(0.6f);
+        orientation.RotateAboutSide(-0.3f);
+        orientation.RotateAboutForward(1.1f);
         var original = new NetworkAgentShoot(
             Guid.NewGuid(),
             new Vec3(1.25f, 2.5f, 3.75f),
             new Vec3(4.5f, 5.75f, 6.25f),
-            new Mat3(
-                new Vec3(1f, 2f, 3f),
-                new Vec3(4f, 5f, 6f),
-                new Vec3(7f, 8f, 9f)),
+            orientation,
             hasRigidBody: true,
             missileItemId: "bodkin_arrows",
             itemModifierId: "balanced",
             banner: null,
-            missileIndex: 42,
             baseSpeed: 55.5f,
             speed: 61.25f,
             currentUsageIndex: 3,
             shotSequence: 4_500_000_123L);
 
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        MessagePacket packet = MessagePacket.Create(original, serializer);
-
-        var result = Assert.IsType<NetworkAgentShoot>(serializer.Deserialize<IMessage>(packet.Data));
+        NetworkAgentShoot result = RoundTrip(original);
 
         Assert.Equal(original.AgentId, result.AgentId);
         Assert.Equal(original.Position, result.Position);
         Assert.Equal(original.Velocity, result.Velocity);
-        Assert.Equal(original.Orientation, result.Orientation);
+        MissileShotReplayTests.AssertWithinTolerance(orientation, result.Orientation);
         Assert.True(result.HasRigidBody);
         Assert.Equal("bodkin_arrows", result.MissileItemId);
         Assert.Equal("balanced", result.ItemModifierId);
         Assert.Null(result.Banner);
-        Assert.Equal(42, result.MissileIndex);
         Assert.Equal(55.5f, result.BaseSpeed);
         Assert.Equal(61.25f, result.Speed);
         Assert.Equal(3, result.CurrentUsageIndex);
         Assert.Equal(4_500_000_123L, result.ShotSequence);
     }
+
+    [Fact]
+    public void NetworkAgentShoot_KeepsAFrameThatIsntARotationExactly()
+    {
+        var skewed = new Mat3(new Vec3(1f, 2f, 3f), new Vec3(4f, 5f, 6f), new Vec3(7f, 8f, 9f));
+
+        NetworkAgentShoot result = RoundTrip(CreateBodkinShot(skewed, banner: null));
+
+        Assert.Equal(skewed, result.Orientation);
+    }
+
+    [Fact]
+    public void NetworkAgentShoot_RoundTripsATableauItemBanner()
+    {
+        var banner = new Banner(MissileShotReplayTests.ClanBannerCode);
+
+        NetworkAgentShoot result = RoundTrip(CreateBodkinShot(Mat3.Identity, banner));
+
+        Assert.Equal(MissileShotReplayTests.ClanBannerCode, result.Banner.Serialize());
+    }
+
+    [Fact]
+    public void BodkinArrowShot_DropsTheBannerAndFullMatrixBytes()
+    {
+        Mat3 orientation = Mat3.Identity;
+        orientation.RotateAboutUp(0.6f);
+        orientation.RotateAboutSide(0.25f);
+        var skewed = new Mat3(new Vec3(1f, 2f, 3f), new Vec3(4f, 5f, 6f), new Vec3(7f, 8f, 9f));
+        var banner = new Banner(MissileShotReplayTests.ClanBannerCode);
+
+        int arrowBytes = WireLength(CreateBodkinShot(orientation, banner: null));
+        int withBannerBytes = WireLength(CreateBodkinShot(orientation, banner));
+        int withFullMatrixBytes = WireLength(CreateBodkinShot(skewed, banner: null));
+
+        // Development sent this shot as 246 B: these 102 plus the banner, the full Mat3 and a 2-byte missile index.
+        Assert.Equal(102, arrowBytes);
+        Assert.Equal(arrowBytes + 100, withBannerBytes);
+        Assert.Equal(arrowBytes + 42, withFullMatrixBytes);
+    }
+
+    private static NetworkAgentShoot CreateBodkinShot(Mat3 orientation, Banner banner) =>
+        new NetworkAgentShoot(
+            Guid.NewGuid(),
+            new Vec3(512.37f, 834.21f, 23.65f),
+            new Vec3(48.2f, 31.7f, 9.4f),
+            orientation,
+            hasRigidBody: false,
+            missileItemId: "bodkin_arrows_a",
+            itemModifierId: null,
+            banner,
+            baseSpeed: 58.4f,
+            speed: 59.1f,
+            currentUsageIndex: 0,
+            shotSequence: 4_500_000_123L);
+
+    private static NetworkAgentShoot RoundTrip(NetworkAgentShoot original)
+    {
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(original, serializer);
+        return Assert.IsType<NetworkAgentShoot>(serializer.Deserialize<IMessage>(packet.Data));
+    }
+
+    private static int WireLength(NetworkAgentShoot shot) =>
+        MessagePacket.Create(shot, new ProtoBufSerializer(new SerializableTypeMapper())).Data.Length;
 
     [Fact]
     public void NetworkApplyBattleDamage_RoundTripsMissileContext()

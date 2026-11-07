@@ -125,10 +125,11 @@ public class MissileHandler : IMissileHandler
         Logger.Debug("Sending missile sequence {sequence}, source {index}, item {itemId}, usage {usageIndex}/{usageCount}",
             sequence, payload.What.MissileIndex, missileItem.StringId, missileWeapon.CurrentUsageIndex,
             missileWeapon.WeaponsCount);
+        // Vanilla reads a weapon's banner only to paint a tableau item, so arrows, bolts and javelins skip it.
+        Banner banner = missileItem.IsUsingTableau ? missileWeapon.Banner : null;
         network.SendAll(new NetworkAgentShoot(agentInfo.AgentId, payload.What.Position, payload.What.Direction,
             payload.What.Orientation, payload.What.HasRigidBody, missileItem.StringId, modifierId,
-            missileWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed,
-            missileWeapon.CurrentUsageIndex, sequence));
+            banner, payload.What.BaseSpeed, payload.What.Speed, missileWeapon.CurrentUsageIndex, sequence));
     }
 
     private void AgentShootReceive(MessagePayload<NetworkAgentShoot> payload)
@@ -154,7 +155,7 @@ public class MissileHandler : IMissileHandler
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Failed to reconstruct missile {MissileIndex}", pending.Shot.MissileIndex);
+                Logger.Error(ex, "Failed to reconstruct missile sequence {sequence}", pending.Shot.ShotSequence);
             }
 
             if (retry && pending.Attempts < MaxReconstructionAttempts)
@@ -165,8 +166,8 @@ public class MissileHandler : IMissileHandler
 
             if (retry)
             {
-                Logger.Warning("Dropping missile {MissileIndex}: no cosmetic shooter became available",
-                    pending.Shot.MissileIndex);
+                Logger.Warning("Dropping missile sequence {sequence}: no cosmetic shooter became available",
+                    pending.Shot.ShotSequence);
             }
             CompleteReconstruction(pending.Shot);
         }
@@ -291,8 +292,8 @@ public class MissileHandler : IMissileHandler
             : MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
         if (missileItem == null)
         {
-            Logger.Warning("Cannot reconstruct missile {index}: item {itemId} was not found",
-                shot.MissileIndex, shot.MissileItemId);
+            Logger.Warning("Cannot reconstruct missile sequence {sequence}: item {itemId} was not found",
+                shot.ShotSequence, shot.MissileItemId);
             return true;
         }
 
@@ -303,8 +304,8 @@ public class MissileHandler : IMissileHandler
         if (missileWeapon.IsEmpty || shot.CurrentUsageIndex < 0
             || shot.CurrentUsageIndex >= missileWeapon.WeaponsCount)
         {
-            Logger.Warning("Cannot reconstruct missile {index}: item {itemId} has invalid usage {usageIndex}/{usageCount}",
-                shot.MissileIndex, shot.MissileItemId, shot.CurrentUsageIndex, missileWeapon.WeaponsCount);
+            Logger.Warning("Cannot reconstruct missile sequence {sequence}: item {itemId} has invalid usage {usageIndex}/{usageCount}",
+                shot.ShotSequence, shot.MissileItemId, shot.CurrentUsageIndex, missileWeapon.WeaponsCount);
             return true;
         }
 
@@ -354,7 +355,8 @@ public class MissileHandler : IMissileHandler
 
         if (index < 0 || missileEntity == null || !missileEntity.WeakEntity.IsValid)
         {
-            Logger.Warning("Cannot reconstruct missile {index}: native add returned no entity", shot.MissileIndex);
+            Logger.Warning("Cannot reconstruct missile sequence {sequence}: native add returned no entity",
+                shot.ShotSequence);
             return true;
         }
 
@@ -363,8 +365,7 @@ public class MissileHandler : IMissileHandler
         mission._missilesDictionary[index] = missile;
         reconstructedShots[index] = (missile, shot.AgentId, shot.ShotSequence);
 
-        Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
-            shot.ShotSequence, shot.MissileIndex, index);
+        Logger.Debug("Reconstructed missile sequence {sequence} as local {localIndex}", shot.ShotSequence, index);
         messageBroker.Publish(this, new MissileReconstructed(
             shot.AgentId,
             shot.ShotSequence,
