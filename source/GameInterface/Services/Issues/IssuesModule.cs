@@ -14,6 +14,7 @@ using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
+using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 
 namespace GameInterface.Services.Issues;
 
@@ -51,6 +52,8 @@ internal class IssuesModule : Module
         builder.RegisterType<LesserNobleRevoltWorldEventService>()
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
+        builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
+        builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
