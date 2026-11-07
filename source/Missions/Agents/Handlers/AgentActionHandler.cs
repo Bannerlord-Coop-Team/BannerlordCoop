@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
@@ -68,13 +69,14 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
 /// </summary>
 public class AgentActionHandler : IAgentActionHandler
 {
-    // Reliable delivery fragments, so this is only to avoid one-giant-packet; action changes per frame are few.
+    // Packets are also cut by bytes, so they leave as one datagram instead of reliable fragments.
     private const int MaxAgentsPerActionPacket = 8;
     private const float DiscreteActionSpeedDeltaThreshold = 0.001f;
     private const float AmbientActionSpeedDeltaThreshold = 0.05f;
     private const float AmbientActionSpeedSampleIntervalSeconds = 0.25f;
 
     private readonly IBattleNetwork client;
+    private readonly ICommonSerializer serializer;
     private readonly IPacketManager packetManager;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry agentRegistry;
@@ -131,6 +133,7 @@ public class AgentActionHandler : IAgentActionHandler
 
     public AgentActionHandler(
         IBattleNetwork client,
+        ICommonSerializer serializer,
         IPacketManager packetManager,
         IMessageBroker messageBroker,
         INetworkAgentRegistry agentRegistry,
@@ -140,6 +143,7 @@ public class AgentActionHandler : IAgentActionHandler
         ILocationNpcAuthorityState locationAuthorityState)
     {
         this.client = client;
+        this.serializer = serializer;
         this.packetManager = packetManager;
         this.messageBroker = messageBroker;
         this.agentRegistry = agentRegistry;
@@ -227,7 +231,8 @@ public class AgentActionHandler : IAgentActionHandler
             ids,
             actions,
             sequences,
-            packet => client.SendAll(packet));
+            client.GetMaxUnreliablePayloadBytes(),
+            (packet, data) => client.SendAll(packet, data));
     }
 
     private void PollAgentAction(
@@ -637,7 +642,8 @@ public class AgentActionHandler : IAgentActionHandler
                 ids,
                 actions,
                 sequences,
-                packet => client.Send(controllerId, packet));
+                client.GetMaxUnreliablePayloadBytes(controllerId),
+                (packet, data) => client.Send(controllerId, packet, data));
         });
     }
 
@@ -673,25 +679,54 @@ public class AgentActionHandler : IAgentActionHandler
         List<Guid> ids,
         List<AgentActionData> actions,
         List<long> sequences,
-        Action<AgentActionPacket> send)
+        int maxPacketBytes,
+        Action<AgentActionPacket, byte[]> send)
     {
+        // Direct routes cap at 1000 B, under the 1020 B reliable limit, and relay budgets include the relay wrapper.
         int battleHostEpoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
-        for (int start = 0; start < ids.Count; start += MaxAgentsPerActionPacket)
+        for (int start = 0; start < ids.Count;)
         {
             int count = Math.Min(MaxAgentsPerActionPacket, ids.Count - start);
-            var idChunk = new Guid[count];
-            var dataChunk = new AgentActionData[count];
-            var sequenceChunk = new long[count];
-            ids.CopyTo(start, idChunk, 0, count);
-            actions.CopyTo(start, dataChunk, 0, count);
-            sequences.CopyTo(start, sequenceChunk, 0, count);
-            send(new AgentActionPacket(
-                controllerId,
-                idChunk,
-                dataChunk,
-                sequenceChunk,
-                battleHostEpoch));
+            AgentActionPacket packet = CreateActionPacket(
+                controllerId, ids, actions, sequences, start, count, battleHostEpoch);
+            byte[] data = serializer.Serialize(packet);
+            while (count > 1 && maxPacketBytes > 0 && data.Length > maxPacketBytes)
+            {
+                // Entries vary in size (equipment snapshots), so shrink by the overshoot and measure again.
+                count = Math.Max(1, Math.Min(count - 1, (count * maxPacketBytes) / data.Length));
+                packet = CreateActionPacket(
+                    controllerId, ids, actions, sequences, start, count, battleHostEpoch);
+                data = serializer.Serialize(packet);
+            }
+#if DEBUG
+            MissionActionDiagnostics.RecordActionPacketSent(packet, data.Length);
+#endif
+            send(packet, data);
+            start += count;
         }
+    }
+
+    private static AgentActionPacket CreateActionPacket(
+        string controllerId,
+        List<Guid> ids,
+        List<AgentActionData> actions,
+        List<long> sequences,
+        int start,
+        int count,
+        int battleHostEpoch)
+    {
+        var idChunk = new Guid[count];
+        var dataChunk = new AgentActionData[count];
+        var sequenceChunk = new long[count];
+        ids.CopyTo(start, idChunk, 0, count);
+        actions.CopyTo(start, dataChunk, 0, count);
+        sequences.CopyTo(start, sequenceChunk, 0, count);
+        return new AgentActionPacket(
+            controllerId,
+            idChunk,
+            dataChunk,
+            sequenceChunk,
+            battleHostEpoch);
     }
 
     private long NextActionSequence(Guid agentId)
