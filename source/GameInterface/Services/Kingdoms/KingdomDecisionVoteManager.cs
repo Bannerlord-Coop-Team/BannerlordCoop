@@ -1911,32 +1911,32 @@ namespace GameInterface.Services.Kingdoms
 
         private void ApplyMissingVotes(KingdomDecisionVoteState state)
         {
-            // Peace could be signed while a player was still fighting, so the server can count a missing peace vote as a full vote against it.
-            KingdomDecisionVoteData peaceRefusal = null;
+            // A player who misses a peace vote, say in a siege battle, counts as one vote against peace.
+            DecisionOutcome peaceRefusal = null;
+            HashSet<string> onlineClanIds = null;
             if (state.Decision is MakePeaceKingdomDecision && ModConfigProvider.ModOptions.KingdomDecisionPeaceUnvotedPlayersAgainst)
             {
-                DecisionOutcome refusalOutcome = state.Election._possibleOutcomes.FirstOrDefault(outcome =>
+                peaceRefusal = state.Election._possibleOutcomes.FirstOrDefault(outcome =>
                     outcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: false });
-                int refusalIndex = GetOutcomeIndex(refusalOutcome, state.Election);
-                peaceRefusal = new KingdomDecisionVoteData(
-                    state.KingdomId, state.DecisionIndex, refusalIndex, (int)Supporter.SupportWeights.FullyPush, false, true);
+                onlineClanIds = GetEligibleClanIds(state.Decision);
             }
 
             foreach (string clanId in state.EligibleClanIds.Where(clanId => !state.FinalVotes.ContainsKey(clanId)))
             {
                 if (!TryGetClan(clanId, state.Decision.Kingdom, out Clan clan)) continue;
-                if (peaceRefusal != null)
-                {
-                    ApplyVoteToElection(state.Election, clan, peaceRefusal);
-                    Logger.Information("Counted clan {ClanId} against peace because it did not vote", clanId);
-                    continue;
-                }
 
                 ResetClanSupport(state.Election, clan);
                 if (state.Election._chooser == clan)
                 {
                     state.Election._chosenOutcome = null;
                 }
+
+                // Only a supporter, never the ruler's pick, so other clans can still outvote it.
+                if (peaceRefusal == null) continue;
+                if (!onlineClanIds.Contains(clanId)) continue;
+
+                peaceRefusal.AddSupport(new Supporter(clan) { SupportWeight = Supporter.SupportWeights.FullyPush });
+                Logger.Information("Counted clan {ClanId} against peace because it did not vote", clanId);
             }
             state.Election.DetermineOfficialSupport();
         }

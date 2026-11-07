@@ -2922,12 +2922,20 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void PeaceVote_UnvotedPlayerCountsAgainstPeaceWhenOptionOn(bool unvotedPlayersAgainst)
+    [InlineData(true, false, 0, true)]
+    [InlineData(false, false, 0, false)]
+    [InlineData(true, true, 0, false)]
+    [InlineData(true, false, 2, false)]
+    public void PeaceVote_UnvotedPlayerCountsAgainstPeaceWhenOptionOn(
+        bool unvotedPlayersAgainst,
+        bool playerConfirmsAbstain,
+        int otherFullPeaceVotes,
+        bool expectWar)
     {
         ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionPeaceUnvotedPlayersAgainst = unvotedPlayersAgainst });
-        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
         var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var enemyClanId = CreateSyncedNpcClan();
@@ -2950,13 +2958,46 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 .Single(outcome => outcome.ShouldPeaceBeDeclared);
             Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
 
+            // The player clan rules this kingdom, so a missing vote must not become the ruler's pick.
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            Assert.Same(playerClan, playerKingdom.RulingClan);
+            var playerDecision = Assert.Single(playerKingdom.UnresolvedDecisions);
+            var states = (System.Collections.IDictionary)AccessTools
+                .Field(typeof(KingdomDecisionVoteManager), "DecisionStates")
+                .GetValue(GetConcreteVoteManager(Server));
+            var election = (KingdomElection)AccessTools.Property(states[playerDecision].GetType(), "Election").GetValue(states[playerDecision]);
+            var playerPeaceOutcome = election._possibleOutcomes
+                .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldPeaceBeDeclared);
+            for (int i = 0; i < otherFullPeaceVotes; i++)
+            {
+                playerPeaceOutcome.AddSupport(new Supporter(enemyClan) { SupportWeight = Supporter.SupportWeights.FullyPush });
+            }
+        });
+
+        if (playerConfirmsAbstain)
+        {
+            client.SimulateMessage(this, new KingdomDecisionVoteRequested(new KingdomDecisionVoteData(
+                playerKingdomId,
+                decisionIndex: 0,
+                outcomeIndex: -1,
+                supportWeight: (int)Supporter.SupportWeights.StayNeutral,
+                isAbstain: true,
+                isFinal: true)));
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+
             GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
 
             Assert.Empty(playerKingdom.UnresolvedDecisions);
-            Assert.Equal(unvotedPlayersAgainst, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+            Assert.Equal(expectWar, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
         });
 
-        Assert.Equal(unvotedPlayersAgainst ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Count());
+        Assert.Equal(expectWar ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Count());
     }
 
     [Fact]

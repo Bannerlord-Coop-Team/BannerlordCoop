@@ -166,7 +166,7 @@
     "kingdomDecisionMissionHoldLimitMinutes": 10,
 
     // Set how a player who hasn't voted counts in a peace vote for their own kingdom, so peace isn't signed while they are busy fighting.
-    // (Default) true: The player counts as voting against peace.
+    // (Default) true: The player counts as one vote against peace. Players who are offline when the vote ends, or who chose to abstain, are not counted.
     // false: The player counts as abstaining, like in other kingdom votes.
     "kingdomDecisionPeaceUnvotedPlayersAgainst": true,
 
