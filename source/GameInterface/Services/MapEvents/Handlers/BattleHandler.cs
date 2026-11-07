@@ -192,8 +192,8 @@ internal class BattleHandler : IHandler
         ));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
-        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
-        // synced add (the client's own add is intercepted and routed to the server).
+        // blocks them now. Server-driven because this handler returns on a client, even when a replicated add
+        // raises MapEventInvolvedPartiesAdded there.
         var playerPartyIds = new List<string>();
         foreach (var addedParty in message.AddedParties)
         {
