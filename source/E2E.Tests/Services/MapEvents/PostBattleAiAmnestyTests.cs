@@ -1,4 +1,4 @@
-﻿﻿using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Configuration;
@@ -153,8 +153,16 @@ public class PostBattleAiAmnestyTests : MapEventTestBase
         {
             Campaign.Current.MainParty ??= GameObjectCreator.CreateInitializedObject<MobileParty>();
             Campaign.Current.SpeedUpMultiplier = 4f;
+            var previousMode = Campaign.Current.TimeControlMode;
             TimePatches.OverrideTimeControlMode(mode);
-            Campaign.Current.TickMapTime(seconds);
+            try
+            {
+                Campaign.Current.TickMapTime(seconds);
+            }
+            finally
+            {
+                TimePatches.OverrideTimeControlMode(previousMode);
+            }
         });
     }
 
