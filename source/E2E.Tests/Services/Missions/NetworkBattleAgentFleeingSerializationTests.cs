@@ -20,10 +20,10 @@ public class NetworkBattleAgentFleeingSerializationTests
     }
 
     [Fact]
-    public void NetworkBattleAgentFleeing_RoundTripsAgentId()
+    public void NetworkBattleAgentFleeing_RoundTripsAgentIdAndRevision()
     {
         var agentId = Guid.NewGuid();
-        var original = new NetworkBattleAgentFleeing(agentId);
+        var original = new NetworkBattleAgentFleeing(agentId, 3);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -31,15 +31,16 @@ public class NetworkBattleAgentFleeingSerializationTests
             serializer.Deserialize<IMessage>(packet.Data));
 
         Assert.Equal(agentId, result.AgentId);
+        Assert.Equal(3, result.AuthorityRevision);
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void NetworkBattleAgentRetreatState_RoundTripsAgentIdAndFlag(bool isRunningAway)
+    public void NetworkBattleAgentRetreatState_RoundTripsAgentIdFlagAndRevision(bool isRunningAway)
     {
         var agentId = Guid.NewGuid();
-        var original = new NetworkBattleAgentRetreatState(agentId, isRunningAway);
+        var original = new NetworkBattleAgentRetreatState(agentId, isRunningAway, 3);
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -48,6 +49,7 @@ public class NetworkBattleAgentFleeingSerializationTests
 
         Assert.Equal(agentId, result.AgentId);
         Assert.Equal(isRunningAway, result.IsRunningAway);
+        Assert.Equal(3, result.AuthorityRevision);
     }
 
     [Fact]

@@ -198,7 +198,7 @@ public class PuppetSpawner : IPuppetSpawner
         if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != data.OwnerControllerId
             || info.AuthorityRevision != data.AuthorityRevision || info.Agent == null || !info.Agent.IsActive()) return;
 
-        puppetRoutApplier?.ApplyRetreatState(info.Agent, data.IsRunningAway);
+        puppetRoutApplier?.ApplyRetreatSnapshot(data.AgentId, data.IsRunningAway, data.AuthorityRevision);
 
         if (data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) return;
         if (!TryResolveCrewFormation(data.ShipId, data.FormationIndex, out int formationIndex)) return;

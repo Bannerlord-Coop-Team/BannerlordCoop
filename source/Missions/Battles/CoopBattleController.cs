@@ -459,6 +459,7 @@ public class CoopBattleController : CoopMissionController
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
 
         deathReporter.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+        puppetRoutApplier.ForgetRemovedAgent(affectedAgent);
     }
 
     public override void OnAgentFleeing(Agent affectedAgent)

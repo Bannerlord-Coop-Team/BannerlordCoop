@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using Common;
 using Common.Messaging;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
@@ -84,7 +85,7 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
                 new CasualtyAttributionMap(),
                 new BattleAgentFader());
 
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
             applier.DrainPendingRouts();
 
             peerAgent = mock.SpawnAgent(
@@ -276,7 +277,7 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             var agent = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(registry.TryRegisterAgent("previous-owner", agentId, agent));
-            adopter.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentRetreatState(agentId, true));
+            adopter.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
             GameThread.Run(() => { }, blocking: true);
             Assert.True(agent.IsRunningAway);
             Assert.True(registry.TryTransferAuthority("adopter", agentId));
@@ -289,6 +290,7 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         var state = Assert.Single(observer.InternalMessages.GetMessages<NetworkBattleAgentRetreatState>());
         Assert.Equal(agentId, state.AgentId);
         Assert.False(state.IsRunningAway);
+        Assert.Equal(1, state.AuthorityRevision);
         GC.KeepAlive(observerController);
     }
 
@@ -308,7 +310,7 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             var puppet = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(observer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("previous-owner", agentId, puppet));
-            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
             GameThread.Run(() => { }, blocking: true);
             Assert.True(puppet.IsRunningAway);
 
@@ -337,6 +339,121 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         });
     }
 
+    // The flag was buffered before the puppet registered, so only the revision says the adopter's refresh is newer.
+    [Fact]
+    public void AuthorityRefresh_RetiresAnOlderBufferedFlag()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, observer, Guid.NewGuid().ToString());
+            var controller = observer.Resolve<CoopBattleController>();
+            var broker = observer.Resolve<IMessageBroker>();
+            var agentId = Guid.NewGuid();
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
+            GameThread.Run(() => { }, blocking: true);
+
+            var puppet = RegisterPreviousOwnersPuppet(observer, mock, agentId);
+            PublishAuthorityRefresh(broker, agentId, isRunningAway: false, authorityRevision: 1);
+            Assert.False(puppet.IsRunningAway);
+
+            controller.OnMissionTick(1f);
+
+            Assert.False(puppet.IsRunningAway);
+            GC.KeepAlive(controller);
+        });
+    }
+
+    // Two senders share no ordering, so the previous owner's last message can land after its successor's refresh.
+    [Fact]
+    public void PreviousOwnersFlag_ArrivingAfterTheAuthorityRefresh_IsIgnored()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, observer, Guid.NewGuid().ToString());
+            var controller = observer.Resolve<CoopBattleController>();
+            var broker = observer.Resolve<IMessageBroker>();
+            var agentId = Guid.NewGuid();
+            var puppet = RegisterPreviousOwnersPuppet(observer, mock, agentId);
+            PublishAuthorityRefresh(broker, agentId, isRunningAway: false, authorityRevision: 1);
+
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
+            GameThread.Run(() => { }, blocking: true);
+            controller.OnMissionTick(1f);
+
+            Assert.False(puppet.IsRunningAway);
+            Assert.Equal(0, mock.AgentFleeingCalls);
+            GC.KeepAlive(controller);
+        });
+    }
+
+    // The other side of the refresh's boundary: a transition from an authority this client hasn't reached yet still counts.
+    [Fact]
+    public void AuthorityRefresh_KeepsANewerBufferedFlag_UntilItsAuthorityArrives()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, observer, Guid.NewGuid().ToString());
+            var controller = observer.Resolve<CoopBattleController>();
+            var broker = observer.Resolve<IMessageBroker>();
+            var agentId = Guid.NewGuid();
+            var puppet = RegisterPreviousOwnersPuppet(observer, mock, agentId);
+
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 2));
+            GameThread.Run(() => { }, blocking: true);
+            PublishAuthorityRefresh(broker, agentId, isRunningAway: false, authorityRevision: 1);
+            controller.OnMissionTick(1f);
+            Assert.False(puppet.IsRunningAway);
+
+            Assert.True(observer.Resolve<INetworkAgentRegistry>().TryTransferAuthority("later-owner", agentId, 2));
+            controller.OnMissionTick(1f);
+
+            Assert.True(puppet.IsRunningAway);
+            GC.KeepAlive(controller);
+        });
+    }
+
+    // One sender's stream is ordered, so its snapshot replaces a flag it sent earlier at that revision, but not its panic.
+    [Fact]
+    public void AuthorityRefresh_ReplacesAnEarlierFlagOfItsOwnRevision_AndKeepsThePanic()
+    {
+        using var fixture = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, "observer");
+
+        observer.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, observer, Guid.NewGuid().ToString());
+            var controller = observer.Resolve<CoopBattleController>();
+            var broker = observer.Resolve<IMessageBroker>();
+            var agentId = Guid.NewGuid();
+            var puppet = RegisterPreviousOwnersPuppet(observer, mock, agentId);
+
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 1));
+            GameThread.Run(() => { }, blocking: true);
+            Assert.Equal(0, mock.AgentFleeingCalls);
+
+            PublishAuthorityRefresh(broker, agentId, isRunningAway: false, authorityRevision: 1);
+            controller.OnMissionTick(1f);
+
+            Assert.False(puppet.IsRunningAway);
+            Assert.Equal(1, mock.AgentFleeingCalls);
+            GC.KeepAlive(controller);
+        });
+    }
+
     // A panic the owner announced after a rally has to win, whichever order the two buffers happen to drain in.
     [Fact]
     public void BufferedRallyThenPanic_LeavesThePuppetRunningAway()
@@ -356,8 +473,8 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
                 new BattleAgentFader());
 
             var agentId = Guid.NewGuid();
-            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false));
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false, 0));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
             GameThread.Run(() => { }, blocking: true);
 
             var puppet = mock.SpawnAgent(
@@ -389,13 +506,13 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
                 new BattleAgentFader());
 
             var agentId = Guid.NewGuid();
-            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false, 0));
             GameThread.Run(() => { }, blocking: true);
 
             var puppet = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", agentId, puppet));
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
             GameThread.Run(() => { }, blocking: true);
             applier.DrainPendingRouts();
 
@@ -426,20 +543,20 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             puppet.Formation = mock.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", agentId, puppet));
 
-            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, true, 0));
             GameThread.Run(() => { }, blocking: true);
             Assert.Equal(0, mock.AgentFleeingCalls);
             Assert.True(AgentMirror.TryGet(puppet, out var agentMirror));
             Assert.NotNull(agentMirror.Formation);
 
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
             GameThread.Run(() => { }, blocking: true);
             Assert.Equal(1, mock.AgentFleeingCalls);
             Assert.Null(agentMirror.Formation);
 
-            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false));
-            broker.Publish(this, new NetworkBattleAgentFleeing(agentId));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(agentId, false, 0));
+            broker.Publish(this, new NetworkBattleAgentFleeing(agentId, 0));
             GameThread.Run(() => { }, blocking: true);
             Assert.Equal(2, mock.AgentFleeingCalls);
             Assert.True(puppet.IsRunningAway);
@@ -466,9 +583,9 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
 
             var runningAwayId = Guid.NewGuid();
             var ralliedId = Guid.NewGuid();
-            broker.Publish(this, new NetworkBattleAgentRetreatState(runningAwayId, true));
-            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, true));
-            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, false));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(runningAwayId, true, 0));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, true, 0));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, false, 0));
             GameThread.Run(() => { }, blocking: true);
 
             var runningAway = mock.SpawnAgent(
@@ -483,6 +600,38 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             Assert.True(runningAway.IsRunningAway);
             Assert.False(rallied.IsRunningAway);
         });
+    }
+
+    // A fleeing or fighting puppet the previous owner registered at revision 0.
+    private static Agent RegisterPreviousOwnersPuppet(EnvironmentInstance instance, MockMission mission, Guid agentId)
+    {
+        var puppet = mission.SpawnAgent(
+            new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+        Assert.True(instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("previous-owner", agentId, puppet));
+        return puppet;
+    }
+
+    // Delivers the snapshot an adopter broadcasts as the agent's new owner.
+    private void PublishAuthorityRefresh(IMessageBroker broker, Guid agentId, bool isRunningAway, long authorityRevision)
+    {
+        var refresh = new BattleAgentSpawnData(
+            agentId,
+            "character",
+            default,
+            BattleSideEnum.Defender,
+            100f,
+            "adopter",
+            "party",
+            1,
+            new Equipment(),
+            new BodyProperties(),
+            new MissionEquipmentData(new()),
+            originalOwnerControllerId: "previous-owner",
+            movementScopeId: "previous-owner",
+            isRunningAway: isRunningAway,
+            authorityRevision: authorityRevision);
+        broker.Publish(this, new NetworkSpawnBattleAgents(new[] { refresh }));
+        GameThread.Run(() => { }, blocking: true);
     }
 
     // Calls the generated dispatcher native reaches, which resolves the agent from the engine's managed object table.

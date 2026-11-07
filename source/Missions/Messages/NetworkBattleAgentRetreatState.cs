@@ -17,9 +17,14 @@ public class NetworkBattleAgentRetreatState : IEvent
     [ProtoMember(2)]
     public readonly bool IsRunningAway;
 
-    public NetworkBattleAgentRetreatState(Guid agentId, bool isRunningAway)
+    // The sender's authority revision of the agent, so a peer can tell a previous owner's late message from a current one.
+    [ProtoMember(3)]
+    public readonly long AuthorityRevision;
+
+    public NetworkBattleAgentRetreatState(Guid agentId, bool isRunningAway, long authorityRevision)
     {
         AgentId = agentId;
         IsRunningAway = isRunningAway;
+        AuthorityRevision = authorityRevision;
     }
 }
