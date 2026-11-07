@@ -406,7 +406,14 @@ internal class BattleHostHandler : IHandler
             }
             else
             {
-                ElectHost(mapEventId, mapEvent, requesterId);
+                // A leader's peer clears a frame before its departure runs, so a player already waiting still hosts first.
+                // The leader itself asking is not that case, so it still takes over from the waiting players.
+                var waiting = battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) ? runtimeState.HideoutHostCandidates : null;
+                bool anotherPlayerWaits = waiting?.Count > 0 && waiting[0].ControllerId != requesterId;
+                if (anotherPlayerWaits && !ShouldAwaitHideoutLeader(mapEventId, mapEvent, controllerId: null))
+                    ElectFirstHideoutCandidate(mapEventId, mapEvent, runtimeState);
+                else
+                    ElectHost(mapEventId, mapEvent, requesterId);
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties

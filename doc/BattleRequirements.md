@@ -128,9 +128,10 @@ have not been assigned to another player.
 The campaign server shall maintain, for each battle instance, an ordered list of players based on
 the sequence in which they became mission-ready in the mission instance, as observed by the
 server. A player still on the loading screen has not yet joined for the purposes of this
-ordering, so the first entry in the list is the initially elected host (BR-010). In a hideout the
-players who waited for the assault leader keep their place in this order, and join the successor
-line once the host's hideout state reaches them.
+ordering, so the first entry in the list is the initially elected host (BR-010). In a hideout a
+player joins the successor line only once the host's hideout state reaches it, so players who
+waited for the assault leader join in the order their hideout state ready requests arrive, not
+the order they became mission-ready.
 
 ### BR-014 — Host Migration
 

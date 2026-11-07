@@ -24,8 +24,9 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
 {
     private const string LeaderControllerId = "ctrl-Leader";
     private const string AllyControllerId = "ctrl-Ally";
+    private const string SecondAllyControllerId = "ctrl-SecondAlly";
 
-    public HideoutAssaultHostElectionTests(ITestOutputHelper output) : base(output) { }
+    public HideoutAssaultHostElectionTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
     [Fact]
     public void AllyLoadsBeforeAssaultLeader_LeaderBecomesHost()
@@ -110,8 +111,10 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
             AssertHostController(instance, mapEventId, AllyControllerId);
     }
 
-    [Fact]
-    public void AssaultLeaderDisconnectsWhileLoading_WaitingAllyHosts()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AssaultLeaderDisconnectsWhileLoading_WaitingAllyHosts(bool secondAllyReadyBeforeDeparture)
     {
         var mapEventId = SetupHideoutAssault();
         var clients = Clients.ToArray();
@@ -120,11 +123,20 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
         EnterBattle(clients[1], mapEventId);
         AssertNoHost(Server, mapEventId);
 
-        Server.Call(() =>
+        if (secondAllyReadyBeforeDeparture)
         {
-            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(clients[0].NetPeer, default));
-        });
-        Server.PumpGameThread();
+            // The leader's peer clears at once while its map event departure still waits for the game thread
+            Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(clients[0].NetPeer));
+            EnterBattle(clients[2], mapEventId);
+        }
+        else
+        {
+            Server.Call(() =>
+            {
+                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(clients[0].NetPeer, default));
+            });
+            Server.PumpGameThread();
+        }
 
         foreach (var instance in Clients.Append(Server))
             AssertHostController(instance, mapEventId, AllyControllerId);
@@ -195,27 +207,32 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
         var clients = Clients.ToArray();
         SetControllerId(clients[0], LeaderControllerId);
         SetControllerId(clients[1], AllyControllerId);
+        SetControllerId(clients[2], SecondAllyControllerId);
 
         string? mapEventId = null;
         string? leaderPartyId = null;
         string? allyPartyId = null;
+        string? secondAllyPartyId = null;
 
         Server.Call(() =>
         {
             var leader = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var ally = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var secondAlly = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var bandits = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
             mapEvent.Initialize(leader.Party, bandits.Party);
             ally.Party.MapEventSide = mapEvent.AttackerSide;
+            secondAlly.Party.MapEventSide = mapEvent.AttackerSide;
             mapEvent.MapEventVisual = null;
             Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             Assert.True(Server.ObjectManager.TryGetId(leader, out leaderPartyId));
             Assert.True(Server.ObjectManager.TryGetId(ally, out allyPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(secondAlly, out secondAllyPartyId));
         }, MapEventDisabledMethods);
 
         foreach (var instance in Clients.Append(Server))
@@ -230,12 +247,14 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
 
         RegisterAsPlayerParty(LeaderControllerId, CreateRegisteredObject<Hero>(), leaderPartyId!);
         RegisterAsPlayerParty(AllyControllerId, CreateRegisteredObject<Hero>(), allyPartyId!);
+        RegisterAsPlayerParty(SecondAllyControllerId, CreateRegisteredObject<Hero>(), secondAllyPartyId!);
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
             if (leaderConnected)
                 players.SetPeer(LeaderControllerId, clients[0].NetPeer);
             players.SetPeer(AllyControllerId, clients[1].NetPeer);
+            players.SetPeer(SecondAllyControllerId, clients[2].NetPeer);
         });
 
         Server.Call(() =>
