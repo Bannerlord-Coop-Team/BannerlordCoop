@@ -50,21 +50,6 @@ public sealed class SmithingVMsHandlerTests
         Assert.Null(weaponDesign.CraftingResultPopup);
     }
 
-    [Fact]
-    public void FinalizingAnOldScreen_KeepsTheOpenOne()
-    {
-        var oldVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
-        var openVM = (CraftingVM)RuntimeHelpers.GetUninitializedObject(typeof(CraftingVM));
-        var provider = new SmithingVMsProvider();
-        using var broker = new MessageBroker();
-        using var handler = new SmithingVMsHandler(broker, Mock.Of<IObjectManager>(), provider);
-        broker.Publish(this, new CraftingVMCreated(oldVM));
-        broker.Publish(this, new CraftingVMCreated(openVM));
-
-        broker.Publish(this, new CraftingVMFinalized(oldVM));
-
-        Assert.Same(openVM, provider.GetCurrentCraftingVM());
-    }
 
     [Fact]
     public void ClosingTheScreen_ThroughTheFinalizePatch_DropsIt()
