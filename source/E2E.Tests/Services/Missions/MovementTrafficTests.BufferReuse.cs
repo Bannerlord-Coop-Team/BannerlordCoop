@@ -183,6 +183,10 @@ public partial class MovementTrafficTests
 
         Assert.Equal(12, states.Count);
         Assert.All(states, state => Assert.Equal(0, state.Retained));
+        // A list that was never filled stays at capacity 0, so this also fails if a buffer goes back to a local.
+        Assert.True(states[0].OwnedAgents >= 8, $"owned agents capacity was {states[0].OwnedAgents}");
+        Assert.True(states[0].Captured >= 5, $"captured capacity was {states[0].Captured}");
+        Assert.True(states[0].RecipientIds >= 3, $"recipient capacity was {states[0].RecipientIds}");
         // Eight agents are owned from the first tick, so every list is already at its final size.
         Assert.All(states, state => Assert.Equal(states[0], state));
     }
