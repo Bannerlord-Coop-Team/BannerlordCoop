@@ -87,17 +87,24 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
             AssertHostController(instance, mapEventId, AllyControllerId);
     }
 
-    [Fact]
-    public void AssaultLeaderWithdrawsWhileLoading_WaitingAllyHosts()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AssaultLeaderWithdrawsWhileLoading_WaitingAllyHosts(bool allyReadyFirst)
     {
         var mapEventId = SetupHideoutAssault();
         var clients = Clients.ToArray();
 
         EnterBattle(clients[0], mapEventId, missionReady: false);
-        EnterBattle(clients[1], mapEventId);
-        AssertNoHost(Server, mapEventId);
+        if (allyReadyFirst)
+        {
+            EnterBattle(clients[1], mapEventId);
+            AssertNoHost(Server, mapEventId);
+        }
 
         DepartBattle(LeaderControllerId, mapEventId, wasRetreat: true);
+        if (!allyReadyFirst)
+            EnterBattle(clients[1], mapEventId);
 
         foreach (var instance in Clients.Append(Server))
             AssertHostController(instance, mapEventId, AllyControllerId);

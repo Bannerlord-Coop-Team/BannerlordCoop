@@ -96,6 +96,12 @@ Armies shall be able to join the battle with the same join restrictions as mobil
 The first player to become **mission-ready** — to finish loading the battle mission, as observed
 by the campaign server — shall become the mission host.
 
+A hideout battle is the exception, because its boss duel runs on the host's own hero. While the
+player whose party leads the attacker side is connected and has not left the battle, players who
+become ready before it wait and the leader becomes the host when it is ready. If the leader leaves,
+withdraws or disconnects before hosting, or is not ready within 90 seconds of the first waiting
+player, the earliest waiting player becomes the host instead.
+
 The campaign server shall arbitrate the election (BR-101) and shall issue the unowned (NPC) troop
 reserves to the elected host together with the election, so that the host fields the NPC troops
 as soon as it is able to spawn them.
@@ -122,7 +128,9 @@ have not been assigned to another player.
 The campaign server shall maintain, for each battle instance, an ordered list of players based on
 the sequence in which they became mission-ready in the mission instance, as observed by the
 server. A player still on the loading screen has not yet joined for the purposes of this
-ordering, so the first entry in the list is the initially elected host (BR-010).
+ordering, so the first entry in the list is the initially elected host (BR-010). In a hideout the
+players who waited for the assault leader keep their place in this order, and join the successor
+line once the host's hideout state reaches them.
 
 ### BR-014 — Host Migration
 
