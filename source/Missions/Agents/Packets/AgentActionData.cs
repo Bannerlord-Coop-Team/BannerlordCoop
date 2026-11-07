@@ -36,10 +36,12 @@ namespace Missions.Agents.Packets
             NameCache.GetName(actionCode);
 
         internal static bool IsRangedSiegeUsageAction(int actionCode) =>
-            NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsRangedSiegeUsage == true;
+            actionCode >= 0
+            && NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsRangedSiegeUsage == true;
 
         internal static bool IsOrderGestureAction(int actionCode) =>
-            NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsOrderGesture == true;
+            actionCode >= 0
+            && NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsOrderGesture == true;
 
         private static string ReadNativeActionName(int actionCode)
         {

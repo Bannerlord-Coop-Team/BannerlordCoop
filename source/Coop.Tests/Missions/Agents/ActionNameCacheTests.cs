@@ -7,7 +7,7 @@ namespace Coop.Tests.Missions.Agents;
 // #4486: the per-frame action poll must not reach the reflective native name lookup for a code it already saw.
 public class ActionNameCacheTests
 {
-    private readonly Dictionary<int, string> names = new Dictionary<int, string>();
+    private readonly Dictionary<int, string?> names = new Dictionary<int, string?>();
     private readonly Dictionary<string, int> indexes = new Dictionary<string, int>();
     private int nameReads;
     private int indexReads;
@@ -16,7 +16,7 @@ public class ActionNameCacheTests
         code =>
         {
             nameReads++;
-            return names.TryGetValue(code, out string name) ? name : null;
+            return names.TryGetValue(code, out string? name) ? name : null;
         },
         name =>
         {
@@ -76,23 +76,27 @@ public class ActionNameCacheTests
     }
 
     [Fact]
-    public void Describe_NoName_HasNoEntry()
-    {
-        Assert.Null(CreateCache().Describe(3, null));
-    }
-
-    [Fact]
-    public void Describe_SameNameInstance_ServesTheEntryFromGetName()
+    public void Describe_SameNameInstance_ReusesTheEntryWithoutReadingTheSourceAgain()
     {
         names[9] = "act_usage_ballista_idle_defender";
         var cache = CreateCache();
 
-        string name = cache.GetName(9);
-        ActionNameCache.Entry first = cache.Describe(9, name);
+        ActionNameCache.Entry first = cache.Describe(9, cache.GetName(9));
         ActionNameCache.Entry second = cache.Describe(9, cache.GetName(9));
 
         Assert.Same(first, second);
         Assert.True(first.IsRangedSiegeUsage);
+        Assert.Equal(1, nameReads);
+    }
+
+    [Fact]
+    public void GetName_AfterDescribeWithAPatchedName_StillAsksTheSource()
+    {
+        // A patched name source hands Describe a name the native tables never gave.
+        var cache = CreateCache();
+        cache.Describe(6, "act_usage_mangonel_big_idle");
+
+        Assert.Null(cache.GetName(6));
         Assert.Equal(1, nameReads);
     }
 

@@ -376,8 +376,8 @@ public class AgentActionHandler : IAgentActionHandler
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
         {
-            action0Discrete |= action0 >= 0 && AgentActionData.IsOrderGestureAction(action0);
-            action1Discrete |= action1 >= 0 && AgentActionData.IsOrderGestureAction(action1);
+            action0Discrete |= AgentActionData.IsOrderGestureAction(action0);
+            action1Discrete |= AgentActionData.IsOrderGestureAction(action1);
         }
 
         // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
@@ -865,7 +865,7 @@ public class AgentActionHandler : IAgentActionHandler
     private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
     {
         if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
-        return actionIndex >= 0 && AgentActionData.IsRangedSiegeUsageAction(actionIndex);
+        return AgentActionData.IsRangedSiegeUsageAction(actionIndex);
     }
 
     internal static bool IsRangedSiegeUsage(string actionName)

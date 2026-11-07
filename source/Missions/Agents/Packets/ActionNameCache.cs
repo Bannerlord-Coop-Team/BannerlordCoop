@@ -5,15 +5,10 @@ using System.Collections.Concurrent;
 namespace Missions.Agents.Packets
 {
     /// <summary>
-    /// Remembers what the native animation tables answered for an action code: its name, whether it is a ranged
-    /// siege use or a main-agent order gesture, and the index the name resolves to. Codes are fixed once the
-    /// action sets load, so a hit skips the reflective native call on the per-frame action poll.
+    /// Remembers what the native animation tables answered for an action code (name, siege usage and order gesture
+    /// classification, resolved index) so the per-frame action poll skips the reflective native call after the first
+    /// sighting. Codes are fixed once the action sets load, and a null name is never stored.
     /// </summary>
-    /// <remarks>
-    /// A null name is never stored, so a missing animation resolver (E2E runtime) keeps falling through to the
-    /// caller's fallback. An entry is only trusted while the name handed to <see cref="Describe"/> is the same
-    /// string instance it was filled from, so a patched or changed name source can't read a stale answer.
-    /// </remarks>
     internal sealed class ActionNameCache
     {
         /// <summary>What is known about one action code, computed once from its name.</summary>
@@ -34,6 +29,9 @@ namespace Missions.Agents.Packets
             internal int ResolvedIndex = -1;
         }
 
+        // Only the name source writes names. Entries are keyed by whatever name the caller just got, which a patched
+        // name source can change, so an entry is reused only while it holds the same string instance.
+        private readonly ConcurrentDictionary<int, string> names = new ConcurrentDictionary<int, string>();
         private readonly ConcurrentDictionary<int, Entry> entries = new ConcurrentDictionary<int, Entry>();
         private readonly Func<int, string> nameSource;
         private readonly Func<string, int> indexSource;
@@ -44,14 +42,14 @@ namespace Missions.Agents.Packets
             this.indexSource = indexSource;
         }
 
-        internal int Count => entries.Count;
+        internal int Count => names.Count;
 
         internal string GetName(int actionCode)
         {
-            if (entries.TryGetValue(actionCode, out Entry cached)) return cached.Name;
+            if (names.TryGetValue(actionCode, out string cached)) return cached;
 
             string name = nameSource(actionCode);
-            if (name != null) entries[actionCode] = new Entry(name);
+            if (name != null) names[actionCode] = name;
             return name;
         }
 
