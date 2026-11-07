@@ -40,6 +40,10 @@ public class SteamGameServerNetworkingTunnelTransport : SteamNetworkingTunnelTra
         ref SteamNetConnectionRealTimeLaneStatus_t laneStatus)
         => SteamGameServerNetworkingSockets.GetConnectionRealTimeStatus(conn, ref status, lanes, ref laneStatus);
 
+    // Reads the connection's info block through the game-server-flavor sockets.
+    protected override bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info)
+        => SteamGameServerNetworkingSockets.GetConnectionInfo(conn, out info);
+
     protected override HSteamNetConnection ConnectP2P(ref SteamNetworkingIdentity identity, int virtualPort,
         int options, SteamNetworkingConfigValue_t[] optionValues)
         => SteamGameServerNetworkingSockets.ConnectP2P(ref identity, virtualPort, options, optionValues);

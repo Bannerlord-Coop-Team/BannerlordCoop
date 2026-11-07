@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
@@ -56,6 +57,10 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(15)]
     public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
     [ProtoMember(16)]
+    public NavalPlayerData NavalPlayerData { get; }
+    [ProtoMember(17)]
+    public string[] HeldLootShipIds { get; }
+    [ProtoMember(18)]
     public ViewDataPlayerData ViewDataPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
@@ -70,10 +75,12 @@ public record NetworkGameSaveDataReceived : IEvent
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        string[] heldLootShipIds = null,
         ViewDataPlayerData viewDataPlayerData = null)
     {
         GameSaveData = gameSaveData;
@@ -87,10 +94,12 @@ public record NetworkGameSaveDataReceived : IEvent
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        HeldLootShipIds = heldLootShipIds;
         ViewDataPlayerData = viewDataPlayerData;
     }
 }

@@ -29,6 +29,18 @@ public interface IReinforcementFielder : IDisposable
 
     /// <summary>[Game thread] Field queued migration reserves as battle capacity becomes available.</summary>
     void Tick();
+
+    /// <summary>
+    /// [Game thread] Hands over a side's queued migration reserve to a mission that fields it itself, as a naval battle does
+    /// on its hulls; troops a late replay already brought in are left out.
+    /// </summary>
+    IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread] Removes recovered troops a late replay brought in after they were taken, reading the live agents
+    /// once for the whole batch, so a mission still holding them does not field them twice. Returns how many it removed.
+    /// </summary>
+    int RemoveLateReplayed(List<CoopAgentOrigin> origins);
 }
 
 /// <inheritdoc cref="IReinforcementFielder"/>
@@ -443,6 +455,38 @@ public class ReinforcementFielder : IReinforcementFielder
         return spawned;
     }
 
+    public IReadOnlyList<CoopAgentOrigin> TakeMigrationReserve(BattleSideEnum side)
+    {
+        if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return Array.Empty<CoopAgentOrigin>();
+
+        var parties = recoveryParties[(int)side];
+        var origins = new List<CoopAgentOrigin>();
+        foreach (var recovery in parties)
+        {
+            recoveryPartyIds.Remove(recovery.PartyId);
+            // As in FieldRecoverySide: a party that left this host's reserve scope (its owner came back) is not fielded here.
+            if (!recovery.Supplier.ContainsParty(recovery.PartyId)) continue;
+
+            foreach (var origin in recovery.Origins)
+            {
+                if (!HasLivePartySeed(recovery.PartyId, origin.UniqueSeed)) origins.Add(origin);
+            }
+        }
+
+        parties.Clear();
+        recoveryCursors[(int)side] = 0;
+        return origins;
+    }
+
+    /// <inheritdoc/>
+    public int RemoveLateReplayed(List<CoopAgentOrigin> origins)
+    {
+        if (origins.Count == 0) return 0;
+
+        var live = new HashSet<(string PartyId, int TroopSeed)>(LivePartySeeds());
+        return origins.RemoveAll(origin => live.Contains((origin.MapEventPartyId, origin.UniqueSeed)));
+    }
+
     // Only the first add records, right after it, so a count of 1 means the formation was empty before the
     // batch. The host's own hero counts as a unit.
     internal static void RecordJoinedFormation(
@@ -452,7 +496,18 @@ public class ReinforcementFielder : IReinforcementFielder
             joinedFormations.Add(formation, countAfterAdd <= 1);
     }
 
+    // Whether an active registered agent carries this recovered troop's party and seed, stopping at the first match.
     private bool HasLivePartySeed(string partyId, int troopSeed)
+    {
+        foreach (var liveSeed in LivePartySeeds())
+        {
+            if (liveSeed.PartyId == partyId && liveSeed.TroopSeed == troopSeed) return true;
+        }
+        return false;
+    }
+
+    // The party and seed of every active registered agent, the one rule land and naval recovery both dedup against.
+    private IEnumerable<(string PartyId, int TroopSeed)> LivePartySeeds()
     {
         foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
         {
@@ -460,11 +515,9 @@ public class ReinforcementFielder : IReinforcementFielder
             {
                 if (info.Agent == null || !info.Agent.IsActive()) continue;
                 var attribution = casualties.GetOrDefault(info.AgentId);
-                if (attribution.MapEventPartyId == partyId && attribution.TroopSeed == troopSeed)
-                    return true;
+                yield return (attribution.MapEventPartyId, attribution.TroopSeed);
             }
         }
-        return false;
     }
 
     /// <summary>Joint active troop targets using the same battle-size allocation as native Init.</summary>

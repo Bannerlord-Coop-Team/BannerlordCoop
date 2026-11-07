@@ -7,6 +7,7 @@ using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
@@ -37,6 +38,7 @@ public interface ICoopSession
     HeroMeetingData HeroMeetingData { get; }
     AgingPlayerData AgingPlayerData { get; }
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+    NavalPlayerData NavalPlayerData { get; }
     PlayerTraitData PlayerTraitData { get; }
     OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
     StatisticsPlayerData StatisticsPlayerData { get; }
@@ -61,7 +63,8 @@ public class CoopSession : ICoopSession
         new TradePlayerData(new(), new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
         new HeroMeetingData(new()),
-        new AgingPlayerData(new()));
+        new AgingPlayerData(new()),
+        new NavalPlayerData(new(), new(), new(), new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -96,6 +99,8 @@ public class CoopSession : ICoopSession
     [ProtoMember(16)]
     public IncidentsPlayerData IncidentsPlayerData { get; }
     [ProtoMember(17)]
+    public NavalPlayerData NavalPlayerData { get; }
+    [ProtoMember(18)]
     public ViewDataPlayerData ViewDataPlayerData { get; }
 
     public CoopSession(
@@ -110,6 +115,7 @@ public class CoopSession : ICoopSession
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         PlayerTraitData playerTraitData = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
@@ -128,6 +134,7 @@ public class CoopSession : ICoopSession
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         ClanFinance = clanFinance ?? new();
         PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
         OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
