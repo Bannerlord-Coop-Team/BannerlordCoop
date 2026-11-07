@@ -105,6 +105,11 @@ internal class ParallelRobustnessPatches
     {
         for (int index = startInclusive; index < endExclusive; ++index)
         {
+            // ParallelInitializeCachedPartyVariables skips parties without a PartyBase, so the cache can have no party here
+            MobileParty mobileParty = __instance._cacheData[index].MobileParty;
+            if (mobileParty == null || !mobileParty.IsActive)
+                continue;
+
             MobileParty.CachedPartyVariables localVariables = __instance._cacheData[index].LocalVariables;
             if (localVariables.IsMoving)
             {
@@ -113,6 +118,12 @@ internal class ParallelRobustnessPatches
                 else
                     __instance._movingPartyIndices[Interlocked.Increment(ref __instance._currentFrameMovingPartyCount)] = index;
             }
+            // Transitioning parties have their own lists, otherwise an embark or disembark never finishes
+            else if (localVariables.IsArmyLeader && localVariables.IsTransitionInProgress)
+                __instance._transitioningArmyLeaderPartyIndices[Interlocked.Increment(ref __instance._currentFrameTransitioningArmyLeaderCount)] = index;
+            else if (!localVariables.IsArmyLeader && localVariables.IsTransitionInProgress && !localVariables.IsAttachedArmyMember)
+                __instance._transitioningPartyIndices[Interlocked.Increment(ref __instance._currentFrameTransitioningCount)] = index;
+            // Stationary army leaders stay on the stationary tick, which has the stale map event guard
             else
                 __instance._stationaryPartyIndices[Interlocked.Increment(ref __instance._currentFrameStationaryPartyCount)] = index;
         }

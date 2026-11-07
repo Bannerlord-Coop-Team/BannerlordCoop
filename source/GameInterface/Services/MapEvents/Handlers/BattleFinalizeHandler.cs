@@ -63,6 +63,7 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -74,7 +75,8 @@ internal class BattleFinalizeHandler : IHandler
         ISettlementInterface settlementInterface,
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
-        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -86,6 +88,7 @@ internal class BattleFinalizeHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -150,6 +153,13 @@ internal class BattleFinalizeHandler : IHandler
             {
                 Logger.Information("Refused finalize of {MapEventId} from non-host peer {PeerId}",
                     payload.What.MapEventId, requester.Id);
+                return;
+            }
+
+            if (retentionPolicy.DefersHostFinalize(payload.What.MapEventId))
+            {
+                Logger.Information("Refused finalize of {MapEventId} from host {ControllerId}: its naval result waits for the server's conclusion",
+                    payload.What.MapEventId, requestingPlayer.ControllerId);
                 return;
             }
         }
@@ -662,7 +672,7 @@ internal class BattleFinalizeHandler : IHandler
             if (mobileParty == null)
                 continue;
 
-            mobileParty.Position = settlement.GatePosition;
+            mobileParty.Position = mobileParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mobileParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mobileParty);
 
@@ -682,7 +692,7 @@ internal class BattleFinalizeHandler : IHandler
 
         using (new AllowedThread())
         {
-            mainParty.Position = settlement.GatePosition;
+            mainParty.Position = mainParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mainParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mainParty);
 
