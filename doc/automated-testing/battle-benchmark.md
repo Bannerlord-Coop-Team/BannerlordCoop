@@ -58,6 +58,15 @@ or every one below, every baseline run; otherwise the change is `within noise`. 
 it says `too few runs`. Without `--all` it shows the headline metrics only. `summary` prints one set's mean and spread,
 for posting baseline numbers.
 
+What the field scenario can show, from an A/A run (six runs of one development build, 2026-11-07):
+
+- The clients' frame rate is capped at 30 on the bench, so the median frame is 33.3 ms in every run and
+  `FramesPerSecond` and `P50Ms` don't move. Compare `P95Ms` and `P99Ms`, CPU, the sections and allocations instead.
+- Run to run, frame P95 and P99 varied 1-4%, client CPU 2-4%, the hot-path sections 10-14% (client `GameThreadDrain`
+  20%), and traffic and allocations 6-18%. A change has to move its metric further than that to come out `separated`.
+- With 3 runs a side, any one metric comes out `separated` by chance one time in ten, so judge a change by the metric
+  it targets, not by whichever rows happen to separate.
+
 ## Scenarios
 
 Both use a dedicated server and two clients (`testclient` hosts the battle, `testclient2` joins), started from the same
@@ -65,22 +74,28 @@ save every run. The local runner that stages them, builds both sides and alterna
 (`coop-live-orchestration/perf-bench/README.md` on the bench machine); any harness that can send console commands can
 run the same steps.
 
-Field battle, about 1,000 agents (`coop.debug.mobile_party.list` gives the bandit id for the save):
+Field battle, about 1,000 agents, on the bench save, where `looters_1` is the looter party testclient attacks
+(`coop.debug.mobile_party.list` lists the parties in another save):
 
 ```text
 server:  coop.debug.set_time_mode Pause force-live-test
-server:  coop.debug.map_event.bandit_attack_fixture_prepare testclient <bandit id>
-server:  coop.debug.mobile_party.large_battle_roster_begin <bandit id> testclient 450
+server:  coop.debug.map_event.bandit_attack_fixture_prepare testclient looters_1
+server:  coop.debug.mobile_party.large_battle_roster_begin looters_1 testclient 450 imperial_legionary imperial_legionary
 server:  coop.debug.map_event.late_join_mode_fixture testclient testclient2
 server:  coop.debug.map_event.late_join_mode_join, then late_join_mode_enter once testclient is in the mission
 clients: coop.debug.map_event.late_join_mode_begin_field_battle
+clients: coop.debug.map_event.late_join_mode_disable_dying
 clients: coop.debug.battle.charge_owned_formations
 clients: coop.debug.benchmark.camera
-all:     coop.debug.benchmark.start <run id> 120 <folder> field   (10 s after the charge)
+all:     coop.debug.benchmark.start field-A-01 120 C:\bench\run01 field   (10 s after the charge)
 ```
 
-The host owns the bandit's and its own troops, about 95% of the agents, like the #3252 runs. Dying is off for the
-whole battle, so the load stays steady through the window.
+The host owns the looters' and its own troops, about 95% of the agents, like the #3252 runs. Dying is turned off on
+both clients after the battle starts, because vanilla `DeploymentMissionController` turns it back on when deployment
+finishes. Each client applies the blows to the agents it owns, so both need it. With it, the active count stayed at
+1,015 from start to end in all 12 windows of the 2026-11-07 runs; without it, half the agents had died or fled by the
+end of a 120 s window. `MissionStart` and `MissionEnd` in the report show whether the load held: a window whose active
+agents fell by more than 10% didn't measure a steady battle.
 
 Siege of Danustica (`town_ES1`, garrison id from `coop.debug.town.info Danustica`): the garrison gets 450
 `imperial_archer` and testclient 450 `imperial_recruit` through `large_battle_roster_begin <garrison id> testclient 450
@@ -101,8 +116,13 @@ same way for these reasons:
   the synthetic receive pressure in `AgentMovementHandler`, and `SiegeInteractionDebugBehavior` with its observation
   patches, which add a lookup per arrow shot and per siege-engine use in sieges. These are fixed costs that don't
   depend on the change being measured, so they shift both sides of an A/B by the same amount.
-- DEBUG logs at Debug level. The runner keeps each run's client logs; the number of `DBG` lines inside the window is in
-  the baseline post on #4483.
+- DEBUG logs at Debug level: 33-45 `DBG` lines per second on each client in the field battle.
+
+Measured on 2026-11-07 with 3 runs a side. DEBUG on was this branch. DEBUG off was the same code with Release's log
+level and the DEBUG battle diagnostics compiled out. Every client and battle-host metric moved by less than the A/A
+run-to-run standard deviation. The biggest moves were the battle host's `ActionPoll`, +5.0 ms/s (+7.7%, about half an
+A/A deviation, where the `MissionActionDiagnostics` checks run), and the client's frame P95, +0.4 ms. CPU rose 1.6% on
+the battle host. So DEBUG overhead is inside the noise and doesn't hide or add a difference bigger than the noise.
 
 ## Memory
 
