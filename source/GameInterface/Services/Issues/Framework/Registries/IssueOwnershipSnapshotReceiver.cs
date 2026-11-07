@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -46,12 +48,22 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
 
     private void Apply(NetworkIssueOwnershipSnapshot snapshot)
     {
-        foreach (var remembered in ownership.GetAll())
+        var owners = snapshot.Owners ?? Array.Empty<IssueOwnershipData>();
+        foreach (var remembered in ownership.GetAll()
+                     .Where(remembered => !owners.Any(owner =>
+                         owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId)))
         {
-            ownership.Remove(remembered.IssueOwnerId);
+            // The client may have missed the server cancellation while disconnected. Replay a local
+            // cancel so its quest and tracked objects do not survive a snapshot that removed it.
+            messageBroker.Publish(this, new NetworkIssueFinalized(
+                remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel));
         }
 
-        foreach (var owner in snapshot.Owners ?? Array.Empty<IssueOwnershipData>())
+        // Clear remembered controllers before the authoritative snapshot, since accept is first-wins.
+        foreach (var remembered in ownership.GetAll())
+            ownership.Remove(remembered.IssueOwnerId);
+
+        foreach (var owner in owners)
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
             if (resolver.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _))

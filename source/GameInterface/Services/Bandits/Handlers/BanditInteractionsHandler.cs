@@ -288,6 +288,7 @@ internal class BanditInteractionsHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
+                messageBroker.Publish(this, new BanditPartyRecruitedByPlayer(mobileParty, mainParty));
                 // Recruitment listeners need the player from this encounter on the dedicated server.
                 using (new MainHeroSubstitutionScope(mainParty.LeaderHero, mainParty))
                 {
