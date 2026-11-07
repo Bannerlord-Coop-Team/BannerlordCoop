@@ -35,9 +35,13 @@ public class ServerBattleCompletionHandler : IHandler
     private readonly object pendingJoinersGate = new object();
     private readonly Dictionary<string, Dictionary<Guid, (string ControllerId, NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
     private readonly Dictionary<string, DateTime> conclusionRetries = new();
+    // When each kept host's battle stops waiting for members that never match its report (Q7).
+    private readonly Dictionary<string, DateTime> keptHostDeadlines = new();
 
     internal TimeSpan JoinReservationTimeout { get; set; } = TimeSpan.FromMinutes(2);
     internal TimeSpan ConclusionRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+    /// <summary>How long a kept host's battle waits for its remaining members before its report concludes it alone.</summary>
+    internal TimeSpan KeptHostReportTimeout { get; set; } = TimeSpan.FromMinutes(2);
 
     public ServerBattleCompletionHandler(
         IMessageBroker messageBroker,
@@ -59,6 +63,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Subscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Subscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Subscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
+        messageBroker.Subscribe<NetworkFieldBattleOpenRefused>(Handle_NetworkFieldBattleOpenRefused);
         messageBroker.Subscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -73,6 +78,7 @@ public class ServerBattleCompletionHandler : IHandler
         messageBroker.Unsubscribe<BattleHostAssignmentChanged>(Handle_BattleHostAssignmentChanged);
         messageBroker.Unsubscribe<BattleJoinAccepted>(Handle_BattleJoinAccepted);
         messageBroker.Unsubscribe<BattleJoinCancelled>(Handle_BattleJoinCancelled);
+        messageBroker.Unsubscribe<NetworkFieldBattleOpenRefused>(Handle_NetworkFieldBattleOpenRefused);
         messageBroker.Unsubscribe<MissionMemberEntered>(Handle_MissionMemberEntered);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
@@ -127,7 +133,8 @@ public class ServerBattleCompletionHandler : IHandler
                     assignment.HostControllerId,
                     assignment.Epoch,
                     out var concludedState,
-                    canConclude);
+                    canConclude,
+                    hostKept: assignment.KeptAfterResult);
 
             if (isCurrentHostResult)
                 messageBroker.Publish(this, new BattleResolvedStateRecorded(instanceId, result.BattleState));
@@ -175,31 +182,28 @@ public class ServerBattleCompletionHandler : IHandler
                     mapEventId,
                     assignment.HostControllerId,
                     assignment.Epoch);
+                if (assignment.KeptAfterResult && !keptHostDeadlines.ContainsKey(mapEventId))
+                    keptHostDeadlines[mapEventId] = DateTime.UtcNow + KeptHostReportTimeout;
             }
 
             TryConcludeReportedBattle(mapEventId);
         });
     }
 
+    // Concludes the battle once its reports agree, holding it while an accepted join has not entered yet.
     private void TryConcludeReportedBattle(string instanceId)
     {
         lock (pendingJoinersGate)
         {
+            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
             {
-                if (completionTracker.TryConcludeAbandoned(
-                        instanceId,
-                        out var abandonedState,
-                        out var abandonedEpoch,
-                        out var abandonedMemberCount))
-                {
-                    ConcludeAbandonedBattle(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
-                }
+                if (!hasPendingJoiners)
+                    TryConcludeAbandonedBattle(instanceId);
 
                 return;
             }
 
-            bool hasPendingJoiners = HasPendingJoiners(instanceId);
             if (!hostRegistry.TryGet(instanceId, out var assignment))
                 return;
 
@@ -209,7 +213,8 @@ public class ServerBattleCompletionHandler : IHandler
                     assignment.HostControllerId,
                     assignment.Epoch,
                     out var concludedState,
-                    !hasPendingJoiners))
+                    !hasPendingJoiners,
+                    hostKept: assignment.KeptAfterResult))
             {
                 return;
             }
@@ -219,6 +224,22 @@ public class ServerBattleCompletionHandler : IHandler
 
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
+    }
+
+    // Concludes an emptied battle from its retained reports. Callers hold it while a join is pending, and the
+    // cancel, refusal and expiry paths call back in once the join is released.
+    private void TryConcludeAbandonedBattle(string instanceId)
+    {
+        if (!completionTracker.TryConcludeAbandoned(
+                instanceId,
+                out var abandonedState,
+                out var abandonedEpoch,
+                out var abandonedMemberCount))
+        {
+            return;
+        }
+
+        ConcludeAbandonedBattle(instanceId, abandonedMemberCount, abandonedState, abandonedEpoch);
     }
 
     private bool HasPendingJoiners(string instanceId)
@@ -270,6 +291,33 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
+    // A client that refused to open the field battle will not enter it, so its join no longer holds the conclusion.
+    private void Handle_NetworkFieldBattleOpenRefused(MessagePayload<NetworkFieldBattleOpenRefused> payload)
+    {
+        var mapEventId = payload.What.MapEventId;
+        if (payload.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId))
+        {
+            Logger.Warning("Ignoring refused field battle open for {Instance}: sender is not a current player", mapEventId);
+            return;
+        }
+
+        RunSerialized(() =>
+        {
+            int released = RemovePeerReservations(mapEventId, controllerId, peer);
+            if (released == 0)
+            {
+                // The reservation already expired or the player entered, so there is nothing left to release.
+                Logger.Information("Refused field battle open from {Controller} for {Instance} had no pending join to release",
+                    controllerId, mapEventId);
+                return;
+            }
+
+            Logger.Information("Released {Count} pending join(s) for {Controller} in {Instance}: the client refused to open the field battle",
+                released, controllerId, mapEventId);
+            TryConcludeReportedBattle(mapEventId);
+        });
+    }
+
     private void Handle_MissionMemberEntered(MessagePayload<MissionMemberEntered> payload)
     {
         var entry = payload.What;
@@ -279,6 +327,9 @@ public class ServerBattleCompletionHandler : IHandler
                 entry.InstanceId,
                 entry.ControllerId,
                 entry.IsFirstMember);
+            // A new instance of the map event must not inherit the kept-host deadline of the one that emptied.
+            if (entry.IsFirstMember)
+                keptHostDeadlines.Remove(entry.InstanceId);
             RemovePendingJoiner(entry.InstanceId, entry.ControllerId, Guid.Empty);
             // Keep campaign objects alive until the entrant's loaded mission reports its own result.
         });
@@ -323,6 +374,7 @@ public class ServerBattleCompletionHandler : IHandler
             lock (pendingJoinersGate)
                 pendingJoiners.Remove(mapEventId);
             conclusionRetries.Remove(mapEventId);
+            keptHostDeadlines.Remove(mapEventId);
             completionTracker.Clear(mapEventId);
         });
     }
@@ -349,6 +401,7 @@ public class ServerBattleCompletionHandler : IHandler
             }
 
             conclusionRetries.Remove(result.MapEventId);
+            keptHostDeadlines.Remove(result.MapEventId);
             lock (pendingJoinersGate)
                 pendingJoiners.Remove(result.MapEventId);
         });
@@ -386,6 +439,8 @@ public class ServerBattleCompletionHandler : IHandler
             foreach (var instanceId in changedInstances)
                 TryConcludeReportedBattle(instanceId);
 
+            ExpireKeptHostDeadlines(now);
+
             foreach (var instanceId in missionManager.TakeExpiredConclusions())
                 RecoverStalledConclusion(instanceId, now);
 
@@ -401,6 +456,21 @@ public class ServerBattleCompletionHandler : IHandler
         });
     }
 
+    // A kept host never answers again, so a member that stays without matching its report would hold the battle open:
+    // past the deadline the host's report concludes it alone (Q7), still behind any pending joiner.
+    private void ExpireKeptHostDeadlines(DateTime now)
+    {
+        var expired = keptHostDeadlines.Where(entry => now >= entry.Value).Select(entry => entry.Key).ToList();
+        foreach (var instanceId in expired)
+        {
+            keptHostDeadlines.Remove(instanceId);
+            Logger.Warning("Battle {Instance} concludes with its kept host's report: its remaining members did not match it within {Timeout}",
+                instanceId, KeptHostReportTimeout);
+            completionTracker.StopWaitingForMembers(instanceId);
+            TryConcludeReportedBattle(instanceId);
+        }
+    }
+
     private void RecoverStalledConclusion(string mapEventId, DateTime retryDueUtc)
     {
         if (!objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent) ||
@@ -409,6 +479,7 @@ public class ServerBattleCompletionHandler : IHandler
             mapEvent.BattleState == BattleState.DefenderVictory)
         {
             conclusionRetries.Remove(mapEventId);
+            keptHostDeadlines.Remove(mapEventId);
             lock (pendingJoinersGate)
                 pendingJoiners.Remove(mapEventId);
             completionTracker.Clear(mapEventId);
@@ -448,6 +519,28 @@ public class ServerBattleCompletionHandler : IHandler
 
             if (joiners.Count == 0)
                 pendingJoiners.Remove(instanceId);
+        }
+    }
+
+    // Only reservations made through the sending peer, so a refusal never releases a join another connection holds.
+    private int RemovePeerReservations(string instanceId, string controllerId, NetPeer peer)
+    {
+        lock (pendingJoinersGate)
+        {
+            if (!pendingJoiners.TryGetValue(instanceId, out var joiners))
+                return 0;
+
+            var peerReservations = joiners
+                .Where(entry => entry.Value.ControllerId == controllerId && ReferenceEquals(entry.Value.Peer, peer))
+                .Select(entry => entry.Key)
+                .ToList();
+            foreach (var reservationId in peerReservations)
+                joiners.Remove(reservationId);
+
+            if (joiners.Count == 0)
+                pendingJoiners.Remove(instanceId);
+
+            return peerReservations.Count;
         }
     }
 

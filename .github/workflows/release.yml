@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -20,7 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -128,7 +132,10 @@ jobs:
     needs: build
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
@@ -161,7 +168,10 @@ jobs:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
 
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7

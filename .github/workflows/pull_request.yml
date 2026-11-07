@@ -38,8 +38,15 @@ jobs:
     timeout-minutes: 30
     if: ${{ !github.event.pull_request.draft }}
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -76,8 +83,15 @@ jobs:
     timeout-minutes: 30
     needs: build
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout
@@ -150,8 +164,15 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
 
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout

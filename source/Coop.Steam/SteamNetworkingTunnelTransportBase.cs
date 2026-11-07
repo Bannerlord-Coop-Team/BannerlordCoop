@@ -1,6 +1,7 @@
 ﻿using Serilog;
 using Steamworks;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
@@ -14,10 +15,11 @@ public abstract class SteamNetworkingTunnelTransportBase :
     protected readonly ILogger Logger;
 
     private readonly object gate = new object();
-    private readonly HashSet<uint> ownedConnections = new HashSet<uint>();
+    // Changed only under gate, but concurrent so sends and describes can check it without taking gate
+    private readonly ConcurrentDictionary<uint, byte> ownedConnections = new ConcurrentDictionary<uint, byte>();
+    private readonly HashSet<uint> acceptedConnections = new HashSet<uint>();
     private readonly TunnelConnectionIdentityRegistry remoteIdentities = new TunnelConnectionIdentityRegistry();
     private readonly Callback<SteamNetConnectionStatusChangedCallback_t> statusChangedCallback;
-    private readonly IntPtr[] receivedMessage = new IntPtr[1];
     private HSteamListenSocket listenSocket = HSteamListenSocket.Invalid;
 
     public event Action<uint, TunnelConnectionState> ConnectionStateChanged;
@@ -47,6 +49,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
         ref SteamNetConnectionRealTimeStatus_t status, int lanes,
         ref SteamNetConnectionRealTimeLaneStatus_t laneStatus);
 
+    // Reads the connection's info block, whose flags say which route it is using.
+    protected abstract bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info);
+
     protected abstract HSteamNetConnection ConnectP2P(ref SteamNetworkingIdentity identity, int virtualPort,
         int options, SteamNetworkingConfigValue_t[] optionValues);
 
@@ -72,6 +77,8 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     public string DescribeConnection(uint connection)
     {
+        if (!ownedConnections.ContainsKey(connection)) return "status unavailable (connection closed)";
+
         var status = default(SteamNetConnectionRealTimeStatus_t);
         var lanes = default(SteamNetConnectionRealTimeLaneStatus_t);
         var result = GetConnectionRealTimeStatus(new HSteamNetConnection(connection), ref status, 0, ref lanes);
@@ -80,7 +87,17 @@ public abstract class SteamNetworkingTunnelTransportBase :
         return $"sendRate={status.m_nSendRateBytesPerSecond}B/s out={status.m_flOutBytesPerSec:F0}B/s " +
             $"in={status.m_flInBytesPerSec:F0}B/s pendingReliable={status.m_cbPendingReliable} " +
             $"unacked={status.m_cbSentUnackedReliable} ping={status.m_nPing}ms " +
-            $"quality={status.m_flConnectionQualityLocal:F2}";
+            $"quality={status.m_flConnectionQualityLocal:F2} route={DescribeRoute(connection)}";
+    }
+
+    // Names the current route, so a ping change in the stats can be matched to a route switch.
+    // Only a connected connection has a route, otherwise a missing Relayed flag would read as direct.
+    private string DescribeRoute(uint connection)
+    {
+        if (!GetConnectionInfo(new HSteamNetConnection(connection), out var info)) return "unknown";
+        if (info.m_eState != ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected) return "unknown";
+
+        return (info.m_nFlags & Constants.k_nSteamNetworkConnectionInfoFlags_Relayed) != 0 ? "relayed" : "direct";
     }
 
     // The per-call options on ConnectP2P/CreateListenSocketP2P should already cover this,
@@ -129,7 +146,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
         lock (gate)
         {
-            ownedConnections.Add(connection.m_HSteamNetConnection);
+            ownedConnections.TryAdd(connection.m_HSteamNetConnection, 0);
             remoteIdentities.Record(connection.m_HSteamNetConnection, hostSteamId);
         }
 
@@ -166,6 +183,9 @@ public abstract class SteamNetworkingTunnelTransportBase :
         {
             if (listenSocket == HSteamListenSocket.Invalid) return;
 
+            // Closing the listen socket closes the connections it accepted inside Steam, so stop receiving on them first
+            foreach (var connection in acceptedConnections) ownedConnections.TryRemove(connection, out _);
+            acceptedConnections.Clear();
             CloseListenSocket(listenSocket);
             listenSocket = HSteamListenSocket.Invalid;
         }
@@ -229,7 +249,8 @@ public abstract class SteamNetworkingTunnelTransportBase :
         bool owned;
         lock (gate)
         {
-            owned = ownedConnections.Remove(connection);
+            owned = ownedConnections.TryRemove(connection, out _);
+            acceptedConnections.Remove(connection);
             remoteIdentities.Remove(connection);
         }
 
@@ -253,8 +274,12 @@ public abstract class SteamNetworkingTunnelTransportBase :
             ? Constants.k_nSteamNetworkingSend_UnreliableNoNagle
             : Constants.k_nSteamNetworkingSend_ReliableNoNagle;
 
-        // Pinning the caller's buffer avoids a copy and keeps sends off the shared gate,
-        // which the game thread's status callback also takes.
+        // A connection the transport no longer owns is swallowed like any other gone connection.
+        // The ownership read and the pinned caller buffer keep sends off the shared gate, which the
+        // game thread's status callback also takes. A close landing between this check and the send
+        // only gets an error result back from Steam, unlike a receive on a closed handle.
+        if (!ownedConnections.ContainsKey(connection)) return true;
+
         var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
         try
         {
@@ -299,7 +324,19 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
     public int ReceiveDatagram(uint connection, byte[] buffer)
     {
-        int count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
+        var receivedMessage = new IntPtr[1];
+        int count;
+
+        // CloseConnection forgets the connection under this gate before the native close, so a pump tick
+        // never receives on a closed handle. The message Steam hands over is ours alone, so the copy and
+        // release run outside the gate and the status callback never waits on them.
+        lock (gate)
+        {
+            if (!ownedConnections.ContainsKey(connection)) return 0;
+
+            count = ReceiveMessagesOnConnection(new HSteamNetConnection(connection), receivedMessage, 1);
+        }
+
         if (count <= 0) return 0;
 
         try
@@ -333,10 +370,11 @@ public abstract class SteamNetworkingTunnelTransportBase :
 
                 if (inbound)
                 {
-                    ownedConnections.Add(connection);
+                    ownedConnections.TryAdd(connection, 0);
+                    acceptedConnections.Add(connection);
                     remoteIdentities.Record(connection, change.m_info.m_identityRemote.GetSteamID64());
                 }
-                else if (!ownedConnections.Contains(connection))
+                else if (!ownedConnections.ContainsKey(connection))
                 {
                     return;
                 }
@@ -385,7 +423,7 @@ public abstract class SteamNetworkingTunnelTransportBase :
         lock (gate)
         {
             connections = new uint[ownedConnections.Count];
-            ownedConnections.CopyTo(connections);
+            ownedConnections.Keys.CopyTo(connections, 0);
         }
 
         foreach (var connection in connections)

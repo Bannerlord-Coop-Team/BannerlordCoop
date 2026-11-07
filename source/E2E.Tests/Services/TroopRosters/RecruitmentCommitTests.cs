@@ -6,7 +6,9 @@ using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -16,7 +18,8 @@ namespace E2E.Tests.Services.TroopRosters;
 /// <summary>
 /// The server commit of a client recruit cart (<see cref="ITroopRosterInterface.HandleOnRecruitmentDone"/>). The cart
 /// can be stale when an AI lord or the daily volunteer update changed a notable's slot after the client opened the
-/// recruit screen, so only entries whose slot still holds the requested troop are recruited, each slot once.
+/// recruit screen, so only entries whose slot still holds the requested troop are recruited, each slot once. The
+/// recruit side effects, such as the recruit xp, go to the party leader, not to the server's hidden main hero.
 /// </summary>
 public class RecruitmentCommitTests : IDisposable
 {
@@ -64,7 +67,14 @@ public class RecruitmentCommitTests : IDisposable
             notable.VolunteerTypes[1] = Get<CharacterObject>(archerId);
 
             // Set after the leader joins its roster, because adding a hero reads the default models
-            Campaign.Current._gameModels = new GameModels(new List<GameModel> { new FixedRecruitCostWageModel() });
+            // The xp models are read only when RecruitmentSideEffects.Apply runs
+            Campaign.Current._gameModels = new GameModels(new List<GameModel>
+            {
+                new FixedRecruitCostWageModel(),
+                new DefaultCharacterStatsModel(),
+                new DefaultGenericXpModel(),
+                new DefaultCharacterDevelopmentModel(),
+            });
         });
     }
 
@@ -145,6 +155,54 @@ public class RecruitmentCommitTests : IDisposable
         Assert.Equal(0, skipped);
         AssertRecruited(infantry: 0, archers: 0);
         Server.Call(() => Assert.Same(Get<CharacterObject>(infantryId), Get<Hero>(notableId).VolunteerTypes[0]));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RecruitSideEffects_XpGoesToThePartyLeaderNotTheServerMainHero(bool mainHeroDead)
+    {
+        float leaderXpBefore = 0;
+        float mainHeroXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.Same(Get<Hero>(leaderId), Get<MobileParty>(partyId).LeaderHero);
+            if (mainHeroDead)
+            {
+                // Birth and Aging can kill the dedicated server's hidden main hero, and death clears its HeroDeveloper
+                Hero.MainHero.ChangeState(Hero.CharacterStates.Dead);
+                Hero.MainHero.OnDeath();
+                Assert.Null(Hero.MainHero.HeroDeveloper);
+            }
+            else
+            {
+                mainHeroXpBefore = Hero.MainHero.HeroDeveloper.GetSkillXp(DefaultSkills.Leadership);
+            }
+
+            // Recruit xp is count * tier * 2, so the troops need a tier above 0
+            Get<CharacterObject>(infantryId).Level = 11;
+            Get<CharacterObject>(archerId).Level = 11;
+            leaderXpBefore = Get<Hero>(leaderId).HeroDeveloper.GetSkillXp(DefaultSkills.Leadership);
+
+            // Only matters when the commit raises OnUnitRecruited, which vanilla applies to Hero.MainHero
+            new RecruitmentCampaignBehavior().RegisterEvents();
+        });
+
+        int skipped = 0;
+        var cart = new[] { new TroopInfo(notableId, infantryId, 0), new TroopInfo(notableId, archerId, 1) };
+        Server.Call(() => skipped = Server.Resolve<ITroopRosterInterface>().HandleOnRecruitmentDone(partyId, cart));
+
+        Assert.Equal(0, skipped);
+        Server.Call(() =>
+        {
+            var roster = Get<MobileParty>(partyId).MemberRoster.GetTroopRoster();
+            Assert.Equal(1, Assert.Single(roster, e => e.Character == Get<CharacterObject>(infantryId)).Number);
+            Assert.Equal(1, Assert.Single(roster, e => e.Character == Get<CharacterObject>(archerId)).Number);
+            Assert.Equal(StartingGold - (2 * TroopCost), Get<Hero>(leaderId).Gold);
+            Assert.True(Get<Hero>(leaderId).HeroDeveloper.GetSkillXp(DefaultSkills.Leadership) > leaderXpBefore);
+            if (!mainHeroDead)
+                Assert.Equal(mainHeroXpBefore, Hero.MainHero.HeroDeveloper.GetSkillXp(DefaultSkills.Leadership));
+        });
     }
 
     private int Recruit(params TroopInfo[] cart)

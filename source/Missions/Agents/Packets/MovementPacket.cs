@@ -36,7 +36,11 @@ namespace Missions.Agents.Packets
         [ProtoMember(7)]
         public long SampleSequence { get; }
 
-        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
+        /// <summary>The naval hulls this packet's deck poses reference, by <see cref="AgentData.DeckShipIndex"/>.</summary>
+        [ProtoMember(8)]
+        public Guid[] DeckShips { get; }
+
+        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0, Guid[] deckShips = null)
         {
             SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
@@ -45,9 +49,10 @@ namespace Missions.Agents.Packets
             AgentIds = agentIds;
             Agents = agents;
             AgentGuids = null;
+            DeckShips = deckShips;
         }
 
-        public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
+        public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0, Guid[] deckShips = null)
         {
             SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
@@ -56,9 +61,10 @@ namespace Missions.Agents.Packets
             AgentIds = null;
             AgentGuids = agentGuids;
             Agents = agents;
+            DeckShips = deckShips;
         }
         internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
-            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence)
-            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence);
+            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence, DeckShips)
+            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence, DeckShips);
     }
 }
