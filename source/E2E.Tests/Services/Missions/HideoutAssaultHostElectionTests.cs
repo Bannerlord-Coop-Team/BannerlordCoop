@@ -112,12 +112,15 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void AssaultLeaderDisconnectsWhileLoading_WaitingAllyHosts(bool secondAllyReadyBeforeDeparture)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void AssaultLeaderDisconnectsWhileLoading_WaitingAllyHosts(bool secondAllyReadyBeforeDeparture, bool waitingAllyGoneToo)
     {
         var mapEventId = SetupHideoutAssault();
         var clients = Clients.ToArray();
+        var gone = waitingAllyGoneToo ? new[] { clients[0], clients[1] } : new[] { clients[0] };
+        var expectedHost = waitingAllyGoneToo ? SecondAllyControllerId : AllyControllerId;
 
         EnterBattle(clients[0], mapEventId, missionReady: false);
         EnterBattle(clients[1], mapEventId);
@@ -125,21 +128,19 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
 
         if (secondAllyReadyBeforeDeparture)
         {
-            // The leader's peer clears at once while its map event departure still waits for the game thread
-            Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(clients[0].NetPeer));
+            // Peers clear at once while their map event departures still wait for the game thread
+            foreach (var client in gone)
+                Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(client.NetPeer));
             EnterBattle(clients[2], mapEventId);
-        }
-        else
-        {
-            Server.Call(() =>
-            {
-                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(clients[0].NetPeer, default));
-            });
-            Server.PumpGameThread();
+            AssertHostController(Server, mapEventId, expectedHost);
         }
 
+        foreach (var client in gone)
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(client.NetPeer, default)));
+        Server.PumpGameThread();
+
         foreach (var instance in Clients.Append(Server))
-            AssertHostController(instance, mapEventId, AllyControllerId);
+            AssertHostController(instance, mapEventId, expectedHost);
     }
 
     [Fact]
