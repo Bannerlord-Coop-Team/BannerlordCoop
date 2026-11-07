@@ -1279,11 +1279,13 @@ public class VillageHostileActionTests : MapEventTestBase
                 client.Call(() =>
                 {
                     var reopened = PlayerEncounter.Current;
-                    var finishedRaid = reopened._mapEvent;
                     var states = Game.Current.GameStateManager;
                     var mapState = states.GameStates.OfType<MapState>().Single();
                     using (new AllowedThread())
+                    {
                         reopened.RosterToReceiveLootMembers.AddToCounts(client.GetRegisteredObject<CharacterObject>(troopId), 1);
+                        reopened.RosterToReceiveLootItems.AddToCounts(client.GetRegisteredObject<ItemObject>(itemId), 1);
+                    }
                     Assert.Equal(PlayerEncounterState.CaptureHeroes, reopened.EncounterState);
                     // The encounter menu is already open. No menu initialization or explicit encounter update
                     // will run when the reinforcement's scoreboard closes; map ticks must resume the results.
@@ -1295,13 +1297,13 @@ public class VillageHostileActionTests : MapEventTestBase
                     Assert.IsType<PartyState>(states.ActiveState);
                     reopened.OnPlayerLootMembersAndPrisonerEnd(null, null, null, null, null, null, false);
                     states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                    mapState.OnMapModeTick(0.1f);
+                    Assert.IsType<InventoryState>(states.ActiveState);
+                    Assert.Same(reopened, PlayerEncounter.Current);
+                    states._gameStates.RemoveAt(states._gameStates.Count - 1);
                     client.NetworkSentMessages.Clear();
                     mapState.OnMapModeTick(0.1f);
                     Assert.NotSame(reopened, PlayerEncounter.Current);
-                    Assert.NotNull(MobileParty.MainParty.MapEvent);
-                    Assert.NotSame(finishedRaid, MobileParty.MainParty.MapEvent);
-                    Assert.False(MobileParty.MainParty.MapEvent.IsFinalized);
-                    Assert.Equal(BattleSideEnum.Attacker, MobileParty.MainParty.Party.Side);
                 }, MapEventDisabledMethods.Concat(new[]
                 {
                     AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
@@ -1309,6 +1311,24 @@ public class VillageHostileActionTests : MapEventTestBase
                     AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
                 }).ToArray());
                 Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestVillageHostileAction>());
+                client.Call(() =>
+                {
+                    Assert.NotNull(MobileParty.MainParty.MapEvent);
+                    Assert.NotEqual(reopenedEventId, MobileParty.MainParty.MapEvent.StringId);
+                    Assert.False(MobileParty.MainParty.MapEvent.IsFinalized);
+                    Assert.Equal(BattleSideEnum.Attacker, MobileParty.MainParty.Party.Side);
+                    Assert.True(client.ObjectManager.TryGetId(MobileParty.MainParty.MapEvent, out _));
+                }, MapEventDisabledMethods);
+                Server.Call(() =>
+                {
+                    var raid = Server.GetRegisteredObject<MobileParty>(context.AttackerMobilePartyId).MapEvent;
+                    Assert.NotNull(raid);
+                    Assert.True(raid.IsRaid);
+                    Assert.False(raid.IsFinalized);
+                    Assert.True(Server.ObjectManager.TryGetId(raid, out var id));
+                    Assert.NotEqual(reopenedEventId, id);
+                    Assert.Equal(2, ended.Count);
+                }, MapEventDisabledMethods);
             }
         }
         finally
