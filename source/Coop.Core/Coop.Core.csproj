@@ -28,9 +28,9 @@
     <LangVersion>10</LangVersion>
     <StartAction>Program</StartAction>
     <PlatformTarget>x64</PlatformTarget>
-    <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
-    <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
-    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
+    <StartWorkingDirectory>$(BannerlordDir)bin\Win64_Shipping_Client</StartWorkingDirectory>
+    <StartProgram>$(BannerlordDir)bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
+    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode$(CoopDebugModules)*Coop*_MODULES_</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <OutputPath>bin\Release\</OutputPath>
@@ -47,6 +47,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <!-- NavalAssemblyModule registers the naval modules directly wherever War Sails is installed; without it the naval projects build empty. -->
+  <PropertyGroup Condition=" '$(CoopNavalDlc)' == 'true' ">
+    <DefineConstants>$(DefineConstants);COOP_NAVAL</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
@@ -89,6 +93,14 @@
       <Name>Coop.Steam</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup Condition=" '$(CoopNavalDlc)' == 'true' ">
+    <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj">
+      <Name>Missions.Naval</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Coop.Naval\Coop.Naval.csproj">
+      <Name>Coop.Naval</Name>
+    </ProjectReference>
+  </ItemGroup>
   <ItemGroup>
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
@@ -121,34 +133,34 @@
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="SandBox.View">
-	    <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+	    <HintPath>$(BannerlordDir)Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
 	  </Reference>
       <Reference Include="SandBox.GauntletUI">
-          <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+          <HintPath>$(BannerlordDir)Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
       </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.Core">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.GauntletUI.Data">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
-		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+		  <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
 	  <Reference Include="TaleWorlds.MountAndBlade">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
 	  </Reference>
       <Reference Include="TaleWorlds.ScreenSystem">
-          <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+          <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
       </Reference>
 	  <Reference Include="TaleWorlds.ObjectSystem">
-	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+	    <HintPath>$(BannerlordDir)bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
 	  </Reference>
   </ItemGroup>
   <ItemGroup>

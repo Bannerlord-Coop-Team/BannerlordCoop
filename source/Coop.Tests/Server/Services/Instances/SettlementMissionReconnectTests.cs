@@ -6,8 +6,8 @@ using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using LiteNetLib;
 using Missions.Messages;
@@ -26,6 +26,7 @@ namespace Coop.Tests.Server.Services.Instances;
 public class SettlementMissionReconnectTests
 {
     private const string InstanceId = "settlement|tavern";
+    private static readonly IBattleHostRetentionPolicy LandPolicy = Mock.Of<IBattleHostRetentionPolicy>();
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,
         binder: null,
@@ -62,7 +63,8 @@ public class SettlementMissionReconnectTests
             messageBroker,
             missionManager,
             network,
-            playerManager.Object);
+            playerManager.Object,
+            LandPolicy);
         var natManager = new NetManager(null);
         NatPunchModule natPunchModule = natManager.NatPunchModule;
         var harmony = new Harmony($"coop.tests.settlement-reconnect.{Guid.NewGuid():N}");
@@ -166,7 +168,7 @@ public class SettlementMissionReconnectTests
         RegisterIdentity(playerManager, peer, "A");
         var missionManager = new MissionManager(playerManager.Object);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager, network, playerManager.Object);
+            messageBroker, missionManager, network, playerManager.Object, LandPolicy);
         var oldRequestId = Guid.NewGuid();
         messageBroker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, oldRequestId));
         messageBroker.Publish(peer, new NetworkMissionEntered("A", InstanceId));
@@ -235,16 +237,10 @@ public class SettlementMissionReconnectTests
         NetPeer peer,
         string controllerId)
     {
-        var player = new Player(
-            controllerId,
-            string.Empty,
-            string.Empty,
-            string.Empty,
-            string.Empty);
-        var mappedPlayer = player;
+        var mappedControllerId = controllerId;
         var mappedPeer = peer;
         playerManager
-            .Setup(manager => manager.TryGetPlayer(peer, out mappedPlayer))
+            .Setup(manager => manager.TryGetCurrentController(peer, out mappedControllerId))
             .Returns(true);
         playerManager
             .Setup(manager => manager.TryGetPeer(controllerId, out mappedPeer))

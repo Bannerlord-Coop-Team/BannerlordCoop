@@ -6,6 +6,8 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Handlers;
@@ -16,6 +18,8 @@ using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -39,7 +43,7 @@ namespace Missions.Battles;
 /// casualty; peer-side puppet kill.</item>
 /// <item><see cref="PuppetSpawner"/> — peer-side puppet spawn/buffer/drain.</item>
 /// <item><see cref="BattleDamageRouter"/> — puppet hits routed to and applied by the owner.</item>
-/// <item><see cref="BattleAuthorityMigrator"/> — player-party withdrawal and host migration.</item>
+/// <item><see cref="BattlePartyWithdrawal"/> / <see cref="BattleAuthorityMigrator"/> — player-party withdrawal; host migration.</item>
 /// <item><see cref="ReinforcementFielder"/> — the host fields new AI parties mid-battle.</item>
 /// <item><see cref="SupplyProgressReporter"/> / <see cref="BattleResultCommitter"/> — server ledger + result report.</item>
 /// <item><see cref="BattleDeploymentCoordinator"/> — deployment activation ("any client" NPC release) and the
@@ -63,6 +67,9 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
 
+    /// <summary>The per-battle parts a naval battle builds its ship services on.</summary>
+    public BattleContext Context { get; }
+
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -83,7 +90,6 @@ public class CoopBattleController : CoopMissionController
     private readonly IBattleHostRegistry hostRegistryRef;
     private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
-    private int lastResultSnapshotEpochReported;
 
     // Whether the pre-live hold on vanilla's battle-end checks has been lifted (see OnMissionTick).
     private bool endConditionHoldReleased;
@@ -92,6 +98,11 @@ public class CoopBattleController : CoopMissionController
 
     // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
     private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
+#if DEBUG
+    internal SiegeInteractionDebugBehavior SiegeInteractionDebugBehavior { get; }
+#endif
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -113,7 +124,16 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        ISiegeGateHitApplier siegeGateHitApplier)
+        ISiegeGateHitApplier siegeGateHitApplier,
+        IRangedSiegeWeaponPresentation rangedSiegeWeaponPresentation,
+        IBattleTeamResolver teamResolver,
+        IBattleAgentFader agentFader,
+        IBattlePlayerPartyResolver playerParties,
+        MissionMapTimeView mapTimeView,
+#if DEBUG
+        SiegeInteractionDebugBehavior siegeInteractionDebugBehavior,
+#endif
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -121,13 +141,22 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+#if DEBUG
+        SiegeInteractionDebugBehavior = siegeInteractionDebugBehavior;
+#endif
+
         var session = new BattleSession(controllerIdProvider, hostRegistry);
+        Session = session;
         debugMissionContext = missionContext;
         coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
             () => session.IsLocalHost);
         var casualties = new CasualtyAttributionMap();
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
+        Deployment = deployment;
+        var resultCommitter = new BattleResultCommitter(network, relayNetwork, session, messageBroker);
 
         lifecycle = new BattleInstanceLifecycle(
             network,
@@ -140,7 +169,7 @@ public class CoopBattleController : CoopMissionController
             missionContext);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
-        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties, agentFader);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
@@ -157,8 +186,12 @@ public class CoopBattleController : CoopMissionController
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         OwnedAgentReplicator ownedAgentReplicator = null;
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
-            changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+        Action<IReadOnlyCollection<Guid>> authorityChanged = changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds);
+        var troopWithdrawal = new BattleTroopWithdrawal(coopMissionComponent, lifecycle, casualties);
+        var partyWithdrawal = new BattlePartyWithdrawal(coopMissionComponent, session, troopWithdrawal, agentFader, playerParties,
+            authorityChanged);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, deployment, formationAssigner, missionContext, reinforcementFielder,
+            partyWithdrawal, playerParties, authorityChanged);
         ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,
@@ -184,20 +217,21 @@ public class CoopBattleController : CoopMissionController
             missionWeaponDataMapper,
             puppetRoutApplier,
             spawnBatchCodec,
-            authorityMigrator);
+            authorityMigrator,
+            teamResolver);
         // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
         // watermark spans every host-authority message type (engine placement + machine state/authority)
         // — a superseded hosting generation is dropped consistently across both. The policy is a
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy, rangedSiegeWeaponPresentation);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy, rangedSiegeWeaponPresentation);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
-        Session = session;
-        Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
+        ResultCommitter = resultCommitter;
+        Context = new BattleContext(session, deployment, coopMissionComponent, hostEpochPolicy, resultCommitter, reinforcementFielder,
+            missionContext, troopWithdrawal, partyWithdrawal);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
@@ -209,38 +243,39 @@ public class CoopBattleController : CoopMissionController
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId));
-        lifecycle.Dispose();
-        replicator.Dispose();
-        deathReporter.Dispose();
-        routReporter.Dispose();
-        puppetSpawner.Dispose();
-        puppetDeathApplier.Dispose();
-        puppetRoutApplier.Dispose();
-        damageRouter.Dispose();
-        authorityMigrator.Dispose();
-        reinforcementFielder.Dispose();
-        siegeEngineDeployment.Dispose();
-        coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null);
-        siegeMachineState.Dispose();
-        siegeWeaponFire.Dispose();
-        Deployment.Dispose();
-        messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
-        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
-
-        if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
-            BattleSpawnGate.HeroAgentAuthorityProbe = null;
-
-        // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
-        // never bleeds into the next siege before the first tick refreshes it.
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.IsAuthorityKnown = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
-        BattleConclusionGate.IsInCoopBattleMission = false;
-
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)),
+            lifecycle.Dispose,
+            replicator.Dispose,
+            deathReporter.Dispose,
+            routReporter.Dispose,
+            puppetSpawner.Dispose,
+            puppetDeathApplier.Dispose,
+            puppetRoutApplier.Dispose,
+            damageRouter.Dispose,
+            authorityMigrator.Dispose,
+            reinforcementFielder.Dispose,
+            siegeEngineDeployment.Dispose,
+            () => coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null),
+            siegeMachineState.Dispose,
+            siegeWeaponFire.Dispose,
+            Deployment.Dispose,
+            () => messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot),
+            () => messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned),
+            () =>
+            {
+                if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
+                    BattleSpawnGate.HeroAgentAuthorityProbe = null;
+                // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
+                // never bleeds into the next siege before the first tick refreshes it.
+                SiegeMissionAuthorityGate.IsLocalAuthority = false;
+                SiegeMissionAuthorityGate.IsAuthorityKnown = false;
+                SiegeMissionAuthorityGate.ResetClaimedMachines();
+                BattleConclusionGate.IsInCoopBattleMission = false;
+            },
+            base.DisposeMission);
     }
 
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
@@ -339,35 +374,33 @@ public class CoopBattleController : CoopMissionController
         damageRouter.Tick(dt);
     }
 
-    // A side counts as fielded once some team of it has a live human agent (puppets qualify; they join
-    // teams like any agent). Mirrors CoopBattleDepletionPatch's live-agent count.
+    // Whether the battle is live and both sides fielded here, a side whose reserve was abandoned excepted.
     private bool BattleReadyForEndChecks()
     {
-        bool attackerFielded = false;
-        bool defenderFielded = false;
-        foreach (var team in Mission.Teams)
-        {
-            if (team.Side != BattleSideEnum.Attacker && team.Side != BattleSideEnum.Defender) continue;
-            if (team.Side == BattleSideEnum.Attacker && attackerFielded) continue;
-            if (team.Side == BattleSideEnum.Defender && defenderFielded) continue;
-
-            foreach (var agent in team.ActiveAgents)
-            {
-                if (!agent.IsHuman) continue;
-                if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
-                else defenderFielded = true;
-                break;
-            }
-
-            if (attackerFielded && defenderFielded) break;
-        }
-
+        SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
         return ShouldReleaseEndConditionHold(
             Deployment.IsActivated,
             attackerFielded,
             defenderFielded,
             BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
             BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+    }
+
+    /// <summary>
+    /// Whether each side has a team with a live human agent here; puppets qualify, since they join teams like any agent.
+    /// Mirrors CoopBattleDepletionPatch's live-agent count; the land and naval end-condition holds both read it.
+    /// </summary>
+    public static void SidesFielded(IEnumerable<Team> teams, out bool attackerFielded, out bool defenderFielded)
+    {
+        attackerFielded = false;
+        defenderFielded = false;
+        foreach (var team in teams)
+        {
+            if (!team.ActiveAgents.Any(agent => agent.IsHuman)) continue;
+
+            if (team.Side == BattleSideEnum.Attacker) attackerFielded = true;
+            else if (team.Side == BattleSideEnum.Defender) defenderFielded = true;
+        }
     }
 
     /// <summary>
@@ -615,11 +648,9 @@ public class CoopBattleController : CoopMissionController
 
         ClearAppliedPendingResultSnapshot();
         ResultCommitter.AcceptResolvedState(snapshot.BattleState);
-        if (Deployment.IsCommitted && lastResultSnapshotEpochReported != snapshot.HostEpoch)
-        {
+        // The committer reports a result once per state and host epoch, so a repeated snapshot sends nothing.
+        if (Deployment.IsCommitted)
             ResultCommitter.ReportAcceptedResult();
-            lastResultSnapshotEpochReported = snapshot.HostEpoch;
-        }
     }
 
     private void ClearAppliedPendingResultSnapshot()
@@ -641,7 +672,7 @@ public class CoopBattleController : CoopMissionController
         else
             SiegeEngineStateReporter.ReportOnLeavingIfHost();
 
-        // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
+        // Retry the result-ready report before tearing the instance down; one already sent at this epoch is skipped.
         ResultCommitter.ReportResolvedResult(missionResult);
 
         // Retreats are reported separately by OnRetreatMission

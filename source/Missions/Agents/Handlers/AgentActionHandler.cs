@@ -47,6 +47,12 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
 
+    /// <summary>
+    /// Owned agents seated at a ship station send no action changes: the station machine animates their puppet on every peer,
+    /// and a replicated channel action makes the helm drop its pilot. Null turns it off.
+    /// </summary>
+    void ConfigureStationSeats(IShipStationSeats seats);
+
     /// <summary>[Game thread] Reapply retained defend input after continuous movement replay.</summary>
     void RefreshRemoteGuardStatesAfterMovement();
 }
@@ -75,6 +81,11 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
+
+    private IShipStationSeats stationSeats;
+
+    public void ConfigureStationSeats(IShipStationSeats seats) => stationSeats = seats;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
@@ -125,7 +136,8 @@ public class AgentActionHandler : IAgentActionHandler
         INetworkAgentRegistry agentRegistry,
         IControllerIdProvider controllerIdProvider,
         IRemoteAgentActionProcessor remoteActionProcessor,
-        IGuardReactionHandler guardReactionHandler)
+        IGuardReactionHandler guardReactionHandler,
+        ILocationNpcAuthorityState locationAuthorityState)
     {
         this.client = client;
         this.packetManager = packetManager;
@@ -134,6 +146,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.controllerIdProvider = controllerIdProvider;
         this.remoteActionProcessor = remoteActionProcessor;
         this.guardReactionHandler = guardReactionHandler;
+        this.locationAuthorityState = locationAuthorityState;
 
         this.packetManager.RegisterPacketHandler(this);
         this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
@@ -239,7 +252,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             actionSyncedAgent);
 #endif
-        if (!actionSyncedAgent) return;
+        if (!actionSyncedAgent || stationSeats?.IsOwnSeat(info.AgentId) == true) return;
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
@@ -371,7 +384,7 @@ public class AgentActionHandler : IAgentActionHandler
 
         // Point-driven location performances replicate semantically. Only non-point ambient actions use this stream.
         bool locationAmbientAgent =
-            LocationNpcGate.IsCoopLocationMissionActive
+            locationAuthorityState.IsCoopLocationMissionActive
             && !isPlayerControlled
             && agent.CurrentlyUsedGameObject == null;
         bool publishAction0Speed =
@@ -599,7 +612,7 @@ public class AgentActionHandler : IAgentActionHandler
                 // not only held defend/guard state. Point users are excluded: the joiner's spawn
                 // record carries the used point id and the local point animates the puppet.
                 bool locationAmbient =
-                    LocationNpcGate.IsCoopLocationMissionActive
+                    locationAuthorityState.IsCoopLocationMissionActive
                     && agent.Controller != AgentControllerType.Player
                     && agent.CurrentlyUsedGameObject == null
                     && (agent.GetCurrentAction(0) != ActionIndexCache.act_none

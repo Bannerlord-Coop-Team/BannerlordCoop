@@ -7,7 +7,6 @@ using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using Moq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -104,11 +103,8 @@ public class ClanRequestSenderValidationTests
 
             Peer = Network.CreatePeer();
             var playerManager = new Mock<IPlayerManager>();
-            if (registeredHeroId != null)
-            {
-                var player = new Player("controller", registeredHeroId, "party", ClanId, "character");
-                playerManager.Setup(manager => manager.TryGetPlayer(Peer, out player)).Returns(true);
-            }
+            playerManager.Setup(manager => manager.IsSenderControllingHero(Peer, ActorId))
+                .Returns(registeredHeroId == ActorId);
 
             var objectManager = new Mock<IObjectManager>();
             Hero actor = Actor;

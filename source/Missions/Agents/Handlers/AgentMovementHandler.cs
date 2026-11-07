@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Packets;
+using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
@@ -36,6 +37,24 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     void Configure(MovementCadenceProfile profile);
 
     bool TrySetForcedBulkHz(int? hz, out string error);
+
+    /// <summary>
+    /// Owned agents the seam places on a hull send hull-local poses and received ones rebase on the resolved local hull; null
+    /// turns it off.
+    /// </summary>
+    void ConfigureShipDeck(IShipDeckSeam seam);
+
+    /// <summary>Owned agents seated at a ship station send no world movement; null turns it off.</summary>
+    void ConfigureStationSeats(IShipStationSeats seats);
+
+    /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
+    void ForgetMovementTarget(Agent agent);
+
+    /// <summary>[Game thread] The naval deck counters (diagnostics).</summary>
+    object InspectShipDecks();
+
+    /// <summary>Per-mission deck diagnostics and DEBUG receiver rejection control.</summary>
+    INavalDeckMovementProbe DeckMovementProbe { get; }
 
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 
@@ -70,7 +89,7 @@ internal interface IAgentMovementDebugControl
 }
 #endif
 
-public class AgentMovementHandler : IAgentMovementHandler
+public partial class AgentMovementHandler : IAgentMovementHandler
 #if DEBUG
     , IAgentMovementDebugControl
 #endif
@@ -102,6 +121,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementRateController movementRateController;
     private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
+    private readonly ILocationNpcAuthorityState locationAuthorityState;
     private readonly IRelayNetwork relayNetwork;
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -439,6 +459,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
         IMissionContext missionContext,
+        INavalDeckMovementProbe deckMovementProbe,
+        ILocationNpcAuthorityState locationAuthorityState,
         IRelayNetwork relayNetwork = null)
     {
         if (movementRateController == null) throw new ArgumentNullException(nameof(movementRateController));
@@ -459,8 +481,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        DeckMovementProbe = deckMovementProbe;
+        this.locationAuthorityState = locationAuthorityState;
         this.relayNetwork = relayNetwork;
-        _interpolator = new AgentPositionInterpolator(agentRegistry);
+        _interpolator = new AgentPositionInterpolator(agentRegistry, locationAuthorityState);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
         this.messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -507,6 +531,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         resolvedMountIdentities.Clear();
         receivedMovementSequences.Clear();
         recipientMovementStates.Clear();
+        ConfigureShipDeck(null);
+        ConfigureStationSeats(null);
 
         movementBatchSender.Clear();
         movementRateController.Dispose();
@@ -792,6 +818,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                     turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
                     mountAction0IsSyntheticTurn: syntheticTurn,
                     mountAuthorityRevision: mountAuthorityRevision);
+                CaptureDeck(agentInfo, ref agentData);
 
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
@@ -1003,6 +1030,7 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
+            if (WithholdSeatedMovement(controllerId, recipient, captured)) continue;
             bool shouldSend = captured.IsMount
                 ? ShouldSendMovement(recipient, agentId, captured.MountData)
                 : ShouldSendMovement(recipient, agentId, captured.AgentData);
@@ -1074,7 +1102,13 @@ public class AgentMovementHandler : IAgentMovementHandler
             EnumerateAgentMovementBatches(priorityMovement, movement),
             firstLegacyBatch: null,
             CreateMovementPacket,
-            (agentId, data) => RecordSentMovement(recipient, agentId, data),
+            (agentId, data) =>
+            {
+                RecordSentMovement(recipient, agentId, data);
+                bool ai = data.DeckShip != Guid.Empty && agentRegistry.TryGetAgentInfo(agentId, out var info)
+                    && info.Agent.Controller == AgentControllerType.AI;
+                DeckMovementProbe.Record(controllerId, agentId, data, ai, totalSimulationTime);
+            },
             mountMovement.Compact.Values,
             mountMovement.Legacy,
             CreateMountMovementPacket,
@@ -1207,7 +1241,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
     private static bool HasMovementChanged(AgentData previous, AgentData current)
     {
-        return (current.Position - previous.Position).LengthSquared > PositionDeltaThresholdSq ||
+        return HasPoseMoved(previous, current) ||
                (current.MovementDirection - previous.MovementDirection).LengthSquared > DirectionDeltaThresholdSq ||
                (current.InputVector - previous.InputVector).LengthSquared > DirectionDeltaThresholdSq ||
                (current.LookDirection - previous.LookDirection).LengthSquared > DirectionDeltaThresholdSq ||
@@ -1621,9 +1655,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         Guid[] canonicalIds,
         AgentData[] data)
     {
+        Guid[] deckShips = IndexDecks(data);
         return identityScopeId == null
-            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence)
-            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence);
+            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips)
+            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence, deckShips: deckShips);
     }
 
     // Standalone mounts share the rider capture clock but retain per-agent receive ordering.
@@ -1655,12 +1690,14 @@ public class AgentMovementHandler : IAgentMovementHandler
         var snapshots = new ReceivedMovement[idCount];
         for (int i = 0; i < idCount; i++)
         {
+            AgentData data = movement.Agents[i];
+            data.ResolveDeckShip(movement.DeckShips);
             snapshots[i] = new ReceivedMovement(
                 movement.IdentityScopeId,
                 usesCompactIds ? movement.AgentIds[i] : (ushort)0,
                 usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
                 usesCompactIds,
-                movement.Agents[i],
+                data,
                 movement.AuthorityRevisions?[i] ?? 0,
                 movement.SampleSequence);
         }
@@ -1819,6 +1856,14 @@ public class AgentMovementHandler : IAgentMovementHandler
                     continue;
                 }
 
+                // The interpolator owns a deck pose and its rebased directions every tick.
+                if (data.DeckShipIndex != 0)
+                {
+                    RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+                    ApplyDeckMovement(agentInfo.AgentId, agent, data);
+                    continue;
+                }
+
                 string riderScope = snapshot.IdentityScopeId ?? agentInfo.MovementScopeId;
                 bool applyMount = TryAcceptEmbeddedMountSequence(
                     agent, riderScope, data.MountData, senderId, snapshot.SampleSequence);
@@ -1848,7 +1893,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 // continuous-state writes: the local point it uses drives alignment and animation
                 // natively, and every direction/look write here would fight it (the seated-NPC
                 // spin). Its position target still flows to the interpolator below.
-                if (!LocationPoseLock.IsPointOwned(agent))
+                if (!LocationPoseLock.IsPointOwned(locationAuthorityState, agent))
                 {
                     if (!agent.HasMount)
                         data.ApplyContinuousState(agent);
@@ -2129,6 +2174,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         {
             if (_disposed) return;
             recipientMovementStates.Remove(controllerId);
+            DeckMovementProbe.RemoveRecipient(controllerId);
             movementBatchSender.RemoveRecipient(controllerId);
         });
     }
@@ -2149,7 +2195,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
         // controller's player and companion agents; its host-owned NPC puppets survive for migration,
         // so this all-agents sweep would fade the whole crowd out with its host.
-        if (LocationNpcGate.IsCoopLocationMissionActive) return;
+        if (locationAuthorityState.IsCoopLocationMissionActive) return;
 
         bool sceneActive = Mission.Current != null;
 

@@ -43,6 +43,7 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
+using Moq;
 using System.Reflection;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
@@ -70,7 +71,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Services.MapEvents;
 
-public class PlayerPartyInteractionFlowTests : MapEventTestBase
+public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 {
     private static Action? beforePvpNotificationDrain;
 
@@ -2218,6 +2219,61 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+#if DEBUG
+    // The ally join start_naval uses: a close from an earlier battle names that battle and must not close the join
+    // into a later one, while a close naming this battle, or no battle, still does. No player interaction precedes the
+    // join to clear the close.
+    [Theory]
+    [InlineData(false, "earlier", true)]
+    [InlineData(true, "earlier", true)]
+    [InlineData(false, "this", false)]
+    [InlineData(true, "this", false)]
+    [InlineData(false, "none", false)]
+    [InlineData(true, "none", false)]
+    public void AllyJoinEncounter_OpensUnlessTheCloseBeforeItCoveredThisBattle(bool naval, string closedBattle, bool expectOpened)
+    {
+        var (_, client2, _, allyPartyId) = CreateTwoPlayerParties();
+        var battle = CreateServerMapEvent();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                mapEvent.Position = new CampaignVec2(default, isOnLand: !naval);
+            });
+        }
+
+        SetMainParty(client2, allyPartyId);
+        var closedMapEventId = closedBattle switch
+        {
+            "earlier" => "MapEvent_EarlierBattle",
+            "this" => battle.MapEventId,
+            _ => null,
+        };
+        client2.SimulateMessage(this, new NetworkClosePvpEncounter(new[] { allyPartyId }, null, closedMapEventId));
+
+        string? enemyPartyId = null;
+        Server.Call(() =>
+        {
+            var objectManager = Server.ObjectManager;
+            Assert.True(objectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var enemyParty));
+            Assert.True(objectManager.TryGetObject<MobileParty>(battle.DefenderPartyId, out var defenderParty));
+            Assert.True(objectManager.TryGetObject<PartyBase>(allyPartyId, out var allyParty));
+            Assert.True(objectManager.TryGetId(enemyParty.Party, out enemyPartyId));
+            Assert.True(Server.Resolve<GameInterface.Services.MapEvents.NavalScenarios.INavalBattleStaging>().TryJoinNavalAlly(
+                battle.MapEventId, enemyParty, defenderParty, allyParty.MobileParty, out var error), error);
+        }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat))).ToList());
+
+        if (expectOpened)
+        {
+            AssertHostileEncounterMapEvent(client2, battle.MapEventId, enemyPartyId!, allyPartyId);
+            return;
+        }
+
+        client2.Call(() => Assert.Null(PlayerEncounter.Current), MapEventDisabledMethods);
+    }
+#endif
+
     [Fact]
     public void HostilePlayerParties_RequestStartsDialogWithOfferServicesDisabledAndTradeAvailable()
     {
@@ -2849,6 +2905,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             playerPartyId,
             siege.SettlementId,
             enterSettlement: false);
+        AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
         client.NetworkSentMessages.Clear();
         Server.NetworkSentMessages.Clear();
         client.Call(() =>
@@ -2928,11 +2986,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                         playerParty.Party,
                         BattleSideEnum.Defender));
 
+                    PayBreakIn(client, playerParty, settlement);
                     Server.SimulateMessage(client.NetPeer, breakInRequest);
                 },
                 MapEventDisabledMethods);
         }
 
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
         Assert.Equal(

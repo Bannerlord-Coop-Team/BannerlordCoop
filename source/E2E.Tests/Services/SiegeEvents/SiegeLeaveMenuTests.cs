@@ -165,6 +165,27 @@ public class SiegeLeaveMenuTests : IDisposable
         });
     }
 
+    // A player who left the siege has no PlayerSiegeEvent, while the menu conditions still run every frame
+    [Theory]
+    [InlineData("game_menu_siege_strategies_lead_assault_on_condition", GameMenuOption.LeaveType.LeadAssault)]
+    [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
+    public void AssaultCondition_NoPlayerSiege_ReturnsFalseWithoutThrowing(
+        string methodName,
+        GameMenuOption.LeaveType expectedLeaveType)
+    {
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.Null(PlayerSiege.PlayerSiegeEvent);
+
+            var (shown, args) = InvokeAssaultCondition(methodName);
+
+            Assert.False(shown);
+            Assert.Equal(expectedLeaveType, args.optionLeaveType);
+        });
+    }
+
     [Theory]
     [InlineData("game_menu_siege_strategies_order_assault_on_condition", GameMenuOption.LeaveType.OrderTroopsToAttack)]
     public void AssaultCondition_MissingSideEngines_ReturnsFalseWithoutThrowing(
@@ -655,7 +676,7 @@ public class SiegeLeaveMenuTests : IDisposable
         string prefixName = methodName.Contains("lead_assault")
             ? "LeadAssaultConditionPrefix"
             : "OrderAssaultConditionPrefix";
-        var prefix = AccessTools.Method(typeof(SiegeAssaultCommandGatePatch), prefixName);
+        var prefix = AccessTools.Method(typeof(SiegeEventCampaignBehaviorPatches), prefixName);
         Assert.NotNull(prefix);
 
         var args = new MenuCallbackArgs((MenuContext)null, null);

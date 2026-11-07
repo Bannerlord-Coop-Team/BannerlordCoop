@@ -10,6 +10,7 @@ using Common.Serialization;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -215,7 +216,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController,
                 peer.Resolve<IMovementPriorityScheduler>(),
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             handler.Configure(MovementCadenceProfile.Battle);
 
             PollMovementWindow(handler, framesPerSecond: 20);
@@ -304,7 +307,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object,
                 peer.Resolve<IMovementPriorityScheduler>(),
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
 
             Agent locallyControlledAgent = SpawnRider(mock);
             Agent remoteControlledAgent = SpawnRider(mock);
@@ -446,7 +451,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object,
                 priorityScheduler,
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Assert.True(registry.TryRegisterAgent(
                 "owner", Guid.NewGuid(), 1, SpawnRider(mock)));
 
@@ -525,7 +532,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object,
                 priorityScheduler,
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Agent agent = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(agent, out MirrorAgent mirror));
             Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
@@ -602,7 +611,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 rateController.Object,
                 priorityScheduler,
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             Agent mainAgent = SpawnRider(mock);
             Agent formationAgent = SpawnRider(mock);
             mock.MainAgent = mainAgent;
@@ -971,7 +982,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 peer.Resolve<IAgentVisualActionAccessor>(),
                 peer.Resolve<IMovementRateController>(),
                 peer.Resolve<IMovementPriorityScheduler>(),
-                peer.Resolve<IMissionContext>());
+                peer.Resolve<IMissionContext>(),
+                peer.Resolve<INavalDeckMovementProbe>(),
+                peer.Resolve<ILocationNpcAuthorityState>());
             var riderMirrors = new List<MirrorAgent>();
 
             for (int i = 0; i < 18; i++)

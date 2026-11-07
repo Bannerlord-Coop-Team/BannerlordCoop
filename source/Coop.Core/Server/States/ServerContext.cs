@@ -2,6 +2,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Modules;
@@ -22,6 +23,7 @@ public class ServerContext
         INetwork network,
         IRegistryManager registryManager,
         IMapEventLoadCleaner mapEventLoadCleaner,
+        ILeaderlessClanResolver leaderlessClanResolver,
         IEmptyLordPartyResetter emptyLordPartyResetter,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
@@ -32,6 +34,7 @@ public class ServerContext
         Network = network;
         RegistryManager = registryManager;
         MapEventLoadCleaner = mapEventLoadCleaner;
+        LeaderlessClanResolver = leaderlessClanResolver;
         EmptyLordPartyResetter = emptyLordPartyResetter;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
@@ -43,6 +46,7 @@ public class ServerContext
     public INetwork Network { get; }
     public IRegistryManager RegistryManager { get; }
     public IMapEventLoadCleaner MapEventLoadCleaner { get; }
+    public ILeaderlessClanResolver LeaderlessClanResolver { get; }
     public IEmptyLordPartyResetter EmptyLordPartyResetter { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }

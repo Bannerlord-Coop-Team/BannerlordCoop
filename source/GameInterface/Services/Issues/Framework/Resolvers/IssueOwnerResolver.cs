@@ -26,12 +26,7 @@ internal class IssueOwnerResolver : IIssueOwnerResolver
     {
         ownerHero = null;
 
-        if (!objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId))
-        {
-            return false;
-        }
-
-        if (!ownership.TryGetOwner(issueOwnerId, issue.StringId, out var controllerId))
+        if (!TryGetOwnerControllerId(issue, out var controllerId))
         {
             return false;
         }
@@ -42,5 +37,17 @@ internal class IssueOwnerResolver : IIssueOwnerResolver
         }
 
         return objectManager.TryGetObject(player.HeroId, out ownerHero);
+    }
+
+    public bool TryGetOwnerControllerId(IssueBase issue, out string controllerId)
+    {
+        controllerId = null;
+
+        if (!objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId))
+        {
+            return false;
+        }
+
+        return ownership.TryGetOwner(issueOwnerId, issue.StringId, out controllerId);
     }
 }

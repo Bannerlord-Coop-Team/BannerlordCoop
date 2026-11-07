@@ -1,4 +1,5 @@
 ﻿using Missions.Agents.Handlers;
+using Missions.Battles;
 using Missions.Missiles.Handlers;
 
 namespace Missions;
@@ -6,6 +7,8 @@ namespace Missions;
 public interface ICoopMissionComponent
 {
     INetworkAgentRegistry AgentRegistry { get; }
+    /// <summary>Network identities of naval hulls in this mission.</summary>
+    INetworkShipRegistry ShipRegistry { get; }
     IMissileHandler MissileHandler { get; }
     IAgentMovementHandler AgentMovementHandler { get; }
     IAgentActionHandler AgentActionHandler { get; }
@@ -22,6 +25,8 @@ public interface ICoopMissionComponent
 public class CoopMissionComponent : ICoopMissionComponent
 {
     public INetworkAgentRegistry AgentRegistry { get; }
+
+    public INetworkShipRegistry ShipRegistry { get; }
 
     public IMissileHandler MissileHandler { get; }
     public IAgentMovementHandler AgentMovementHandler { get; }
@@ -45,6 +50,7 @@ public class CoopMissionComponent : ICoopMissionComponent
 
     public CoopMissionComponent(
         INetworkAgentRegistry agentRegistry,
+        INetworkShipRegistry shipRegistry,
         IMissileHandler missileHandler,
         IAgentMovementHandler agentMovementHandler,
         IAgentActionHandler agentActionHandler,
@@ -59,6 +65,7 @@ public class CoopMissionComponent : ICoopMissionComponent
         )
     {
         AgentRegistry = agentRegistry;
+        ShipRegistry = shipRegistry;
         MissileHandler = missileHandler;
         AgentMovementHandler = agentMovementHandler;
         AgentActionHandler = agentActionHandler;

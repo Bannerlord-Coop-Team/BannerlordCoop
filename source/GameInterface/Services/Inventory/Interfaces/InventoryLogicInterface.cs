@@ -1,4 +1,6 @@
 ﻿using Common;
+using Common.Util;
+using TaleWorlds.CampaignSystem.Inventory;
 using Common.Logging;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.MobileParties.Extensions;
@@ -176,12 +178,35 @@ namespace GameInterface.Services.Inventory.Interfaces
 
         public void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements)
         {
-            if (itemRosterElements == null) return;
+            if (targetItemRoster == null || itemRosterElements == null) return;
 
-            targetItemRoster.Clear();
+            // Apply the snapshot as per-element deltas. Clearing a shared market roster
+            // broadcasts a reset to every open trade screen in that settlement.
+            var current = targetItemRoster.ToArray();
+            foreach (var currentElement in current)
+            {
+                int desired = FindAmount(itemRosterElements, currentElement.EquipmentElement);
+                int delta = desired - currentElement.Amount;
+                if (delta != 0)
+                    targetItemRoster.AddToCounts(currentElement.EquipmentElement, delta);
+            }
 
-            // Rebuild roster with new data
-            targetItemRoster.Add(itemRosterElements);
+            foreach (var desiredElement in itemRosterElements)
+            {
+                int currentAmount = FindAmount(targetItemRoster, desiredElement.EquipmentElement);
+                int delta = desiredElement.Amount - currentAmount;
+                if (delta != 0)
+                    targetItemRoster.AddToCounts(desiredElement.EquipmentElement, delta);
+            }
+        }
+
+        private static int FindAmount(IEnumerable<ItemRosterElement> roster, EquipmentElement element)
+        {
+            foreach (var item in roster)
+            {
+                if (item.EquipmentElement.IsEqualTo(element)) return item.Amount;
+            }
+            return 0;
         }
 
         public void UpdateEquipmentWithData(MobileParty mobileParty, Dictionary<CharacterObject, Equipment[]> characterEquipments, Hero initialHero)

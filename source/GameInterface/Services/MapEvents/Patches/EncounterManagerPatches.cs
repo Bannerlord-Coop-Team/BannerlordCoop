@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -128,6 +129,11 @@ internal class EncounterManagerPatches
                 return false;
 
             if (mobileParty.ShortTermBehavior == AiBehavior.EngageParty && mobileParty.ShortTermTargetParty == null)
+                return false;
+
+            // Vanilla stops time under the encounter menu, co-op keeps the client map running, so the main party
+            // would otherwise re-interact every tick with the target it is already in an encounter with.
+            if (mobileParty.IsMainParty && PlayerEncounter.Current != null)
                 return false;
         }
 

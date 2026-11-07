@@ -1,12 +1,17 @@
 ﻿using GameInterface.Services.Alleys;
+using GameInterface.Services.CampaignService.Statistics;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Traits;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 using System;
@@ -32,6 +37,11 @@ public interface ICoopSession
     HeroMeetingData HeroMeetingData { get; }
     AgingPlayerData AgingPlayerData { get; }
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+    NavalPlayerData NavalPlayerData { get; }
+    PlayerTraitData PlayerTraitData { get; }
+    OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    StatisticsPlayerData StatisticsPlayerData { get; }
+    IncidentsPlayerData IncidentsPlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -47,11 +57,12 @@ public class CoopSession : ICoopSession
         new WorkshopPlayerData(new()),
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
-        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
-        new TradePlayerData(new(), new(), new(), new()),
+        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+        new TradePlayerData(new(), new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
         new HeroMeetingData(new()),
-        new AgingPlayerData(new()));
+        new AgingPlayerData(new()),
+        new NavalPlayerData(new(), new(), new(), new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -77,6 +88,16 @@ public class CoopSession : ICoopSession
     public AgingPlayerData AgingPlayerData { get; }
     [ProtoMember(12)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+    [ProtoMember(13)]
+    public PlayerTraitData PlayerTraitData { get; }
+    [ProtoMember(14)]
+    public OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
+    [ProtoMember(15)]
+    public StatisticsPlayerData StatisticsPlayerData { get; }
+    [ProtoMember(16)]
+    public IncidentsPlayerData IncidentsPlayerData { get; }
+    [ProtoMember(17)]
+    public NavalPlayerData NavalPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -90,7 +111,12 @@ public class CoopSession : ICoopSession
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        NavalPlayerData navalPlayerData,
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        PlayerTraitData playerTraitData = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        StatisticsPlayerData statisticsPlayerData = null,
+        IncidentsPlayerData incidentsPlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -103,6 +129,11 @@ public class CoopSession : ICoopSession
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         ClanFinance = clanFinance ?? new();
+        PlayerTraitData = playerTraitData ?? new PlayerTraitData(new());
+        OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
+        StatisticsPlayerData = statisticsPlayerData ?? new StatisticsPlayerData(new());
+        IncidentsPlayerData = incidentsPlayerData ?? new IncidentsPlayerData(new(), new(), new(), new(), new());
     }
 }

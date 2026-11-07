@@ -3,6 +3,7 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -43,11 +44,12 @@ namespace Coop.Tests.Server.Services.Save
                 new WorkshopPlayerData(new()),
                 new CaravansPlayerData(new(), new()),
                 new AlleyPlayerData(new()),
-                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
-                new TradePlayerData(new(), new(), new(), new()),
+                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+                new TradePlayerData(new(), new(), new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
-                new AgingPlayerData(new()));
+                new AgingPlayerData(new()),
+                new NavalPlayerData(new(), new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

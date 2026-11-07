@@ -58,10 +58,14 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenRosterRefresher>();
     private readonly IPartyScreenRosterBaselineProvider baselineProvider;
+    private readonly IPartyScreenLockPreserver lockPreserver;
 
-    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider)
+    public PartyScreenRosterRefresher(
+        IPartyScreenRosterBaselineProvider baselineProvider,
+        IPartyScreenLockPreserver lockPreserver)
     {
         this.baselineProvider = baselineProvider;
+        this.lockPreserver = lockPreserver;
     }
 
     public bool TryApply(
@@ -73,7 +77,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (character == null) throw new ArgumentNullException(nameof(character));
         if (applyAuthoritative == null) throw new ArgumentNullException(nameof(applyAuthoritative));
 
-        var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        var logic = GetOpenLogic(Game.Current?.GameStateManager);
         return TryApply(
             logic,
             authoritativeRoster,
@@ -145,7 +149,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
         if (authoritativeRoster == null) throw new ArgumentNullException(nameof(authoritativeRoster));
 
-        var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        var logic = GetOpenLogic(Game.Current?.GameStateManager);
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
@@ -176,7 +180,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (authoritativeRoster == null) throw new ArgumentNullException(nameof(authoritativeRoster));
         if (applyAuthoritative == null) throw new ArgumentNullException(nameof(applyAuthoritative));
 
-        var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        var logic = GetOpenLogic(Game.Current?.GameStateManager);
         return TryApply(logic, authoritativeRoster, applyAuthoritative);
     }
 
@@ -266,7 +270,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         }
     }
 
-    private static void RefreshScreen(PartyScreenLogic logic)
+    private void RefreshScreen(PartyScreenLogic logic)
     {
         var partyVm = GetPartyVm(logic);
         var previousSelection = partyVm?.CurrentCharacter;
@@ -275,7 +279,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             ? GetIdentity(previousSelection)
             : default;
 
-        logic.OnReset(false);
+        lockPreserver.Reset(logic, () => logic.OnReset(false));
 
         if (!restoreSelection) return;
 
@@ -295,7 +299,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         replacement.UpdateRecruitable();
     }
 
-    private static void RefreshTroop(
+    private void RefreshTroop(
         PartyScreenLogic logic,
         TroopRoster baseline,
         CharacterObject character,
@@ -386,6 +390,12 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         }
         partyVm.UpdateTroopManagerPopUpCounts();
     }
+
+    /// <summary>
+    /// The open party screen, also while a conversation started from it is the active state.
+    /// </summary>
+    internal static PartyScreenLogic GetOpenLogic(GameStateManager gameStateManager)
+        => gameStateManager?.LastOrDefault<PartyState>()?.PartyScreenLogic;
 
     private static TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyVM GetPartyVm(
         PartyScreenLogic logic)

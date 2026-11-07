@@ -63,6 +63,7 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -74,7 +75,8 @@ internal class BattleFinalizeHandler : IHandler
         ISettlementInterface settlementInterface,
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
-        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -86,6 +88,7 @@ internal class BattleFinalizeHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -143,12 +146,21 @@ internal class BattleFinalizeHandler : IHandler
         // on a refusal — the finalized reply would pull the refused client off the menu vanilla parked
         // it on. Server-local publishes (requester null) and battles with no elected host pass.
         if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment)
-            && playerManager.TryGetPlayer(requester, out var requestingPlayer)
-            && requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+            && playerManager.TryGetPlayer(requester, out var requestingPlayer))
         {
-            Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
-                payload.What.MapEventId, requestingPlayer.ControllerId);
-            return;
+            if (requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+            {
+                Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
+                    payload.What.MapEventId, requestingPlayer.ControllerId);
+                return;
+            }
+
+            if (retentionPolicy.DefersHostFinalize(payload.What.MapEventId))
+            {
+                Logger.Information("Refused finalize of {MapEventId} from host {ControllerId}: its naval result waits for the server's conclusion",
+                    payload.What.MapEventId, requestingPlayer.ControllerId);
+                return;
+            }
         }
 
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
@@ -618,6 +630,16 @@ internal class BattleFinalizeHandler : IHandler
         {
             if (Campaign.Current == null) return;
 
+            var mainParty = MobileParty.MainParty;
+            // This reply has no event id; an old reply must not close or move a new active raider.
+            if (ModInformation.IsClient && mainParty?.MapEvent is MapEvent activeRaid &&
+                activeRaid.IsRaidHostileAction() && !activeRaid.IsFinalized)
+                return;
+
+            // A late reply cannot identify or close the new village encounter opened by a raid reset.
+            if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
+                return;
+
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate
             // (BattleModeEncounterOptionsPatch) no longer treats this event as claimed.
             BattleModeRegistry.End();
@@ -627,7 +649,6 @@ internal class BattleFinalizeHandler : IHandler
             // itself. Exiting menus here would close the capture screen.
             if (PlayerCaptivity.IsCaptive) return;
 
-            var mainParty = MobileParty.MainParty;
             MoveLocalRaidPartyToSettlementGate(mainParty, GetLocalRaidFinalizationSettlement(mainParty));
 
             if (PlayerEncounter.Current != null)
@@ -650,7 +671,7 @@ internal class BattleFinalizeHandler : IHandler
             if (mobileParty == null)
                 continue;
 
-            mobileParty.Position = settlement.GatePosition;
+            mobileParty.Position = mobileParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mobileParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mobileParty);
 
@@ -670,7 +691,7 @@ internal class BattleFinalizeHandler : IHandler
 
         using (new AllowedThread())
         {
-            mainParty.Position = settlement.GatePosition;
+            mainParty.Position = mainParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mainParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mainParty);
 

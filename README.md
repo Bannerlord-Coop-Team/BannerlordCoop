@@ -86,7 +86,11 @@ Support helps cover development tools, hosting infrastructure, dedicated servers
 
 Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor) Also join our [Discord](https://discord.gg/VXqGyT8) for direct questions and collaboration.
 
+We do not accept tests or implementations that no human contributor takes ownership of, because they add too much technical debt. AI tools may write code and tests, but a human contributor must own every change: direct its design, review and test it, answer review feedback, and be able to explain and maintain it. PRs that nobody owns this way may be closed.
+
 Debug builds of the in-game server always try to load a campaign save named `MP` when the server starts: a plain `/server` launch loads nothing else, and a `/coopsave <name>` launch attempts `MP` before the named save. A missing `MP` save is skipped with `Failed to load save with name MP` in the server log, so create a game and save it as `MP` before hosting from a Debug build; the [Environment Setup Guide](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Environment-Setup-Guide) wiki page covers this under Windows Setup (create a new game and save it as MP). Release builds skip `MP` and load only the save picked in the host screen or passed with `/coopsave`.
+
+The Visual Studio launch profiles for `Coop`, `ClientDebug`, `ClientDebug2` and `Coop.Core` append the `COOP_DEBUG_MODULES` user environment variable to the `_MODULES_` list right after `StoryMode`, so extra modules can be loaded without editing the launch settings. Start each module with `*`: `setx COOP_DEBUG_MODULES "*NavalDLC"` loads War Sails, and `"*NavalDLC*OtherModule"` loads more than one. Left unset, the default module list is used. Restart Visual Studio after changing it, because it only reads environment variables when it starts.
 
 By submitting a contribution to BannerlordCoop, you agree that your contribution
 may be used, modified, distributed, sublicensed, and relicensed by the

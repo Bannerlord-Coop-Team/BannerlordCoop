@@ -15,7 +15,7 @@ Deployment is disabled when the profile's `deployment` property is omitted or nu
 }
 ```
 
-The server does not discover/install MSBuild or edit MCP settings. The root must be absolute, outside Windows/user Temp and separate from the source checkout and game installation. Deployment paths must not traverse junctions/symlinks; configure the real installation path, not its `mb2` alias. The checkout's read-only build-reference `mb2` junction remains supported. Do not put this durable root on disposable storage or delete it to resolve a failure.
+The server does not discover/install MSBuild or edit MCP settings. The root must be absolute, outside Windows/user Temp and separate from the source checkout and game installation. Deployment paths must not traverse junctions/symlinks; configure the real installation path. Do not put this durable root on disposable storage or delete it to resolve a failure.
 
 Use one MCP session/host per machine as before. All deployment-enabled profiles/sessions for the same installation must use the same durable root. The shared root's exclusive file lease serializes deployment and `start_run`/`start_client` across those sessions. Within a server, the existing run lifecycle gate covers all profiles, including deployment-disabled profiles. An owned run must be stopped with confirmed cleanup before deployment, even if its root process exited.
 
@@ -41,7 +41,7 @@ Only the expected `source/Coop.sln` checkout layout and projects are accepted. T
 
 ## Exact write set
 
-The service rebuilds `Coop.csproj` and its reference graph in the selected configuration with Windows MSBuild, package restore enabled and node reuse disabled. If `source/Missions.Naval` exists, its solution entry/project and output are required. It is rebuilt last without rebuilding already-built shared references. No naval optin is created and no naval XML declaration is inferred.
+The service rebuilds `Coop.csproj` and its reference graph in the selected configuration with Windows MSBuild, package restore enabled and node reuse disabled. It passes `SolutionDir`, because a project-level `packages.config` restore otherwise fails with `No solution found`, and `NuGetAudit=false`, because Scriban's advisories otherwise fail restore as errors. If `source/Missions.Naval` exists, its solution entry/project and output are required. It is rebuilt last without rebuilding already-built shared references. No naval optin is created and no naval XML declaration is inferred.
 
 The deployed assembly set is `Coop`, `Common`, `Coop.Core`, `GameInterface`, `Missions`, `Coop.Steam`, `Coop.CrashReporter.exe`, and `Missions.Naval` when present. SDK projects must use the supported `bin/Release/netstandard2.0` (or `bin/Debug/netstandard2.0` when selected) layout; other layouts fail rather than guessing. Shared project outputs must match their copies in the selected `Coop/bin/Release` or `Coop/bin/Debug` directory by length, hash and MVID. A fixed runtime dependency filename allowlist in `DeploymentPlan` selects only existing top-level DLLs from that selected directory; unrecognized non-game DLLs fail rather than silently producing a partial package. No recursive bin traversal, game DLLs, publicizer directories, Steamworks.NET (game-owned), PDBs or whole-engine trees are shipped. When dependency/layout changes require new files, update the allowlist deliberately and test it; this is not a generic packager.
 

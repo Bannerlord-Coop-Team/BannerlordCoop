@@ -7,10 +7,12 @@ using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -96,6 +98,14 @@ internal class MapEventResultsHandler : IHandler
                     continue;
                 }
 
+                var prisoners = default(TroopRosterData);
+                if (playerSide == mapEvent.WinningSide)
+                {
+                    networkPlayerLootData.LootedPrisoners?.TryGetValue(playerMapEventPartyId, out prisoners);
+                }
+
+                messageBroker.Publish(this, new PlayerPrisonersLooted(player, prisoners));
+
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,
                     mapEvent.WinningSide,
@@ -133,7 +143,8 @@ internal class MapEventResultsHandler : IHandler
                 data.PlayerMapEventPartyId,
                 out var lootedItems,
                 out var lootedMembers,
-                out var lootedPrisoners);
+                out var lootedPrisoners,
+                out var lootedShips);
 
             // Set the encounter state ahead to start at applying results when a winning player leaves the battle
             // CaptureHeroes is the first EncounterState that doesn't rely on the MapEvent, which is already destroyed when a player leaves a battle
@@ -152,6 +163,7 @@ internal class MapEventResultsHandler : IHandler
                 playerEncounter.RosterToReceiveLootItems.Add(lootedItems);
                 playerEncounter.RosterToReceiveLootMembers.Add(lootedMembers);
                 playerEncounter.RosterToReceiveLootPrisoners.Add(lootedPrisoners);
+                playerEncounter.ReceivedLootShips.AddRange(lootedShips);
             }
         });
     }

@@ -95,6 +95,7 @@ public class IssueCreationSyncTests : IDisposable
         var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
         Assert.Equal(notableId, created.IssueOwnerId);
         Assert.Equal(typeof(AllowedIssue).Name, created.IssueTypeName);
+        Assert.False(string.IsNullOrEmpty(created.IssueId));
 
         Server.Call(() =>
         {
@@ -121,6 +122,21 @@ public class IssueCreationSyncTests : IDisposable
                 Assert.Same(counterOfferHero, issue.CounterOfferHero);
             });
         }
+    }
+
+    [Fact]
+    public void AClientCannotRenameTheServersIssue()
+    {
+        CreateIssueOnServer();
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        var client = TestEnvironment.Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            notable.Issue.StringId = "issue_local";
+            Assert.Equal(created.IssueId, notable.Issue.StringId);
+        });
     }
 
     [Fact]

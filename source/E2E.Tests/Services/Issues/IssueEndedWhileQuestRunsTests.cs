@@ -11,6 +11,7 @@ namespace E2E.Tests.Services.Issues;
 public class IssueEndedWhileQuestRunsTests : IDisposable
 {
     private readonly StubIssueQuestGenerator quests = new();
+    private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly QuestScenario scenario;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -25,6 +26,7 @@ public class IssueEndedWhileQuestRunsTests : IDisposable
     {
         TestEnvironment.Dispose();
         quests.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Common.Serialization
 {
@@ -48,6 +49,8 @@ namespace Common.Serialization
             // and rebuild via a parameterized constructor. Without this, fields are silently
             // dropped on write and the constructor fails to bind on read.
             IncludeFields = true,
+            // Invalid map positions are NaN, e.g. a raft fleet's cached anchor
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         };
 
         /// <inheritdoc/>

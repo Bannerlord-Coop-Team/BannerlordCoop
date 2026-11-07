@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Locations;
+﻿using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Patches;
 using System;
 using TaleWorlds.CampaignSystem.AgentOrigins;
@@ -10,43 +12,6 @@ namespace GameInterface.Tests.Services.Locations;
 
 public class LocationCompanionAuthorityPatchTests
 {
-    [Theory]
-    [InlineData(true, false, false, false, 30f, 18f, true)]
-    [InlineData(false, false, false, false, 30f, 18f, false)]
-    [InlineData(true, true, false, false, 30f, 18f, false)]
-    [InlineData(true, false, true, false, 30f, 18f, false)]
-    [InlineData(true, false, false, true, 30f, 18f, false)]
-    [InlineData(true, false, false, false, 17f, 18f, false)]
-    public void VanillaFallback_UsesVanillaBodyguardEligibility(
-        bool isHero,
-        bool isMainHero,
-        bool isPrisoner,
-        bool isWounded,
-        float age,
-        float heroComesOfAge,
-        bool expected)
-    {
-        Assert.Equal(expected,
-            LocationCharacterGuardPatches.IsEligibleVanillaCompanion(
-                isHero, isMainHero, isPrisoner, isWounded, age, heroComesOfAge));
-    }
-
-    [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, false)]
-    public void VanillaFallback_RetainsOnlyEligibleMainPartyCompanion(
-        bool isInMainParty,
-        bool isEligible,
-        bool expected)
-    {
-        Assert.Equal(expected,
-            LocationCharacterGuardPatches.ShouldRetainExistingCompanion(
-                isInMainParty,
-                isEligible));
-    }
-
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -62,7 +27,7 @@ public class LocationCompanionAuthorityPatchTests
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void DefaultLocationSpawn_BypassesNpcGateOnlyForOwnedCompanions(
+    public void DefaultLocationSpawn_BypassesNativeSpawnSuppressionOnlyForOwnedCompanions(
         bool isOwnedCompanion,
         bool suppressNativeSpawns,
         bool expected)
@@ -77,7 +42,7 @@ public class LocationCompanionAuthorityPatchTests
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(false, false, true)]
-    public void EnteringLocationSpawn_BypassesNpcGateOnlyForOwnedCompanions(
+    public void EnteringLocationSpawn_BypassesNativeSpawnSuppressionOnlyForOwnedCompanions(
         bool isOwnedCompanion,
         bool suppressNativeSpawns,
         bool expected)
@@ -93,7 +58,9 @@ public class LocationCompanionAuthorityPatchTests
     {
         var mainAgent = CreateAgentWithSimpleOrigin();
 
-        Assert.True(LocationNpcGate.IsPlayerPartyAgent(mainAgent, mainAgent));
+        using var state = CreateAuthorityState();
+
+        Assert.True(state.IsPlayerPartyAgent(mainAgent, mainAgent));
     }
 
     [Fact]
@@ -101,27 +68,23 @@ public class LocationCompanionAuthorityPatchTests
     {
         var remotePartyPuppet = CreateAgentWithSimpleOrigin();
         var ambientNpc = CreateAgentWithSimpleOrigin();
-        LocationNpcGate.BeginMission(
+        using var state = CreateAuthorityState();
+        state.BeginMission(
             "settlement|tavern",
             agent => ReferenceEquals(agent, remotePartyPuppet));
 
-        try
+        using (state.ReplayNativePopulation())
         {
-            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: true,
-                remotePartyPuppet));
-            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: true,
-                ambientNpc));
-            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(
-                isReplayingNativePopulation: false,
-                remotePartyPuppet));
+            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
+            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, ambientNpc, mainAgent: null));
         }
-        finally
-        {
-            LocationNpcGate.EndMission();
-        }
+
+        Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
     }
+
+    /// <summary>Builds an authority state over a real, empty host registry.</summary>
+    private static LocationNpcAuthorityState CreateAuthorityState()
+        => new LocationNpcAuthorityState(new LocationHostRegistry(new ControllerIdProvider()));
 
     private static Agent CreateAgentWithSimpleOrigin()
     {

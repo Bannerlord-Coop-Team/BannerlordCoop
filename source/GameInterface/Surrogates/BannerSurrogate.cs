@@ -1,4 +1,5 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Banners.Extensions;
+using ProtoBuf;
 using TaleWorlds.Core;
 
 namespace GameInterface.Surrogates;
@@ -21,6 +22,9 @@ internal struct BannerSurrogate
 
     public static implicit operator Banner(BannerSurrogate surrogate)
     {
-        return new Banner(surrogate.Data);
+        // AutoSync sets clan and kingdom banners from this. A kingdom banner can't be null, so a code without
+        // readable layers gets a default banner instead of one with no layers. Every network message with a
+        // banner comes through here too, so an empty code stays the empty banner the sender has.
+        return surrogate.Data.ToBannerWithLayers();
     }
 }

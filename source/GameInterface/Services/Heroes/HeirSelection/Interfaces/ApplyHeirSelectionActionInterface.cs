@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -10,10 +11,12 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -24,17 +27,23 @@ public interface IApplyHeirSelectionActionInterface : IGameAbstraction
     void ApplyByRetirement(Hero originalHero, Hero heir);
     void ApplyByRetirementWithoutHeir(Hero originalHero);
     void AppointClanLeader(Hero originalHero, Hero successor);
+    void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty);
 }
 
 public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterface
 {
     private readonly IMessageBroker messageBroker;
     private readonly ISessionWorkshopPlayerDataInterface workshopData;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
 
-    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopData)
+    public ApplyHeirSelectionActionInterface(
+        IMessageBroker messageBroker,
+        ISessionWorkshopPlayerDataInterface workshopData,
+        ILeaderlessClanResolver leaderlessClanResolver)
     {
         this.messageBroker = messageBroker;
         this.workshopData = workshopData;
+        this.leaderlessClanResolver = leaderlessClanResolver;
     }
 
     public void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty)
@@ -57,11 +66,17 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
                 .OrderBy(candidate => candidate.IsPlayerHero())
                 .FirstOrDefault();
 
+            // a kingdom clan must not stay without a leader (#4166): any adult can take over, even one
+            // the retirement order skips (a prisoner, someone travelling)
+            if (successor == null && clan.Kingdom != null)
+                successor = leaderlessClanResolver.FindSuccessor(clan, originalHero);
+
             if (successor != null)
             {
+                // the retiring hero is still the leader here, so the full vanilla action applies
                 ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, successor);
             }
-            else
+            else if (clan.Kingdom == null)
             {
                 // The vanilla leader change action leaves the retired hero as leader when there is no successor.
                 clan.SetLeader(null);
@@ -70,6 +85,10 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 
         DisableHeroAction.Apply(originalHero);
         RecordRetirement(originalHero);
+
+        // nobody can lead the kingdom clan: close it without killing the retired hero or the children
+        if (clan?.Kingdom != null && clan.Leader == originalHero)
+            leaderlessClanResolver.CloseClan(clan);
     }
 
     public void AppointClanLeader(Hero originalHero, Hero successor)
@@ -156,6 +175,34 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         }
 
         messageBroker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(originalHero, heir));
+    }
+
+    // Substitute for fleet transfer that happens during ChangePlayerCharacterAction.Apply to run on the server
+    public void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty)
+    {
+        if (originalParty == null || heirParty == null || originalParty == heirParty) return;
+        if (originalParty.Ships.Count == 0) return;
+
+        var anchorPosition = originalParty.Anchor.Position;
+        var lastUsedDisembarkPosition = originalParty.Anchor.GetLastUsedDisembarkPosition();
+
+        // A crew left at sea keeps its weakest ship
+        Ship keptShip = originalParty.MemberRoster.TotalManCount <= 1 || !originalParty.IsCurrentlyAtSea
+            ? null
+            : originalParty.Ships.MinBy(ship => ship.HitPoints);
+        for (int i = originalParty.Ships.Count - 1; i >= 0; i--)
+        {
+            if (originalParty.Ships[i] != keptShip)
+            {
+                ChangeShipOwnerAction.ApplyByTransferring(heirParty.Party, originalParty.Ships[i]);
+            }
+        }
+
+        if (heirParty.Ships.Count > 0 && anchorPosition.IsValid() && !heirParty.Anchor.IsValid && !heirParty.IsCurrentlyAtSea)
+        {
+            heirParty.Anchor.SetPosition(anchorPosition);
+            heirParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
+        }
     }
 
     private void TransferAssets(Hero originalHero, Hero heir)

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -14,11 +15,35 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
+
+    /// <summary>[Game thread] Whether this client sits in the encounter meeting menu with its conversation open.</summary>
+    public bool IsEncounterMeetingConversationOpen();
+
+    /// <summary>
+    /// [Game thread] Ends the open encounter meeting conversation as the player's answer does, so vanilla moves on to the battle;
+    /// false with the reason when no such conversation is open.
+    /// </summary>
+    public bool TryCompleteEncounterMeeting(out string failure);
 }
 
+/// <summary>Runs vanilla <see cref="PlayerEncounter"/> steps on this machine for the co-op encounter flow.</summary>
 public class PlayerEncounterInterface : IPlayerEncounterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
+
+    // The menu vanilla's encounter shows while its pre-battle conversation runs.
+    private const string EncounterMeetingMenuId = "encounter_meeting";
+
+    private readonly ISiegeEventInterface siegeEventInterface;
+
+    public PlayerEncounterInterface() : this(null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    {
+        this.siegeEventInterface = siegeEventInterface;
+    }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
     {
@@ -99,6 +124,29 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         }
     }
 
+    public bool IsEncounterMeetingConversationOpen() =>
+        Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == EncounterMeetingMenuId
+        && Campaign.Current.ConversationManager.IsConversationInProgress;
+
+    public bool TryCompleteEncounterMeeting(out string failure)
+    {
+        failure = null;
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != EncounterMeetingMenuId)
+        {
+            failure = "The encounter meeting is not active.";
+            return false;
+        }
+
+        if (!Campaign.Current.ConversationManager.IsConversationInProgress)
+        {
+            failure = "The encounter conversation is not active.";
+            return false;
+        }
+
+        Campaign.Current.ConversationManager.EndConversation();
+        return true;
+    }
+
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)
     {
         if (hero == null) return false;
@@ -114,6 +162,12 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     {
         //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
+
+        // a won siege's leader gets the aftermath choice and an army member the leader's pick, like vanilla DoEnd
+        // (#3903); this finishes the encounter itself, otherwise the stale assault menu stays up with only Leave
+        if (siegeEventInterface?.TryRouteToAftermath(playerEncounter._mapEvent) == true)
+            return;
+
         PlayerEncounter.Finish(true);
     }
 }

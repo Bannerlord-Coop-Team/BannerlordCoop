@@ -1,9 +1,12 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Tests.Services.Issues;
 using System;
 using System.Threading;
 
@@ -37,7 +40,20 @@ internal class PatchBootstrap : IDisposable
         builder.RegisterType<NetworkConfig>().As<INetworkConfig>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
         builder.RegisterModule<GameInterfaceModule>();
-        Container = builder.Build();
+
+        builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
+
+        // Naval sync is tested here too, so the module registers it; the flag goes back for the test itself.
+        bool previousNavalEnabled = ModInformation.IsNavalEnabled;
+        ModInformation.IsNavalEnabled = true;
+        try
+        {
+            Container = builder.Build();
+        }
+        finally
+        {
+            ModInformation.IsNavalEnabled = previousNavalEnabled;
+        }
 
         // This will not allow changing of the container in ContainerProvider until containerLock is disposed
         ContainerProvider.SetContainer(Container);

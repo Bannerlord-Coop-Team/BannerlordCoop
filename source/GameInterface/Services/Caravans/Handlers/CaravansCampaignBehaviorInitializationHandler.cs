@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Caravans.Interfaces;
@@ -65,7 +66,10 @@ internal class CaravansCampaignBehaviorInitializationHandler : IHandler
 
     private void Handle(MessagePayload<NetworkInitializeServerCaravansDataKeys> obj)
     {
-        sessionCaravansPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        GameThread.RunSafe(() =>
+        {
+            sessionCaravansPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+        });
     }
 
     private List<Kingdom> GetProhibitedKingdoms(string playerHeroId)

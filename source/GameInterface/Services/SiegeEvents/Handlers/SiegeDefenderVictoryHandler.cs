@@ -1,11 +1,13 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.MountAndBlade;
@@ -13,11 +15,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Client-side deferred siege-defeated transition for a winning inside defender. On a defender assault victory
-/// the server replicates the SiegeEvent/MapEvent teardown, which bypasses vanilla's local siege-end routing, so
-/// the winner would otherwise fall through to the settlement arrival menu. The server sends
-/// <see cref="NetworkPromptSiegeDefenderVictory"/> after the finalize; this parks the transition and runs it on
-/// the next CampaignTick once the mission has fully popped, mirroring <see cref="SiegeCaptureTransitionRetryHandler"/>.
+/// Once a winning siege defender has collected its staged loot, opens the siege-defeated menu that the server's
+/// replicated teardown skips.
 /// </summary>
 internal class SiegeDefenderVictoryHandler : IHandler
 {
@@ -56,11 +55,13 @@ internal class SiegeDefenderVictoryHandler : IHandler
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (ModInformation.IsServer || pendingSettlement == null) return;
+        var settlement = pendingSettlement;
+        if (ModInformation.IsServer || settlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
+        // StagedBattleResultUpdatePatch plays out the loot flow; prompt once it has finished the encounter.
+        if (StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current)) return;
 
-        var settlement = pendingSettlement;
         pendingSettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }

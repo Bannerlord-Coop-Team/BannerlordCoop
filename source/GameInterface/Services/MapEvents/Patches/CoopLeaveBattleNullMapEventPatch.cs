@@ -56,6 +56,25 @@ internal class CoopEncounterLeaveConditionNullMapEventPatch
     }
 }
 
+/// <summary>
+/// Same stale "encounter" menu: vanilla's attack condition reads the finished <c>PlayerEncounter</c> in
+/// <c>CheckEnemyAttackableHonorably</c> before its own no-map-event check, and the NRE breaks the whole menu refresh.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.game_menu_encounter_attack_on_condition))]
+internal class CoopEncounterAttackConditionNullMapEventPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(ref bool __result)
+    {
+        if (MobileParty.MainParty?.MapEvent != null)
+            return true;
+
+        __result = false; // what vanilla's EncounterAttackCondition returns with no map event
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(EncounterGameMenuBehavior),
     nameof(EncounterGameMenuBehavior.game_menu_encounter_abandon_army_on_condition))]
 internal class CoopEncounterAbandonArmyConditionNullMapEventPatch
@@ -68,6 +87,29 @@ internal class CoopEncounterAbandonArmyConditionNullMapEventPatch
 
         if (args != null)
             args.optionLeaveType = GameMenuOption.LeaveType.Leave;
+
+        __result = false;
+        return false;
+    }
+}
+
+/// <summary>
+/// Guards "Continue siege preparations" on a stale encounter menu whose main party the server already took off every side:
+/// vanilla asks <c>GetLeaderParty(MainParty.Side)</c> with <c>BattleSideEnum.None</c> and throws IndexOutOfRangeException.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.game_menu_town_besiege_continue_siege_on_condition))]
+internal class CoopContinueSiegeConditionNoSidePatch
+{
+    // A main party on no side can't lead one, so the option is hidden, which is what vanilla answers without the throw.
+    [HarmonyPrefix]
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
+    {
+        if (PartyBase.MainParty?.MapEventSide != null)
+            return true;
+
+        if (args != null)
+            args.optionLeaveType = GameMenuOption.LeaveType.Continue;
 
         __result = false;
         return false;

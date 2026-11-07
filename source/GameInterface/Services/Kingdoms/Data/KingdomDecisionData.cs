@@ -20,6 +20,7 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoInclude(108, typeof(ProposeCallToWarAgreementDecisionData))]
     [ProtoInclude(109, typeof(StartAllianceDecisionData))]
     [ProtoInclude(110, typeof(TradeAgreementDecisionData))]
+    [ProtoInclude(111, typeof(RegisteredKingdomDecisionData))]
     public abstract class KingdomDecisionData
     {
         [ProtoMember(1)]

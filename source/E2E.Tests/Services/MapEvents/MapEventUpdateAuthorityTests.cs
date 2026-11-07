@@ -1,6 +1,8 @@
 ﻿using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -36,10 +38,11 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     }
 
     [Fact]
-    public void MapEvent_WithPlayerMobileParty_ServerUpdateIsBlocked()
+    public void MapEvent_WithConnectedPlayerMobileParty_ServerUpdateIsBlocked()
     {
         var context = CreateServerMapEvent();
         var (_, playerPartyId) = CreatePlayerHeroParty("player");
+        ConnectPlayer("player");
 
         Server.Call(() =>
         {
@@ -57,6 +60,7 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     {
         var context = CreateServerMapEvent();
         var (_, playerPartyId) = CreatePlayerHeroParty("player");
+        ConnectPlayer("player");
 
         try
         {
@@ -78,6 +82,179 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
         }
     }
 
+    [Fact]
+    public void MapEvent_WithOnlyOfflinePlayers_ServerUpdateIsBlockedDuringGracePeriod()
+    {
+        // a player who crashed or dropped gets time to rejoin and fight the battle themselves
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WithOnlyOfflinePlayers_ServerUpdateIsAllowedAfterGracePeriod()
+    {
+        // #3864: nothing else resolves the battle once its players are gone
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+            StartGracePeriodInThePast(mapEvent);
+
+            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WhenAnOfflinePlayerRejoins_GracePeriodStartsOver()
+    {
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+            StartGracePeriodInThePast(mapEvent);
+        }, MapEventDisabledMethods);
+
+        ConnectPlayer("player");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+
+        // offline again: a fresh grace period, not the old expired one
+        Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(Clients.First().NetPeer));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WithOneConnectedAndOneOfflinePlayer_ServerUpdateIsBlocked()
+    {
+        var context = CreateServerMapEvent();
+        var (_, offlinePartyId) = CreatePlayerHeroParty("offline-player");
+        var (_, onlinePartyId) = CreatePlayerHeroParty("online-player");
+        ConnectPlayer("online-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(offlinePartyId, out var offlineParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(onlinePartyId, out var onlineParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, offlineParty.Party);
+            AddSyntheticMapEventParty(mapEvent.DefenderSide, onlineParty.Party);
+
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WithOfflinePlayerWhileServerSimulationRuns_ServerUpdateIsBlocked()
+    {
+        // a simulation started before the disconnect finishes first
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+                AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+                StartGracePeriodInThePast(mapEvent);
+                Assert.True(ServerBattleModeArbiter.TryClaimSimulation(context.MapEventId));
+
+                Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(context.MapEventId));
+        }
+    }
+
+    [Fact]
+    public void MapEvent_WithOfflinePlayerWhileServerSimulationRuns_AllowedThreadUpdateIsBlocked()
+    {
+        // the allow original fast path must not run vanilla resolution next to a running simulation
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+                AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+                StartGracePeriodInThePast(mapEvent);
+                Assert.True(ServerBattleModeArbiter.TryClaimSimulation(context.MapEventId));
+
+                using (new AllowedThread())
+                    Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(context.MapEventId));
+        }
+    }
+
+    [Fact]
+    public void MapEvent_WithOnlyOfflinePlayers_ResolvesWhenTheServerUpdates()
+    {
+        // #3864: the battle used to stay on the map with neither side losing troops
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+            playerParty.Party._mapEventSide = mapEvent.AttackerSide;
+            mapEvent.AttackerSide._battleParties.Add(new MapEventParty(playerParty.Party));
+            StartGracePeriodInThePast(mapEvent);
+
+            for (int i = 0; i < 500 && mapEvent.State != MapEventState.WaitingRemoval; i++)
+                mapEvent.Update();
+
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+        }, MapEventDisabledMethods);
+    }
+    private void ConnectPlayer(string controllerId)
+    {
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, Clients.First().NetPeer));
+    }
+
+    private static void StartGracePeriodInThePast(MapEvent mapEvent) =>
+        MapEventPatches.SetAllPlayersOfflineSince(mapEvent, System.DateTime.UtcNow - MapEventConfig.OfflinePlayerGracePeriod - System.TimeSpan.FromMinutes(1));
     [Fact]
     public void MapEvent_WithMissingParty_ServerUpdateIsBlocked()
     {

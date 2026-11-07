@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -532,11 +533,7 @@ public sealed partial class MobilePartyBehaviorSnapshot : IMobilePartyBehaviorSn
 
         if (resetPath)
         {
-            party._pathMode = false;
-            party._aiPathNotFound = false;
-            party.PathLastFace = PathFaceRecord.NullFaceRecord;
-            party.PathBegin = 0;
-            party.NextTargetPosition = party.Position;
+            party.ResetPath();
             party.Party.SetVisualAsDirty();
         }
     }
