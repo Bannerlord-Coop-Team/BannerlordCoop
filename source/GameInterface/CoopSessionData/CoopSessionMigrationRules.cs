@@ -1,8 +1,11 @@
-﻿using GameInterface.Services.Caravans;
+﻿using GameInterface.Services.CampaignService.Statistics;
+using GameInterface.Services.Caravans;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Incidents;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
@@ -42,7 +45,12 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerUnlockedFigureHeads)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerLastFigureheadLootTimes)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerSentTroops)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerCachedFleets)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(OrderOfBattlePlayerData), nameof(OrderOfBattlePlayerData.PlayerOrderOfBattles)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(StatisticsPlayerData), nameof(StatisticsPlayerData.PlayerStatistics)));
 
         /// Define fields that should have their data cleared
         ClearWithMigration.Add(AccessTools.Property(typeof(CaravansPlayerData), nameof(CaravansPlayerData.PlayerTradeRumorTakenCaravans)));
@@ -64,7 +72,14 @@ internal static class CoopSessionMigrationRules
 
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerIsIllDays)));
         ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerSuccessions)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(AgingPlayerData), nameof(AgingPlayerData.PlayerMarriageOffers)));
 
         ClearWithMigration.Add(AccessTools.Property(typeof(PlayerTraitData), nameof(PlayerTraitData.PlayerTraitXp)));
+
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerIncidentsOnCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerLastGlobalIncidentCooldown)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerActiveIncidentSeed)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerCanInvokeSettlementEvent)));
+        ClearWithMigration.Add(AccessTools.Property(typeof(IncidentsPlayerData), nameof(IncidentsPlayerData.PlayerPendingIncident)));
     }
 }

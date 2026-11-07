@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.OwnerChange;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -20,6 +21,12 @@ internal class IssueManagerChangeIssueOwnerDispatchPatch
     {
         __state = issue.IssueOwner;
 
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IIssueCancellationCoordinator>(out var coordinator) &&
+            !coordinator.BeforeGiverOwnerChange(issue, __state))
+        {
+            return false;
+        }
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             return true;
@@ -32,7 +39,7 @@ internal class IssueManagerChangeIssueOwnerDispatchPatch
     [HarmonyPostfix]
     private static void Postfix(IssueBase issue, Hero __state)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed())
+        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed() || issue.IssueOwner == __state)
         {
             return;
         }

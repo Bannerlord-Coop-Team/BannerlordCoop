@@ -141,6 +141,27 @@ namespace Coop.Tests.Steam
         }
 
         [Fact]
+        public void Stop_StopsThePumpBeforeClosingTheListener()
+        {
+            host.Start(4200);
+            RaiseConnectedPeer(7);
+            Assert.True(SpinWait.SpinUntil(() => transport.ReceiveCalls > 0, TimeSpan.FromSeconds(2)));
+
+            // Closing the listener closes its accepted connections inside Steam, so no pump tick may run past it
+            int receivesDuringClose = -1;
+            transport.OnStopListening = () =>
+            {
+                int before = transport.ReceiveCalls;
+                Thread.Sleep(50);
+                receivesDuringClose = transport.ReceiveCalls - before;
+            };
+
+            host.Stop();
+
+            Assert.Equal(0, receivesDuringClose);
+        }
+
+        [Fact]
         public void Datagrams_FlowBothWaysBetweenPeerAndServer()
         {
             using var serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
@@ -218,6 +239,41 @@ namespace Coop.Tests.Steam
             serverSocket.SendTo(new byte[] { 1, 7 }, peerRelayEndpoint);
             SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 1);
             Assert.Equal(new byte[] { 1, 7 }, transport.SentDatagrams[0].Data);
+        }
+
+        [Fact]
+        public void MergedDatagram_SendsUnreliablePacketsOnTheDroppableLane()
+        {
+            using var serverSocket = CreateServerSocket();
+            IPEndPoint peerRelayEndpoint = ConnectPeerAndObserveServerEndpoint(serverSocket, 7, 0);
+
+            serverSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, peerRelayEndpoint);
+
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            var droppable = Assert.Single(sent, datagram => datagram.Droppable);
+            var reliable = Assert.Single(sent, datagram => !datagram.Droppable);
+            Assert.Equal(SteamTunnelTests.MergedUnreliable, droppable.Data);
+            Assert.Equal(SteamTunnelTests.MergedChanneled, reliable.Data);
+        }
+
+        [Fact]
+        public void MergedDatagram_UnderBackpressure_ParksOnlyTheReliablePart()
+        {
+            using var serverSocket = CreateServerSocket();
+            IPEndPoint peerRelayEndpoint = ConnectPeerAndObserveServerEndpoint(serverSocket, 7, 0);
+
+            // Refuses the unreliable part, which drops, then the reliable part, which parks.
+            transport.FailSendsRemaining = 2;
+            serverSocket.SendTo(SteamTunnelTests.MergedUnreliableAndChanneled, peerRelayEndpoint);
+            SteamTunnelClientTests.WaitUntil(() => transport.RejectedSends >= 2);
+            serverSocket.SendTo(new byte[] { 1, 8 }, peerRelayEndpoint);
+
+            SteamTunnelClientTests.WaitUntil(() => transport.SentDatagrams.Length == 2);
+            var sent = transport.SentDatagrams;
+            Assert.Equal(SteamTunnelTests.MergedChanneled, sent[0].Data);
+            Assert.False(sent[0].Droppable);
+            Assert.Equal(new byte[] { 1, 8 }, sent[1].Data);
         }
 
         [Fact]

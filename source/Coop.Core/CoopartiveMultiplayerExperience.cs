@@ -44,6 +44,7 @@ namespace Coop.Core
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
         private readonly string coopLogFilePath;
+        // Set when startup decided this process must not host (a War Sails mismatch); every host attempt shows it instead.
         private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
         private volatile bool coopStarting;
@@ -479,6 +480,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule<NavalAssemblyModule>();
             builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
             builder.RegisterInstance(new NetworkConfig
             {
@@ -657,6 +659,7 @@ namespace Coop.Core
                 builder.RegisterInstance(presenceClient).As<IDiscordPresenceClient>().ExternallyOwned();
             }
             builder.RegisterModule<GameInterfaceModule>();
+            builder.RegisterModule<NavalAssemblyModule>();
             builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
 
             if (configuration != null)

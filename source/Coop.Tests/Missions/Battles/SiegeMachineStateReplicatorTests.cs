@@ -42,6 +42,7 @@ public class SiegeMachineStateReplicatorTests
             AccessTools.Field(typeof(RangedSiegeWeapon), "LoadAmmoStandingPoint").SetValue(weapon, point);
             AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(point, true);
             AccessTools.Field(typeof(SiegeMachineStateReplicator), "peerWeaponState").SetValue(sut, new Dictionary<int, int>());
+            AccessTools.Field(typeof(SiegeMachineStateReplicator), "weaponPresentation").SetValue(sut, new RangedSiegeWeaponPresentation());
             pointActivationCalls = 0;
             var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyWeaponAnimation");
             if (!catchUp) apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.Reloading });

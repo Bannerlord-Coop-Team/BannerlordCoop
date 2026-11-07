@@ -9,6 +9,7 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.MapTracking;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -69,6 +70,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
     private readonly IPlayerMarriageRules playerMarriageRules;
+    private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
@@ -78,7 +80,8 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly HashSet<string> openedConversationSessionIds = new HashSet<string>();
     private readonly HashSet<string> endedInteractionSessionIds = new HashSet<string>();
     private readonly HashSet<string> hostileEncounterSessionIds = new HashSet<string>();
-    private readonly HashSet<string> closedHostileEncounterPartyIds = new HashSet<string>();
+    // Player party id to the map event its close named; a null id closes any hostile encounter start of that party.
+    private readonly Dictionary<string, string> closedHostileEncounterMapEventIds = new Dictionary<string, string>();
     private bool presentationTickRegistered;
 
     public PlayerPartyInteractionHandler(
@@ -92,6 +95,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IClanJoinRules clanJoinRules,
         IClanLeaveRules clanLeaveRules,
         IPlayerMarriageRules playerMarriageRules,
+        IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking)
     {
         this.messageBroker = messageBroker;
@@ -103,6 +107,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
+        this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -110,6 +115,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             clanJoinRules,
             clanLeaveRules,
             playerMarriageRules,
+            playerDivorceRules,
             mapTracking);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
@@ -216,8 +222,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (!TryGetControlledSessionParty(message, out var myPartyId, out _)) return;
 
-            closedHostileEncounterPartyIds.Remove(message.InitiatorPartyId);
-            closedHostileEncounterPartyIds.Remove(message.ResponderPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.InitiatorPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.ResponderPartyId);
 
             network.SendAll(new NetworkPlayerPartyInteractionShown(message.SessionId, myPartyId));
         }, context: "Confirm player-party interaction party");
@@ -290,8 +296,6 @@ internal class PlayerPartyInteractionHandler : IHandler
                 session.ResponderPartyId);
             return;
         }
-
-        if (TryHandleClanDepartureOption(session, partyId, message.Option)) return;
 
         if (partyId == session.InitiatorPartyId)
         {
@@ -381,7 +385,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         GameThread.RunSafe(() =>
         {
             foreach (var partyId in payload.What.PartyIds ?? Array.Empty<string>())
-                closedHostileEncounterPartyIds.Add(partyId);
+                closedHostileEncounterMapEventIds[partyId] = payload.What.MapEventId;
         }, context: "Record closed player-party hostile encounter");
     }
 
@@ -408,6 +412,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             ? ResolveTroopIds(GetOfferedBarterTroops(message.BarterVM))
             : Array.Empty<TroopRosterElementData>();
         var offeredPeace = message.BarterVM != null && HasOfferedPeace(message.BarterVM);
+        var offeredMarriages = message.BarterVM != null
+            ? ResolveMarriageIds(GetOfferedBarterMarriages(message.BarterVM))
+            : Array.Empty<PlayerPartyMarriageOfferData>();
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             message.SessionId,
             partyId,
@@ -416,7 +423,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             offeredGold,
             offeredFiefs,
             offeredPrisoners,
-            offeredPeace));
+            offeredPeace,
+            offeredMarriages));
     }
 
     private void Handle_PlayerPartyTradeAcceptSelected(MessagePayload<PlayerPartyTradeAcceptSelected> payload)
@@ -452,7 +460,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedGold,
             message.OfferedFiefs,
             message.OfferedPrisoners,
-            offeredPeace);
+            offeredPeace,
+            message.OfferedMarriages);
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
@@ -463,7 +472,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedGold,
             message.OfferedFiefs,
             message.OfferedPrisoners,
-            offeredPeace));
+            offeredPeace,
+            message.OfferedMarriages));
         SendTradeStates(session, false);
     }
 
@@ -513,7 +523,10 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void HandleInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
         if (TryHandleInitiatorLeaveOption(session, option)) return;
+        if (TryHandleWithdrawProposalOption(session, option)) return;
         if (TryHandleStopMapTrackingOption(session, option)) return;
+        if (TryHandleClanDepartureOption(session, option)) return;
+        if (TryHandleDivorceOption(session, option)) return;
         if (option == PlayerPartyInteractionOption.OfferServices) return;
         if (TryHandleInitiatorHostileDemandOption(session, option)) return;
         if (TryHandleInitiatorMercenaryOption(session, option)) return;
@@ -521,15 +534,29 @@ internal class PlayerPartyInteractionHandler : IHandler
         HandleInitiatorProposalOption(session, option);
     }
 
-    private bool TryHandleClanDepartureOption(PlayerPartyInteractionSession session, string partyId, PlayerPartyInteractionOption option)
+    private bool TryHandleClanDepartureOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
         if (option != PlayerPartyInteractionOption.LeaveClan && option != PlayerPartyInteractionOption.RemoveFromClan)
             return false;
+        if (!session.InitiatorEnabledOptions.Contains(option)) return true;
 
         EndSession(session, option == PlayerPartyInteractionOption.LeaveClan
             ? PlayerPartyInteractionOutcomeType.ClanLeft
             : PlayerPartyInteractionOutcomeType.ClanMemberRemoved,
-            partyId);
+            session.InitiatorPartyId);
+        return true;
+    }
+
+    private bool TryHandleDivorceOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.DivorceStayInClan && option != PlayerPartyInteractionOption.DivorceLeaveClan)
+            return false;
+        if (!session.InitiatorEnabledOptions.Contains(option)) return true;
+
+        EndSession(session, option == PlayerPartyInteractionOption.DivorceLeaveClan
+            ? PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan
+            : PlayerPartyInteractionOutcomeType.Divorced,
+            session.InitiatorPartyId);
         return true;
     }
 
@@ -550,6 +577,17 @@ internal class PlayerPartyInteractionHandler : IHandler
             return true;
 
         EndSession(session, GetLeaveOutcome(session));
+        return true;
+    }
+
+    // Separate from Leave because leaving an open trade still counts as declining it.
+    private bool TryHandleWithdrawProposalOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.WithdrawProposal) return false;
+        if (session.Proposal == PlayerPartyInteractionProposal.None ||
+            session.Proposal == PlayerPartyInteractionProposal.HostileDemand) return true;
+
+        EndSession(session, PlayerPartyInteractionOutcomeType.ProposalWithdrawn);
         return true;
     }
 
@@ -833,7 +871,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.InitiatorOfferedGold,
             session.InitiatorOfferedFiefs,
             session.InitiatorOfferedPrisoners,
-            session.InitiatorOfferedPeace));
+            session.InitiatorOfferedPeace,
+            session.InitiatorOfferedMarriages));
 
         network.SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             session.SessionId,
@@ -843,7 +882,8 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ResponderOfferedGold,
             session.ResponderOfferedFiefs,
             session.ResponderOfferedPrisoners,
-            session.ResponderOfferedPeace));
+            session.ResponderOfferedPeace,
+            session.ResponderOfferedMarriages));
     }
 
     private void SendInitiatorState(
@@ -878,7 +918,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.IsHostile,
             session.VassalUnavailableReason,
             session.MercenaryUnavailableReason,
-            session.ClanJoinUnavailableReason));
+            session.ClanJoinUnavailableReason,
+            session.PatrilinealMarriageUnavailableReason,
+            session.MatrilinealMarriageUnavailableReason));
     }
 
     private void SendResponderState(
@@ -888,12 +930,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionOption[] options,
         PlayerPartyInteractionOption[] enabledOptions = null)
     {
-        if (phase == PlayerPartyInteractionPhase.WaitingForProposal || phase == PlayerPartyInteractionPhase.ProposalPending)
-        {
-            enabledOptions = (enabledOptions ?? options).Concat(session.ResponderClanOptions).ToArray();
-            options = options.Concat(session.ResponderClanOptions).ToArray();
-        }
-
         var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
             ? ResolvePartyItemIds(session.ResponderPartyId)
             : Array.Empty<ItemRosterElementData>();
@@ -959,9 +995,9 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
-        foreach (var option in GetClanDepartureOptions(initiatorParty.LeaderHero, responderParty.LeaderHero))
-            AddInitiatorOption(session, option, enabled: true);
-        session.ResponderClanOptions = GetClanDepartureOptions(responderParty.LeaderHero, initiatorParty.LeaderHero).ToArray();
+        foreach (var (option, enabled) in GetClanDepartureOptions(initiatorParty.LeaderHero, responderParty.LeaderHero)
+                     .Concat(GetDivorceOptions(initiatorParty.LeaderHero, responderParty.LeaderHero)))
+            AddInitiatorOption(session, option, enabled);
 
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
         AddInitiatorOption(session, mapTracking.AreTracking(initiatorParty.MobileParty, responderParty.MobileParty)
@@ -971,6 +1007,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero))
         {
             AddInitiatorOption(session, PlayerPartyInteractionOption.ProposeMarriage, !session.IsHostile);
+            session.PatrilinealMarriageUnavailableReason = playerMarriageRules.GetClanJoinUnavailableReason(
+                initiatorParty.LeaderHero, responderParty.LeaderHero, matrilineal: false);
+            session.MatrilinealMarriageUnavailableReason = playerMarriageRules.GetClanJoinUnavailableReason(
+                initiatorParty.LeaderHero, responderParty.LeaderHero, matrilineal: true);
             AddInitiatorOption(session, PlayerPartyInteractionOption.PatrilinealMarriage,
                 CanProposeMarriage(session, PlayerPartyInteractionProposal.PatrilinealMarriage));
             AddInitiatorOption(session, PlayerPartyInteractionOption.MatrilinealMarriage,
@@ -1008,11 +1048,23 @@ internal class PlayerPartyInteractionHandler : IHandler
         return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
     }
 
-    private IEnumerable<PlayerPartyInteractionOption> GetClanDepartureOptions(Hero actor, Hero other)
+    // A departure blocked only by a pregnancy is still offered, disabled, so the client can explain why.
+    private IEnumerable<(PlayerPartyInteractionOption Option, bool Enabled)> GetClanDepartureOptions(Hero actor, Hero other)
     {
         if (actor?.Clan == null || actor.Clan != other?.Clan) yield break;
-        if (clanLeaveRules.CanLeave(actor)) yield return PlayerPartyInteractionOption.LeaveClan;
-        if (clanLeaveRules.CanRemove(actor, other)) yield return PlayerPartyInteractionOption.RemoveFromClan;
+        if (clanLeaveRules.CanLeave(actor))
+            yield return (PlayerPartyInteractionOption.LeaveClan, !clanLeaveRules.AreExpectingChild(actor, actor.Clan.Leader));
+        if (clanLeaveRules.CanRemove(actor, other))
+            yield return (PlayerPartyInteractionOption.RemoveFromClan, !clanLeaveRules.AreExpectingChild(other, actor));
+    }
+
+    private IEnumerable<(PlayerPartyInteractionOption Option, bool Enabled)> GetDivorceOptions(Hero actor, Hero spouse)
+    {
+        if (!playerDivorceRules.CanDivorce(actor, spouse)) yield break;
+        yield return (PlayerPartyInteractionOption.ProposeDivorce, true);
+        yield return (PlayerPartyInteractionOption.DivorceStayInClan, true);
+        if (playerDivorceRules.CanLeaveClan(actor, spouse))
+            yield return (PlayerPartyInteractionOption.DivorceLeaveClan, !clanLeaveRules.AreExpectingChild(actor, spouse));
     }
 
     private static int GetMercenaryAwardMultiplier(Clan mercenaryClan, Kingdom kingdom)
@@ -1224,7 +1276,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionProposal proposal)
     {
         if (outcomeType == PlayerPartyInteractionOutcomeType.ClanLeft ||
-            outcomeType == PlayerPartyInteractionOutcomeType.ClanMemberRemoved)
+            outcomeType == PlayerPartyInteractionOutcomeType.ClanMemberRemoved ||
+            outcomeType == PlayerPartyInteractionOutcomeType.Divorced ||
+            outcomeType == PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan)
             return PlayerPartyInteractionOutcomeType.Rejected;
 
         return GetDeclinedOutcome(proposal);
@@ -1321,8 +1375,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (IsHostileEncounterClosed(message))
         {
             CloseLocalPlayerPartyEncounter(localSide == BattleSideEnum.Attacker ? attacker.MobileParty : defender.MobileParty);
-            closedHostileEncounterPartyIds.Remove(message.AttackerPartyId);
-            closedHostileEncounterPartyIds.Remove(message.DefenderPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.AttackerPartyId);
+            closedHostileEncounterMapEventIds.Remove(message.DefenderPartyId);
             return;
         }
 
@@ -1333,8 +1387,17 @@ internal class PlayerPartyInteractionHandler : IHandler
     }
 
     private bool IsHostileEncounterClosed(NetworkPlayerPartyHostileEncounterStarted message)
-        => closedHostileEncounterPartyIds.Contains(message.AttackerPartyId) ||
-           closedHostileEncounterPartyIds.Contains(message.DefenderPartyId);
+        => IsPartyEncounterClosed(message.AttackerPartyId, message.MapEventId) ||
+           IsPartyEncounterClosed(message.DefenderPartyId, message.MapEventId);
+
+    // A battle's close names its map event, so it must not close that party's hostile encounter in a later battle.
+    private bool IsPartyEncounterClosed(string partyId, string mapEventId)
+        => partyId != null &&
+           closedHostileEncounterMapEventIds.TryGetValue(partyId, out var closedMapEventId) &&
+           ClosesHostileEncounter(closedMapEventId, mapEventId);
+
+    internal static bool ClosesHostileEncounter(string closedMapEventId, string startedMapEventId)
+        => closedMapEventId == null || closedMapEventId == startedMapEventId;
 
     private bool TryResolveHostileEncounter(
         NetworkPlayerPartyHostileEncounterStarted message,
@@ -1396,10 +1459,23 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         using (new AllowedThread())
         {
+            var tracker = mapEvent.TroopUpgradeTracker;
             EncounterManager.RestartPlayerEncounter(attacker, defender);
+            RestoreTroopUpgradeTracker(mapEvent, tracker);
         }
 
         AssignLocalHostileEncounter(attacker, defender, mapEvent, localSide);
+    }
+
+    /// <summary>
+    /// [Client, under AllowedThread] Restarting finishes a joined encounter, and vanilla LeaveBattle then drops the main
+    /// party's tracker that the server keeps, so a later hero hit would find none. The party is re-attached right after.
+    /// </summary>
+    internal static void RestoreTroopUpgradeTracker(MapEvent mapEvent, TroopUpgradeTracker tracker)
+    {
+        if (tracker == null || mapEvent.IsFinalized || mapEvent.TroopUpgradeTracker != null) return;
+
+        mapEvent.TroopUpgradeTracker = tracker;
     }
 
     private static BattleSideEnum GetLocalHostileEncounterSide(PartyBase attacker, PartyBase defender)
@@ -1639,7 +1715,11 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         try
         {
-            conversationManager.OpenMapConversation(playerData, otherData);
+            if (myParty.MobileParty?.IsCurrentlyAtSea == true)
+                CampaignMission.OpenConversationMission(playerData, otherData);
+            else
+                conversationManager.OpenMapConversation(playerData, otherData);
+
             PlayerPartyInteractionDialogState.RefreshConversation();
             openedConversationSessionIds.Add(sessionId);
         }
@@ -1737,6 +1817,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         barterData.AddBarterGroup(new PrisonerBarterGroup());
         barterData.AddBarterGroup(new ItemBarterGroup());
         barterData.AddBarterGroup(new OtherBarterGroup());
+        barterData.AddBarterGroup(new PlayerPartyMarriageBarterGroup());
         barterData.AddBarterGroup(new GoldBarterGroup());
     }
 
@@ -1759,6 +1840,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         AddPartyPrisonerBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyItemBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
         AddPartyTroopBarterables(barterData, ownerHero, otherHero, ownerParty, otherParty);
+        AddPartyMarriageBarterables(barterData, ownerHero, ownerParty, otherParty);
     }
 
     private static void AddPartyPeaceBarterable(
@@ -1876,6 +1958,20 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
     }
 
+    private static void AddPartyMarriageBarterables(
+        BarterData barterData,
+        Hero ownerHero,
+        PartyBase ownerParty,
+        PartyBase otherParty)
+    {
+        foreach (var (hero, spouse) in PlayerPartyMarriageBarterable.GetMarriageCandidates(ownerParty, otherParty))
+        {
+            barterData.AddBarterable<PlayerPartyMarriageBarterGroup>(
+                new PlayerPartyMarriageBarterable(ownerHero, ownerParty, hero, spouse),
+                false);
+        }
+    }
+
     private ItemRosterElementData[] ResolveItemIds(IEnumerable<(ItemRosterElement, int)> items)
     {
         var result = new List<ItemRosterElementData>();
@@ -1893,6 +1989,21 @@ internal class PlayerPartyInteractionHandler : IHandler
             result.Add(new ItemRosterElementData(
                 new ItemObjectData(itemObjectId, itemModifierId, item.EquipmentElement.ItemModifier == null),
                 count));
+        }
+
+        return result.ToArray();
+    }
+
+    private PlayerPartyMarriageOfferData[] ResolveMarriageIds(IEnumerable<PlayerPartyMarriageBarterable> marriages)
+    {
+        var result = new List<PlayerPartyMarriageOfferData>();
+
+        foreach (var marriage in marriages)
+        {
+            if (!objectManager.TryGetIdWithLogging(marriage.HeroBeingMarried, out var heroId)) continue;
+            if (!objectManager.TryGetIdWithLogging(marriage.Spouse, out var spouseId)) continue;
+
+            result.Add(new PlayerPartyMarriageOfferData(heroId, spouseId));
         }
 
         return result.ToArray();
@@ -2020,6 +2131,18 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
 
         return false;
+    }
+
+    private static IEnumerable<PlayerPartyMarriageBarterable> GetOfferedBarterMarriages(BarterVM barterVM)
+    {
+        if (barterVM == null) return Enumerable.Empty<PlayerPartyMarriageBarterable>();
+
+        return (barterVM.LeftOfferList ?? Enumerable.Empty<BarterItemVM>())
+            .Concat(barterVM.RightOfferList ?? Enumerable.Empty<BarterItemVM>())
+            .Where(offeredItem => PlayerPartyTradeContext.CanOffer(offeredItem.Barterable))
+            .Select(offeredItem => offeredItem.Barterable)
+            .OfType<PlayerPartyMarriageBarterable>()
+            .ToArray();
     }
 
     private static IEnumerable<Settlement> GetOfferedBarterFiefs(BarterVM barterVM)

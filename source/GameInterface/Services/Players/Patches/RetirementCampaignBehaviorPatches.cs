@@ -44,8 +44,8 @@ internal class RetirementCampaignBehaviorPatches
             GameOverState.IsGameOver = true;
             MessageBroker.Instance.Publish(__instance, new PlayerRetirementRequested());
 
+            // The statistics are shown once the server sends them back with NetworkPlayerRetired
             GameMenu.ExitToLast();
-            __instance.ShowGameStatistics();
         }
 
         return false;
