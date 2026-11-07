@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.Players;
@@ -196,6 +197,129 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             Assert.True(registry.TryGetAgentInfo(id, out var info));
             Assert.Same(agent, info.Agent);
         });
+    }
+
+    // K6: the owner's formation 3 is its hull's formation there; here that hull is formation 1, so crew follow the ship id.
+    [Fact]
+    public void CrewUpdate_JoinsItsHullsLocalFormation_AndWaitsForAHullNotSpawnedYet()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mission = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var ships = component.ShipRegistry;
+            var session = Mock.Of<IBattleSession>(value => value.InstanceId == "battle" && value.OwnControllerId == "peer");
+            using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
+                component, session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
+                peer.Resolve<IMissionWeaponDataMapper>());
+            var spawned = RegisterHull(ships, mission.DefenderTeam, FormationClass.Ranged);
+            var late = Guid.NewGuid();
+            var id = Guid.NewGuid();
+            var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
+            var original = mission.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            agent.Formation = original;
+            Assert.True(registry.TryRegisterAgent("owner", id, agent));
+
+            broker.Publish(this, ProtoBuf.Serializer.DeepClone(new NetworkBattleAgentFormations("battle", "owner",
+                new[] { new BattleAgentFormationData(id, (int)FormationClass.HorseArcher, 0, spawned) })));
+            Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell, agent.Formation);
+
+            broker.Publish(this, new NetworkBattleAgentFormations("battle", "owner",
+                new[] { new BattleAgentFormationData(id, (int)FormationClass.Infantry, 0, late) }));
+            spawner.DrainPendingPuppets();
+            Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell, agent.Formation);
+
+            RegisterHull(ships, mission.DefenderTeam, FormationClass.Cavalry, late);
+            spawner.DrainPendingPuppets();
+            Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Cavalry).Shell, agent.Formation);
+        });
+    }
+
+    // K6: a catch-up snapshot carries the owner's formation index too, and refreshes crew onto its hull here.
+    [Fact]
+    public void CatchUp_RefreshesCrewOntoItsHullsLocalFormation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mission = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var session = Mock.Of<IBattleSession>(value => value.InstanceId == "battle" && value.OwnControllerId == "peer");
+            Mock.Get(session).Setup(value => value.IsOwn(It.IsAny<string>())).Returns((string id) => id == "peer");
+            var component = peer.Resolve<ICoopMissionComponent>();
+            using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
+                component, session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
+                peer.Resolve<IMissionWeaponDataMapper>());
+            var shipId = RegisterHull(component.ShipRegistry, mission.DefenderTeam, FormationClass.Ranged);
+            var id = Guid.NewGuid();
+            var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
+            agent.Formation = mission.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            Assert.True(registry.TryRegisterAgent("owner", "owner", "owner", id, 0, agent, 0));
+            var record = new BattleAgentSpawnData(id, "troop", default, BattleSideEnum.Defender,
+                100f, "owner", null, 0, new Equipment(), default, null, formationIndex: (int)FormationClass.HorseArcher,
+                originalOwnerControllerId: "owner", movementScopeId: "owner", shipId: shipId);
+
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+            Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell, agent.Formation);
+        });
+    }
+
+    [Fact]
+    public void FormationUpdate_CarriesTheHullTheAgentCrews()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        owner.Call(() =>
+        {
+            var mission = fixture.CreateMission(owner);
+            var broker = owner.Resolve<IMessageBroker>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+            var network = new Mock<IBattleNetwork>();
+            var session = Mock.Of<IBattleSession>(value => value.OwnControllerId == "owner" && value.InstanceId == "battle");
+            var component = owner.Resolve<ICoopMissionComponent>();
+            using var replicator = new OwnedAgentReplicator(network.Object, broker, owner.ObjectManager,
+                component, session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new BattleAgentSpawnBatchCodec(), owner.Resolve<IMissionWeaponDataMapper>());
+            var shipId = RegisterHull(component.ShipRegistry, mission.DefenderTeam, FormationClass.Ranged);
+            var crew = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.AI).Team(mission.DefenderTeam.Shell));
+            var swimmer = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.AI).Team(mission.DefenderTeam.Shell));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), crew));
+            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), swimmer));
+
+            crew.Formation = mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell;
+            swimmer.Formation = null;
+            broker.Publish(this, new BattleAgentFormationChanged(crew));
+            broker.Publish(this, new BattleAgentFormationChanged(swimmer));
+            replicator.FlushPendingFormations();
+
+            var updates = network.Invocations.Select(call => call.Arguments[0]).OfType<NetworkBattleAgentFormations>()
+                .SelectMany(batch => batch.Agents).ToArray();
+            Assert.Equal(shipId, updates.Single(update => update.FormationIndex == (int)FormationClass.Ranged).ShipId);
+            Assert.Equal(Guid.Empty, updates.Single(update => update.FormationIndex == -1).ShipId);
+        });
+    }
+
+    // A hull registered on the team's formation, carrying that formation's index as a live formation does.
+    private static Guid RegisterHull(INetworkShipRegistry ships, MockTeam team, FormationClass formationClass, Guid shipId = default)
+    {
+        var formation = team.GetFormation(formationClass).Shell;
+        AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex)).SetValue(formation, formationClass);
+        if (shipId == Guid.Empty) shipId = Guid.NewGuid();
+        Assert.True(ships.TryRegister(new NetworkShipInfo(shipId, "owner", null, false, MissionTestObjects.CreateHull(), formation)));
+        return shipId;
     }
 
     [Fact]

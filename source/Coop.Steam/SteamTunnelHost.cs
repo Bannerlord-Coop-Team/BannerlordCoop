@@ -39,6 +39,7 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
     private readonly Dictionary<IPEndPoint, ulong> remoteSteamIds = new Dictionary<IPEndPoint, ulong>();
     private readonly byte[] serverBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
+    private readonly byte[] droppableBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
     // Rebuilt under the gate whenever the peer set changes, so the 2ms pump tick reads a
     // stable array without taking the lock.
@@ -317,11 +318,17 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         {
             if (length == 0) continue;
 
-            bool droppable = SteamTunnel.IsDroppableDatagram(serverBuffer, length);
-            if (!transport.SendDatagram(connection, serverBuffer, length, droppable))
+            // The park slot is free here, so the reliable lane is split straight into it.
+            SteamTunnel.SplitByLane(serverBuffer, length, droppableBuffer, out int droppableLength,
+                peer.PendingDatagram, out int reliableLength);
+            if (droppableLength > 0)
             {
-                Array.Copy(serverBuffer, peer.PendingDatagram, length);
-                peer.PendingLength = length;
+                transport.SendDatagram(connection, droppableBuffer, droppableLength, droppable: true);
+            }
+
+            if (reliableLength > 0 && !transport.SendDatagram(connection, peer.PendingDatagram, reliableLength, droppable: false))
+            {
+                peer.PendingLength = reliableLength;
                 return;
             }
         }

@@ -28,6 +28,8 @@ public sealed class DeploymentSettings
 
 public sealed class LaunchProfile
 {
+    // The operator owns the dedicated server; runs on this profile launch and manage clients only.
+    public bool ExternalServer { get; set; }
     public string Executable { get; set; }
     public DeploymentSettings Deployment { get; set; }
     public string[] Modules { get; set; } = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
@@ -40,6 +42,9 @@ public sealed class LaunchProfile
 
     // Bannerlord install root, two levels above the bin\Win64_Shipping_Client executable.
     public string GameRoot() => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Executable), "..", ".."));
+
+    // Number of game processes a run with this many clients launches.
+    public int NewProcesses(int clientCount) => clientCount + (ExternalServer ? 0 : 1);
 
     public void ValidateBudgets()
     {

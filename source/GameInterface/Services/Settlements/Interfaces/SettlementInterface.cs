@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -35,9 +37,19 @@ public interface ISettlementInterface : IGameAbstraction
     void StartSettlementEncounter(MobileParty party, Settlement settlement);
 
     /// <summary>
-    /// Ends the local player's settlement encounter.
+    /// Ends the local player's settlement encounter, leaving the way <paramref name="leaveType"/> describes.
     /// </summary>
-    void EndSettlementEncounter();
+    void EndSettlementEncounter(SettlementLeaveType leaveType = SettlementLeaveType.Leave);
+
+    /// <summary>
+    /// Server-only: puts a party that just left a settlement at sea in its port and replicates the position.
+    /// </summary>
+    void PartySetSail(MobileParty party, Settlement settlement);
+
+    /// <summary>
+    /// Server-only: puts a party ashore at a settlement's gate, anchors its fleet in the port and replicates the position.
+    /// </summary>
+    void PartyDisembark(MobileParty party, Settlement settlement);
 
     /// <summary>
     /// Server-only: updates a settlement's location population (hero/companion placement) after a
@@ -56,10 +68,12 @@ internal class SettlementInterface : ISettlementInterface
     private static readonly ILogger Logger = LogManager.GetLogger<SettlementInterface>();
 
     private readonly SettlementPopulationTracker populationTracker;
+    private readonly IMessageBroker messageBroker;
 
-    public SettlementInterface(SettlementPopulationTracker populationTracker)
+    public SettlementInterface(SettlementPopulationTracker populationTracker, IMessageBroker messageBroker)
     {
         this.populationTracker = populationTracker;
+        this.messageBroker = messageBroker;
     }
 
     public void PartyEnterSettlement(MobileParty party, Settlement settlement)
@@ -69,7 +83,14 @@ internal class SettlementInterface : ISettlementInterface
         // and the garrison sally-out scan then reads the besieger as zero strength and sallies every check.
         if (party.BesiegedSettlement == settlement) return;
 
+        bool wasAtSea = party.IsCurrentlyAtSea;
         EnterSettlementAction.ApplyForParty(party, settlement);
+
+        // Sailing into a town puts the party ashore, which the entering player's client doesn't run itself
+        if (ModInformation.IsServer && party.IsCurrentlyAtSea != wasAtSea)
+        {
+            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: party.IsCurrentlyAtSea));
+        }
     }
 
     public void PartyLeaveSettlement(MobileParty party)
@@ -98,7 +119,25 @@ internal class SettlementInterface : ISettlementInterface
         PlayerEncounter.Current.Init(party.Party, settlementParty, settlement);
     }
 
-    public void EndSettlementEncounter()
+    public void PartySetSail(MobileParty party, Settlement settlement)
+    {
+        party.SetSailAtPosition(settlement.PortPosition);
+        party.SetMoveModeHold();
+
+        // SetSailAtPosition writes the position directly, so push it and the sea state to clients
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: true));
+    }
+
+    public void PartyDisembark(MobileParty party, Settlement settlement)
+    {
+        // Same as PlayerTownVisitCampaignBehavior.game_menu_village_disembark_on_consequence
+        party.DisembarkToPosition(settlement.GatePosition);
+        party.Anchor.SetSettlement(settlement);
+
+        messageBroker.Publish(this, new PartyBehaviorChangeAttempted(party, forcePosition: true, isCurrentlyAtSea: false));
+    }
+
+    public void EndSettlementEncounter(SettlementLeaveType leaveType = SettlementLeaveType.Leave)
     {
         var mainParty = MobileParty.MainParty;
         var mapEvent = PlayerEncounter.Battle;
@@ -116,7 +155,15 @@ internal class SettlementInterface : ISettlementInterface
         // besieger-camp position instead of the gate.
         var leftSettlement = mainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
         if (leftSettlement != null)
-            mainParty.Position = leftSettlement.GatePosition;
+        {
+            // Setting sail mirrors NavalTransitionCampaignBehavior.SetSail, which leaves from the port instead
+            if (leaveType == SettlementLeaveType.SetSail)
+                mainParty.SetSailAtPosition(leftSettlement.PortPosition);
+            else if (leaveType == SettlementLeaveType.Disembark)
+                mainParty.DisembarkToPosition(leftSettlement.GatePosition);
+            else
+                mainParty.Position = mainParty.IsCurrentlyAtSea ? leftSettlement.PortPosition : leftSettlement.GatePosition;
+        }
 
         // ExitToLast returns to the map inside Finish. Hold first so the still-active target cannot
         // immediately start another encounter before Finish returns to this method.

@@ -8,7 +8,7 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 /// visit, or that the location notification for that visit is due.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLesserNobleRevoltJournalUpdate : IServerToClientCommand
+public readonly struct NetworkLesserNobleRevoltJournalUpdate : ICommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;

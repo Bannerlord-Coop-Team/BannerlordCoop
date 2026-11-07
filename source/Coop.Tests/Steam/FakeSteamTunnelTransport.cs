@@ -14,7 +14,8 @@ namespace Coop.Tests.Steam
     public class FakeSteamTunnelTransport : ISteamTunnelTransport, ISteamTunnelConnectionIdentityResolver
     {
         private readonly object gate = new object();
-        private readonly List<(uint Connection, byte[] Data)> sentDatagrams = new List<(uint, byte[])>();
+        private readonly List<(uint Connection, byte[] Data, bool Droppable)> sentDatagrams =
+            new List<(uint, byte[], bool)>();
         private readonly Dictionary<uint, Queue<byte[]>> pendingReceives = new Dictionary<uint, Queue<byte[]>>();
         private readonly Dictionary<uint, ulong> remoteSteamIds = new Dictionary<uint, ulong>();
 
@@ -33,7 +34,7 @@ namespace Coop.Tests.Steam
         public void RaiseConnectionState(uint connection, TunnelConnectionState state) =>
             ConnectionStateChanged?.Invoke(connection, state);
 
-        public (uint Connection, byte[] Data)[] SentDatagrams
+        public (uint Connection, byte[] Data, bool Droppable)[] SentDatagrams
         {
             get
             {
@@ -128,7 +129,7 @@ namespace Coop.Tests.Steam
                     return droppable;
                 }
 
-                sentDatagrams.Add((connection, data.Take(length).ToArray()));
+                sentDatagrams.Add((connection, data.Take(length).ToArray(), droppable));
             }
 
             return true;
