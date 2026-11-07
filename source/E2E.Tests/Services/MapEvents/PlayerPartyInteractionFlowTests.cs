@@ -1544,7 +1544,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void TradeActiveState_WithoutSnapshots_OpensTradeAndKeepsRosters()
+    public void TradeActiveState_WithoutSnapshots_ActivatesSessionAndKeepsRosters()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
