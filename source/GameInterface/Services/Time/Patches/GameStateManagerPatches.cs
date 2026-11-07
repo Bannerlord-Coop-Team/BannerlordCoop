@@ -3,6 +3,7 @@ using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Time.Patches
 {
@@ -15,31 +16,43 @@ namespace GameInterface.Services.Time.Patches
 
         // Prevents pausing in menus with their own game states (such as the banner editor, party screen, clan screen, etc.)
         [HarmonyPatch(nameof(GameStateManager.OnTick))]
-        static void Prefix(ref GameStateManager __instance, float dt)
+        static bool Prefix(ref GameStateManager __instance, float dt)
         {
-            if (!(__instance.ActiveState is MapState))
+            if (__instance.ActiveState is MapState activeMapState)
             {
-                MapState mapState = __instance.LastOrDefault<MapState>();
-                if (mapState == null) return;
+                // A screen pushed over the map without its own state (save/load, options) disables the map scene view,
+                // and ticking map visuals against it crashes natively, so tick the campaign without the map handler
+                if (activeMapState.Handler is not MapScreen mapScreen || ScreenManager.TopScreen == mapScreen) return true;
 
-                // Co-op keeps the (now backgrounded) map ticking so the world keeps simulating
-                // without pausing while another screen (clan, kingdom, inventory, crafting, etc.) is on top.
-                // Unlike vanilla, that forced tick also runs the inactive map handler's UI/input callbacks.
-                // Those callbacks read stale input and can take focus from the active screen, which triggers
-                // map hotkeys while typing and immediately clears fields such as the blacksmith weapon name.
-                // Temporarily detach the handler so campaign simulation keeps ticking without the inactive
-                // map UI. Always restore it in finally: if OnTick throws and the handler stays null, later map
-                // input and lifecycle callbacks would remain broken for the rest of the session.
-                var handler = mapState.Handler;
-                mapState.Handler = null;
-                try
-                {
-                    mapState.OnTick(dt);
-                }
-                finally
-                {
-                    mapState.Handler = handler;
-                }
+                __instance.CleanRequests();
+                TickWithoutHandler(activeMapState, dt);
+                return false;
+            }
+
+            MapState mapState = __instance.LastOrDefault<MapState>();
+            if (mapState == null) return true;
+
+            // Co-op keeps the (now backgrounded) map ticking so the world keeps simulating
+            // without pausing while another screen (clan, kingdom, inventory, crafting, etc.) is on top.
+            // Unlike vanilla, that forced tick also runs the inactive map handler's UI/input callbacks.
+            // Those callbacks read stale input and can take focus from the active screen, which triggers
+            // map hotkeys while typing and immediately clears fields such as the blacksmith weapon name.
+            TickWithoutHandler(mapState, dt);
+            return true;
+        }
+
+        // Always restore the handler: if OnTick throws and it stays null, map input and lifecycle callbacks stay broken
+        private static void TickWithoutHandler(MapState mapState, float dt)
+        {
+            var handler = mapState.Handler;
+            mapState.Handler = null;
+            try
+            {
+                mapState.OnTick(dt);
+            }
+            finally
+            {
+                mapState.Handler = handler;
             }
         }
     }

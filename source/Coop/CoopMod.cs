@@ -14,6 +14,7 @@ using Coop.UI.LoadGameUI;
 using GameInterface;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -127,6 +128,15 @@ namespace Coop
             
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
+            // The dedicated server sets this itself; without it the module validator refuses NavalDLC on either side.
+            bool navalModuleEnabled = moduleInfoProvider.GetModuleInfos()
+                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
+            string navalUnsupportedReason = navalModuleEnabled
+                ? new NavalFeatureFlag().GetUnsupportedReason(System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location))
+                : null;
+            if (navalUnsupportedReason != null)
+                Logger.Warning("NavalDLC is enabled but {Reason}, so NavalDLC is treated as unsupported", navalUnsupportedReason);
+            ModInformation.IsNavalEnabled = navalModuleEnabled && navalUnsupportedReason == null;
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
@@ -154,7 +164,8 @@ namespace Coop
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,
-                        "Unsupported module wwarning preference could not be saved"));
+                        "Unsupported module wwarning preference could not be saved"),
+                    new ModuleValidator());
             }
 
             if (ManagedServerConfig.IsManagedServer)
