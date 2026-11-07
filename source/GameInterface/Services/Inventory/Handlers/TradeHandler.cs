@@ -37,6 +37,7 @@ internal class TradeHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IInventoryScreenRosterRefresher screenInventory;
     private readonly ISendCoalescer sendCoalescer;
     private bool warnedMissingCoalescer;
 
@@ -46,6 +47,7 @@ internal class TradeHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         IVillageHostileActionInterface villageHostileActionInterface,
+        IInventoryScreenRosterRefresher screenInventory,
         ISendCoalescer sendCoalescer = null)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
@@ -53,6 +55,7 @@ internal class TradeHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.screenInventory = screenInventory;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
@@ -128,7 +131,8 @@ internal class TradeHandler : IHandler
             soldItems,
             what.ForceTransferId,
             what.InitialPlayerRoster,
-            transactionSoldItems
+            transactionSoldItems,
+            ResolveInitialEquipmentData(what.InitialPartyEquipment)
         );
 
         network.SendAll(message);
@@ -158,6 +162,7 @@ internal class TradeHandler : IHandler
 
             var toItemRosterData = RebaseInventoryData(
                 toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+            RebaseEquipmentData(message.CharacterIdEquipmentsData, message.InitialCharacterIdEquipmentsData);
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
@@ -331,6 +336,33 @@ internal class TradeHandler : IHandler
         return rebased.ToArray();
     }
 
+    /// <summary>
+    /// Keeps the server's slot wherever the screen didn't change it, as RebaseInventoryData does for rosters,
+    /// so a screen opened before the reply to an earlier close can't undo that close.
+    /// </summary>
+    private void RebaseEquipmentData(Dictionary<string, EquipmentData[]> submitted, Dictionary<string, EquipmentData[]> initial)
+    {
+        if (initial == null) return;
+
+        foreach (var hero in submitted)
+        {
+            if (!initial.TryGetValue(hero.Key, out var initialSets)) continue;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(hero.Key, out var liveHero)) continue;
+
+            for (int set = 0; set < hero.Value.Length; set++)
+            {
+                var live = GetLiveEquipment(liveHero.CharacterObject, hero.Value[set].EquipmentType);
+                if (live == null) continue;
+
+                var slots = hero.Value[set].ItemSlots;
+                for (int slot = 0; slot < slots.Length; slot++)
+                {
+                    if (SameElement(slots[slot], initialSets[set].ItemSlots[slot])) slots[slot] = live._itemSlots[slot];
+                }
+            }
+        }
+    }
+
     private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
     {
         foreach (var item in roster)
@@ -453,6 +485,7 @@ internal class TradeHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.InitialHeroId, out var initialHero)) return;
 
                 ResolveCharacterEquipmentsData(obj.What.CharacterIdEquipmentsData, out var characterEquipmentsData);
+                screenInventory.MergeEquipmentUpdate(characterEquipmentsData);
                 inventoryLogicInterface.UpdateEquipmentWithData(mobileParty, characterEquipmentsData, initialHero);
             }
         });
@@ -738,6 +771,24 @@ internal class TradeHandler : IHandler
         }
 
         return characterIdEquipmentsData;
+    }
+
+    // Keys the screen's opening slots by hero id, the same shape as the slots it submits
+    private Dictionary<string, EquipmentData[]> ResolveInitialEquipmentData(Dictionary<CharacterObject, Equipment[]> initialEquipment)
+    {
+        if (initialEquipment == null) return null;
+
+        var initialEquipmentData = new Dictionary<string, EquipmentData[]>();
+        foreach (var hero in initialEquipment)
+        {
+            if (!objectManager.TryGetIdWithLogging(hero.Key.HeroObject, out var heroId)) continue;
+
+            initialEquipmentData[heroId] = hero.Value
+                .Select(equipment => new EquipmentData(equipment._equipmentType, equipment._itemSlots))
+                .ToArray();
+        }
+
+        return initialEquipmentData;
     }
 
     private void AddHeroEquipmentData(Dictionary<string, EquipmentData[]> characterIdEquipmentsData, CharacterObject character)

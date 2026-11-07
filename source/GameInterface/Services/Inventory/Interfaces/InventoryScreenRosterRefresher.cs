@@ -1,8 +1,10 @@
 ﻿using Common.Util;
 using GameInterface.Services.TownMarketDatas.Patches;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
@@ -15,7 +17,9 @@ public interface IInventoryScreenRosterRefresher : IGameAbstraction
 {
     void CaptureInventoryBaseline(InventoryLogic logic);
     ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic);
+    Dictionary<CharacterObject, Equipment[]> GetEquipmentBaseline(InventoryLogic logic);
     bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount);
+    void MergeEquipmentUpdate(Dictionary<CharacterObject, Equipment[]> received);
     bool TryClearInventory(ItemRoster roster);
     void RestoreInventoryBackup(InventoryLogic logic);
 }
@@ -40,6 +44,42 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 
     public ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic)
         => inventoryBaselines.TryGetValue(logic, out var baseline) ? baseline.Rosters[1].ToArray() : null;
+
+    /// <summary>Gets the slots the screen's pending changes are measured against, by party hero.</summary>
+    public Dictionary<CharacterObject, Equipment[]> GetEquipmentBaseline(InventoryLogic logic)
+        => inventoryBaselines.TryGetValue(logic, out var baseline) ? baseline.PlayerEquipment.CharacterEquipments : null;
+
+    /// <summary>
+    /// Moves the open screen's equipment baselines to the server's slots, and writes
+    /// the screen's pending slots into <paramref name="received"/> so applying it keeps them.
+    /// </summary>
+    public void MergeEquipmentUpdate(Dictionary<CharacterObject, Equipment[]> received)
+    {
+        var logic = (GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic;
+        if (logic == null || !inventoryBaselines.TryGetValue(logic, out var baseline)) return;
+
+        foreach (var hero in received)
+        {
+            if (!baseline.PlayerEquipment.CharacterEquipments.TryGetValue(hero.Key, out var initialSets)) continue;
+            if (!logic._partyInitialEquipment.CharacterEquipments.TryGetValue(hero.Key, out var backupSets)) continue;
+
+            var liveSets = new[] { hero.Key.FirstBattleEquipment, hero.Key.FirstCivilianEquipment, hero.Key.FirstStealthEquipment };
+            for (int set = 0; set < liveSets.Length; set++)
+                MergeEquipmentSlots(hero.Value[set]._itemSlots, liveSets[set]._itemSlots, initialSets[set]._itemSlots, backupSets[set]._itemSlots);
+        }
+    }
+
+    /// <summary>Merges one equipment set. Slaughter can move the backup past the baseline, and a backup moved that way is left alone.</summary>
+    private static void MergeEquipmentSlots(EquipmentElement[] received, EquipmentElement[] live, EquipmentElement[] initial, EquipmentElement[] backup)
+    {
+        for (int slot = 0; slot < Equipment.EquipmentSlotLength; slot++)
+        {
+            var serverSlot = received[slot];
+            if (!live[slot].IsEqualTo(initial[slot])) received[slot] = live[slot];
+            if (backup[slot].IsEqualTo(initial[slot])) backup[slot] = serverSlot;
+            initial[slot] = serverSlot;
+        }
+    }
 
     public bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount)
         => TryApplyInventoryUpdate(
