@@ -65,6 +65,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
         Prefix(typeof(Mission), "set_PlayerTeam", nameof(Mission_set_PlayerTeam));
         Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
+        // BattleAgentLogic's hit reward reads the teams' validity and leader.
+        Prefix(typeof(Team), "get_IsValid", nameof(Team_get_IsValid));
+        Prefix(typeof(Team), "get_Leader", nameof(Team_get_Leader));
         harmony.Patch(
             AccessTools.Method(typeof(Mission.TeamCollection), nameof(Mission.TeamCollection.Add), new[]
             {
@@ -117,6 +120,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObjectMT), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        Prefix(typeof(Agent), "get_State", nameof(Agent_get_State));
         Prefix(typeof(Agent), nameof(Agent.CreateBloodBurstAtLimb), nameof(Agent_CreateBloodBurstAtLimb));
         Prefix(typeof(Agent), nameof(Agent.OnFleeing), nameof(Agent_OnFleeing));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
@@ -139,10 +143,11 @@ public sealed class MissionEngineFixture : IDisposable
             AccessTools.Constructor(typeof(CommonAIComponent), new[] { typeof(Agent) }),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(CommonAIComponent_ctor))));
 
-        // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature.
+        // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature. It runs last so a blow
+        // a coop prefix suppressed (a hit on a puppet) is not applied, like the native HandleBlow it replaces.
         harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.RegisterBlow), new[] { typeof(Blow), typeof(AttackCollisionData).MakeByRefType() }),
-            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Agent_RegisterBlow))));
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Agent_RegisterBlow)), Priority.Last));
 
         // Team / Formation — host-migration adoption (ConvertPuppetToHostAi + the Charge order).
         Prefix(typeof(Agent), "get_Formation", nameof(Agent_get_Formation));
@@ -494,6 +499,33 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Team_get_IsValid(Team __instance, ref bool __result)
+    {
+        if (!MockTeam.ForShell(__instance, out _)) return true;
+        __result = true;
+        return false;
+    }
+
+    // Vanilla: the main agent when it is on this team, otherwise the first active hero, otherwise the first active agent.
+    private static bool Team_get_Leader(Team __instance, ref Agent __result)
+    {
+        if (!MockTeam.ForShell(__instance, out _) || !TryActiveMock(out var mock)) return true;
+
+        __result = null;
+        if (mock.MainAgent != null && mock.MainAgent.Team == __instance)
+        {
+            __result = mock.MainAgent;
+            return false;
+        }
+        foreach (var agent in mock.Agents)
+        {
+            if (!AgentMirror.TryGet(agent, out var mirror) || !mirror.IsActive || mirror.Team != __instance) continue;
+            if (__result == null || mirror.Character?.IsHero == true) __result = agent;
+            if (mirror.Character?.IsHero == true) break;
+        }
+        return false;
+    }
+
     // ---- Agent shims ----
     private static bool Agent_get_Controller(Agent __instance, ref AgentControllerType __result)
     {
@@ -631,6 +663,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_State(Agent __instance, ref AgentState __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.IsActive ? AgentState.Active : m.WasKilled ? AgentState.Killed : AgentState.Unconscious;
+        return false;
+    }
+
     private static bool Agent_CreateBloodBurstAtLimb(Agent __instance)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -705,9 +744,10 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_RegisterBlow(Agent __instance, Blow blow)
+    private static bool Agent_RegisterBlow(Agent __instance, Blow blow, ref AttackCollisionData collisionData, bool __runOriginal)
     {
         if (!AgentMirror.TryGet(__instance, out var victim)) return true;
+        if (!__runOriginal) return false;
         if (TryActiveMock(out var registrationMock))
             registrationMock.LastRegisteredBlow = blow;
 
@@ -744,25 +784,92 @@ public sealed class MissionEngineFixture : IDisposable
             damage = 0f;
         }
         victim.Health = Math.Max(0f, victim.Health - damage);
+        NativeAgentFields.SyncHealth(__instance, victim);
         if (TryActiveMock(out var activeMock)
             && activeMock.DismountRiderOnNextBlow)
         {
             activeMock.DismountRiderOnNextBlow = false;
             __instance.MountAgent = null;
         }
+        Mission mission = victim.Mission;
+        Agent blowAffector = blow.OwnerId != -1 ? mission.FindAgentWithIndex(blow.OwnerId) : null;
+        if (!mission.DisableDying
+            && Mission.Current.Mode != MissionMode.Conversation
+            && Mission.Current.Mode != MissionMode.CutScene)
+        {
+            DispatchAgentHit(mission, __instance, blowAffector, blow, collisionData, damage);
+        }
         if (victim.Health < 1f)
         {
             victim.Health = 0f;
             victim.IsActive = false;
+            // The native death decides killed or unconscious; a replayed death takes the owner's result.
+            AgentState removedState = AgentState.Killed;
             if (BattleSpawnGate.TryGetReplicatedDeathState(__instance, out var agentState))
-                victim.WasKilled = agentState == AgentState.Killed;
-            if (BattleSpawnGate.TryGetReplicatedDeath(__instance, out _, out var killingBlow) && killingBlow.IsValid)
-                victim.DeathAction = killingBlow.DeathAction;
+                removedState = agentState;
+            victim.WasKilled = removedState == AgentState.Killed;
+            NativeAgentFields.SyncHealth(__instance, victim);
+            NativeAgentFields.MarkRemoved(__instance, removedState);
+            var removedBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, victim.DeathAction, 0);
+            if (BattleSpawnGate.TryGetReplicatedDeath(__instance, out _, out var killingBlow))
+            {
+                removedBlow = killingBlow;
+                if (killingBlow.IsValid)
+                    victim.DeathAction = killingBlow.DeathAction;
+            }
             if (victim.MountAgent != null && AgentMirror.TryGet(victim.MountAgent, out var horse) && horse.RiderAgent == __instance)
                 horse.RiderAgent = null;
             victim.MountAgent = null;
+            DispatchAgentRemoved(mission, __instance, blowAffector, removedState, removedBlow);
         }
         return false;
+    }
+
+    /// <summary>
+    /// Models <c>Mission.OnAgentHit</c>, which <c>Agent.HandleBlow</c> runs before its death check: every mission
+    /// behavior gets <c>OnAgentHit</c> then <c>OnScoreHit</c> for the blow. Agent components are not modeled.
+    /// </summary>
+    private static void DispatchAgentHit(
+        Mission mission, Agent affectedAgent, Agent affectorAgent, Blow blow, AttackCollisionData collisionData, float damagedHp)
+    {
+        if (mission.MissionBehaviors.Count == 0) return;
+
+        int slot = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+        MissionWeapon affectorWeapon = MissionWeapon.Invalid;
+        bool isSiegeEngineHit = false;
+        float hitDistance = 0f;
+        float shotDifficulty = -1f;
+        if (blow.IsMissile)
+        {
+            var missile = mission._missilesDictionary[slot];
+            affectorWeapon = missile.Weapon;
+            isSiegeEngineHit = missile.MissionObjectToIgnore != null;
+            hitDistance = (blow.GlobalPosition - blow.WeaponRecord.StartingPosition).Length;
+            if (affectorAgent != null)
+                shotDifficulty = mission.GetShootDifficulty(affectedAgent, affectorAgent, blow.VictimBodyPart == BoneBodyPartType.Head);
+        }
+        else if (affectorAgent != null && slot >= 0)
+        {
+            affectorWeapon = affectorAgent.Equipment[slot];
+        }
+
+        foreach (var behavior in mission.MissionBehaviors.ToList())
+        {
+            behavior.OnAgentHit(affectedAgent, affectorAgent, in affectorWeapon, in blow, in collisionData);
+            behavior.OnScoreHit(affectedAgent, affectorAgent, affectorWeapon.CurrentUsageItem, false, isSiegeEngineHit,
+                in blow, in collisionData, damagedHp, hitDistance, shotDifficulty);
+        }
+    }
+
+    /// <summary>Models the native death callback <c>Mission.OnAgentRemoved</c> notifying every mission behavior.</summary>
+    private static void DispatchAgentRemoved(
+        Mission mission, Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
+    {
+        var behaviors = mission.MissionBehaviors.ToList();
+        foreach (var behavior in behaviors)
+            behavior.OnEarlyAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
+        foreach (var behavior in behaviors)
+            behavior.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
     }
 
     private static bool Agent_get_Formation(Agent __instance, ref Formation __result)
