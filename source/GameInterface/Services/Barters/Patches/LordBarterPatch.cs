@@ -211,6 +211,20 @@ internal static class LordBarterPatch
     }
 
     /// <summary>
+    /// Shows the open defection barter at the price the server authorized it at.
+    /// </summary>
+    internal static void ApplyServerValuation(NetworkLordBarterAuthorized authorized)
+    {
+        if (authorizedBarter == null || authorized.RequestId != pendingRequestId) return;
+
+        var joinKingdom = authorizedBarter.GetBarterables().OfType<JoinKingdomAsClanBarterable>().FirstOrDefault();
+        if (joinKingdom == null) return;
+
+        LordBarterValuationPatch.Pin(joinKingdom, authorized.JoinKingdomValue);
+        LordBarterValuationPatch.RefreshBarterScreen(authorizedBarter);
+    }
+
+    /// <summary>
     /// Whether this accepted barter is the safe passage that ends the encounter the player is
     /// standing in, rather than one agreed elsewhere.
     /// </summary>
