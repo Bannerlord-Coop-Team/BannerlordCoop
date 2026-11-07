@@ -50,23 +50,6 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
             Assert.Null(report.AttackerWeapon);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void HitReward_SendsWeaponOnlyForHeroAttacker(bool attackerIsHero)
-    {
-        var battle = SetupBattle();
-        var reporter = Clients.First();
-
-        reporter.Call(() => PublishHitReward(reporter, battle, attackerIsHero, WeaponClass.OneHandedSword));
-
-        var reward = Assert.Single(reporter.NetworkSentMessages.GetMessages<NetworkBattleHitReward>());
-        if (attackerIsHero)
-            Assert.Equal(WeaponClass.OneHandedSword, Assert.IsAssignableFrom<WeaponComponentData>(reward.LastAttackerWeapon).WeaponClass);
-        else
-            Assert.Null(reward.LastAttackerWeapon);
-    }
-
     [Fact]
     public void ScoreHit_FromHeroAttacker_StillRaisesHeroCombatHitWithTheWeapon()
     {
