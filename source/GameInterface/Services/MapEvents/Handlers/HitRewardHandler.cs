@@ -286,6 +286,9 @@ public class HitRewardHandler : IHandler
 
             if (affectorCharacter.IsHero)
             {
+                // A client leaves the tracker null until the replicated tracker from the server arrives
+                if (troopUpgradeTracker == null) return;
+
                 Hero heroObject = affectorCharacter.HeroObject;
                 using (IEnumerator<SkillObject> enumerator = troopUpgradeTracker.CheckSkillUpgrades(heroObject).GetEnumerator())
                 {
