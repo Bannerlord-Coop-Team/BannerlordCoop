@@ -121,7 +121,7 @@ internal class EscapeMenuCoopOptionsPatch
 
     private static void RequestUnstuck()
     {
-        var mainParty = MobileParty.MainParty;
+        var mainParty = Campaign.Current?.MainParty;
         if (mainParty == null) return;
 
         MessageBroker.Instance.Publish(mainParty, new PlayerUnstuckRequested(mainParty));

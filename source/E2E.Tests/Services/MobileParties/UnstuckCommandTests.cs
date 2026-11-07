@@ -104,6 +104,40 @@ public class UnstuckCommandTests : MapEventTestBase
     }
 
     [Fact]
+    public void EscapeMenuUnstuck_ConfirmYesAfterTheCampaignIsGone_SendsNothingAndDoesNotThrow()
+    {
+        SetupRegisteredMainHeroAndParty();
+
+        var shownInquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => shownInquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            Client.Call(() => EscapeMenuCoopOptionsPatch.ShowUnstuckConfirm());
+
+            var inquiry = Assert.Single(shownInquiries);
+
+            // A server disconnect ends the campaign while the popup stays open. Client.Call
+            // restores Campaign.Current afterwards.
+            Client.Call(() =>
+            {
+                Campaign.Current = null;
+                inquiry.AffirmativeAction();
+            });
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        Assert.Empty(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+    }
+
+    [Fact]
     public void PlayerBugReport_RequestsDiagnosticLogsFromEveryConnectedClient()
     {
         var requester = SetupRegisteredMainHeroAndParty();
