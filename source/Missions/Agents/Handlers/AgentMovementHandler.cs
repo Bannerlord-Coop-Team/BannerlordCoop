@@ -34,6 +34,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     int AvailableOutgoingMovementBytes { get; }
 
+    /// <summary>Each recipient's effective movement ceiling (diagnostics).</summary>
+    IReadOnlyDictionary<string, double> RouteMovementBytesPerSecond { get; }
+
     void Configure(MovementCadenceProfile profile);
 
     bool TrySetForcedBulkHz(int? hz, out string error);
@@ -553,6 +556,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     public MovementRateSnapshot MovementRate => movementRateController.Snapshot;
 
     public int AvailableOutgoingMovementBytes => movementBatchSender.AvailableOutgoingBytes;
+
+    public IReadOnlyDictionary<string, double> RouteMovementBytesPerSecond =>
+        movementBatchSender.GetRouteBytesPerSecond();
 
     public void Configure(MovementCadenceProfile profile)
     {

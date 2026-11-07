@@ -83,6 +83,19 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         }
     }
 
+    /// <summary>Reads the delivery health of the accepted connection from one remote peer.</summary>
+    public bool TryGetPeerHealth(ulong remoteSteamId, out RouteHealth health)
+    {
+        foreach (var peer in peerSnapshot)
+        {
+            if (peer.Value.RemoteSteamId == remoteSteamId)
+                return transport.TryGetConnectionHealth(peer.Key, out health);
+        }
+
+        health = default;
+        return false;
+    }
+
     public void Start(int serverPort)
     {
         Start(serverPort, SteamTunnel.VirtualPort);

@@ -149,6 +149,31 @@ public class MissionPeerCredentialMappingTests
     }
 
     [Fact]
+    public void RouteHealth_SteamPeerUsesSteamCountersAndDirectPeerUsesLiteNetRoundTrip()
+    {
+        using var fixture = new Fixture();
+        var steamHealth = new RouteHealth(1900, 0.5f, 100);
+        fixture.SteamBridge
+            .Setup(bridge => bridge.TryGetRouteHealth(9001, out steamHealth))
+            .Returns(true);
+        NetPeer steamPeer = fixture.TrackPending("steam-peer", Guid.NewGuid(), actualSteamId: 9001);
+        NetPeer directPeer = fixture.TrackPending("direct-peer", Guid.NewGuid(), actualSteamId: 0);
+        fixture.MissionContext.Setup(context => context.TryGetPeer("steam-peer", out steamPeer)).Returns(true);
+        fixture.MissionContext.Setup(context => context.TryGetPeer("direct-peer", out directPeer)).Returns(true);
+
+        Assert.True(fixture.Client.TryGetRouteHealth("steam-peer", out RouteHealth bridged));
+        Assert.Equal(1900, bridged.RoundTripMilliseconds);
+        Assert.Equal(0.5f, bridged.Quality);
+        Assert.Equal(100, bridged.QueuedBytes);
+
+        Assert.True(fixture.Client.TryGetRouteHealth("direct-peer", out RouteHealth direct));
+        Assert.Equal(directPeer.RoundTripTime, direct.RoundTripMilliseconds);
+        Assert.Equal(RouteHealth.UnknownQuality, direct.Quality);
+
+        Assert.False(fixture.Client.TryGetRouteHealth("relay-peer", out _));
+    }
+
+    [Fact]
     public void AuthenticatedSteamReplacement_WaitsForRotatedAnnouncementThenMaps()
     {
         using var fixture = new Fixture(startNetwork: true, authenticatedSteamId: 9001);

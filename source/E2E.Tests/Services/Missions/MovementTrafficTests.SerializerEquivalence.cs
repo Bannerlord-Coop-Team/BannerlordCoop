@@ -385,5 +385,10 @@ public partial class MovementTrafficTests
         public void SendAllBut(string controllerId, IMessage message) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes(string controllerId) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes() => throw new NotSupportedException();
+        public bool TryGetRouteHealth(string controllerId, out Common.Network.Session.RouteHealth health)
+        {
+            health = default;
+            return false;
+        }
     }
 }

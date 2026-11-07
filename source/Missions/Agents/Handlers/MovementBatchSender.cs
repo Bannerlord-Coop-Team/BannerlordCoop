@@ -45,6 +45,9 @@ public interface IMovementBatchSender
         int deferredSnapshots,
         float maximumDeferredAgeSeconds);
 
+    /// <summary>Lists each recipient's effective ceiling, the lowest of its configured and health limits.</summary>
+    IReadOnlyDictionary<string, double> GetRouteBytesPerSecond();
+
     void RemoveRecipient(string controllerId);
 
     void Clear();
@@ -169,6 +172,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
     private readonly IMovementTrafficBudgetFactory trafficBudgetFactory;
     private readonly IMovementPriorityScheduler priorityScheduler;
     private readonly IMovementNetworkSettings networkSettings;
+    private readonly IMovementRouteBackoff routeBackoff;
     private readonly IMovementTrafficBudget outgoingTrafficBudget;
     private readonly Dictionary<string, RecipientState> recipients =
         new Dictionary<string, RecipientState>(StringComparer.Ordinal);
@@ -239,7 +243,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
         IMovementPacketCompressor packetCompressor,
         IMovementTrafficBudgetFactory trafficBudgetFactory,
         IMovementPriorityScheduler priorityScheduler,
-        IMovementNetworkSettings networkSettings)
+        IMovementNetworkSettings networkSettings,
+        IMovementRouteBackoff routeBackoff = null)
     {
         if (client == null) throw new ArgumentNullException(nameof(client));
         if (packetCompressor == null) throw new ArgumentNullException(nameof(packetCompressor));
@@ -252,6 +257,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         this.trafficBudgetFactory = trafficBudgetFactory;
         this.priorityScheduler = priorityScheduler;
         this.networkSettings = networkSettings;
+        this.routeBackoff = routeBackoff ?? new MovementRouteBackoff(client);
         outgoingTrafficBudget = trafficBudgetFactory.Create(
             networkSettings.OutgoingBytesPerSecond,
             CalculateBurstBytes(networkSettings.OutgoingBytesPerSecond, 1000));
@@ -281,6 +287,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         outgoingTrafficBudget.Advance(elapsedSeconds);
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Advance(elapsedSeconds);
+        routeBackoff.Advance(elapsedSeconds);
     }
 
     public void ConfigureRecipient(
@@ -288,7 +295,9 @@ public sealed class MovementBatchSender : IMovementBatchSender
         double bytesPerSecond,
         int maxPayloadBytes)
     {
-        double normalizedBytesPerSecond = NormalizeByteRate(bytesPerSecond);
+        double normalizedBytesPerSecond = Math.Min(
+            NormalizeByteRate(bytesPerSecond),
+            routeBackoff.GetBytesPerSecond(controllerId));
         RecipientState recipient = GetOrCreateRecipient(controllerId);
         recipient.TrafficBudget.Configure(
             normalizedBytesPerSecond,
@@ -573,10 +582,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
             : new MovementTrafficFrame();
     }
 
+    public IReadOnlyDictionary<string, double> GetRouteBytesPerSecond()
+    {
+        var rates = new Dictionary<string, double>(recipients.Count, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, RecipientState> recipient in recipients)
+            rates.Add(recipient.Key, recipient.Value.TrafficBudget.BytesPerSecond);
+        return rates;
+    }
+
     public void RemoveRecipient(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         recipients.Remove(controllerId);
+        routeBackoff.RemoveRoute(controllerId);
     }
 
     public void Clear()
@@ -585,6 +603,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Clear();
         recipients.Clear();
+        routeBackoff.Clear();
     }
 
     private RecipientState GetOrCreateRecipient(string controllerId)
@@ -758,6 +777,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (!outgoingTrafficBudget.TrySpend(candidate.Payload.Length))
                 throw new InvalidOperationException("The shared movement budget changed during a game-thread send.");
             client.Send(controllerId, candidate.Packet, candidate.Payload);
+            routeBackoff.ReportSent(controllerId, candidate.Payload.Length);
             for (int i = 0; i < candidate.Count; i++)
                 onSent?.Invoke(
                     GetCircular(

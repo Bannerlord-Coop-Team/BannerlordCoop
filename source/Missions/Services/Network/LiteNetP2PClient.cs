@@ -1321,6 +1321,71 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         return hasRoute && !hasViableRoute ? 0 : maxPayloadBytes;
     }
 
+    // Steam's counters win over LiteNetLib's ping on a bridged peer, because Steam drops pings in its unreliable lane.
+    public bool TryGetRouteHealth(string controllerId, out RouteHealth health)
+    {
+#if DEBUG
+        if (TryGetSimulatedRouteHealth(controllerId, out health)) return true;
+#endif
+        health = default;
+        if (!missionContext.TryGetPeer(controllerId, out NetPeer peer)) return false;
+
+        // LiteNetLib holds reliable packets behind its window, so this backlog never shows in Steam's counters.
+        long queuedBytes = (long)(peer.GetPacketsCountInReliableQueue(0, true) +
+            peer.GetPacketsCountInReliableQueue(0, false)) * SafeSinglePacketBytes;
+
+        ulong remoteSteamId;
+        lock (peerGate)
+        {
+            peerSteamIds.TryGetValue(peer, out remoteSteamId);
+        }
+
+        if (remoteSteamId != 0 && steamBridge.TryGetRouteHealth(remoteSteamId, out RouteHealth steamHealth))
+        {
+            health = new RouteHealth(
+                steamHealth.RoundTripMilliseconds,
+                steamHealth.Quality,
+                steamHealth.QueuedBytes + queuedBytes);
+            return true;
+        }
+
+        health = new RouteHealth(peer.RoundTripTime, RouteHealth.UnknownQuality, queuedBytes);
+        return true;
+    }
+
+#if DEBUG
+    private readonly Dictionary<string, (int RoundTripMilliseconds, long ExpiresAt)> simulatedRouteRoundTrips = new();
+
+    /// <summary>Makes a route report the given RTT for a while, so back-off can be driven without a shaped link.</summary>
+    internal void SetSimulatedRouteRoundTrip(string controllerId, float durationSeconds, int roundTripMilliseconds)
+    {
+        lock (peerGate)
+        {
+            simulatedRouteRoundTrips[controllerId] = (
+                roundTripMilliseconds,
+                Stopwatch.GetTimestamp() + (long)(durationSeconds * Stopwatch.Frequency));
+        }
+    }
+
+    /// <summary>Returns a route's unexpired simulated reading, dropping it once it has run out.</summary>
+    private bool TryGetSimulatedRouteHealth(string controllerId, out RouteHealth health)
+    {
+        health = default;
+        lock (peerGate)
+        {
+            if (!simulatedRouteRoundTrips.TryGetValue(controllerId, out var simulated)) return false;
+            if (Stopwatch.GetTimestamp() >= simulated.ExpiresAt)
+            {
+                simulatedRouteRoundTrips.Remove(controllerId);
+                return false;
+            }
+
+            health = new RouteHealth(simulated.RoundTripMilliseconds, RouteHealth.UnknownQuality, 0);
+            return true;
+        }
+    }
+#endif
+
     private int GetMaxRelayPayloadBytes(string currentInstanceId, string controllerId)
     {
         var key = (currentInstanceId, controllerId);
