@@ -517,6 +517,8 @@ public sealed class MovementTrafficBudgetTests
         public byte[] Serialize(IPacket packet) =>
             new byte[((SizedPacket)packet).Count * 10];
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
+
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             restored = packet;
