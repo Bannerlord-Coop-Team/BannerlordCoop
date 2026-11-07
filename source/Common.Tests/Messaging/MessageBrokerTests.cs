@@ -216,18 +216,28 @@ public class MessageBrokerTests
     }
 
     /// <summary>
-    /// Subscriber that signals once a publish has reached it, so another thread can start changing subscriptions mid-walk.
+    /// Subscriber that holds a publish inside its callback until another thread has changed the subscriptions,
+    /// so the change lands while the walk is part way through the list.
     /// </summary>
-    private sealed class SignallingSubscriber
+    private sealed class GateSubscriber
     {
         private readonly ManualResetEventSlim reached;
+        private readonly ManualResetEventSlim release;
 
-        public SignallingSubscriber(ManualResetEventSlim reached)
+        public GateSubscriber(ManualResetEventSlim reached, ManualResetEventSlim release)
         {
             this.reached = reached;
+            this.release = release;
         }
 
-        public void Handle(MessagePayload<ProbeMessage> payload) => reached.Set();
+        public bool TimedOut { get; private set; }
+
+        public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            reached.Set();
+            if (!release.Wait(TimeSpan.FromSeconds(10)))
+                TimedOut = true;
+        }
     }
 
     /// <summary>
@@ -612,24 +622,29 @@ public class MessageBrokerTests
         for (int round = 0; round < rounds && failures.Count == 0; round++)
         {
             var broker = new ProbeBroker();
-            using var publishStarted = new ManualResetEventSlim();
-            var signal = new SignallingSubscriber(publishStarted);
-            broker.Subscribe<ProbeMessage>(signal.Handle);
+            using var reached = new ManualResetEventSlim();
+            using var removed = new ManualResetEventSlim();
+            var gate = new GateSubscriber(reached, removed);
+            var staying = new Subscriber();
             var leaving = new Subscriber[leavingPerRound];
             for (int i = 0; i < leaving.Length; i++)
-            {
                 leaving[i] = new Subscriber();
+            // Half the leaving subscribers come before the gate, so removing one shifts entries the walk already passed
+            for (int i = 0; i < leaving.Length / 2; i++)
                 broker.Subscribe<ProbeMessage>(leaving[i].Handle);
-            }
-            var staying = new Subscriber();
+            broker.Subscribe<ProbeMessage>(gate.Handle);
             broker.Subscribe<ProbeMessage>(staying.Handle);
+            for (int i = leaving.Length / 2; i < leaving.Length; i++)
+                broker.Subscribe<ProbeMessage>(leaving[i].Handle);
 
-            // Removals start only once a publish is walking the list, so every round overlaps them
+            // The first removal lands while a publish is held at the gate, and the rest race the publishes that follow
             var unsubscriber = Task.Run(() =>
             {
-                if (!publishStarted.Wait(TimeSpan.FromSeconds(10)))
+                if (!reached.Wait(TimeSpan.FromSeconds(10)))
                     return false;
-                foreach (var subscriber in leaving)
+                broker.Unsubscribe<ProbeMessage>(leaving[0].Handle);
+                removed.Set();
+                foreach (var subscriber in leaving.Skip(1))
                     broker.Unsubscribe<ProbeMessage>(subscriber.Handle);
                 return true;
             });
@@ -649,11 +664,11 @@ public class MessageBrokerTests
                 failures.Add($"round {round}: publish threw {ex.GetType().Name}: {ex.Message}");
             }
 
-            if (!unsubscriber.Result)
-                failures.Add($"round {round}: no publish reached the first subscriber");
+            if (!unsubscriber.Result || gate.TimedOut)
+                failures.Add($"round {round}: the publish and the first removal never met at the gate");
             else if (failures.Count == 0 && staying.Received != published)
                 failures.Add($"round {round}: the staying subscriber ran {staying.Received} times for {published} publishes");
-            GC.KeepAlive(signal);
+            GC.KeepAlive(gate);
             GC.KeepAlive(leaving);
             GC.KeepAlive(staying);
         }
