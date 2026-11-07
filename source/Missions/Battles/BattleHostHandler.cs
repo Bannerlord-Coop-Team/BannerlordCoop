@@ -376,8 +376,7 @@ internal class BattleHostHandler : IHandler
         var requester = payload.Who as NetPeer;
 
         // Reads campaign collections and the shared assignment, so run on the main thread. That also
-        // serializes requests for one battle: the first the server processes becomes the host, the rest
-        // append in arrival (= mission-ready) order, so concurrent requests cannot double-elect.
+        // serializes requests for one battle, so concurrent requests cannot double-elect.
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
@@ -409,8 +408,8 @@ internal class BattleHostHandler : IHandler
     {
         if (hostRegistry.TryGet(mapEventId, out var existing))
         {
-            // Host already elected. Record this player in the successor line in join order (idempotent),
-            // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
+            // Host already elected. Record this player in the successor line, preferred hosts first, then join order
+            // (idempotent), so migration promotes the first successor still present. A mid-battle joiner lands here too.
             if ((!mapEvent.IsHideoutBattle || hideoutStateReady) &&
                 succession.TryAppendSuccessor(mapEventId, requesterId, out var updated))
             {
