@@ -99,7 +99,7 @@ public class ReplayedDeathReportTests : MissionTestEnvironment
             blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
             AttackCollisionData collisionData = default;
             killerMission.victim.RegisterBlow(blow, in collisionData);
-            killerMission.controller.OnMissionTick(0.016f);
+            killerMission.controller.OnPreDisplayMissionTick(0.016f);
         });
 
         Assert.True(AgentMirror.TryGet(ownerMission.victim, out var ownerVictim));
