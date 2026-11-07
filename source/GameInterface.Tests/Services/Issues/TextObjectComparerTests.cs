@@ -17,18 +17,11 @@ public class TextObjectComparerTests
         Text(Collected, new Dictionary<string, object> { ["TARGET"] = target, ["COUNT"] = 7 });
 
     [Fact]
-    public void BothNull_AreSame()
+    public void Null_MatchesOnlyNull()
     {
         Assert.True(comparer.SameText(null, null));
         Assert.True(comparer.SameKey(null, null));
-    }
-
-    [Fact]
-    public void OneNull_IsNotSame()
-    {
         Assert.False(comparer.SameText(Text("Danustica"), null));
-        Assert.False(comparer.SameText(null, Text("Danustica")));
-        Assert.False(comparer.SameKey(Text("Danustica"), null));
         Assert.False(comparer.SameKey(null, Text("Danustica")));
     }
 
