@@ -59,16 +59,14 @@ public class EncounterGameMenuBehaviorInterface : IEncounterGameMenuBehaviorInte
             }
         }
 
-        // Replace CampaignEventDispatcher.Instance.OnPlayerDesertedBattle call.
-        // Receivers use main party which isn't available on the server.
+        // PlayerVariablesBehavior is off in co-op (DisablePlayerVariablesBehavior), so its listener's tactics xp and valor loss are applied here.
         SkillLevelingManager.OnTacticsUsed(mainParty, numberOfTroopsSacrificed * 50f);
 
         using (new MainHeroSubstitutionScope(mainHero, mainParty))
         {
             TraitLevelingHelper.OnTroopsSacrificed();
+            CampaignEventDispatcher.Instance.OnPlayerDesertedBattle(numberOfTroopsSacrificed);
         }
-
-        // TODO: Send message for CompanionGrievanceBehavior.OnPlayerDesertedBattle
 
         // BesiegerCamp isn't cleared here, the siege break SiegeEntryFlowPatches routes after this request does it.
     }
