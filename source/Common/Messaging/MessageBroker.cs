@@ -1,7 +1,8 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Linq;
 using System.Reflection;
 
 namespace Common.Messaging;
@@ -19,16 +20,12 @@ public class MessageBroker : IMessageBroker
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
     protected static MessageBroker instance;
-    protected readonly Dictionary<Type, List<WeakDelegate>> subscribers;
-    // Guards the two lists below. They replace an Interlocked counter, and a counter cannot be left
-    // unbalanced by an interleaving, while a lost list update would mark a list as walked for good
-    // and stop pruning it for the lifetime of the broker
-    private readonly object bookkeepingLock = new object();
-    // Subscriber lists a publish is currently walking, one entry per running publish, so pruning a
-    // list holds off while a loop is stepping through it by index
-    private readonly List<List<WeakDelegate>> walkedByPublish = new List<List<WeakDelegate>>();
-    // Lists whose pruning was skipped for that reason, caught up by the publish that leaves last
-    private readonly List<List<WeakDelegate>> prunePending = new List<List<WeakDelegate>>();
+    // Network handlers publish on the poller thread while the game thread subscribes and unsubscribes, so
+    // every change goes through subscriptionLock and swaps in a new array instead of editing one a publish may be walking
+    protected readonly ConcurrentDictionary<Type, SubscriberList> subscribers;
+    private readonly object subscriptionLock = new object();
+    // Sequence of the newest subscription. Arrays stay ordered by it, so a publish can find its place in a swapped array
+    private long lastSequence;
     public static MessageBroker Instance { 
         get
         {
@@ -39,7 +36,7 @@ public class MessageBroker : IMessageBroker
 
     public MessageBroker()
     {
-        subscribers = new Dictionary<Type, List<WeakDelegate>>();
+        subscribers = new ConcurrentDictionary<Type, SubscriberList>();
     }
 
     public virtual void Publish<T>(object source, T message) where T : IMessage
@@ -47,111 +44,145 @@ public class MessageBroker : IMessageBroker
         if (message == null)
             return;
 
-        if (!subscribers.ContainsKey(typeof(T)))
-        {
-            return;
-        }
+        if (!subscribers.TryGetValue(typeof(T), out var list)) return;
 
-        var delegates = subscribers[typeof(T)];
-        if (delegates == null || delegates.Count == 0) return;
+        var items = list.Items;
+        if (items.Length == 0) return;
         var payload = new MessagePayload<T>(source, message);
-        lock (bookkeepingLock)
+        long passed = 0;
+        int i = 0;
+        while (true)
         {
-            walkedByPublish.Add(delegates);
-        }
-        try
-        {
-            for (int i = 0; i < delegates.Count; i++)
+            // A handler or another thread swapped the array, so carry on in the new one after the last sequence
+            // passed, which reaches subscribers added during this publish and skips removed ones without repeating any
+            var latest = list.Items;
+            // Emptying a list drops its message type, so a subscriber added after that went into a new list,
+            // which another thread may have emptied and replaced again before this read it
+            while (latest.Length == 0 && subscribers.TryGetValue(typeof(T), out var replacement) && replacement != list)
             {
-                // TODO this might be slow
-                var weakDelegate = delegates[i];
-                if (weakDelegate.IsAlive == false)
-                {
-                    // Subscriptions are weak by design, but a collected target means this message is
-                    // silently not handled — name it, because a lost handler is otherwise invisible
-                    // (the classic trap: a closure/lambda subscription nothing kept alive).
-                    Logger.Warning("Dropping dead subscriber {Method} for {MessageType}: its target was garbage collected",
-                        weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
-                    delegates.RemoveAt(i--);
-                    continue;
-                }
-
-                try
-                {
-                    // Making synchronous to maintain sequencing of packets
-                    weakDelegate.Invoke(new object[] { payload });
-                }
-                catch (TargetInvocationException ex) when (ex.InnerException is not null)
-                {
-                    // MethodInfo.Invoke wraps what the handler threw, and the wrapper's own frames end here
-                    Logger.Error(ex.InnerException, "Failed to run {Method} for {MessageType}",
-                        weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to run {Method} for {MessageType}",
-                        weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
-                }
+                list = replacement;
+                latest = list.Items;
             }
-        }
-        finally
-        {
-            lock (bookkeepingLock)
+            if (latest != items)
             {
-                walkedByPublish.Remove(delegates);
-                if (!walkedByPublish.Contains(delegates) && prunePending.Remove(delegates))
+                items = latest;
+                i = 0;
+                while (i < items.Length && items[i].Sequence <= passed) i++;
+            }
+            if (i >= items.Length) break;
+
+            var subscription = items[i++];
+            passed = subscription.Sequence;
+            var weakDelegate = subscription.Handler;
+            if (weakDelegate.IsAlive == false)
+            {
+                // Subscriptions are weak by design, but a collected target means this message is
+                // silently not handled — name it, because a lost handler is otherwise invisible
+                // (the classic trap: a closure/lambda subscription nothing kept alive).
+                Logger.Warning("Dropping dead subscriber {Method} for {MessageType}: its target was garbage collected",
+                    weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
+                lock (subscriptionLock)
                 {
-                    delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
-                    if (delegates.Count == 0 && subscribers.TryGetValue(typeof(T), out var current) && current == delegates)
-                        subscribers.Remove(typeof(T));
+                    Replace(typeof(T), list, list.Items.Where(entry => entry.Handler.IsAlive).ToArray());
                 }
+                continue;
+            }
+
+            try
+            {
+                // Making synchronous to maintain sequencing of packets
+                weakDelegate.Invoke(new object[] { payload });
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is not null)
+            {
+                // MethodInfo.Invoke wraps what the handler threw, and the wrapper's own frames end here
+                Logger.Error(ex.InnerException, "Failed to run {Method} for {MessageType}",
+                    weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to run {Method} for {MessageType}",
+                    weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
             }
         }
     }
 
     public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
     {
-        var delegates = subscribers.ContainsKey(typeof(T)) ?
-                        subscribers[typeof(T)] : new List<WeakDelegate>();
-        RemoveDeadSubscribers(delegates);
-        if (!delegates.Contains(subscription))
+        var handler = new WeakDelegate(subscription);
+        lock (subscriptionLock)
         {
-            delegates.Add(subscription);
+            if (!subscribers.TryGetValue(typeof(T), out var list))
+            {
+                list = new SubscriberList();
+                subscribers[typeof(T)] = list;
+            }
+
+            // Entries whose target was collected otherwise sit here until this message type is published again
+            var kept = list.Items.Where(entry => entry.Handler.IsAlive).ToList();
+            if (!kept.Any(entry => entry.Handler.Equals(handler)))
+                kept.Add(new Subscription(handler, ++lastSequence));
+            list.Items = kept.ToArray();
         }
-        subscribers[typeof(T)] = delegates;
     }
 
     public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
     {
-        
-        if (!subscribers.ContainsKey(typeof(T))) return;
-        var delegates = subscribers[typeof(T)];
-        if (delegates.Contains(new WeakDelegate(subscription)))
-            delegates.Remove(subscription);
-        RemoveDeadSubscribers(delegates);
-        if (delegates.Count == 0)
-            subscribers.Remove(typeof(T));
+        var handler = new WeakDelegate(subscription);
+        lock (subscriptionLock)
+        {
+            if (!subscribers.TryGetValue(typeof(T), out var list)) return;
+
+            Replace(typeof(T), list, list.Items.Where(entry => entry.Handler.IsAlive && !entry.Handler.Equals(handler)).ToArray());
+        }
     }
 
-    // Entries whose target was collected otherwise sit here until this message type is published again.
-    // Pruning a list that a publish is stepping through by index would move entries past its position,
-    // so that list is noted here and pruned in the finally of that publish instead.
-    private void RemoveDeadSubscribers(List<WeakDelegate> delegates)
+    // Callers hold subscriptionLock. The message type is dropped once nothing is subscribed to it.
+    private void Replace(Type messageType, SubscriberList list, Subscription[] items)
     {
-        lock (bookkeepingLock)
-        {
-            if (walkedByPublish.Contains(delegates))
-            {
-                if (!prunePending.Contains(delegates))
-                    prunePending.Add(delegates);
-                return;
-            }
-            delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
-        }
+        list.Items = items;
+        if (items.Length == 0 && subscribers.TryGetValue(messageType, out var current) && current == list)
+            subscribers.TryRemove(messageType, out _);
     }
 
     public virtual void Dispose()
     {
-        subscribers?.Clear();
+        lock (subscriptionLock)
+        {
+            subscribers.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Subscribers of one message type, in registration order
+    /// </summary>
+    protected sealed class SubscriberList
+    {
+        private volatile Subscription[] items = Array.Empty<Subscription>();
+
+        // Replaced under subscriptionLock and never edited, so a publish walks the array it read without locking
+        public Subscription[] Items
+        {
+            get => items;
+            internal set => items = value;
+        }
+
+        public int Count => items.Length;
+    }
+
+    /// <summary>
+    /// One subscribed handler and the order it was registered in
+    /// </summary>
+    protected sealed class Subscription
+    {
+        public Subscription(WeakDelegate handler, long sequence)
+        {
+            Handler = handler;
+            Sequence = sequence;
+        }
+
+        public WeakDelegate Handler { get; }
+
+        public long Sequence { get; }
     }
 }
