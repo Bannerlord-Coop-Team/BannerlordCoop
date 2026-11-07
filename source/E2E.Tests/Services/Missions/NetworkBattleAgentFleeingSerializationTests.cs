@@ -33,6 +33,23 @@ public class NetworkBattleAgentFleeingSerializationTests
         Assert.Equal(agentId, result.AgentId);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NetworkBattleAgentRetreatState_RoundTripsAgentIdAndFlag(bool isRunningAway)
+    {
+        var agentId = Guid.NewGuid();
+        var original = new NetworkBattleAgentRetreatState(agentId, isRunningAway);
+
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+        MessagePacket packet = MessagePacket.Create(original, serializer);
+        var result = Assert.IsType<NetworkBattleAgentRetreatState>(
+            serializer.Deserialize<IMessage>(packet.Data));
+
+        Assert.Equal(agentId, result.AgentId);
+        Assert.Equal(isRunningAway, result.IsRunningAway);
+    }
+
     [Fact]
     public void BattleAgentSpawnData_RoundTripsRunningAwayState()
     {

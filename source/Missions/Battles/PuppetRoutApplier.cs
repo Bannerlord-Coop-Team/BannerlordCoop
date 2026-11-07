@@ -36,6 +36,7 @@ public class PuppetRoutApplier : IPuppetRoutApplier
     private readonly IBattleAgentFader fader;
     private readonly HashSet<Guid> pendingFleeing = new HashSet<Guid>();
     private readonly HashSet<Guid> pendingRouts = new HashSet<Guid>();
+    private readonly Dictionary<Guid, bool> pendingRetreatStates = new Dictionary<Guid, bool>();
 
     public PuppetRoutApplier(
         IMessageBroker messageBroker,
@@ -49,14 +50,17 @@ public class PuppetRoutApplier : IPuppetRoutApplier
         this.fader = fader;
 
         messageBroker.Subscribe<NetworkBattleAgentFleeing>(Handle_NetworkBattleAgentFleeing);
+        messageBroker.Subscribe<NetworkBattleAgentRetreatState>(Handle_NetworkBattleAgentRetreatState);
         messageBroker.Subscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkBattleAgentFleeing>(Handle_NetworkBattleAgentFleeing);
+        messageBroker.Unsubscribe<NetworkBattleAgentRetreatState>(Handle_NetworkBattleAgentRetreatState);
         messageBroker.Unsubscribe<NetworkBattleAgentRouted>(Handle_NetworkBattleAgentRouted);
         pendingFleeing.Clear();
+        pendingRetreatStates.Clear();
         pendingRouts.Clear();
     }
 
@@ -69,6 +73,16 @@ public class PuppetRoutApplier : IPuppetRoutApplier
                 pendingFleeing.Add(payload.What.AgentId);
                 Logger.Information("[BattleSync] Deferring fleeing state of {AgentId} until its puppet registers", payload.What.AgentId);
             }
+        });
+    }
+
+    // Applies an owner's retreat flag, keeping the latest one until the puppet registers.
+    private void Handle_NetworkBattleAgentRetreatState(MessagePayload<NetworkBattleAgentRetreatState> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!TryApplyRetreatState(payload.What.AgentId, payload.What.IsRunningAway))
+                pendingRetreatStates[payload.What.AgentId] = payload.What.IsRunningAway;
         });
     }
 
@@ -94,6 +108,13 @@ public class PuppetRoutApplier : IPuppetRoutApplier
                 if (TryApplyFleeing(agentId))
                     pendingFleeing.Remove(agentId);
             }
+        }
+
+        // After the fleeing drain, because a retreat state is the newer of the two.
+        foreach (var pending in new List<KeyValuePair<Guid, bool>>(pendingRetreatStates))
+        {
+            if (TryApplyRetreatState(pending.Key, pending.Value))
+                pendingRetreatStates.Remove(pending.Key);
         }
 
         if (pendingRouts.Count == 0) return;
@@ -125,6 +146,15 @@ public class PuppetRoutApplier : IPuppetRoutApplier
         // Notify every mission behavior after mirroring the authoritative transition.
         agent.IsRunningAway = true;
         mission.OnAgentFleeing(agent);
+    }
+
+    // Mirrors only the flag: vanilla doesn't announce a team AI retreat, so its fleeing side effects must not run here.
+    private bool TryApplyRetreatState(Guid agentId, bool isRunningAway)
+    {
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info)) return false;
+
+        info.Agent.IsRunningAway = isRunningAway;
+        return true;
     }
 
     private bool TryApplyRout(Guid agentId)

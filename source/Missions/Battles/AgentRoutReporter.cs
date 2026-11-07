@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -19,12 +20,21 @@ public interface IAgentRoutReporter : IDisposable
 {
     /// <summary>[Game thread] Broadcast that a locally authoritative agent began fleeing.</summary>
     void OnAgentFleeing(Agent agent);
+
+    /// <summary>[Game thread] Periodically broadcast retreat state changes of locally authoritative agents.</summary>
+    void Tick(float dt);
 }
 
 /// <inheritdoc cref="IAgentRoutReporter"/>
 public class AgentRoutReporter : IAgentRoutReporter
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentRoutReporter>();
+
+    // Short against vanilla's retreat latch, which needs every enemy flagged for the reinforcement interval plus 3s.
+    private const float RetreatStateScanInterval = 0.5f;
+
+    private readonly HashSet<Guid> agentsMirroredAsRunningAway = new HashSet<Guid>();
+    private float retreatStateScanCooldown;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -70,7 +80,35 @@ public class AgentRoutReporter : IAgentRoutReporter
         if (info.CurrentAuthority != session.OwnControllerId) return;
 
         Logger.Information("[BattleSync] Broadcasting fleeing state of agent {AgentId} to the battle mesh", info.AgentId);
+        agentsMirroredAsRunningAway.Add(info.AgentId);
         network.SendAll(new NetworkBattleAgentFleeing(info.AgentId));
+    }
+
+    // Scans instead of hooking the native retreat callback: StopRetreating clears the flag without it, and the
+    // callback is small enough for the JIT to inline past a Harmony detour.
+    public void Tick(float dt)
+    {
+        retreatStateScanCooldown -= dt;
+        if (retreatStateScanCooldown > 0f || !session.HasInstance) return;
+
+        retreatStateScanCooldown = RetreatStateScanInterval;
+        foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
+            MirrorRetreatState(info);
+    }
+
+    // Tells peers when an owned troop's flag differs from what they were last told. Team AI retreats reach only this path.
+    private void MirrorRetreatState(CoopAgentInfo info)
+    {
+        var agent = info.Agent;
+        if (!agent.IsHuman || !agent.IsActive()) return;
+
+        bool isRunningAway = agent.IsRunningAway;
+        bool changed = isRunningAway
+            ? agentsMirroredAsRunningAway.Add(info.AgentId)
+            : agentsMirroredAsRunningAway.Remove(info.AgentId);
+        if (!changed) return;
+
+        network.SendAll(new NetworkBattleAgentRetreatState(info.AgentId, isRunningAway));
     }
 
     // Published synchronously from Mission.OnAgentRemoved, so the mission state is the one the removal happened in.

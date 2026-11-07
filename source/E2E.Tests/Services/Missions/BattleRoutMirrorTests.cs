@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using Common;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
@@ -167,5 +168,142 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         });
 
         Assert.Equal(1, observer.InternalMessages.GetMessageCount<NetworkBattleAgentFleeing>());
+    }
+
+    // BattleEndLogic reads this flag, and a team AI retreat sets it without Mission.OnAgentFleeing, so only the scan can see it.
+    [Fact]
+    public void RetreatStateScan_MirrorsARetreatAndARally_WithoutFleeingSideEffects()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var observer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(observer, "observer");
+
+        string missionInstanceId = Guid.NewGuid().ToString();
+        var agentId = Guid.NewGuid();
+        Agent puppet = null!;
+        MockMission observerMission = null!;
+        CoopBattleController observerController = null!;
+        observer.Call(() =>
+        {
+            observerMission = CreateConnectedMission(fixture, observer, missionInstanceId);
+            observerController = observer.Resolve<CoopBattleController>();
+            puppet = observerMission.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            puppet.Formation = observerMission.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            Assert.True(observer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", agentId, puppet));
+        });
+
+        Agent ownedAgent = null!;
+        CoopBattleController ownerController = null!;
+        owner.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
+            ownerController = owner.Resolve<CoopBattleController>();
+            ownerController.Session.TryBegin(missionInstanceId);
+            ownedAgent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Assert.True(owner.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", agentId, ownedAgent));
+
+            ownedAgent.IsRunningAway = true;
+            ownerController.OnMissionTick(1f);
+            ownerController.OnMissionTick(1f);
+        });
+
+        Assert.Equal(1, observer.InternalMessages.GetMessageCount<NetworkBattleAgentRetreatState>());
+        observer.Call(() =>
+        {
+            GameThread.Run(() => { }, blocking: true);
+            Assert.True(puppet.IsRunningAway);
+            Assert.Equal(0, observerMission.AgentFleeingCalls);
+            Assert.True(AgentMirror.TryGet(puppet, out var agentMirror));
+            Assert.NotNull(agentMirror.Formation);
+        });
+
+        owner.Call(() =>
+        {
+            ownedAgent.IsRunningAway = false;
+            ownerController.OnMissionTick(1f);
+        });
+
+        Assert.Equal(2, observer.InternalMessages.GetMessageCount<NetworkBattleAgentRetreatState>());
+        observer.Call(() =>
+        {
+            GameThread.Run(() => { }, blocking: true);
+            Assert.False(puppet.IsRunningAway);
+        });
+
+        GC.KeepAlive(ownerController);
+        GC.KeepAlive(observerController);
+    }
+
+    [Fact]
+    public void RetreatStateScan_DoesNotRepeatAFleeingAlreadyAnnounced()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var observer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(observer, "observer");
+
+        string missionInstanceId = Guid.NewGuid().ToString();
+        observer.Call(() => CreateConnectedMission(fixture, observer, missionInstanceId));
+
+        owner.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
+            var controller = owner.Resolve<CoopBattleController>();
+            controller.Session.TryBegin(missionInstanceId);
+            var agent = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Assert.True(owner.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), agent));
+
+            agent.IsRunningAway = true;
+            controller.OnAgentFleeing(agent);
+            controller.OnMissionTick(1f);
+        });
+
+        Assert.Equal(1, observer.InternalMessages.GetMessageCount<NetworkBattleAgentFleeing>());
+        Assert.Equal(0, observer.InternalMessages.GetMessageCount<NetworkBattleAgentRetreatState>());
+    }
+
+    [Fact]
+    public void RetreatStateBeforeRegistration_AppliesTheLatestWhenPendingRoutsDrain()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            using var applier = new PuppetRoutApplier(
+                broker,
+                peer.Resolve<ICoopMissionComponent>(),
+                new CasualtyAttributionMap(),
+                new BattleAgentFader());
+
+            var runningAwayId = Guid.NewGuid();
+            var ralliedId = Guid.NewGuid();
+            broker.Publish(this, new NetworkBattleAgentRetreatState(runningAwayId, true));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, true));
+            broker.Publish(this, new NetworkBattleAgentRetreatState(ralliedId, false));
+            GameThread.Run(() => { }, blocking: true);
+
+            var runningAway = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            var rallied = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(registry.TryRegisterAgent("owner", runningAwayId, runningAway));
+            Assert.True(registry.TryRegisterAgent("owner", ralliedId, rallied));
+
+            applier.DrainPendingRouts();
+
+            Assert.True(runningAway.IsRunningAway);
+            Assert.False(rallied.IsRunningAway);
+        });
     }
 }
