@@ -1409,7 +1409,7 @@ internal class BattleHostHandler : IHandler
             runtimeState.HideoutHostCandidates.Clear();
         // BR-102: epoch 1 for a fresh battle, or one past the last generation if this map event was abandoned and re-entered.
         var assignment = succession.Elect(mapEventId, hostControllerId, mapEvent.IsNavalMapEvent);
-        Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
+        Logger.Information("[BattleHost] Elected host {Host} for battle {MapEventId} at epoch {Epoch}",
             hostControllerId, mapEventId, assignment.Epoch);
     }
 
