@@ -20,8 +20,8 @@ namespace Missions.Agents.Packets
                 mainHandUsageIndex = 0;
             }
 
-            MainHandIndex = (int)mainHandIndex;
-            OffHandIndex = (int)offHandIndex;
+            MainHandIndexWire = (int)mainHandIndex + 1;
+            OffHandIndexWire = (int)offHandIndex + 1;
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = GetItemId(agent?.Equipment, mainHandIndex);
             OffHandItemId = GetItemId(agent?.Equipment, offHandIndex);
@@ -70,8 +70,8 @@ namespace Missions.Agents.Packets
             string offHandItemId = null,
             AgentArrowAmmoData[] arrowAmmo = null)
         {
-            MainHandIndex = (int)mainHandIndex;
-            OffHandIndex = (int)offHandIndex;
+            MainHandIndexWire = (int)mainHandIndex + 1;
+            OffHandIndexWire = (int)offHandIndex + 1;
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = mainHandItemId;
             OffHandItemId = offHandItemId;
@@ -304,10 +304,13 @@ namespace Missions.Agents.Packets
             }
         }
 
+        // Shifted by one so protobuf omits an empty hand (EquipmentIndex.None, -1) instead of writing a 10-byte varint.
         [ProtoMember(1)]
-        public int MainHandIndex { get; }
+        private int MainHandIndexWire { get; }
+        public int MainHandIndex => MainHandIndexWire - 1;
         [ProtoMember(2)]
-        public int OffHandIndex { get; }
+        private int OffHandIndexWire { get; }
+        public int OffHandIndex => OffHandIndexWire - 1;
         [ProtoMember(3)]
         public int MainHandUsageIndex { get; }
         [ProtoMember(4)]
