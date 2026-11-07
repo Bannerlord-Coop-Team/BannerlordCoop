@@ -110,6 +110,7 @@ public class LiteNetP2PClientBroadcastTests
             deathAction: value);
     }
 
+    /// <summary>Counts <see cref="Serialize"/> calls and forwards everything to a real serializer.</summary>
     private sealed class CountingSerializer : ICommonSerializer
     {
         private readonly ICommonSerializer inner;
@@ -132,6 +133,7 @@ public class LiteNetP2PClientBroadcastTests
         }
     }
 
+    /// <summary>A mission client whose controllers all route through the relay, so every send is captured.</summary>
     private sealed class Fixture : IDisposable
     {
         public readonly ProtoBufSerializer PlainSerializer = new(new SerializableTypeMapper());
