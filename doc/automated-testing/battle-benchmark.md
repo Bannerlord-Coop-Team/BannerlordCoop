@@ -106,5 +106,12 @@ same way for these reasons:
 
 ## Memory
 
-Measured on the first bench runs and recorded here: peak working set of the dedicated server, the battle host and the
-other client during a 1,000-agent field battle, and the lowest available memory during the window.
+A dedicated server and two DEBUG clients in a 1,015-agent field battle (the host owning about 962), sampled every 5 s:
+
+| | Working set | Private |
+| --- | --- | --- |
+| battle host client | 4.4 GB | 7.2 GB |
+| other client | 4.3 GB | 7.0 GB |
+| dedicated server | 1.1 GB | 1.4 GB |
+
+Together they took about 16 GB of available memory, so start a run with at least 20 GB available.
