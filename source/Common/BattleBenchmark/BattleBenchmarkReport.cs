@@ -119,7 +119,11 @@ public sealed class BattleBenchmarkRouteTraffic
     public BattleBenchmarkTrafficCounts Received { get; set; }
 }
 
-/// <summary>Traffic in one direction of a route, see <see cref="BattleBenchmarkTraffic"/>.</summary>
+/// <summary>
+/// Traffic in one direction of a route. Bytes are what was handed to LiteNetLib, before its own headers: the payload on a
+/// direct mission peer, the serialized relay packet on the campaign relay. Reliable datagrams count fragments and are
+/// only known for sent traffic, because LiteNetLib hands over a received fragmented packet reassembled.
+/// </summary>
 public sealed class BattleBenchmarkTrafficCounts
 {
     public long MovementDatagrams { get; set; }
@@ -133,6 +137,19 @@ public sealed class BattleBenchmarkTrafficCounts
     public long ReliableBytes { get; set; }
     public double ReliablePacketsPerSecond { get; set; }
     public double ReliableBytesPerSecond { get; set; }
+
+    /// <summary>Datagrams on the wire: one per reliable packet up to the single-packet size, fragments above it.</summary>
+    public long ReliableDatagrams { get; set; }
+    public double ReliableDatagramsPerSecond { get; set; }
+
+    /// <summary>Reliable packets over the single-packet size, which went out as two or more fragments.</summary>
+    public long OversizedReliablePackets { get; set; }
+    public double OversizedReliablePacketsPerSecond { get; set; }
+    public double DirectReliableBytesPerSecond { get; set; }
+    public long RelayedReliablePackets { get; set; }
+    public long RelayedReliableBytes { get; set; }
+    public double RelayedReliableBytesPerSecond { get; set; }
+    public long RelayedReliableDatagrams { get; set; }
 }
 
 /// <summary>Every network message this process received over the window, by type.</summary>

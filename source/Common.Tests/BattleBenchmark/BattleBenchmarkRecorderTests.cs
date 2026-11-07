@@ -89,18 +89,18 @@ public class BattleBenchmarkRecorderTests : IDisposable
     public void Report_CountsSectionsTrafficAndMessagesOnlyWhileRecording()
     {
         var recorder = CreateRecorder();
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.Movement, 900);
+        recorder.RecordSent("PlayerTwo", reliable: false, 900, 1020, relayed: false);
         recorder.RecordReceivedMessage(typeof(string));
         using (recorder.Measure(BattleBenchmarkSection.MovementSend)) now += Second;
 
         Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
         using (recorder.Measure(BattleBenchmarkSection.MovementSend)) now += Second / 4;
         using (recorder.Measure(BattleBenchmarkSection.MovementSend)) now += Second / 4;
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.Movement, 1000);
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.Movement, 1000);
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.ReliableMessage, 40);
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.ReliablePacket, 400);
-        recorder.RecordReceived("PlayerThree", BattleBenchmarkTraffic.Movement, 500);
+        recorder.RecordSent("PlayerTwo", reliable: false, 1000, 1020, relayed: false);
+        recorder.RecordSent("PlayerTwo", reliable: false, 1000, 1020, relayed: false);
+        recorder.RecordReliableMessageSent("PlayerTwo", 40);
+        recorder.RecordSent("PlayerTwo", reliable: true, 400, 1020, relayed: false);
+        recorder.RecordReceived("PlayerThree", reliable: false, 500);
         recorder.RecordReceivedMessage(typeof(int));
         recorder.RecordReceivedMessage(typeof(int));
         recorder.RecordReceivedMessage(typeof(string));
@@ -124,6 +124,40 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Equal(3, report.ReceivedMessages.Total);
         Assert.Equal(new[] { "Int32", "String" }, report.ReceivedMessages.ByType.Keys);
         Assert.Equal(2, report.ReceivedMessages.ByType["Int32"]);
+    }
+
+    [Fact]
+    public void Report_CountsReliableFragmentsAndSplitsDirectFromRelayedBytes()
+    {
+        var recorder = CreateRecorder();
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
+        recorder.RecordSent("PlayerTwo", reliable: true, 1020, 1020, relayed: false);
+        recorder.RecordSent("PlayerTwo", reliable: true, 2029, 1020, relayed: false);
+        recorder.RecordSent("PlayerTwo", reliable: true, 1500, 1020, relayed: true);
+        now += Second;
+
+        BattleBenchmarkTrafficCounts sent = recorder.BuildReport(now, "stopped", sampler.Sample(), BattleBenchmarkMissionState.None)
+            .Routes.Single().Sent;
+
+        Assert.Equal(3, sent.ReliablePackets);
+        Assert.Equal(1 + 3 + 2, sent.ReliableDatagrams);
+        Assert.Equal(2, sent.OversizedReliablePackets);
+        Assert.Equal(1020d + 2029d, sent.DirectReliableBytesPerSecond, 6);
+        Assert.Equal(1500, sent.RelayedReliableBytes);
+        Assert.Equal(2, sent.RelayedReliableDatagrams);
+    }
+
+    // LiteNetLib 1.3.1 sends a reliable payload whole up to mtu - 4 bytes and otherwise in fragments of mtu - 4 - 6.
+    [Theory]
+    [InlineData(1, 1020, 1)]
+    [InlineData(1020, 1020, 1)]
+    [InlineData(1021, 1020, 2)]
+    [InlineData(2028, 1020, 2)]
+    [InlineData(2029, 1020, 3)]
+    [InlineData(5000, 0, 1)]
+    public void CountReliableDatagrams_MatchesLiteNetLibFragmentation(int bytes, int maxSinglePacketBytes, int expected)
+    {
+        Assert.Equal(expected, BattleBenchmarkRecorder.CountReliableDatagrams(bytes, maxSinglePacketBytes));
     }
 
     [Fact]

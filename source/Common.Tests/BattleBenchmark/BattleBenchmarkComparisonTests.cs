@@ -77,7 +77,7 @@ public class BattleBenchmarkComparisonTests : IDisposable
         var recorder = new BattleBenchmarkRecorder(
             new FixedSampler(), new FixedProbe(), Stopwatch.GetTimestamp, _ => { }, _ => { });
         Assert.True(recorder.TryStart("round-trip", "field", TimeSpan.FromSeconds(30), Path.Combine(root, "A", "run-01"), out _));
-        recorder.RecordSent("PlayerTwo", BattleBenchmarkTraffic.Movement, 800);
+        recorder.RecordSent("PlayerTwo", reliable: false, 800, 1020, relayed: false);
         Assert.True(recorder.TryStop(out _, out _));
 
         BattleBenchmarkRun run = Assert.Single(comparison.LoadRuns(Path.Combine(root, "A")));

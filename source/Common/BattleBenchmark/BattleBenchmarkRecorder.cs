@@ -35,9 +35,17 @@ public interface IBattleBenchmarkRecorder
     /// <summary>Times <paramref name="section"/> until the returned scope is disposed; does nothing while idle.</summary>
     BattleBenchmarkScope Measure(BattleBenchmarkSection section);
 
-    void RecordSent(string route, BattleBenchmarkTraffic traffic, int bytes);
+    /// <summary>Counts one message handed to the reliable channel, before batching.</summary>
+    void RecordReliableMessageSent(string route, int bytes);
 
-    void RecordReceived(string route, BattleBenchmarkTraffic traffic, int bytes);
+    /// <summary>
+    /// Counts one send handed to LiteNetLib: a movement datagram, or a reliable packet that leaves as one datagram up to
+    /// <paramref name="maxSinglePacketBytes"/> and as fragments above it.
+    /// </summary>
+    void RecordSent(string route, bool reliable, int bytes, int maxSinglePacketBytes, bool relayed);
+
+    /// <summary>Counts one received payload; LiteNetLib hands over a fragmented reliable packet reassembled.</summary>
+    void RecordReceived(string route, bool reliable, int bytes);
 
     void RecordReceivedMessage(Type messageType);
 }
@@ -228,18 +236,45 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         RaiseMaximum(ref sectionMaxTicks[index], elapsed);
     }
 
-    public void RecordSent(string route, BattleBenchmarkTraffic traffic, int bytes)
+    public void RecordReliableMessageSent(string route, int bytes)
     {
         if (!recording || route == null) return;
 
-        routes.GetOrAdd(route, CreateRoute).Add(sent: true, traffic, bytes);
+        routes.GetOrAdd(route, CreateRoute).Sent.AddReliableMessage(bytes);
     }
 
-    public void RecordReceived(string route, BattleBenchmarkTraffic traffic, int bytes)
+    public void RecordSent(string route, bool reliable, int bytes, int maxSinglePacketBytes, bool relayed)
     {
         if (!recording || route == null) return;
 
-        routes.GetOrAdd(route, CreateRoute).Add(sent: false, traffic, bytes);
+        TrafficTotals sent = routes.GetOrAdd(route, CreateRoute).Sent;
+        if (reliable)
+            sent.AddReliable(bytes, CountReliableDatagrams(bytes, maxSinglePacketBytes), relayed);
+        else
+            sent.AddMovement(bytes);
+    }
+
+    public void RecordReceived(string route, bool reliable, int bytes)
+    {
+        if (!recording || route == null) return;
+
+        TrafficTotals received = routes.GetOrAdd(route, CreateRoute).Received;
+        if (reliable)
+            received.AddReliable(bytes, datagrams: 0, relayed: false);
+        else
+            received.AddMovement(bytes);
+    }
+
+    /// <summary>
+    /// The datagrams LiteNetLib sends for one reliable payload: one up to the single-packet size, otherwise fragments
+    /// that each carry the single-packet size minus <see cref="LiteNetLib.NetConstants.FragmentHeaderSize"/>.
+    /// </summary>
+    internal static int CountReliableDatagrams(int bytes, int maxSinglePacketBytes)
+    {
+        if (bytes <= maxSinglePacketBytes || maxSinglePacketBytes <= LiteNetLib.NetConstants.FragmentHeaderSize) return 1;
+
+        int fragmentBytes = maxSinglePacketBytes - LiteNetLib.NetConstants.FragmentHeaderSize;
+        return (bytes + fragmentBytes - 1) / fragmentBytes;
     }
 
     public void RecordReceivedMessage(Type messageType)
@@ -400,7 +435,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             },
             MissionStart = missionStart,
             MissionEnd = missionEnd,
-            Traffic = RouteCounters.Sum(routeReports, seconds),
+            Traffic = RouteCounters.Sum(routes.Values, seconds),
             Routes = routeReports,
             ReceivedMessages = new BattleBenchmarkReceivedMessages
             {
@@ -490,14 +525,9 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     private const string BuildConfiguration = "Release";
 #endif
 
-    /// <summary>Thread-safe counts and bytes for one route, per <see cref="BattleBenchmarkTraffic"/> and direction.</summary>
+    /// <summary>One route's sent and received traffic.</summary>
     private sealed class RouteCounters
     {
-        private readonly long[] sentCounts = new long[(int)BattleBenchmarkTraffic.Count];
-        private readonly long[] sentBytes = new long[(int)BattleBenchmarkTraffic.Count];
-        private readonly long[] receivedCounts = new long[(int)BattleBenchmarkTraffic.Count];
-        private readonly long[] receivedBytes = new long[(int)BattleBenchmarkTraffic.Count];
-
         public RouteCounters(string route)
         {
             Route = route;
@@ -505,81 +535,121 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
         public string Route { get; }
 
-        public void Add(bool sent, BattleBenchmarkTraffic traffic, int bytes)
-        {
-            int index = (int)traffic;
-            Interlocked.Increment(ref (sent ? sentCounts : receivedCounts)[index]);
-            Interlocked.Add(ref (sent ? sentBytes : receivedBytes)[index], bytes);
-        }
+        public TrafficTotals Sent { get; } = new TrafficTotals();
+
+        public TrafficTotals Received { get; } = new TrafficTotals();
 
         public BattleBenchmarkRouteTraffic ToReport(double seconds) => new BattleBenchmarkRouteTraffic
         {
             Route = Route,
-            Sent = ToCounts(sentCounts, sentBytes, seconds),
-            Received = ToCounts(receivedCounts, receivedBytes, seconds),
+            Sent = Sent.ToCounts(seconds),
+            Received = Received.ToCounts(seconds),
         };
 
-        public static BattleBenchmarkRouteTraffic Sum(IReadOnlyList<BattleBenchmarkRouteTraffic> routes, double seconds)
+        public static BattleBenchmarkRouteTraffic Sum(IEnumerable<RouteCounters> routes, double seconds)
         {
-            var sent = new long[2 * (int)BattleBenchmarkTraffic.Count];
-            var received = new long[2 * (int)BattleBenchmarkTraffic.Count];
-            foreach (BattleBenchmarkRouteTraffic route in routes)
+            var sent = new TrafficTotals();
+            var received = new TrafficTotals();
+            foreach (RouteCounters route in routes)
             {
-                AddTo(sent, route.Sent);
-                AddTo(received, route.Received);
+                sent.Add(route.Sent);
+                received.Add(route.Received);
             }
 
             return new BattleBenchmarkRouteTraffic
             {
                 Route = "all",
-                Sent = FromTotals(sent, seconds),
-                Received = FromTotals(received, seconds),
+                Sent = sent.ToCounts(seconds),
+                Received = received.ToCounts(seconds),
             };
         }
+    }
 
-        private static BattleBenchmarkTrafficCounts ToCounts(long[] counts, long[] bytes, double seconds)
+    /// <summary>Thread-safe traffic totals for one direction of one route.</summary>
+    private sealed class TrafficTotals
+    {
+        private long movementDatagrams;
+        private long movementBytes;
+        private long reliableMessages;
+        private long reliableMessageBytes;
+        private long reliablePackets;
+        private long reliableBytes;
+        private long reliableDatagrams;
+        private long oversizedReliablePackets;
+        private long relayedReliablePackets;
+        private long relayedReliableBytes;
+        private long relayedReliableDatagrams;
+
+        public void AddMovement(long bytes, long datagrams = 1)
         {
-            var totals = new long[2 * (int)BattleBenchmarkTraffic.Count];
-            for (int index = 0; index < (int)BattleBenchmarkTraffic.Count; index++)
-            {
-                totals[2 * index] = Interlocked.Read(ref counts[index]);
-                totals[(2 * index) + 1] = Interlocked.Read(ref bytes[index]);
-            }
-            return FromTotals(totals, seconds);
+            Interlocked.Add(ref movementDatagrams, datagrams);
+            Interlocked.Add(ref movementBytes, bytes);
         }
 
-        private static void AddTo(long[] totals, BattleBenchmarkTrafficCounts counts)
+        public void AddReliableMessage(long bytes, long messages = 1)
         {
-            totals[2 * (int)BattleBenchmarkTraffic.Movement] += counts.MovementDatagrams;
-            totals[(2 * (int)BattleBenchmarkTraffic.Movement) + 1] += counts.MovementBytes;
-            totals[2 * (int)BattleBenchmarkTraffic.ReliableMessage] += counts.ReliableMessages;
-            totals[(2 * (int)BattleBenchmarkTraffic.ReliableMessage) + 1] += counts.ReliableMessageBytes;
-            totals[2 * (int)BattleBenchmarkTraffic.ReliablePacket] += counts.ReliablePackets;
-            totals[(2 * (int)BattleBenchmarkTraffic.ReliablePacket) + 1] += counts.ReliableBytes;
+            Interlocked.Add(ref reliableMessages, messages);
+            Interlocked.Add(ref reliableMessageBytes, bytes);
         }
 
-        // totals holds count, bytes pairs indexed by BattleBenchmarkTraffic.
-        private static BattleBenchmarkTrafficCounts FromTotals(long[] totals, double seconds)
+        public void AddReliable(int bytes, int datagrams, bool relayed)
         {
-            long movementDatagrams = totals[2 * (int)BattleBenchmarkTraffic.Movement];
-            long movementBytes = totals[(2 * (int)BattleBenchmarkTraffic.Movement) + 1];
-            long reliableMessages = totals[2 * (int)BattleBenchmarkTraffic.ReliableMessage];
-            long reliableMessageBytes = totals[(2 * (int)BattleBenchmarkTraffic.ReliableMessage) + 1];
-            long reliablePackets = totals[2 * (int)BattleBenchmarkTraffic.ReliablePacket];
-            long reliableBytes = totals[(2 * (int)BattleBenchmarkTraffic.ReliablePacket) + 1];
+            Interlocked.Increment(ref reliablePackets);
+            Interlocked.Add(ref reliableBytes, bytes);
+            Interlocked.Add(ref reliableDatagrams, datagrams);
+            if (datagrams > 1) Interlocked.Increment(ref oversizedReliablePackets);
+            if (!relayed) return;
+
+            Interlocked.Increment(ref relayedReliablePackets);
+            Interlocked.Add(ref relayedReliableBytes, bytes);
+            Interlocked.Add(ref relayedReliableDatagrams, datagrams);
+        }
+
+        public void Add(TrafficTotals other)
+        {
+            AddMovement(Interlocked.Read(ref other.movementBytes), Interlocked.Read(ref other.movementDatagrams));
+            AddReliableMessage(Interlocked.Read(ref other.reliableMessageBytes), Interlocked.Read(ref other.reliableMessages));
+            Interlocked.Add(ref reliablePackets, Interlocked.Read(ref other.reliablePackets));
+            Interlocked.Add(ref reliableBytes, Interlocked.Read(ref other.reliableBytes));
+            Interlocked.Add(ref reliableDatagrams, Interlocked.Read(ref other.reliableDatagrams));
+            Interlocked.Add(ref oversizedReliablePackets, Interlocked.Read(ref other.oversizedReliablePackets));
+            Interlocked.Add(ref relayedReliablePackets, Interlocked.Read(ref other.relayedReliablePackets));
+            Interlocked.Add(ref relayedReliableBytes, Interlocked.Read(ref other.relayedReliableBytes));
+            Interlocked.Add(ref relayedReliableDatagrams, Interlocked.Read(ref other.relayedReliableDatagrams));
+        }
+
+        public BattleBenchmarkTrafficCounts ToCounts(double seconds)
+        {
+            long movement = Interlocked.Read(ref movementDatagrams);
+            long movementTotal = Interlocked.Read(ref movementBytes);
+            long messages = Interlocked.Read(ref reliableMessages);
+            long packets = Interlocked.Read(ref reliablePackets);
+            long reliable = Interlocked.Read(ref reliableBytes);
+            long datagrams = Interlocked.Read(ref reliableDatagrams);
+            long oversized = Interlocked.Read(ref oversizedReliablePackets);
+            long relayed = Interlocked.Read(ref relayedReliableBytes);
             return new BattleBenchmarkTrafficCounts
             {
-                MovementDatagrams = movementDatagrams,
-                MovementBytes = movementBytes,
-                MovementDatagramsPerSecond = PerSecond(movementDatagrams, seconds),
-                MovementBytesPerSecond = PerSecond(movementBytes, seconds),
-                ReliableMessages = reliableMessages,
-                ReliableMessageBytes = reliableMessageBytes,
-                ReliableMessagesPerSecond = PerSecond(reliableMessages, seconds),
-                ReliablePackets = reliablePackets,
-                ReliableBytes = reliableBytes,
-                ReliablePacketsPerSecond = PerSecond(reliablePackets, seconds),
-                ReliableBytesPerSecond = PerSecond(reliableBytes, seconds),
+                MovementDatagrams = movement,
+                MovementBytes = movementTotal,
+                MovementDatagramsPerSecond = PerSecond(movement, seconds),
+                MovementBytesPerSecond = PerSecond(movementTotal, seconds),
+                ReliableMessages = messages,
+                ReliableMessageBytes = Interlocked.Read(ref reliableMessageBytes),
+                ReliableMessagesPerSecond = PerSecond(messages, seconds),
+                ReliablePackets = packets,
+                ReliableBytes = reliable,
+                ReliablePacketsPerSecond = PerSecond(packets, seconds),
+                ReliableBytesPerSecond = PerSecond(reliable, seconds),
+                ReliableDatagrams = datagrams,
+                ReliableDatagramsPerSecond = PerSecond(datagrams, seconds),
+                OversizedReliablePackets = oversized,
+                OversizedReliablePacketsPerSecond = PerSecond(oversized, seconds),
+                DirectReliableBytesPerSecond = PerSecond(reliable - relayed, seconds),
+                RelayedReliablePackets = Interlocked.Read(ref relayedReliablePackets),
+                RelayedReliableBytes = relayed,
+                RelayedReliableBytesPerSecond = PerSecond(relayed, seconds),
+                RelayedReliableDatagrams = Interlocked.Read(ref relayedReliableDatagrams),
             };
         }
     }
