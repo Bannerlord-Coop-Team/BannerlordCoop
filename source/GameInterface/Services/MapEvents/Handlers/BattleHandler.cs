@@ -147,6 +147,10 @@ internal class BattleHandler : IHandler
         // during MapEvent.Initialize, or an already-running one as a reinforcement);
         // the joining party's MapEventSide is already set by this point, so the live
         // count is accurate.
+        // A replicated add runs the native add on a client too. Only the server sends rosters, or a
+        // client's copy would replace the server's.
+        if (ModInformation.IsClient) return;
+
         CapFastForwardForMapEvent();
         RefreshFastForwardState();
 

@@ -1,7 +1,12 @@
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -56,6 +61,36 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             Assert.Equal(1, CountLive(party.Troops, troop)); // one killed in the authoritative roster
             Assert.Equal(casualtiesBefore + 1, mapEvent.DefenderSide.TroopCasualties);
         });
+    }
+
+    [Fact]
+    public void ClientPlayerPartyAdd_SendsNoRostersToServer()
+    {
+        var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
+
+        string joinerId = null!;
+        Server.Call(() =>
+        {
+            var joiner = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(Server.ObjectManager.TryGetId(joiner, out joinerId));
+        });
+        RegisterAsPlayerParty("joiner", CreateRegisteredObject<Hero>(), joinerId);
+
+        var client = Clients.First();
+        client.NetworkSentMessages.Clear();
+
+        // A replicated add runs the native MapEventSide.AddPartyInternal on the client, which raises MapEventInvolvedPartiesAdded there.
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerId, out var joiner));
+            using (new AllowedThread())
+                joiner.Party.MapEventSide = mapEvent.AttackerSide;
+            Assert.Contains(mapEvent.AttackerSide.Parties, party => party.Party == joiner.Party);
+        }, MapEventDisabledMethods);
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkUpdateMapEventParty>());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
     }
 
     private static int CountLive(FlattenedTroopRoster roster, CharacterObject troop)
