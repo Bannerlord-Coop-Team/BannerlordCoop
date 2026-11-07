@@ -1814,7 +1814,7 @@ namespace GameInterface.Services.Kingdoms
                 proposerClanId,
                 state.FinalVotes.Count,
                 state.EligibleClanIds.Count);
-            ApplyMissingAbstentions(state);
+            ApplyMissingVotes(state);
             ResolveDecision(state);
             return true;
         }
@@ -1909,11 +1909,28 @@ namespace GameInterface.Services.Kingdoms
             return decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true;
         }
 
-        private void ApplyMissingAbstentions(KingdomDecisionVoteState state)
+        private void ApplyMissingVotes(KingdomDecisionVoteState state)
         {
+            // Peace could be signed while a player was still fighting, so the server can count a missing peace vote as a full vote against it.
+            KingdomDecisionVoteData peaceRefusal = null;
+            if (state.Decision is MakePeaceKingdomDecision && ModConfigProvider.ModOptions.KingdomDecisionPeaceUnvotedPlayersAgainst)
+            {
+                DecisionOutcome refusalOutcome = state.Election._possibleOutcomes.FirstOrDefault(outcome =>
+                    outcome is MakePeaceKingdomDecision.MakePeaceDecisionOutcome { ShouldPeaceBeDeclared: false });
+                int refusalIndex = GetOutcomeIndex(refusalOutcome, state.Election);
+                peaceRefusal = new KingdomDecisionVoteData(
+                    state.KingdomId, state.DecisionIndex, refusalIndex, (int)Supporter.SupportWeights.FullyPush, false, true);
+            }
+
             foreach (string clanId in state.EligibleClanIds.Where(clanId => !state.FinalVotes.ContainsKey(clanId)))
             {
                 if (!TryGetClan(clanId, state.Decision.Kingdom, out Clan clan)) continue;
+                if (peaceRefusal != null)
+                {
+                    ApplyVoteToElection(state.Election, clan, peaceRefusal);
+                    Logger.Information("Counted clan {ClanId} against peace because it did not vote", clanId);
+                    continue;
+                }
 
                 ResetClanSupport(state.Election, clan);
                 if (state.Election._chooser == clan)

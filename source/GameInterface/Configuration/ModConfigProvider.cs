@@ -78,6 +78,8 @@ public readonly struct ModOptions
     public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
     [ProtoMember(28)]
     public readonly int KingdomDecisionMissionHoldLimitMinutes { get; } = 10;
+    [ProtoMember(29)]
+    public readonly bool KingdomDecisionPeaceUnvotedPlayersAgainst { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -103,6 +105,7 @@ public readonly struct ModOptions
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
         KingdomDecisionMissionHoldLimitMinutes = modOptionsData.KingdomDecisionMissionHoldLimitMinutes ?? KingdomDecisionMissionHoldLimitMinutes;
+        KingdomDecisionPeaceUnvotedPlayersAgainst = modOptionsData.KingdomDecisionPeaceUnvotedPlayersAgainst ?? KingdomDecisionPeaceUnvotedPlayersAgainst;
         CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;

@@ -2921,6 +2921,44 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PeaceVote_UnvotedPlayerCountsAgainstPeaceWhenOptionOn(bool unvotedPlayersAgainst)
+    {
+        ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionPeaceUnvotedPlayersAgainst = unvotedPlayersAgainst });
+        var player = CreateSyncedPlayerContext(ControllerId, Clients.First());
+        var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(enemyClanId, enemyKingdomId);
+        EnsureKingdomRegisteredEverywhere(playerKingdomId);
+        EnsureKingdomRegisteredEverywhere(enemyKingdomId);
+        ConfigureWarEverywhere(playerKingdomId, enemyKingdomId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+
+            var npcDecision = new MakePeaceKingdomDecision(enemyClan, playerKingdom);
+            var peaceOutcome = npcDecision.DetermineInitialCandidates()
+                .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
+                .Single(outcome => outcome.ShouldPeaceBeDeclared);
+            Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
+
+            Assert.Empty(playerKingdom.UnresolvedDecisions);
+            Assert.Equal(unvotedPlayersAgainst, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+        });
+
+        Assert.Equal(unvotedPlayersAgainst ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Count());
+    }
+
     [Fact]
     public void AddDecision_UsesRegisteredPlayerClanWhenPartyClanPointsElsewhere()
     {

@@ -310,6 +310,7 @@ public class ModConfigTests : IDisposable
         Assert.False(options.EnableHeroExecutions);
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
         Assert.Equal(10, options.KingdomDecisionMissionHoldLimitMinutes);
+        Assert.True(options.KingdomDecisionPeaceUnvotedPlayersAgainst);
     }
 
     /// <summary>
