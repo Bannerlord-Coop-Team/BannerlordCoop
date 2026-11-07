@@ -18,6 +18,21 @@ An older `mod-config.json` directly in `Documents\Mount and Blade II Bannerlord`
 
 The log shows the file in use: `mod-config.json loaded (<path>)`, after `created <path> from <template>` when the server had to create it. On a dedicated server, check this line to see which file your build reads.
 
+## Public telemetry identity
+
+Release servers keep a small `telemetry-server-id-<port>.txt` file in the first
+directory that applies:
+
+1. `COOP_DATA_DIR`.
+2. `BANNERLORD_USER_DIR`.
+3. `server-data` next to the server program.
+
+The file contains a generated installation id and is reused after restarts, so
+one server keeps one public presence row while its session id changes. Keep the
+file with the server's persistent data when moving a headless server. If the
+file cannot be read or written, telemetry uses a temporary process id and the
+server continues to start.
+
 ## Saves and session files
 
 `<save>.sav` holds the world. `<save>.json`, with the same name, holds each player's character and co-op progress. The server writes the `.json`:
@@ -54,6 +69,6 @@ See [Steam bans](SteamBans.md) for the file format and which ids are loaded.
 - An empty variable counts as unset. Leave a variable unset rather than setting it to spaces.
 - On Windows, set them as User variables of the account that runs the server, or as System variables. On Linux the names are case-sensitive.
 - The server uses the values it was started with. Restart it after a change. When you host from the game, fully exit the game and Steam, then start them again.
-- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` for `COOP_DATA_DIR`, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, nobody is banned, or returning players go to character creation.
+- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` for `COOP_DATA_DIR`, `telemetry-server-id-<port>.txt` for each server, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, gets a new public presence identity, nobody is banned, or returning players go to character creation.
 - The server creates the folders for `mod-config.json` and the session `.json` when they are missing, and needs write access to them.
 - In a container, point the variables at a mounted volume. Files in the container's own filesystem are lost when it is recreated.
