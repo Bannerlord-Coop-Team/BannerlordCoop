@@ -67,7 +67,8 @@ internal class AlternativeSolutionPickerPatches
         var issue = Hero.OneToOneConversationHero?.Issue;
         if (ModInformation.IsClient && issue != null && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
         {
-            picker.Close(issue, cancel: true);
+            // Native ClosePartyPresentation pops the picker after this conversation callback returns.
+            picker.Close(issue, cancel: true, closeScreen: false);
             return false;
         }
         return true;
