@@ -65,6 +65,7 @@ public class EncounterGameMenuBehaviorInterface : IEncounterGameMenuBehaviorInte
         using (new MainHeroSubstitutionScope(mainHero, mainParty))
         {
             TraitLevelingHelper.OnTroopsSacrificed();
+            // CompanionGrievanceBehavior is off in co-op too, desertion grievances are #3894
             CampaignEventDispatcher.Instance.OnPlayerDesertedBattle(numberOfTroopsSacrificed);
         }
 

@@ -104,7 +104,7 @@ public class LeaveSoldiersBehindDesertionTests : MapEventTestBase
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
                 new CampaignBehaviorBase[] { new EncounterGameMenuBehavior() }));
 
-            // The server registers every campaign behavior's events, PlayerVariablesBehavior's listener would apply the xp and trait again
+            // Registered like the server registers every behavior, so the xp and trait would apply twice if its listener ever ran
             new PlayerVariablesBehavior().RegisterEvents();
         });
 
@@ -149,6 +149,7 @@ public class LeaveSoldiersBehindDesertionTests : MapEventTestBase
         private void OnPlayerDeserted(int count) => Desertions.Add((count, Hero.MainHero, MobileParty.MainParty));
     }
 
+    /// <summary>Makes the try-to-get-away model return a fixed count, the real one needs live battle strength models.</summary>
     private sealed class FixedTroopSacrifice : IDisposable
     {
         private static readonly MethodInfo Model = AccessTools.Method(
