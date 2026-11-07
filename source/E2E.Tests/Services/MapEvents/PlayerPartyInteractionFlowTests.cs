@@ -1948,6 +1948,104 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
     }
 
+    [Fact]
+    public void TradeAccept_AgainAfterEditingTheAcceptedOfferInOneFrame_KeepsTheNewAccept()
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        {
+            var item = barterVM.RightOtherList[0];
+            item.Barterable.SetIsOffered(true);
+            barterVM.RightOfferList.Add(item);
+            item.CurrentOfferedAmount = 2;
+            barterVM.ExecuteOffer();
+            item.CurrentOfferedAmount = 3;
+            barterVM.ExecuteOffer();
+            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
+
+            Assert.True(PlayerPartyTradeContext.LocalAccepted);
+        });
+        client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+    }
+
+    [Fact]
+    public void TradeCancel_AfterEditingTheAcceptedOfferInOneFrame_EndsTheTrade()
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        {
+            var item = barterVM.RightOtherList[0];
+            item.Barterable.SetIsOffered(true);
+            barterVM.RightOfferList.Add(item);
+            item.CurrentOfferedAmount = 2;
+            barterVM.ExecuteOffer();
+            item.CurrentOfferedAmount = 3;
+            barterVM.ExecuteCancel();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+    }
+
+    [Fact]
+    public void TradeOpen_AfterRosterChangeInTheSameTick_BuildsBarterFromCurrentCounts()
+    {
+        var (client1, client2, _, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        TestEnvironment.FlushCoalescer();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.TradeProposal);
+
+        // Stays in the coalescer like food consumption from the tick the responder accepts in.
+        var serverGrain = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            initiatorParty.ItemRoster.AddToCounts(DefaultItems.Grain, 2);
+            serverGrain = initiatorParty.ItemRoster.GetItemNumber(DefaultItems.Grain);
+        });
+
+        // The trade context is process wide in the harness, so only the first trader to get its state opens the barter.
+        var openedGrain = new List<int>();
+        var unsubscribes = new List<Action>();
+        foreach (var trader in new[] { client1, client2 })
+        {
+            trader.Call(() =>
+            {
+                Assert.True(trader.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                var grain = DefaultItems.Grain;
+                var barterManager = BarterManager.Instance;
+                BarterManager.BarterBeginEventDelegate captureOpenedGrain = barterData => openedGrain.AddRange(barterData
+                    .GetBarterables()
+                    .OfType<ItemBarterable>()
+                    .Where(barterable => barterable.OriginalParty == initiatorParty &&
+                                         barterable.ItemRosterElement.EquipmentElement.Item == grain)
+                    .Select(barterable => barterable.ItemRosterElement.Amount));
+                barterManager.BarterBegin += captureOpenedGrain;
+                unsubscribes.Add(() => barterManager.BarterBegin -= captureOpenedGrain);
+            });
+        }
+
+        try
+        {
+            SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+        }
+        finally
+        {
+            unsubscribes.ForEach(unsubscribe => unsubscribe());
+        }
+
+        Assert.Equal(serverGrain, Assert.Single(openedGrain));
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]

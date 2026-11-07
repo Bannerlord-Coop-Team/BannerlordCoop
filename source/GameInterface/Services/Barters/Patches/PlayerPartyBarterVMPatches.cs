@@ -55,7 +55,6 @@ internal class PlayerPartyBarterVMPatches
     static bool ExecuteOfferPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanAccept()) return false;
 
         PlayerPartyTradeContext.PublishAccept(true);
         return false;
@@ -66,7 +65,6 @@ internal class PlayerPartyBarterVMPatches
     static bool ExecuteCancelPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanCancel()) return false;
 
         PlayerPartyTradeContext.PublishLeave();
         return false;
@@ -170,7 +168,6 @@ internal class PlayerPartyBarterManagerPatches
     static bool ApplyAndFinalizePlayerBarterPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanAccept()) return false;
 
         PlayerPartyTradeContext.PublishAccept(true);
         return false;
@@ -181,7 +178,6 @@ internal class PlayerPartyBarterManagerPatches
     static bool CancelAndFinalizePlayerBarterPrefix()
     {
         if (!PlayerPartyTradeContext.IsActive) return true;
-        if (!PlayerPartyTradeContext.CanCancel()) return false;
 
         PlayerPartyTradeContext.PublishLeave();
         return false;

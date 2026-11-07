@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Configuration;
@@ -66,6 +67,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
+    private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
     private readonly ConcurrentDictionary<string, string> sessionsByPartyId = new ConcurrentDictionary<string, string>();
@@ -89,7 +91,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         IClanLeaveRules clanLeaveRules,
         IPlayerMarriageRules playerMarriageRules,
         IPlayerDivorceRules playerDivorceRules,
-        IPlayerMapTracking mapTracking)
+        IPlayerMapTracking mapTracking,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -102,6 +105,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerMarriageRules = playerMarriageRules;
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
+        this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
             kingdomMembershipState,
@@ -764,6 +768,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             session.InitiatorAcceptedTrade = false;
             session.ResponderAcceptedTrade = false;
+            // Clients build the barter screen from their replicated rosters, so this tick's roster deltas go out first.
+            sendCoalescer?.Flush(network);
             SendTradeStates(session);
             return;
         }
