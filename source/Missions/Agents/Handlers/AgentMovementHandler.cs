@@ -438,6 +438,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     private string sharedBudgetReservedControllerId;
     private int sharedBudgetReservedBytes;
     private bool sharedBudgetReservationIsPriority;
+
+    // Per-tick scratch reused across polls so a bulk tick doesn't reallocate lists sized to every owned agent.
+    // Only the game thread polls movement, and ClearTickBuffers empties them after every poll.
+    private readonly List<CoopAgentInfo> ownedAgents = new List<CoopAgentInfo>();
+    private readonly List<CapturedMovement> capturedMovements = new List<CapturedMovement>();
+    private readonly HashSet<Guid> broadcastAgentIds = new HashSet<Guid>();
+    private readonly List<string> recipientIds = new List<string>();
+    private readonly HashSet<Guid> staleAgentIds = new HashSet<Guid>();
 #if DEBUG
     private int initialConfiguredBulkHz;
     private float syntheticReceivePressureRemainingSeconds;
@@ -685,19 +693,34 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
         firstMovementPoll = false;
 
-        IReadOnlyCollection<CoopAgentInfo> agents = authoritativeAgentsDue
-            ? agentRegistry.GetAgents(controllerIdProvider.ControllerId)
-            : GetPriorityAgents();
+        IReadOnlyCollection<CoopAgentInfo> agents;
+        if (authoritativeAgentsDue)
+        {
+            agentRegistry.GetAgents(controllerIdProvider.ControllerId, ownedAgents);
+            agents = ownedAgents;
+        }
+        else
+        {
+            agents = GetPriorityAgents();
+        }
         IReadOnlyCollection<string> recipients = missionContext.ControllersInMission;
         long startedAt = Stopwatch.GetTimestamp();
-        MovementTrafficFrame traffic = PollMovementAgents(
-            agents,
-            recipients,
-            authoritativeAgentsDue,
-            priorityAgentDue,
-            samplePopulation,
-            elapsedSinceBulkSample,
-            elapsedSincePrioritySample);
+        MovementTrafficFrame traffic;
+        try
+        {
+            traffic = PollMovementAgents(
+                agents,
+                recipients,
+                authoritativeAgentsDue,
+                priorityAgentDue,
+                samplePopulation,
+                elapsedSinceBulkSample,
+                elapsedSincePrioritySample);
+        }
+        finally
+        {
+            ClearTickBuffers();
+        }
         movementRateController.ReportSend(
             ElapsedMilliseconds(startedAt),
             traffic,
@@ -717,6 +740,24 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 
         movementRateController.SetLocalFocusAgent(focusAgentId);
     }
+
+    // Clear zeroes the used slots, so no Agent or CoopAgentInfo reference outlives the tick that captured it.
+    private void ClearTickBuffers()
+    {
+        ownedAgents.Clear();
+        capturedMovements.Clear();
+        broadcastAgentIds.Clear();
+        recipientIds.Clear();
+        staleAgentIds.Clear();
+    }
+
+    // Capacity of each reused list and the number of entries left in all five buffers, for the buffer reuse tests.
+    internal (int OwnedAgents, int Captured, int RecipientIds, int Retained) GetBufferState() =>
+        (ownedAgents.Capacity,
+            capturedMovements.Capacity,
+            recipientIds.Capacity,
+            ownedAgents.Count + capturedMovements.Count + broadcastAgentIds.Count +
+                recipientIds.Count + staleAgentIds.Count);
 
     private IReadOnlyCollection<CoopAgentInfo> GetPriorityAgents()
     {
@@ -743,8 +784,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     {
         // One sequence identifies this capture across recipients, priorities, and packet fragments.
         sampleSequence++;
-        var capturedMovements = new List<CapturedMovement>();
-        var broadcastAgentIds = new HashSet<Guid>();
         int activeLocallyControlledAgents = 0;
 
         foreach (CoopAgentInfo agentInfo in agentInfos)
@@ -830,10 +869,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 CountActiveMissionAgents(),
                 activeLocallyControlledAgents);
         if (includeAuthoritativeAgents)
-            RemoveStaleLocalState(broadcastAgentIds);
+            RemoveStaleLocalState();
 
         var traffic = new MovementTrafficFrame();
-        var recipientIds = new List<string>();
         foreach (string recipientId in recipients)
         {
             if (!string.IsNullOrEmpty(recipientId) &&
@@ -1277,23 +1315,23 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                    StringComparison.Ordinal);
     }
 
-    private void RemoveStaleLocalState(HashSet<Guid> broadcastAgentIds)
+    private void RemoveStaleLocalState()
     {
         foreach (RecipientMovementState recipient in recipientMovementStates.Values)
         {
-            var staleRecipientAgentIds = new HashSet<Guid>();
+            staleAgentIds.Clear();
             foreach (Guid agentId in recipient.LastSentMovement.Keys)
             {
                 if (!broadcastAgentIds.Contains(agentId))
-                    staleRecipientAgentIds.Add(agentId);
+                    staleAgentIds.Add(agentId);
             }
             foreach (Guid agentId in recipient.MovementPendingSince.Keys)
             {
                 if (!broadcastAgentIds.Contains(agentId))
-                    staleRecipientAgentIds.Add(agentId);
+                    staleAgentIds.Add(agentId);
             }
 
-            foreach (Guid agentId in staleRecipientAgentIds)
+            foreach (Guid agentId in staleAgentIds)
             {
                 recipient.LastSentMovement.Remove(agentId);
                 recipient.MovementPendingSince.Remove(agentId);
