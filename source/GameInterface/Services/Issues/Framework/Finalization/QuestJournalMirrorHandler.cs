@@ -132,7 +132,7 @@ internal class QuestJournalMirrorHandler : IHandler
         }, context: nameof(QuestJournalMirrorHandler));
     }
 
-    private static bool Reconcile(QuestBase quest, IssueJournalEntry[] entries, HashSet<JournalLog> previousOwnerEntries)
+    private bool Reconcile(QuestBase quest, IssueJournalEntry[] entries, HashSet<JournalLog> previousOwnerEntries)
     {
         var remaining = quest.JournalEntries.ToList();
         var ordered = new List<JournalLog>();
