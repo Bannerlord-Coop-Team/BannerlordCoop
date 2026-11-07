@@ -297,6 +297,17 @@ public class GameThread : IUpdateable
         }
     }
 
+    // A blocking wait's pump drains the queue without being an application frame, so the frame observer doesn't see it.
+    private void PumpQueue()
+    {
+        if (Thread.CurrentThread.ManagedThreadId != Instance.m_GameLoopThreadId)
+        {
+            throw new ArgumentException("Wrong thread!");
+        }
+
+        DrainFrame();
+    }
+
     private void DrainFrame()
     {
         QueueContext current = CurrentQueue;
@@ -841,7 +852,7 @@ public class GameThread : IUpdateable
                 // battle-start construction.
                 try
                 {
-                    Instance.Update(TimeSpan.Zero);
+                    Instance.PumpQueue();
                 }
                 catch (Exception e)
                 {

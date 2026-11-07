@@ -236,18 +236,22 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         RaiseMaximum(ref sectionMaxTicks[index], elapsed);
     }
 
+    // The traffic writers run on the network threads. Each reads the window's route table before checking recording, so
+    // a send that races a window change lands in the closing window, never in the next one.
     public void RecordReliableMessageSent(string route, int bytes)
     {
+        ConcurrentDictionary<string, RouteCounters> window = routes;
         if (!recording || route == null) return;
 
-        routes.GetOrAdd(route, CreateRoute).Sent.AddReliableMessage(bytes);
+        window.GetOrAdd(route, CreateRoute).Sent.AddReliableMessage(bytes);
     }
 
     public void RecordSent(string route, bool reliable, int bytes, int maxSinglePacketBytes, bool relayed)
     {
+        ConcurrentDictionary<string, RouteCounters> window = routes;
         if (!recording || route == null) return;
 
-        TrafficTotals sent = routes.GetOrAdd(route, CreateRoute).Sent;
+        TrafficTotals sent = window.GetOrAdd(route, CreateRoute).Sent;
         if (reliable)
             sent.AddReliable(bytes, CountReliableDatagrams(bytes, maxSinglePacketBytes), relayed);
         else
@@ -256,9 +260,10 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
     public void RecordReceived(string route, bool reliable, int bytes)
     {
+        ConcurrentDictionary<string, RouteCounters> window = routes;
         if (!recording || route == null) return;
 
-        TrafficTotals received = routes.GetOrAdd(route, CreateRoute).Received;
+        TrafficTotals received = window.GetOrAdd(route, CreateRoute).Received;
         if (reliable)
             received.AddReliable(bytes, datagrams: 0, relayed: false);
         else
@@ -279,9 +284,10 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
     public void RecordReceivedMessage(Type messageType)
     {
+        ConcurrentDictionary<Type, StrongBox<long>> window = receivedMessages;
         if (!recording || messageType == null) return;
 
-        Interlocked.Increment(ref receivedMessages.GetOrAdd(messageType, CreateMessageCount).Value);
+        Interlocked.Increment(ref window.GetOrAdd(messageType, CreateMessageCount).Value);
     }
 
     public void OnFrame(long drainStartedTimestamp, long drainFinishedTimestamp)
@@ -376,11 +382,21 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         missionEnd ??= BattleBenchmarkMissionState.None;
         missionStart ??= BattleBenchmarkMissionState.None;
 
+        // A network thread that passed its recording check just before the window closed can still add to the counters,
+        // so read each one once and derive every total from those reads.
         List<BattleBenchmarkRouteTraffic> routeReports = routes.Values
             .OrderBy(route => route.Route, StringComparer.Ordinal)
             .Select(route => route.ToReport(seconds))
             .ToList();
-        long totalMessages = receivedMessages.Values.Sum(count => count.Value);
+        // Keyed by short type name; same-named messages from different namespaces share a row.
+        KeyValuePair<string, long>[] messageCounts = receivedMessages
+            .Select(entry => new KeyValuePair<string, long>(entry.Key.Name, Interlocked.Read(ref entry.Value.Value)))
+            .GroupBy(entry => entry.Key)
+            .Select(group => new KeyValuePair<string, long>(group.Key, group.Sum(entry => entry.Value)))
+            .OrderByDescending(entry => entry.Value)
+            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+            .ToArray();
+        long totalMessages = messageCounts.Sum(entry => entry.Value);
 
         return new BattleBenchmarkReport
         {
@@ -436,16 +452,13 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             },
             MissionStart = missionStart,
             MissionEnd = missionEnd,
-            Traffic = RouteCounters.Sum(routes.Values, seconds),
+            Traffic = RouteCounters.Sum(routeReports, seconds),
             Routes = routeReports,
             ReceivedMessages = new BattleBenchmarkReceivedMessages
             {
                 Total = totalMessages,
                 PerSecond = PerSecond(totalMessages, seconds),
-                ByType = receivedMessages
-                    .OrderByDescending(entry => entry.Value.Value)
-                    .ThenBy(entry => entry.Key.Name, StringComparer.Ordinal)
-                    .ToDictionary(entry => entry.Key.Name, entry => entry.Value.Value),
+                ByType = messageCounts.ToDictionary(entry => entry.Key, entry => entry.Value),
             },
         };
     }
@@ -547,11 +560,12 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             Received = Received.ToCounts(seconds),
         };
 
-        public static BattleBenchmarkRouteTraffic Sum(IEnumerable<RouteCounters> routes, double seconds)
+        // Sums the per-route reports already taken, so the total matches the routes it lists.
+        public static BattleBenchmarkRouteTraffic Sum(IEnumerable<BattleBenchmarkRouteTraffic> routes, double seconds)
         {
             var sent = new TrafficTotals();
             var received = new TrafficTotals();
-            foreach (RouteCounters route in routes)
+            foreach (BattleBenchmarkRouteTraffic route in routes)
             {
                 sent.Add(route.Sent);
                 received.Add(route.Received);
@@ -606,17 +620,18 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             Interlocked.Add(ref relayedReliableDatagrams, datagrams);
         }
 
-        public void Add(TrafficTotals other)
+        // Only for a local total built on one thread from already-read route reports.
+        public void Add(BattleBenchmarkTrafficCounts counts)
         {
-            AddMovement(Interlocked.Read(ref other.movementBytes), Interlocked.Read(ref other.movementDatagrams));
-            AddReliableMessage(Interlocked.Read(ref other.reliableMessageBytes), Interlocked.Read(ref other.reliableMessages));
-            Interlocked.Add(ref reliablePackets, Interlocked.Read(ref other.reliablePackets));
-            Interlocked.Add(ref reliableBytes, Interlocked.Read(ref other.reliableBytes));
-            Interlocked.Add(ref reliableDatagrams, Interlocked.Read(ref other.reliableDatagrams));
-            Interlocked.Add(ref oversizedReliablePackets, Interlocked.Read(ref other.oversizedReliablePackets));
-            Interlocked.Add(ref relayedReliablePackets, Interlocked.Read(ref other.relayedReliablePackets));
-            Interlocked.Add(ref relayedReliableBytes, Interlocked.Read(ref other.relayedReliableBytes));
-            Interlocked.Add(ref relayedReliableDatagrams, Interlocked.Read(ref other.relayedReliableDatagrams));
+            AddMovement(counts.MovementBytes, counts.MovementDatagrams);
+            AddReliableMessage(counts.ReliableMessageBytes, counts.ReliableMessages);
+            reliablePackets += counts.ReliablePackets;
+            reliableBytes += counts.ReliableBytes;
+            reliableDatagrams += counts.ReliableDatagrams;
+            oversizedReliablePackets += counts.OversizedReliablePackets;
+            relayedReliablePackets += counts.RelayedReliablePackets;
+            relayedReliableBytes += counts.RelayedReliableBytes;
+            relayedReliableDatagrams += counts.RelayedReliableDatagrams;
         }
 
         public BattleBenchmarkTrafficCounts ToCounts(double seconds)

@@ -44,6 +44,19 @@ public class GameThreadFrameObserverTests : IDisposable
         Assert.All(frames, frame => Assert.True(frame.Finished >= frame.Started));
     }
 
+    [Fact]
+    public void BlockingWaitPump_IsNotAFrame()
+    {
+        bool ran = false;
+        GameThread.EnqueueSafe(() => ran = true);
+
+        Assert.True(GameThread.WaitWhilePumping(() => ran, DateTime.UtcNow.AddSeconds(10)));
+        Assert.Empty(frames);
+
+        GameThread.Instance.Update(TimeSpan.Zero);
+        Assert.Single(frames);
+    }
+
     private sealed class RecordingObserver : IGameThreadFrameObserver
     {
         private readonly List<(long, long)> frames;

@@ -1016,6 +1016,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                     pendingReliablePayloadCount--;
                     if (pending.Payloads.Count == 0) pendingReliablePayloads.Remove(peer);
                     GetReceiveDiagnostics(peer).Record(ReceivePathEvent.MappedReceive, payload.Length);
+                    // Buffered before the peer was mapped, so OnNetworkReceive didn't count it.
+                    if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                        battleBenchmark.RecordReceived(sender, reliable: true, payload.Length);
                 }
                 HandleReceivedPayload(peer, payload, generation);
             }

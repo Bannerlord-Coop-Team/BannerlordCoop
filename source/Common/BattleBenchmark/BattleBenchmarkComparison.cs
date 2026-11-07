@@ -13,7 +13,25 @@ namespace Common.BattleBenchmark;
 /// Loads battle benchmark runs and compares a baseline set with a candidate set: every metric's mean, run-to-run spread
 /// and delta, per process role. Used by the <c>tools/BattleBenchmark</c> command line tool.
 /// </summary>
-public class BattleBenchmarkComparison
+public interface IBattleBenchmarkComparison
+{
+    IReadOnlyList<BattleBenchmarkRun> LoadRuns(string root);
+
+    BattleBenchmarkRun ParseRun(string name, IEnumerable<string> reportJson);
+
+    IReadOnlyList<BattleBenchmarkMetricComparison> Compare(
+        IReadOnlyList<BattleBenchmarkRun> baseline,
+        IReadOnlyList<BattleBenchmarkRun> candidate,
+        bool includeAll,
+        string filter = null);
+
+    string Render(IReadOnlyList<BattleBenchmarkMetricComparison> comparisons, int baselineRuns, int candidateRuns);
+
+    string RenderSummary(IReadOnlyList<BattleBenchmarkRun> runs, bool includeAll, string filter = null);
+}
+
+/// <inheritdoc cref="IBattleBenchmarkComparison"/>
+public class BattleBenchmarkComparison : IBattleBenchmarkComparison
 {
     // Metrics shown without --all: the ones a battle performance change is judged on.
     private static readonly Regex HeadlinePattern = new Regex(

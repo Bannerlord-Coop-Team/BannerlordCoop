@@ -122,7 +122,9 @@ public sealed class BattleBenchmarkRouteTraffic
 /// <summary>
 /// Traffic in one direction of a route. Bytes are what was handed to LiteNetLib, before its own headers: the payload on a
 /// direct mission peer, the serialized relay packet on the campaign relay. Reliable datagrams count fragments and are
-/// only known for sent traffic, because LiteNetLib hands over a received fragmented packet reassembled.
+/// only known for sent traffic, because LiteNetLib hands over a received fragmented packet reassembled. Received traffic
+/// covers the direct mission connection only: the server forwards a relayed payload on the campaign connection, where
+/// it can't be told apart from campaign traffic, so relayed traffic shows in the sender's <c>Relayed*</c> counts.
 /// </summary>
 public sealed class BattleBenchmarkTrafficCounts
 {

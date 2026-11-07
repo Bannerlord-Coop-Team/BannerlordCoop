@@ -147,6 +147,32 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Equal(2, sent.RelayedReliableDatagrams);
     }
 
+    [Fact]
+    public void Report_TotalsMatchTheirRows_WhileANetworkThreadKeepsWriting()
+    {
+        var recorder = new BattleBenchmarkRecorder(sampler, probe, Stopwatch.GetTimestamp, _ => { }, _ => { });
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(60), outputDirectory, out _));
+        using var stop = new CancellationTokenSource();
+        var writer = new Thread(() =>
+        {
+            for (int i = 0; !stop.IsCancellationRequested; i++)
+            {
+                recorder.RecordSent(i % 2 == 0 ? "PlayerTwo" : "PlayerThree", reliable: false, 100, 1020, relayed: false);
+                recorder.RecordReceivedMessage(i % 2 == 0 ? typeof(int) : typeof(string));
+            }
+        });
+        writer.Start();
+        Thread.Sleep(50);
+
+        BattleBenchmarkReport report = recorder.BuildReport(Stopwatch.GetTimestamp(), "stopped", default, BattleBenchmarkMissionState.None);
+        stop.Cancel();
+        writer.Join();
+
+        Assert.Equal(report.Routes.Sum(route => route.Sent.MovementDatagrams), report.Traffic.Sent.MovementDatagrams);
+        Assert.Equal(report.Routes.Sum(route => route.Sent.MovementBytes), report.Traffic.Sent.MovementBytes);
+        Assert.Equal(report.ReceivedMessages.ByType.Values.Sum(), report.ReceivedMessages.Total);
+    }
+
     // LiteNetLib 1.3.1 sends a reliable payload whole up to mtu - 4 bytes and otherwise in fragments of mtu - 4 - 6.
     [Theory]
     [InlineData(1, 1020, 1)]

@@ -31,7 +31,8 @@ for (int index = 0; index < args.Length; index++)
     }
 }
 
-var comparison = new BattleBenchmarkComparison();
+// The tool has no container; it builds the comparison itself.
+IBattleBenchmarkComparison comparison = new BattleBenchmarkComparison();
 string output;
 switch (positional.FirstOrDefault())
 {
