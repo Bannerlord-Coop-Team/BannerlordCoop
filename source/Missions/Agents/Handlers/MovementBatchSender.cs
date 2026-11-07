@@ -1062,13 +1062,13 @@ public sealed class MovementBatchSender : IMovementBatchSender
     {
         var data = new T[count];
         CopyCircular(batch.Data, offset, start, data);
+        var canonicalIds = new Guid[count];
+        CopyCircular(batch.CanonicalIds, offset, start, canonicalIds);
 
         IPacket packet;
         if (idFormat == MovementIdFormat.Canonical)
         {
-            var ids = new Guid[count];
-            CopyCircular(batch.CanonicalIds, offset, start, ids);
-            packet = createPacket(null, null, ids, data);
+            packet = createPacket(null, null, canonicalIds, data);
         }
         else
         {
@@ -1093,7 +1093,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return new SerializedMovementBatch(
             count,
             packet,
-            packetCompressor.Serialize(packet));
+            packetCompressor.SerializeSnapshots(packet, canonicalIds));
     }
 
     private static T GetCircular<T>(
