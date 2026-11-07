@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Linq;
 using Common.Messaging;
+using Common.PacketHandlers;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
 using Missions;
 using Missions.Agents;
 using Missions.Agents.Handlers;
@@ -16,16 +19,16 @@ using Xunit;
 
 namespace E2E.Tests.Services.Missions;
 
-// #4494: each peer gets min(its cap, bulk Hz) whatever frame it joined on and however long the battle runs.
+// #4494: each peer gets min(its cap, bulk Hz, frame rate) whatever frame it joined on and however long the battle runs.
 public partial class MovementTrafficTests
 {
-    private const float SixtyFps = 1f / 60f;
-
     [Theory]
-    [InlineData(40, 40, 40)]
-    [InlineData(40, 40, 30)]
-    [InlineData(60, 60, 40)]
+    [InlineData(60, 40, 40, 40)]
+    [InlineData(60, 40, 40, 30)]
+    [InlineData(60, 60, 60, 40)]
+    [InlineData(45, 60, 60, 40)]
     public void PollMovement_PeerJoiningBetweenBulkPollsGetsItsOwnCap(
+        int framesPerSecond,
         int bulkHz,
         int earlyCapHz,
         int lateCapHz)
@@ -38,42 +41,40 @@ public partial class MovementTrafficTests
         {
             var mock = fixture.CreateMission(peer);
             var broker = peer.Resolve<IMessageBroker>();
-            var registry = peer.Resolve<INetworkAgentRegistry>();
-            var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            using AgentMovementHandler handler = CreateHandlerWithFrozenCapClock(peer);
             Agent agent = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
-            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
             handler.Configure(MovementCadenceProfile.Battle);
             Assert.True(handler.TrySetForcedBulkHz(bulkHz, out _));
             broker.Publish(this, new NetworkMissionPeerEntered("early", "battle"));
             broker.Publish(this, new NetworkMovementReceiverCap("early", earlyCapHz, 1));
 
+            float frameSeconds = 1f / framesPerSecond;
             handler.PollMovement(0f);
-            handler.PollMovement(SixtyFps);
+            handler.PollMovement(frameSeconds);
             // The cap goes after the enter, because entering clears the peer's cap.
             broker.Publish(this, new NetworkMissionPeerEntered("late", "battle"));
             broker.Publish(this, new NetworkMovementReceiverCap("late", lateCapHz, 1));
 
-            for (int frame = 1; frame <= 180; frame++)
+            for (int frame = 1; frame <= 3 * framesPerSecond; frame++)
             {
-                if (frame == 61)
+                if (frame == framesPerSecond + 1)
                     network.DirectPacketSends.Clear();
-                // Refresh the caps once a second like the receiver heartbeat, so they never expire mid-test.
-                if (frame % 60 == 0)
-                {
-                    broker.Publish(this, new NetworkMovementReceiverCap("early", earlyCapHz, 1 + (frame / 60)));
-                    broker.Publish(this, new NetworkMovementReceiverCap("late", lateCapHz, 1 + (frame / 60)));
-                }
                 mirror.Position = new Vec3(frame, 0f, 0f);
-                handler.PollMovement(SixtyFps);
+                handler.PollMovement(frameSeconds);
             }
 
-            Assert.Equal(2 * Math.Min(earlyCapHz, bulkHz), CountMovementPackets(network, "early"));
-            Assert.Equal(2 * Math.Min(lateCapHz, bulkHz), CountMovementPackets(network, "late"));
+            int earlyHz = Math.Min(earlyCapHz, Math.Min(bulkHz, framesPerSecond));
+            int lateHz = Math.Min(lateCapHz, Math.Min(bulkHz, framesPerSecond));
+            Assert.Equal(2 * earlyHz, network.DirectPacketSends.Count(send =>
+                send.ControllerId == "early" && send.Packet is MovementPacket));
+            Assert.Equal(2 * lateHz, network.DirectPacketSends.Count(send =>
+                send.ControllerId == "late" && send.Packet is MovementPacket));
             MovementRateSnapshot rate = handler.MovementRate;
-            Assert.Equal(Math.Min(earlyCapHz, bulkHz), rate.PeerBulkHz["early"]);
-            Assert.Equal(Math.Min(lateCapHz, bulkHz), rate.PeerBulkHz["late"]);
+            Assert.Equal(earlyHz, rate.PeerBulkHz["early"]);
+            Assert.Equal(lateHz, rate.PeerBulkHz["late"]);
         });
     }
 
@@ -88,12 +89,11 @@ public partial class MovementTrafficTests
         {
             var mock = fixture.CreateMission(peer);
             var broker = peer.Resolve<IMessageBroker>();
-            var registry = peer.Resolve<INetworkAgentRegistry>();
-            var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            using AgentMovementHandler handler = CreateHandlerWithFrozenCapClock(peer);
             Agent agent = SpawnRider(mock);
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
-            Assert.True(registry.TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
             handler.Configure(MovementCadenceProfile.Battle);
             Assert.True(handler.TrySetForcedBulkHz(40, out _));
             broker.Publish(this, new NetworkMissionPeerEntered("early", "battle"));
@@ -106,17 +106,47 @@ public partial class MovementTrafficTests
             {
                 if (frame == frames - 3600 + 1)
                     network.DirectPacketSends.Clear();
-                if (frame % 60 == 0)
-                    broker.Publish(this, new NetworkMovementReceiverCap("early", 40, 1 + (frame / 60)));
                 mirror.Position = new Vec3(frame % 1000, 0f, 0f);
-                handler.PollMovement(SixtyFps);
+                handler.PollMovement(1f / 60f);
             }
 
-            Assert.Equal(60 * 40, CountMovementPackets(network, "early"));
+            Assert.Equal(60 * 40, network.DirectPacketSends.Count(send =>
+                send.ControllerId == "early" && send.Packet is MovementPacket));
         });
     }
 
-    private static int CountMovementPackets(MockBattleNetwork network, string controllerId) =>
-        network.DirectPacketSends.Count(send =>
-            send.ControllerId == controllerId && send.Packet is MovementPacket);
+    // Receiver caps expire after 3.5 s of Stopwatch time, so a frozen clock keeps a slow test run from dropping them.
+    private static AgentMovementHandler CreateHandlerWithFrozenCapClock(EnvironmentInstance peer)
+    {
+        peer.Resolve<ICoopMissionComponent>().AgentMovementHandler.Dispose();
+        var network = peer.Resolve<IBattleNetwork>();
+        var broker = peer.Resolve<IMessageBroker>();
+        var controllerIdProvider = peer.Resolve<IControllerIdProvider>();
+        var missionContext = peer.Resolve<IMissionContext>();
+        var rateController = new MovementRateController(
+            network,
+            broker,
+            controllerIdProvider,
+            missionContext,
+            () => 0L,
+            1,
+            MovementRateController.ReadFrameLimitHz,
+            enableHeartbeat: false,
+            peer.Resolve<IMovementNetworkSettings>());
+        return new AgentMovementHandler(
+            network,
+            peer.Resolve<IPacketManager>(),
+            broker,
+            peer.Resolve<INetworkAgentRegistry>(),
+            controllerIdProvider,
+            peer.Resolve<IAgentEquipmentApplier>(),
+            peer.Resolve<IMovementBatchSender>(),
+            peer.Resolve<IPuppetMountStateRepairer>(),
+            peer.Resolve<IAgentVisualActionAccessor>(),
+            rateController,
+            peer.Resolve<IMovementPriorityScheduler>(),
+            missionContext,
+            peer.Resolve<INavalDeckMovementProbe>(),
+            peer.Resolve<ILocationNpcAuthorityState>());
+    }
 }
