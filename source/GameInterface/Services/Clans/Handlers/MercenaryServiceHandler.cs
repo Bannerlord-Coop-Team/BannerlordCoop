@@ -138,7 +138,8 @@ internal class MercenaryServiceHandler : IHandler
             return;
         }
 
-        ChangeClanInfluenceAction.Apply(clan, -hero.Clan.Influence);
+        // Leaving the kingdom clears the clan's own influence, as vanilla's Clan.LeaveKingdomInternal does, so a
+        // fired mercenary's unpaid debt goes with it and the requester's influence is never read here.
         ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan, true);
     }
     private void HandlePlayerRelationChange(MessagePayload<PlayerRelationChange> payload)
