@@ -60,7 +60,7 @@ public class CoopSession : ICoopSession
         new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
-        new HeroMeetingData(new()),
+        new HeroMeetingData(new(), new()),
         new AgingPlayerData(new()),
         new NavalPlayerData(new(), new(), new(), new()));
 
