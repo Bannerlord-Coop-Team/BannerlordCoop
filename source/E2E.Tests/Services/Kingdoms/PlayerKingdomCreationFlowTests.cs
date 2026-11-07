@@ -2939,18 +2939,23 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var playerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var enemyClanId = CreateSyncedNpcClan();
+        string[] npcClanIds = { CreateSyncedNpcClan("PeaceVoteNpcA"), CreateSyncedNpcClan("PeaceVoteNpcB") };
 
         ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        ConfigureClanInKingdom(npcClanIds[0], playerKingdomId);
+        ConfigureClanInKingdom(npcClanIds[1], playerKingdomId);
         ConfigureClanInKingdom(enemyClanId, enemyKingdomId);
         EnsureKingdomRegisteredEverywhere(playerKingdomId);
         EnsureKingdomRegisteredEverywhere(enemyKingdomId);
         ConfigureWarEverywhere(playerKingdomId, enemyKingdomId);
 
+        const float playerInfluence = 500f;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            playerClan.Influence = playerInfluence;
 
             var npcDecision = new MakePeaceKingdomDecision(enemyClan, playerKingdom);
             var peaceOutcome = npcDecision.DetermineInitialCandidates()
@@ -2959,7 +2964,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
 
             // The player clan rules this kingdom, so a missing vote must not become the ruler's pick.
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
             Assert.Same(playerClan, playerKingdom.RulingClan);
             var playerDecision = Assert.Single(playerKingdom.UnresolvedDecisions);
             var states = (System.Collections.IDictionary)AccessTools
@@ -2969,9 +2973,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var playerPeaceOutcome = election._possibleOutcomes
                 .OfType<MakePeaceKingdomDecision.MakePeaceDecisionOutcome>()
                 .Single(outcome => outcome.ShouldPeaceBeDeclared);
+
+            // Replace the AI clans' own picks so each case controls the other votes.
+            foreach (DecisionOutcome outcome in election._possibleOutcomes)
+            {
+                outcome.SupporterList.Clear();
+            }
             for (int i = 0; i < otherFullPeaceVotes; i++)
             {
-                playerPeaceOutcome.AddSupport(new Supporter(enemyClan) { SupportWeight = Supporter.SupportWeights.FullyPush });
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(npcClanIds[i], out var npcClan));
+                playerPeaceOutcome.AddSupport(new Supporter(npcClan) { SupportWeight = Supporter.SupportWeights.FullyPush });
             }
         });
 
@@ -2995,6 +3006,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.Empty(playerKingdom.UnresolvedDecisions);
             Assert.Equal(expectWar, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
+
+            // A vote the player never cast must not spend their influence.
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
+            Assert.Equal(playerInfluence, playerClan.Influence);
         });
 
         Assert.Equal(expectWar ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Count());
@@ -5540,9 +5555,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         return CreateSyncedPlayerContext(ControllerId, Clients.First());
     }
 
-    private string CreateSyncedNpcClan()
+    private string CreateSyncedNpcClan(string npcControllerId = "NpcPeaceOfferEnemy")
     {
-        const string npcControllerId = "NpcPeaceOfferEnemy";
         var npc = CreateSyncedPlayerContext(npcControllerId, _ => false);
 
         RemovePlayerRegistration(Server, npcControllerId);

@@ -162,7 +162,7 @@
 
     // Set how long (real-time minutes) a player kingdom decision vote waits for players who are in a battle, town or tavern and haven't voted.
     // 0 or lower: The vote waits until they leave, then gives them a fresh voting window.
-    // (Default) 10: Once a vote has waited 10 minutes, it resolves and players who haven't voted count as abstaining.
+    // (Default) 10: Once a vote has waited 10 minutes, it resolves and players who haven't voted count as abstaining (in peace votes, see kingdomDecisionPeaceUnvotedPlayersAgainst below).
     "kingdomDecisionMissionHoldLimitMinutes": 10,
 
     // Set how a player who hasn't voted counts in a peace vote for their own kingdom, so peace isn't signed while they are busy fighting.

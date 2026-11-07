@@ -1033,7 +1033,7 @@ namespace GameInterface.Services.Kingdoms
                 && !state.FinalVotes.Values.Any(vote => !vote.VoteData.IsAbstain);
         }
 
-        private void ResolveDecision(KingdomDecisionVoteState state)
+        private void ResolveDecision(KingdomDecisionVoteState state, List<Supporter> missingPeaceVotes = null)
         {
             if (state.IsResolved) return;
 
@@ -1041,6 +1041,15 @@ namespace GameInterface.Services.Kingdoms
             DecisionOutcome chosenOutcome = IsUnvotedCallToWar(state)
                 ? state.Election.ChooseCallToWarRefusal()
                 : state.Election.ChooseOutcomeWithCurrentVotes();
+
+            // The outcome already counted them. Native HandleInfluenceCosts charges every listed supporter, and a missing vote must cost nothing.
+            if (missingPeaceVotes != null)
+            {
+                foreach (DecisionOutcome outcome in state.Election._possibleOutcomes)
+                {
+                    outcome.SupporterList.RemoveAll(supporter => missingPeaceVotes.Contains(supporter));
+                }
+            }
             int outcomeIndex = GetOutcomeIndex(chosenOutcome, state.Election);
             outcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out string outcomeKey);
             KingdomDecision.SupportStatus supportStatus = GetSupportStatusOfDecisionOutcome(chosenOutcome);
@@ -1814,8 +1823,8 @@ namespace GameInterface.Services.Kingdoms
                 proposerClanId,
                 state.FinalVotes.Count,
                 state.EligibleClanIds.Count);
-            ApplyMissingVotes(state);
-            ResolveDecision(state);
+            List<Supporter> missingPeaceVotes = ApplyMissingVotes(state);
+            ResolveDecision(state, missingPeaceVotes);
             return true;
         }
 
@@ -1909,9 +1918,11 @@ namespace GameInterface.Services.Kingdoms
             return decision?.Kingdom?._unresolvedDecisions?.Contains(decision) == true;
         }
 
-        private void ApplyMissingVotes(KingdomDecisionVoteState state)
+        // Returns the supporters added for missing peace votes.
+        private List<Supporter> ApplyMissingVotes(KingdomDecisionVoteState state)
         {
             // A player who misses a peace vote, say in a siege battle, counts as one vote against peace.
+            var missingPeaceVotes = new List<Supporter>();
             DecisionOutcome peaceRefusal = null;
             HashSet<string> onlineClanIds = null;
             if (state.Decision is MakePeaceKingdomDecision && ModConfigProvider.ModOptions.KingdomDecisionPeaceUnvotedPlayersAgainst)
@@ -1935,10 +1946,13 @@ namespace GameInterface.Services.Kingdoms
                 if (peaceRefusal == null) continue;
                 if (!onlineClanIds.Contains(clanId)) continue;
 
-                peaceRefusal.AddSupport(new Supporter(clan) { SupportWeight = Supporter.SupportWeights.FullyPush });
+                var supporter = new Supporter(clan) { SupportWeight = Supporter.SupportWeights.FullyPush };
+                peaceRefusal.AddSupport(supporter);
+                missingPeaceVotes.Add(supporter);
                 Logger.Information("Counted clan {ClanId} against peace because it did not vote", clanId);
             }
             state.Election.DetermineOfficialSupport();
+            return missingPeaceVotes;
         }
 
         private void PublishRoundStatus(KingdomDecisionVoteState state)
