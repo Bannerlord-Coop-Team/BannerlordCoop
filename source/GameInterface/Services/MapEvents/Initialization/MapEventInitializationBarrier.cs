@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -592,11 +593,14 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         return true;
     }
 
-    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
-        encounter?._mapEvent == mapEvent ||
-        encounter?.BattleSimulation?.MapEvent == mapEvent ||
-        GetPlayerEncounterBattle() == mapEvent ||
-        GetPlayerEncounterEncounteredBattle() == mapEvent;
+    private static bool References(PlayerEncounter encounter, MapEvent mapEvent)
+    {
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        return encounter?._mapEvent == mapEvent ||
+            encounter?.BattleSimulation?.MapEvent == mapEvent ||
+            GetPlayerEncounterBattle() == mapEvent ||
+            encounteredBattle == mapEvent;
+    }
 
     internal static bool IsBattleResultEncounter(PlayerEncounter encounter)
     {
@@ -619,18 +623,6 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         try
         {
             return PlayerEncounter.Battle;
-        }
-        catch (NullReferenceException)
-        {
-            return null;
-        }
-    }
-
-    private static MapEvent GetPlayerEncounterEncounteredBattle()
-    {
-        try
-        {
-            return PlayerEncounter.EncounteredBattle;
         }
         catch (NullReferenceException)
         {

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using Serilog;
@@ -31,11 +32,9 @@ internal class RaidJoinEncounterConditionPatch
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
-        // EncounteredBattle dereferences Current._encounteredParty, which is still null while the encounter is set up.
-        if (PlayerEncounter.Current?._encounteredParty == null)
+        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var mapEvent))
             return;
 
-        var mapEvent = PlayerEncounter.EncounteredBattle;
         if (!mapEvent.IsActiveSlowVillageRaid())
             return;
 
@@ -72,21 +71,10 @@ internal class RaidJoinEncounterConditionPatch
 
     private static bool IsEncounterSetUp()
     {
-        if (PlayerEncounter.Current?._encounteredParty == null)
+        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var mapEvent))
             return false;
 
-        MapEvent mapEvent;
-        try
-        {
-            mapEvent = PlayerEncounter.EncounteredBattle;
-        }
-        catch (NullReferenceException)
-        {
-            return false;
-        }
-
-        return mapEvent != null &&
-               (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent));
+        return !ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent);
     }
 }
 

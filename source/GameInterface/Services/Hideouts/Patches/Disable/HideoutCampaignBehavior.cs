@@ -3,7 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -145,7 +147,8 @@ internal class HideoutCampaignBehaviorPatch
 
     private static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounter.EncounteredBattle;
+        PlayerEncounterExtensions.TryGetEncounteredBattle(out var encounteredBattle);
+        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? encounteredBattle;
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
@@ -277,10 +280,23 @@ internal class HideoutJoinEncounterOptionsPatch
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(ref bool __result)
+    private static bool Prefix(MenuCallbackArgs args, ref bool __result)
     {
-        if (ModInformation.IsServer || PlayerEncounter.EncounteredBattle?.IsHideoutBattle != true)
-            return true;
+        if (ModInformation.IsServer) return true;
+
+        // Vanilla throws here until the server sets up the encounter
+        if (!PlayerEncounterExtensions.TryGetEncounteredBattle(out var battle))
+        {
+            __result = false;
+            if (args != null)
+            {
+                args.IsEnabled = false;
+                args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
+            }
+            return false;
+        }
+
+        if (!battle.IsHideoutBattle) return true;
 
         // Hideouts join through the shared troop selection.
         __result = false;
