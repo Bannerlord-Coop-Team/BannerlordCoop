@@ -260,10 +260,14 @@ public class AgentActionHandler : IAgentActionHandler
         bool hadState = state.HasObservation;
         AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
         bool pilotSeatChanged = !Nullable.Equals(state.PilotSeat, pilotSeat);
-        AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
-            ? capturedEquipment : (AgentEquipmentData?)null;
+        // Capture again only when the live loadout differs from the last observed one, otherwise reuse it.
+        bool equipmentUnchanged = hadState
+            && (state.Equipment.HasValue ? state.Equipment.Value.MatchesLive(agent) : !agent.IsHuman);
+        AgentEquipmentData? equipment = equipmentUnchanged ? state.Equipment
+            : AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
+                ? capturedEquipment : (AgentEquipmentData?)null;
         bool equipmentChanged = hadState
-            ? !Nullable.Equals(state.Equipment, equipment)
+            ? !equipmentUnchanged
             : equipment.HasValue
                 && (equipment.Value.MainHandIndex != (int)EquipmentIndex.None
                     || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
@@ -555,7 +559,8 @@ public class AgentActionHandler : IAgentActionHandler
             guardMode,
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
-            publishAction1Speed ? action1Speed : (float?)null);
+            publishAction1Speed ? action1Speed : (float?)null,
+            equipment);
         actionData = PrepareEquipmentSnapshot(info, actionData.WithPilotSeat(pilotSeat), catchUp: false);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
