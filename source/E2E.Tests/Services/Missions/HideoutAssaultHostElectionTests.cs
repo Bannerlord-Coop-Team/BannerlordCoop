@@ -40,6 +40,10 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
             AssertHostController(instance, mapEventId, LeaderControllerId);
         AssertIsLocalHost(clients[0], mapEventId, true);
         AssertIsLocalHost(clients[1], mapEventId, false);
+
+        // The waiting ally joins the successor line once it has the leader's hideout state
+        SendHideoutStateReady(clients[1], AllyControllerId, mapEventId);
+        AssertHost(Server, mapEventId, LeaderControllerId, AllyControllerId);
     }
 
     [Fact]
@@ -64,6 +68,36 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
         var clients = Clients.ToArray();
 
         EnterBattle(clients[1], mapEventId);
+
+        foreach (var instance in Clients.Append(Server))
+            AssertHostController(instance, mapEventId, AllyControllerId);
+    }
+
+    [Fact]
+    public void AssaultLeaderAbsent_FirstReadyPlayerHostsWithoutWaiting()
+    {
+        var mapEventId = SetupHideoutAssault();
+        var clients = Clients.ToArray();
+
+        EnterBattle(clients[0], mapEventId, missionReady: false);
+        DepartBattle(LeaderControllerId, mapEventId);
+        EnterBattle(clients[1], mapEventId);
+
+        foreach (var instance in Clients.Append(Server))
+            AssertHostController(instance, mapEventId, AllyControllerId);
+    }
+
+    [Fact]
+    public void AssaultLeaderWithdrawsWhileLoading_WaitingAllyHosts()
+    {
+        var mapEventId = SetupHideoutAssault();
+        var clients = Clients.ToArray();
+
+        EnterBattle(clients[0], mapEventId, missionReady: false);
+        EnterBattle(clients[1], mapEventId);
+        AssertNoHost(Server, mapEventId);
+
+        DepartBattle(LeaderControllerId, mapEventId, wasRetreat: true);
 
         foreach (var instance in Clients.Append(Server))
             AssertHostController(instance, mapEventId, AllyControllerId);
@@ -134,7 +168,14 @@ public class HideoutAssaultHostElectionTests : MissionTestEnvironment
         foreach (var instance in Clients.Append(Server))
             AssertHostController(instance, mapEventId, AllyControllerId);
         Assert.All(HostAssignments(mapEventId), message => Assert.Equal(AllyControllerId, message.HostControllerId));
+
+        SendHideoutStateReady(clients[0], LeaderControllerId, mapEventId);
+        AssertHost(Server, mapEventId, AllyControllerId, LeaderControllerId);
     }
+
+    // CoopHideoutMissionLogic sends this again once the host's hideout state has reached the client
+    private void SendHideoutStateReady(EnvironmentInstance client, string controllerId, string mapEventId) =>
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestBattleHost(mapEventId, controllerId, hideoutStateReady: true));
 
     private NetworkBattleHostAssigned[] HostAssignments(string mapEventId) =>
         Server.NetworkSentMessages.GetMessages<NetworkBattleHostAssigned>()

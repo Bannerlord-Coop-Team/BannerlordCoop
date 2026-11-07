@@ -1413,8 +1413,9 @@ internal class BattleHostHandler : IHandler
             hostControllerId, mapEventId, assignment.Epoch);
     }
 
-    // [Server, game thread] A hideout battle waits for its assault leader while that player is still connected and taking part
-    private bool ShouldAwaitHideoutLeader(string mapEventId, MapEvent mapEvent, string requesterId)
+    // [Server, game thread] A hideout battle waits for its assault leader while that player is still connected and taking part,
+    // and never when the leader is the player asking or the one leaving
+    private bool ShouldAwaitHideoutLeader(string mapEventId, MapEvent mapEvent, string controllerId)
     {
         if (!mapEvent.IsHideoutBattle) return false;
         var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
@@ -1427,14 +1428,15 @@ internal class BattleHostHandler : IHandler
 
             bool absent = battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)
                 && runtimeState.AbsentControllers.Contains(player.ControllerId);
-            return player.ControllerId != requesterId && playerManager.IsConnected(player) && !absent
+            return player.ControllerId != controllerId && playerManager.IsConnected(player) && !absent
                 && !HasWithdrawn(mapEventId, player.ControllerId);
         }
 
         return false;
     }
 
-    // [Server, game thread] The assault leader left before hosting, so the earliest waiting player hosts instead of hanging
+    // [Server, game thread] The assault leader left before hosting, so the earliest waiting player hosts instead of hanging.
+    // Leaving a hideout never marks the leader withdrawn, so its own departure ends the wait.
     private void ElectAwaitingHideoutHost(string mapEventId, MapEvent mapEvent, string departedControllerId)
     {
         if (mapEvent == null || hostRegistry.TryGet(mapEventId, out _) ||
@@ -1443,7 +1445,7 @@ internal class BattleHostHandler : IHandler
 
         var candidates = runtimeState.HideoutHostCandidates;
         candidates.RemoveAll(candidate => candidate.ControllerId == departedControllerId);
-        if (candidates.Count == 0 || ShouldAwaitHideoutLeader(mapEventId, mapEvent, candidates[0].ControllerId))
+        if (candidates.Count == 0 || ShouldAwaitHideoutLeader(mapEventId, mapEvent, departedControllerId))
             return;
 
         ElectFirstHideoutCandidate(mapEventId, mapEvent, runtimeState);
