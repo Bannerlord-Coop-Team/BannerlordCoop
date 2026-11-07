@@ -1611,18 +1611,20 @@ namespace Missions.Agents.Handlers
                 ApplyDetachedWeaponPickup(agent, equipmentIndex, ref resultingSlotWeapon);
         }
 
-        private static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical)
+        // Only a tableau item shows its banner, and replayed missiles arrive without one.
+        internal static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical)
         {
             if (current.IsEmpty || canonical.IsEmpty)
                 return current.IsEmpty && canonical.IsEmpty;
 
             return ReferenceEquals(current.Item, canonical.Item) &&
                 ReferenceEquals(current.ItemModifier, canonical.ItemModifier) &&
-                string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal) &&
+                (!current.Item.IsUsingTableau ||
+                 string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal)) &&
                 current.RawDataForNetwork == canonical.RawDataForNetwork;
         }
 
-        private static bool WorldItemMatchesPickup(
+        internal static bool WorldItemMatchesPickup(
             MissionWeapon current,
             MissionWeapon canonical,
             bool compareDataValue)
@@ -1632,7 +1634,8 @@ namespace Missions.Agents.Handlers
 
             return ReferenceEquals(current.Item, canonical.Item) &&
                 ItemModifiersMatch(current.ItemModifier, canonical.ItemModifier) &&
-                string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal) &&
+                (!current.Item.IsUsingTableau ||
+                 string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal)) &&
                 (!compareDataValue ||
                  current.RawDataForNetwork == canonical.RawDataForNetwork);
         }
