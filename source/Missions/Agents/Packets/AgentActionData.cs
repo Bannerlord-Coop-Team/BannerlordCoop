@@ -394,9 +394,28 @@ namespace Missions.Agents.Packets
             int guardReactionChannel,
             float? action0Speed,
             float? action1Speed)
+            : this(
+                agent,
+                defendFlags,
+                guardMode,
+                guardReactionChannel,
+                action0Speed,
+                action1Speed,
+                AgentEquipmentData.TryCapture(agent, out var equipment) ? equipment : (AgentEquipmentData?)null)
         {
-            Equipment = AgentEquipmentData.TryCapture(agent, out var equipment)
-                ? equipment : (AgentEquipmentData?)null;
+        }
+
+        // The equipment is passed in by the caller that already captured it this frame, so it isn't read twice.
+        internal AgentActionData(
+            Agent agent,
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode,
+            int guardReactionChannel,
+            float? action0Speed,
+            float? action1Speed,
+            AgentEquipmentData? capturedEquipment)
+        {
+            Equipment = capturedEquipment;
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
             bool isPlayerControlled =
