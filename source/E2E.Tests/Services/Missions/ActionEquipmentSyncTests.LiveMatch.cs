@@ -22,7 +22,7 @@ public partial class ActionEquipmentSyncTests
         new object[] { "arrow-modifier-removed", true },
         new object[] { "arrow-modifier-changed", true },
         new object[] { "arrow-item-swapped-same-amount", true },
-        new object[] { "arrow-class-to-bolt", true },
+        new object[] { "arrow-class-only", false },
         new object[] { "ammo-slot-added", true },
         new object[] { "ammo-slot-removed", true },
         new object[] { "ammo-stack-moved-slot", true },
@@ -166,7 +166,8 @@ public partial class ActionEquipmentSyncTests
             case "arrow-item-swapped-same-amount":
                 equipment[ArrowSlot] = Ammo("barbed_arrows", 29);
                 break;
-            case "arrow-class-to-bolt":
+            case "arrow-class-only":
+                // The weapon class decides whether a slot is ammo but is not sent, so same item and amount is no change.
                 equipment[ArrowSlot] = Ammo("arrows", 29, null, WeaponClass.Bolt);
                 break;
             case "ammo-slot-added":
