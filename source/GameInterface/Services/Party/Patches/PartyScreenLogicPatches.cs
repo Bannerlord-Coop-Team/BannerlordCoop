@@ -1,7 +1,9 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -215,6 +217,20 @@ internal class PartyScreenLogicPatches
         sentTroops.Clear();
         sentTroops.Add(transferredTroops);
     }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyPrefix]
+    public static void OnPartyScreenClosedPrefix(PartyScreenLogic __instance, out IDisposable __state)
+    {
+        // PartyScreenHelper pops the screen itself once this returns, so the quest picker must not pop it too
+        __state = ModInformation.IsClient && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker)
+            ? picker.BeginNativeClose(__instance)
+            : null;
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyFinalizer]
+    public static void OnPartyScreenClosedFinalizer(IDisposable __state) => __state?.Dispose();
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
     [HarmonyPostfix]
