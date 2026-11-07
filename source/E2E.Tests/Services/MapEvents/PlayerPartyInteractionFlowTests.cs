@@ -2040,6 +2040,28 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
     }
 
+    [Fact]
+    public void AutoBalance_ClosesItsBatch_SoLaterAmountChangeSendsOffer()
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        client1.NetworkSentMessages.Clear();
+
+        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
+        {
+            var item = barterVM.RightOtherList[0];
+
+            barterVM.ExecuteAutoBalance();
+            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+
+            item.Barterable.SetIsOffered(true);
+            barterVM.RightOfferList.Add(item);
+            item.CurrentOfferedAmount = 3;
+        });
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]

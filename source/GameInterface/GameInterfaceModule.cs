@@ -41,6 +41,7 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
 using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Commands;
@@ -253,6 +254,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
         // Shared so the per tick Update patch reads it from the provider cache.
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerPartyOfferBatchTracker>().As<IPlayerPartyOfferBatchTracker>().InstancePerLifetimeScope();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
