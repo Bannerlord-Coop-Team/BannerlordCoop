@@ -95,6 +95,9 @@ public class MissionModule : Module
         builder.RegisterType<MovementTrafficBudgetFactory>()
             .As<IMovementTrafficBudgetFactory>()
             .InstancePerDependency();
+        builder.RegisterType<MovementRouteBackoff>()
+            .As<IMovementRouteBackoff>()
+            .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
             .InstancePerDependency();

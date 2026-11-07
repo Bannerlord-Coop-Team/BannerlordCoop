@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Network.Session;
+using System;
 
 namespace Coop.Steam;
 
@@ -166,6 +167,9 @@ public interface ISteamTunnelTransport : IDisposable
 
     /// <summary>One-line live status (effective send rate, backlog, throughput, ping) for logs.</summary>
     string DescribeConnection(uint connection);
+
+    /// <summary>Reads the connection's ping, delivery quality and unsent bytes; false when it has no status.</summary>
+    bool TryGetConnectionHealth(uint connection, out RouteHealth health);
 }
 
 /// <summary>Optional authenticated-identity capability for a Steam tunnel transport.</summary>

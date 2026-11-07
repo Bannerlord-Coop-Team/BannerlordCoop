@@ -188,6 +188,7 @@ internal static class MovementDebugCommands
                 $"availableOutgoingBytes={handler.AvailableOutgoingMovementBytes}",
                 $"configuredIncomingBytesPerSecond={state.ConfiguredIncomingBytesPerSecond}",
                 $"incomingBytesPerSender={state.AdvertisedIncomingBytesPerSender}",
+                $"routeBytesPerSecond={FormatRouteRates(handler.RouteMovementBytesPerSecond)}",
                 $"focusAgentId={state.FocusAgentId}",
                 $"deferred={state.MaximumDeferredSnapshots}",
                 $"deferredAge={state.MaximumDeferredAgeSeconds.ToString("0.000", CultureInfo.InvariantCulture)}",
@@ -344,6 +345,45 @@ internal static class MovementDebugCommands
             return Succeeded("MOVEMENT_RECEIVE_PRESSURE_CLEARED");
         }
     }
+
+    public sealed class SimulateRouteCongestionCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.movement";
+
+        public string Name => "simulate_route_congestion";
+
+        public string Description => "Reports the given RTT as a mission route's health, for testing back-off without a shaped link.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id."),
+            new ExpectedArgs("duration_seconds", "How long to report it, 0 clears it."),
+            new ExpectedArgs("rtt_ms", "The round trip time to report."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float durationSeconds) ||
+                !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int roundTripMilliseconds))
+            {
+                return Failed("Invalid command argument value.");
+            }
+            if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network) || !(network is LiteNetP2PClient client))
+                return Failed("No active co-op mission peer network.");
+
+            client.SetSimulatedRouteRoundTrip(args[0], durationSeconds, roundTripMilliseconds);
+            return Succeeded($"MOVEMENT_ROUTE_CONGESTION_SET controller={args[0]}|" +
+                $"durationSeconds={durationSeconds.ToString("0.00", CultureInfo.InvariantCulture)}|" +
+                $"rttMs={roundTripMilliseconds}");
+        }
+    }
+
+    /// <summary>Formats each route's ceiling as controller:bytesPerSecond for the state line.</summary>
+    private static string FormatRouteRates(IReadOnlyDictionary<string, double> rates) =>
+        string.Join(",", rates.Select(rate =>
+            $"{rate.Key}:{rate.Value.ToString("0", CultureInfo.InvariantCulture)}"));
 
     private static bool TryGetHandler(out IAgentMovementHandler handler)
     {
