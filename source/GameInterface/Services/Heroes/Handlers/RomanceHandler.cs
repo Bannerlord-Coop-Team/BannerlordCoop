@@ -279,34 +279,23 @@ internal class RomanceHandler : IHandler
             resolvedStates.Add((person1, person2, state));
         }
 
-        var changedStates = resolvedStates
-            .Where(state => Romance.GetRomanticLevel(state.Person1, state.Person2) != (Romance.RomanceLevelEnum)state.Data.Level)
-            .ToList();
-
         using (new AllowedThread())
         {
             Romance.RomanticStateList.Clear();
 
             foreach (var state in resolvedStates)
             {
-                Romance.SetRomanticState(
+                ChangeRomanticStateAction.Apply(
                     state.Person1,
                     state.Person2,
                     (Romance.RomanceLevelEnum)state.Data.Level);
 
                 var romanticState = Romance.GetRomanticState(state.Person1, state.Person2);
+                if (romanticState == null) continue;
+
                 romanticState.ProgressToNextLevel = state.Data.ProgressToNextLevel;
                 romanticState.LastVisit = state.Data.LastVisit;
                 romanticState.ScoreFromPersuasion = state.Data.ScoreFromPersuasion;
-            }
-
-            // Fired after the list is complete, because vanilla's listener throws on a retired hero with no clan.
-            foreach (var state in changedStates)
-            {
-                CampaignEventDispatcher.Instance.OnRomanticStateChanged(
-                    state.Person1,
-                    state.Person2,
-                    (Romance.RomanceLevelEnum)state.Data.Level);
             }
         }
     }

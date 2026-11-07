@@ -7,6 +7,7 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.CommentBehaviors;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -30,22 +31,27 @@ public class RomanceSnapshotSyncTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
-    // A retired hero whose clan closed has no Clan, which makes the game's romance listener throw.
+    // A retired hero whose clan closed has no Clan, which vanilla's romance listener doesn't expect.
     [Fact]
-    public void Snapshot_WithRetiredClanlessHero_KeepsLaterStatesOnClient()
+    public void Snapshot_WithRetiredClanlessHero_KeepsLaterStatesAndNotifications()
     {
         var client = environment.Clients.First();
         var closingClanId = CreateKingdomClan();
-        var otherClanId = CreateKingdomClan();
+        var partnerClanId = CreateKingdomClan();
+        var courtingClanId = CreateKingdomClan();
         var retiringId = AddMember(closingClanId);
-        var formerPartnerId = AddMember(otherClanId);
-        var courtingId = AddMember(otherClanId);
-        var courtedId = AddMember(otherClanId);
+        var formerPartnerId = AddMember(partnerClanId);
+        var courtingId = AddMember(courtingClanId);
+        var courtedId = AddMember(courtingClanId);
 
         environment.Server.Call(() =>
         {
             var retiring = environment.Server.GetRegisteredObject<Hero>(retiringId);
             environment.Server.GetRegisteredObject<Clan>(closingClanId).SetLeader(retiring);
+            environment.Server.GetRegisteredObject<Clan>(partnerClanId)
+                .SetLeader(environment.Server.GetRegisteredObject<Hero>(formerPartnerId));
+            environment.Server.GetRegisteredObject<Clan>(courtingClanId)
+                .SetLeader(environment.Server.GetRegisteredObject<Hero>(courtingId));
             Romance.SetRomanticState(
                 retiring,
                 environment.Server.GetRegisteredObject<Hero>(formerPartnerId),
@@ -74,16 +80,20 @@ public class RomanceSnapshotSyncTests : IDisposable
         client.Call(() =>
         {
             CampaignEvents.RomanticStateChanged.ClearListeners(listener);
+            var retired = client.GetRegisteredObject<Hero>(retiringId);
+            var courting = client.GetRegisteredObject<Hero>(courtingId);
+            var logs = Campaign.Current.LogEntryHistory.GetGameActionLogs<ChangeRomanticStateLogEntry>(_ => true);
+
             Assert.Equal(
                 Romance.RomanceLevelEnum.FailedInCompatibility,
-                Romance.GetRomanticLevel(
-                    client.GetRegisteredObject<Hero>(retiringId),
-                    client.GetRegisteredObject<Hero>(formerPartnerId)));
+                Romance.GetRomanticLevel(retired, client.GetRegisteredObject<Hero>(formerPartnerId)));
             Assert.Equal(
                 Romance.RomanceLevelEnum.CourtshipStarted,
-                Romance.GetRomanticLevel(
-                    client.GetRegisteredObject<Hero>(courtingId),
-                    client.GetRegisteredObject<Hero>(courtedId)));
+                Romance.GetRomanticLevel(courting, client.GetRegisteredObject<Hero>(courtedId)));
+
+            // Both pairs include a clan leader, so vanilla logs each one, including the clanless hero's.
+            Assert.Single(logs, log => log.Hero1 == retired || log.Hero2 == retired);
+            Assert.Single(logs, log => log.Hero1 == courting || log.Hero2 == courting);
         });
     }
 
