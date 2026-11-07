@@ -33,14 +33,9 @@ public class MessageAggregationBuffer
     }
 
     /// <summary>
-    /// Buffers a payload. If its framed bytes would push the buffered total past
-    /// <paramref name="maxFramedBytes"/>, the previously buffered payloads are returned to be sent now
-    /// (the new payload starts the next batch); otherwise returns null.
+    /// Buffers a payload. Returns the earlier batch to send now when the payload's framed bytes would push it past
+    /// <paramref name="maxFramedBytes"/> (the new payload starts the next batch); otherwise returns null.
     /// </summary>
-    /// <param name="maxFramedBytes">
-    /// Framed bytes a batch may hold, picked by the caller so the batch plus its envelope fits one
-    /// datagram on the destination's current route.
-    /// </param>
     public List<byte[]> Append(byte[] payload, int maxFramedBytes)
     {
         List<byte[]> overflow = null;

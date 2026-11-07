@@ -8,10 +8,7 @@ namespace Missions.Messages;
 /// field changes and replayed to joiners; appliers are idempotent. Machines are scene-placed, so
 /// their MissionObjectId matches across clients loading the same scene and levels.
 /// </summary>
-/// <remarks>
-/// The int sentinel fields are shifted by one on the wire so protobuf omits their usual -1 instead of
-/// writing a 10-byte varint.
-/// </remarks>
+// The int sentinels are shifted by one on the wire so protobuf omits their usual -1 instead of a 10-byte varint.
 [ProtoContract(SkipConstructor = true)]
 public class NetworkSiegeMachineState : IEvent
 {

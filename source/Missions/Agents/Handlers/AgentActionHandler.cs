@@ -682,7 +682,7 @@ public class AgentActionHandler : IAgentActionHandler
         int maxPacketBytes,
         Action<AgentActionPacket, byte[]> send)
     {
-        // Every route's unreliable single-datagram limit is at or below its reliable one, so it bounds these sends too.
+        // Direct routes cap at 1000 B, under the 1020 B reliable limit, and relay budgets include the relay wrapper.
         int battleHostEpoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
         for (int start = 0; start < ids.Count;)
         {
