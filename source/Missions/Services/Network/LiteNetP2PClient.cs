@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -71,6 +72,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
     private readonly Dictionary<NetPeer, IReceivePathDiagnostics> receiveDiagnostics = new();
     private readonly Dictionary<string, IReceivePathDiagnostics> routeDiagnostics = new();
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
     private bool disposed;
 
     private string instanceId = null;
@@ -114,7 +116,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         ISteamMissionBridge steamBridge,
         IMovementPacketCompressor movementPacketCompressor,
         IReliableMessageBatcher<string> reliableMessageBatcher,
-        Func<IReceivePathDiagnostics> diagnosticsFactory)
+        Func<IReceivePathDiagnostics> diagnosticsFactory,
+        // Optional so the tests that build this client directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
         this.diagnosticsFactory = diagnosticsFactory;
@@ -132,6 +136,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         this.steamBridge = steamBridge;
         this.movementPacketCompressor = movementPacketCompressor;
         this.reliableMessageBatcher = reliableMessageBatcher;
+        this.battleBenchmark = battleBenchmark;
 
         netManager = new NetManager(this)
         {
@@ -1175,6 +1180,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (packet is MessagePacket messagePacket)
         {
+            battleBenchmark?.RecordSent(controllerId, BattleBenchmarkTraffic.ReliableMessage, messagePacket.Data.Length);
             // Spawn admission must see a bare message before later authority changes reach the game thread.
             if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
             {
@@ -1196,6 +1202,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
             packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
         {
+            battleBenchmark?.RecordSent(controllerId, BattleBenchmarkTraffic.ReliableMessage, data.Length);
+            battleBenchmark?.RecordSent(controllerId, BattleBenchmarkTraffic.ReliablePacket, data.Length);
             reliableMessageBatcher.FlushThen(
                 controllerId,
                 SendReliableMessagePayload,
@@ -1203,6 +1211,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             return;
         }
 
+        battleBenchmark?.RecordSent(controllerId, BattleBenchmarkTraffic.Movement, data.Length);
         SendPacketToController(controllerId, packet, data);
     }
 
@@ -1250,6 +1259,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private void SendReliableMessagePayload(string controllerId, byte[] data)
     {
+        battleBenchmark?.RecordSent(controllerId, BattleBenchmarkTraffic.ReliablePacket, data.Length);
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
@@ -1461,6 +1471,13 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 GetReceiveDiagnostics(peer).Record(
                     mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop, bytes);
                 if (!mapped) return;
+                if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                {
+                    battleBenchmark.RecordReceived(
+                        sender,
+                        reliable ? BattleBenchmarkTraffic.ReliablePacket : BattleBenchmarkTraffic.Movement,
+                        bytes);
+                }
             }
         }
 

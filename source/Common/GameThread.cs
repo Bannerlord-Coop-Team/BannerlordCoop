@@ -269,6 +269,9 @@ public class GameThread : IUpdateable
 
     #endregion
 
+    /// <summary>Gets each frame's drain timing while set; the battle benchmark sets it only while it records.</summary>
+    public IGameThreadFrameObserver FrameObserver { get; set; }
+
     public void Update(TimeSpan frameTime)
     {
         if (Thread.CurrentThread.ManagedThreadId != Instance.m_GameLoopThreadId)
@@ -276,6 +279,26 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
+        IGameThreadFrameObserver observer = FrameObserver;
+        if (observer == null)
+        {
+            DrainFrame();
+            return;
+        }
+
+        long started = Stopwatch.GetTimestamp();
+        try
+        {
+            DrainFrame();
+        }
+        finally
+        {
+            observer.OnFrame(started, Stopwatch.GetTimestamp());
+        }
+    }
+
+    private void DrainFrame()
+    {
         QueueContext current = CurrentQueue;
         long budget = Interlocked.Read(ref current.activeDrainTicks);
         if (budget > 0)
