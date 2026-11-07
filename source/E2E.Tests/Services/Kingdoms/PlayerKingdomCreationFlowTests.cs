@@ -2924,12 +2924,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Theory]
     [InlineData(true, false, 0, true)]
     [InlineData(false, false, 0, false)]
-    [InlineData(true, true, 0, false)]
+    [InlineData(true, true, 2, false)]
     [InlineData(true, false, 2, false)]
     public void PeaceVote_UnvotedPlayerCountsAgainstPeaceWhenOptionOn(
         bool unvotedPlayersAgainst,
-        bool playerConfirmsAbstain,
-        int otherFullPeaceVotes,
+        bool playerAbstainsWhileSecondPlayerWaits,
+        int npcPeaceVotes,
         bool expectWar)
     {
         ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionPeaceUnvotedPlayersAgainst = unvotedPlayersAgainst });
@@ -2940,8 +2940,19 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var enemyClanId = CreateSyncedNpcClan();
         string[] npcClanIds = { CreateSyncedNpcClan("PeaceVoteNpcA"), CreateSyncedNpcClan("PeaceVoteNpcB") };
+        // Worth 3 and 2 support points, so the case with one or two missing votes against (3 or 6) never ties.
+        Supporter.SupportWeights[] npcPeaceWeights = { Supporter.SupportWeights.FullyPush, Supporter.SupportWeights.StronglyFavor };
+        var playerClanIds = new List<string> { player.ClanId };
 
         ConfigureClanInKingdom(player.ClanId, playerKingdomId);
+        if (playerAbstainsWhileSecondPlayerWaits)
+        {
+            var secondClient = Clients.Skip(1).First();
+            secondClient.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+            var secondPlayer = CreateSyncedPlayerContext(SecondControllerId, secondClient);
+            ConfigureClanInKingdom(secondPlayer.ClanId, playerKingdomId);
+            playerClanIds.Add(secondPlayer.ClanId);
+        }
         ConfigureClanInKingdom(npcClanIds[0], playerKingdomId);
         ConfigureClanInKingdom(npcClanIds[1], playerKingdomId);
         ConfigureClanInKingdom(enemyClanId, enemyKingdomId);
@@ -2954,8 +2965,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(enemyClanId, out var enemyClan));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
-            playerClan.Influence = playerInfluence;
+            foreach (string playerClanId in playerClanIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var clan));
+                clan.Influence = playerInfluence;
+            }
 
             var npcDecision = new MakePeaceKingdomDecision(enemyClan, playerKingdom);
             var peaceOutcome = npcDecision.DetermineInitialCandidates()
@@ -2964,6 +2978,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(CoopKingdomElection.TryRedirectPlayerPeaceOffer(npcDecision, peaceOutcome));
 
             // The player clan rules this kingdom, so a missing vote must not become the ruler's pick.
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
             Assert.Same(playerClan, playerKingdom.RulingClan);
             var playerDecision = Assert.Single(playerKingdom.UnresolvedDecisions);
             var states = (System.Collections.IDictionary)AccessTools
@@ -2979,14 +2994,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             {
                 outcome.SupporterList.Clear();
             }
-            for (int i = 0; i < otherFullPeaceVotes; i++)
+            for (int i = 0; i < npcPeaceVotes; i++)
             {
                 Assert.True(Server.ObjectManager.TryGetObject<Clan>(npcClanIds[i], out var npcClan));
-                playerPeaceOutcome.AddSupport(new Supporter(npcClan) { SupportWeight = Supporter.SupportWeights.FullyPush });
+                playerPeaceOutcome.AddSupport(new Supporter(npcClan) { SupportWeight = npcPeaceWeights[i] });
             }
         });
 
-        if (playerConfirmsAbstain)
+        if (playerAbstainsWhileSecondPlayerWaits)
         {
             client.SimulateMessage(this, new KingdomDecisionVoteRequested(new KingdomDecisionVoteData(
                 playerKingdomId,
@@ -2995,6 +3010,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 supportWeight: (int)Supporter.SupportWeights.StayNeutral,
                 isAbstain: true,
                 isFinal: true)));
+
+            // The second player hasn't voted, so the round waits for its deadline.
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(playerKingdomId, out var playerKingdom));
+                Assert.Single(playerKingdom.UnresolvedDecisions);
+            });
         }
 
         Server.Call(() =>
@@ -3004,12 +3026,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
 
+            // With an abstain counted against too, 6 points against beat the AI clans' 5 and peace would fail.
             Assert.Empty(playerKingdom.UnresolvedDecisions);
             Assert.Equal(expectWar, FactionManager.IsAtWarAgainstFaction(playerKingdom, enemyKingdom));
 
-            // A vote the player never cast must not spend their influence.
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var playerClan));
-            Assert.Equal(playerInfluence, playerClan.Influence);
+            // A vote a player never cast must not spend their influence.
+            foreach (string playerClanId in playerClanIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var clan));
+                Assert.Equal(playerInfluence, clan.Influence);
+            }
         });
 
         Assert.Equal(expectWar ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkMakePeace>().Count());
