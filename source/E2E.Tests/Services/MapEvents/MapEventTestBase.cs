@@ -1139,14 +1139,14 @@ public abstract class MapEventTestBase : IDisposable
         finally { harmony.UnpatchAll(harmony.Id); }
     }
 
-    private static bool OpenLootPartyScreen()
+    protected static bool OpenLootPartyScreen()
     {
         var states = Game.Current.GameStateManager;
         states._gameStates.Add(states.CreateState<PartyState>());
         return false;
     }
 
-    private static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
+    protected static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
     {
         Assert.True(itemRostersToLoot[PartyBase.MainParty].Sum(item => item.Amount) > 0);
         var states = Game.Current.GameStateManager;

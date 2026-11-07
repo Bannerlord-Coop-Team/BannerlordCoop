@@ -2,11 +2,13 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Villages.Messages;
+using TaleWorlds.CampaignSystem.Encounters;
 
 namespace Coop.Core.Client.Services.Villages.Handlers;
 
@@ -17,19 +19,22 @@ internal class ClientVillageHostileActionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IPlayerEncounterInterface playerEncounterInterface;
 
     public ClientVillageHostileActionHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IControllerIdProvider controllerIdProvider,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IPlayerEncounterInterface playerEncounterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.controllerIdProvider = controllerIdProvider;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.playerEncounterInterface = playerEncounterInterface;
 
         messageBroker.Subscribe<VillageHostileActionAttempted>(Handle_VillageHostileActionAttempted);
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
@@ -55,6 +60,8 @@ internal class ClientVillageHostileActionHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(message.MobileParty, out var mobilePartyId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Settlement, out var settlementId)) return;
+        if (!playerEncounterInterface.TrackPendingHostileAction(PlayerEncounter.Current))
+            return;
 
         network.SendAll(new NetworkRequestVillageHostileAction(message.Action, mobilePartyId, settlementId, controllerIdProvider.ControllerId));
     }
@@ -62,12 +69,17 @@ internal class ClientVillageHostileActionHandler : IHandler
     private void Handle_NetworkVillageHostileActionStarted(MessagePayload<NetworkVillageHostileActionStarted> payload)
     {
         GameThread.RunSafe(
-            () => villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action),
+            () =>
+            {
+                playerEncounterInterface.ClearPendingHostileAction();
+                villageHostileActionInterface.BeginHostileActionPresentation(payload.What.Action);
+            },
             context: nameof(Handle_NetworkVillageHostileActionStarted));
     }
 
     private void Handle_NetworkVillageHostileActionDenied(MessagePayload<NetworkVillageHostileActionDenied> payload)
     {
+        playerEncounterInterface.RecoverRejectedHostileAction();
         messageBroker.Publish(this, new SendInformationMessage(GetDeniedMessage(payload.What.Reason)));
     }
 
