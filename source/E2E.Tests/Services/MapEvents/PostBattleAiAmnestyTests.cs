@@ -1,6 +1,8 @@
-﻿using Common.Util;
+﻿﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.MapEvents;
+using E2E.Tests.Util;
+using GameInterface.Configuration;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -8,14 +10,16 @@ using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
 /// AI parties can't start an engagement with a player who is still in the post battle screens or in the
-/// amnesty after them. The battle ends through the server's real finalize and the player leaves the screens
-/// through a real client <see cref="PlayerEncounter.Finish"/>, so both signals run end to end.
+/// amnesty after them. The battle ends through the server's real finalize, the player leaves the screens
+/// through a real client <see cref="PlayerEncounter.Finish"/> and the clock runs through the server's real
+/// <c>Campaign.TickMapTime</c>, so every signal runs end to end.
 /// </summary>
 public class PostBattleAiAmnestyTests : MapEventTestBase
 {
@@ -29,7 +33,7 @@ public class PostBattleAiAmnestyTests : MapEventTestBase
 
         DestroyServerMapEvent(battleId);
         // The screens aren't limited by the amnesty length.
-        RunServerClock(seconds: 60f, paused: false);
+        RunServerClock(seconds: 60f, CampaignTimeControlMode.UnstoppablePlay);
 
         Assert.False(CanEngage(aiPartyId, playerPartyId));
     }
@@ -41,27 +45,77 @@ public class PostBattleAiAmnestyTests : MapEventTestBase
         DestroyServerMapEvent(battleId);
         LeavePostBattleScreens(Clients.First(), playerPartyId);
 
-        RunServerClock(seconds: 29f, paused: false);
+        // Fast forward still counts real seconds.
+        RunServerClock(seconds: 29f, CampaignTimeControlMode.UnstoppableFastForward);
         Assert.False(CanEngage(aiPartyId, playerPartyId));
 
-        RunServerClock(seconds: 600f, paused: true);
+        RunServerClock(seconds: 600f, CampaignTimeControlMode.Stop);
         Assert.False(CanEngage(aiPartyId, playerPartyId));
 
-        RunServerClock(seconds: 2f, paused: false);
+        RunServerClock(seconds: 2f, CampaignTimeControlMode.UnstoppablePlay);
         Assert.True(CanEngage(aiPartyId, playerPartyId));
     }
 
     [Fact]
-    public void OtherPlayerCanStillEngageDuringAmnesty()
+    public void ZeroAmnesty_EndsProtectionWhenPlayerLeavesScreens()
+    {
+        var previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { PostBattleAiAmnestySeconds = 0 });
+        try
+        {
+            var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
+            DestroyServerMapEvent(battleId);
+            Assert.False(CanEngage(aiPartyId, playerPartyId));
+
+            LeavePostBattleScreens(Clients.First(), playerPartyId);
+
+            Assert.True(CanEngage(aiPartyId, playerPartyId));
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
+    }
+
+    /// <summary>The other player's own encounter finish doesn't end the first player's screens.</summary>
+    [Fact]
+    public void OtherPlayer_CanStillEngage_AndItsNoticeLeavesTheFirstPlayerInTheScreens()
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
         var (_, otherPlayerPartyId) = CreatePlayerHeroParty("2");
         TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "2");
         DestroyServerMapEvent(battleId);
-        LeavePostBattleScreens(Clients.First(), playerPartyId);
+
+        LeavePostBattleScreens(Clients.Last(), otherPlayerPartyId);
+        RunServerClock(seconds: 60f, CampaignTimeControlMode.UnstoppablePlay);
 
         Assert.False(CanEngage(aiPartyId, playerPartyId));
         Assert.True(CanEngage(otherPlayerPartyId, playerPartyId));
+    }
+
+    [Fact]
+    public void AiPartyStillReachesASettlementWhileAPlayerIsProtected()
+    {
+        var (battleId, _, aiPartyId) = SetupPlayerWithNearbyAiParty();
+        DestroyServerMapEvent(battleId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        var reached = false;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var ai));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            EnsureEncounterModel();
+            using (new AllowedThread())
+            {
+                ai.Position = settlement.GatePosition;
+                ai.SetShortTermBehavior(AiBehavior.GoToSettlement, settlement.Party);
+            }
+
+            reached = ((IInteractablePoint)settlement.Party).CanPartyInteract(ai, 0f);
+        });
+
+        Assert.True(reached);
     }
 
     /// <summary>Player "1" on the first client attacks an AI party; a second AI party stands next to the player.</summary>
@@ -91,13 +145,16 @@ public class PostBattleAiAmnestyTests : MapEventTestBase
         AssertHasPlayerEncounter(client, expected: false);
     }
 
-    // The campaign's per frame dt is zero while paused, whatever real time passes.
-    private void RunServerClock(float seconds, bool paused)
+    // TickMapTime reads MainParty and the speed multiplier, which the constructor skipped harness campaign leaves unset.
+    // The mode goes through TimePatches like the server sets it, because the TimeControlMode getter reads it from there.
+    private void RunServerClock(float seconds, CampaignTimeControlMode mode)
     {
         Server.Call(() =>
         {
-            Campaign.Current._dt = paused ? 0f : 0.25f * seconds;
-            Server.Resolve<PostBattleAiAmnesty>().Tick(seconds);
+            Campaign.Current.MainParty ??= GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Campaign.Current.SpeedUpMultiplier = 4f;
+            TimePatches.OverrideTimeControlMode(mode);
+            Campaign.Current.TickMapTime(seconds);
         });
     }
 

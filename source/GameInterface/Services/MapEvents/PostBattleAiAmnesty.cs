@@ -92,10 +92,10 @@ internal sealed class PostBattleAiAmnesty : IHandler
         }
     }
 
-    // A protected player who starts a new battle leaves it open to AI joining it as usual.
+    // Settlement targets have no mobile party. A protected player who starts a new battle leaves it open to AI joining.
     internal bool IsProtectedFrom(MobileParty target, MobileParty attacker)
     {
-        if (protections.Count == 0 || target?.MapEvent != null || attacker == null) return false;
+        if (target == null || attacker == null || protections.Count == 0 || target.MapEvent != null) return false;
 
         return protections.ContainsKey(target) && !attacker.IsPlayerParty();
     }
