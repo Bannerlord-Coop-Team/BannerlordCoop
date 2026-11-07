@@ -1,14 +1,18 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
+using GameInterface.Services.Villages;
+using GameInterface.Services.Villages.Interfaces;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -28,6 +32,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     private readonly string plateId;
     private readonly string mailId;
     private readonly string swordId;
+    private readonly string daggerId;
     private GameStateManager? previousStates;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -45,6 +50,7 @@ public class InventoryEquipmentCloseTests : IDisposable
         plateId = CreateEquippableItem("close_test_plate", ItemObject.ItemTypeEnum.BodyArmor);
         mailId = CreateEquippableItem("close_test_mail", ItemObject.ItemTypeEnum.BodyArmor);
         swordId = CreateEquippableItem("close_test_sword", ItemObject.ItemTypeEnum.OneHandedWeapon);
+        daggerId = CreateEquippableItem("close_test_dagger", ItemObject.ItemTypeEnum.OneHandedWeapon);
 
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
@@ -70,7 +76,7 @@ public class InventoryEquipmentCloseTests : IDisposable
 
             party.ItemRoster.Clear();
             party.ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(armorId), 1);
-            foreach (var itemId in new[] { helmetId, plateId, mailId, swordId })
+            foreach (var itemId in new[] { helmetId, plateId, mailId, swordId, daggerId })
                 party.ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(itemId), 1);
         });
         TestEnvironment.FlushCoalescer();
@@ -182,7 +188,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void SameSlotEquip_ReplyLandsOnTheOpenScreen_ReturnsTheFirstItemToTheRoster()
+    public void SameSlotEquip_ReplyLandsOnTheOpenScreen_RefusesTheLaterClose()
     {
         PauseNetwork();
         OpenScreen();
@@ -197,11 +203,11 @@ public class InventoryEquipmentCloseTests : IDisposable
         CloseScreen(fromCancel: false);
         ResumeNetwork();
 
-        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 0));
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 1));
     }
 
     [Fact]
-    public void SameSlotEquip_BothClosesBeforeAnyReply_ReturnsTheFirstItemToTheRoster()
+    public void SameSlotEquip_BothClosesBeforeAnyReply_RefusesTheLaterClose()
     {
         PauseNetwork();
         OpenScreen();
@@ -213,7 +219,7 @@ public class InventoryEquipmentCloseTests : IDisposable
         CloseScreen(fromCancel: false);
         ResumeNetwork();
 
-        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 0));
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 1));
     }
 
     [Fact]
@@ -236,7 +242,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void ReplacingAnEquippedItemTwiceBeforeTheReply_ReturnsBothReplacedItems()
+    public void ReplacingAnEquippedItemTwiceBeforeTheReply_RefusesTheLaterClose()
     {
         OpenScreen();
         Equip(armorId, EquipmentIndex.Body);
@@ -255,7 +261,7 @@ public class InventoryEquipmentCloseTests : IDisposable
         CloseScreen(fromCancel: false);
         ResumeNetwork();
 
-        AssertEverywhere(EquipmentIndex.Body, mailId, (armorId, 1), (plateId, 1), (mailId, 0));
+        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 0), (mailId, 1));
     }
 
     [Fact]
@@ -292,7 +298,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void ServerSlotWriteUnderAPendingEquip_KeepsThePendingEquipAndReturnsTheWrittenItem()
+    public void ServerSlotWriteUnderAPendingEquip_RefusesTheCloseAndShowsTheServersSlot()
     {
         OpenScreen();
         Equip(armorId, EquipmentIndex.Body);
@@ -301,7 +307,123 @@ public class InventoryEquipmentCloseTests : IDisposable
         Router.RunUntilIdle();
         TestEnvironment.FlushCoalescer();
 
-        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 2));
+        AssertEverywhere(EquipmentIndex.Body, plateId, (armorId, 1), (plateId, 1));
+    }
+
+    [Fact]
+    public void LinkedSlotMovesAfterTheRosterLostAnItem_RefusesTheWholeClose()
+    {
+        OpenScreen();
+        Equip(swordId, EquipmentIndex.Weapon1);
+        CloseScreen(fromCancel: false);
+        Router.RunUntilIdle();
+        TestEnvironment.FlushCoalescer();
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(daggerId, EquipmentIndex.Weapon2);
+        CloseScreen(fromCancel: false);
+
+        // Weapon0 only stays affordable if Weapon1 really gives the sword up, and Weapon1 needs the dagger that just left
+        OpenScreen();
+        MoveBetweenSlots(swordId, EquipmentIndex.Weapon1, EquipmentIndex.Weapon0);
+        Equip(daggerId, EquipmentIndex.Weapon1);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Weapon0, null, (swordId, 0), (daggerId, 0));
+        AssertEverywhere(EquipmentIndex.Weapon1, swordId, (swordId, 0), (daggerId, 0));
+        AssertEverywhere(EquipmentIndex.Weapon2, daggerId, (swordId, 0), (daggerId, 0));
+    }
+
+    [Fact]
+    public void RejectedForceTransferClose_AfterAReplyLandedOnIt_LeavesBothMachinesOnTheServersSlot()
+    {
+        var settlementId = MovePlateToSettlementStock();
+        string? poolId = null;
+        Server.Call(() =>
+        {
+            var service = Server.Resolve<IVillageHostileActionInterface>();
+            poolId = service.AuthorizeForceTransfer(default, partyId, settlementId, Array.Empty<ItemRosterElementData>(), null, 0).RequestId;
+            Assert.True(service.TryConsumeForceTransfer(poolId, partyId, out _));
+        });
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenSettlementScreen(settlementId, isTrading: false);
+        Client.Call(() => ForceTransferScreenTracker.NoteLootScreenOpened(poolId!, Client.GetRegisteredObject<Settlement>(settlementId).ItemRoster));
+        EquipFromSettlement(plateId, EquipmentIndex.Body);
+        ResumeNetwork();
+        PauseNetwork();
+
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 0));
+    }
+
+    [Fact]
+    public void EquippedPurchaseTheMerchantCanNoLongerSupply_EmptiesTheSlotAndRefunds()
+    {
+        var settlementId = MovePlateToSettlementStock();
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+            instance.Call(() => instance.GetRegisteredObject<ItemObject>(plateId).Value = 100);
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold = 1000);
+        TestEnvironment.FlushCoalescer();
+
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        Router.RunUntilIdle();
+        TestEnvironment.FlushCoalescer();
+
+        PauseNetwork();
+        OpenSettlementScreen(settlementId, isTrading: true);
+        EquipFromSettlement(plateId, EquipmentIndex.Body);
+        Server.Call(() => Server.GetRegisteredObject<Settlement>(settlementId).ItemRoster.AddToCounts(Server.GetRegisteredObject<ItemObject>(plateId), -1));
+
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, null, (armorId, 1), (plateId, 0));
+        Server.Call(() => Assert.Equal(1000, Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold));
+    }
+
+    [Fact]
+    public void SellingAnItemAnEarlierCloseEquipped_RefusesTheCloseWithoutPayingForIt()
+    {
+        var settlementId = MovePlateToSettlementStock();
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+            instance.Call(() => instance.GetRegisteredObject<ItemObject>(armorId).Value = 100);
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold = 1000);
+        TestEnvironment.FlushCoalescer();
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenSettlementScreen(settlementId, isTrading: true);
+        Client.Call(() =>
+        {
+            var state = (InventoryState)Game.Current.GameStateManager.ActiveState;
+            var element = new ItemRosterElement(Client.GetRegisteredObject<ItemObject>(armorId), 1);
+            state.InventoryLogic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.PlayerInventory,
+                InventoryLogic.InventorySide.OtherInventory, element, EquipmentIndex.None, EquipmentIndex.None, null));
+        });
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEquippedEverywhere(armorId, EquipmentIndex.Body);
+        Server.Call(() =>
+        {
+            var armor = Server.GetRegisteredObject<ItemObject>(armorId);
+            Assert.Equal(0, Server.GetRegisteredObject<Settlement>(settlementId).ItemRoster.GetItemNumber(armor));
+            Assert.Equal(1000, Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold);
+        });
     }
 
     // Registers an item in every instance's native catalog, because equipment slots cross the wire by item id
@@ -371,6 +493,74 @@ public class InventoryEquipmentCloseTests : IDisposable
                 InventoryLogic.InventorySide.BattleEquipment, element, EquipmentIndex.None, slot, character));
 
             Assert.Equal(itemId, ItemIdOf(Client, character.FirstBattleEquipment[slot]));
+        });
+    }
+
+    // Moves an item between two equipment slots through vanilla's transfer command
+    private void MoveBetweenSlots(string itemId, EquipmentIndex from, EquipmentIndex to)
+    {
+        Client.Call(() =>
+        {
+            var state = (InventoryState)Game.Current.GameStateManager.ActiveState;
+            var character = Client.GetRegisteredObject<MobileParty>(partyId).LeaderHero.CharacterObject;
+            var element = new ItemRosterElement(Client.GetRegisteredObject<ItemObject>(itemId), 1);
+
+            state.InventoryLogic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.BattleEquipment,
+                InventoryLogic.InventorySide.BattleEquipment, element, from, to, character));
+        });
+    }
+
+    // Takes the plate out of the party inventory and makes it the only stock of a new settlement
+    private string MovePlateToSettlementStock()
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        Server.Call(() =>
+        {
+            var plate = Server.GetRegisteredObject<ItemObject>(plateId);
+            Server.GetRegisteredObject<MobileParty>(partyId).ItemRoster.AddToCounts(plate, -1);
+
+            var stock = Server.GetRegisteredObject<Settlement>(settlementId).ItemRoster;
+            stock.Clear();
+            stock.AddToCounts(plate, 1);
+        });
+        TestEnvironment.FlushCoalescer();
+        return settlementId;
+    }
+
+    // Opens a loot or trade screen with the settlement's stock on the left, at base prices because the harness has no market
+    private void OpenSettlementScreen(string settlementId, bool isTrading)
+    {
+        Client.Call(() =>
+        {
+            var party = Client.GetRegisteredObject<MobileParty>(partyId);
+            var character = party.LeaderHero.CharacterObject;
+            var states = Game.Current.GameStateManager;
+            var mode = isTrading ? InventoryScreenHelper.InventoryMode.Trade : InventoryScreenHelper.InventoryMode.Loot;
+
+            var logic = new InventoryLogic(party, character, null);
+            logic.Initialize(Client.GetRegisteredObject<Settlement>(settlementId).ItemRoster, party.ItemRoster, party.MemberRoster, isTrading,
+                isSpecialActionsPermitted: true, character, InventoryScreenHelper.InventoryCategoryType.None, null, useBasePrices: true, mode);
+
+            // Vanilla's view model hooks this, and the harness has none
+            logic.TotalAmountChange = _ => { };
+
+            var state = states.CreateState<InventoryState>();
+            state.InventoryLogic = logic;
+            states._gameStates.Add(state);
+        });
+    }
+
+    // Moves an item from the settlement's stock straight onto a battle slot through vanilla's transfer command
+    private void EquipFromSettlement(string itemId, EquipmentIndex slot)
+    {
+        Client.Call(() =>
+        {
+            var state = (InventoryState)Game.Current.GameStateManager.ActiveState;
+            var character = Client.GetRegisteredObject<MobileParty>(partyId).LeaderHero.CharacterObject;
+            var element = new ItemRosterElement(Client.GetRegisteredObject<ItemObject>(itemId), 1);
+
+            state.InventoryLogic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.OtherInventory,
+                InventoryLogic.InventorySide.BattleEquipment, element, EquipmentIndex.None, slot, character));
         });
     }
 

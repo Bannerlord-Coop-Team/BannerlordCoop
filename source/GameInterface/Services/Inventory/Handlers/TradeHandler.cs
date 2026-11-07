@@ -145,100 +145,128 @@ internal class TradeHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            ItemRoster fromRoster = null;
-            if (!message.IsFromItemRosterNull && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.FromItemRosterId, out fromRoster)) return;
-
-            if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return;
-
-            SettlementComponent currentSettlementComponent = null;
-            if (!message.IsSettlementComponentNull &&
-                !objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out currentSettlementComponent)) return;
-
-            MobileParty currentMobileParty = null;
-            if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
-
-            var slotChanges = RebaseEquipmentData(message.CharacterIdEquipmentsData, message.InitialCharacterIdEquipmentsData);
-            var toItemRosterData = RebaseInventoryData(
-                toRoster, message.InitialPlayerRoster, message.ToItemRosterData, slotChanges);
-
-            var boughtItems = ResolveTradeItems(message.BoughtItems);
-            var soldItems = ResolveTradeItems(message.SoldItems);
-
-            if (ModInformation.IsServer && !message.IsTrading)
-            {
-                if (message.ForceTransferId != null)
-                {
-                    if (!TryValidateForceTransfer(message, peer))
-                    {
-                        logger.Debug("Force transfer trade rejected, no inventory exchange event sent (Party={PartyId})", message.OwnerPartyId);
-                        return;
-                    }
-                }
-                else if (villageHostileActionInterface.HasPendingForceTransferForParty(message.OwnerPartyId))
-                {
-                    // Attribution missed (see ForceTransferScreenTracker): the cap cannot
-                    // be enforced on this commit. Logged so live runs prove attribution
-                    // works; still applied under the trusted-client model.
-                    logger.Warning(
-                        "ForceTransfer loot commit without attribution while a pool is pending (Party={PartyId})",
-                        message.OwnerPartyId);
-                }
-            }
-
-            var fromItemRosterData = message.FromItemRosterData;
-            var totalAmount = message.TotalAmount;
-            var merchantGold = message.MerchantGold;
-            var purchasedItems = boughtItems;
-
-            // Undo any purchases that are no longer present in the roster
-            // When looting, taken items are treated as bought items
-            if (fromRoster != null)
-            {
-                var heroEquipments = GetHeroTradeEquipments(message.CharacterIdEquipmentsData);
-                totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
-                purchasedItems = GetKeptPurchases(boughtItems, keptItems);
-
-                // Merchants are shared, the client's snapshot misses what other players traded since it was taken
-                if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
-            }
-
-            if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
-
-            ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
-
-            // Update rosters with new data
-            if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
-            if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
-            else if (message.IsManagingWarehouse)
-            {
-                // Manage warehouse rosters separately as they involve more complicated logic
-                MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
-            }
-
-            // Update hero equipment with new data
-            inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
-            network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
-
-            inventoryLogicInterface.ApplyDoneLogic(
-                fromRoster,
-                toRoster,
-                message.IsTrading,
-                message.CanGainXpFromDiscarding,
-                hero,
-                totalAmount,
-                merchantGold,
-                currentMobileParty,
-                currentSettlementComponent,
-                boughtItems,
-                soldItems
-            );
-
-            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : soldItems;
-            SendTradeCompleted(peer, toRoster, hero, purchasedItems, exchangedSoldItems, message.IsTrading);
+            if (!TryApplyClose(message, peer)) SendLiveEquipment(message);
         });
+    }
+
+    /// <summary>
+    /// Applies a closed screen as one unit, and returns false with nothing applied if it can't be.
+    /// The client has already put its screen back, so a false result still owes it the server's slots.
+    /// </summary>
+    private bool TryApplyClose(CompleteTrade message, NetPeer peer)
+    {
+        ItemRoster fromRoster = null;
+        if (!message.IsFromItemRosterNull && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.FromItemRosterId, out fromRoster)) return false;
+
+        if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return false;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return false;
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.OwnerPartyId, out var ownerParty)) return false;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(message.InitialHeroId, out var initialHero)) return false;
+
+        SettlementComponent currentSettlementComponent = null;
+        if (!message.IsSettlementComponentNull &&
+            !objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out currentSettlementComponent)) return false;
+
+        MobileParty currentMobileParty = null;
+        if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return false;
+
+        if (!CanRosterCoverClose(toRoster, message) || !TryRebaseEquipmentData(message))
+        {
+            logger.Debug("Inventory close conflicts with the server's inventory, nothing applied (Party={PartyId})", message.OwnerPartyId);
+            if (peer != null) network.Send(peer, new SendInformationMessage("Your inventory changed before this screen closed, so its changes were not applied."));
+            return false;
+        }
+
+        var toItemRosterData = RebaseInventoryData(
+            toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+
+        var boughtItems = ResolveTradeItems(message.BoughtItems);
+        var soldItems = ResolveTradeItems(message.SoldItems);
+
+        if (ModInformation.IsServer && !message.IsTrading)
+        {
+            if (message.ForceTransferId != null)
+            {
+                if (!TryValidateForceTransfer(message, peer))
+                {
+                    logger.Debug("Force transfer trade rejected, no inventory exchange event sent (Party={PartyId})", message.OwnerPartyId);
+                    return false;
+                }
+            }
+            else if (villageHostileActionInterface.HasPendingForceTransferForParty(message.OwnerPartyId))
+            {
+                // Attribution missed (see ForceTransferScreenTracker): the cap cannot
+                // be enforced on this commit. Logged so live runs prove attribution
+                // works; still applied under the trusted-client model.
+                logger.Warning(
+                    "ForceTransfer loot commit without attribution while a pool is pending (Party={PartyId})",
+                    message.OwnerPartyId);
+            }
+        }
+
+        var fromItemRosterData = message.FromItemRosterData;
+        var totalAmount = message.TotalAmount;
+        var merchantGold = message.MerchantGold;
+        var purchasedItems = boughtItems;
+
+        // Undo any purchases that are no longer present in the roster
+        // When looting, taken items are treated as bought items
+        if (fromRoster != null)
+        {
+            var heroEquipments = GetHeroTradeEquipments(message.CharacterIdEquipmentsData);
+            totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
+            purchasedItems = GetKeptPurchases(boughtItems, keptItems);
+
+            // Merchants are shared, the client's snapshot misses what other players traded since it was taken
+            if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
+        }
+
+        if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+
+        ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
+
+        // Update rosters with new data
+        if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
+        if (fromRoster != null) inventoryLogicInterface.UpdateRosterWithData(fromRoster, fromItemRosterData);
+        else if (message.IsManagingWarehouse)
+        {
+            // Manage warehouse rosters separately as they involve more complicated logic
+            MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(peer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
+        }
+
+        // Update hero equipment with new data
+        inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
+        network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
+
+        inventoryLogicInterface.ApplyDoneLogic(
+            fromRoster,
+            toRoster,
+            message.IsTrading,
+            message.CanGainXpFromDiscarding,
+            hero,
+            totalAmount,
+            merchantGold,
+            currentMobileParty,
+            currentSettlementComponent,
+            boughtItems,
+            soldItems
+        );
+
+        var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : soldItems;
+        SendTradeCompleted(peer, toRoster, hero, purchasedItems, exchangedSoldItems, message.IsTrading);
+        return true;
+    }
+
+    /// <summary>Sends the server's slots for every hero the closed screen covered, so the client shows what really happened.</summary>
+    private void SendLiveEquipment(CompleteTrade message)
+    {
+        var liveEquipment = new Dictionary<string, EquipmentData[]>();
+        foreach (var heroId in message.CharacterIdEquipmentsData.Keys)
+        {
+            if (objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) AddHeroEquipmentData(liveEquipment, hero.CharacterObject);
+        }
+
+        network.SendAll(new UpdateEquipmentClients(liveEquipment, message.OwnerPartyId, message.InitialHeroId));
     }
 
     /// <summary>
@@ -315,33 +343,20 @@ internal class TradeHandler : IHandler
     internal static ItemRosterElement[] RebaseInventoryData(
         ItemRoster authoritativeRoster,
         ItemRosterElement[] initialRoster,
-        ItemRosterElement[] submittedRoster,
-        List<EquipmentSlotChange> slotChanges = null)
+        ItemRosterElement[] submittedRoster)
     {
         initialRoster ??= Array.Empty<ItemRosterElement>();
         submittedRoster ??= Array.Empty<ItemRosterElement>();
-        slotChanges ??= new List<EquipmentSlotChange>();
-
-        long GetDelta(EquipmentElement element) =>
-            (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element) + slotChanges.Sum(change => change.RosterCorrection(element));
-
-        // A slot can only gain what the roster still holds, otherwise the item would exist twice
-        foreach (var change in slotChanges)
-        {
-            if (change.Submitted.Item != null && FindAmount(authoritativeRoster, change.Submitted) + GetDelta(change.Submitted) < 0) change.Reject();
-        }
-
         var elements = new List<EquipmentElement>();
-        AddUniqueElements(elements, initialRoster.Select(item => item.EquipmentElement));
-        AddUniqueElements(elements, submittedRoster.Select(item => item.EquipmentElement));
-        AddUniqueElements(elements, slotChanges.SelectMany(change => change.Elements));
+        AddUniqueElements(elements, initialRoster);
+        AddUniqueElements(elements, submittedRoster);
 
         // ItemRoster(ItemRoster) sizes its array to Count, and an empty copy can never grow
         var rebased = new ItemRoster();
         rebased.Add(authoritativeRoster);
         foreach (var element in elements)
         {
-            long delta = GetDelta(element);
+            long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
             int current = FindAmount(rebased, element);
             int final = (int)Math.Max(0L, Math.Min(int.MaxValue, current + delta));
             if (final != current) rebased.AddToCounts(element, final - current);
@@ -350,15 +365,15 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Keeps the server's slot wherever the screen didn't change it, so a screen opened before the reply to an
-    /// earlier close can't undo that close, and returns the slots it did change for the roster rebase to settle.
+    /// Keeps the server's slot wherever the screen didn't change it, and returns false if a slot
+    /// it did change no longer holds what the screen saw, because the screen's roster moves assumed it did.
     /// </summary>
-    private List<EquipmentSlotChange> RebaseEquipmentData(Dictionary<string, EquipmentData[]> submitted, Dictionary<string, EquipmentData[]> initial)
+    private bool TryRebaseEquipmentData(CompleteTrade message)
     {
-        var slotChanges = new List<EquipmentSlotChange>();
-        if (initial == null) return slotChanges;
+        var initial = message.InitialCharacterIdEquipmentsData;
+        if (initial == null) return true;
 
-        foreach (var hero in submitted)
+        foreach (var hero in message.CharacterIdEquipmentsData)
         {
             if (!initial.TryGetValue(hero.Key, out var initialSets)) continue;
             if (!objectManager.TryGetObjectWithLogging<Hero>(hero.Key, out var liveHero)) continue;
@@ -372,19 +387,37 @@ internal class TradeHandler : IHandler
                 var initialSlots = initialSets[set].ItemSlots;
                 for (int slot = 0; slot < slots.Length; slot++)
                 {
-                    if (SameElement(slots[slot], initialSlots[slot])) slots[slot] = live._itemSlots[slot];
-                    else slotChanges.Add(new EquipmentSlotChange(slots, slot, initialSlots[slot], live._itemSlots[slot]));
+                    if (SameElement(slots[slot], initialSlots[slot]))
+                    {
+                        slots[slot] = live._itemSlots[slot];
+                        continue;
+                    }
+
+                    if (!SameElement(initialSlots[slot], live._itemSlots[slot])) return false;
                 }
             }
         }
 
-        return slotChanges;
+        return true;
     }
 
-    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<EquipmentElement> roster)
+    // A close can't take more of an item out of the roster than the server still has, whether it equips, sells or discards it
+    private static bool CanRosterCoverClose(ItemRoster toRoster, CompleteTrade message)
     {
-        foreach (var element in roster)
+        var submitted = message.ToItemRosterData ?? Array.Empty<ItemRosterElement>();
+        foreach (var item in message.InitialPlayerRoster ?? Array.Empty<ItemRosterElement>())
         {
+            if ((long)FindAmount(toRoster, item.EquipmentElement) + FindAmount(submitted, item.EquipmentElement) - item.Amount < 0) return false;
+        }
+
+        return true;
+    }
+
+    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
+    {
+        foreach (var item in roster)
+        {
+            var element = item.EquipmentElement;
             if (element.Item == null || elements.Any(existing => SameElement(existing, element))) continue;
             elements.Add(element);
         }
