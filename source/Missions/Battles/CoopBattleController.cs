@@ -352,7 +352,6 @@ public class CoopBattleController : CoopMissionController
         // above from releasing. Vanilla end checks will observe the resulting depletion normally.
         puppetDeathApplier.DrainPendingDeaths();
         puppetRoutApplier.DrainPendingRouts();
-        routReporter.Tick(dt);
 
         siegeEngineDeployment.DrainPending(dt);
         // Puppets registered this frame need their buffered equipment before pending load requests drain.
