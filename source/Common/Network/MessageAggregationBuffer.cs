@@ -15,39 +15,44 @@ namespace Common.Network;
 /// </remarks>
 public class MessageAggregationBuffer
 {
-    private readonly int budgetBytes;
-
     private List<byte[]> payloads = new List<byte[]>();
-    private int payloadBytes;
-
-    /// <param name="budgetBytes">
-    /// Combined payload size to aim for per batch. Callers pick it so a batch plus its envelope
-    /// framing fits one datagram at the link's LiteNetLib-negotiated packet size. The shared
-    /// <see cref="ReliableMessageBatcher{TDestination}"/> supplies the production budget.
-    /// </param>
-    public MessageAggregationBuffer(int budgetBytes)
-    {
-        this.budgetBytes = budgetBytes;
-    }
+    private int framedBytes;
 
     public bool IsEmpty => payloads.Count == 0;
 
     /// <summary>
-    /// Buffers a payload. If accepting it would push the buffered total past the budget, the
-    /// previously buffered payloads are returned to be sent now (the new payload starts the next
-    /// batch); otherwise returns null.
+    /// Bytes one payload takes inside <see cref="Common.PacketHandlers.AggregateMessagePacket.Messages"/>:
+    /// the field tag, the varint length and the payload itself.
     /// </summary>
-    public List<byte[]> Append(byte[] payload)
+    public static int GetFramedLength(byte[] payload)
+    {
+        int length = payload.Length;
+        int lengthBytes = 1;
+        while ((length >>= 7) != 0) lengthBytes++;
+        return 1 + lengthBytes + payload.Length;
+    }
+
+    /// <summary>
+    /// Buffers a payload. If its framed bytes would push the buffered total past
+    /// <paramref name="maxFramedBytes"/>, the previously buffered payloads are returned to be sent now
+    /// (the new payload starts the next batch); otherwise returns null.
+    /// </summary>
+    /// <param name="maxFramedBytes">
+    /// Framed bytes a batch may hold, picked by the caller so the batch plus its envelope fits one
+    /// datagram on the destination's current route.
+    /// </param>
+    public List<byte[]> Append(byte[] payload, int maxFramedBytes)
     {
         List<byte[]> overflow = null;
+        int payloadFramedBytes = GetFramedLength(payload);
 
-        if (payloadBytes + payload.Length > budgetBytes && payloads.Count > 0)
+        if (framedBytes + payloadFramedBytes > maxFramedBytes && payloads.Count > 0)
         {
             overflow = TakeBatch();
         }
 
         payloads.Add(payload);
-        payloadBytes += payload.Length;
+        framedBytes += payloadFramedBytes;
 
         return overflow;
     }
@@ -64,7 +69,7 @@ public class MessageAggregationBuffer
     {
         var batch = payloads;
         payloads = new List<byte[]>();
-        payloadBytes = 0;
+        framedBytes = 0;
         return batch;
     }
 }
