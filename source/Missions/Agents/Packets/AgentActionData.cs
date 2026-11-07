@@ -5,6 +5,7 @@ using Missions.Diagnostics;
 #endif
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
@@ -25,7 +26,22 @@ namespace Missions.Agents.Packets
             typeof(MBAPI).GetField("IMBAnimation", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         private static MethodInfo getActionNameWithCode;
 
-        internal static string GetActionNameWithCode(int actionCode)
+        private static readonly ActionNameCache NameCache = new ActionNameCache(
+            ReadNativeActionName,
+            actionName => ActionIndexCache.Create(actionName).Index);
+
+        // Kept un-inlined so a Harmony patch on it still wins in callers that were JITted first.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static string GetActionNameWithCode(int actionCode) =>
+            NameCache.GetName(actionCode);
+
+        internal static bool IsRangedSiegeUsageAction(int actionCode) =>
+            NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsRangedSiegeUsage == true;
+
+        internal static bool IsOrderGestureAction(int actionCode) =>
+            NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsOrderGesture == true;
+
+        private static string ReadNativeActionName(int actionCode)
         {
             var animation = AnimationField?.GetValue(null);
             if (animation == null) return null;
@@ -45,7 +61,7 @@ namespace Missions.Agents.Packets
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {
-                action = ActionIndexCache.Create(actionName);
+                action = new ActionIndexCache(NameCache.ResolveIndex(actionIndex, actionName));
                 return action.Index >= 0;
             }
 
@@ -635,7 +651,7 @@ namespace Missions.Agents.Packets
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {
-                action = ActionIndexCache.Create(actionName);
+                action = new ActionIndexCache(NameCache.ResolveIndex(actionIndex, actionName));
                 return true;
             }
 
