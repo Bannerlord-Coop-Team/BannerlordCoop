@@ -784,6 +784,7 @@ public sealed class MissionEngineFixture : IDisposable
             damage = 0f;
         }
         victim.Health = Math.Max(0f, victim.Health - damage);
+        NativeAgentFields.SyncHealth(__instance, victim);
         if (TryActiveMock(out var activeMock)
             && activeMock.DismountRiderOnNextBlow)
         {
@@ -805,10 +806,10 @@ public sealed class MissionEngineFixture : IDisposable
             // The native death decides killed or unconscious; a replayed death takes the owner's result.
             AgentState removedState = AgentState.Killed;
             if (BattleSpawnGate.TryGetReplicatedDeathState(__instance, out var agentState))
-            {
-                victim.WasKilled = agentState == AgentState.Killed;
                 removedState = agentState;
-            }
+            victim.WasKilled = removedState == AgentState.Killed;
+            NativeAgentFields.SyncHealth(__instance, victim);
+            NativeAgentFields.MarkRemoved(__instance, removedState);
             var removedBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, victim.DeathAction, 0);
             if (BattleSpawnGate.TryGetReplicatedDeath(__instance, out _, out var killingBlow))
             {

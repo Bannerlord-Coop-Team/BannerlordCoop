@@ -126,6 +126,8 @@ public class ReplayedDeathReportTests : MissionTestEnvironment
         // The origin skips AgentBuildData.TroopOrigin, whose equipment seed needs a loaded character.
         Assert.True(AgentMirror.TryGet(agent, out var mirror));
         mirror.Origin = new CoopAgentOrigin(character, party.Party, 0, null, new UniqueTroopDescriptor(1));
+        // BattleAgentLogic's vanilla bodies run inside Harmony-patched methods.
+        NativeAgentFields.Back(agent, mirror);
         return agent;
     }
 }
