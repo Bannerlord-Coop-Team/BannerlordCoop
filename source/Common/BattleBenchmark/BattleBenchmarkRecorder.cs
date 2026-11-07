@@ -69,6 +69,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
     private readonly IBattleBenchmarkProcessSampler processSampler;
     private readonly IBattleBenchmarkMissionProbe missionProbe;
+    private readonly IJsonFileIO fileIO;
     private readonly Func<long> timestamp;
     private readonly Action<IGameThreadFrameObserver> attachFrameObserver;
     private readonly Action<IGameThreadFrameObserver> detachFrameObserver;
@@ -98,10 +99,14 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     private string lastReportPath;
     private string lastError;
 
-    public BattleBenchmarkRecorder(IBattleBenchmarkProcessSampler processSampler, IBattleBenchmarkMissionProbe missionProbe)
+    public BattleBenchmarkRecorder(
+        IBattleBenchmarkProcessSampler processSampler,
+        IBattleBenchmarkMissionProbe missionProbe,
+        IJsonFileIO fileIO)
         : this(
             processSampler,
             missionProbe,
+            fileIO,
             Stopwatch.GetTimestamp,
             observer => GameThread.Instance.FrameObserver = observer,
             observer =>
@@ -115,12 +120,14 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     internal BattleBenchmarkRecorder(
         IBattleBenchmarkProcessSampler processSampler,
         IBattleBenchmarkMissionProbe missionProbe,
+        IJsonFileIO fileIO,
         Func<long> timestamp,
         Action<IGameThreadFrameObserver> attachFrameObserver,
         Action<IGameThreadFrameObserver> detachFrameObserver)
     {
         this.processSampler = processSampler;
         this.missionProbe = missionProbe;
+        this.fileIO = fileIO;
         this.timestamp = timestamp;
         this.attachFrameObserver = attachFrameObserver;
         this.detachFrameObserver = detachFrameObserver;
@@ -338,7 +345,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             report = BuildReport(endTimestamp, endReason, processSampler.Sample(), missionProbe.Capture());
             path = Path.Combine(outputDirectory, runId,
                 $"{report.Process.Role}-{SafeFileName(report.Process.ControllerId)}-{report.Process.ProcessId}.json");
-            new JsonFileIO().WriteToFile(path, report);
+            fileIO.WriteToFile(path, report);
         }
         catch (Exception exception)
         {

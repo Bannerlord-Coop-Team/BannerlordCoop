@@ -1,4 +1,5 @@
 ﻿using Common.BattleBenchmark;
+using Common.Serialization;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -20,7 +21,7 @@ public class BattleBenchmarkRecorderTests : IDisposable
     }
 
     private BattleBenchmarkRecorder CreateRecorder() =>
-        new BattleBenchmarkRecorder(sampler, probe, () => now, attached.Add, observer => attached.Remove(observer));
+        new BattleBenchmarkRecorder(sampler, probe, new JsonFileIO(), () => now, attached.Add, observer => attached.Remove(observer));
 
     [Theory]
     [InlineData("bad id", 10, null, "run id")]
@@ -150,7 +151,7 @@ public class BattleBenchmarkRecorderTests : IDisposable
     [Fact]
     public void Report_TotalsMatchTheirRows_WhileANetworkThreadKeepsWriting()
     {
-        var recorder = new BattleBenchmarkRecorder(sampler, probe, Stopwatch.GetTimestamp, _ => { }, _ => { });
+        var recorder = new BattleBenchmarkRecorder(sampler, probe, new JsonFileIO(), Stopwatch.GetTimestamp, _ => { }, _ => { });
         Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(60), outputDirectory, out _));
         using var stop = new CancellationTokenSource();
         var writer = new Thread(() =>

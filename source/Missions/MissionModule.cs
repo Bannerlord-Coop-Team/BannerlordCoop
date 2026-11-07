@@ -4,6 +4,7 @@ using Common.BattleBenchmark;
 using Common.Commands;
 using Common.Logging;
 using Common.Network.Session;
+using Common.Serialization;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Hideouts;
@@ -84,6 +85,7 @@ public class MissionModule : Module
         builder.RegisterType<BattleBenchmarkRecorder>().As<IBattleBenchmarkRecorder>().SingleInstance();
         builder.RegisterType<BattleBenchmarkProcessSampler>().As<IBattleBenchmarkProcessSampler>().InstancePerDependency();
         builder.RegisterType<BattleBenchmarkMissionProbe>().As<IBattleBenchmarkMissionProbe>().InstancePerDependency();
+        builder.RegisterType<JsonFileIO>().As<IJsonFileIO>().InstancePerDependency();
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()

@@ -1,4 +1,5 @@
 ﻿using Common.BattleBenchmark;
+using Common.Serialization;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -75,7 +76,7 @@ public class BattleBenchmarkComparisonTests : IDisposable
     public void RecorderReports_RoundTripIntoTheComparison()
     {
         var recorder = new BattleBenchmarkRecorder(
-            new FixedSampler(), new FixedProbe(), Stopwatch.GetTimestamp, _ => { }, _ => { });
+            new FixedSampler(), new FixedProbe(), new JsonFileIO(), Stopwatch.GetTimestamp, _ => { }, _ => { });
         Assert.True(recorder.TryStart("round-trip", "field", TimeSpan.FromSeconds(30), Path.Combine(root, "A", "run-01"), out _));
         recorder.RecordSent("PlayerTwo", reliable: false, 800, 1020, relayed: false);
         Assert.True(recorder.TryStop(out _, out _));
