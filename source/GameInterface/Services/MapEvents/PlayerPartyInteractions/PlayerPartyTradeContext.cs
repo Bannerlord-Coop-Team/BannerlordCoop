@@ -33,6 +33,8 @@ internal static class PlayerPartyTradeContext
     private static BarterVM activeBarterVM;
     private static ButtonWidget resetButton;
     private static bool isApplyingServerOffer;
+    private static bool isBatchingOffer;
+    private static bool hasBatchedOffer;
     private static readonly FieldInfo PrisonerCharacterField =
         typeof(TransferPrisonerBarterable).GetField("_prisonerCharacter", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -102,12 +104,13 @@ internal static class PlayerPartyTradeContext
     }
 
     // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
+    // A marriage's amount is always 1, so an amount callback would only fire once, here, and publish an offer during setup.
     private static void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
     {
         for (int i = 0; i < items.Count; i++)
         {
             if (items[i].Barterable is PlayerPartyMarriageBarterable marriage)
-                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, activeBarterVM.OnOfferedAmountChange);
+                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, onAmountChange: null);
         }
     }
 
@@ -213,10 +216,35 @@ internal static class PlayerPartyTradeContext
     public static void PublishOfferChanged(BarterVM barterVM)
     {
         if (!IsActive) return;
+        // Every barterable's initial amount calls SendOffer while the constructor builds the lists.
+        if (!barterVM.InitializationIsOver) return;
         if (isApplyingServerOffer || !CanModifyOffer()) return;
+
+        if (isBatchingOffer)
+        {
+            hasBatchedOffer = true;
+            return;
+        }
 
         ResetAcceptance();
         MessageBroker.Instance.Publish(barterVM, new PlayerPartyTradeOfferChanged(SessionId, barterVM));
+    }
+
+    // Holds back offer publishes while one user action changes many barter items.
+    public static void BeginOfferBatch()
+    {
+        isBatchingOffer = true;
+    }
+
+    // Publishes the single offer a batch held back, if it changed anything.
+    public static void EndOfferBatch(BarterVM barterVM)
+    {
+        isBatchingOffer = false;
+
+        if (!hasBatchedOffer) return;
+
+        hasBatchedOffer = false;
+        PublishOfferChanged(barterVM);
     }
 
     public static void PublishAccept(bool accepted)

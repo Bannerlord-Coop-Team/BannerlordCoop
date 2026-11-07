@@ -76,7 +76,16 @@ internal class PlayerPartyBarterVMPatches
     [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
     [HarmonyPrefix]
     static bool ExecuteAutoBalancePrefix()
-        => PlayerPartyTradeContext.CanModifyOffer();
+    {
+        PlayerPartyTradeContext.BeginOfferBatch();
+        return PlayerPartyTradeContext.CanModifyOffer();
+    }
+
+    // A finalizer so the batch ends even when the original throws or the prefix skips it.
+    [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
+    [HarmonyFinalizer]
+    static void ExecuteAutoBalanceFinalizer(BarterVM __instance)
+        => PlayerPartyTradeContext.EndOfferBatch(__instance);
 
     [HarmonyPatch("TransferItem")]
     [HarmonyPrefix]
@@ -129,7 +138,15 @@ internal class PlayerPartyBarterTransferAllPatches
 
     [HarmonyPrefix]
     static bool ExecuteTransferAllPrefix(BarterVM __instance, MethodBase __originalMethod)
-        => PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    {
+        PlayerPartyTradeContext.BeginOfferBatch();
+        return PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
+    }
+
+    // A finalizer so the batch ends even when the original throws or the prefix skips it.
+    [HarmonyFinalizer]
+    static void ExecuteTransferAllFinalizer(BarterVM __instance)
+        => PlayerPartyTradeContext.EndOfferBatch(__instance);
 }
 
 [HarmonyPatch]

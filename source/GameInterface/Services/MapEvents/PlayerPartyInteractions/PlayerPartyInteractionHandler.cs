@@ -811,7 +811,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             session.InitiatorAcceptedTrade = false;
             session.ResponderAcceptedTrade = false;
-            SendTradeStates(session);
+            SendTradeOpenedStates(session);
             return;
         }
 
@@ -848,6 +848,18 @@ internal class PlayerPartyInteractionHandler : IHandler
     private static bool IsMarriageProposal(PlayerPartyInteractionProposal proposal)
         => proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
            proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
+
+    // Opens the trade on both clients. Only this state carries the inventories,
+    // because a client reads them once, when its barter screen opens.
+    private void SendTradeOpenedStates(PlayerPartyInteractionSession session)
+    {
+        var initiatorItems = ResolvePartyItemIds(session.InitiatorPartyId);
+        var responderItems = ResolvePartyItemIds(session.ResponderPartyId);
+
+        SendInitiatorState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, Array.Empty<PlayerPartyInteractionOption>(), partyItems: initiatorItems, otherPartyItems: responderItems);
+        SendResponderState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, Array.Empty<PlayerPartyInteractionOption>(), partyItems: responderItems, otherPartyItems: initiatorItems);
+        SendTradeOffers(session);
+    }
 
     private void SendTradeStates(PlayerPartyInteractionSession session)
         => SendTradeStates(session, true);
@@ -891,15 +903,10 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionPhase phase,
         PlayerPartyInteractionProposal proposal,
         PlayerPartyInteractionOption[] options,
-        PlayerPartyInteractionOption[] enabledOptions = null)
+        PlayerPartyInteractionOption[] enabledOptions = null,
+        ItemRosterElementData[] partyItems = null,
+        ItemRosterElementData[] otherPartyItems = null)
     {
-        var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
-            ? ResolvePartyItemIds(session.InitiatorPartyId)
-            : Array.Empty<ItemRosterElementData>();
-        var otherPartyItems = phase == PlayerPartyInteractionPhase.TradeActive
-            ? ResolvePartyItemIds(session.ResponderPartyId)
-            : Array.Empty<ItemRosterElementData>();
-
         network.SendAll(new NetworkPlayerPartyInteractionState(
             session.SessionId,
             session.InitiatorPartyId,
@@ -928,15 +935,10 @@ internal class PlayerPartyInteractionHandler : IHandler
         PlayerPartyInteractionPhase phase,
         PlayerPartyInteractionProposal proposal,
         PlayerPartyInteractionOption[] options,
-        PlayerPartyInteractionOption[] enabledOptions = null)
+        PlayerPartyInteractionOption[] enabledOptions = null,
+        ItemRosterElementData[] partyItems = null,
+        ItemRosterElementData[] otherPartyItems = null)
     {
-        var partyItems = phase == PlayerPartyInteractionPhase.TradeActive
-            ? ResolvePartyItemIds(session.ResponderPartyId)
-            : Array.Empty<ItemRosterElementData>();
-        var otherPartyItems = phase == PlayerPartyInteractionPhase.TradeActive
-            ? ResolvePartyItemIds(session.InitiatorPartyId)
-            : Array.Empty<ItemRosterElementData>();
-
         network.SendAll(new NetworkPlayerPartyInteractionState(
             session.SessionId,
             session.ResponderPartyId,
@@ -1729,6 +1731,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         }
     }
 
+    // A client that couldn't open on the first state opens on the next one, from its replicated rosters.
+    // Those can be stale but the server clamps item amounts on accept, and that beats a client stuck with no screen.
     private void OpenTrade(NetworkPlayerPartyInteractionState state)
     {
         if (PlayerPartyTradeContext.IsActive) return;
@@ -1765,7 +1769,8 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void ApplyTradeItemSnapshot(ItemRoster itemRoster, ItemRosterElementData[] items)
     {
-        if (itemRoster == null || items == null) return;
+        // No inventories arrive as null over the wire and as empty from a direct call, neither may wipe the roster.
+        if (itemRoster == null || items == null || items.Length == 0) return;
 
         using (new AllowedThread())
         {
