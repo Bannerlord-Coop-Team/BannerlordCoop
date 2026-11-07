@@ -1337,6 +1337,7 @@ public class MerchantOutlawsTests : IDisposable
         IssueEnds,
     }
 
+    // Cancel is the case that popped twice before #4465, Done and IssueEnds pin the exits that must still pop once
     [Theory]
     [InlineData(PickerExit.Cancel)]
     [InlineData(PickerExit.Done)]
@@ -1442,6 +1443,7 @@ public class MerchantOutlawsTests : IDisposable
                 states._gameStates.Remove(conversation);
                 states._gameStates.Remove(map);
                 GameStateManager._current = previous;
+                Campaign.Current.ConversationManager._conversationAgents.Remove(agent.Object);
             }
         }, TextHelpers);
         environment.FlushCoalescer();
