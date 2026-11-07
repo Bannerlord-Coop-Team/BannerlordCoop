@@ -145,7 +145,7 @@ public partial class MovementTrafficTests
                 // Bulk drops to the cap 23 ms after a capped send, so the first every-poll send must still wait.
                 if (frame == 45)
                     Assert.True(handler.TrySetForcedBulkHz(40, out _));
-                float frameSeconds = 1f / 45f + (frame % 2 == 1 ? 0.001f : -0.001f);
+                float frameSeconds = (1f / 45f) + (frame % 2 == 1 ? 0.001f : -0.001f);
                 time += frameSeconds;
                 int sentBefore = network.DirectPacketSends.Count;
                 mirror.Position = new Vec3(frame, 0f, 0f);
