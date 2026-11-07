@@ -14,6 +14,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Caravans;
 
+/// <summary>Checks how the server stores trade rumor caravans sent by a client.</summary>
 public class SessionCaravansPlayerDataInterfaceTests
 {
     static SessionCaravansPlayerDataInterfaceTests()
