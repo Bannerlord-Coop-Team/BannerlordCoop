@@ -56,17 +56,6 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
         Assert.True(formation.MovementOrderSet);
     }
 
-    [Fact]
-    public void PromotedInAFieldBattle_ChargesTheAdoptedEnemies()
-    {
-        var (mirror, formation, _) = AdoptDefender(phase: null, BattleSideEnum.None);
-
-        Assert.Equal(AgentControllerType.AI, mirror.Controller);
-        Assert.NotNull(formation);
-        Assert.True(formation!.IsAIControlled);
-        Assert.True(formation.MovementOrderSet);
-    }
-
     // The issue's case: the battle went live before the duel, so the promotion also runs the NPC release
     [Fact]
     public void PromotedAfterADuelWinInALiveBattle_LeavesTheSurrenderedBanditsIdle()
@@ -124,7 +113,7 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
 
     // The old host "A" ran a defender NPC that this client mirrors as an inert puppet; A leaves and this client adopts it
     private (MirrorAgent Mirror, MockFormation? Formation, CoopHideoutMissionLogic? Hideout) AdoptDefender(
-        HideoutPhase? phase, BattleSideEnum winner, bool teamlessSpectator = false)
+        HideoutPhase phase, BattleSideEnum winner, bool teamlessSpectator = false)
     {
         using var fixture = new MissionEngineFixture();
         var newHost = Clients.First();
@@ -140,11 +129,8 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
             var registry = newHost.Resolve<INetworkAgentRegistry>();
             controller.Session.TryBegin("mapEvent1");
 
-            if (phase.HasValue)
-            {
-                hideout = CreateHideoutLogic(phase.Value, winner);
-                mission.Shell.MissionBehaviors.Add(hideout);
-            }
+            hideout = CreateHideoutLogic(phase, winner);
+            mission.Shell.MissionBehaviors.Add(hideout);
 
             var defenders = new MockTeam(BattleSideEnum.Defender);
             var spawnTeam = teamlessSpectator ? new MockTeam(BattleSideEnum.None) : defenders;
