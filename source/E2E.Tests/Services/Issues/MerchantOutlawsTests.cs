@@ -1407,8 +1407,8 @@ public class MerchantOutlawsTests : IDisposable
             using (new AllowedThread()) logic.TransferTroop(transfer, false);
 
             // PartyScreenHelper reads the global state manager, which the harness leaves unset
-            var previous = GameStateManager.Current;
-            var states = GameStateManager.Current = Game.Current.GameStateManager;
+            var previous = GameStateManager._current;
+            var states = GameStateManager._current = Game.Current.GameStateManager;
             var map = states.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>();
             var conversation = states.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>();
             var screen = states.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
@@ -1441,7 +1441,7 @@ public class MerchantOutlawsTests : IDisposable
             {
                 states._gameStates.Remove(conversation);
                 states._gameStates.Remove(map);
-                GameStateManager.Current = previous;
+                GameStateManager._current = previous;
             }
         }, TextHelpers);
         environment.FlushCoalescer();
