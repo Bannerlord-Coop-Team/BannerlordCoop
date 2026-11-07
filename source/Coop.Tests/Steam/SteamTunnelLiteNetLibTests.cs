@@ -49,7 +49,8 @@ namespace Coop.Tests.Steam
         {
             Assert.True(server.Start(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             relay = new SplittingRelay(server.LocalPort);
-            Assert.True(client.Start());
+            // Loopback like the server, otherwise the test host opens a socket on every interface and Windows asks for a firewall rule
+            Assert.True(client.Start(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             NetPeer peer = client.Connect("127.0.0.1", relay.Port, ConnectionKey);
             PollUntil(() => peer.ConnectionState == ConnectionState.Connected && server.ConnectedPeersCount == 1);
 
