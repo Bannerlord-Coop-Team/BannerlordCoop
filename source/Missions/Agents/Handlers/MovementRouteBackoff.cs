@@ -111,7 +111,14 @@ public sealed class MovementRouteBackoff : IMovementRouteBackoff
     {
         double sentBytesPerSecond = route.SentBytes / elapsedSeconds;
         route.SentBytes = 0;
-        if (!network.TryGetRouteHealth(controllerId, out RouteHealth health)) return;
+        if (!network.TryGetRouteHealth(controllerId, out RouteHealth health))
+        {
+            // The peer fell back to the relay, which has no reading. It likely shares the uplink that just
+            // saturated, so ramp up rather than reset, and a returning peer's RTT starts a fresh baseline.
+            route.BaselineRoundTripMilliseconds = 0;
+            Recover(route, sentBytesPerSecond);
+            return;
+        }
 
         route.SamplesSinceCut++;
         if (health.RoundTripMilliseconds > 0 &&

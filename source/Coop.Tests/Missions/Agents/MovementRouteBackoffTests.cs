@@ -124,6 +124,26 @@ public class MovementRouteBackoffTests
             backoff.GetBytesPerSecond(Route));
     }
 
+    // A transport timeout moves sends to the relay without a membership change, so nothing removes the route.
+    [Fact]
+    public void RouteFallingBackToTheRelay_RampsUpAndAReturningPeerStartsAFreshBaseline()
+    {
+        SampleRoundTrips(FullBattleBytesPerSecond, BaselineRoundTrip, SaturatedRoundTrip, SaturatedRoundTrip, SaturatedRoundTrip);
+        double ceiling = backoff.GetBytesPerSecond(Route);
+
+        healthByRoute.Remove(Route);
+        for (int i = 0; i < 6; i++)
+        {
+            backoff.ReportSent(Route, (int)ceiling);
+            backoff.Advance(1f);
+        }
+        double recovered = ceiling + MovementRouteBackoff.GrowthBytesPerSecondPerSample;
+        Assert.Equal(recovered, backoff.GetBytesPerSecond(Route));
+
+        SampleRoundTrips(recovered, BaselineRoundTrip + 400, BaselineRoundTrip + 400, BaselineRoundTrip + 400);
+        Assert.True(backoff.GetBytesPerSecond(Route) >= recovered);
+    }
+
     // A route switch or another app raises RTT by itself; movement this small cannot be the cause.
     [Fact]
     public void LastingRoundTripWithMinimalMovement_BecomesTheNewBaseline()
