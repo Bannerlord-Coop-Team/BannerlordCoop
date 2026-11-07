@@ -90,10 +90,13 @@ public readonly struct AlleyClearedRequested : IEvent
 {
     public readonly Alley Alley;
     public readonly Hero Clearer;
-    public AlleyClearedRequested(Alley alley, Hero clearer)
+    /// <summary>Who held the alley when the player started the fight, even if another gang took it since.</summary>
+    public readonly Hero GangOwner;
+    public AlleyClearedRequested(Alley alley, Hero clearer, Hero gangOwner)
     {
         Alley = alley;
         Clearer = clearer;
+        GangOwner = gangOwner;
     }
 }
 

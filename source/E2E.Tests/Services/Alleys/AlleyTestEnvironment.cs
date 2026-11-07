@@ -7,9 +7,11 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Alleys.Patches;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -103,6 +105,13 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
                 this,
                 new AlleyAcquiredRequested(alley, owner, overseer, roster, alley.Owner));
         });
+    }
+
+    // Runs the prefix vanilla StartCommonAreaBattle runs first. Its own body needs a live mission with agents.
+    protected static void StartFight(EnvironmentInstance client, string alleyId)
+    {
+        var prefix = AccessTools.Method(typeof(MissionAlleyHandlerPatches), "StartCommonAreaBattlePrefix");
+        client.Call(() => prefix.Invoke(null, new object[] { client.GetRegisteredObject<Alley>(alleyId) }));
     }
 
     public void ForceAttack(AlleyDomainScenario scenario)

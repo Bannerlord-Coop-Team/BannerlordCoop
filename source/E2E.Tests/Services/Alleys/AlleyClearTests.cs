@@ -23,7 +23,7 @@ public class AlleyClearTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         var clearingClient = Clients.First();
 
-        LeaveItEmpty(clearingClient, scenario.AttackerAlleyId);
+        FightAndLeaveItEmpty(clearingClient, scenario.AttackerAlleyId);
 
         Server.Call(() => Assert.Null(Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
         foreach (var client in Clients)
@@ -38,7 +38,7 @@ public class AlleyClearTests : AlleyTestEnvironment
         var scenario = CreateAlleyDomainScenario();
         string merchantId = AddNotables(scenario);
 
-        LeaveItEmpty(Clients.First(), scenario.AttackerAlleyId);
+        FightAndLeaveItEmpty(Clients.First(), scenario.AttackerAlleyId);
 
         AssertRelations(scenario, merchantId, gangLeaderRelation: -5, merchantRelation: 1);
     }
@@ -57,7 +57,7 @@ public class AlleyClearTests : AlleyTestEnvironment
         Assert.Equal(scenario.AttackerAlleyId, GetManagementData(scenario.PlayerAlleyId).UnderAttackByAlleyId);
         Assert.NotNull(GetClientAlleyData(ownerClient, scenario.PlayerAlleyId).UnderAttackBy);
 
-        LeaveItEmpty(ownerClient, scenario.AttackerAlleyId);
+        FightAndLeaveItEmpty(ownerClient, scenario.AttackerAlleyId);
 
         Assert.Null(GetManagementData(scenario.PlayerAlleyId).UnderAttackByAlleyId);
         Assert.Null(GetClientAlleyData(ownerClient, scenario.PlayerAlleyId).UnderAttackBy);
@@ -66,6 +66,37 @@ public class AlleyClearTests : AlleyTestEnvironment
             client.Call(() => Assert.Null(client.Resolve<IAlleyCampaignBehaviorInterface>()
                 .ClientAlleyData[scenario.PlayerAlleyId].UnderAttackByAlleyId));
         }
+    }
+
+    [Fact]
+    public void AnotherGangTakesTheAlleyBeforeLeaveItEmpty_KeepsTheNewGang()
+    {
+        var scenario = CreateAlleyDomainScenario();
+        var clearingClient = Clients.First();
+        string newGangLeaderId = CreateRegisteredObject<Hero>();
+        ConfigureHeroIdentity(newGangLeaderId);
+
+        StartFight(clearingClient, scenario.AttackerAlleyId);
+        // The server's new owner reaches both clients while the victory screen is open.
+        Server.Call(() =>
+        {
+            Hero newGangLeader = Server.GetRegisteredObject<Hero>(newGangLeaderId);
+            newGangLeader.SetNewOccupation(Occupation.GangLeader);
+            Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).SetOwner(newGangLeader);
+        });
+        clearingClient.Call(() => Assert.Same(clearingClient.GetRegisteredObject<Hero>(newGangLeaderId),
+            clearingClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
+
+        LeaveItEmpty(clearingClient, scenario.AttackerAlleyId);
+
+        Server.Call(() => Assert.Same(Server.GetRegisteredObject<Hero>(newGangLeaderId),
+            Server.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
+    }
+
+    private static void FightAndLeaveItEmpty(EnvironmentInstance client, string alleyId)
+    {
+        StartFight(client, alleyId);
+        LeaveItEmpty(client, alleyId);
     }
 
     // The listener MissionAlleyHandler.OnLeaveItEmpty reaches once the gang leader is beaten

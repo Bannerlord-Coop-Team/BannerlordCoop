@@ -129,9 +129,9 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Clearer, out var clearerId)) return;
-        // Already free on this client, so there is nothing to clear.
-        if (payload.What.Alley.Owner == null) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.Alley.Owner, out var gangOwnerId)) return;
+        // Nobody held the alley when the fight started, so there is nothing to clear.
+        if (payload.What.GangOwner == null) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.GangOwner, out var gangOwnerId)) return;
 
         network.SendAll(new RequestClearAlley(alleyId, clearerId, gangOwnerId));
     }

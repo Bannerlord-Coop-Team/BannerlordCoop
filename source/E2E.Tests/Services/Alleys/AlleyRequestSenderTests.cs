@@ -2,8 +2,6 @@
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Alleys.Messages;
-using GameInterface.Services.Alleys.Patches;
-using HarmonyLib;
 using Helpers;
 using Moq;
 using SandBox.Missions.MissionLogics;
@@ -179,13 +177,6 @@ public class AlleyRequestSenderTests : AlleyTestEnvironment
             this, new RequestChangeAlleyOverseer(scenario.PlayerAlleyId, scenario.OverseerHeroId)));
 
         Assert.Equal(scenario.OverseerHeroId, GetManagementData(scenario.PlayerAlleyId).OverseerId);
-    }
-
-    // Runs the prefix vanilla StartCommonAreaBattle runs first. Its own body needs a live mission with agents.
-    private static void StartFight(EnvironmentInstance client, string alleyId)
-    {
-        var prefix = AccessTools.Method(typeof(MissionAlleyHandlerPatches), "StartCommonAreaBattlePrefix");
-        client.Call(() => prefix.Invoke(null, new object[] { client.GetRegisteredObject<Alley>(alleyId) }));
     }
 
     private AlleyDomainScenario AcquiredByOwner()

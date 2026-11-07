@@ -71,8 +71,9 @@ internal class AlleyCampaignBehaviorPatches
     private static bool OnAlleyClearedByPlayerPrefix(Alley alley)
     {
         if (ModInformation.IsServer || alley == null) return false;
+        if (!ContainerProvider.TryResolve<IAlleyFightOwnerTracker>(out var fightOwnerTracker)) return false;
 
-        MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero));
+        MessageBroker.Instance.Publish(alley, new AlleyClearedRequested(alley, Hero.MainHero, fightOwnerTracker.Take()));
         return false;
     }
 
