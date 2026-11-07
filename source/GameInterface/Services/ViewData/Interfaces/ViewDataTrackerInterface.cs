@@ -46,7 +46,7 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
                 examinedPrisonerCharacters[characterId] = entry.Value;
         }
 
-        var pinnedObjects = GetPinnedObjects();
+        var pinnedObjects = GetPinCounts().Keys;
 
         return new PlayerViewData
         {
@@ -117,18 +117,18 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
         tracker._plunderItems.Clear();
 
         var visualTrackerManager = Campaign.Current.VisualTrackerManager;
-        // The server save's pins aren't this player's
-        foreach (var pinnedObject in GetPinnedObjects())
-            visualTrackerManager.RemoveTrackedObject(pinnedObject, forceRemove: true);
+        // The server save's pins aren't this player's, but its quest, issue and army references stay
+        foreach (var pinCount in GetPinCounts())
+        {
+            for (int i = 0; i < pinCount.Value; i++)
+                visualTrackerManager.RemoveTrackedObject(pinCount.Key);
+        }
 
         var savedPins = GetObjects<Settlement>(viewData.TrackedSettlementIds).Cast<ITrackableCampaignObject>()
             .Concat(GetObjects<MobileParty>(viewData.TrackedPartyIds));
+        // Registered even when a quest already tracks it, so the pin keeps its own reference after the quest marker goes
         foreach (var pin in savedPins)
-        {
-            // Vanilla's track toggles also skip an object a quest already tracks
-            if (!visualTrackerManager.CheckTracked(pin))
-                visualTrackerManager.RegisterObject(pin);
-        }
+            visualTrackerManager.RegisterObject(pin);
     }
 
     public void SetPlayerViewData(string playerHeroId, PlayerViewData viewData)
@@ -136,20 +136,40 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
         ViewDataPlayerData.PlayerViewData[playerHeroId] = viewData;
     }
 
-    // Settlements and parties the player pinned, leaving out the ones quests, issues and the player's army track themselves
-    private List<ITrackableBase> GetPinnedObjects()
+    // TrackerCount holds a reference per tracker, so the player's pins are the settlement and party references left after the quest, issue and army ones
+    private Dictionary<ITrackableBase, int> GetPinCounts()
     {
-        var gameTracked = new HashSet<ITrackableBase>(Campaign.Current.QuestManager._trackedObjects.Keys);
+        var gameReferences = new Dictionary<ITrackableBase, int>();
+        void AddGameReferences(ITrackableBase trackedObject, int count)
+        {
+            gameReferences.TryGetValue(trackedObject, out var existing);
+            gameReferences[trackedObject] = existing + count;
+        }
+
+        foreach (var questTracks in Campaign.Current.QuestManager._trackedObjects)
+            AddGameReferences(questTracks.Key, questTracks.Value.Count(quest => quest.IsTrackEnabled));
+
         foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
-            gameTracked.UnionWith(issue._trackedObjects);
+        {
+            foreach (var trackedObject in issue._trackedObjects)
+                AddGameReferences(trackedObject, 1);
+        }
 
         var army = MobileParty.MainParty?.Army;
         if (army != null && army.LeaderParty != MobileParty.MainParty && army.AiBehaviorObject is Settlement armyTarget)
-            gameTracked.Add(armyTarget);
+            AddGameReferences(armyTarget, 1);
 
-        return Campaign.Current.VisualTrackerManager._trackedObjects.Keys
-            .Where(trackedObject => (trackedObject is Settlement || trackedObject is MobileParty) && !gameTracked.Contains(trackedObject))
-            .ToList();
+        var pinCounts = new Dictionary<ITrackableBase, int>();
+        foreach (var tracked in Campaign.Current.VisualTrackerManager._trackedObjects)
+        {
+            if (!(tracked.Key is Settlement || tracked.Key is MobileParty)) continue;
+
+            gameReferences.TryGetValue(tracked.Key, out var gameCount);
+            var pinCount = tracked.Value.TrackerCount - gameCount;
+            if (pinCount > 0) pinCounts[tracked.Key] = pinCount;
+        }
+
+        return pinCounts;
     }
 
     private List<string> GetIds<T>(IEnumerable<T> objects)
