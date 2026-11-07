@@ -167,6 +167,30 @@ public class MessageBrokerTests
     }
 
     /// <summary>
+    /// Subscriber that unsubscribes another subscriber from inside its callback, the way a handler disposes
+    /// an object that also listens for the message being handled.
+    /// </summary>
+    private sealed class PeerUnsubscribingSubscriber
+    {
+        private readonly MessageBroker broker;
+        private readonly Subscriber peer;
+        private readonly List<string> log;
+
+        public PeerUnsubscribingSubscriber(MessageBroker broker, Subscriber peer, List<string> log)
+        {
+            this.broker = broker;
+            this.peer = peer;
+            this.log = log;
+        }
+
+        public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            log.Add("disposer");
+            broker.Unsubscribe<ProbeMessage>(peer.Handle);
+        }
+    }
+
+    /// <summary>
     /// Broker that exposes its own subscription table, because the entry and key counts are what these tests assert.
     /// </summary>
     private sealed class ProbeBroker : MessageBroker
@@ -475,6 +499,99 @@ public class MessageBrokerTests
         Assert.Equal(1, later.Received);
         GC.KeepAlive(thrower);
         GC.KeepAlive(later);
+    }
+
+    [Fact]
+    public void Publish_WhenAHandlerUnsubscribesItself_StillInvokesTheNextSubscriber()
+    {
+        var broker = new ProbeBroker();
+        var order = new List<string>();
+        var first = new Subscriber("first", order);
+        var teardown = new SelfUnsubscribingSubscriber(broker, order);
+        var last = new Subscriber("last", order);
+        broker.Subscribe<ProbeMessage>(first.Handle);
+        broker.Subscribe<ProbeMessage>(teardown.Handle);
+        broker.Subscribe<ProbeMessage>(last.Handle);
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(new[] { "first", "teardown", "last" }, order);
+        Assert.Equal(2, broker.EntryCountFor<ProbeMessage>());
+        GC.KeepAlive(first);
+        GC.KeepAlive(teardown);
+        GC.KeepAlive(last);
+    }
+
+    [Fact]
+    public void Publish_WhenAHandlerUnsubscribesALaterSubscriber_DoesNotInvokeIt()
+    {
+        var broker = new ProbeBroker();
+        var order = new List<string>();
+        var disposed = new Subscriber("disposed", order);
+        var disposer = new PeerUnsubscribingSubscriber(broker, disposed, order);
+        var last = new Subscriber("last", order);
+        broker.Subscribe<ProbeMessage>(disposer.Handle);
+        broker.Subscribe<ProbeMessage>(disposed.Handle);
+        broker.Subscribe<ProbeMessage>(last.Handle);
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(new[] { "disposer", "last" }, order);
+        GC.KeepAlive(disposed);
+        GC.KeepAlive(disposer);
+        GC.KeepAlive(last);
+    }
+
+    [Fact]
+    public void Publish_WhileAnotherThreadUnsubscribesEarlierSubscribers_InvokesTheRemainingSubscriberOncePerPublish()
+    {
+        const int rounds = 300;
+        const int leavingPerRound = 64;
+        var failures = new List<string>();
+
+        for (int round = 0; round < rounds && failures.Count == 0; round++)
+        {
+            var broker = new ProbeBroker();
+            var leaving = new Subscriber[leavingPerRound];
+            for (int i = 0; i < leaving.Length; i++)
+            {
+                leaving[i] = new Subscriber();
+                broker.Subscribe<ProbeMessage>(leaving[i].Handle);
+            }
+            var staying = new Subscriber();
+            broker.Subscribe<ProbeMessage>(staying.Handle);
+
+            using var start = new Barrier(2);
+            var unsubscriber = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                foreach (var subscriber in leaving)
+                    broker.Unsubscribe<ProbeMessage>(subscriber.Handle);
+            });
+
+            start.SignalAndWait();
+            int published = 0;
+            try
+            {
+                while (!unsubscriber.IsCompleted)
+                {
+                    broker.Publish(this, new ProbeMessage());
+                    published++;
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"round {round}: publish threw {ex.GetType().Name}: {ex.Message}");
+            }
+            unsubscriber.Wait();
+
+            if (failures.Count == 0 && staying.Received != published)
+                failures.Add($"round {round}: the staying subscriber ran {staying.Received} times for {published} publishes");
+            GC.KeepAlive(leaving);
+            GC.KeepAlive(staying);
+        }
+
+        Assert.Empty(failures);
     }
 
     private static void HandleTargetless(MessagePayload<ProbeMessage> payload) => targetlessReceived++;
