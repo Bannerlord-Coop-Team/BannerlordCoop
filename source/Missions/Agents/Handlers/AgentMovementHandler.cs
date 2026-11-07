@@ -198,6 +198,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         public readonly Dictionary<Guid, float> MovementPendingSince =
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
+        public bool DueEveryBulkPoll;
         public double LastBulkPollTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
@@ -980,22 +981,35 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         int receiverCapHz,
         int bulkHz)
     {
-        if (!recipient.HasBulkPoll || receiverCapHz >= bulkHz)
+        if (!recipient.HasBulkPoll)
         {
             recipient.HasBulkPoll = true;
+            recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
+            recipient.LastBulkPollTime = bulkPollSeconds;
+            return true;
+        }
+
+        if (receiverCapHz < bulkHz)
+        {
+            recipient.DueEveryBulkPoll = false;
+        }
+        else if (recipient.DueEveryBulkPoll)
+        {
             recipient.LastBulkPollTime = bulkPollSeconds;
             return true;
         }
 
         float interval = 1f / Math.Max(1, receiverCapHz);
-        if (bulkPollSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+        double elapsed = bulkPollSeconds - recipient.LastBulkPollTime;
+        if (elapsed + CadenceEpsilonSeconds < interval)
             return false;
 
-        // Keep up to one owed send, so an uneven poll doesn't cost the peer a send, but stay under a full interval
-        // behind, so it never gets more than one send over its cap.
-        recipient.LastBulkPollTime = Math.Max(
-            recipient.LastBulkPollTime + interval,
-            bulkPollSeconds - interval + CadenceEpsilonSeconds);
+        int elapsedIntervals = Math.Max(
+            1,
+            (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
+        recipient.LastBulkPollTime += elapsedIntervals * (double)interval;
+        // Only a send the timer allows starts every-poll sending, so a drop in bulk Hz can't double up on the last one.
+        recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
         return true;
     }
 
