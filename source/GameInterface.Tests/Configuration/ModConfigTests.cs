@@ -315,6 +315,7 @@ public class ModConfigTests : IDisposable
         Assert.False(options.EnableHeroExecutions);
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
         Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, options.ClansAfterKingdomDestruction);
+        Assert.Empty(options.PreferredBattleHosts);
     }
 
     /// <summary>
@@ -339,7 +340,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
         Assert.Equal(60, config.ModOptions.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(config.ModOptions.CoopClansEnabled);
-        Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
+        Assert.Equivalent(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions), strict: true);
     }
 
     [Fact]
@@ -354,6 +355,7 @@ public class ModConfigTests : IDisposable
   },
   ""modOptions"": {
     ""KINGDOMDECISIONVOTETIMEOUTSECONDS"": 600,
+    ""PreferredBattleHosts"": [""76561198000000002"", null, ""76561198000000001"",],
   },
 }");
 
@@ -363,6 +365,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerTroopsReceivedDamage);
         Assert.False(config.Difficulty.BirthAndDeath);
         Assert.Equal(600, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
+        Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, new ModOptions(config.ModOptions).PreferredBattleHosts);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
     }
 
@@ -377,6 +380,7 @@ public class ModConfigTests : IDisposable
   ""modOptions"": {
     ""kingdomDecisionVoteTimeoutSeconds"": ""invalid"",
     ""wandererLimit"": 40,
+    ""preferredBattleHosts"": null,
   }
 }");
 
@@ -384,6 +388,7 @@ public class ModConfigTests : IDisposable
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
+        Assert.Empty(new ModOptions(config.ModOptions).PreferredBattleHosts);
         Assert.Equal(40, config.ModOptions.WandererLimit);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
     }

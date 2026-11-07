@@ -146,6 +146,6 @@ public class BattleHostSuccessionTests
     {
         var policy = new Mock<IBattleHostRetentionPolicy>();
         policy.Setup(p => p.KeepsHostAfterResult(Battle, It.IsAny<bool>())).Returns<string, bool>((_, hasResult) => naval && hasResult);
-        return new BattleHostSuccession(broker.Object, network.Object, registry, policy.Object);
+        return new BattleHostSuccession(broker.Object, network.Object, registry, policy.Object, Mock.Of<IPreferredBattleHosts>());
     }
 }

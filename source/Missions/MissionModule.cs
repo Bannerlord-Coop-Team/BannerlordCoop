@@ -213,6 +213,14 @@ public class MissionModule : Module
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .SingleInstance();
+        builder.RegisterType<PreferredBattleHosts>()
+            .As<IPreferredBattleHosts>()
+            .InstancePerDependency();
+        // Holds the elections BattleHostHandler has not run yet, so it lives as long as that handler: one per
+        // session container, which keeps each E2E game instance's holds apart.
+        builder.RegisterType<PreferredBattleHostHold>()
+            .As<IPreferredBattleHostHold>()
+            .SingleInstance();
         builder.RegisterType<BattleSizeProvider>()
             .As<IBattleSizeProvider>()
             .InstancePerDependency();

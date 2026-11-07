@@ -7,7 +7,8 @@ namespace Missions.Messages;
 /// Client → server: sent when the client's battle mission has FINISHED LOADING (it is MISSION-READY,
 /// BR-010), asking the server to elect (or report) the authoritative battle host for the map event. Carries
 /// the requester's controller id so the server can record the mission-ready order (BR-013) — the first to
-/// become ready is the host, the rest the successor line. The server replies with
+/// become ready is the host unless the server prefers a listed player (BR-010), the rest the successor line.
+/// The server replies with
 /// <see cref="NetworkBattleHostAssigned"/> plus the requester's owned reserves (the NPC grant for the host).
 /// </summary>
 [ProtoContract]

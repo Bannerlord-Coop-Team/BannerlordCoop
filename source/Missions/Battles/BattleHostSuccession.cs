@@ -33,10 +33,10 @@ internal enum HostDepartureOutcome
 /// </summary>
 internal interface IBattleHostSuccession
 {
-    /// <summary>Elects the first mission-ready requester as host, in the battle's next hosting generation (BR-010, BR-102).</summary>
+    /// <summary>Elects the requester as host, in the battle's next hosting generation (BR-010, BR-102). With preferred hosts set, the hold picks who that is.</summary>
     BattleHostAssignment Elect(string mapEventId, string hostControllerId, bool isNaval);
 
-    /// <summary>Appends a mission-ready member to the successor line (BR-013); false when it is the host or already queued.</summary>
+    /// <summary>Adds a mission-ready member to the successor line, preferred hosts first by rank (BR-013); false when it is the host or already queued.</summary>
     bool TryAppendSuccessor(string mapEventId, string controllerId, out BattleHostAssignment updated);
 
     /// <summary>Drops a departed member from the battle's hosting: a successor leaves the line, a host is kept or replaced.</summary>
@@ -67,6 +67,7 @@ internal class BattleHostSuccession : IBattleHostSuccession
     private readonly INetwork network;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleHostRetentionPolicy retentionPolicy;
+    private readonly IPreferredBattleHosts preferredHosts;
 
     // Highest host epoch ever issued per battle (BR-102), kept across assignment removal: clients keep their last assignment
     // when a battle is abandoned, so a re-election for the same map event must issue a higher epoch or they would ignore it.
@@ -86,12 +87,14 @@ internal class BattleHostSuccession : IBattleHostSuccession
         IMessageBroker messageBroker,
         INetwork network,
         IBattleHostRegistry hostRegistry,
-        IBattleHostRetentionPolicy retentionPolicy)
+        IBattleHostRetentionPolicy retentionPolicy,
+        IPreferredBattleHosts preferredHosts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.hostRegistry = hostRegistry;
         this.retentionPolicy = retentionPolicy;
+        this.preferredHosts = preferredHosts;
     }
 
     public BattleHostAssignment Elect(string mapEventId, string hostControllerId, bool isNaval)
@@ -109,7 +112,12 @@ internal class BattleHostSuccession : IBattleHostSuccession
             if (successor == controllerId) return false;
 
         // The host did not change, so the assignment stays in the same hosting generation (BR-102).
-        updated = existing.WithSuccessors(new List<string>(existing.SuccessorControllerIds) { controllerId });
+        // Preferred hosts go ahead of everyone ranked below them, otherwise mission-ready order is kept.
+        var successors = new List<string>(existing.SuccessorControllerIds);
+        int rank = preferredHosts.RankOf(controllerId);
+        int index = successors.FindIndex(successor => preferredHosts.RankOf(successor) > rank);
+        successors.Insert(index < 0 ? successors.Count : index, controllerId);
+        updated = existing.WithSuccessors(successors);
         Store(mapEventId, updated);
         return true;
     }
@@ -140,7 +148,8 @@ internal class BattleHostSuccession : IBattleHostSuccession
             return HostDepartureOutcome.Hostless;
         }
 
-        // Promote the earliest-joined successor still present; the host changed, so the epoch advances (BR-102).
+        // Promote the first successor still present (preferred hosts by rank, then mission-ready order); the host
+        // changed, so the epoch advances (BR-102).
         var newHost = successors[0];
         successors.RemoveAt(0);
         var promoted = assignment.PromotedTo(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
