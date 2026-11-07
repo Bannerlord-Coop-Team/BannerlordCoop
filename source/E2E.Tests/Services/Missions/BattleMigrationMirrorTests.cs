@@ -1,6 +1,11 @@
 using System;
 using System.Linq;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using Missions.Services.Network;
+using Moq;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
@@ -71,6 +76,53 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
             Assert.Equal("B", info.CurrentAuthority);
 
             GC.KeepAlive(controller);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void LateSpawnedPuppet_ChargesItsFormationUnlessItCrewsAHull(bool shipCrew, bool expectCharge)
+    {
+        using var fixture = new MissionEngineFixture();
+        var newHost = Clients.First();
+        SetControllerId(newHost, "B");
+
+        var npcId = Guid.NewGuid();
+
+        newHost.Call(() =>
+        {
+            var mock = fixture.CreateMission(newHost);
+            var component = newHost.Resolve<ICoopMissionComponent>();
+            var registry = newHost.Resolve<INetworkAgentRegistry>();
+            var npc = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            var formation = mock.DefenderTeam.GetFormation(FormationClass.Infantry);
+            npc.Formation = formation.Shell;
+            Assert.True(registry.TryRegisterAgent("A", npcId, npc));
+            var crewShip = new NetworkShipInfo(Guid.NewGuid(), "A", "party", isNpcParty: true, null!, formation.Shell);
+            var ships = new Mock<INetworkShipRegistry>();
+            ships.Setup(value => value.TryGetByFormation(formation.Shell, out crewShip)).Returns(shipCrew);
+            var missionComponent = new Mock<ICoopMissionComponent>();
+            missionComponent.SetupGet(value => value.AgentRegistry).Returns(component.AgentRegistry);
+            missionComponent.SetupGet(value => value.AgentMovementHandler).Returns(component.AgentMovementHandler);
+            missionComponent.SetupGet(value => value.ShipRegistry).Returns(ships.Object);
+
+            var session = new Mock<IBattleSession>();
+            session.SetupGet(value => value.HostControllerId).Returns("B");
+            session.SetupGet(value => value.OwnControllerId).Returns("B");
+            session.SetupGet(value => value.IsLocalHost).Returns(true);
+            using var migrator = new BattleAuthorityMigrator(Mock.Of<INetwork>(), newHost.Resolve<IMessageBroker>(),
+                Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(), missionComponent.Object, session.Object,
+                Mock.Of<IBattleDeploymentCoordinator>(), Mock.Of<IAgentFormationAssigner>(), Mock.Of<IMissionContext>(),
+                Mock.Of<IReinforcementFielder>(), Mock.Of<IBattlePartyWithdrawal>(),
+                Mock.Of<IBattlePlayerPartyResolver>());
+
+            migrator.ApplyLateSpawnedPuppet(npc, npcId, null!, Guid.Empty);
+
+            Assert.True(registry.TryGetAgentInfo(npcId, out var info));
+            Assert.Equal("B", info.CurrentAuthority);
+            Assert.Equal(expectCharge, formation.MovementOrderSet);
         });
     }
 

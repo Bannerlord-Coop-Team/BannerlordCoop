@@ -2,7 +2,10 @@
 using Common.Commands;
 using Common;
 using GameInterface.CoopSessionData;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using System.Globalization;
@@ -99,6 +102,17 @@ internal class HeroConversationDebugCommand
         {
             var manager = Campaign.Current.ConversationManager;
             if (!manager.IsConversationInProgress) return Failed("No conversation is active.");
+
+            var conversationHero = Hero.OneToOneConversationHero;
+            if (conversationHero?.Issue != null &&
+                ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+                objectManager.TryGetId(conversationHero, out var issueOwnerId) &&
+                ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker) &&
+                ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) &&
+                !tracker.TryGet(issueOwnerId, controller.ControllerId, conversationHero.Issue.StringId))
+            {
+                return Failed($"Server has not approved issue conversation for {issueOwnerId ?? conversationHero.StringId} ({conversationHero.Issue.StringId}).");
+            }
 
             if (args.Count > 0)
             {

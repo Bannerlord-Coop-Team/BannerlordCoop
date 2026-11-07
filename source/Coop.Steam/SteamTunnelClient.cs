@@ -19,6 +19,8 @@ public class SteamTunnelClient : IDisposable
     private readonly IReceivePathDiagnostics diagnostics;
     private readonly byte[] udpBuffer = new byte[SteamTunnel.MaxDatagramBytes];
     private readonly byte[] steamBuffer = new byte[SteamTunnel.MaxDatagramBytes];
+    private readonly byte[] droppableBuffer = new byte[SteamTunnel.MaxDatagramBytes];
+    private readonly byte[] reliableBuffer = new byte[SteamTunnel.MaxDatagramBytes];
 
     private Socket socket;
     private Poller poller;
@@ -28,7 +30,7 @@ public class SteamTunnelClient : IDisposable
     private EndPoint receiveSender = TunnelSocket.AnyEndpoint();
     private EndPoint clientEndpoint;
     // Length of a held-back datagram for when the Steam send buffer is full. It stays in
-    // udpBuffer, which nothing overwrites until the retry succeeds.
+    // reliableBuffer, which nothing overwrites until the retry succeeds.
     private int pendingLength;
 
     public SteamTunnelClient(ISteamTunnelTransport transport, IReceivePathDiagnostics diagnostics)
@@ -102,7 +104,7 @@ public class SteamTunnelClient : IDisposable
         // Only reliable-class datagrams ever park, so the retry is never droppable.
         if (pendingLength > 0)
         {
-            if (!transport.SendDatagram(connection, udpBuffer, pendingLength, droppable: false)) return;
+            if (!transport.SendDatagram(connection, reliableBuffer, pendingLength, droppable: false)) return;
 
             pendingLength = 0;
         }
@@ -119,10 +121,16 @@ public class SteamTunnelClient : IDisposable
                     DateTime.UtcNow, connection, LocalPort, receiveSender);
             }
             clientEndpoint = receiveSender;
-            bool droppable = SteamTunnel.IsDroppableDatagram(udpBuffer, length);
-            if (!transport.SendDatagram(connection, udpBuffer, length, droppable))
+            SteamTunnel.SplitByLane(udpBuffer, length, droppableBuffer, out int droppableLength,
+                reliableBuffer, out int reliableLength);
+            if (droppableLength > 0)
             {
-                pendingLength = length;
+                transport.SendDatagram(connection, droppableBuffer, droppableLength, droppable: true);
+            }
+
+            if (reliableLength > 0 && !transport.SendDatagram(connection, reliableBuffer, reliableLength, droppable: false))
+            {
+                pendingLength = reliableLength;
                 return;
             }
         }

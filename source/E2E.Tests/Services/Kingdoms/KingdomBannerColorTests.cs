@@ -4,6 +4,8 @@ using E2E.Tests.Util;
 using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -22,6 +24,13 @@ public class KingdomBannerColorTests : SyncTestBase
 
     private const string OriginalBannerCode = "11.9001.9001.1528.1528.764.764.1.0.0.133.9002.9002.512.512.764.764.0.0.0";
     private const string EditedBannerCode = "11.9001.9001.1528.1528.764.764.1.0.0.133.9003.9003.512.512.764.764.0.0.0";
+
+    // Clan.PreAfterLoad first asks whether the save is from an older game version, which reads the game
+    // version from the install. Load as a save from this version so the test doesn't depend on the install.
+    private static readonly MethodBase[] SaveFromThisVersion =
+    {
+        AccessTools.PropertyGetter(typeof(MBSaveLoad), nameof(MBSaveLoad.IsUpdatingGameVersion)),
+    };
 
     private readonly string kingdomId;
     private readonly string rulerClanId;
@@ -154,6 +163,106 @@ public class KingdomBannerColorTests : SyncTestBase
             Assert.Equal(OldIconColor, Server.GetRegisteredObject<Kingdom>(kingdomId).SecondaryBannerColor);
             Assert.Equal(OriginalBannerCode, Server.GetRegisteredObject<Clan>(rulerClanId).Banner.Serialize());
         });
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("11.9001")]
+    [InlineData("11.9001.9001.1528.1528.764.764.1.0.x")]
+    public void BannerEdit_WithUnreadableCode_KeepsBannerAndIsNotRelayed(string bannerCode)
+    {
+        Server.SimulateMessage(memberClient.NetPeer, new NetworkUpdatePlayerBanner(bannerCode, memberClanId, BackgroundColor, NewIconColor));
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>());
+        Server.Call(() =>
+        {
+            Assert.Equal(OriginalBannerCode, Server.GetRegisteredObject<Clan>(memberClanId).Banner.Serialize());
+        });
+    }
+
+    [Fact]
+    public void RelayedBannerEdit_WithUnreadableCode_KeepsClientBanner()
+    {
+        memberClient.SimulateMessage(Server, new NetworkUpdatePlayerBanner("11.9001", memberClanId, BackgroundColor, NewIconColor));
+        memberClient.PumpGameThread();
+
+        memberClient.Call(() =>
+        {
+            Assert.Equal(OriginalBannerCode, memberClient.GetRegisteredObject<Clan>(memberClanId).Banner.Serialize());
+        });
+    }
+
+    [Fact]
+    public void ClanWithEmptyBanner_GetsDefaultBannerOnLoad()
+    {
+        Server.Call(() =>
+        {
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var memberClan = Server.GetRegisteredObject<Clan>(memberClanId);
+
+            using (new AllowedThread())
+            {
+                memberClan._banner = new Banner();
+                // Kingdom clans aren't saved, PreAfterLoad adds each clan back.
+                kingdom._clans.Remove(memberClan);
+            }
+
+            // Vanilla repaints the kingdom colours here and reads the first banner layer.
+            memberClan.PreAfterLoad();
+
+            Assert.False(memberClan.Banner.IsBannerDataListEmpty());
+            Assert.Equal(BackgroundColorId, memberClan.Banner.GetPrimaryColorId());
+            Assert.Single(kingdom.Clans, clan => clan == memberClan);
+        }, SaveFromThisVersion);
+    }
+
+    [Fact]
+    public void RulingClanWithEmptyKingdomBanner_GetsDefaultKingdomBannerOnLoad()
+    {
+        Server.Call(() =>
+        {
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var rulerClan = Server.GetRegisteredObject<Clan>(rulerClanId);
+
+            using (new AllowedThread())
+            {
+                kingdom.Banner = new Banner();
+                kingdom._clans.Remove(rulerClan);
+            }
+
+            // A ruling clan's Banner is the kingdom banner, which vanilla repaints here.
+            rulerClan.PreAfterLoad();
+
+            Assert.False(kingdom.Banner.IsBannerDataListEmpty());
+            Assert.Equal(BackgroundColorId, kingdom.Banner.GetPrimaryColorId());
+            Assert.Equal(OriginalBannerCode, rulerClan.ClanOriginalBanner.Serialize());
+            Assert.Single(kingdom.Clans, clan => clan == rulerClan);
+        }, SaveFromThisVersion);
+    }
+
+    [Fact]
+    public void RulingClanWithNoKingdomBanner_GetsDefaultKingdomBannerOnLoad()
+    {
+        Server.Call(() =>
+        {
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var rulerClan = Server.GetRegisteredObject<Clan>(rulerClanId);
+
+            using (new AllowedThread())
+            {
+                kingdom.Banner = null;
+                kingdom._clans.Remove(rulerClan);
+            }
+
+            rulerClan.PreAfterLoad();
+
+            Assert.NotNull(kingdom.Banner);
+            Assert.False(kingdom.Banner.IsBannerDataListEmpty());
+            Assert.Equal(BackgroundColorId, kingdom.Banner.GetPrimaryColorId());
+            Assert.Equal(OriginalBannerCode, rulerClan.ClanOriginalBanner.Serialize());
+            Assert.Single(kingdom.Clans, clan => clan == rulerClan);
+        }, SaveFromThisVersion);
     }
 
     private void SendRulerBannerEdit(EnvironmentInstance sender)

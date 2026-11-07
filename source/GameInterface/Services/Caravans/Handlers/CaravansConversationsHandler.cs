@@ -114,7 +114,7 @@ internal class CaravansConversationsHandler : IHandler
 
     private void Handle_NetworkChangeCaravanHomeSettlement(MessagePayload<NetworkChangeCaravanHomeSettlement> obj)
     {
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
@@ -136,18 +136,21 @@ internal class CaravansConversationsHandler : IHandler
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
 
-        // Guard against saving ids that can't be resolved on the server
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
-        if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomId, out var _)) return;
+        GameThread.RunSafe(() =>
+        {
+            // Guard against saving ids that can't be resolved on the server
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
+            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.KingdomId, out var _)) return;
 
-        if (obj.What.KingdomAlreadyProhibited)
-        {
-            sessionCaravansPlayerDataInterface.RemoveProhibitedKingdom(obj.What.MainHeroId, obj.What.KingdomId);
-        }
-        else
-        {
-            sessionCaravansPlayerDataInterface.AddProhibitedKingdom(obj.What.MainHeroId, obj.What.KingdomId);
-        }
+            if (obj.What.KingdomAlreadyProhibited)
+            {
+                sessionCaravansPlayerDataInterface.RemoveProhibitedKingdom(obj.What.MainHeroId, obj.What.KingdomId);
+            }
+            else
+            {
+                sessionCaravansPlayerDataInterface.AddProhibitedKingdom(obj.What.MainHeroId, obj.What.KingdomId);
+            }
+        });
     }
 
     private void Handle_ApplyHostileCaravanInteraction(MessagePayload<ApplyHostileCaravanInteraction> obj)
@@ -164,9 +167,10 @@ internal class CaravansConversationsHandler : IHandler
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
 
-        sessionInteractionsPlayerDataInterface.SetPlayerCaravanInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
         GameThread.RunSafe(() =>
         {
+            sessionInteractionsPlayerDataInterface.SetPlayerCaravanInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, CaravansCampaignBehavior.PlayerInteraction.Hostile);
+
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var conversationParty)) return;
@@ -188,11 +192,14 @@ internal class CaravansConversationsHandler : IHandler
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
 
-        // Guard against saving ids that can't be resolved on the server
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var _)) return;
+        GameThread.RunSafe(() =>
+        {
+            // Guard against saving ids that can't be resolved on the server
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.ConversationPartyId, out var _)) return;
 
-        sessionInteractionsPlayerDataInterface.SetPlayerCaravanInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, obj.What.Interaction);
+            sessionInteractionsPlayerDataInterface.SetPlayerCaravanInteraction(obj.What.MainHeroId, obj.What.ConversationPartyId, obj.What.Interaction);
+        });
     }
 
     private void Handle_UpdateTradeRumorTakenCaravans(MessagePayload<UpdateTradeRumorTakenCaravans> obj)
@@ -215,9 +222,12 @@ internal class CaravansConversationsHandler : IHandler
     {
         if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var _)) return;
 
-        sessionCaravansPlayerDataInterface.UpdateTradeRumorTakenCaravansForPlayer(obj.What.MainHeroId, obj.What.TradeRumorTakenCaravansIds);
+            sessionCaravansPlayerDataInterface.UpdateTradeRumorTakenCaravansForPlayer(obj.What.MainHeroId, obj.What.TradeRumorTakenCaravansIds);
+        });
     }
 
     private void Handle_CaravanLootedLeaveOnConsequence(MessagePayload<CaravanLootedLeaveOnConsequence> obj)
