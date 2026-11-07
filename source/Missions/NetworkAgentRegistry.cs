@@ -572,6 +572,9 @@ public class CoopAgentInfo
     public string CurrentAuthority { get; internal set; }
     public long AuthorityRevision { get; internal set; }
 
+    // Whether this client already ran the fleeing side effects of the owner's current panic.
+    internal bool PanicNotified { get; set; }
+
     internal void RecordAuthoritativeEquipment(AgentEquipmentData equipment)
     {
         authoritativeEquipment = equipment;
