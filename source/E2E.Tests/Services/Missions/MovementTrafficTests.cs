@@ -1534,6 +1534,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                 traffic,
                 includesAuthoritativeAgents);
 
+        public void ReportRecipientBulkSend(string controllerId) =>
+            inner.ReportRecipientBulkSend(controllerId);
+
         public void ReportReceive(
             double queueMilliseconds,
             double applyMilliseconds,

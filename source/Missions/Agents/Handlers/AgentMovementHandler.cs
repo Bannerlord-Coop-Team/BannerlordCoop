@@ -198,7 +198,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         public readonly Dictionary<Guid, float> MovementPendingSince =
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
-        public float LastBulkPollTime;
+        public bool DueEveryBulkPoll;
+        public double LastBulkPollTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
         public readonly ReusableMovementBatches<AgentData> PriorityMovement =
@@ -427,6 +428,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
     private float bulkPollElapsed;
+    // Frame time at the latest bulk poll, summed in double because float time drifts per-peer cadence in long battles.
+    private double bulkPollSeconds;
     private float priorityPollElapsed;
     private float bulkSampleElapsed;
     private float prioritySampleElapsed;
@@ -669,6 +672,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         if (authoritativeAgentsDue)
         {
             bulkPollElapsed = firstMovementPoll ? 0f : bulkPollElapsed % bulkInterval;
+            bulkPollSeconds += bulkSampleElapsed;
             bulkSampleElapsed = 0f;
         }
         if (priorityAgentDue)
@@ -697,7 +701,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             priorityAgentDue,
             samplePopulation,
             elapsedSinceBulkSample,
-            elapsedSincePrioritySample);
+            elapsedSincePrioritySample,
+            rate.BulkHz);
         movementRateController.ReportSend(
             ElapsedMilliseconds(startedAt),
             traffic,
@@ -739,7 +744,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         bool includePriorityAgent,
         bool samplePopulation,
         float bulkSampleElapsed,
-        float prioritySampleElapsed)
+        float prioritySampleElapsed,
+        int bulkHz)
     {
         // One sequence identifies this capture across recipients, priorities, and packet fragments.
         sampleSequence++;
@@ -880,7 +886,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             bool recipientBulkDue = includeAuthoritativeAgents &&
                 IsRecipientBulkDue(
                     recipient,
-                    movementRateController.GetReceiverCapHz(recipientId));
+                    movementRateController.GetReceiverCapHz(recipientId),
+                    bulkHz);
             bool reservedRoute = string.Equals(
                 recipientId,
                 sharedBudgetReservedControllerId,
@@ -902,7 +909,10 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 out MovementSendPairResult sendResult);
             traffic = traffic.Add(recipientTraffic);
             if (sendResult.BulkSentCount > 0)
+            {
                 lastBulkSendingRecipient = routedRecipientIndex;
+                movementRateController.ReportRecipientBulkSend(recipientId);
+            }
             if (sendResult.PrioritySentCount > 0)
                 lastPrioritySendingRecipient = routedRecipientIndex;
             if (!sendResult.BlockedBySharedBudget)
@@ -964,30 +974,42 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         return recipient;
     }
 
+    // A peer whose cap is at least the bulk rate gets every bulk poll; a timer anchored to the first poll would miss
+    // every other one when frame rate over bulk Hz isn't a whole number.
     private bool IsRecipientBulkDue(
         RecipientMovementState recipient,
-        int receiverCapHz)
+        int receiverCapHz,
+        int bulkHz)
     {
-        float interval = 1f / Math.Max(1, receiverCapHz);
-        if (recipient.HasBulkPoll &&
-            totalSimulationTime - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+        if (!recipient.HasBulkPoll)
         {
-            return false;
+            recipient.HasBulkPoll = true;
+            recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
+            recipient.LastBulkPollTime = bulkPollSeconds;
+            return true;
         }
 
-        if (recipient.HasBulkPoll)
+        if (receiverCapHz < bulkHz)
         {
-            float elapsed = totalSimulationTime - recipient.LastBulkPollTime;
-            int elapsedIntervals = Math.Max(
-                1,
-                (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
-            recipient.LastBulkPollTime += elapsedIntervals * interval;
+            recipient.DueEveryBulkPoll = false;
         }
-        else
+        else if (recipient.DueEveryBulkPoll)
         {
-            recipient.LastBulkPollTime = totalSimulationTime;
+            recipient.LastBulkPollTime = bulkPollSeconds;
+            return true;
         }
-        recipient.HasBulkPoll = true;
+
+        float interval = 1f / Math.Max(1, receiverCapHz);
+        double elapsed = bulkPollSeconds - recipient.LastBulkPollTime;
+        if (elapsed + CadenceEpsilonSeconds < interval)
+            return false;
+
+        int elapsedIntervals = Math.Max(
+            1,
+            (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
+        recipient.LastBulkPollTime += elapsedIntervals * (double)interval;
+        // Only a send the timer allows starts every-poll sending, so a drop in bulk Hz can't double up on the last one.
+        recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
         return true;
     }
 
