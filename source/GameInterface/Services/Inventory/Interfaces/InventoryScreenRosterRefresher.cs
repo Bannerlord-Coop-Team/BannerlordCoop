@@ -71,7 +71,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
 
     /// <summary>
     /// Merges one equipment set. A pending slot keeps its baseline, which is what lets the server see the conflict and
-    /// refuse the close. Slaughter can move the backup past the baseline, and it's left alone then.
+    /// refuse the slot changes. Slaughter can move the backup past the baseline, and it's left alone then.
     /// </summary>
     private static void MergeEquipmentSlots(EquipmentElement[] received, EquipmentElement[] live, EquipmentElement[] initial, EquipmentElement[] backup)
     {

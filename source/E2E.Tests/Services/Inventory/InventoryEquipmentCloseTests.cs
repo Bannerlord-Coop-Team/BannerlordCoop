@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
@@ -33,6 +34,8 @@ public class InventoryEquipmentCloseTests : IDisposable
     private readonly string mailId;
     private readonly string swordId;
     private readonly string daggerId;
+    private readonly string lootPlateId;
+    private readonly string lootHelmetId;
     private GameStateManager? previousStates;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -51,6 +54,8 @@ public class InventoryEquipmentCloseTests : IDisposable
         mailId = CreateEquippableItem("close_test_mail", ItemObject.ItemTypeEnum.BodyArmor);
         swordId = CreateEquippableItem("close_test_sword", ItemObject.ItemTypeEnum.OneHandedWeapon);
         daggerId = CreateEquippableItem("close_test_dagger", ItemObject.ItemTypeEnum.OneHandedWeapon);
+        lootPlateId = CreateEquippableItem("close_test_loot_plate", ItemObject.ItemTypeEnum.BodyArmor);
+        lootHelmetId = CreateEquippableItem("close_test_loot_helmet", ItemObject.ItemTypeEnum.HeadArmor);
 
         foreach (var instance in TestEnvironment.Clients.Prepend(Server))
         {
@@ -188,7 +193,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void SameSlotEquip_ReplyLandsOnTheOpenScreen_RefusesTheLaterClose()
+    public void SameSlotEquip_ReplyLandsOnTheOpenScreen_RefusesTheLaterEquip()
     {
         PauseNetwork();
         OpenScreen();
@@ -207,7 +212,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void SameSlotEquip_BothClosesBeforeAnyReply_RefusesTheLaterClose()
+    public void SameSlotEquip_BothClosesBeforeAnyReply_RefusesTheLaterEquip()
     {
         PauseNetwork();
         OpenScreen();
@@ -242,7 +247,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void ReplacingAnEquippedItemTwiceBeforeTheReply_RefusesTheLaterClose()
+    public void ReplacingAnEquippedItemTwiceBeforeTheReply_RefusesTheLaterEquip()
     {
         OpenScreen();
         Equip(armorId, EquipmentIndex.Body);
@@ -298,7 +303,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void ServerSlotWriteUnderAPendingEquip_RefusesTheCloseAndShowsTheServersSlot()
+    public void ServerSlotWriteUnderAPendingEquip_RefusesTheEquipAndShowsTheServersSlot()
     {
         OpenScreen();
         Equip(armorId, EquipmentIndex.Body);
@@ -311,7 +316,7 @@ public class InventoryEquipmentCloseTests : IDisposable
     }
 
     [Fact]
-    public void LinkedSlotMovesAfterTheRosterLostAnItem_RefusesTheWholeClose()
+    public void LinkedSlotMovesAfterTheRosterLostAnItem_RefusesAllTheEquipChanges()
     {
         OpenScreen();
         Equip(swordId, EquipmentIndex.Weapon1);
@@ -426,6 +431,123 @@ public class InventoryEquipmentCloseTests : IDisposable
         });
     }
 
+    // Loot and vanilla's reward screen differ only in mode, and neither can be reopened once it closes
+    [Theory]
+    [InlineData(InventoryScreenHelper.InventoryMode.Loot)]
+    [InlineData(InventoryScreenHelper.InventoryMode.Default)]
+    public void ConflictingEquipOnAOneShotScreen_RefusesTheEquipAndAwardsEveryItemOnce(InventoryScreenHelper.InventoryMode mode)
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        var reward = new[] { lootPlateId, lootHelmetId };
+        OpenOneShotScreen(mode, reward);
+        EquipFromLeft(lootPlateId, EquipmentIndex.Body);
+        TakeFromLeft(lootHelmetId);
+
+        // The earlier reply lands first, and the conflict outlives it
+        ResumeNetwork();
+        PauseNetwork();
+
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (lootPlateId, 1), (lootHelmetId, 1));
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<SendInformationMessage>(), message => message.Text.Contains("equipment"));
+    }
+
+    [Fact]
+    public void ConflictingEquipOnAForceTransferScreen_StillAwardsTheSupplies()
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string? poolId = null;
+        Server.Call(() =>
+        {
+            var supplies = new[] { new ItemRosterElementData(new ItemObjectData(lootPlateId, null, true), 1) };
+            poolId = Server.Resolve<IVillageHostileActionInterface>().AuthorizeForceTransfer(default, partyId, settlementId, supplies, null, 0).RequestId;
+        });
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenOneShotScreen(InventoryScreenHelper.InventoryMode.Loot, new[] { lootPlateId }, poolId);
+        EquipFromLeft(lootPlateId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (lootPlateId, 1));
+        Server.Call(() => Assert.False(Server.Resolve<IVillageHostileActionInterface>().TryPeekForceTransfer(poolId!, partyId, out _)));
+    }
+
+    [Fact]
+    public void EquipFromALootScreenWithNoConflict_EquipsTheItem()
+    {
+        OpenOneShotScreen(InventoryScreenHelper.InventoryMode.Loot, new[] { lootPlateId, lootHelmetId });
+        EquipFromLeft(lootPlateId, EquipmentIndex.Body);
+        TakeFromLeft(lootHelmetId);
+        CloseScreen(fromCancel: false);
+        Router.RunUntilIdle();
+        TestEnvironment.FlushCoalescer();
+
+        AssertEverywhere(EquipmentIndex.Body, lootPlateId, (lootPlateId, 0), (lootHelmetId, 1));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
+    }
+
+    [Fact]
+    public void DiscardTheRosterCantCoverOnALootScreen_StillAwardsTheLoot()
+    {
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenOneShotScreen(InventoryScreenHelper.InventoryMode.Loot, new[] { lootHelmetId });
+        TakeFromLeft(lootHelmetId);
+        Client.Call(() =>
+        {
+            var state = (InventoryState)Game.Current.GameStateManager.ActiveState;
+            var element = new ItemRosterElement(Client.GetRegisteredObject<ItemObject>(armorId), 1);
+            state.InventoryLogic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.PlayerInventory,
+                InventoryLogic.InventorySide.OtherInventory, element, EquipmentIndex.None, EquipmentIndex.None, null));
+        });
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (lootHelmetId, 1));
+    }
+
+    [Fact]
+    public void ConflictingEquippedPurchase_KeepsTheTradeAndPutsTheItemInTheRoster()
+    {
+        var settlementId = MovePlateToSettlementStock();
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+            instance.Call(() => instance.GetRegisteredObject<ItemObject>(plateId).Value = 100);
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold = 1000);
+        TestEnvironment.FlushCoalescer();
+
+        PauseNetwork();
+        OpenScreen();
+        Equip(armorId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+
+        OpenSettlementScreen(settlementId, isTrading: true);
+        EquipFromSettlement(plateId, EquipmentIndex.Body);
+        CloseScreen(fromCancel: false);
+        ResumeNetwork();
+
+        AssertEverywhere(EquipmentIndex.Body, armorId, (armorId, 0), (plateId, 1));
+        Server.Call(() =>
+        {
+            var plate = Server.GetRegisteredObject<ItemObject>(plateId);
+            Assert.Equal(0, Server.GetRegisteredObject<Settlement>(settlementId).ItemRoster.GetItemNumber(plate));
+            Assert.Equal(900, Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold);
+        });
+    }
+
     // Registers an item in every instance's native catalog, because equipment slots cross the wire by item id
     private string CreateEquippableItem(string stringId, ItemObject.ItemTypeEnum type)
     {
@@ -475,6 +597,7 @@ public class InventoryEquipmentCloseTests : IDisposable
             var state = states.CreateState<InventoryState>();
             logic.Initialize(new ItemRoster(), party.ItemRoster, party.MemberRoster, isTrading: false, isSpecialActionsPermitted: true,
                 character, InventoryScreenHelper.InventoryCategoryType.None, null, useBasePrices: true, state.InventoryMode);
+            StandInForViewModel(logic);
             state.InventoryLogic = logic;
             states._gameStates.Add(state);
         });
@@ -527,6 +650,24 @@ public class InventoryEquipmentCloseTests : IDisposable
         return settlementId;
     }
 
+    // Does what SPInventoryVM does for a transfer, because vanilla's logic leaves clearing the source slot to the view model
+    private static void StandInForViewModel(InventoryLogic logic)
+    {
+        logic.TotalAmountChange = _ => { };
+
+        // The publicizer exposes the event's backing field too, which makes the plain += ambiguous
+        InventoryLogic.ProcessResultListDelegate applyResults = (_, results) =>
+        {
+            foreach (var result in results.Where(result => InventoryLogic.IsEquipmentSide(result.ResultSide)))
+            {
+                result.ResultSideEquipment[result.EffectedEquipmentIndex] = result.FinalNumber > 0
+                    ? result.EffectedItemRosterElement.EquipmentElement
+                    : default;
+            }
+        };
+        typeof(InventoryLogic).GetEvent("AfterTransfer")!.AddEventHandler(logic, applyResults);
+    }
+
     // Opens a loot or trade screen with the settlement's stock on the left, at base prices because the harness has no market
     private void OpenSettlementScreen(string settlementId, bool isTrading)
     {
@@ -541,12 +682,53 @@ public class InventoryEquipmentCloseTests : IDisposable
             logic.Initialize(Client.GetRegisteredObject<Settlement>(settlementId).ItemRoster, party.ItemRoster, party.MemberRoster, isTrading,
                 isSpecialActionsPermitted: true, character, InventoryScreenHelper.InventoryCategoryType.None, null, useBasePrices: true, mode);
 
-            // Vanilla's view model hooks this, and the harness has none
-            logic.TotalAmountChange = _ => { };
+            StandInForViewModel(logic);
 
             var state = states.CreateState<InventoryState>();
             state.InventoryLogic = logic;
             states._gameStates.Add(state);
+        });
+    }
+
+    // Opens a screen on a client-only left roster, the way battle loot and reward items reach the player
+    private void OpenOneShotScreen(InventoryScreenHelper.InventoryMode mode, string[] itemIds, string? forceTransferId = null)
+    {
+        Client.Call(() =>
+        {
+            var party = Client.GetRegisteredObject<MobileParty>(partyId);
+            var character = party.LeaderHero.CharacterObject;
+            var states = Game.Current.GameStateManager;
+
+            var left = new ItemRoster();
+            using (new AllowedThread())
+            {
+                foreach (var itemId in itemIds) left.AddToCounts(Client.GetRegisteredObject<ItemObject>(itemId), 1);
+            }
+
+            var logic = new InventoryLogic(party, character, null);
+            logic.Initialize(left, party.ItemRoster, party.MemberRoster, isTrading: false, isSpecialActionsPermitted: true,
+                character, InventoryScreenHelper.InventoryCategoryType.None, null, useBasePrices: true, mode);
+            StandInForViewModel(logic);
+            if (forceTransferId != null) ForceTransferScreenTracker.NoteLootScreenOpened(forceTransferId, left);
+
+            var state = states.CreateState<InventoryState>();
+            state.InventoryLogic = logic;
+            states._gameStates.Add(state);
+        });
+    }
+
+    // Moves an item from the left roster straight onto a battle slot through vanilla's transfer command
+    private void EquipFromLeft(string itemId, EquipmentIndex slot) => EquipFromSettlement(itemId, slot);
+
+    // Moves an item from the left roster to the party inventory through vanilla's transfer command
+    private void TakeFromLeft(string itemId)
+    {
+        Client.Call(() =>
+        {
+            var state = (InventoryState)Game.Current.GameStateManager.ActiveState;
+            var element = new ItemRosterElement(Client.GetRegisteredObject<ItemObject>(itemId), 1);
+            state.InventoryLogic.AddTransferCommand(TransferCommand.Transfer(1, InventoryLogic.InventorySide.OtherInventory,
+                InventoryLogic.InventorySide.PlayerInventory, element, EquipmentIndex.None, EquipmentIndex.None, null));
         });
     }
 

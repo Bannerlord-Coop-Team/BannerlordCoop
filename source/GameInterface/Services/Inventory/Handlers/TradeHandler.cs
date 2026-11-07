@@ -170,15 +170,24 @@ internal class TradeHandler : IHandler
         MobileParty currentMobileParty = null;
         if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return false;
 
-        if (!CanRosterCoverClose(toRoster, message) || !TryRebaseEquipmentData(message))
+        var initialRoster = message.InitialPlayerRoster ?? Array.Empty<ItemRosterElement>();
+        var submittedRoster = message.ToItemRosterData ?? Array.Empty<ItemRosterElement>();
+        var slotChanges = RebaseEquipmentData(message);
+
+        bool refusesEquipment = slotChanges.Count > 0 &&
+            (slotChanges.Any(change => change.IsConflict) || !CanRosterCover(toRoster, initialRoster, submittedRoster));
+        if (refusesEquipment) RefuseEquipmentChanges(slotChanges, ref initialRoster, ref submittedRoster);
+
+        // Stock, stash and another party's items can be redone later, but a loot or reward screen can't be reopened.
+        // Its left side only ever gives, so a discard the roster can't cover just doesn't happen.
+        if (!message.CanGainXpFromDiscarding && !CanRosterCover(toRoster, initialRoster, submittedRoster))
         {
-            logger.Debug("Inventory close conflicts with the server's inventory, nothing applied (Party={PartyId})", message.OwnerPartyId);
+            logger.Debug("Inventory close takes more than the server's roster holds, nothing applied (Party={PartyId})", message.OwnerPartyId);
             if (peer != null) network.Send(peer, new SendInformationMessage("Your inventory changed before this screen closed, so its changes were not applied."));
             return false;
         }
 
-        var toItemRosterData = RebaseInventoryData(
-            toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+        var toItemRosterData = RebaseInventoryData(toRoster, initialRoster, submittedRoster);
 
         var boughtItems = ResolveTradeItems(message.BoughtItems);
         var soldItems = ResolveTradeItems(message.SoldItems);
@@ -202,6 +211,12 @@ internal class TradeHandler : IHandler
                     "ForceTransfer loot commit without attribution while a pool is pending (Party={PartyId})",
                     message.OwnerPartyId);
             }
+        }
+
+        if (refusesEquipment)
+        {
+            logger.Debug("Inventory close conflicts with the server's equipment, its slot changes were refused (Party={PartyId})", message.OwnerPartyId);
+            if (peer != null) network.Send(peer, new SendInformationMessage("Your equipment changed before this screen closed, so its equipment changes were not applied. Check your inventory."));
         }
 
         var fromItemRosterData = message.FromItemRosterData;
@@ -365,13 +380,14 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Keeps the server's slot wherever the screen didn't change it, and returns false if a slot
-    /// it did change no longer holds what the screen saw, because the screen's roster moves assumed it did.
+    /// Keeps the server's slot wherever the screen didn't change it, so a screen opened before the reply
+    /// to an earlier close can't undo that close, and returns the slots it did change.
     /// </summary>
-    private bool TryRebaseEquipmentData(CompleteTrade message)
+    private List<EquipmentSlotChange> RebaseEquipmentData(CompleteTrade message)
     {
+        var slotChanges = new List<EquipmentSlotChange>();
         var initial = message.InitialCharacterIdEquipmentsData;
-        if (initial == null) return true;
+        if (initial == null) return slotChanges;
 
         foreach (var hero in message.CharacterIdEquipmentsData)
         {
@@ -387,27 +403,47 @@ internal class TradeHandler : IHandler
                 var initialSlots = initialSets[set].ItemSlots;
                 for (int slot = 0; slot < slots.Length; slot++)
                 {
-                    if (SameElement(slots[slot], initialSlots[slot]))
-                    {
-                        slots[slot] = live._itemSlots[slot];
-                        continue;
-                    }
-
-                    if (!SameElement(initialSlots[slot], live._itemSlots[slot])) return false;
+                    if (SameElement(slots[slot], initialSlots[slot])) slots[slot] = live._itemSlots[slot];
+                    else slotChanges.Add(new EquipmentSlotChange(slots, slot, initialSlots[slot], live._itemSlots[slot]));
                 }
             }
         }
 
-        return true;
+        return slotChanges;
+    }
+
+    /// <summary>
+    /// Refuses all the screen's slot changes as a group. What it equipped stays in the inventory
+    /// and what it unequipped never left the slot, so the rest of the close still stands.
+    /// </summary>
+    private static void RefuseEquipmentChanges(
+        List<EquipmentSlotChange> slotChanges,
+        ref ItemRosterElement[] initialRoster,
+        ref ItemRosterElement[] submittedRoster)
+    {
+        initialRoster = WithOneOfEach(initialRoster, slotChanges.Select(change => change.Initial));
+        submittedRoster = WithOneOfEach(submittedRoster, slotChanges.Select(change => change.Submitted));
+        slotChanges.ForEach(change => change.Refuse());
+    }
+
+    // Copies the roster data with one more of each given item
+    private static ItemRosterElement[] WithOneOfEach(ItemRosterElement[] roster, IEnumerable<EquipmentElement> items)
+    {
+        var result = roster.ToList();
+        foreach (var item in items)
+        {
+            if (item.Item != null) AddToStock(result, item, 1);
+        }
+
+        return result.ToArray();
     }
 
     // A close can't take more of an item out of the roster than the server still has, whether it equips, sells or discards it
-    private static bool CanRosterCoverClose(ItemRoster toRoster, CompleteTrade message)
+    private static bool CanRosterCover(ItemRoster toRoster, ItemRosterElement[] initialRoster, ItemRosterElement[] submittedRoster)
     {
-        var submitted = message.ToItemRosterData ?? Array.Empty<ItemRosterElement>();
-        foreach (var item in message.InitialPlayerRoster ?? Array.Empty<ItemRosterElement>())
+        foreach (var item in initialRoster)
         {
-            if ((long)FindAmount(toRoster, item.EquipmentElement) + FindAmount(submitted, item.EquipmentElement) - item.Amount < 0) return false;
+            if ((long)FindAmount(toRoster, item.EquipmentElement) + FindAmount(submittedRoster, item.EquipmentElement) - item.Amount < 0) return false;
         }
 
         return true;
