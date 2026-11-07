@@ -26,10 +26,19 @@ public class BattleBenchmarkMissionProbe : IBattleBenchmarkMissionProbe
         state.InMission = true;
         state.IsBattleHost = battle?.Session.IsLocalHost == true;
         state.Scene = mission.SceneName;
-        state.ActiveAgents = mission.Agents.Count(agent => agent.IsActive());
-        state.OwnedAgents = controller.MissionComponent.AgentRegistry
-            .GetAgents(battle?.Session.OwnControllerId ?? state.ControllerId)
-            .Count(info => info.Agent != null && info.Agent.IsActive());
+        state.MissionEnded = mission.MissionEnded;
+        // An ended mission is tearing its agents down, and Agent.State reads native memory, so don't touch them.
+        if (state.MissionEnded) return state;
+
+        // Count from the mission's own agent list; a registry entry can outlive its native agent.
+        string ownControllerId = battle?.Session.OwnControllerId ?? state.ControllerId;
+        INetworkAgentRegistry registry = controller.MissionComponent.AgentRegistry;
+        foreach (Agent agent in mission.Agents.Where(agent => agent.IsActive()))
+        {
+            state.ActiveAgents++;
+            if (registry.TryGetAgentInfo(agent, out CoopAgentInfo info) && info.CurrentAuthority == ownControllerId)
+                state.OwnedAgents++;
+        }
         return state;
     }
 }

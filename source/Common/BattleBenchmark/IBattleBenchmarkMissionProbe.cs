@@ -13,6 +13,9 @@ public sealed class BattleBenchmarkMissionState
 
     public bool InMission { get; set; }
 
+    /// <summary>The battle was already over, so the window didn't measure a running battle.</summary>
+    public bool MissionEnded { get; set; }
+
     public bool IsBattleHost { get; set; }
 
     public string ControllerId { get; set; }

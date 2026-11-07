@@ -310,8 +310,6 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
     private bool Finish(long endTimestamp, string endReason, out string reportPath, out string error)
     {
-        BattleBenchmarkReport report;
-        string path;
         lock (gate)
         {
             if (!recording)
@@ -322,23 +320,26 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             }
 
             recording = false;
-            report = BuildReport(endTimestamp, endReason, processSampler.Sample(), missionProbe.Capture());
-            path = Path.Combine(outputDirectory, runId,
-                $"{report.Process.Role}-{SafeFileName(report.Process.ControllerId)}-{report.Process.ProcessId}.json");
         }
 
         detachFrameObserver(this);
 
+        // Finish runs inside GameThread.Update, so nothing here may throw into the game loop.
+        BattleBenchmarkReport report;
+        string path = null;
         try
         {
+            report = BuildReport(endTimestamp, endReason, processSampler.Sample(), missionProbe.Capture());
+            path = Path.Combine(outputDirectory, runId,
+                $"{report.Process.Role}-{SafeFileName(report.Process.ControllerId)}-{report.Process.ProcessId}.json");
             new JsonFileIO().WriteToFile(path, report);
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "[BattleBenchmark] Could not write {Path}", path);
+            Logger.Error(exception, "[BattleBenchmark] Could not write the report for {RunId} to {Path}", runId, path);
             lock (gate)
             {
-                lastError = $"Could not write {path}: {exception.Message}";
+                lastError = $"Could not write the report for {runId}: {exception.Message}";
             }
             reportPath = null;
             error = lastError;

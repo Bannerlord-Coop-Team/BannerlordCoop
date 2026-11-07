@@ -214,6 +214,21 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(outputDirectory, "disposed")));
     }
 
+    [Fact]
+    public void Window_ThatCannotBuildItsReport_EndsWithoutThrowingIntoTheGameLoop()
+    {
+        var recorder = CreateRecorder();
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(1), outputDirectory, out _));
+        probe.Throw = true;
+
+        now += 2 * Second;
+        recorder.OnFrame(now, now);
+
+        Assert.False(recorder.IsRecording);
+        Assert.Empty(attached);
+        Assert.Contains("probe failed", recorder.Status.LastError);
+    }
+
     [Theory]
     [InlineData(0.50, 5)]
     [InlineData(0.95, 10)]
@@ -242,6 +257,8 @@ public class BattleBenchmarkRecorderTests : IDisposable
     {
         public BattleBenchmarkMissionState State { get; set; } = BattleBenchmarkMissionState.None;
 
-        public BattleBenchmarkMissionState Capture() => State;
+        public bool Throw { get; set; }
+
+        public BattleBenchmarkMissionState Capture() => Throw ? throw new InvalidOperationException("probe failed") : State;
     }
 }
