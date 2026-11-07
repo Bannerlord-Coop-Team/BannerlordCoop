@@ -1,6 +1,6 @@
 ﻿using Missions.Agents.Packets;
 using System;
-using TaleWorlds.MountAndBlade;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace Coop.Tests.Missions.Agents;
