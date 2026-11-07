@@ -1,4 +1,4 @@
-﻿using Missions.Missiles.Message;
+﻿using Missions.Missiles;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -6,6 +6,8 @@ namespace E2E.Tests.Services.Missions;
 
 public class MissileOrientationCodecTests
 {
+    private readonly MissileOrientationCodec codec = new MissileOrientationCodec();
+
     [Fact]
     public void RandomRotations_UnpackWellInsideTheTolerance()
     {
@@ -16,8 +18,8 @@ public class MissileOrientationCodecTests
         {
             Mat3 orientation = RandomRotation(random);
 
-            Assert.True(MissileOrientationCodec.TryPack(orientation, out ulong packed));
-            Mat3 unpacked = MissileOrientationCodec.Unpack(packed);
+            Assert.True(codec.TryPack(orientation, out ulong packed));
+            Mat3 unpacked = codec.Unpack(packed);
 
             worstElementError = Math.Max(worstElementError, MaxElementError(orientation, unpacked));
             // A point on a long javelin, 1.5 m from the missile origin and off its axis.
@@ -47,8 +49,8 @@ public class MissileOrientationCodecTests
 
         foreach (Mat3 frame in frames)
         {
-            Assert.True(MissileOrientationCodec.TryPack(frame, out ulong packed));
-            Assert.True(frame.NearlyEquals(MissileOrientationCodec.Unpack(packed), 0.00002f));
+            Assert.True(codec.TryPack(frame, out ulong packed));
+            Assert.True(frame.NearlyEquals(codec.Unpack(packed), 0.00002f));
         }
     }
 
@@ -60,10 +62,10 @@ public class MissileOrientationCodecTests
         var skewed = new Mat3(new Vec3(1f, 0.1f, 0f), Vec3.Forward, Vec3.Up);
         var notANumber = new Mat3(new Vec3(float.NaN, 0f, 0f), Vec3.Forward, Vec3.Up);
 
-        Assert.False(MissileOrientationCodec.TryPack(scaled, out _));
-        Assert.False(MissileOrientationCodec.TryPack(mirrored, out _));
-        Assert.False(MissileOrientationCodec.TryPack(skewed, out _));
-        Assert.False(MissileOrientationCodec.TryPack(notANumber, out _));
+        Assert.False(codec.TryPack(scaled, out _));
+        Assert.False(codec.TryPack(mirrored, out _));
+        Assert.False(codec.TryPack(skewed, out _));
+        Assert.False(codec.TryPack(notANumber, out _));
     }
 
     internal static Mat3 RandomRotation(Random random)
@@ -75,7 +77,7 @@ public class MissileOrientationCodecTests
         return orientation;
     }
 
-    private static float NextAngle(Random random) => (float)((random.NextDouble() * 2.0 - 1.0) * Math.PI);
+    private static float NextAngle(Random random) => (float)(((random.NextDouble() * 2.0) - 1.0) * Math.PI);
 
     private static float MaxElementError(Mat3 expected, Mat3 actual) =>
         Math.Max(MaxElementError(expected.s, actual.s),

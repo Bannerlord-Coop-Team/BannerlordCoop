@@ -34,6 +34,7 @@ public class MissileHandler : IMissileHandler
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry networkAgentRegistry;
+    private readonly IMissileOrientationCodec orientationCodec;
     private readonly ConcurrentQueue<(NetworkAgentShoot Shot, int Attempts)> pendingShots = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
@@ -58,11 +59,12 @@ public class MissileHandler : IMissileHandler
     }
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
-        INetworkAgentRegistry networkAgentRegistry)
+        INetworkAgentRegistry networkAgentRegistry, IMissileOrientationCodec orientationCodec)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
+        this.orientationCodec = orientationCodec;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
@@ -127,8 +129,11 @@ public class MissileHandler : IMissileHandler
             missileWeapon.WeaponsCount);
         // Vanilla reads a weapon's banner only to paint a tableau item, so arrows, bolts and javelins skip it.
         Banner banner = missileItem.IsUsingTableau ? missileWeapon.Banner : null;
+        Mat3? exactOrientation = null;
+        if (!orientationCodec.TryPack(payload.What.Orientation, out ulong packedOrientation))
+            exactOrientation = payload.What.Orientation;
         network.SendAll(new NetworkAgentShoot(agentInfo.AgentId, payload.What.Position, payload.What.Direction,
-            payload.What.Orientation, payload.What.HasRigidBody, missileItem.StringId, modifierId,
+            packedOrientation, exactOrientation, payload.What.HasRigidBody, missileItem.StringId, modifierId,
             banner, payload.What.BaseSpeed, payload.What.Speed, missileWeapon.CurrentUsageIndex, sequence));
     }
 
@@ -316,7 +321,8 @@ public class MissileHandler : IMissileHandler
         Vec3 impactTarget = default;
         bool fastForward = TryTakeImpactHint(shot, out hint)
             && TryResolveImpactTarget(hint, mission, out impactTarget);
-        MissileReplayPlan replay = MissileReplayPlanner.Plan(shot.Position, shot.Velocity, shot.Orientation,
+        Mat3 launchOrientation = shot.ExactOrientation ?? orientationCodec.Unpack(shot.PackedOrientation);
+        MissileReplayPlan replay = MissileReplayPlanner.Plan(shot.Position, shot.Velocity, launchOrientation,
             shot.Speed, fastForward, impactTarget, hint.ImpactVelocity);
         if (replay.IsFastForwarded)
         {

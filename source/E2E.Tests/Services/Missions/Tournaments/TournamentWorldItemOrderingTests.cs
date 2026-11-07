@@ -11,6 +11,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Agents.Patches;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Missions.Tournaments;
@@ -1437,7 +1438,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         {
             this.agentRegistry = agentRegistry;
             this.shotMap = shotMap;
-            missiles = new MissileHandler(network, Broker, agentRegistry);
+            missiles = new MissileHandler(network, Broker, agentRegistry, new MissileOrientationCodec());
             drops = CreateHandler(observer, agentRegistry, Items, objectManager, Spawner, Broker);
             pickups = new WeaponPickupHandler(agentRegistry, Items, network, Broker, objectManager);
         }

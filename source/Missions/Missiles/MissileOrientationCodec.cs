@@ -1,10 +1,18 @@
-﻿using System;
+﻿﻿using System;
 using TaleWorlds.Library;
 
-namespace Missions.Missiles.Message;
+namespace Missions.Missiles;
 
 /// <summary>Packs a missile launch rotation into 64 bits as a smallest-three quaternion.</summary>
-internal static class MissileOrientationCodec
+public interface IMissileOrientationCodec
+{
+    /// <summary>Packs <paramref name="orientation"/>, failing when the unpacked frame would be off by more than <see cref="MissileOrientationCodec.Tolerance"/>.</summary>
+    bool TryPack(Mat3 orientation, out ulong packed);
+    Mat3 Unpack(ulong packed);
+}
+
+/// <inheritdoc/>
+public class MissileOrientationCodec : IMissileOrientationCodec
 {
     // Largest error allowed on any matrix element after a round trip. Vanilla multiplayer sends missile frames
     // as unit vectors with a 0.002 step, so this stays within what vanilla already shows.
@@ -17,8 +25,7 @@ internal static class MissileOrientationCodec
     private const float ComponentRange = 0.70710677f;
     private const float Scale = ComponentMask / (2f * ComponentRange);
 
-    /// <summary>Packs <paramref name="orientation"/>, failing when the unpacked frame would be off by more than <see cref="Tolerance"/>.</summary>
-    public static bool TryPack(Mat3 orientation, out ulong packed)
+    public bool TryPack(Mat3 orientation, out ulong packed)
     {
         Quaternion quat = Quaternion.QuaternionFromMat3(orientation);
         float[] components = { quat.X, quat.Y, quat.Z, quat.W };
@@ -45,7 +52,7 @@ internal static class MissileOrientationCodec
         return IsWithinTolerance(orientation, Unpack(packed));
     }
 
-    public static Mat3 Unpack(ulong packed)
+    public Mat3 Unpack(ulong packed)
     {
         int largest = (int)(packed >> IndexShift) & 3;
         float[] components = new float[4];

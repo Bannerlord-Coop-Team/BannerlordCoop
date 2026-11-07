@@ -8,6 +8,7 @@ using E2E.Tests.Environment.MockEngine;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Missions;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using TaleWorlds.Core;
@@ -92,7 +93,7 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 network.RouteMessages = false;
                 using var broker = new MessageBroker();
                 using var handler = new MissileHandler(network, broker,
-                    shooterClient.Resolve<INetworkAgentRegistry>());
+                    shooterClient.Resolve<INetworkAgentRegistry>(), new MissileOrientationCodec());
 
                 broker.Publish(this, new AgentShoot(shooter, wielded, position, direction, orientation,
                     55f, 61f, hasRigidBody, missileIndex: 7));
@@ -114,7 +115,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 var registry = peerClient.Resolve<INetworkAgentRegistry>();
                 Assert.True(registry.TryRegisterAgent("shooter", agentId, shooterCopy));
                 using var broker = new MessageBroker();
-                using var handler = new MissileHandler(peerClient.Resolve<MockBattleNetwork>(), broker, registry);
+                using var handler = new MissileHandler(peerClient.Resolve<MockBattleNetwork>(), broker, registry,
+                    new MissileOrientationCodec());
 
                 broker.Publish(this, received);
                 handler.DrainPendingShots();

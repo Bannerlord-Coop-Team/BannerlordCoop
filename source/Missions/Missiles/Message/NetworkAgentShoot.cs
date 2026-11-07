@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 using TaleWorlds.Core;
@@ -18,7 +18,7 @@ public class NetworkAgentShoot : ICommand
     public Vec3 Velocity { get; }
     // Only set when the frame doesn't fit PackedOrientation within MissileOrientationCodec.Tolerance.
     [ProtoMember(4)]
-    private Mat3? ExactOrientation { get; }
+    public Mat3? ExactOrientation { get; }
     [ProtoMember(5)]
     public bool HasRigidBody { get; }
     [ProtoMember(6)]
@@ -36,21 +36,17 @@ public class NetworkAgentShoot : ICommand
     [ProtoMember(13)]
     public long ShotSequence { get; }
     [ProtoMember(14, DataFormat = DataFormat.FixedSize)]
-    private ulong PackedOrientation { get; }
+    public ulong PackedOrientation { get; }
 
-    public Mat3 Orientation => ExactOrientation ?? MissileOrientationCodec.Unpack(PackedOrientation);
-
-    public NetworkAgentShoot(Guid agentId, Vec3 position, Vec3 velocity, Mat3 orientation,
-        bool hasRigidBody, string missileItemId, string itemModifierId, Banner banner,
+    public NetworkAgentShoot(Guid agentId, Vec3 position, Vec3 velocity, ulong packedOrientation,
+        Mat3? exactOrientation, bool hasRigidBody, string missileItemId, string itemModifierId, Banner banner,
         float baseSpeed, float speed, int currentUsageIndex, long shotSequence)
     {
         AgentId = agentId;
         Position = position;
         Velocity = velocity;
-        if (MissileOrientationCodec.TryPack(orientation, out ulong packed))
-            PackedOrientation = packed;
-        else
-            ExactOrientation = orientation;
+        PackedOrientation = packedOrientation;
+        ExactOrientation = exactOrientation;
         HasRigidBody = hasRigidBody;
         MissileItemId = missileItemId;
         ItemModifierId = itemModifierId;
