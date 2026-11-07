@@ -237,6 +237,12 @@
     // If a higher-priority player is still loading, the server waits up to 5 seconds for them before picking someone else.
     // (Default) []: The first player to finish loading hosts the battle.
     // e.g. ["76561198000000001", "76561198000000002"]
-    "preferredBattleHosts": []
+    "preferredBattleHosts": [],
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
+    // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
+    // (Default) false: the dedicated server runs without NavalDLC.
+    // true: the dedicated server runs with NavalDLC. Needs a save made with it and a tester build.
+    "warSails": false
   }
 }

@@ -36,6 +36,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
+    private SettlementLeaveType pendingLeaveType;
     private (MobileParty Party, Settlement Settlement, MapEvent Battle) lastAutomaticRecovery;
 
     public ClientSettlementExitEnterHandler(
@@ -119,8 +120,9 @@ public class ClientSettlementExitEnterHandler : IHandler
             return;
 
         pendingLeavePartyId = partyId;
+        pendingLeaveType = payload.LeaveType;
 
-        var message = new NetworkRequestEndSettlementEncounter(partyId);
+        var message = new NetworkRequestEndSettlementEncounter(partyId, payload.LeaveType);
 
         network.SendAll(message);
     }
@@ -228,6 +230,7 @@ public class ClientSettlementExitEnterHandler : IHandler
             return;
 
         pendingLeavePartyId = 0;
+        pendingLeaveType = SettlementLeaveType.Leave;
         if (pendingStart == null || pendingStart.State == PendingStartState.Sent)
             return;
 
@@ -250,12 +253,15 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void HandleAppliedLeave(uint partyId)
     {
         bool resolvesPendingLeave = pendingLeavePartyId != 0;
+        var leaveType = SettlementLeaveType.Leave;
         if (resolvesPendingLeave)
         {
             if (partyId != 0 && pendingLeavePartyId != partyId)
                 return;
 
+            leaveType = pendingLeaveType;
             pendingLeavePartyId = 0;
+            pendingLeaveType = SettlementLeaveType.Leave;
             pendingStart = null;
         }
 
@@ -268,7 +274,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         using (new AllowedThread())
         {
-            settlementInterface.EndSettlementEncounter();
+            settlementInterface.EndSettlementEncounter(leaveType);
         }
     }
 

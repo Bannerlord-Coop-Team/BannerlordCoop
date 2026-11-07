@@ -20,7 +20,8 @@ public sealed class ModBuildService : IModBuildService
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Deployment builds require Windows MSBuild.");
         var projects = new List<string> { "Coop" };
-        if (File.Exists(Path.Combine(repository, "source", "Missions.Naval", "Missions.Naval.csproj"))) projects.Add("Missions.Naval");
+        foreach (string naval in DeploymentPlan.NavalProjects)
+            if (File.Exists(Path.Combine(repository, "source", naval, naval + ".csproj"))) projects.Add(naval);
         foreach (string project in projects)
         {
             var info = CreateStartInfo(repository, profile.Deployment.MsbuildPath, profile.GameRoot(), artifacts, project, configuration);
@@ -35,7 +36,7 @@ public sealed class ModBuildService : IModBuildService
     public static ProcessStartInfo CreateStartInfo(string repository, string msbuild, string gameRoot, string artifacts, string project, string configuration = "Release")
     {
         if (configuration != "Release" && configuration != "Debug") throw new ArgumentException("configuration must be Release or Debug.", nameof(configuration));
-        if (project != "Coop" && project != "Missions.Naval") throw new ArgumentException("Unsupported deployment project.");
+        if (project != "Coop" && !DeploymentPlan.NavalProjects.Contains(project)) throw new ArgumentException("Unsupported deployment project.");
         var info = new ProcessStartInfo(msbuild)
         {
             WorkingDirectory = repository, UseShellExecute = false, CreateNoWindow = true,
@@ -52,7 +53,7 @@ public sealed class ModBuildService : IModBuildService
             "-p:ModsRoot=" + EscapeProperty(scratch), "-p:ModDir=" + EscapeProperty(Path.Combine(scratch, "Coop")),
             "-p:ModBinDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "bin")), "-p:ModPrefabDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "prefabs")) })
             info.ArgumentList.Add(argument);
-        if (project == "Missions.Naval") info.ArgumentList.Add("-p:BuildProjectReferences=false");
+        if (project != "Coop") info.ArgumentList.Add("-p:BuildProjectReferences=false");
         return info;
     }
 

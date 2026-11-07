@@ -147,7 +147,7 @@ public class AuthoritativeCompletionTests : MapEventTestBase
         // A host-migration handoff on the server: the host departs, the successor (guest) is promoted.
         Server.Call(() =>
             Server.Resolve<IMessageBroker>().Publish(this,
-                new MissionMemberDeparted(HostControllerId, mapEventId, wasRetreat: false, isInstanceEmpty: false)));
+                new MissionMemberDeparted(HostControllerId, mapEventId, wasRetreat: false, isInstanceEmpty: false, withdraws: false)));
 
         // A reconnecting/rejoining client replays its completion for the same (now-gone) battle.
         hostClient.Call(() =>
@@ -199,7 +199,7 @@ public class AuthoritativeCompletionTests : MapEventTestBase
 
         Server.Call(() =>
             Server.Resolve<IMessageBroker>().Publish(this,
-                new MissionMemberDeparted(HostControllerId, mapEventId, wasRetreat: false, isInstanceEmpty: false)));
+                new MissionMemberDeparted(HostControllerId, mapEventId, wasRetreat: false, isInstanceEmpty: false, withdraws: false)));
 
         Clients.Last().Call(() =>
             Clients.Last().Resolve<INetwork>().SendAll(new NetworkChangeBattleState(mapEventId, BattleState.AttackerVictory)),

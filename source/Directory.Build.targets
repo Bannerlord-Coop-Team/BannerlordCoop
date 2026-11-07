@@ -1,4 +1,17 @@
 <Project>
+  <!-- Coop.sln can't condition a project, so without War Sails the naval projects build as empty
+       assemblies that nothing references instead of failing on the missing NavalDLC types. -->
+  <ItemGroup Condition="'$(CoopNavalDlc)' != 'true' And ('$(MSBuildProjectName)' == 'Missions.Naval' Or '$(MSBuildProjectName)' == 'Coop.Naval')">
+    <Compile Remove="$(MSBuildProjectDirectory)\**\*.cs" />
+    <Reference Remove="NavalDLC;NavalDLC.View;NavalDLC.GauntletUI;NavalDLC.ViewModelCollection" />
+    <Publicize Remove="@(Publicize)" />
+    <DoNotPublicize Remove="@(DoNotPublicize)" />
+  </ItemGroup>
+  <!-- A local Release build with War Sails installed is a TESTER build like Debug, so War Sails co-op can run in it.
+       CI sets CI=true, so its release builds stay without TESTER unless the workflow passes it. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(CoopNavalDlc)' == 'true' And '$(CI)' != 'true'">
+    <DefineConstants>$(DefineConstants);TESTER</DefineConstants>
+  </PropertyGroup>
   <!-- Fails a game-referencing project with one clear error when BANNERLORD_DIR is unset or isn't an install, instead
        of a wall of MSB3245/CS0246. A global -p:BannerlordDir skips EnsureTrailingSlash, so a missing slash lands here too. -->
   <Target Name="CheckBannerlordDir"

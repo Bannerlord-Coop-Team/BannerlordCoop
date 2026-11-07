@@ -83,6 +83,57 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
+        // The stats line has to name the route, because ping alone cant tell a route switch apart.
+        [Theory]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Relayed, "route=relayed")]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Relayed | Constants.k_nSteamNetworkConnectionInfoFlags_Fast, "route=relayed")]
+        [InlineData(0, "route=direct")]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Fast, "route=direct")]
+        public void DescribeConnection_NamesRouteFromConnectionFlags(int flags, string expectedRoute)
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = flags,
+            };
+
+            Assert.EndsWith(expectedRoute, transport.DescribeConnection(42));
+        }
+
+        // A failed info read must not lose the rest of the stats line.
+        [Fact]
+        public void DescribeConnection_ReportsUnknownRouteWhenInfoIsUnavailable()
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = null,
+            };
+
+            string description = transport.DescribeConnection(42);
+
+            Assert.StartsWith("sendRate=", description);
+            Assert.EndsWith("route=unknown", description);
+        }
+
+        // A join that fails before finding a route has no Relayed flag, which must not read as direct.
+        [Theory]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_FindingRoute)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)]
+        public void DescribeConnection_ReportsUnknownRouteWhenNotConnected(ESteamNetworkingConnectionState state)
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = 0,
+                ConnectionInfoState = state,
+            };
+
+            Assert.EndsWith("route=unknown", transport.DescribeConnection(42));
+        }
+
         private static void SeedOwnedConnection(
             SteamNetworkingTunnelTransportBase transport,
             uint connection,
@@ -115,6 +166,10 @@ namespace Coop.Tests.Steam
             {
             }
 
+            public EResult RealTimeStatusResult { get; set; } = EResult.k_EResultFail;
+            public int? ConnectionInfoFlags { get; set; }
+            public ESteamNetworkingConnectionState ConnectionInfoState { get; set; } =
+                ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected;
             public List<uint> RawClosedConnections { get; } = new List<uint>();
             public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
                 ConfiguredValues { get; } =
@@ -183,7 +238,14 @@ namespace Coop.Tests.Steam
                 HSteamNetConnection conn,
                 ref SteamNetConnectionRealTimeStatus_t status,
                 int lanes,
-                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus) => EResult.k_EResultFail;
+                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus) => RealTimeStatusResult;
+
+            // Scripts the route flags, where null stands for Steam refusing the read.
+            protected override bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info)
+            {
+                info = new SteamNetConnectionInfo_t { m_nFlags = ConnectionInfoFlags ?? 0, m_eState = ConnectionInfoState };
+                return ConnectionInfoFlags.HasValue;
+            }
 
             protected override HSteamNetConnection ConnectP2P(
                 ref SteamNetworkingIdentity identity,
