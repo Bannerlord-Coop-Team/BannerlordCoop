@@ -157,7 +157,7 @@ public partial class MovementTrafficTests
         "11|r1|MovementPacket|47|511094947D11BAFE",
         "11|r2|MovementPacket|47|2B6C7487633B6116",
         "11|r2|MovementPacket|131|84CBDF446CCDA9D0",
-        "11|r2|MovementPacket|47|511094947D11BAFE</StdOut>",
+        "11|r2|MovementPacket|47|511094947D11BAFE",
     };
 
     // Two runs, because a datagram that differs between runs of the same scenario is not a usable reference.
