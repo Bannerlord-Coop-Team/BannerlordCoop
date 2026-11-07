@@ -9,6 +9,7 @@ namespace GameInterface.Services.Smithing.Interfaces;
 public interface ISmithingVMsProvider : IGameAbstraction
 {
     void SetCurrentCraftingVM(CraftingVM craftingVM);
+    void ClearCurrentCraftingVM(CraftingVM craftingVM);
 
     SmeltingVM GetCurrentSmeltingVM();
     RefinementVM GetCurrentRefinementVM();
@@ -25,6 +26,13 @@ public class SmithingVMsProvider : ISmithingVMsProvider
     public void SetCurrentCraftingVM(CraftingVM craftingVM)
     {
         currentCraftingVM = craftingVM;
+    }
+
+    public void ClearCurrentCraftingVM(CraftingVM craftingVM)
+    {
+        // A newer screen may already have replaced the finalized one
+        if (ReferenceEquals(currentCraftingVM, craftingVM))
+            currentCraftingVM = null;
     }
 
     public SmeltingVM GetCurrentSmeltingVM()

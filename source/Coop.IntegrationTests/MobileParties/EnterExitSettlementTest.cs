@@ -493,6 +493,52 @@ namespace Coop.IntegrationTests.MobileParties
             }
         }
 
+        [Fact]
+        public void SetSailLeave_SetsSailFromLeftSettlement_OnServer()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            RegisterPartyForClient(client1, party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            party._currentSettlement = settlement;
+
+            GameThreadTestRunner.Run(() =>
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail)));
+
+            Assert.Equal(SettlementLeaveType.SetSail,
+                Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>()).LeaveType);
+
+            var serverSettlementInterface = TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>();
+            serverSettlementInterface.Verify(s => s.PartyLeaveSettlement(party), Times.Once);
+            serverSettlementInterface.Verify(s => s.PartySetSail(party, settlement), Times.Once);
+            serverSettlementInterface.Verify(s => s.PartyDisembark(party, settlement), Times.Never);
+        }
+
+        [Fact]
+        public void DisembarkLeave_DisembarksAtLeftSettlementBeforeLeaving_OnServer()
+        {
+            var client1 = TestEnvironment.Clients.First();
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            RegisterPartyForClient(client1, party, "party1");
+            TestEnvironment.RegisterObjectInNetwork(settlement, "settlement1");
+            party._currentSettlement = settlement;
+
+            var serverSettlementInterface = TestEnvironment.Server.Resolve<Mock<ISettlementInterface>>();
+            var calls = new List<string>();
+            serverSettlementInterface.Setup(s => s.PartyDisembark(party, settlement)).Callback(() => calls.Add("disembark"));
+            serverSettlementInterface.Setup(s => s.PartyLeaveSettlement(party)).Callback(() => calls.Add("leave"));
+
+            GameThreadTestRunner.Run(() =>
+                client1.SimulateMessage(this, new EndSettlementEncounterAttempted(party, SettlementLeaveType.Disembark)));
+
+            Assert.Equal(SettlementLeaveType.Disembark,
+                Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>()).LeaveType);
+            Assert.Equal(new[] { "disembark", "leave" }, calls);
+            serverSettlementInterface.Verify(s => s.PartySetSail(party, settlement), Times.Never);
+        }
+
         private void RegisterPartyForClient(
             EnvironmentInstance client,
             MobileParty party,

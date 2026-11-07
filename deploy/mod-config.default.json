@@ -225,6 +225,17 @@
 
     // Set the time in seconds players have to vote on kingdom decisions.
     // Default is 60. Values of 0 or lower will default back to 60.
-    "kingdomDecisionVoteTimeoutSeconds": 60
+    "kingdomDecisionVoteTimeoutSeconds": 60,
+
+    // Set what happens to clans when their kingdom is destroyed.
+    // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
+    // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
+    "clansAfterKingdomDestruction": "Vanilla",
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
+    // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
+    // (Default) false: the dedicated server runs without NavalDLC.
+    // true: the dedicated server runs with NavalDLC. Needs a save made with it and a tester build.
+    "warSails": false
   }
 }

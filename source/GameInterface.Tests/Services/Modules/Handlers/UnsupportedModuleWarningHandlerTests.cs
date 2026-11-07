@@ -1,6 +1,9 @@
-﻿using GameInterface.Services.Modules;
+﻿using Common;
+using GameInterface.Services.Modules;
+using System;
 using System.Collections.Generic;
 using GameInterface.Services.Modules.Handlers;
+using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.UI.CoopOptions;
 using TaleWorlds.Library;
 using Xunit;
@@ -9,8 +12,23 @@ namespace GameInterface.Tests.Services.Modules.Handlers;
 /// <summary>
 /// Addition of multiple tests to check the logic behind the warning
 /// </summary>
-public class UnsupportedModuleWarningHandlerTests
+[Collection(ModInformationRoleCollection.Name)]
+public class UnsupportedModuleWarningHandlerTests : IDisposable
 {
+    private readonly bool previousNavalDlc = ModInformation.IsNavalEnabled;
+
+    // Starts every test with War Sails off; the test that needs it on turns it on.
+    public UnsupportedModuleWarningHandlerTests()
+    {
+        ModInformation.IsNavalEnabled = false;
+    }
+
+    // Puts back the process-wide flag.
+    public void Dispose()
+    {
+        ModInformation.IsNavalEnabled = previousNavalDlc;
+    }
+
     [Theory]
     [InlineData("Coop")]
     [InlineData("CoopNightly")]
@@ -22,7 +40,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("StoryMode", isOfficial: true),
             Module(coopModuleId, isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         var shown = 0;
 
         coordinator.TryShowPrompt(true, _ => shown++);
@@ -39,7 +57,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Coop", isOfficial: false),
             Module("CoopNightly", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -58,7 +76,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("ExampleMod", isOfficial: false),
             Module("AnotherMod", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -89,7 +107,7 @@ public class UnsupportedModuleWarningHandlerTests
         provider.Names["Bannerlord.Harmony"] = "Harmony";
         provider.Names["ExampleMod"] = "ExampleMod";
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -111,9 +129,43 @@ public class UnsupportedModuleWarningHandlerTests
         var provider = new TestModuleInfoProvider(
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false),
+            Module("SomeDlc", isOfficial: true, isDlc: true));
+
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.Contains("- SomeDlc", inquiry.Text);
+    }
+
+    [Fact]
+    public void NavalDlc_DoesNotShowWarning_WhenTheBuildShippedNavalCode()
+    {
+        ModInformation.IsNavalEnabled = true;
+        var provider = new TestModuleInfoProvider(
+            Module("Native", isOfficial: true),
+            Module("Coop", isOfficial: false),
             Module("NavalDLC", isOfficial: true, isDlc: true));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.Null(inquiry);
+    }
+
+    [Fact]
+    public void NavalDlc_ShowsWarning_WhenTheBuildHasNoNavalCode()
+    {
+        var provider = new TestModuleInfoProvider(
+            Module("Native", isOfficial: true),
+            Module("Coop", isOfficial: false),
+            Module("NavalDLC", isOfficial: true, isDlc: true));
+
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -131,7 +183,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("DedicatedServer.Linux", isOfficial: false),
             Module("DedicatedServer.Windows", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         var shown = 0;
 
         coordinator.TryShowPrompt(true, _ => shown++);
@@ -145,7 +197,7 @@ public class UnsupportedModuleWarningHandlerTests
         var provider = new TestModuleInfoProvider(
             Module("ExampleMod", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
         var shown = 0;
 
         coordinator.TryShowPrompt(false, _ => shown++);
@@ -163,7 +215,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {}, new ModuleValidator());
 
         coordinator.TryShowPrompt(true, _ => { });
         coordinator.TryShowPrompt(true, _ => { });
@@ -183,7 +235,8 @@ public class UnsupportedModuleWarningHandlerTests
             provider,
             provider,
             store,
-            _ => { });
+            _ => { },
+            new ModuleValidator());
         firstLaunchHandler.TryShowPrompt(
             true,
             value => inquiry = value);
@@ -196,7 +249,7 @@ public class UnsupportedModuleWarningHandlerTests
         var secondLaunchHandler = new UnsupportedModuleWarningHandler(
             provider,
             provider,
-            store, _ => { });
+            store, _ => { }, new ModuleValidator());
         var shownOnNextLaunch = 0;
 
         secondLaunchHandler.TryShowPrompt(
@@ -217,7 +270,8 @@ public class UnsupportedModuleWarningHandlerTests
             provider,
             provider,
             store,
-            _ => { });
+            _ => { },
+            new ModuleValidator());
         firstLaunchHandler.TryShowPrompt(
             true,
             value => inquiry = value);
@@ -237,7 +291,8 @@ public class UnsupportedModuleWarningHandlerTests
             provider,
             provider,
             store,
-            _ => { });
+            _ => { },
+            new ModuleValidator());
         var shownOnNextLaunch = 0;
         secondLaunchHandler.TryShowPrompt(
             true,

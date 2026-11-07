@@ -59,13 +59,6 @@ public class MessagePacketHandler : IMessagePacketHandler
         if (message is null)
             throw new ArgumentNullException(nameof(message));
 
-        if (ModInformation.IsServer && message is IServerToClientCommand)
-        {
-            Logger.Warning("Rejected server-to-client-only message {MessageType} received while running as server",
-                message.GetType());
-            return;
-        }
-
         var messageType = message.GetType();
         var publishInvoker = GetPublishInvoker(messageType);
 

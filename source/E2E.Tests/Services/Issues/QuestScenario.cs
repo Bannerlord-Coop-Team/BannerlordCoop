@@ -21,6 +21,7 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
+    private readonly Func<EnvironmentInstance, Hero, IssueBase>? issueFactory;
 
     public string NotableId { get; }
     public Player PlayerA { get; }
@@ -38,6 +39,7 @@ internal sealed class QuestScenario
         Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null)
     {
         this.testEnvironment = testEnvironment;
+        issueFactory = createIssue;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
@@ -66,6 +68,13 @@ internal sealed class QuestScenario
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
         });
+    }
+
+    public string AddIssue()
+    {
+        var notableId = testEnvironment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance, notableId);
+        return notableId;
     }
 
     public QuestBase QuestOf(EnvironmentInstance instance)
@@ -139,6 +148,23 @@ internal sealed class QuestScenario
 
                 Campaign.Current.IssueManager._issues.Add(hero, issue);
                 hero.OnIssueCreatedForHero(issue);
+            }
+        });
+    }
+
+    private void AddIssue(EnvironmentInstance instance, string notableId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+
+            using (new AllowedThread())
+            {
+                var issue = issueFactory?.Invoke(instance, notable) ?? new AllowedIssue(notable, null);
+                issue.StringId = $"issue_scenario_{notableId}";
+                issue._issueState = IssueBase.IssueState.Ongoing;
+                Campaign.Current.IssueManager._issues.Add(notable, issue);
+                notable.OnIssueCreatedForHero(issue);
             }
         });
     }

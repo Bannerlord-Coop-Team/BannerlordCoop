@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-docker_image=${E2E_IMAGE:-garrettluskey/bannerlordcoop:latest}
+docker_image=${E2E_IMAGE:-ghcr.io/bannerlord-coop-team/bannerlordcoop:latest}
 shard_count=${E2E_SHARDS:-4}
 # Where the test image holds the game assemblies; builds and tests resolve them through BANNERLORD_DIR.
 image_bannerlord_dir=/home/mb2
@@ -37,7 +37,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 if ! docker image inspect "$docker_image" >/dev/null 2>&1; then
     echo "Docker image $docker_image is not available locally" >&2
-    echo "Pull it first with: docker pull $docker_image" >&2
+    echo "Pull it first with: docker pull $docker_image (log in with docker login ghcr.io using a token with read:packages)" >&2
     exit 1
 fi
 

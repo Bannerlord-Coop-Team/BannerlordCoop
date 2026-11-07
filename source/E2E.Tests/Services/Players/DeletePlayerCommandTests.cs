@@ -3,6 +3,9 @@ using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Statistics.Data;
+using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Commands;
@@ -252,6 +255,25 @@ public class DeletePlayerCommandTests : IDisposable
         {
             Assert.False(OtherClient.Resolve<IPlayerManager>().TryGetPlayer(fixture.ControllerId, out _));
         });
+    }
+
+    [Fact]
+    public void ServerRetirementRequest_SendsTheFinalStatisticsToTheRetiringPlayer()
+    {
+        var fixture = SetupRegisteredPlayer();
+        var playerStatistics = Server.Resolve<ICoopSessionProvider>().CoopSession.StatisticsPlayerData.PlayerStatistics;
+        playerStatistics[fixture.HeroId] = new StatisticsData { NumberOfBattlesWon = 3 };
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new NetworkRequestPlayerRetirement());
+        }, new[] { AccessTools.Method(typeof(ApplyHeirSelectionActionInterface), "RecordRetirement") });
+
+        var retired = Server.NetworkSentMessages.GetMessages<NetworkPlayerRetired>().ToArray();
+        Assert.Equal(2, retired.Length);
+        var withStatistics = Assert.Single(retired, message => message.Statistics != null);
+        Assert.Equal(3, withStatistics.Statistics.NumberOfBattlesWon);
+        Assert.False(playerStatistics.ContainsKey(fixture.HeroId));
     }
 
     private record PlayerFixture(string ControllerId, string HeroId, string CharacterId, string PartyId, string ClanId);

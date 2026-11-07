@@ -22,11 +22,24 @@ public interface IPlayerEncounterInterface : IGameAbstraction
     public bool TrackPendingHostileAction(PlayerEncounter playerEncounter);
     public void ClearPendingHostileAction();
     public void RecoverRejectedHostileAction();
+
+    /// <summary>[Game thread] Whether this client sits in the encounter meeting menu with its conversation open.</summary>
+    public bool IsEncounterMeetingConversationOpen();
+
+    /// <summary>
+    /// [Game thread] Ends the open encounter meeting conversation as the player's answer does, so vanilla moves on to the battle;
+    /// false with the reason when no such conversation is open.
+    /// </summary>
+    public bool TryCompleteEncounterMeeting(out string failure);
 }
 
+/// <summary>Runs vanilla <see cref="PlayerEncounter"/> steps on this machine for the co-op encounter flow.</summary>
 public class PlayerEncounterInterface : IPlayerEncounterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
+
+    // The menu vanilla's encounter shows while its pre-battle conversation runs.
+    private const string EncounterMeetingMenuId = "encounter_meeting";
 
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly IMessageBroker messageBroker;
@@ -151,6 +164,29 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                 hero.StringId, hero.Clan?.StringId);
             EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
         }
+    }
+
+    public bool IsEncounterMeetingConversationOpen() =>
+        Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == EncounterMeetingMenuId
+        && Campaign.Current.ConversationManager.IsConversationInProgress;
+
+    public bool TryCompleteEncounterMeeting(out string failure)
+    {
+        failure = null;
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != EncounterMeetingMenuId)
+        {
+            failure = "The encounter meeting is not active.";
+            return false;
+        }
+
+        if (!Campaign.Current.ConversationManager.IsConversationInProgress)
+        {
+            failure = "The encounter conversation is not active.";
+            return false;
+        }
+
+        Campaign.Current.ConversationManager.EndConversation();
+        return true;
     }
 
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)
