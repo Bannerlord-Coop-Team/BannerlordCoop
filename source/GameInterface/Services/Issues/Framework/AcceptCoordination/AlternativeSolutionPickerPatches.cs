@@ -60,6 +60,19 @@ internal class AlternativeSolutionPickerPatches
             picker.Track(__instance);
     }
 
+    [HarmonyPatch(typeof(PartyScreenLogic), nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyPrefix]
+    private static void ClosedPrefix(PartyScreenLogic __instance, out System.IDisposable __state)
+    {
+        __state = ModInformation.IsClient && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker)
+            ? picker.BeginNativeClose(__instance)
+            : null;
+    }
+
+    [HarmonyPatch(typeof(PartyScreenLogic), nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyFinalizer]
+    private static void ClosedFinalizer(System.IDisposable __state) => __state?.Dispose();
+
     [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence))]
     [HarmonyPrefix]
     private static bool CancelPrefix()

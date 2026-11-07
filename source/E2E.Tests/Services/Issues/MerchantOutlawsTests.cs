@@ -1330,6 +1330,136 @@ public class MerchantOutlawsTests : IDisposable
         AssertEndedEverywhere();
     }
 
+    public enum PickerExit
+    {
+        Cancel,
+        Done,
+        IssueEnds,
+    }
+
+    [Theory]
+    [InlineData(PickerExit.Cancel)]
+    [InlineData(PickerExit.Done)]
+    [InlineData(PickerExit.IssueEnds)]
+    public void ClosingTheTroopPickerPopsOnlyItsOwnScreen(PickerExit exit)
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var sent = 0;
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Get<CharacterObject>(instance, troopId).Level = 20;
+                    Get<CharacterObject>(instance, troopId).UpgradeTargets = Array.Empty<CharacterObject>();
+                    Get<Hero>(instance, companionId).HitPoints = 100;
+                    Get<Hero>(instance, companionId).SetSkillValue(DefaultSkills.Tactics, 150);
+                    Get<Hero>(instance, companionId)._partyBelongedTo = Get<MobileParty>(instance, scenario.PlayerA.MobilePartyId);
+                }
+            });
+        }
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId);
+            sent = Get<Hero>(Server, scenario.NotableId).Issue.GetTotalAlternativeSolutionNeededMenCount();
+            party.MemberRoster.AddToCounts(Get<Hero>(Server, companionId).CharacterObject, 1);
+            party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), sent + 5);
+        });
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            var party = Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId);
+            var companion = Get<Hero>(ClientA, companionId).CharacterObject;
+            var agent = new Mock<IAgent>();
+            agent.SetupGet(value => value.Character).Returns(Get<Hero>(ClientA, scenario.NotableId).CharacterObject);
+            Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(companion, -1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion, 1);
+            }
+
+            var behavior = new IssuesCampaignBehavior();
+            var picker = ClientA.Resolve<IAlternativeSolutionPicker>();
+            picker.Open(issue);
+            var logic = new PartyScreenLogic();
+            // Vanilla's PartyScreenDoneClicked continues the conversation, which runs the next line's consequence before the native pop
+            logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
+                issue.AlternativeSolutionSentTroops, TroopRoster.CreateDummyTroopRoster(),
+                PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.NotTransferable,
+                PartyScreenLogic.TransferState.Transferable, null, PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+                partyPresentationDoneButtonDelegate: PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
+                partyScreenClosedDelegate: (_, _, _, _, _, _, _) =>
+                {
+                    if (behavior.issue_offer_player_accept_alternative_5_a_condition())
+                        IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_consequence();
+                    else
+                        IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence();
+                }));
+            logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            var transfer = new PartyScreenLogic.PartyCommand();
+            transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, troopId), sent, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(transfer, false);
+
+            // PartyScreenHelper reads the global state manager, which the harness leaves unset
+            var previous = GameStateManager.Current;
+            var states = GameStateManager.Current = Game.Current.GameStateManager;
+            var map = states.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>();
+            var conversation = states.CreateState<TaleWorlds.CampaignSystem.GameState.MapState>();
+            var screen = states.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
+            screen.PartyScreenLogic = logic;
+            screen.PartyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            states._gameStates.Add(map);
+            states._gameStates.Add(conversation);
+            states._gameStates.Add(screen);
+            try
+            {
+                switch (exit)
+                {
+                    case PickerExit.Cancel:
+                        // PartyVM.ExecuteCancelInternal
+                        using (new AllowedThread()) logic.Reset(false);
+                        PartyScreenHelper.CloseScreen(isForced: false, fromCancel: true);
+                        break;
+                    case PickerExit.Done:
+                        PartyScreenHelper.CloseScreen(isForced: false);
+                        break;
+                    case PickerExit.IssueEnds:
+                        picker.Close(issue, cancel: true);
+                        break;
+                }
+
+                Assert.Same(conversation, states.ActiveState);
+                Assert.DoesNotContain(screen, states._gameStates);
+            }
+            finally
+            {
+                states._gameStates.Remove(conversation);
+                states._gameStates.Remove(map);
+                GameStateManager.Current = previous;
+            }
+        }, TextHelpers);
+        environment.FlushCoalescer();
+
+        if (exit == PickerExit.Done)
+        {
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+            return;
+        }
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        ClientA.Call(() =>
+        {
+            var party = Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId);
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(Get<Hero>(ClientA, companionId).CharacterObject));
+            Assert.Equal(sent + 5, party.MemberRoster.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
+        });
+    }
+
     [Fact]
     public void ReceivedServerProgressDoesNotEchoAnOwnerSnapshot()
     {

@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -30,6 +31,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IAlternativeSolutionTroopValidator troops;
     private readonly Dictionary<TroopRoster, (IssueBase Issue, PartyScreenLogic Logic)> pickers = new();
+    private PartyScreenLogic nativeClose;
 
     public AlternativeSolutionPicker(IMessageBroker broker, INetwork network, IObjectManager objects,
         IPlayerManager players, IControllerIdProvider controller, IAlternativeSolutionCommitments commitments,
@@ -86,13 +88,32 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
             if (picker.Logic != null)
             {
                 picker.Logic.Reset(true);
-                if (Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic)
+                // PartyScreenHelper pops the screen itself once its closed callback, where a Cancel lands, returns
+                if (picker.Logic != nativeClose &&
+                    Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic)
                     Game.Current.GameStateManager.PopState();
             }
             troops.ReturnToMainParty(issue);
         }
         if (cancel && objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
             network.SendAll(new RequestAlternativeSolutionCancellation(giverId, issue.StringId));
+    }
+
+    public IDisposable BeginNativeClose(PartyScreenLogic logic) => new NativeCloseScope(this, logic);
+
+    private sealed class NativeCloseScope : IDisposable
+    {
+        private readonly AlternativeSolutionPicker picker;
+        private readonly PartyScreenLogic previous;
+
+        public NativeCloseScope(AlternativeSolutionPicker picker, PartyScreenLogic logic)
+        {
+            this.picker = picker;
+            previous = picker.nativeClose;
+            picker.nativeClose = logic;
+        }
+
+        public void Dispose() => picker.nativeClose = previous;
     }
 
     private void Handle_Done(MessagePayload<PartyDoneLogicAttempted> payload)
