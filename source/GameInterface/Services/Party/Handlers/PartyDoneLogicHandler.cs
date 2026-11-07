@@ -127,6 +127,10 @@ internal class PartyDoneLogicHandler : IHandler
                 objectManager);
         }
 
+        string garrisonDonationSettlementId = null;
+        if (obj.What.GarrisonDonationSettlement != null &&
+            !objectManager.TryGetIdWithLogging(obj.What.GarrisonDonationSettlement, out garrisonDonationSettlementId)) return;
+
         string issueOwnerId = null;
         string issueId = null;
         picker.TryGetIssue(obj.What.LeftMemberRoster, out issueOwnerId, out issueId);
@@ -154,7 +158,8 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId, issueOwnerId, issueId
+            obj.What.ForceTransferId, issueOwnerId, issueId,
+            garrisonDonationSettlementId
         );
 
         network.SendAll(message);
@@ -263,6 +268,23 @@ internal class PartyDoneLogicHandler : IHandler
                 return;
             }
 
+            // Donated troops join the garrison only with this Done, so a stale screen after the party left
+            // the town changes neither the party nor the garrison
+            Settlement garrisonDonationSettlement = null;
+            if (message.GarrisonDonationSettlementId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging(message.GarrisonDonationSettlementId, out garrisonDonationSettlement)) return;
+
+                if (mainHero.PartyBelongedTo?.CurrentSettlement != garrisonDonationSettlement)
+                {
+                    logger.Warning(
+                        "Rejected Party screen garrison donation because {MainHeroId} is no longer at {SettlementId}",
+                        message.MainHeroId,
+                        message.GarrisonDonationSettlementId);
+                    return;
+                }
+            }
+
             if (donationSettlement != null &&
                 !TryValidatePrisonerDonationRosters(
                     donatedPrisonersRoster,
@@ -327,6 +349,8 @@ internal class PartyDoneLogicHandler : IHandler
                 ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, applicableTakenPrisonersRoster);
             if (donationSettlement != null)
                 ApplyPrisonerDonationEffects(mainHero, donationSettlement, donatedPrisonersRoster);
+            if (garrisonDonationSettlement != null)
+                ApplyGarrisonDonation(garrisonDonationSettlement, message.LeftMemberRosterData);
             NotifyTakenPrisonersChanged(applicableTakenPrisonersRoster);
             ApplyPartyRewardChanges(mainHero, message);
             ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
@@ -666,6 +690,26 @@ internal class PartyDoneLogicHandler : IHandler
             mainHero.PartyBelongedTo,
             donatedPrisonersRoster,
             settlement);
+    }
+
+    // Vanilla DonateGarrisonDoneHandler, run once the Done that took these troops from the party is applied.
+    // The donate screen's left roster starts empty, so its delta is the whole donated roster.
+    private void ApplyGarrisonDonation(Settlement settlement, TroopRosterData donatedTroops)
+    {
+        MobileParty garrisonParty = settlement.Town.GarrisonParty;
+        if (garrisonParty == null)
+        {
+            settlement.AddGarrisonParty();
+            garrisonParty = settlement.Town.GarrisonParty;
+        }
+
+        foreach (var element in troopRosterInterface.UnpackTroopRosterData(donatedTroops))
+        {
+            garrisonParty.AddElementToMemberRoster(element.Character, element.Number, false);
+
+            if (element.Character.IsHero)
+                EnterSettlementAction.ApplyForCharacterOnly(element.Character.HeroObject, settlement);
+        }
     }
 
     private void ApplyReleasedAndTakenPrisonerActions(

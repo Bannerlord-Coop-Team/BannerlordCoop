@@ -82,6 +82,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     public readonly string ForceTransferId;
     [ProtoMember(24)] public readonly string IssueOwnerId;
     [ProtoMember(25)] public readonly string IssueId;
+    // Set when this Done also donated troops to a town's garrison
+    [ProtoMember(26)] public readonly string GarrisonDonationSettlementId;
 
     public NetworkCompleteDoneLogic(
         string mainHeroId,
@@ -106,7 +108,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         bool applyReleasedAndTakenPrisonerActions = false,
         string donationSettlementId = null,
         FlattenedTroop[] donatedPrisonersRoster = null,
-        string forceTransferId = null, string issueOwnerId = null, string issueId = null)
+        string forceTransferId = null, string issueOwnerId = null, string issueId = null,
+        string garrisonDonationSettlementId = null)
     {
         MainHeroId = mainHeroId;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -133,5 +136,6 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         ForceTransferId = forceTransferId;
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
+        GarrisonDonationSettlementId = garrisonDonationSettlementId;
     }
 }
