@@ -16,7 +16,6 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Localization;
 using Serilog;
 
 namespace GameInterface.Services.Issues.Framework.Finalization;
@@ -139,10 +138,12 @@ internal class QuestJournalMirrorHandler : IHandler
         foreach (var entry in entries)
         {
             var matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
-                SameText(log.LogText, entry.Text) && SameText(log.TaskName, entry.TaskName)).ToArray();
+                QuestJournalTextComparer.SameText(log.LogText, entry.Text) &&
+                QuestJournalTextComparer.SameText(log.TaskName, entry.TaskName)).ToArray();
             if (matches.Length == 0)
                 matches = remaining.Where(log => log.Type == entry.Type && log.Range == entry.Range &&
-                    SameKey(log.LogText, entry.Text) && SameKey(log.TaskName, entry.TaskName)).ToArray();
+                    QuestJournalTextComparer.SameKey(log.LogText, entry.Text) &&
+                    QuestJournalTextComparer.SameKey(log.TaskName, entry.TaskName)).ToArray();
             var exact = matches.Where(log => log.LogTime.NumTicks == entry.Time.NumTicks).ToArray();
             // Existing server-created stages may have a different tick; consume the first unmatched occurrence.
             if (matches.Length > 1 && exact.Length == 0)
@@ -167,27 +168,4 @@ internal class QuestJournalMirrorHandler : IHandler
         quest._journalEntries.AddRange(ordered);
         return true;
     }
-
-    private static bool SameText(TextObject first, TextObject second)
-    {
-        if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes == null) != (second.Attributes == null) ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
-    }
-
-    private static bool SameKey(TextObject first, TextObject second) =>
-        ReferenceEquals(first, second) ||
-        (first != null && second != null && first.Value == second.Value);
 }
