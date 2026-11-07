@@ -117,7 +117,7 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
         tracker._plunderItems.Clear();
 
         var visualTrackerManager = Campaign.Current.VisualTrackerManager;
-        // The server save's pins aren't this player's, but its quest, issue and army references stay
+        // The server save's pins aren't this player's, but its quest and issue references stay
         foreach (var pinCount in GetPinCounts())
         {
             for (int i = 0; i < pinCount.Value; i++)
@@ -136,7 +136,8 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
         ViewDataPlayerData.PlayerViewData[playerHeroId] = viewData;
     }
 
-    // TrackerCount holds a reference per tracker, so the player's pins are the settlement and party references left after the quest, issue and army ones
+    // TrackerCount holds a reference per tracker, so the player's pins are the settlement and party references left after the quest and issue ones.
+    // Clients never register the army target reference, ArmyPatches sets the army fields directly
     private Dictionary<ITrackableBase, int> GetPinCounts()
     {
         var gameReferences = new Dictionary<ITrackableBase, int>();
@@ -154,10 +155,6 @@ public class ViewDataTrackerInterface : IViewDataTrackerInterface
             foreach (var trackedObject in issue._trackedObjects)
                 AddGameReferences(trackedObject, 1);
         }
-
-        var army = MobileParty.MainParty?.Army;
-        if (army != null && army.LeaderParty != MobileParty.MainParty && army.AiBehaviorObject is Settlement armyTarget)
-            AddGameReferences(armyTarget, 1);
 
         var pinCounts = new Dictionary<ITrackableBase, int>();
         foreach (var tracked in Campaign.Current.VisualTrackerManager._trackedObjects)
