@@ -52,6 +52,13 @@ internal class PlayerPartyTradeOverlay : GlobalLayer
         dataSource.LocalAccepted = localAccepted;
         dataSource.RemoteAccepted = remoteAccepted;
     }
+
+    // Global layers tick every frame while the barter screen is up, so the offer goes out at most once a frame.
+    protected override void OnLateTick(float dt)
+    {
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+            offerSender.Flush();
+    }
 }
 
 internal class PlayerPartyTradeOverlayVM : ViewModel

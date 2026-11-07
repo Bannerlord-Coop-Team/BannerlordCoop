@@ -1478,105 +1478,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void TradeActiveState_IncludesServerPartyItemSnapshots()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        var initiatorItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-        var responderItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(initiatorItemId, out var initiatorItem));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(responderItemId, out var responderItem));
-
-            initiatorParty.ItemRoster.AddToCounts(initiatorItem, 3);
-            responderParty.ItemRoster.AddToCounts(responderItem, 4);
-        });
-
-        Server.NetworkSentMessages.Clear();
-        StartTrade(client1, client2, initiatorPartyId, responderPartyId);
-
-        var tradeStates = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
-            .Where(s => s.Phase == PlayerPartyInteractionPhase.TradeActive)
-            .ToArray();
-
-        var initiatorState = tradeStates.Single(s => s.PartyId == initiatorPartyId);
-        AssertPartyItemSnapshotContains(initiatorState.PartyItems, initiatorItemId, 3);
-        AssertPartyItemSnapshotContains(initiatorState.OtherPartyItems, responderItemId, 4);
-
-        var responderState = tradeStates.Single(s => s.PartyId == responderPartyId);
-        AssertPartyItemSnapshotContains(responderState.PartyItems, responderItemId, 4);
-        AssertPartyItemSnapshotContains(responderState.OtherPartyItems, initiatorItemId, 3);
-    }
-
-    [Fact]
-    public void TradeStatesAfterOpening_CarryNoPartyItemSnapshots()
-    {
-        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
-            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
-            initiatorParty.ItemRoster.AddToCounts(item, 3);
-        });
-
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
-
-        Server.NetworkSentMessages.Clear();
-        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
-            sessionId,
-            initiatorPartyId,
-            new[] { new ItemRosterElementData(new ItemObjectData(itemId, null, itemModifierNull: true), 2) },
-            Array.Empty<TroopRosterElementData>())));
-        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
-
-        var states = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
-        Assert.Equal(4, states.Length);
-        Assert.All(states, state =>
-        {
-            Assert.Empty(state.PartyItems);
-            Assert.Empty(state.OtherPartyItems);
-        });
-    }
-
-    [Fact]
-    public void TradeActiveState_WithoutSnapshots_ActivatesSessionAndKeepsRosters()
-    {
-        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
-        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
-
-        client1.Call(() =>
-        {
-            Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var party));
-            Assert.True(client1.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
-            using (new AllowedThread())
-                party.ItemRoster.AddToCounts(item, 3);
-        });
-
-        client1.SimulateMessage(Server.NetPeer, new NetworkPlayerPartyInteractionState(
-            "late-session",
-            initiatorPartyId,
-            responderPartyId,
-            "Other player",
-            PlayerPartyInteractionPhase.TradeActive,
-            PlayerPartyInteractionProposal.Trade,
-            Array.Empty<PlayerPartyInteractionOption>(),
-            isInitiator: true));
-
-        client1.Call(() =>
-        {
-            Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var party));
-            Assert.True(client1.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
-            Assert.Equal("late-session", PlayerPartyTradeContext.SessionId);
-            Assert.Equal(3, GetItemAmount(party, item));
-        });
-    }
-
-    [Fact]
     public void TradeAccept_FromBothParties_AppliesAcceptedTradeContents()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
@@ -1769,9 +1670,13 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Array.Empty<TroopRosterElementData>(),
             offeredPeace: true)));
 
-        var relayedOffer = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().Single();
-        Assert.Equal(initiatorPartyId, relayedOffer.PartyId);
-        Assert.False(relayedOffer.OfferedPeace);
+        var relayedOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().ToArray();
+        Assert.Equal(2, relayedOffers.Length);
+        Assert.All(relayedOffers, relayedOffer =>
+        {
+            Assert.Equal(initiatorPartyId, relayedOffer.PartyId);
+            Assert.False(relayedOffer.OfferedPeace);
+        });
 
         client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             sessionId,
@@ -1863,7 +1768,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void TradeOfferUpdate_RelaysThroughServerAndClearsAcceptState()
+    public void TradeOfferUpdate_RelaysToBothTradersWithoutTradeStates()
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
@@ -1881,7 +1786,10 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             offeredFiefs: new[] { "fief-1" },
             offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) })));
 
-        var relayedOffer = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().Single();
+        // One copy per trader, the other player applies it and the sender's echo clears its acceptance.
+        var relayedOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().ToArray();
+        Assert.Equal(2, relayedOffers.Length);
+        var relayedOffer = relayedOffers[0];
         Assert.Equal(sessionId, relayedOffer.SessionId);
         Assert.Equal(initiatorPartyId, relayedOffer.PartyId);
         Assert.Single(relayedOffer.OfferedItems);
@@ -1895,19 +1803,11 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Single(relayedOffer.OfferedPrisoners);
         Assert.Equal(2u, relayedOffer.OfferedPrisoners[0].CharacterId);
 
-        var states = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
-        Assert.Contains(states, s =>
-            s.PartyId == initiatorPartyId &&
-            !s.InitiatorAcceptedTrade &&
-            !s.ResponderAcceptedTrade);
-        Assert.Contains(states, s =>
-            s.PartyId == responderPartyId &&
-            !s.InitiatorAcceptedTrade &&
-            !s.ResponderAcceptedTrade);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
     }
 
     [Fact]
-    public void TradeOfferUpdate_TroopOffer_AppliesAsOfferedOnOtherClient()
+    public void TradeOfferUpdate_TroopOffer_AppliesAsOfferedOnOtherClientWithoutSendingBack()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
         var initiatorTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
@@ -1952,6 +1852,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
 
         Server.NetworkSentMessages.Clear();
+        client2.NetworkSentMessages.Clear();
         client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             sessionId,
             initiatorPartyId,
@@ -1971,117 +1872,98 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
             Assert.True(troopItem.IsOffered);
             Assert.Equal(4, troopItem.CurrentOfferedAmount);
+
+            client2.Resolve<IPlayerPartyTradeOfferSender>().Flush();
         });
+
+        // Applying the other player's offer runs SendOffer for every amount, which must not send an offer back.
+        Assert.Empty(client2.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
     }
 
     [Fact]
-    public void BarterInitialization_SendsNoOffers_ButLaterAmountChangeSendsOne()
+    public void OfferFlush_LargeBarterSetup_SendsNothing_ThenOneOfferPerChange()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
         client1.NetworkSentMessages.Clear();
-        Server.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 4, barterVM =>
+        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
         {
-            Assert.True(barterVM.InitializationIsOver);
+            var offerSender = client1.Resolve<IPlayerPartyTradeOfferSender>();
+
+            // Every barter item's constructor runs SendOffer, but nothing is offered yet.
+            offerSender.Flush();
             Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
 
             var item = barterVM.RightOtherList[0];
             item.Barterable.SetIsOffered(true);
             barterVM.RightOfferList.Add(item);
+            item.CurrentOfferedAmount = 2;
             item.CurrentOfferedAmount = 3;
+            offerSender.Flush();
+            offerSender.Flush();
         });
 
         var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
         Assert.Equal(3, Assert.Single(offer.OfferedTroops).Number);
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
     }
 
     [Fact]
-    public void TransferAll_SendsOneOfferWithEveryStack()
+    public void OfferFlush_TransferAll_SendsOneOfferWithEveryStack()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
         client1.NetworkSentMessages.Clear();
 
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 4,
-            barterVM => barterVM.ExecuteTransferAllRightOther());
+        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 50, barterVM =>
+        {
+            barterVM.ExecuteTransferAllRightOther();
+            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
+        });
 
         var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
-        Assert.Equal(4, offer.OfferedTroops.Length);
+        Assert.Equal(50, offer.OfferedTroops.Length);
         Assert.All(offer.OfferedTroops, troop => Assert.Equal(5, troop.Number));
     }
 
     [Fact]
-    public void TransferAll_WhenOriginalThrows_LaterAmountChangeStillSendsOffer()
+    public void TradeAccept_AfterUnflushedOfferChange_ReachesServerAfterTheOffer()
     {
         var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
-        client1.NetworkSentMessages.Clear();
+        Server.NetworkSentMessages.Clear();
 
         RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
         {
             var item = barterVM.RightOtherList[0];
-            var rightLists = barterVM._rightList.ToArray();
-
-            barterVM._rightList.Clear();
-            Assert.Throws<KeyNotFoundException>(() => barterVM.ExecuteTransferAllRightOther());
-            foreach (var rightList in rightLists)
-                barterVM._rightList.Add(rightList.Key, rightList.Value);
-
-            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
-
             item.Barterable.SetIsOffered(true);
             barterVM.RightOfferList.Add(item);
             item.CurrentOfferedAmount = 3;
+            barterVM.ExecuteOffer();
+            client1.Resolve<IPlayerPartyTradeOfferSender>().Flush();
         });
+        client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
 
-        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
-    }
-
-    [Fact]
-    public void AutoBalance_ClosesItsBatch_SoLaterAmountChangeSendsOffer()
-    {
-        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
-        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
-        client1.NetworkSentMessages.Clear();
-
-        RunOnInitiatorBarterScreen(client1, sessionId, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId, troopStacks: 1, barterVM =>
-        {
-            var item = barterVM.RightOtherList[0];
-
-            barterVM.ExecuteAutoBalance();
-            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
-
-            item.Barterable.SetIsOffered(true);
-            barterVM.RightOfferList.Add(item);
-            item.CurrentOfferedAmount = 3;
-        });
-
-        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+        // An offer arriving after the accept would clear it, and the responder's accept alone wouldnt end the trade.
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
     }
 
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void TradeOfferUpdate_AfterEitherPlayerAccepts_RelaysAndClearsAcceptState(
+    public void TradeOfferUpdate_AfterEitherPlayerAccepts_ClearsAcceptanceWithoutTradeStates(
         bool initiatorAccepted,
         bool initiatorUpdates)
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
         var acceptingClient = initiatorAccepted ? client1 : client2;
-        var acceptedPartyId = initiatorAccepted ? initiatorPartyId : responderPartyId;
+        var otherClient = initiatorAccepted ? client2 : client1;
         var updatingClient = initiatorUpdates ? client1 : client2;
         var updaterPartyId = initiatorUpdates ? initiatorPartyId : responderPartyId;
 
-        Server.NetworkSentMessages.Clear();
         acceptingClient.Call(() => acceptingClient.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
-        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>(), s =>
-            s.PartyId == acceptedPartyId &&
-            s.InitiatorAcceptedTrade == initiatorAccepted &&
-            s.ResponderAcceptedTrade == !initiatorAccepted);
+        acceptingClient.Call(() => Assert.True(PlayerPartyTradeContext.LocalAccepted || PlayerPartyTradeContext.RemoteAccepted));
 
         Server.NetworkSentMessages.Clear();
         updatingClient.Call(() => updatingClient.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
@@ -2093,19 +1975,15 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             },
             Array.Empty<TroopRosterElementData>())));
 
-        var relayedOffer = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().Single();
-        Assert.Equal(sessionId, relayedOffer.SessionId);
-        Assert.Equal(updaterPartyId, relayedOffer.PartyId);
+        var relayedOffers = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().ToArray();
+        Assert.Equal(2, relayedOffers.Length);
+        Assert.All(relayedOffers, offer => Assert.Equal(updaterPartyId, offer.PartyId));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+        acceptingClient.Call(() => Assert.False(PlayerPartyTradeContext.LocalAccepted || PlayerPartyTradeContext.RemoteAccepted));
 
-        var states = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
-        Assert.Contains(states, s =>
-            s.PartyId == initiatorPartyId &&
-            !s.InitiatorAcceptedTrade &&
-            !s.ResponderAcceptedTrade);
-        Assert.Contains(states, s =>
-            s.PartyId == responderPartyId &&
-            !s.InitiatorAcceptedTrade &&
-            !s.ResponderAcceptedTrade);
+        // The first acceptance was cleared, so the other player's accept alone doesnt end the trade.
+        otherClient.Call(() => otherClient.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
     }
 
     [Fact]
@@ -5502,12 +5380,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
     private static void ThrowAfterBanditBarterMutation()
         => throw new InvalidOperationException("Post-apply bandit barter work failed.");
 
-    private static void AssertPartyItemSnapshotContains(ItemRosterElementData[] items, string itemId, int amount)
-    {
-        var item = Assert.Single(items, i => i.ItemObjectData.ItemObjectId == itemId);
-
-        Assert.Equal(amount, item.Amount);
-    }
 
     private static void SetupFief(Settlement settlement, Town town, PartyBase ownerParty)
     {

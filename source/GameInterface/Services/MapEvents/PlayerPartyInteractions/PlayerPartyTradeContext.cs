@@ -11,7 +11,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
-using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
@@ -29,6 +28,7 @@ internal static class PlayerPartyTradeContext
     public static bool LocalAccepted { get; private set; }
     public static bool RemoteAccepted { get; private set; }
     public static bool SuppressNativeCloseMessages { get; private set; }
+    public static BarterVM ActiveBarterVM => activeBarterVM;
 
     private static BarterVM activeBarterVM;
     private static ButtonWidget resetButton;
@@ -102,13 +102,12 @@ internal static class PlayerPartyTradeContext
     }
 
     // Runs from the BarterVM constructor postfix, before the barter movie binds to these lists.
-    // A marriage's amount is always 1, so an amount callback would only fire once, here, and publish an offer during setup.
     private static void UseMarriageItemVMs(MBBindingList<BarterItemVM> items)
     {
         for (int i = 0; i < items.Count; i++)
         {
             if (items[i].Barterable is PlayerPartyMarriageBarterable marriage)
-                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, onAmountChange: null);
+                items[i] = new PlayerPartyMarriageBarterItemVM(marriage, activeBarterVM.TransferItem, activeBarterVM.OnOfferedAmountChange);
         }
     }
 
@@ -119,14 +118,6 @@ internal static class PlayerPartyTradeContext
         LocalAccepted = localAccepted;
         RemoteAccepted = remoteAccepted;
         RefreshBarterControls();
-    }
-
-    public static bool CanTransfer(TransferCommand transferCommand)
-    {
-        if (!IsActive) return true;
-        if (!CanModifyOffer()) return false;
-
-        return transferCommand.FromSide == InventoryLogic.InventorySide.PlayerInventory;
     }
 
     public static bool CanOffer(Barterable barterable)
@@ -202,30 +193,14 @@ internal static class PlayerPartyTradeContext
         }
     }
 
-    public static void PublishOfferChanged(InventoryLogic inventoryLogic)
-    {
-        if (!IsActive) return;
-        if (isApplyingServerOffer || !CanModifyOffer()) return;
-
-        ResetAcceptance();
-        MessageBroker.Instance.Publish(inventoryLogic, new PlayerPartyTradeOfferChanged(SessionId, inventoryLogic));
-    }
-
-    public static void PublishOfferChanged(BarterVM barterVM)
-    {
-        if (!IsActive) return;
-        // Every barterable's initial amount calls SendOffer while the constructor builds the lists.
-        if (!barterVM.InitializationIsOver) return;
-        if (isApplyingServerOffer || !CanModifyOffer()) return;
-
-        ResetAcceptance();
-        MessageBroker.Instance.Publish(barterVM, new PlayerPartyTradeOfferChanged(SessionId, barterVM));
-    }
-
     public static void PublishAccept(bool accepted)
     {
         if (!IsActive) return;
         if (!CanAccept()) return;
+
+        // Sends a pending offer first, so the accept never reaches the server ahead of the offer it accepts.
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+            offerSender.Flush();
 
         if (accepted)
         {
@@ -252,6 +227,9 @@ internal static class PlayerPartyTradeContext
     public static void ApplyOfferUpdate(NetworkPlayerPartyTradeOfferUpdated message, IObjectManager objectManager)
     {
         if (!IsActive || SessionId != message.SessionId) return;
+
+        // The server clears both acceptances on every offer it relays, the local party's echo included.
+        ResetAcceptance();
         if (activeBarterVM == null || objectManager == null) return;
 
         if (IsLocalOfferMessage(message, objectManager))
@@ -335,7 +313,7 @@ internal static class PlayerPartyTradeContext
         resetButton.IsDisabled = IsActive;
     }
 
-    private static void ResetAcceptance()
+    public static void ResetAcceptance()
     {
         if (!LocalAccepted && !RemoteAccepted) return;
 

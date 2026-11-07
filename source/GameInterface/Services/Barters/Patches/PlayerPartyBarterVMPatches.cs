@@ -1,6 +1,5 @@
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.BarterSystem;
@@ -37,13 +36,13 @@ internal class PlayerPartyBarterVMPatches
     static bool OfferItemRemovePrefix(BarterItemVM barterItemVM)
         => PlayerPartyTradeContext.CanOffer(barterItemVM?.Barterable);
 
+    // Vanilla calls SendOffer after every single item change, so this only marks the offer for the next flush.
     [HarmonyPatch("SendOffer")]
     [HarmonyPostfix]
-    static void SendOfferPostfix(BarterVM __instance)
+    static void SendOfferPostfix()
     {
-        if (ContainerProvider.TryResolve<IPlayerPartyOfferBatchTracker>(out var batches) && batches.TryHoldBack()) return;
-
-        PlayerPartyTradeContext.PublishOfferChanged(__instance);
+        if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+            offerSender.MarkChanged();
     }
 
     [HarmonyPatch("RefreshOfferLabel")]
@@ -80,20 +79,8 @@ internal class PlayerPartyBarterVMPatches
 
     [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
     [HarmonyPrefix]
-    static bool ExecuteAutoBalancePrefix(BarterVM __instance, out IDisposable __state)
-    {
-        __state = ContainerProvider.TryResolve<IPlayerPartyOfferBatchTracker>(out var batches)
-            ? batches.Open(() => PlayerPartyTradeContext.PublishOfferChanged(__instance))
-            : null;
-
-        return PlayerPartyTradeContext.CanModifyOffer();
-    }
-
-    // A finalizer so the batch ends even when the original throws or the prefix skips it.
-    [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
-    [HarmonyFinalizer]
-    static void ExecuteAutoBalanceFinalizer(IDisposable __state)
-        => __state?.Dispose();
+    static bool ExecuteAutoBalancePrefix()
+        => PlayerPartyTradeContext.CanModifyOffer();
 
     [HarmonyPatch("TransferItem")]
     [HarmonyPrefix]
@@ -145,19 +132,8 @@ internal class PlayerPartyBarterTransferAllPatches
     }
 
     [HarmonyPrefix]
-    static bool ExecuteTransferAllPrefix(BarterVM __instance, MethodBase __originalMethod, out IDisposable __state)
-    {
-        __state = ContainerProvider.TryResolve<IPlayerPartyOfferBatchTracker>(out var batches)
-            ? batches.Open(() => PlayerPartyTradeContext.PublishOfferChanged(__instance))
-            : null;
-
-        return PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
-    }
-
-    // A finalizer so the batch ends even when the original throws or the prefix skips it.
-    [HarmonyFinalizer]
-    static void ExecuteTransferAllFinalizer(IDisposable __state)
-        => __state?.Dispose();
+    static bool ExecuteTransferAllPrefix(BarterVM __instance, MethodBase __originalMethod)
+        => PlayerPartyTradeContext.CanOfferTransferAll(__instance, __originalMethod?.Name);
 }
 
 [HarmonyPatch]
