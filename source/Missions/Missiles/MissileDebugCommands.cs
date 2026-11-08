@@ -60,17 +60,15 @@ public sealed class StuckMissilesCoopCommand : ICoopCommand
         foreach (KeyValuePair<Guid, SpawnedItemEntity> entry in stuck.Skip(offset).Take(limit))
         {
             MatrixFrame frame = entry.Value.GameEntity.GetGlobalFrame();
-            Mat3 rotation = frame.rotation;
+            Vec3 o = frame.origin, s = frame.rotation.s, f = frame.rotation.f, u = frame.rotation.u;
             output.Append('\n').Append(string.Format(CultureInfo.InvariantCulture,
-                "STUCK_MISSILE worldItem={0} item={1} amount={2} o={3} s={4} f={5} u={6}",
+                "STUCK_MISSILE worldItem={0} item={1} amount={2} o={3:R},{4:R},{5:R} s={6:R},{7:R},{8:R} " +
+                "f={9:R},{10:R},{11:R} u={12:R},{13:R},{14:R}",
                 entry.Key, entry.Value.WeaponCopy.Item?.StringId, entry.Value.WeaponCopy.Amount,
-                Format(frame.origin), Format(rotation.s), Format(rotation.f), Format(rotation.u)));
+                o.x, o.y, o.z, s.x, s.y, s.z, f.x, f.y, f.z, u.x, u.y, u.z));
         }
 
         return new CoopCommandResult(true, output.ToString());
     }
-
-    private static string Format(Vec3 value) =>
-        string.Format(CultureInfo.InvariantCulture, "{0:R},{1:R},{2:R}", value.x, value.y, value.z);
 }
 #endif
