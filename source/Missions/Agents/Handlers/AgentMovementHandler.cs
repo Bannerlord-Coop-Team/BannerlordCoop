@@ -198,7 +198,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         public readonly Dictionary<Guid, float> MovementPendingSince =
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
-        public bool DueEveryBulkPoll;
         public double LastBulkPollTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
@@ -974,35 +973,24 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         return recipient;
     }
 
-    // A peer whose cap is at least the bulk rate gets every bulk poll; a timer anchored to the first poll would miss
-    // every other one when frame rate over bulk Hz isn't a whole number.
+    // Every send's slot is at least one interval after the last and less than one before the send, so no second holds
+    // more than cap + 1 sends. A peer at or above the bulk rate takes the bulk schedule's slot, so it lines up with every
+    // poll instead of missing every other one when frame rate over bulk Hz isn't a whole number.
     private bool IsRecipientBulkDue(
         RecipientMovementState recipient,
         int receiverCapHz,
         int bulkHz)
     {
         float interval = 1f / Math.Max(1, receiverCapHz);
-        // This poll's slot on the bulk schedule: whole bulk intervals after the last one, never after the poll itself.
-        double bulkGridSeconds = bulkPollSeconds - bulkPollElapsed;
+        // Whole bulk intervals after the last bulk slot, never after this poll.
+        double bulkSlot = bulkPollSeconds - bulkPollElapsed;
+        double earliestSlot = bulkPollSeconds - interval + CadenceEpsilonSeconds;
         if (!recipient.HasBulkPoll)
         {
             recipient.HasBulkPoll = true;
-            recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
-            recipient.LastBulkPollTime = recipient.DueEveryBulkPoll ? bulkGridSeconds : bulkPollSeconds;
-            return true;
-        }
-
-        if (receiverCapHz < bulkHz)
-        {
-            recipient.DueEveryBulkPoll = false;
-        }
-        else if (recipient.DueEveryBulkPoll)
-        {
-            // Bulk slots are at least one cap interval apart, but the first one after a capped send can be closer, and
-            // sending it would put one more send than the cap allows into that second.
-            if (bulkGridSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
-                return false;
-            recipient.LastBulkPollTime = bulkGridSeconds;
+            recipient.LastBulkPollTime = receiverCapHz >= bulkHz
+                ? Math.Max(bulkSlot, earliestSlot)
+                : bulkPollSeconds;
             return true;
         }
 
@@ -1010,12 +998,18 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         if (elapsed + CadenceEpsilonSeconds < interval)
             return false;
 
+        if (receiverCapHz >= bulkHz)
+        {
+            recipient.LastBulkPollTime = Math.Max(
+                Math.Max(bulkSlot, recipient.LastBulkPollTime + interval),
+                earliestSlot);
+            return true;
+        }
+
         int elapsedIntervals = Math.Max(
             1,
             (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
         recipient.LastBulkPollTime += elapsedIntervals * (double)interval;
-        // Only a send the timer allows starts every-poll sending, so a drop in bulk Hz can't double up on the last one.
-        recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
         return true;
     }
 

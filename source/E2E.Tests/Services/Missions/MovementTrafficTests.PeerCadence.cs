@@ -159,10 +159,31 @@ public partial class MovementTrafficTests
         });
     }
 
+    // Bulk drops from 60 Hz to the 40 Hz cap while the peer is still on its capped timer.
     [Theory]
     [InlineData(52, 0.0005f)]
     [InlineData(54, 0.001f)]
     public void PollMovement_BulkRateDroppingToPeerCapStaysOneOverCapInEverySecond(int dropFrame, float wobbleSeconds)
+    {
+        AssertAtMostOneOverCapInEverySecond(
+            dropFrame + 90,
+            frame => (1f / 45f) + (frame % 2 == 0 ? wobbleSeconds : -wobbleSeconds),
+            frame => frame < dropFrame ? 60 : 40);
+    }
+
+    // The peer gets every 40 Hz poll at about 41 fps, then bulk rises above its 40 Hz cap.
+    [Fact]
+    public void PollMovement_BulkRateRisingAbovePeerCapStaysOneOverCapInEverySecond()
+    {
+        AssertAtMostOneOverCapInEverySecond(
+            172,
+            _ => 0.024389649f,
+            frame => frame < 41 ? 10 : frame < 82 ? 40 : 60);
+    }
+
+    // One moving agent sent to a receiver capped at 40 Hz with bulk forced per frame: no second holds more than 41 bulk
+    // sends, and the last second still gets the cap.
+    private void AssertAtMostOneOverCapInEverySecond(int frames, Func<int, float> frameSecondsAt, Func<int, int> bulkHzAt)
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -178,19 +199,22 @@ public partial class MovementTrafficTests
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
             handler.Configure(MovementCadenceProfile.Battle);
-            Assert.True(handler.TrySetForcedBulkHz(60, out _));
+            int bulkHz = bulkHzAt(0);
+            Assert.True(handler.TrySetForcedBulkHz(bulkHz, out _));
             broker.Publish(this, new NetworkMissionPeerEntered("receiver", "battle"));
             broker.Publish(this, new NetworkMovementReceiverCap("receiver", 40, 1));
 
             handler.PollMovement(0f);
             var sendTimes = new List<double>();
             double time = 0d;
-            for (int frame = 1; frame <= dropFrame + 90; frame++)
+            for (int frame = 1; frame <= frames; frame++)
             {
-                // The first every-poll send after the drop lands on the bulk schedule, not the capped timer's phase.
-                if (frame == dropFrame)
-                    Assert.True(handler.TrySetForcedBulkHz(40, out _));
-                float frameSeconds = (1f / 45f) + (frame % 2 == 0 ? wobbleSeconds : -wobbleSeconds);
+                if (bulkHzAt(frame) != bulkHz)
+                {
+                    bulkHz = bulkHzAt(frame);
+                    Assert.True(handler.TrySetForcedBulkHz(bulkHz, out _));
+                }
+                float frameSeconds = frameSecondsAt(frame);
                 time += frameSeconds;
                 int sentBefore = network.DirectPacketSends.Count(send => send.ControllerId == "receiver");
                 mirror.Position = new Vec3(frame, 0f, 0f);
