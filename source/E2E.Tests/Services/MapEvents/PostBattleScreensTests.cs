@@ -150,9 +150,9 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         AssertServerTime(TimeControlEnum.Play_1x);
     }
 
-    /// <summary>A client can finish its encounter before the server finalizes the battle.</summary>
+    /// <summary>Joining a running battle through the encounter menu finishes an encounter for that same battle.</summary>
     [Fact]
-    public void FinishBeforeFinalize_DoesNotHoldThePause()
+    public void FinishBeforeFinalize_DoesNotSkipTheScreens()
     {
         PlayServerTime();
         var (battleId, playerPartyId, _) = SetupPlayerWithNearbyAiParty();
@@ -162,7 +162,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
 
         DestroyServerMapEvent(battleId);
 
-        AssertServerTime(TimeControlEnum.Play_1x);
+        AssertServerTime(TimeControlEnum.Pause);
     }
 
     /// <summary>A captured player finishes no encounter, so the release mustn't bring the screens back.</summary>
@@ -216,17 +216,6 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
 
         AssertServerTime(TimeControlEnum.Pause);
     }
-
-    [Fact]
-    public void Amnesty_FinishBeforeFinalize_StartsTheAmnestyAtTheFinish() => WithAmnesty(30, () =>
-    {
-        var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
-        LeavePostBattleScreens(Clients.First(), playerPartyId, battleId);
-
-        DestroyServerMapEvent(battleId);
-
-        Assert.False(CanEngage(aiPartyId, playerPartyId));
-    });
 
     [Fact]
     public void ScreensEndAfterTheCap()

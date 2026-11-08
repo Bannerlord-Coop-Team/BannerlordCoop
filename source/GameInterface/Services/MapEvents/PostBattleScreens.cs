@@ -4,7 +4,6 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEventParties.Messages;
-using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -32,17 +31,14 @@ namespace GameInterface.Services.MapEvents;
 /// </remarks>
 internal sealed class PostBattleScreens : IHandler
 {
-    // Backstop for a client that never finishes its encounter.
+    // Backstop for a client that never finishes its encounter, or one whose finish reached the server before the
+    // finalize (joining a battle finishes an encounter too, so an early finish can't be told apart).
     internal const double MaxScreenSeconds = 180;
 
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MobileParty, Entry> parties = new Dictionary<MobileParty, Entry>();
-    // A client can finish its encounter before the server finalizes that battle. In a PvE battle the client's
-    // MapEventRegistry finishes at once when the finalize lands after it left the mission, so that path keeps the old behaviour.
-    private readonly Dictionary<MobileParty, (MapEvent MapEvent, DateTime FinishedAt)> finishedBeforeFinalize =
-        new Dictionary<MobileParty, (MapEvent, DateTime)>();
 
     private bool disposed;
 
@@ -59,7 +55,6 @@ internal sealed class PostBattleScreens : IHandler
         messageBroker.Subscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
-        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public void Dispose()
@@ -67,28 +62,15 @@ internal sealed class PostBattleScreens : IHandler
         messageBroker.Unsubscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
-        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
 
         disposed = true;
         parties.Clear();
-        finishedBeforeFinalize.Clear();
     }
 
     // A captured party is parked and doesn't finish its encounter until released. An offline player's party (a
     // battle cleaned up on load) never finishes it either.
     internal void Enter(MobileParty party, MapEvent mapEvent)
     {
-        if (finishedBeforeFinalize.TryGetValue(party, out var finish))
-        {
-            finishedBeforeFinalize.Remove(party);
-            if (finish.MapEvent == mapEvent)
-            {
-                if (ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0)
-                    parties[party] = new Entry(null, finish.FinishedAt, finish.FinishedAt);
-                return;
-            }
-        }
-
         if (!party.IsActive || playerManager.IsOwnerOfPartyDisconnected(party)) return;
 
         var enteredAt = UtcNow();
@@ -134,14 +116,9 @@ internal sealed class PostBattleScreens : IHandler
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return;
 
-            // Only the battle whose encounter finished, not one the party is in now. An old encounter can finish as a
-            // new battle starts.
+            // Only the battle whose encounter finished. An old encounter can finish as a new battle starts.
             if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null || entry.MapEventId != finishedMapEventId)
-            {
-                if (party.MapEvent != null && party.MapEvent.StringId == finishedMapEventId)
-                    finishedBeforeFinalize[party] = (party.MapEvent, UtcNow());
                 return;
-            }
 
             if (ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0)
                 parties[party] = new Entry(entry.MapEventId, entry.EnteredAt, UtcNow());
@@ -157,19 +134,7 @@ internal sealed class PostBattleScreens : IHandler
         var party = payload.What.PrisonerParty;
         if (party == null) return;
 
-        GameThread.RunSafe(() =>
-        {
-            parties.Remove(party);
-            finishedBeforeFinalize.Remove(party);
-        }, context: nameof(PostBattleScreens));
-    }
-
-    // Finishes kept for a battle that finalized without the party in it.
-    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
-    {
-        var mapEvent = payload.What.MapEvent;
-        foreach (var party in finishedBeforeFinalize.Where(pair => pair.Value.MapEvent == mapEvent).Select(pair => pair.Key).ToList())
-            finishedBeforeFinalize.Remove(party);
+        GameThread.RunSafe(() => parties.Remove(party), context: nameof(PostBattleScreens));
     }
 
     private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> payload)
@@ -178,9 +143,6 @@ internal sealed class PostBattleScreens : IHandler
         {
             foreach (var party in parties.Keys.Where(playerManager.IsOwnerOfPartyDisconnected).ToList())
                 parties.Remove(party);
-
-            foreach (var party in finishedBeforeFinalize.Keys.Where(playerManager.IsOwnerOfPartyDisconnected).ToList())
-                finishedBeforeFinalize.Remove(party);
         }, context: nameof(PostBattleScreens));
     }
 
