@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Missions.Missiles.Message;
+using Missions.Missiles.Patches;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -69,6 +70,7 @@ public class MissileHandler : IMissileHandler
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
         messageBroker.Subscribe<MissileRemoved>(Handle_MissileRemoved);
+        messageBroker.Subscribe<MissileCollisionDiag>(Handle_MissileCollisionDiag);
     }
 
     ~MissileHandler() => Dispose();
@@ -83,6 +85,7 @@ public class MissileHandler : IMissileHandler
         messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Unsubscribe<MissileItemDropped>(Handle_MissileItemDropped);
         messageBroker.Unsubscribe<MissileRemoved>(Handle_MissileRemoved);
+        messageBroker.Unsubscribe<MissileCollisionDiag>(Handle_MissileCollisionDiag);
         pendingReconstructions.Clear();
         impactHints.Clear();
         localShots.Clear();
@@ -235,6 +238,33 @@ public class MissileHandler : IMissileHandler
 
         localShots.Remove(payload.What.MissileIndex);
         reconstructedShots.Remove(payload.What.MissileIndex);
+    }
+
+    // #4536 TEMPORARY diagnostics.
+    private readonly Dictionary<int, (Guid Id, bool Local)> diagIds = new();
+
+    private void Handle_MissileCollisionDiag(MessagePayload<MissileCollisionDiag> payload)
+    {
+        MissileCollisionDiag d = payload.What;
+        if (disposed) return;
+        if (!d.After)
+        {
+            (Guid Id, bool Local) id = (Guid.Empty, false);
+            if (reconstructedShots.TryGetValue(d.MissileIndex, out var r)) id = (CreateMissileItemId(r.AgentId, r.ShotSequence), false);
+            else if (localShots.TryGetValue(d.MissileIndex, out var l)) id = (CreateMissileItemId(l.AgentId, l.ShotSequence), true);
+            diagIds[d.MissileIndex] = id;
+            string victim = d.AttachedAgent == null ? "-"
+                : networkAgentRegistry.TryGetAgentInfo(d.AttachedAgent, out var vi) ? vi.AgentId.ToString() : "unregistered";
+            Logger.Information("[MissileDiag] collision worldItem={WorldItemId} local={Local} reaction={Reaction} victim={Victim} shield={Shield} bone={Bone} object={Object} isLocalFrame={IsLocalFrame} attach={Attach}",
+                id.Id, id.Local, d.Reaction, victim, d.AttachedToShield, d.BoneIndex, d.AttachedObject, d.IsAttachedFrameLocal,
+                MissileCollisionDiag.Format(d.AttachLocalFrame));
+            return;
+        }
+
+        diagIds.TryGetValue(d.MissileIndex, out var after);
+        diagIds.Remove(d.MissileIndex);
+        Logger.Information("[MissileDiag] result worldItem={WorldItemId} reaction={Reaction} global={Global}",
+            after.Id, d.Reaction, MissileCollisionDiag.Format(d.ResultGlobalFrame));
     }
 
     internal static Guid CreateMissileItemId(Guid agentId, long shotSequence)
