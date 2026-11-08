@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
 using Common.PacketHandlers;
@@ -155,6 +156,54 @@ public partial class MovementTrafficTests
             }
 
             Assert.InRange(sendsInWindow, 40, 41);
+        });
+    }
+
+    [Theory]
+    [InlineData(52, 0.0005f)]
+    [InlineData(54, 0.001f)]
+    public void PollMovement_BulkRateDroppingToPeerCapStaysOneOverCapInEverySecond(int dropFrame, float wobbleSeconds)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            using AgentMovementHandler handler = CreateHandlerWithFrozenCapClock(peer);
+            Agent agent = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(agent, out var mirror));
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
+            handler.Configure(MovementCadenceProfile.Battle);
+            Assert.True(handler.TrySetForcedBulkHz(60, out _));
+            broker.Publish(this, new NetworkMissionPeerEntered("receiver", "battle"));
+            broker.Publish(this, new NetworkMovementReceiverCap("receiver", 40, 1));
+
+            handler.PollMovement(0f);
+            var sendTimes = new List<double>();
+            double time = 0d;
+            for (int frame = 1; frame <= dropFrame + 90; frame++)
+            {
+                // The first every-poll send after the drop lands on the bulk schedule, not the capped timer's phase.
+                if (frame == dropFrame)
+                    Assert.True(handler.TrySetForcedBulkHz(40, out _));
+                float frameSeconds = (1f / 45f) + (frame % 2 == 0 ? wobbleSeconds : -wobbleSeconds);
+                time += frameSeconds;
+                int sentBefore = network.DirectPacketSends.Count(send => send.ControllerId == "receiver");
+                mirror.Position = new Vec3(frame, 0f, 0f);
+                handler.PollMovement(frameSeconds);
+                if (network.DirectPacketSends.Count(send => send.ControllerId == "receiver") > sentBefore)
+                    sendTimes.Add(time);
+            }
+
+            int mostInOneSecond = sendTimes
+                .Select((sent, index) => sendTimes.Skip(index).TakeWhile(later => later < sent + 1d).Count())
+                .Max();
+            Assert.InRange(mostInOneSecond, 40, 41);
+            Assert.InRange(sendTimes.Count(sent => sent > time - 1d), 40, 41);
         });
     }
 

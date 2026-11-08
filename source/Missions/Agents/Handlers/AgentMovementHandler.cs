@@ -981,11 +981,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         int receiverCapHz,
         int bulkHz)
     {
+        float interval = 1f / Math.Max(1, receiverCapHz);
+        // This poll's slot on the bulk schedule: whole bulk intervals after the last one, never after the poll itself.
+        double bulkGridSeconds = bulkPollSeconds - bulkPollElapsed;
         if (!recipient.HasBulkPoll)
         {
             recipient.HasBulkPoll = true;
             recipient.DueEveryBulkPoll = receiverCapHz >= bulkHz;
-            recipient.LastBulkPollTime = bulkPollSeconds;
+            recipient.LastBulkPollTime = recipient.DueEveryBulkPoll ? bulkGridSeconds : bulkPollSeconds;
             return true;
         }
 
@@ -995,11 +998,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
         else if (recipient.DueEveryBulkPoll)
         {
-            recipient.LastBulkPollTime = bulkPollSeconds;
+            // Bulk slots are at least one cap interval apart, but the first one after a capped send can be closer, and
+            // sending it would put one more send than the cap allows into that second.
+            if (bulkGridSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+                return false;
+            recipient.LastBulkPollTime = bulkGridSeconds;
             return true;
         }
 
-        float interval = 1f / Math.Max(1, receiverCapHz);
         double elapsed = bulkPollSeconds - recipient.LastBulkPollTime;
         if (elapsed + CadenceEpsilonSeconds < interval)
             return false;
