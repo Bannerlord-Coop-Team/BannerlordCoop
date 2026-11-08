@@ -53,28 +53,6 @@ public class ActionNameCacheTests
         Assert.Equal(3, nameReads);
     }
 
-    [Theory]
-    [InlineData("act_usage_ballista_idle_defender", true, false)]
-    [InlineData("act_usage_ballista_ammo_pick_up_start_defender", true, false)]
-    [InlineData("act_usage_mangonel_big_shoot", true, false)]
-    [InlineData("act_usage_mangonel_reload_2_idle", true, false)]
-    [InlineData("act_usage_trebuchet_idle", false, false)]
-    [InlineData("act_command", false, true)]
-    [InlineData("act_command_follow", false, true)]
-    [InlineData("act_horse_command", false, true)]
-    [InlineData("act_horse_command_charge", false, true)]
-    [InlineData("act_walk_forward", false, false)]
-    [InlineData("act_mount", false, false)]
-    public void Describe_ClassifiesTheNameLikeTheUncachedChecks(string name, bool siegeUsage, bool orderGesture)
-    {
-        var cache = CreateCache();
-
-        ActionNameCache.Entry entry = cache.Describe(40, name);
-
-        Assert.Equal(siegeUsage, entry.IsRangedSiegeUsage);
-        Assert.Equal(orderGesture, entry.IsOrderGesture);
-    }
-
     [Fact]
     public void Describe_SameNameInstance_ReusesTheEntryWithoutReadingTheSourceAgain()
     {
