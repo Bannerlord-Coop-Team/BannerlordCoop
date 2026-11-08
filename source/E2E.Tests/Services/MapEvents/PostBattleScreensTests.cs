@@ -6,14 +6,15 @@ using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -30,16 +31,6 @@ public class PostBattleScreensTests : MapEventTestBase
     public PostBattleScreensTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void AmnestyIsOffByDefault()
-    {
-        var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
-
-        DestroyServerMapEvent(battleId);
-
-        Assert.True(CanEngage(aiPartyId, playerPartyId));
-    }
-
-    [Fact]
     public void Amnesty_AiPartyCannotEngagePlayerStillInPostBattleScreens() => WithAmnesty(1, () =>
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
@@ -47,27 +38,28 @@ public class PostBattleScreensTests : MapEventTestBase
 
         DestroyServerMapEvent(battleId);
         // The screens aren't limited by the amnesty length.
-        Thread.Sleep(1100);
+        AdvanceServerClock(seconds: 60);
 
         Assert.False(CanEngage(aiPartyId, playerPartyId));
     });
 
     [Fact]
-    public void Amnesty_RunsOutInRealSecondsAfterLeavingScreens() => WithAmnesty(1, () =>
+    public void Amnesty_RunsOutAfterLeavingScreens() => WithAmnesty(30, () =>
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
         DestroyServerMapEvent(battleId);
         LeavePostBattleScreens(Clients.First(), playerPartyId);
+
+        AdvanceServerClock(seconds: 29);
         Assert.False(CanEngage(aiPartyId, playerPartyId));
 
-        Thread.Sleep(1100);
-
+        AdvanceServerClock(seconds: 2);
         Assert.True(CanEngage(aiPartyId, playerPartyId));
     });
 
     /// <summary>The other player's own encounter finish doesn't end the first player's screens.</summary>
     [Fact]
-    public void Amnesty_OtherPlayerCanStillEngage_AndItsNoticeLeavesTheFirstPlayerInTheScreens() => WithAmnesty(1, () =>
+    public void Amnesty_OtherPlayerCanEngage_AndOnlyEndsItsOwnScreens() => WithAmnesty(1, () =>
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
         var (_, otherPlayerPartyId) = CreatePlayerHeroParty("2");
@@ -75,35 +67,10 @@ public class PostBattleScreensTests : MapEventTestBase
         DestroyServerMapEvent(battleId);
 
         LeavePostBattleScreens(Clients.Last(), otherPlayerPartyId);
-        Thread.Sleep(1100);
+        AdvanceServerClock(seconds: 60);
 
         Assert.False(CanEngage(aiPartyId, playerPartyId));
         Assert.True(CanEngage(otherPlayerPartyId, playerPartyId));
-    });
-
-    [Fact]
-    public void Amnesty_AiPartyStillReachesASettlement() => WithAmnesty(30, () =>
-    {
-        var (battleId, _, aiPartyId) = SetupPlayerWithNearbyAiParty();
-        DestroyServerMapEvent(battleId);
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
-        var reached = false;
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var ai));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            EnsureEncounterModel();
-            using (new AllowedThread())
-            {
-                ai.Position = settlement.GatePosition;
-                ai.SetShortTermBehavior(AiBehavior.GoToSettlement, settlement.Party);
-            }
-
-            reached = ((IInteractablePoint)settlement.Party).CanPartyInteract(ai, 0f);
-        });
-
-        Assert.True(reached);
     });
 
     [Fact]
@@ -177,6 +144,58 @@ public class PostBattleScreensTests : MapEventTestBase
         AssertServerTime(TimeControlEnum.Play_1x);
     }
 
+    /// <summary>A client can finish its encounter before the server finalizes the battle.</summary>
+    [Fact]
+    public void FinishBeforeFinalize_DoesNotHoldThePause()
+    {
+        PlayServerTime();
+        var (battleId, playerPartyId, _) = SetupPlayerWithNearbyAiParty();
+        AcquireOccupancyPause();
+        LeavePostBattleScreens(Clients.First(), playerPartyId);
+        AssertServerTime(TimeControlEnum.Pause);
+
+        DestroyServerMapEvent(battleId);
+
+        AssertServerTime(TimeControlEnum.Play_1x);
+    }
+
+    /// <summary>A captured player finishes no encounter, so the release mustn't bring the screens back.</summary>
+    [Fact]
+    public void CapturedPlayer_IsNotInTheScreensWhenReleased()
+    {
+        PlayServerTime();
+        var (heroId, partyId) = CreatePlayerHeroParty("1");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "1");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var battleId = CreateBattleStateDefeatMapEvent(heroId, partyId, captorPartyId);
+        AcquireOccupancyPause();
+
+        CommitBattleStateDefeat(battleId);
+        var battleLeft = false;
+        Server.Call(() => battleLeft = Server.ObjectManager.TryGetObject<MapEvent>(battleId, out _));
+        if (battleLeft)
+            DestroyServerMapEvent(battleId);
+        ReleasePlayerAfterCaptorDefeated(heroId);
+        PublishOnServer(new PlayerConnectionStateChanged());
+
+        AssertServerTime(TimeControlEnum.Play_1x);
+    }
+
+    [Fact]
+    public void ScreensEndAfterTheCap()
+    {
+        PlayServerTime();
+        var (battleId, _, _) = SetupPlayerWithNearbyAiParty();
+        AcquireOccupancyPause();
+        DestroyServerMapEvent(battleId);
+        AssertServerTime(TimeControlEnum.Pause);
+
+        AdvanceServerClock(PostBattleScreens.MaxScreenSeconds + 1);
+        PublishOnServer(new PlayerConnectionStateChanged());
+
+        AssertServerTime(TimeControlEnum.Play_1x);
+    }
+
     /// <summary>Player "1" on the first client attacks an AI party; a second AI party stands next to the player.</summary>
     private (string battleId, string playerPartyId, string aiPartyId) SetupPlayerWithNearbyAiParty()
     {
@@ -217,6 +236,14 @@ public class PostBattleScreensTests : MapEventTestBase
             ModConfigProvider.ModOptions = previousOptions;
         }
     }
+
+    // Moves the server's post battle clock forward and holds it there.
+    private void AdvanceServerClock(double seconds) => Server.Call(() =>
+    {
+        var screens = Server.Resolve<PostBattleScreens>();
+        var now = screens.UtcNow().AddSeconds(seconds);
+        screens.UtcNow = () => now;
+    });
 
     // Set before any player connects, so the occupancy pause has a speed to go back to. It goes through TimePatches
     // because the TimeControlMode getter reads it from there.

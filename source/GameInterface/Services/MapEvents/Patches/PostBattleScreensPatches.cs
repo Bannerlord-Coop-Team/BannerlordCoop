@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -22,7 +23,7 @@ internal class PostBattleScreensPatches
         foreach (var party in __instance.InvolvedParties)
         {
             if (party.MobileParty?.IsPlayerParty() == true)
-                screens.Enter(party.MobileParty);
+                screens.Enter(party.MobileParty, __instance);
         }
     }
 
@@ -44,7 +45,9 @@ internal class PostBattleScreensPatches
             __result = false;
     }
 
+    // Both gates run for every AI decision, so the default (off) skips the container lookup.
     private static bool IsProtectedFromAi(MobileParty target, MobileParty attacker) =>
+        ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0 &&
         ModInformation.IsServer &&
         ContainerProvider.TryResolve<PostBattleScreens>(out var screens) &&
         screens.IsProtectedFrom(target, attacker);
