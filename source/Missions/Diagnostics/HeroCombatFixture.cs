@@ -39,6 +39,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         public int HitsWithoutWeapon;
         public double Damage;
         public double ExpectedSkillXp;
+        public double RawXp;
     }
 
     private readonly IMessageBroker messageBroker;
@@ -103,7 +104,8 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                 skill = isHorseCharge ? DefaultSkills.Riding : DefaultSkills.Athletics;
             }
 
-            double expected = xp.RoundedResultNumber * models.GenericXpModel.GetXpMultiplier(hero) * hero.HeroDeveloper.GetFocusFactor(skill);
+            double raw = xp.RoundedResultNumber;
+            double expected = raw * models.GenericXpModel.GetXpMultiplier(hero) * hero.HeroDeveloper.GetFocusFactor(skill);
             string weaponClass = hit.LastAttackerWeapon?.WeaponClass.ToString() ?? "none";
             string key = hero.StringId + "|" + skill.StringId + "|" + weaponClass;
             if (!tallies.TryGetValue(key, out Tally tally))
@@ -116,6 +118,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
             if (hit.LastAttackerWeapon == null) tally.HitsWithoutWeapon++;
             tally.Damage += hit.DamageAmount;
             tally.ExpectedSkillXp += expected;
+            tally.RawXp += raw;
         }
     }
 
@@ -131,6 +134,11 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
             .ToArray();
         if (heroes.Length == 0)
             return Failed("This client controls no active hero agent");
+
+        lock (gate)
+        {
+            previousControllers.Clear();
+        }
 
         var notes = new List<string>();
         foreach (Agent agent in heroes)
@@ -158,12 +166,16 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
     {
         lock (gate)
         {
+            // Agents of an earlier mission are gone with it; only touch the current mission's.
+            Mission mission = Mission.Current;
+            int restored = 0;
             foreach (var pair in previousControllers)
             {
-                if (pair.Key.IsActive()) pair.Key.Controller = pair.Value;
+                if (mission == null || pair.Key.Mission != mission || !pair.Key.IsActive()) continue;
+                pair.Key.Controller = pair.Value;
+                restored++;
             }
 
-            int restored = previousControllers.Count;
             previousControllers.Clear();
             return new CoopCommandResult(true, $"HERO_COMBAT_STOPPED restored={restored}\nLIVE_TEST_JSON=" + Snapshot());
         }
@@ -203,6 +215,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                     tally.HitsWithoutWeapon,
                     damage = Math.Round(tally.Damage, 1),
                     expectedSkillXp = Math.Round(tally.ExpectedSkillXp, 2),
+                    rawXp = Math.Round(tally.RawXp, 2),
                 }).ToArray(),
                 nonHeroHits,
                 nonHeroHitsWithCommander,
