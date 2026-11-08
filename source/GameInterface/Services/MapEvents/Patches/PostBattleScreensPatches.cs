@@ -1,16 +1,15 @@
 ﻿using Common;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
-/// <summary>Server hooks for <see cref="PostBattleAiAmnesty"/>.</summary>
+/// <summary>Server hooks for <see cref="PostBattleScreens"/>.</summary>
 [HarmonyPatch]
-internal class PostBattleAiAmnestyPatches
+internal class PostBattleScreensPatches
 {
     // Finalize detaches every party, so the players are read before vanilla runs.
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
@@ -18,24 +17,13 @@ internal class PostBattleAiAmnestyPatches
     private static void Prefix_FinalizeEventAux(MapEvent __instance, bool __runOriginal)
     {
         if (!__runOriginal || ModInformation.IsClient || __instance.IsFinalized) return;
-        if (!ContainerProvider.TryResolve<PostBattleAiAmnesty>(out var amnesty)) return;
+        if (!ContainerProvider.TryResolve<PostBattleScreens>(out var screens)) return;
 
         foreach (var party in __instance.InvolvedParties)
         {
             if (party.MobileParty?.IsPlayerParty() == true)
-                amnesty.Protect(party.MobileParty);
+                screens.Enter(party.MobileParty);
         }
-    }
-
-    // realDt is the frame's real time, so game speed doesn't change how fast the protection runs out.
-    [HarmonyPatch(typeof(Campaign), "TickMapTime")]
-    [HarmonyPostfix]
-    private static void Postfix_TickMapTime(float realDt)
-    {
-        if (ModInformation.IsClient) return;
-
-        if (ContainerProvider.TryResolve<PostBattleAiAmnesty>(out var amnesty))
-            amnesty.Tick(realDt);
     }
 
     // The hard stop: OnPartyInteraction, which starts the encounter, only runs when this passes.
@@ -58,6 +46,6 @@ internal class PostBattleAiAmnestyPatches
 
     private static bool IsProtectedFromAi(MobileParty target, MobileParty attacker) =>
         ModInformation.IsServer &&
-        ContainerProvider.TryResolve<PostBattleAiAmnesty>(out var amnesty) &&
-        amnesty.IsProtectedFrom(target, attacker);
+        ContainerProvider.TryResolve<PostBattleScreens>(out var screens) &&
+        screens.IsProtectedFrom(target, attacker);
 }

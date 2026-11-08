@@ -3,6 +3,7 @@ using Common.Network.Messages;
 using Common.Util;
 using Coop.Tests.Stubs;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -102,7 +103,8 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
             broker,
             objectManager.Object,
             playerManager.Object,
-            timeControl.Object);
+            timeControl.Object,
+            new PostBattleScreens(broker, playerManager.Object, objectManager.Object));
         Assert.True(handler.UpdateOccupancyTimeControl(true));
 
         broker.Publish(this, new PlayerConnectionStateChanged());
@@ -115,10 +117,14 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
 
     private static PlayerOccupancyPauseHandler CreateHandler(Mock<ITimeControlInterface> timeControl)
     {
+        var broker = new StubMessageBroker();
+        var objectManager = Mock.Of<IObjectManager>();
+        var playerManager = Mock.Of<IPlayerManager>();
         return new PlayerOccupancyPauseHandler(
-            new StubMessageBroker(),
-            Mock.Of<IObjectManager>(),
-            Mock.Of<IPlayerManager>(),
-            timeControl.Object);
+            broker,
+            objectManager,
+            playerManager,
+            timeControl.Object,
+            new PostBattleScreens(broker, playerManager, objectManager));
     }
 }

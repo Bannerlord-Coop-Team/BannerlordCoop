@@ -129,11 +129,11 @@
     "playerBattleAiJoinWindowHours": 6,
 
     // Set how many real seconds AI parties leave a player alone after a battle.
-    // AI parties can never attack a player who is still in the loot, prisoner or other after battle screens.
-    // Default is 30, meaning AI parties also can't attack for 30 seconds after the player leaves those screens.
-    // Only counts while the game is unpaused, and game speed doesn't change it. Other players can still attack.
-    // If set to 0, the player is only protected while in those screens.
-    "postBattleAiAmnestySeconds": 30,
+    // (Default) 0: Off. AI parties can attack a player as soon as their battle ends.
+    // Above 0: AI parties can't attack a player who is still in the loot, prisoner or other after battle screens,
+    // or for this many seconds after the player leaves them. The seconds count while paused too, and game speed
+    // doesn't change them. Other players can still attack.
+    "postBattleAiAmnestySeconds": 0,
 
     // Toggle speed limit when players are in a battle.
     // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.
