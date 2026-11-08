@@ -13,11 +13,11 @@ internal class PlayerCaptivityRobustnessPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerCaptivityRobustnessPatches>();
 
-    // Nobody plays the server's main hero, so if it is captured its captivity menu can never be clicked, and an
-    // open menu zeroes the campaign dt so no party AI thinks. Players' captivity runs in PlayerCaptivityServerHandler.
+    // Nobody plays the server's main hero, and an open captivity menu zeroes the campaign dt so no party AI thinks.
+    // Players' captivity runs in PlayerCaptivityServerHandler.
     [HarmonyPatch(typeof(PlayerCaptivity), nameof(PlayerCaptivity.Update))]
     [HarmonyPrefix]
-    private static bool Prefix_Update() => !ModInformation.IsServer;
+    private static bool Prefix_Update() => ModInformation.IsClient;
 
     [HarmonyPatch(typeof(PlayerCaptivity), nameof(PlayerCaptivity.Update))]
     [HarmonyFinalizer]
