@@ -101,6 +101,50 @@ public class BattleBenchmarkComparisonTests : IDisposable
         Assert.Contains("| Frames.P95Ms | 11.0 ± 1.00 [10.0, 12.0] (n=3) | 8.50 ± 0.50 [8.00, 9.00] (n=3) | -2.50 | -22.7% | separated |", table);
     }
 
+    [Fact]
+    public void RenderMessageTypes_TablesBytesPerSecondPerType_CountingAMissingTypeAsZero()
+    {
+        // The candidate stops sending NetworkMove in run 3 and shrinks it in the others; NetworkIdle never sends a byte.
+        IReadOnlyList<BattleBenchmarkRun> baseline = new[]
+        {
+            TypeRun("b1", ("NetworkMove", 1000, 10), ("NetworkHit", 100, 2), ("NetworkIdle", 0, 0)),
+            TypeRun("b2", ("NetworkMove", 1100, 11), ("NetworkHit", 100, 2)),
+            TypeRun("b3", ("NetworkMove", 900, 9), ("NetworkHit", 100, 2)),
+        };
+        IReadOnlyList<BattleBenchmarkRun> candidate = new[]
+        {
+            TypeRun("c1", ("NetworkMove", 500, 10), ("NetworkHit", 100, 2)),
+            TypeRun("c2", ("NetworkMove", 550, 11), ("NetworkHit", 100, 2)),
+            TypeRun("c3", ("NetworkHit", 100, 2)),
+        };
+
+        string table = comparison.RenderMessageTypes(baseline, candidate);
+
+        Assert.Contains("### server sent", table);
+        Assert.Contains("| NetworkMove | 1,000 ± 100.0 [900.0, 1,100] (n=3) | 350.0 ± 304.1 [0, 550.0] (n=3) | -650.0 | -65.0% | " +
+                        "separated | 10.0 | 7.00 | 100.0 | 50.0 |", table);
+        Assert.True(table.IndexOf("| NetworkMove", StringComparison.Ordinal) < table.IndexOf("| NetworkHit", StringComparison.Ordinal));
+        Assert.DoesNotContain("NetworkIdle", table);
+        Assert.DoesNotContain("### server received", table);
+    }
+
+    private BattleBenchmarkRun TypeRun(string name, params (string Type, double BytesPerSecond, double CountPerSecond)[] types)
+    {
+        var byType = types.ToDictionary(
+            type => type.Type,
+            type => (object)new { type.BytesPerSecond, type.CountPerSecond });
+        string json = JsonSerializer.Serialize(new
+        {
+            Schema = BattleBenchmarkReport.CurrentSchema,
+            Process = new { Role = "server", ControllerId = "Server", ProcessId = 42 },
+            MessageTraffic = new
+            {
+                Sent = new { Total = new { BytesPerSecond = types.Sum(type => type.BytesPerSecond) }, ByType = byType },
+            },
+        });
+        return comparison.ParseRun(name, new[] { json });
+    }
+
     private IReadOnlyList<BattleBenchmarkRun> Runs(double[] p95) =>
         p95.Select((value, index) => comparison.ParseRun($"run-{index}", new[] { Report("battle-host", "PlayerOne", value, "[]") }))
             .ToList();

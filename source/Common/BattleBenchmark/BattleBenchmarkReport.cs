@@ -21,11 +21,14 @@ public sealed class BattleBenchmarkReport
     public BattleBenchmarkMissionState MissionStart { get; set; }
     public BattleBenchmarkMissionState MissionEnd { get; set; }
 
-    /// <summary>All routes added together.</summary>
+    /// <summary>All mission routes added together; null on the server, which is never a mission peer.</summary>
     public BattleBenchmarkRouteTraffic Traffic { get; set; }
 
     public List<BattleBenchmarkRouteTraffic> Routes { get; set; }
     public BattleBenchmarkReceivedMessages ReceivedMessages { get; set; }
+
+    /// <summary>Every message and packet sent and received, by type, on the campaign connection and the mission peers together.</summary>
+    public BattleBenchmarkMessageTraffic MessageTraffic { get; set; }
 }
 
 /// <summary>Which process wrote a report, and its build.</summary>
@@ -162,6 +165,37 @@ public sealed class BattleBenchmarkReceivedMessages
 
     /// <summary>Message type name to count, largest first.</summary>
     public Dictionary<string, long> ByType { get; set; }
+}
+
+/// <summary>
+/// Message and packet traffic by type. Bytes are the serialized message or packet handed to the connection, before
+/// LiteNetLib's headers, once per peer it went to. A message sent inside an aggregate counts its own bytes, and the
+/// aggregate's framing counts under <c>AggregateMessagePacket</c> (sent: campaign connection only). A message relayed
+/// through the server counts under its own type and again inside <c>RelayPacket</c>.
+/// </summary>
+public sealed class BattleBenchmarkMessageTraffic
+{
+    public BattleBenchmarkTypeTraffic Sent { get; set; }
+    public BattleBenchmarkTypeTraffic Received { get; set; }
+}
+
+/// <summary>One direction's total and its share per type.</summary>
+public sealed class BattleBenchmarkTypeTraffic
+{
+    public BattleBenchmarkByteCounts Total { get; set; }
+
+    /// <summary>Message or packet type name to its counts, most bytes first.</summary>
+    public Dictionary<string, BattleBenchmarkByteCounts> ByType { get; set; }
+}
+
+/// <summary>How many messages or packets went one way over the window, and their bytes.</summary>
+public sealed class BattleBenchmarkByteCounts
+{
+    public long Count { get; set; }
+    public long Bytes { get; set; }
+    public double CountPerSecond { get; set; }
+    public double BytesPerSecond { get; set; }
+    public double AverageBytes { get; set; }
 }
 
 /// <summary>What <see cref="IBattleBenchmarkRecorder.Status"/> reports.</summary>

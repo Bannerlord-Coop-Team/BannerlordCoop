@@ -45,7 +45,8 @@ switch (positional.FirstOrDefault())
             Console.Error.WriteLine($"No benchmark runs found: baseline={baseline.Count}, candidate={candidate.Count}");
             return 3;
         }
-        output = comparison.Render(comparison.Compare(baseline, candidate, includeAll, filter), baseline.Count, candidate.Count);
+        output = comparison.Render(comparison.Compare(baseline, candidate, includeAll, filter), baseline.Count, candidate.Count) +
+                 comparison.RenderMessageTypes(baseline, candidate);
         break;
     }
     case "summary" when positional.Count == 2:

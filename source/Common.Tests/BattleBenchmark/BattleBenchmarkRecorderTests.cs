@@ -1,4 +1,5 @@
 ﻿using Common.BattleBenchmark;
+using Common.PacketHandlers;
 using Common.Serialization;
 using System.Diagnostics;
 using System.Text.Json;
@@ -125,6 +126,39 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Equal(3, report.ReceivedMessages.Total);
         Assert.Equal(new[] { "Int32", "String" }, report.ReceivedMessages.ByType.Keys);
         Assert.Equal(2, report.ReceivedMessages.ByType["Int32"]);
+    }
+
+    [Fact]
+    public void Report_CountsBytesPerTypeAndOnlyTheFramingOfAReceivedAggregate()
+    {
+        var recorder = CreateRecorder();
+        recorder.RecordTypeSent(typeof(int), 999);
+
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
+        recorder.RecordTypeSent(typeof(int), 100);
+        recorder.RecordTypeSent(typeof(int), 300);
+        recorder.RecordTypeSent(typeof(string), 50);
+        // Only the 22 bytes of framing around the 30 and 20 byte messages; the handler counts those as it unpacks them.
+        recorder.RecordPayloadReceived(new AggregateMessagePacket(new[] { new byte[30], new byte[20] }), 72);
+        recorder.RecordTypeReceived(typeof(int), 30);
+        recorder.RecordTypeReceived(typeof(int), 20);
+        recorder.RecordPayloadReceived("bare", 40);
+        now += 2 * Second;
+
+        BattleBenchmarkMessageTraffic traffic = recorder.BuildReport(now, "stopped", sampler.Sample(), BattleBenchmarkMissionState.None)
+            .MessageTraffic;
+
+        Assert.Equal(new[] { "Int32", "String" }, traffic.Sent.ByType.Keys);
+        BattleBenchmarkByteCounts sentInts = traffic.Sent.ByType["Int32"];
+        Assert.Equal(2, sentInts.Count);
+        Assert.Equal(400, sentInts.Bytes);
+        Assert.Equal(200d, sentInts.BytesPerSecond, 6);
+        Assert.Equal(1d, sentInts.CountPerSecond, 6);
+        Assert.Equal(200d, sentInts.AverageBytes, 6);
+        Assert.Equal(450, traffic.Sent.Total.Bytes);
+        Assert.Equal(new[] { "Int32", "String", "AggregateMessagePacket" }, traffic.Received.ByType.Keys);
+        Assert.Equal(22, traffic.Received.ByType["AggregateMessagePacket"].Bytes);
+        Assert.Equal(72 + 40, traffic.Received.Total.Bytes);
     }
 
     [Fact]

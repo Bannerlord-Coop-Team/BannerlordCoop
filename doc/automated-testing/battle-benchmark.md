@@ -38,8 +38,9 @@ When no window is recording the instrumentation does nothing measurable: the tim
 | `Garbage` | Gen0, gen1 and gen2 collections, allocated bytes and bytes per second over the window. |
 | `Cpu` | Process CPU seconds and percent of one core. |
 | `Memory` | Working set at start and end, peak working set since the process started, private and managed heap at the end. |
-| `Traffic`, `Routes` | Per peer and in total, sent and received: movement datagrams and bytes, reliable messages (logical sends, before batching) and bytes, reliable packets (what went to LiteNetLib: a batch or a reliable packet) and bytes, each also per second. Sent traffic also has `ReliableDatagrams` (what LiteNetLib puts on the wire: one per packet up to its single-packet size, 1,020 B at the 1,024 B MTU neither connection raises, otherwise `ceil(bytes / (size - 6))` fragments), `OversizedReliablePackets` (packets that fragmented), and reliable bytes per second split into `Direct` (mission peer) and `Relayed` (the serialized relay packet on the campaign connection). Received reliable packets arrive reassembled, so they have no datagram count. Received traffic covers the direct mission connection only: the server forwards relayed payloads on the campaign connection, where they can't be told apart from campaign traffic, so relayed traffic shows in the sender's `Relayed*` counts. |
+| `Traffic`, `Routes` | Mission traffic, left out on the server, which is never a mission peer. Per peer and in total, sent and received: movement datagrams and bytes, reliable messages (logical sends, before batching) and bytes, reliable packets (what went to LiteNetLib: a batch or a reliable packet) and bytes, each also per second. Sent traffic also has `ReliableDatagrams` (what LiteNetLib puts on the wire: one per packet up to its single-packet size, 1,020 B at the 1,024 B MTU neither connection raises, otherwise `ceil(bytes / (size - 6))` fragments), `OversizedReliablePackets` (packets that fragmented), and reliable bytes per second split into `Direct` (mission peer) and `Relayed` (the serialized relay packet on the campaign connection). Received reliable packets arrive reassembled, so they have no datagram count. Received traffic covers the direct mission connection only: the server forwards relayed payloads on the campaign connection, where they can't be told apart from campaign traffic, so relayed traffic shows in the sender's `Relayed*` counts. |
 | `ReceivedMessages` | Every message received, by type, and the total per second. On the dedicated server this is the battle traffic it receives. |
+| `MessageTraffic` | Every message and packet sent and received, on the campaign connection and the mission peers together: per type and in total, the count, bytes, count and bytes per second, and bytes per message. Bytes are the serialized message or packet handed to the connection or taken off it, before LiteNetLib's headers, once per peer. A message inside an aggregate counts its own bytes and the aggregate's framing counts under `AggregateMessagePacket` (sent: campaign connection only). A message relayed through the server counts under its own type and again inside `RelayPacket`. On the dedicated server this is all of its traffic. |
 | `MissionStart`, `MissionEnd` | In mission, battle host, active agents, agents this process owns, scene. |
 | `Process`, `Window` | Role, controller id, build configuration, version (with commit), runtime, window start, end and length. |
 
@@ -55,8 +56,10 @@ dotnet run --project tools/BattleBenchmark -- summary <runs> [--all] [--filter <
 `compare` prints one Markdown table per process role: each metric's baseline and candidate mean ± standard deviation
 [min, max], the delta and the delta in percent. The verdict is `separated` only when every candidate run lies above,
 or every one below, every baseline run; otherwise the change is `within noise`. With fewer than 3 runs on either side
-it says `too few runs`. Without `--all` it shows the headline metrics only. `summary` prints one set's mean and spread,
-for posting baseline numbers.
+it says `too few runs`. Without `--all` it shows the headline metrics only. After those tables, "Bytes per message type"
+has one table per process role and direction: each type's bytes per second (mean ± spread, delta, verdict), messages
+per second and bytes per message, largest change first. That is where a bandwidth change shows: the bytes per message
+of the type it touches, times its rate. `summary` prints one set's mean and spread, for posting baseline numbers.
 
 What the field scenario can show, from an A/A run (six runs of one development build, 2026-11-07):
 

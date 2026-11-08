@@ -1195,6 +1195,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (packet is MessagePacket messagePacket)
         {
             battleBenchmark?.RecordReliableMessageSent(controllerId, messagePacket.Data.Length);
+            battleBenchmark?.RecordTypeSent(messagePacket.MessageType, messagePacket.Data.Length);
             // Spawn admission must see a bare message before later authority changes reach the game thread.
             if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
             {
@@ -1213,6 +1214,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             return;
         }
 
+        battleBenchmark?.RecordTypeSent(packet.GetType(), data.Length);
         if (packet.DeliveryMethod == DeliveryMethod.ReliableOrdered ||
             packet.DeliveryMethod == DeliveryMethod.ReliableUnordered)
         {
@@ -1512,6 +1514,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket, int? generation = null)
     {
         object received = serializer.Deserialize(serializedPacket);
+        battleBenchmark?.RecordPayloadReceived(received, serializedPacket.Length);
         lock (peerGate)
         {
             if (generation.HasValue &&

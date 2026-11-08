@@ -27,6 +27,8 @@ public interface IBattleBenchmarkComparison
 
     string Render(IReadOnlyList<BattleBenchmarkMetricComparison> comparisons, int baselineRuns, int candidateRuns);
 
+    string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate);
+
     string RenderSummary(IReadOnlyList<BattleBenchmarkRun> runs, bool includeAll, string filter = null);
 }
 
@@ -42,7 +44,13 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         @"|Memory\.PeakWorkingSetMb" +
         @"|MissionEnd\.(ActiveAgents|OwnedAgents)" +
         @"|Traffic\.(Sent|Received)\.\w+PerSecond" +
-        @"|ReceivedMessages\.PerSecond)$",
+        @"|ReceivedMessages\.PerSecond" +
+        @"|MessageTraffic\.(Sent|Received)\.Total\.(CountPerSecond|BytesPerSecond))$",
+        RegexOptions.Compiled);
+
+    // One message or packet type's rates, which RenderMessageTypes tables instead of the main tables.
+    private static readonly Regex MessageTypePattern = new Regex(
+        @"^MessageTraffic\.(?<direction>Sent|Received)\.ByType\.(?<type>.+)\.(?<metric>BytesPerSecond|CountPerSecond|AverageBytes)$",
         RegexOptions.Compiled);
 
     // Identity and bookkeeping fields, not measurements.
@@ -159,6 +167,92 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         }
         return text.ToString();
     }
+
+    /// <summary>
+    /// Renders bytes per second per message or packet type, per process key and direction, largest change first. A type
+    /// missing from a report that has the per-type counts had none in that run, so it counts as 0 there. Types with no
+    /// bytes in any run are left out.
+    /// </summary>
+    public string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate)
+    {
+        var text = new StringBuilder();
+        text.AppendLine();
+        text.AppendLine("## Bytes per message type");
+        text.AppendLine();
+        text.AppendLine("Serialized bytes per second handed to the connection or taken off it, by message or packet type, largest " +
+                        "change first. Msgs/s and bytes/msg are means over the runs.");
+        foreach (string processKey in baseline.Concat(candidate)
+                     .SelectMany(run => run.Processes.Keys)
+                     .Distinct()
+                     .OrderBy(ProcessOrder)
+                     .ThenBy(key => key, StringComparer.Ordinal))
+        {
+            foreach (string direction in new[] { "Sent", "Received" })
+            {
+                // Reports written before the per-type counts existed have no total, so they are left out.
+                string total = $"MessageTraffic.{direction}.Total.BytesPerSecond";
+                List<IReadOnlyDictionary<string, double>> baselineRuns = MetricsOf(baseline, processKey, total);
+                List<IReadOnlyDictionary<string, double>> candidateRuns = MetricsOf(candidate, processKey, total);
+
+                BattleBenchmarkMetricComparison Rate(string type, string rate)
+                {
+                    string metric = $"MessageTraffic.{direction}.ByType.{type}.{rate}";
+                    return new BattleBenchmarkMetricComparison(
+                        processKey,
+                        metric,
+                        BattleBenchmarkSpread.Of(baselineRuns.Select(metrics => metrics.TryGetValue(metric, out double value) ? value : 0d)),
+                        BattleBenchmarkSpread.Of(candidateRuns.Select(metrics => metrics.TryGetValue(metric, out double value) ? value : 0d)));
+                }
+
+                var rows = baselineRuns.Concat(candidateRuns)
+                    .SelectMany(metrics => metrics.Keys)
+                    .Select(metric => MessageTypePattern.Match(metric))
+                    .Where(match => match.Success && match.Groups["direction"].Value == direction)
+                    .Select(match => match.Groups["type"].Value)
+                    .Distinct()
+                    .Select(type => (Type: type, Bytes: Rate(type, "BytesPerSecond"), Count: Rate(type, "CountPerSecond")))
+                    .Where(row => row.Bytes.Baseline.Maximum > 0 || row.Bytes.Candidate.Maximum > 0)
+                    .OrderByDescending(row => double.IsNaN(row.Bytes.Delta) ? double.MaxValue : Math.Abs(row.Bytes.Delta))
+                    .ThenBy(row => row.Type, StringComparer.Ordinal)
+                    .ToList();
+                if (rows.Count == 0) continue;
+
+                text.AppendLine();
+                text.AppendLine($"### {processKey} {direction.ToLowerInvariant()}");
+                text.AppendLine();
+                text.AppendLine("| Type | Bytes/s baseline | Bytes/s candidate | Delta | Delta % | Verdict | " +
+                                "Msgs/s baseline | Msgs/s candidate | Bytes/msg baseline | Bytes/msg candidate |");
+                text.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+                foreach (var row in rows)
+                {
+                    text.AppendLine($"| {row.Type} | {Format(row.Bytes.Baseline)} | {Format(row.Bytes.Candidate)} | " +
+                                    $"{FormatNumber(row.Bytes.Delta)} | {FormatPercent(row.Bytes.DeltaPercent)} | {row.Bytes.Verdict} | " +
+                                    $"{FormatNumber(row.Count.Baseline.Mean)} | {FormatNumber(row.Count.Candidate.Mean)} | " +
+                                    $"{FormatNumber(BytesPerMessage(row.Bytes.Baseline, row.Count.Baseline))} | " +
+                                    $"{FormatNumber(BytesPerMessage(row.Bytes.Candidate, row.Count.Candidate))} |");
+                }
+            }
+        }
+        return text.ToString();
+    }
+
+    private static List<IReadOnlyDictionary<string, double>> MetricsOf(
+        IEnumerable<BattleBenchmarkRun> runs,
+        string processKey,
+        string requiredMetric)
+    {
+        var result = new List<IReadOnlyDictionary<string, double>>();
+        foreach (BattleBenchmarkRun run in runs)
+        {
+            if (run.Processes.TryGetValue(processKey, out var metrics) && metrics.ContainsKey(requiredMetric))
+                result.Add(metrics);
+        }
+        return result;
+    }
+
+    // The ratio of the means, so a run with no messages of the type doesn't count as 0 bytes per message.
+    private static double BytesPerMessage(BattleBenchmarkSpread bytesPerSecond, BattleBenchmarkSpread countPerSecond) =>
+        countPerSecond.Count == 0 || countPerSecond.Mean == 0 ? double.NaN : bytesPerSecond.Mean / countPerSecond.Mean;
 
     /// <summary>Renders one set's mean and spread per metric, for posting baseline numbers.</summary>
     public string RenderSummary(IReadOnlyList<BattleBenchmarkRun> runs, bool includeAll, string filter = null)

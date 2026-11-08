@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.PacketHandlers;
 using Common.Serialization;
 using Serilog;
 using System;
@@ -17,7 +18,7 @@ namespace Common.BattleBenchmark;
 
 /// <summary>
 /// Records one fixed battle benchmark window in this process (frame times, hot-path sections, garbage, CPU, memory
-/// and per-route mission traffic) and writes the summary as JSON. Idle until started, so the instrumented paths only
+/// per-route mission traffic and bytes per message type) and writes the summary as JSON. Idle until started, so the instrumented paths only
 /// read <see cref="IsRecording"/>.
 /// </summary>
 public interface IBattleBenchmarkRecorder
@@ -48,6 +49,18 @@ public interface IBattleBenchmarkRecorder
     void RecordReceived(string route, bool reliable, int bytes);
 
     void RecordReceivedMessage(Type messageType);
+
+    /// <summary>Counts one message or packet handed to the campaign connection or a mission peer, with its serialized bytes.</summary>
+    void RecordTypeSent(Type type, int bytes);
+
+    /// <summary>
+    /// Counts one payload as it comes off the campaign connection or a mission peer. An aggregate counts only its framing
+    /// here, because <see cref="RecordTypeReceived"/> counts each message inside it as it is unpacked.
+    /// </summary>
+    void RecordPayloadReceived(object payload, int bytes);
+
+    /// <summary>Counts one received message or packet with its serialized bytes.</summary>
+    void RecordTypeReceived(Type type, int bytes);
 }
 
 /// <inheritdoc cref="IBattleBenchmarkRecorder"/>
@@ -66,6 +79,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     private static readonly Regex RunIdPattern = new Regex("^[A-Za-z0-9_.-]{1,64}$", RegexOptions.Compiled);
     private static readonly Func<string, RouteCounters> CreateRoute = route => new RouteCounters(route);
     private static readonly Func<Type, StrongBox<long>> CreateMessageCount = _ => new StrongBox<long>();
+    private static readonly Func<Type, TypeCounter> CreateTypeCounter = _ => new TypeCounter();
 
     private readonly IBattleBenchmarkProcessSampler processSampler;
     private readonly IBattleBenchmarkMissionProbe missionProbe;
@@ -96,6 +110,8 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     private long[] sectionMaxTicks = new long[(int)BattleBenchmarkSection.Count];
     private ConcurrentDictionary<string, RouteCounters> routes = new ConcurrentDictionary<string, RouteCounters>();
     private ConcurrentDictionary<Type, StrongBox<long>> receivedMessages = new ConcurrentDictionary<Type, StrongBox<long>>();
+    private ConcurrentDictionary<Type, TypeCounter> sentTypes = new ConcurrentDictionary<Type, TypeCounter>();
+    private ConcurrentDictionary<Type, TypeCounter> receivedTypes = new ConcurrentDictionary<Type, TypeCounter>();
     private string lastReportPath;
     private string lastError;
 
@@ -198,6 +214,8 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             sectionMaxTicks = new long[(int)BattleBenchmarkSection.Count];
             routes = new ConcurrentDictionary<string, RouteCounters>();
             receivedMessages = new ConcurrentDictionary<Type, StrongBox<long>>();
+            sentTypes = new ConcurrentDictionary<Type, TypeCounter>();
+            receivedTypes = new ConcurrentDictionary<Type, TypeCounter>();
             lastReportPath = null;
             lastError = null;
 
@@ -295,6 +313,37 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         if (!recording || messageType == null) return;
 
         Interlocked.Increment(ref window.GetOrAdd(messageType, CreateMessageCount).Value);
+    }
+
+    public void RecordTypeSent(Type type, int bytes)
+    {
+        ConcurrentDictionary<Type, TypeCounter> window = sentTypes;
+        if (!recording || type == null) return;
+
+        window.GetOrAdd(type, CreateTypeCounter).Add(bytes);
+    }
+
+    public void RecordPayloadReceived(object payload, int bytes)
+    {
+        if (!recording || payload == null) return;
+
+        if (payload is AggregateMessagePacket aggregate)
+        {
+            int framing = bytes;
+            foreach (byte[] message in aggregate.Messages ?? Array.Empty<byte[]>()) framing -= message?.Length ?? 0;
+            RecordTypeReceived(typeof(AggregateMessagePacket), framing);
+            return;
+        }
+
+        RecordTypeReceived(payload.GetType(), bytes);
+    }
+
+    public void RecordTypeReceived(Type type, int bytes)
+    {
+        ConcurrentDictionary<Type, TypeCounter> window = receivedTypes;
+        if (!recording || type == null) return;
+
+        window.GetOrAdd(type, CreateTypeCounter).Add(bytes);
     }
 
     public void OnFrame(long drainStartedTimestamp, long drainFinishedTimestamp)
@@ -404,6 +453,8 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             .ThenBy(entry => entry.Key, StringComparer.Ordinal)
             .ToArray();
         long totalMessages = messageCounts.Sum(entry => entry.Value);
+        // The server is never a mission peer, so its report leaves the mission traffic out; MessageTraffic holds all of it.
+        bool server = ModInformation.IsServer;
 
         return new BattleBenchmarkReport
         {
@@ -411,7 +462,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             Label = label,
             Process = new BattleBenchmarkProcessInfo
             {
-                Role = ModInformation.IsServer ? "server" : missionEnd.IsBattleHost ? "battle-host" : "client",
+                Role = server ? "server" : missionEnd.IsBattleHost ? "battle-host" : "client",
                 ControllerId = missionEnd.ControllerId,
                 ProcessId = GetProcessId(),
                 Configuration = BuildConfiguration,
@@ -459,16 +510,48 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             },
             MissionStart = missionStart,
             MissionEnd = missionEnd,
-            Traffic = RouteCounters.Sum(routeReports, seconds),
-            Routes = routeReports,
+            Traffic = server ? null : RouteCounters.Sum(routeReports, seconds),
+            Routes = server ? null : routeReports,
             ReceivedMessages = new BattleBenchmarkReceivedMessages
             {
                 Total = totalMessages,
                 PerSecond = PerSecond(totalMessages, seconds),
                 ByType = messageCounts.ToDictionary(entry => entry.Key, entry => entry.Value),
             },
+            MessageTraffic = new BattleBenchmarkMessageTraffic
+            {
+                Sent = BuildTypeTraffic(sentTypes, seconds),
+                Received = BuildTypeTraffic(receivedTypes, seconds),
+            },
         };
     }
+
+    // Reads each counter once, keyed by short type name like ReceivedMessages, largest bytes first.
+    private static BattleBenchmarkTypeTraffic BuildTypeTraffic(ConcurrentDictionary<Type, TypeCounter> types, double seconds)
+    {
+        var rows = types
+            .Select(entry => (Name: entry.Key.Name, Counts: entry.Value.Read()))
+            .GroupBy(row => row.Name)
+            .Select(group => (Name: group.Key, Count: group.Sum(row => row.Counts.Count), Bytes: group.Sum(row => row.Counts.Bytes)))
+            .OrderByDescending(row => row.Bytes)
+            .ThenBy(row => row.Name, StringComparer.Ordinal)
+            .ToList();
+
+        return new BattleBenchmarkTypeTraffic
+        {
+            Total = ToByteCounts(rows.Sum(row => row.Count), rows.Sum(row => row.Bytes), seconds),
+            ByType = rows.ToDictionary(row => row.Name, row => ToByteCounts(row.Count, row.Bytes, seconds)),
+        };
+    }
+
+    private static BattleBenchmarkByteCounts ToByteCounts(long count, long bytes, double seconds) => new BattleBenchmarkByteCounts
+    {
+        Count = count,
+        Bytes = bytes,
+        CountPerSecond = PerSecond(count, seconds),
+        BytesPerSecond = PerSecond(bytes, seconds),
+        AverageBytes = count == 0 ? 0d : (double)bytes / count,
+    };
 
     private BattleBenchmarkFrames BuildFrames(double seconds)
     {
@@ -585,6 +668,21 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
                 Received = received.ToCounts(seconds),
             };
         }
+    }
+
+    /// <summary>Thread-safe count and bytes of one message or packet type in one direction.</summary>
+    private sealed class TypeCounter
+    {
+        private long count;
+        private long bytes;
+
+        public void Add(int byteCount)
+        {
+            Interlocked.Increment(ref count);
+            Interlocked.Add(ref bytes, byteCount);
+        }
+
+        public (long Count, long Bytes) Read() => (Interlocked.Read(ref count), Interlocked.Read(ref bytes));
     }
 
     /// <summary>Thread-safe traffic totals for one direction of one route.</summary>
