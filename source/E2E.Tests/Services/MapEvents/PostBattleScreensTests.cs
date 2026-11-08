@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
@@ -7,6 +8,7 @@ using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -26,8 +28,10 @@ namespace E2E.Tests.Services.MapEvents;
 /// amnesty seconds after. The battle ends through the server's real finalize and the player leaves the screens
 /// through a real client <see cref="PlayerEncounter.Finish"/>, so every signal runs end to end.
 /// </summary>
-public class PostBattleScreensTests : MapEventTestBase
+public class PostBattleScreensTests : MapEventTestBase, IDisposable
 {
+    private CampaignTimeControlMode? previousTimeMode;
+
     public PostBattleScreensTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
@@ -181,17 +185,46 @@ public class PostBattleScreensTests : MapEventTestBase
         AssertServerTime(TimeControlEnum.Play_1x);
     }
 
+    /// <summary>A failed or stale conversation approval sends the same message, but it isn't an encounter finish.</summary>
+    [Fact]
+    public void StaleApprovalDuringTheBattle_DoesNotSkipItsScreens()
+    {
+        PlayServerTime();
+        var (battleId, _, _) = SetupPlayerWithNearbyAiParty();
+        AcquireOccupancyPause();
+        var client = Clients.First();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded("stale-request")));
+        Server.PumpGameThread();
+
+        DestroyServerMapEvent(battleId);
+
+        AssertServerTime(TimeControlEnum.Pause);
+    }
+
+    [Fact]
+    public void Amnesty_FinishBeforeFinalize_StartsTheAmnestyAtTheFinish() => WithAmnesty(30, () =>
+    {
+        var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
+        LeavePostBattleScreens(Clients.First(), playerPartyId);
+
+        DestroyServerMapEvent(battleId);
+
+        Assert.False(CanEngage(aiPartyId, playerPartyId));
+    });
+
     [Fact]
     public void ScreensEndAfterTheCap()
     {
         PlayServerTime();
         var (battleId, _, _) = SetupPlayerWithNearbyAiParty();
         AcquireOccupancyPause();
+        var expiries = new List<Action>();
+        Server.Call(() => Server.Resolve<PostBattleScreens>().Schedule = (_, expire) => expiries.Add(expire));
         DestroyServerMapEvent(battleId);
         AssertServerTime(TimeControlEnum.Pause);
 
-        AdvanceServerClock(PostBattleScreens.MaxScreenSeconds + 1);
-        PublishOnServer(new PlayerConnectionStateChanged());
+        Server.Call(() => Assert.Single(expiries)());
+        Server.PumpGameThread();
 
         AssertServerTime(TimeControlEnum.Play_1x);
     }
@@ -246,9 +279,19 @@ public class PostBattleScreensTests : MapEventTestBase
     });
 
     // Set before any player connects, so the occupancy pause has a speed to go back to. It goes through TimePatches
-    // because the TimeControlMode getter reads it from there.
-    private void PlayServerTime() =>
-        Server.Call(() => TimePatches.OverrideTimeControlMode(CampaignTimeControlMode.StoppablePlay));
+    // because the TimeControlMode getter reads it from there, and Dispose puts the static mode back.
+    private void PlayServerTime() => Server.Call(() =>
+    {
+        previousTimeMode ??= Campaign.Current.TimeControlMode;
+        TimePatches.OverrideTimeControlMode(CampaignTimeControlMode.StoppablePlay);
+    });
+
+    public new void Dispose()
+    {
+        if (previousTimeMode is CampaignTimeControlMode mode)
+            Server.Call(() => TimePatches.OverrideTimeControlMode(mode));
+        base.Dispose();
+    }
 
     private void PublishOnServer<T>(T message) where T : IMessage
     {

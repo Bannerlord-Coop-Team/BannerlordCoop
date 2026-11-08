@@ -99,12 +99,13 @@ public class PlayerOccupancyPauseHandlerTests : IDisposable
         party.Party.MobileParty = party;
         var objectManager = new Mock<IObjectManager>();
         objectManager.Setup(manager => manager.TryGetObject<MobileParty>("party", out party)).Returns(true);
+        using var screens = new PostBattleScreens(broker, playerManager.Object, objectManager.Object);
         using var handler = new PlayerOccupancyPauseHandler(
             broker,
             objectManager.Object,
             playerManager.Object,
             timeControl.Object,
-            new PostBattleScreens(broker, playerManager.Object, objectManager.Object));
+            screens);
         Assert.True(handler.UpdateOccupancyTimeControl(true));
 
         broker.Publish(this, new PlayerConnectionStateChanged());

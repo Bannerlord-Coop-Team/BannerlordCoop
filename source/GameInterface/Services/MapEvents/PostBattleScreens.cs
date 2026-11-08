@@ -4,6 +4,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -13,6 +14,7 @@ using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -24,23 +26,27 @@ namespace GameInterface.Services.MapEvents;
 /// <see cref="ModOptions.PostBattleAiAmnestySeconds"/> is above 0.
 /// </summary>
 /// <remarks>
-/// The screens start when the server finalizes the battle and end with the client's <see cref="NetworkConversationEnded"/>,
-/// sent on every PlayerEncounter.Finish, a capture, a disconnect or after <see cref="MaxScreenSeconds"/>. Times are
-/// real seconds, paused time included. Game thread only.
+/// The screens start when the server finalizes the battle and end with the client's encounter finish
+/// (<see cref="NetworkConversationEnded.EncounterFinished"/>), a capture, a disconnect or after
+/// <see cref="MaxScreenSeconds"/>. Times are real seconds, paused time included. Game thread only.
 /// </remarks>
 internal sealed class PostBattleScreens : IHandler
 {
-    // Backstop for a client that never sends its notice. Checked when the screens are read, not on a tick.
+    // Backstop for a client that never finishes its encounter.
     internal const double MaxScreenSeconds = 180;
 
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<MobileParty, Entry> parties = new Dictionary<MobileParty, Entry>();
-    // A client can finish its encounter before the server finalizes that battle.
-    private readonly Dictionary<MobileParty, MapEvent> finishedBeforeFinalize = new Dictionary<MobileParty, MapEvent>();
+    // A client can finish its encounter before the server finalizes that battle. In a PvE battle the client's
+    // MapEventRegistry finishes at once when the finalize lands after it left the mission, so that path keeps the old behaviour.
+    private readonly Dictionary<MobileParty, (MapEvent MapEvent, DateTime FinishedAt)> finishedBeforeFinalize =
+        new Dictionary<MobileParty, (MapEvent, DateTime)>();
 
     internal Func<DateTime> UtcNow = () => DateTime.UtcNow;
+    internal Action<TimeSpan, Action> Schedule = (delay, action) =>
+        Task.Delay(delay).ContinueWith(_ => GameThread.RunSafe(action, context: nameof(PostBattleScreens)));
 
     public PostBattleScreens(IMessageBroker messageBroker, IPlayerManager playerManager, IObjectManager objectManager)
     {
@@ -51,6 +57,7 @@ internal sealed class PostBattleScreens : IHandler
         messageBroker.Subscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public void Dispose()
@@ -58,31 +65,32 @@ internal sealed class PostBattleScreens : IHandler
         messageBroker.Unsubscribe<NetworkConversationEnded>(Handle_NetworkConversationEnded);
         messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     // A captured party is parked and doesn't finish its encounter until released. An offline player's party (a
-    // battle cleaned up on load) never sends the notice either.
+    // battle cleaned up on load) never finishes it either.
     internal void Enter(MobileParty party, MapEvent mapEvent)
     {
-        if (finishedBeforeFinalize.TryGetValue(party, out var finishedMapEvent))
+        if (finishedBeforeFinalize.TryGetValue(party, out var finish))
         {
             finishedBeforeFinalize.Remove(party);
-            if (finishedMapEvent == mapEvent) return;
+            if (finish.MapEvent == mapEvent)
+            {
+                if (ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0)
+                    parties[party] = new Entry(finish.FinishedAt, finish.FinishedAt);
+                return;
+            }
         }
 
         if (!party.IsActive || playerManager.IsOwnerOfPartyDisconnected(party)) return;
 
-        parties[party] = new Entry(UtcNow(), leftAt: null);
+        var enteredAt = UtcNow();
+        parties[party] = new Entry(enteredAt, leftAt: null);
+        Schedule(TimeSpan.FromSeconds(MaxScreenSeconds), () => Expire(party, enteredAt));
     }
 
-    internal bool IsInScreens(MobileParty party)
-    {
-        if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null) return false;
-        if (UtcNow() - entry.EnteredAt < TimeSpan.FromSeconds(MaxScreenSeconds)) return true;
-
-        parties.Remove(party);
-        return false;
-    }
+    internal bool IsInScreens(MobileParty party) => parties.TryGetValue(party, out var entry) && entry.LeftAt == null;
 
     // Settlement targets have no mobile party. A protected player who starts a new battle leaves it open to AI joining.
     internal bool IsProtectedFrom(MobileParty target, MobileParty attacker)
@@ -90,16 +98,26 @@ internal sealed class PostBattleScreens : IHandler
         var amnestySeconds = ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds;
         if (amnestySeconds <= 0 || target == null || attacker == null || target.MapEvent != null) return false;
         if (attacker.IsPlayerParty() || !parties.TryGetValue(target, out var entry)) return false;
-
-        var protectedUntil = entry.LeftAt?.AddSeconds(amnestySeconds) ?? entry.EnteredAt.AddSeconds(MaxScreenSeconds);
-        if (UtcNow() < protectedUntil) return true;
+        if (entry.LeftAt == null || UtcNow() < entry.LeftAt.Value.AddSeconds(amnestySeconds)) return true;
 
         parties.Remove(target);
         return false;
     }
 
+    // Only for the screens this call started, not a later battle's.
+    private void Expire(MobileParty party, DateTime enteredAt)
+    {
+        if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null || entry.EnteredAt != enteredAt) return;
+
+        parties.Remove(party);
+        messageBroker.Publish(this, new PartyOccupancyChanged(party));
+    }
+
     private void Handle_NetworkConversationEnded(MessagePayload<NetworkConversationEnded> payload)
     {
+        // Failed or stale conversation approvals send the same message without the flag.
+        if (!payload.What.EncounterFinished) return;
+
         GameThread.RunSafe(() =>
         {
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
@@ -108,7 +126,7 @@ internal sealed class PostBattleScreens : IHandler
             if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null)
             {
                 if (party.MapEvent != null)
-                    finishedBeforeFinalize[party] = party.MapEvent;
+                    finishedBeforeFinalize[party] = (party.MapEvent, UtcNow());
                 return;
             }
 
@@ -131,6 +149,14 @@ internal sealed class PostBattleScreens : IHandler
             parties.Remove(party);
             finishedBeforeFinalize.Remove(party);
         }, context: nameof(PostBattleScreens));
+    }
+
+    // Finishes kept for a battle that finalized without the party in it.
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        var mapEvent = payload.What.MapEvent;
+        foreach (var party in finishedBeforeFinalize.Where(pair => pair.Value.MapEvent == mapEvent).Select(pair => pair.Key).ToList())
+            finishedBeforeFinalize.Remove(party);
     }
 
     private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> payload)

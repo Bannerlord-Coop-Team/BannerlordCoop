@@ -12,9 +12,13 @@ internal readonly struct NetworkConversationEnded : ICommand
 {
     [ProtoMember(1)]
     public readonly string RequestId;
+    /// <summary>Sent from PlayerEncounter.Finish, not a failed or stale approval.</summary>
+    [ProtoMember(2)]
+    public readonly bool EncounterFinished;
 
-    public NetworkConversationEnded(string requestId = null)
+    public NetworkConversationEnded(string requestId = null, bool encounterFinished = false)
     {
         RequestId = requestId;
+        EncounterFinished = encounterFinished;
     }
 }
