@@ -852,6 +852,21 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             return traffic;
         }
 
+        // Sharing snapshot encodings only pays off when two or more recipients send this capture's agents.
+        int sendingRecipients = includeAuthoritativeAgents ? 0 : recipientIds.Count;
+        if (includeAuthoritativeAgents)
+        {
+            foreach (string recipientId in recipientIds)
+            {
+                if (!recipientMovementStates.TryGetValue(recipientId, out RecipientMovementState state) ||
+                    IsBulkIntervalElapsed(state, movementRateController.GetReceiverCapHz(recipientId)))
+                {
+                    sendingRecipients++;
+                }
+            }
+        }
+        movementBatchSender.SetCaptureRecipients(sendingRecipients);
+
         int recipientOffset = includeAuthoritativeAgents
             ? bulkRecipientSendOffset
             : priorityRecipientSendOffset;
@@ -956,17 +971,21 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         return recipient;
     }
 
+    // The due test without advancing the recipient's cadence.
+    private bool IsBulkIntervalElapsed(RecipientMovementState recipient, int receiverCapHz)
+    {
+        float interval = 1f / Math.Max(1, receiverCapHz);
+        return !(recipient.HasBulkPoll &&
+            totalSimulationTime - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval);
+    }
+
     private bool IsRecipientBulkDue(
         RecipientMovementState recipient,
         int receiverCapHz)
     {
-        float interval = 1f / Math.Max(1, receiverCapHz);
-        if (recipient.HasBulkPoll &&
-            totalSimulationTime - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
-        {
-            return false;
-        }
+        if (!IsBulkIntervalElapsed(recipient, receiverCapHz)) return false;
 
+        float interval = 1f / Math.Max(1, receiverCapHz);
         if (recipient.HasBulkPoll)
         {
             float elapsed = totalSimulationTime - recipient.LastBulkPollTime;

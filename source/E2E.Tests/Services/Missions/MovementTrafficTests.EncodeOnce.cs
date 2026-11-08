@@ -120,6 +120,8 @@ public partial class MovementTrafficTests
                     : new MountMovementPacket(scope, compactIds, data, EquivalenceSender, sampleSequence: sequence);
 
             sender.BeginFrame(frame == 0 ? 0f : 0.025f);
+            // Every third capture takes the single-recipient whole-packet path, so switching paths is covered too.
+            sender.SetCaptureRecipients(frame % 3 == 1 ? 1 : EncodeOnceRecipients.Length);
             foreach (string recipient in EncodeOnceRecipients)
             {
                 MovementSendPairResult result = sender.SendInterleaved(
