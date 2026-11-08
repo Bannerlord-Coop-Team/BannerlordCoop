@@ -31,6 +31,8 @@ namespace E2E.Tests.Services.MapEvents;
 public class PostBattleScreensTests : MapEventTestBase, IDisposable
 {
     private CampaignTimeControlMode? previousTimeMode;
+    private readonly Dictionary<(EnvironmentInstance, string), MapEvent> clientBattles =
+        new Dictionary<(EnvironmentInstance, string), MapEvent>();
 
     public PostBattleScreensTests(ITestOutputHelper output) : base(output) { }
 
@@ -249,12 +251,14 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         var ctx = CreateServerMapEvent();
         RegisterAsPlayerParty("1", TestEnvironment.CreateRegisteredObject<Hero>(), ctx.AttackerPartyId);
         TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "1");
+        foreach (var client in Clients)
+            client.Call(() => clientBattles[(client, ctx.MapEventId)] = client.GetRegisteredObject<MapEvent>(ctx.MapEventId));
 
         return (ctx.MapEventId, ctx.AttackerPartyId, CreateServerParty());
     }
 
-    // The encounter holds a stand in for the battle it belonged to, with that battle's id, like the client's own
-    // copy after the server destroyed it. FinalizeBattle is off so Finish doesn't try to end it.
+    // The encounter holds the client's own copy of the battle, kept from before the server destroyed it, so its id
+    // comes the real way. An unknown id gets a stand in. FinalizeBattle is off so Finish doesn't try to end it.
     private void LeavePostBattleScreens(EnvironmentInstance client, string partyId, string finishedMapEventId)
     {
         client.Call(() =>
@@ -265,6 +269,12 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         var encounter = SetMockPlayerEncounter(client);
         client.Call(() =>
         {
+            if (clientBattles.TryGetValue((client, finishedMapEventId), out var battle))
+            {
+                encounter._mapEvent = battle;
+                return;
+            }
+
             encounter._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
             using (new AllowedThread())
                 encounter._mapEvent.StringId = finishedMapEventId;

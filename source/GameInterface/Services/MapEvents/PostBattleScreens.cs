@@ -91,9 +91,9 @@ internal sealed class PostBattleScreens : IHandler
 
         if (!party.IsActive || playerManager.IsOwnerOfPartyDisconnected(party)) return;
 
-        objectManager.TryGetId(mapEvent, out string mapEventId);
         var enteredAt = UtcNow();
-        parties[party] = new Entry(mapEventId, enteredAt, leftAt: null);
+        // StringId ("Created_N"), not the object manager id, is what the client sends.
+        parties[party] = new Entry(mapEvent.StringId, enteredAt, leftAt: null);
         Schedule(TimeSpan.FromSeconds(MaxScreenSeconds), () => Expire(party, enteredAt));
     }
 
@@ -138,8 +138,7 @@ internal sealed class PostBattleScreens : IHandler
             // new battle starts.
             if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null || entry.MapEventId != finishedMapEventId)
             {
-                if (party.MapEvent != null && objectManager.TryGetId(party.MapEvent, out string currentMapEventId) &&
-                    currentMapEventId == finishedMapEventId)
+                if (party.MapEvent != null && party.MapEvent.StringId == finishedMapEventId)
                     finishedBeforeFinalize[party] = (party.MapEvent, UtcNow());
                 return;
             }
