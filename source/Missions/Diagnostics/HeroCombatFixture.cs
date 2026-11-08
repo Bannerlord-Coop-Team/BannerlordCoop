@@ -308,7 +308,16 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         collisionData.InflictedDamage = InjectedDamage;
         collisionData.BaseMagnitude = blow.BaseMagnitude;
 
-        mission.OnAgentHit(victim, hero, in blow, in collisionData, false, InjectedDamage);
+        try
+        {
+            mission.OnAgentHit(victim, hero, in blow, in collisionData, false, InjectedDamage);
+        }
+        finally
+        {
+            // The arrow only exists to be looked up by index; it must not fall on anyone and score again.
+            mission.RemoveMissileAsClient(missile.Index);
+        }
+
         return true;
     }
 
