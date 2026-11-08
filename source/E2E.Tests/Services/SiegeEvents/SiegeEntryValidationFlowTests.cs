@@ -382,6 +382,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
                 using (new AllowedThread())
                 {
+                    settlement._position = Position(20f, 30f);
+                    settlement.GatePosition = settlement.Position;
                     camp.LeaderParty._besiegerCamp = camp;
                     camp.LeaderParty.Position = campPosition;
                     party.Position = arrivalPosition;
