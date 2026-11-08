@@ -1,0 +1,43 @@
+{
+  "head": "bdfe1ae6716a61c0ade1ea42743e814a59c64dc2",
+  "dsHead": "fc52b3c12fef858207fafe2ef2a7dc4f075d0fd7",
+  "bankedRows": 28,
+  "freshExactHead": 16,
+  "waivedHistorical": 12,
+  "remaining": [],
+  "ready": false,
+  "runs": [
+    {
+      "jobId": "live-3760-rl-5d74df421b75",
+      "runToken": "7bf2c989ae2bc70eed4cf11815193e25",
+      "manifestFilesVerified": 1935,
+      "receiptSha256": "0946c137fd133fb71de0ab9dc230da7332d5b157e022dd835b8d09831726ff58"
+    },
+    {
+      "jobId": "live-3760-rl-a3ec3618fe2a",
+      "runToken": "4c550b82295a20e4e2a97bdd5fdf7b2a",
+      "manifestFilesVerified": 613,
+      "receiptSha256": "4805d493238174d13b875e899b7e49d85e9f2cb90055a108ef8e78b832ef79cc"
+    },
+    {
+      "jobId": "live-3760-rl-2ad3b95c982b",
+      "runToken": "514212fc0052841919e76366267bc501",
+      "manifestFilesVerified": 893,
+      "receiptSha256": "13d1fb87dd5f304eb8d19ccb43cc88fe6bbd77401001c57021b17596605801d4"
+    }
+  ],
+  "framework": {
+    "head": "bdfe1ae6716a61c0ade1ea42743e814a59c64dc2",
+    "GenericFolder": 0,
+    "removedFrameworkReferences": [],
+    "refs": 0,
+    "contains9e85bfe3c": true,
+    "FAIL": 0,
+    "rawAudit": "oldfw-raw.log",
+    "rawModernSubstringMatches": 62,
+    "rawInterpretation": "The unmodified shared script also matches modern QuestTypeRegistry/IQuestTypeDescriptor names. These are not removed Generic references."
+  },
+  "agentsLint": "FAIL=0 WARN=1",
+  "hive": "docker-ci-f0cd9c33e95c4329bb79: 7689 passed, 0 failed, 3 skipped",
+  "createdUtc": "2026-11-08T14:38:37.540998+00:00"
+}
