@@ -11,6 +11,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 
@@ -19,6 +20,7 @@ namespace Missions.Diagnostics;
 public interface IHeroCombatFixture : IHandler
 {
     CoopCommandResult Start(bool giveBow);
+    CoopCommandResult Chase();
     CoopCommandResult Stop();
     string Snapshot();
 }
@@ -147,7 +149,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
 
             agent.SetMortalityState(Agent.MortalityState.Immortal);
             if (agent.Formation == null)
-                agent.Formation = mission.PlayerTeam?.GetFormation(FormationClass.Infantry);
+                mission.PlayerTeam?.GetFormation(FormationClass.Infantry)?.AddUnit(agent);
 
             lock (gate)
             {
@@ -157,9 +159,49 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                     agent.Controller = AgentControllerType.AI;
                 }
             }
+
+            agent.SetIsAIPaused(false);
+            agent.ClearTargetFrame();
         }
 
         return new CoopCommandResult(true, $"HERO_COMBAT_STARTED heroes={heroes.Length} bow={giveBow} {string.Join(" ", notes)}\nLIVE_TEST_JSON=" + Snapshot());
+    }
+
+    public CoopCommandResult Chase()
+    {
+        Mission mission = Mission.Current;
+        if (mission == null) return Failed("No active coop battle mission");
+
+        int chasing = 0;
+        lock (gate)
+        {
+            foreach (Agent agent in previousControllers.Keys)
+            {
+                if (agent.Mission != mission || !agent.IsActive() || agent.Team == null) continue;
+
+                Agent nearest = null;
+                float nearestDistance = float.MaxValue;
+                foreach (Agent other in mission.Agents)
+                {
+                    if (!other.IsHuman || !other.IsActive() || other.Team == null || !other.Team.IsEnemyOf(agent.Team)) continue;
+                    float distance = agent.Position.Distance(other.Position);
+                    if (distance >= nearestDistance) continue;
+                    nearest = other;
+                    nearestDistance = distance;
+                }
+
+                Vec3 direction = nearest == null ? Vec3.Zero : nearest.Position - agent.Position;
+                direction.z = 0f;
+                if (nearest == null || direction.LengthSquared <= 0.0001f) continue;
+
+                direction.Normalize();
+                Vec2 target = nearest.Position.AsVec2;
+                agent.SetTargetPositionAndDirection(in target, in direction);
+                chasing++;
+            }
+        }
+
+        return new CoopCommandResult(true, $"HERO_COMBAT_CHASE heroes={chasing}");
     }
 
     public CoopCommandResult Stop()
@@ -172,6 +214,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
             foreach (var pair in previousControllers)
             {
                 if (mission == null || pair.Key.Mission != mission || !pair.Key.IsActive()) continue;
+                pair.Key.ClearTargetFrame();
                 pair.Key.Controller = pair.Value;
                 restored++;
             }
@@ -195,6 +238,14 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                         hero = ((CharacterObject)agent.Character).StringId,
                         controller = agent.Controller.ToString(),
                         health = agent.Health,
+                        position = new[] { (float)Math.Round(agent.Position.x, 1), (float)Math.Round(agent.Position.y, 1) },
+                        speed = (float)Math.Round(agent.GetCurrentVelocity().Length, 2),
+                        aiPaused = agent.IsPaused,
+                        wielded = agent.GetPrimaryWieldedItemIndex().ToString(),
+                        formation = agent.Formation == null
+                            ? "none"
+                            : $"{agent.Formation.FormationIndex} units={agent.Formation.CountOfUnits} order={agent.Formation.GetReadonlyMovementOrderReference().OrderType}",
+                        nearestEnemyMeters = NearestEnemyMeters(mission, agent),
                         weapons = Enumerable.Range((int)EquipmentIndex.WeaponItemBeginSlot, 4)
                             .Select(slot => agent.Equipment[(EquipmentIndex)slot])
                             .Select(weapon => weapon.IsEmpty ? "empty" : weapon.Item.StringId + ":" + weapon.CurrentUsageItem?.WeaponClass)
@@ -222,6 +273,18 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                 nonHeroDamage = Math.Round(nonHeroDamage, 1),
             });
         }
+    }
+
+    private static float NearestEnemyMeters(Mission mission, Agent hero)
+    {
+        float nearest = float.MaxValue;
+        foreach (Agent other in mission.Agents)
+        {
+            if (!other.IsHuman || !other.IsActive() || other.Team == null || hero.Team == null || !other.Team.IsEnemyOf(hero.Team)) continue;
+            nearest = Math.Min(nearest, hero.Position.Distance(other.Position));
+        }
+
+        return nearest == float.MaxValue ? -1f : (float)Math.Round(nearest, 1);
     }
 
     private static string EquipBow(Agent agent)
@@ -270,7 +333,7 @@ public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("action", "start, start_bow (adds a hunting bow and arrows first), stop or state."),
+        new ExpectedArgs("action", "start, start_bow (adds a hunting bow and arrows first), chase (walk to the nearest enemy), stop or state."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -282,6 +345,7 @@ public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
         {
             case "start": return fixture.Start(giveBow: false);
             case "start_bow": return fixture.Start(giveBow: true);
+            case "chase": return fixture.Chase();
             case "stop": return fixture.Stop();
             case "state": return new CoopCommandResult(true, "HERO_COMBAT_STATE\nLIVE_TEST_JSON=" + fixture.Snapshot());
             default: return new CoopCommandResult(false, "Invalid command argument value.", "command_failed");
