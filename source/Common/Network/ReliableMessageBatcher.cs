@@ -87,6 +87,7 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
                     destination,
                     destinationBuffer.Buffer.Drain(),
                     sendReliableOrdered);
+                TrafficProbe4488.Record("reliable:bare", messagePayload.Length); // TEMP #4488
                 sendReliableOrdered(destination, messagePayload);
                 return;
             }
@@ -112,6 +113,7 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
                 destination,
                 destinationBuffer.Buffer.Drain(),
                 sendReliableOrdered);
+            TrafficProbe4488.Record("reliable:immediate", messagePayload.Length); // TEMP #4488
             sendReliableOrdered(destination, messagePayload);
         }
     }
@@ -217,12 +219,14 @@ public class ReliableMessageBatcher<TDestination> : IReliableMessageBatcher<TDes
 
         if (payloads.Count == 1)
         {
+            TrafficProbe4488.Record("reliable:single", payloads[0].Length); // TEMP #4488
             sendReliableOrdered(destination, payloads[0]);
             return;
         }
 
         var envelope = new AggregateMessagePacket(payloads.ToArray());
         byte[] data = serializer.Serialize(envelope);
+        TrafficProbe4488.Record("reliable:aggregate", data.Length); // TEMP #4488
         sendReliableOrdered(destination, data);
 
         if (AggregateSent == null) return;
