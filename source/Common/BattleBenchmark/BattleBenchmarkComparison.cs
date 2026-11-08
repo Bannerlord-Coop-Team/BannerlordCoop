@@ -212,7 +212,9 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
                     .Distinct()
                     .Select(type => (Type: type, Bytes: Rate(type, "BytesPerSecond"), Count: Rate(type, "CountPerSecond")))
                     .Where(row => row.Bytes.Baseline.Maximum > 0 || row.Bytes.Candidate.Maximum > 0)
-                    .OrderByDescending(row => double.IsNaN(row.Bytes.Delta) ? double.MaxValue : Math.Abs(row.Bytes.Delta))
+                    // Rounded so float residue on an unchanged type doesn't decide the order; the busiest type goes first then.
+                    .OrderByDescending(row => double.IsNaN(row.Bytes.Delta) ? double.MaxValue : Math.Round(Math.Abs(row.Bytes.Delta), 3))
+                    .ThenByDescending(row => Math.Max(row.Bytes.Baseline.Mean, row.Bytes.Candidate.Mean))
                     .ThenBy(row => row.Type, StringComparer.Ordinal)
                     .ToList();
                 if (rows.Count == 0) continue;
@@ -349,7 +351,9 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         if (double.IsNaN(value)) return "n/a";
         double magnitude = Math.Abs(value);
         string format = magnitude >= 1000 ? "N0" : magnitude >= 10 ? "0.0" : magnitude >= 0.1 ? "0.00" : "0.####";
-        return value.ToString(format, CultureInfo.InvariantCulture);
+        string text = value.ToString(format, CultureInfo.InvariantCulture);
+        // Float residue on an unchanged metric, like -1e-13, would print as -0.
+        return text == "-0" ? "0" : text;
     }
 
     private static string FormatPercent(double value) =>
