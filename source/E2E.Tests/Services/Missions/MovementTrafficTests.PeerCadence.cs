@@ -181,13 +181,55 @@ public partial class MovementTrafficTests
             frame => frame < 41 ? 10 : frame < 82 ? 40 : 60);
     }
 
+    // A peer joins at a 15 Hz cap under 10 Hz bulk, then bulk goes to 60 Hz and its cap to 30 Hz a frame later.
+    [Fact]
+    public void PollMovement_PeerCapRisingStaysOneOverNewCapInEverySecond()
+    {
+        var run = BulkSendsToReceiver(
+            78,
+            frame => (1f / 35f) + (frame % 2 == 1 ? 0.0005f : -0.0005f),
+            frame => frame < 7 ? 10 : 60,
+            frame => frame < 8 ? 15 : 30,
+            joinsAfterFirstPoll: true);
+
+        Assert.InRange(MostInOneSecond(run.Sends), 30, 31);
+    }
+
+    // At a 60 Hz cap the peer gets every 40 Hz poll, then its cap drops to 30 Hz, under the bulk rate.
+    [Fact]
+    public void PollMovement_PeerCapDroppingUnderBulkRateKeepsItsNewCap()
+    {
+        var run = BulkSendsToReceiver(540, _ => 1f / 45f, _ => 40, frame => frame < 14 ? 60 : 30, joinsAfterFirstPoll: false);
+
+        // Frames 181 to 540 are 8 s at 30 Hz.
+        Assert.InRange(run.Sends.Count(send => send.Frame > 180), 239, 241);
+        Assert.InRange(MostInOneSecond(run.Sends.Where(send => send.Frame >= 14).ToList()), 30, 31);
+    }
+
     // One moving agent sent to a receiver capped at 40 Hz with bulk forced per frame: no second holds more than 41 bulk
     // sends, and the last second still gets the cap.
     private void AssertAtMostOneOverCapInEverySecond(int frames, Func<int, float> frameSecondsAt, Func<int, int> bulkHzAt)
     {
+        var run = BulkSendsToReceiver(frames, frameSecondsAt, bulkHzAt, _ => 40, joinsAfterFirstPoll: false);
+
+        Assert.InRange(MostInOneSecond(run.Sends), 40, 41);
+        Assert.InRange(run.Sends.Count(send => send.Time > run.EndTime - 1d), 40, 41);
+    }
+
+    // Bulk Hz and the receiver's cap are set per frame (frame 0 is PollMovement(0f)); returns the frame and frame time of
+    // every poll that sent the receiver bulk movement.
+    private (List<(int Frame, double Time)> Sends, double EndTime) BulkSendsToReceiver(
+        int frames,
+        Func<int, float> frameSecondsAt,
+        Func<int, int> bulkHzAt,
+        Func<int, int> capHzAt,
+        bool joinsAfterFirstPoll)
+    {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
         SetControllerId(peer, "owner");
+        var sends = new List<(int Frame, double Time)>();
+        double time = 0d;
 
         peer.Call(() =>
         {
@@ -200,13 +242,17 @@ public partial class MovementTrafficTests
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
             handler.Configure(MovementCadenceProfile.Battle);
             int bulkHz = bulkHzAt(0);
+            int capHz = capHzAt(0);
+            long capSequence = 1;
             Assert.True(handler.TrySetForcedBulkHz(bulkHz, out _));
+            if (joinsAfterFirstPoll)
+                handler.PollMovement(0f);
+            // The cap goes after the enter, because entering clears the peer's cap.
             broker.Publish(this, new NetworkMissionPeerEntered("receiver", "battle"));
-            broker.Publish(this, new NetworkMovementReceiverCap("receiver", 40, 1));
+            broker.Publish(this, new NetworkMovementReceiverCap("receiver", capHz, capSequence));
+            if (!joinsAfterFirstPoll)
+                handler.PollMovement(0f);
 
-            handler.PollMovement(0f);
-            var sendTimes = new List<double>();
-            double time = 0d;
             for (int frame = 1; frame <= frames; frame++)
             {
                 if (bulkHzAt(frame) != bulkHz)
@@ -214,22 +260,26 @@ public partial class MovementTrafficTests
                     bulkHz = bulkHzAt(frame);
                     Assert.True(handler.TrySetForcedBulkHz(bulkHz, out _));
                 }
+                if (capHzAt(frame) != capHz)
+                {
+                    capHz = capHzAt(frame);
+                    broker.Publish(this, new NetworkMovementReceiverCap("receiver", capHz, ++capSequence));
+                }
                 float frameSeconds = frameSecondsAt(frame);
                 time += frameSeconds;
                 int sentBefore = network.DirectPacketSends.Count(send => send.ControllerId == "receiver");
                 mirror.Position = new Vec3(frame, 0f, 0f);
                 handler.PollMovement(frameSeconds);
                 if (network.DirectPacketSends.Count(send => send.ControllerId == "receiver") > sentBefore)
-                    sendTimes.Add(time);
+                    sends.Add((frame, time));
             }
-
-            int mostInOneSecond = sendTimes
-                .Select((sent, index) => sendTimes.Skip(index).TakeWhile(later => later < sent + 1d).Count())
-                .Max();
-            Assert.InRange(mostInOneSecond, 40, 41);
-            Assert.InRange(sendTimes.Count(sent => sent > time - 1d), 40, 41);
         });
+
+        return (sends, time);
     }
+
+    private static int MostInOneSecond(List<(int Frame, double Time)> sends) =>
+        sends.Select((sent, index) => sends.Skip(index).TakeWhile(later => later.Time < sent.Time + 1d).Count()).Max();
 
     // Receiver caps expire after 3.5 s of Stopwatch time, so a frozen clock keeps a slow test run from dropping them.
     private static AgentMovementHandler CreateHandlerWithFrozenCapClock(EnvironmentInstance peer)

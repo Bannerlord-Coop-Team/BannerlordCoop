@@ -199,6 +199,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
         public double LastBulkPollTime;
+        public double LastBulkDueTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
         public readonly ReusableMovementBatches<AgentData> PriorityMovement =
@@ -974,8 +975,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     }
 
     // Every send's slot is at least one interval after the last and less than one before the send, so no second holds
-    // more than cap + 1 sends. A peer at or above the bulk rate takes the bulk schedule's slot, so it lines up with every
-    // poll instead of missing every other one when frame rate over bulk Hz isn't a whole number.
+    // more than cap + 1 sends. Each send takes the earliest such slot, so a peer reaches its cap whatever frame it started
+    // on; at or above the bulk rate the slot never goes before the bulk schedule's, so the peer lines up with every poll.
     private bool IsRecipientBulkDue(
         RecipientMovementState recipient,
         int receiverCapHz,
@@ -991,25 +992,20 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             recipient.LastBulkPollTime = receiverCapHz >= bulkHz
                 ? Math.Max(bulkSlot, earliestSlot)
                 : bulkPollSeconds;
+            recipient.LastBulkDueTime = bulkPollSeconds;
             return true;
         }
 
-        double elapsed = bulkPollSeconds - recipient.LastBulkPollTime;
-        if (elapsed + CadenceEpsilonSeconds < interval)
+        // A raised cap shortens the interval, so the last slot can't trail the last due poll by more than the new one.
+        recipient.LastBulkPollTime = Math.Max(
+            recipient.LastBulkPollTime,
+            recipient.LastBulkDueTime - interval + CadenceEpsilonSeconds);
+        if (bulkPollSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
             return false;
 
-        if (receiverCapHz >= bulkHz)
-        {
-            recipient.LastBulkPollTime = Math.Max(
-                Math.Max(bulkSlot, recipient.LastBulkPollTime + interval),
-                earliestSlot);
-            return true;
-        }
-
-        int elapsedIntervals = Math.Max(
-            1,
-            (int)Math.Floor((elapsed + CadenceEpsilonSeconds) / interval));
-        recipient.LastBulkPollTime += elapsedIntervals * (double)interval;
+        double slot = Math.Max(recipient.LastBulkPollTime + interval, earliestSlot);
+        recipient.LastBulkPollTime = receiverCapHz >= bulkHz ? Math.Max(slot, bulkSlot) : slot;
+        recipient.LastBulkDueTime = bulkPollSeconds;
         return true;
     }
 
