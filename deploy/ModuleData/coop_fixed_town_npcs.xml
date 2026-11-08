@@ -1012,4 +1012,32 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_27103307"
+    name="{=!}Tibby the Cupbearer"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN1"
+    coop_location="lordshall"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Greetings! I am Tibby the Cupbearer, son of Tibby the cupbearer. I come from a long line of Cupbearers. If there is a cup that needs borne, my family will answer the call without failure."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.sturgian_crown" />
+        <equipment slot="Body" id="Item.fine_town_tunic" />
+        <equipment slot="Leg" id="Item.fine_town_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
