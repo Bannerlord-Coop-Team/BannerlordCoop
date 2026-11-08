@@ -1173,9 +1173,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IPacket packet, byte[] data)
     {
-        // TEMP #4488: reliable bytes per message or packet type.
-        if (packet is MessagePacket probed) TrafficProbe4488.Record("msg:" + probed.MessageType?.Name, probed.Data.Length);
-        else if (packet.DeliveryMethod != DeliveryMethod.Unreliable) TrafficProbe4488.Record("pkt:" + packet.GetType().Name, data.Length);
         if (packet is MessagePacket messagePacket)
         {
             // Spawn admission must see a bare message before later authority changes reach the game thread.
