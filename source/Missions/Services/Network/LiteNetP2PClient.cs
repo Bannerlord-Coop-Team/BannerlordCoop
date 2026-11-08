@@ -1129,13 +1129,22 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     public void SendAll(IMessage message)
     {
         IReadOnlyCollection<string> controllers = missionContext.ControllersInMission;
+        long counterStart = SendPathCounters.Begin(SendPathOp.SendAll);
+        try
+        {
         if (controllers.Count == 0) return;
 
         // The payload has nothing per peer, so every controller's batcher gets the same bytes.
         MessagePacket packet = MessagePacket.Create(message, serializer);
+        SendPathCounters.Serialized(packet.Data.Length);
         foreach (var controllerId in controllers)
         {
             SendMessagePacket(controllerId, packet);
+        }
+        }
+        finally
+        {
+            SendPathCounters.End(counterStart, message.GetType(), controllers.Count);
         }
     }
 
@@ -1154,15 +1163,34 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IMessage message)
     {
-        SendMessagePacket(controllerId, MessagePacket.Create(message, serializer));
+        long counterStart = SendPathCounters.Begin(SendPathOp.Send);
+        try
+        {
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        SendPathCounters.Serialized(packet.Data.Length);
+        SendMessagePacket(controllerId, packet);
+        }
+        finally
+        {
+            SendPathCounters.End(counterStart, message.GetType(), 1);
+        }
     }
 
     public void SendAllBut(string excludedId, IMessage message)
     {
+        long counterStart = SendPathCounters.Begin(SendPathOp.SendAllBut);
+        try
+        {
         MessagePacket packet = MessagePacket.Create(message, serializer);
+        SendPathCounters.Serialized(packet.Data.Length);
         foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
         {
             SendMessagePacket(controllerId, packet);
+        }
+        }
+        finally
+        {
+            SendPathCounters.End(counterStart, message.GetType(), missionContext.ControllersInMission.Count);
         }
     }
 
