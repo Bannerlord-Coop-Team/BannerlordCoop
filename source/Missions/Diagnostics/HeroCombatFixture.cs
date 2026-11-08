@@ -20,7 +20,8 @@ namespace Missions.Diagnostics;
 public interface IHeroCombatFixture : IHandler
 {
     CoopCommandResult Start(bool giveBow);
-    CoopCommandResult Chase();
+    CoopCommandResult Melee();
+    CoopCommandResult Shoot();
     CoopCommandResult Stop();
     string Snapshot();
 }
@@ -167,41 +168,104 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         return new CoopCommandResult(true, $"HERO_COMBAT_STARTED heroes={heroes.Length} bow={giveBow} {string.Join(" ", notes)}\nLIVE_TEST_JSON=" + Snapshot());
     }
 
-    public CoopCommandResult Chase()
+    /// <summary>Teleports each hero next to its nearest enemy, where the AI fights on its own.</summary>
+    public CoopCommandResult Melee()
     {
         Mission mission = Mission.Current;
         if (mission == null) return Failed("No active coop battle mission");
 
-        int chasing = 0;
+        int engaged = 0;
         lock (gate)
         {
             foreach (Agent agent in previousControllers.Keys)
             {
-                if (agent.Mission != mission || !agent.IsActive() || agent.Team == null) continue;
+                Agent enemy = NearestEnemy(mission, agent, out float distance);
+                if (enemy == null) continue;
 
-                Agent nearest = null;
-                float nearestDistance = float.MaxValue;
-                foreach (Agent other in mission.Agents)
-                {
-                    if (!other.IsHuman || !other.IsActive() || other.Team == null || !other.Team.IsEnemyOf(agent.Team)) continue;
-                    float distance = agent.Position.Distance(other.Position);
-                    if (distance >= nearestDistance) continue;
-                    nearest = other;
-                    nearestDistance = distance;
-                }
-
-                Vec3 direction = nearest == null ? Vec3.Zero : nearest.Position - agent.Position;
-                direction.z = 0f;
-                if (nearest == null || direction.LengthSquared <= 0.0001f) continue;
-
-                direction.Normalize();
-                Vec2 target = nearest.Position.AsVec2;
-                agent.SetTargetPositionAndDirection(in target, in direction);
-                chasing++;
+                if (distance > 3f) PlaceBeside(agent, enemy, 1.5f);
+                engaged++;
             }
         }
 
-        return new CoopCommandResult(true, $"HERO_COMBAT_CHASE heroes={chasing}");
+        return new CoopCommandResult(true, $"HERO_COMBAT_MELEE heroes={engaged}");
+    }
+
+    /// <summary>Puts each hero a bow shot from its nearest enemy and fires one of its arrows at it.</summary>
+    public CoopCommandResult Shoot()
+    {
+        Mission mission = Mission.Current;
+        if (mission == null) return Failed("No active coop battle mission");
+
+        int shots = 0;
+        lock (gate)
+        {
+            foreach (Agent agent in previousControllers.Keys)
+            {
+                Agent enemy = NearestEnemy(mission, agent, out float distance);
+                if (enemy == null) continue;
+
+                MissionWeapon ammo = default;
+                for (EquipmentIndex slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.NumAllWeaponSlots; slot++)
+                {
+                    MissionWeapon candidate = agent.Equipment[slot];
+                    if (candidate.IsEmpty || candidate.CurrentUsageItem?.WeaponClass != WeaponClass.Arrow || candidate.Amount <= 0) continue;
+                    ammo = candidate;
+                    break;
+                }
+
+                if (ammo.IsEmpty) continue;
+
+                if (distance > 60f || distance < 8f)
+                {
+                    PlaceBeside(agent, enemy, 35f);
+                    distance = 35f;
+                }
+
+                Vec3 from = agent.GetEyeGlobalPosition();
+                Vec3 to = enemy.Position + new Vec3(0f, 0f, 1.2f + (distance * 0.015f));
+                Vec3 direction = to - from;
+                if (direction.LengthSquared <= 0.0001f) continue;
+
+                direction.Normalize();
+                Mat3 orientation = Mat3.CreateMat3WithForward(in direction);
+                MissionWeapon missile = new MissionWeapon(ammo.Item, ammo.ItemModifier, ammo.Banner);
+                missile.Amount = 1;
+                float speed = missile.CurrentUsageItem.MissileSpeed;
+                mission.AddCustomMissile(agent, missile, from, direction, orientation, speed, speed, false, null);
+                shots++;
+            }
+        }
+
+        return new CoopCommandResult(true, $"HERO_COMBAT_SHOOT heroes={shots}");
+    }
+
+    private static Agent NearestEnemy(Mission mission, Agent hero, out float distance)
+    {
+        distance = float.MaxValue;
+        if (hero.Mission != mission || !hero.IsActive() || hero.Team == null) return null;
+
+        Agent nearest = null;
+        foreach (Agent other in mission.Agents)
+        {
+            if (!other.IsHuman || !other.IsActive() || other.Team == null || !other.Team.IsEnemyOf(hero.Team)) continue;
+            float candidate = hero.Position.Distance(other.Position);
+            if (candidate >= distance) continue;
+            nearest = other;
+            distance = candidate;
+        }
+
+        return nearest;
+    }
+
+    private static void PlaceBeside(Agent hero, Agent enemy, float meters)
+    {
+        Vec3 away = hero.Position - enemy.Position;
+        away.z = 0f;
+        if (away.LengthSquared <= 0.0001f) away = new Vec3(1f, 0f, 0f);
+
+        away.Normalize();
+        hero.TeleportToPosition(enemy.Position + (away * meters));
+        hero.ClearTargetFrame();
     }
 
     public CoopCommandResult Stop()
@@ -277,14 +341,8 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
 
     private static float NearestEnemyMeters(Mission mission, Agent hero)
     {
-        float nearest = float.MaxValue;
-        foreach (Agent other in mission.Agents)
-        {
-            if (!other.IsHuman || !other.IsActive() || other.Team == null || hero.Team == null || !other.Team.IsEnemyOf(hero.Team)) continue;
-            nearest = Math.Min(nearest, hero.Position.Distance(other.Position));
-        }
-
-        return nearest == float.MaxValue ? -1f : (float)Math.Round(nearest, 1);
+        NearestEnemy(mission, hero, out float distance);
+        return distance == float.MaxValue ? -1f : (float)Math.Round(distance, 1);
     }
 
     private static string EquipBow(Agent agent)
@@ -333,7 +391,7 @@ public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("action", "start, start_bow (adds a hunting bow and arrows first), chase (walk to the nearest enemy), stop or state."),
+        new ExpectedArgs("action", "start, start_bow (adds a hunting bow and arrows first), melee (put the heroes beside the nearest enemy), shoot (fire one arrow from each hero at the nearest enemy), stop or state."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -345,7 +403,8 @@ public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
         {
             case "start": return fixture.Start(giveBow: false);
             case "start_bow": return fixture.Start(giveBow: true);
-            case "chase": return fixture.Chase();
+            case "melee": return fixture.Melee();
+            case "shoot": return fixture.Shoot();
             case "stop": return fixture.Stop();
             case "state": return new CoopCommandResult(true, "HERO_COMBAT_STATE\nLIVE_TEST_JSON=" + fixture.Snapshot());
             default: return new CoopCommandResult(false, "Invalid command argument value.", "command_failed");
