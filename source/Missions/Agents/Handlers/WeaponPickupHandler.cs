@@ -644,6 +644,15 @@ namespace Missions.Agents.Handlers
                         pickupId: pickupId));
             }
             network.SendAll(message);
+            if (message.IsStuckMissile)
+            {
+                Logger.Debug(
+                    "Sent stuck missile pickup agent={AgentId} worldItem={WorldItemId} item={ItemId} consumed={Consumed}",
+                    agentId,
+                    worldItemId,
+                    itemObjectId,
+                    message.WorldItemConsumed);
+            }
         }
 
         private void HandleWorldItemIdentityResolved(MessagePayload<WorldItemIdentityResolved> payload)
@@ -868,6 +877,15 @@ namespace Missions.Agents.Handlers
                     pickupId: message.PickupId));
             TrackResolvedPickup(message.PickupId);
             RetryPendingNetworkPickups(message.WorldItemId);
+            if (message.IsStuckMissile)
+            {
+                Logger.Debug(
+                    "Applied stuck missile pickup agent={AgentId} worldItem={WorldItemId} item={ItemId} consumed={Consumed}",
+                    message.AgentId,
+                    message.WorldItemId,
+                    message.ItemObjectId,
+                    message.WorldItemConsumed);
+            }
         }
 
         // [Game thread] Ranks a pickup that consumed a stuck missile against the others of that missile and takes back
