@@ -531,20 +531,9 @@ public class PuppetSpawner : IPuppetSpawner
         {
             Mission.Current.MainAgent = agent;
         }
-        else if (isOwnAgent &&
-            Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.IsSurrenderedDefender(agent) == true)
-        {
-            // A won hideout's surrendered bandit drained after a migration stays idle like the adopted ones
-            agent.Controller = AgentControllerType.None;
-        }
         else if (isOwnAgent)
         {
-            // One of our own troops arriving as a spawn record. It spawned AI-controlled and locally driven
-            // (never an interpolated puppet — we are its authority the moment it registers below), so wake its
-            // AI exactly as the adopt/reinforcement paths do or it stands idle. If our
-            // hero died while we were gone, the leaderless-control path (ChargeLeaderlessOwnTroops) charges
-            // these formations at our deployment finish, exactly as it does for a fresh leaderless spawn.
-            AgentAiWaker.Wake(agent);
+            ActivateOwnSpawnedAgent(agent);
         }
         else
         {
@@ -650,6 +639,23 @@ public class PuppetSpawner : IPuppetSpawner
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         slotsAvailable -= slotsNeeded;
         return true;
+    }
+
+    // One of our own troops arriving as a spawn record. It spawned AI-controlled and locally driven
+    // (never an interpolated puppet — we are its authority the moment it registers), so wake its
+    // AI exactly as the adopt/reinforcement paths do or it stands idle. If our
+    // hero died while we were gone, the leaderless-control path (ChargeLeaderlessOwnTroops) charges
+    // these formations at our deployment finish, exactly as it does for a fresh leaderless spawn.
+    // A won hideout's surrendered bandit drained after a migration stays idle like the adopted ones.
+    private static void ActivateOwnSpawnedAgent(Agent agent)
+    {
+        if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.IsSurrenderedDefender(agent) == true)
+        {
+            agent.Controller = AgentControllerType.None;
+            return;
+        }
+
+        AgentAiWaker.Wake(agent);
     }
 
     // Reliable refreshes can arrive on either side of the original catch-up or local departure action.
