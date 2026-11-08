@@ -27,7 +27,7 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 /// <remarks>
 /// The screens start when the server finalizes the battle and end with the client's encounter finish
-/// (<see cref="NetworkConversationEnded.EncounterFinished"/>), a capture, a disconnect or after
+/// (<see cref="NetworkConversationEnded.FinishedMapEventId"/>), a capture, a disconnect or after
 /// <see cref="MaxScreenSeconds"/>. Times are real seconds, paused time included. Game thread only.
 /// </remarks>
 internal sealed class PostBattleScreens : IHandler
@@ -43,6 +43,8 @@ internal sealed class PostBattleScreens : IHandler
     // MapEventRegistry finishes at once when the finalize lands after it left the mission, so that path keeps the old behaviour.
     private readonly Dictionary<MobileParty, (MapEvent MapEvent, DateTime FinishedAt)> finishedBeforeFinalize =
         new Dictionary<MobileParty, (MapEvent, DateTime)>();
+
+    private bool disposed;
 
     internal Func<DateTime> UtcNow = () => DateTime.UtcNow;
     internal Action<TimeSpan, Action> Schedule = (delay, action) =>
@@ -66,6 +68,10 @@ internal sealed class PostBattleScreens : IHandler
         messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
         messageBroker.Unsubscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+
+        disposed = true;
+        parties.Clear();
+        finishedBeforeFinalize.Clear();
     }
 
     // A captured party is parked and doesn't finish its encounter until released. An offline player's party (a
@@ -78,15 +84,16 @@ internal sealed class PostBattleScreens : IHandler
             if (finish.MapEvent == mapEvent)
             {
                 if (ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0)
-                    parties[party] = new Entry(finish.FinishedAt, finish.FinishedAt);
+                    parties[party] = new Entry(null, finish.FinishedAt, finish.FinishedAt);
                 return;
             }
         }
 
         if (!party.IsActive || playerManager.IsOwnerOfPartyDisconnected(party)) return;
 
+        objectManager.TryGetId(mapEvent, out string mapEventId);
         var enteredAt = UtcNow();
-        parties[party] = new Entry(enteredAt, leftAt: null);
+        parties[party] = new Entry(mapEventId, enteredAt, leftAt: null);
         Schedule(TimeSpan.FromSeconds(MaxScreenSeconds), () => Expire(party, enteredAt));
     }
 
@@ -107,6 +114,7 @@ internal sealed class PostBattleScreens : IHandler
     // Only for the screens this call started, not a later battle's.
     private void Expire(MobileParty party, DateTime enteredAt)
     {
+        if (disposed) return;
         if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null || entry.EnteredAt != enteredAt) return;
 
         parties.Remove(party);
@@ -115,23 +123,28 @@ internal sealed class PostBattleScreens : IHandler
 
     private void Handle_NetworkConversationEnded(MessagePayload<NetworkConversationEnded> payload)
     {
-        // Failed or stale conversation approvals send the same message without the flag.
-        if (!payload.What.EncounterFinished) return;
+        // Failed or stale conversation approvals send no map event. A client older than this change never sends one
+        // either, so its screens hold until the cap (Coop requires matching versions).
+        var finishedMapEventId = payload.What.FinishedMapEventId;
+        if (string.IsNullOrEmpty(finishedMapEventId)) return;
 
         GameThread.RunSafe(() =>
         {
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return;
 
-            if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null)
+            // Only the battle whose encounter finished, not one the party is in now. An old encounter can finish as a
+            // new battle starts.
+            if (!parties.TryGetValue(party, out var entry) || entry.LeftAt != null || entry.MapEventId != finishedMapEventId)
             {
-                if (party.MapEvent != null)
+                if (party.MapEvent != null && objectManager.TryGetId(party.MapEvent, out string currentMapEventId) &&
+                    currentMapEventId == finishedMapEventId)
                     finishedBeforeFinalize[party] = (party.MapEvent, UtcNow());
                 return;
             }
 
             if (ModConfigProvider.ModOptions.PostBattleAiAmnestySeconds > 0)
-                parties[party] = new Entry(entry.EnteredAt, UtcNow());
+                parties[party] = new Entry(entry.MapEventId, entry.EnteredAt, UtcNow());
             else
                 parties.Remove(party);
 
@@ -173,12 +186,14 @@ internal sealed class PostBattleScreens : IHandler
 
     private readonly struct Entry
     {
+        public readonly string MapEventId;
         public readonly DateTime EnteredAt;
         // Null while the party is in the screens.
         public readonly DateTime? LeftAt;
 
-        public Entry(DateTime enteredAt, DateTime? leftAt)
+        public Entry(string mapEventId, DateTime enteredAt, DateTime? leftAt)
         {
+            MapEventId = mapEventId;
             EnteredAt = enteredAt;
             LeftAt = leftAt;
         }

@@ -52,7 +52,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
         DestroyServerMapEvent(battleId);
-        LeavePostBattleScreens(Clients.First(), playerPartyId);
+        LeavePostBattleScreens(Clients.First(), playerPartyId, battleId);
 
         AdvanceServerClock(seconds: 29);
         Assert.False(CanEngage(aiPartyId, playerPartyId));
@@ -70,7 +70,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         TestEnvironment.ConnectRegisteredPlayer(Clients.Last(), "2");
         DestroyServerMapEvent(battleId);
 
-        LeavePostBattleScreens(Clients.Last(), otherPlayerPartyId);
+        LeavePostBattleScreens(Clients.Last(), otherPlayerPartyId, battleId);
         AdvanceServerClock(seconds: 60);
 
         Assert.False(CanEngage(aiPartyId, playerPartyId));
@@ -98,7 +98,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         DestroyServerMapEvent(battleId);
         AssertServerTime(TimeControlEnum.Pause);
 
-        LeavePostBattleScreens(Clients.First(), playerPartyId);
+        LeavePostBattleScreens(Clients.First(), playerPartyId, battleId);
 
         AssertServerTime(TimeControlEnum.Play_1x);
     }
@@ -115,7 +115,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         DestroyServerMapEvent(battleId);
         AssertServerTime(TimeControlEnum.Pause);
 
-        LeavePostBattleScreens(Clients.Last(), secondPartyId);
+        LeavePostBattleScreens(Clients.Last(), secondPartyId, battleId);
 
         AssertServerTime(TimeControlEnum.Play_1x);
     }
@@ -155,7 +155,7 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         PlayServerTime();
         var (battleId, playerPartyId, _) = SetupPlayerWithNearbyAiParty();
         AcquireOccupancyPause();
-        LeavePostBattleScreens(Clients.First(), playerPartyId);
+        LeavePostBattleScreens(Clients.First(), playerPartyId, battleId);
         AssertServerTime(TimeControlEnum.Pause);
 
         DestroyServerMapEvent(battleId);
@@ -201,11 +201,25 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         AssertServerTime(TimeControlEnum.Pause);
     }
 
+    /// <summary>Starting a new PvP battle finishes the old encounter (OpenHostileEncounter).</summary>
+    [Fact]
+    public void OldEncounterFinishDuringANewBattle_DoesNotSkipItsScreens()
+    {
+        PlayServerTime();
+        var (battleId, playerPartyId, _) = SetupPlayerWithNearbyAiParty();
+        AcquireOccupancyPause();
+        LeavePostBattleScreens(Clients.First(), playerPartyId, finishedMapEventId: "MapEvent_Old");
+
+        DestroyServerMapEvent(battleId);
+
+        AssertServerTime(TimeControlEnum.Pause);
+    }
+
     [Fact]
     public void Amnesty_FinishBeforeFinalize_StartsTheAmnestyAtTheFinish() => WithAmnesty(30, () =>
     {
         var (battleId, playerPartyId, aiPartyId) = SetupPlayerWithNearbyAiParty();
-        LeavePostBattleScreens(Clients.First(), playerPartyId);
+        LeavePostBattleScreens(Clients.First(), playerPartyId, battleId);
 
         DestroyServerMapEvent(battleId);
 
@@ -239,18 +253,27 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
         return (ctx.MapEventId, ctx.AttackerPartyId, CreateServerParty());
     }
 
-    private void LeavePostBattleScreens(EnvironmentInstance client, string partyId)
+    // The encounter holds a stand in for the battle it belonged to, with that battle's id, like the client's own
+    // copy after the server destroyed it. FinalizeBattle is off so Finish doesn't try to end it.
+    private void LeavePostBattleScreens(EnvironmentInstance client, string partyId, string finishedMapEventId)
     {
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Campaign.Current.MainParty = party;
         });
-        SetMockPlayerEncounter(client);
+        var encounter = SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            encounter._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            using (new AllowedThread())
+                encounter._mapEvent.StringId = finishedMapEventId;
+        });
         EnableHeadlessEncounterFinish(client);
 
         client.Call(() => PlayerEncounter.Finish(), MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.FinalizeBattle)))
             .ToList());
 
         AssertHasPlayerEncounter(client, expected: false);
