@@ -9,7 +9,7 @@ namespace GameInterface.Services.MapEvents.Messages.Conversation;
 /// </summary>
 internal readonly struct ConversationEnded : IEvent
 {
-    /// <summary>The map event the finished encounter belonged to, read before Finish cleared it.</summary>
+    /// <summary>The map event the finished encounter belonged to, read before Finish cleared it. Null when there was none.</summary>
     public readonly string FinishedMapEventId;
 
     public ConversationEnded(string finishedMapEventId)

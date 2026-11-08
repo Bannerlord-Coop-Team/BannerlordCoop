@@ -130,6 +130,7 @@ internal sealed class PostBattleScreens : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (disposed) return;
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)) return;
 
