@@ -1128,8 +1128,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IMessage message)
     {
-        IReadOnlyCollection<string> controllers = missionContext.ControllersInMission;
         long counterStart = SendPathCounters.Begin(SendPathOp.SendAll);
+        IReadOnlyCollection<string> controllers = missionContext.ControllersInMission;
         try
         {
         if (controllers.Count == 0) return;
