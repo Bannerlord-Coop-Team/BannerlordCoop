@@ -206,6 +206,24 @@ public partial class MovementTrafficTests
         Assert.InRange(MostInOneSecond(run.Sends.Where(send => send.Frame >= 14).ToList()), 30, 31);
     }
 
+    // Short frames whose float sums round: if the cadence clock isn't the frames' real sum, a 42nd send lands a few ns
+    // inside the second.
+    [Fact]
+    public void PollMovement_RoundedShortFramesStayOneOverCapInEverySecond()
+    {
+        var run = BulkSendsToReceiver(
+            81,
+            frame => frame == 1 ? 0.0625f
+                : frame == 2 ? 0.01f
+                : frame == 3 ? (1f / 40f) - 0.01f
+                : frame % 2 == 0 ? 0.002002f : (1f / 40f) - 0.002002f,
+            _ => 60,
+            _ => 40,
+            joinsAfterFirstPoll: false);
+
+        Assert.InRange(MostInOneSecond(run.Sends), 40, 41);
+    }
+
     // One moving agent sent to a receiver capped at 40 Hz with bulk forced per frame: no second holds more than 41 bulk
     // sends, and the last second still gets the cap.
     private void AssertAtMostOneOverCapInEverySecond(int frames, Func<int, float> frameSecondsAt, Func<int, int> bulkHzAt)
