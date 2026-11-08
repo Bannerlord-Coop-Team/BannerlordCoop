@@ -19,17 +19,19 @@ namespace Missions.Diagnostics;
 
 public interface IHeroCombatFixture : IHandler
 {
-    CoopCommandResult Start(bool giveBow);
-    CoopCommandResult Melee();
-    CoopCommandResult Shoot();
-    CoopCommandResult Stop();
+    CoopCommandResult Prepare();
+    CoopCommandResult Hit(bool ranged, int count);
+    CoopCommandResult Restore();
     string Snapshot();
 }
 
 /// <summary>
-/// DEBUG cheat for #4499: lets the heroes this client controls fight on their own (AI controller), optionally with a
-/// bow, and tallies each hero hit reward next to the skill xp vanilla would give for it, so the server's xp can be
-/// compared with it.
+/// DEBUG cheat for #4499: a hero agent can't be made to fight from a script (it is player controlled, and the AI of a
+/// lone general formation doesn't engage), so this injects hero hits through the hit path a native hit takes, and
+/// tallies each hero hit reward next to the skill xp vanilla gives for it, so the server's xp can be compared.
+/// Melee blows go through <c>Agent.RegisterBlow</c>, which the co-op damage router sends to the victim's owner.
+/// A ranged blow resolves its weapon from a live missile that only exists on the shooter's client, so it calls
+/// <c>Mission.OnAgentHit</c> directly and does not damage the victim.
 /// </summary>
 internal sealed class HeroCombatFixture : IHeroCombatFixture
 {
@@ -48,7 +50,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
     private readonly IMessageBroker messageBroker;
     private readonly object gate = new object();
     private readonly Dictionary<string, Tally> tallies = new Dictionary<string, Tally>();
-    private readonly Dictionary<Agent, AgentControllerType> previousControllers = new Dictionary<Agent, AgentControllerType>();
+    private readonly Dictionary<Agent, Agent.MortalityState> previousMortality = new Dictionary<Agent, Agent.MortalityState>();
     private int nonHeroHits;
     private int nonHeroHitsWithCommander;
     private double nonHeroDamage;
@@ -125,118 +127,189 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         }
     }
 
-    public CoopCommandResult Start(bool giveBow)
+    private Agent[] LocalHeroes(Mission mission)
     {
-        Mission mission = Mission.Current;
-        if (mission == null || !ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
-            return Failed("No active coop battle mission");
+        if (mission == null || !ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)) return Array.Empty<Agent>();
 
-        Agent[] heroes = mission.Agents
+        return mission.Agents
             .Where(agent => agent.IsHuman && agent.IsActive() && (agent.Character as CharacterObject)?.IsHero == true
                 && registry.IsLocallyControlled(agent))
             .ToArray();
+    }
+
+    /// <summary>Gives the heroes this client controls a bow if they have none, and makes them immortal.</summary>
+    public CoopCommandResult Prepare()
+    {
+        Mission mission = Mission.Current;
+        Agent[] heroes = LocalHeroes(mission);
         if (heroes.Length == 0)
             return Failed("This client controls no active hero agent");
 
-        lock (gate)
-        {
-            previousControllers.Clear();
-        }
-
         var notes = new List<string>();
-        foreach (Agent agent in heroes)
-        {
-            if (giveBow) notes.Add(EquipBow(agent));
-
-            agent.SetMortalityState(Agent.MortalityState.Immortal);
-            if (agent.Formation == null)
-                mission.PlayerTeam?.GetFormation(FormationClass.Infantry)?.AddUnit(agent);
-
-            lock (gate)
-            {
-                if (agent.Controller != AgentControllerType.AI)
-                {
-                    previousControllers[agent] = agent.Controller;
-                    agent.Controller = AgentControllerType.AI;
-                }
-            }
-
-            agent.SetIsAIPaused(false);
-            agent.ClearTargetFrame();
-        }
-
-        return new CoopCommandResult(true, $"HERO_COMBAT_STARTED heroes={heroes.Length} bow={giveBow} {string.Join(" ", notes)}\nLIVE_TEST_JSON=" + Snapshot());
-    }
-
-    /// <summary>Teleports each hero next to its nearest enemy, where the AI fights on its own.</summary>
-    public CoopCommandResult Melee()
-    {
-        Mission mission = Mission.Current;
-        if (mission == null) return Failed("No active coop battle mission");
-
-        int engaged = 0;
         lock (gate)
         {
-            foreach (Agent agent in previousControllers.Keys)
+            foreach (Agent agent in heroes)
             {
-                Agent enemy = NearestEnemy(mission, agent, out float distance);
-                if (enemy == null) continue;
-
-                if (distance > 3f) PlaceBeside(agent, enemy, 1.5f);
-                engaged++;
+                notes.Add(EquipBow(agent));
+                if (!previousMortality.ContainsKey(agent)) previousMortality[agent] = agent.CurrentMortalityState;
+                agent.SetMortalityState(Agent.MortalityState.Immortal);
             }
         }
 
-        return new CoopCommandResult(true, $"HERO_COMBAT_MELEE heroes={engaged}");
+        return new CoopCommandResult(true, $"HERO_COMBAT_PREPARED heroes={heroes.Length} {string.Join(" ", notes)}\nLIVE_TEST_JSON=" + Snapshot());
     }
 
-    /// <summary>Puts each hero a bow shot from its nearest enemy and fires one of its arrows at it.</summary>
-    public CoopCommandResult Shoot()
+    /// <summary>Injects <paramref name="count"/> hits per hero on its nearest enemy.</summary>
+    public CoopCommandResult Hit(bool ranged, int count)
     {
         Mission mission = Mission.Current;
-        if (mission == null) return Failed("No active coop battle mission");
+        Agent[] heroes = LocalHeroes(mission);
+        if (heroes.Length == 0)
+            return Failed("This client controls no active hero agent");
 
-        int shots = 0;
-        lock (gate)
+        int injected = 0;
+        foreach (Agent hero in heroes)
         {
-            foreach (Agent agent in previousControllers.Keys)
+            for (int i = 0; i < count; i++)
             {
-                Agent enemy = NearestEnemy(mission, agent, out float distance);
-                if (enemy == null) continue;
+                Agent victim = NearestEnemy(mission, hero, out _);
+                if (victim == null) break;
 
-                MissionWeapon ammo = default;
-                for (EquipmentIndex slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.NumAllWeaponSlots; slot++)
-                {
-                    MissionWeapon candidate = agent.Equipment[slot];
-                    if (candidate.IsEmpty || candidate.CurrentUsageItem?.WeaponClass != WeaponClass.Arrow || candidate.Amount <= 0) continue;
-                    ammo = candidate;
-                    break;
-                }
-
-                if (ammo.IsEmpty) continue;
-
-                if (distance > 60f || distance < 8f)
-                {
-                    PlaceBeside(agent, enemy, 35f);
-                    distance = 35f;
-                }
-
-                Vec3 from = agent.GetEyeGlobalPosition();
-                Vec3 to = enemy.Position + new Vec3(0f, 0f, 1.2f + (distance * 0.015f));
-                Vec3 direction = to - from;
-                if (direction.LengthSquared <= 0.0001f) continue;
-
-                direction.Normalize();
-                Mat3 orientation = Mat3.CreateMat3WithForward(in direction);
-                MissionWeapon missile = new MissionWeapon(ammo.Item, ammo.ItemModifier, ammo.Banner);
-                missile.Amount = 1;
-                float speed = missile.CurrentUsageItem.MissileSpeed;
-                mission.AddCustomMissile(agent, missile, from, direction, orientation, speed, speed, false, null);
-                shots++;
+                if (ranged ? InjectRangedHit(mission, hero, victim) : InjectMeleeHit(hero, victim)) injected++;
             }
         }
 
-        return new CoopCommandResult(true, $"HERO_COMBAT_SHOOT heroes={shots}");
+        return new CoopCommandResult(true, $"HERO_COMBAT_HIT ranged={ranged} injected={injected} heroes={heroes.Length}");
+    }
+
+    public CoopCommandResult Restore()
+    {
+        lock (gate)
+        {
+            // Agents of an earlier mission are gone with it; only touch the current mission's.
+            Mission mission = Mission.Current;
+            int restored = 0;
+            foreach (var pair in previousMortality)
+            {
+                if (mission == null || pair.Key.Mission != mission || !pair.Key.IsActive()) continue;
+                pair.Key.SetMortalityState(pair.Value);
+                restored++;
+            }
+
+            previousMortality.Clear();
+            return new CoopCommandResult(true, $"HERO_COMBAT_RESTORED heroes={restored}\nLIVE_TEST_JSON=" + Snapshot());
+        }
+    }
+
+    private static bool InjectMeleeHit(Agent hero, Agent victim)
+    {
+        // A native melee hit: Mission.CreateMeleeBlow fills the blow like this and the engine hands it to RegisterBlow.
+        EquipmentIndex slot = hero.GetPrimaryWieldedItemIndex();
+        if (slot == EquipmentIndex.None || hero.Equipment[slot].IsEmpty || hero.Equipment[slot].CurrentUsageItem?.IsMeleeWeapon != true)
+        {
+            slot = EquipmentIndex.None;
+            for (EquipmentIndex candidate = EquipmentIndex.WeaponItemBeginSlot; candidate < EquipmentIndex.NumAllWeaponSlots; candidate++)
+            {
+                if (hero.Equipment[candidate].IsEmpty || hero.Equipment[candidate].CurrentUsageItem?.IsMeleeWeapon != true) continue;
+                slot = candidate;
+                break;
+            }
+        }
+
+        if (slot == EquipmentIndex.None) return false;
+
+        MissionWeapon weapon = hero.Equipment[slot];
+        Vec3 direction = victim.Position - hero.Position;
+        direction.z = 0f;
+        if (direction.LengthSquared <= 0.0001f) return false;
+
+        direction.Normalize();
+        Blow blow = new Blow(hero.Index);
+        blow.AttackType = AgentAttackType.Standard;
+        blow.StrikeType = StrikeType.Swing;
+        blow.DamageType = DamageTypes.Cut;
+        blow.BoneIndex = victim.Monster.HeadLookDirectionBoneIndex;
+        blow.VictimBodyPart = BoneBodyPartType.Head;
+        blow.BaseMagnitude = 40f;
+        blow.GlobalPosition = victim.Position + new Vec3(0f, 0f, 1.5f);
+        blow.Direction = direction;
+        blow.SwingDirection = direction;
+        blow.InflictedDamage = InjectedDamage;
+        blow.DamageCalculated = true;
+        blow.WeaponRecord.FillAsMeleeBlow(weapon.Item, weapon.CurrentUsageItem, (int)slot,
+            hero.Monster.GetBoneToAttachForItemFlags(weapon.Item.ItemFlags));
+
+        AttackCollisionData collisionData = AttackCollisionData.GetAttackCollisionDataForDebugPurpose(
+            _attackBlockedWithShield: false, _correctSideShieldBlock: false, _isAlternativeAttack: false, _isColliderAgent: true,
+            _collidedWithShieldOnBack: false, _isMissile: false, _isMissileBlockedWithWeapon: false, _missileHasPhysics: false,
+            _entityExists: false, _thrustTipHit: false, _missileGoneUnderWater: false, _missileGoneOutOfBorder: false,
+            CombatCollisionResult.StrikeAgent, (int)slot, (int)StrikeType.Swing, (int)DamageTypes.Cut, blow.BoneIndex,
+            BoneBodyPartType.Head, hero.Monster.MainHandItemBoneIndex, Agent.UsageDirection.AttackLeft, -1,
+            CombatHitResultFlags.NormalHit, 0.5f, 1f, 0f, 0f, 0f, 0f, 0f, 0f, Vec3.Up, direction, blow.GlobalPosition,
+            Vec3.Zero, Vec3.Zero, victim.Velocity, Vec3.Up);
+        collisionData.InflictedDamage = InjectedDamage;
+        collisionData.BaseMagnitude = blow.BaseMagnitude;
+
+        victim.RegisterBlow(blow, in collisionData);
+        return true;
+    }
+
+    private static bool InjectRangedHit(Mission mission, Agent hero, Agent victim)
+    {
+        // A native arrow hit: Mission.CreateMissileBlow fills the blow like this around a live missile. The missile
+        // is fired straight up so it can't hit anything by itself; its index is what OnAgentHit resolves the weapon from.
+        MissionWeapon ammo = default;
+        for (EquipmentIndex slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.NumAllWeaponSlots; slot++)
+        {
+            MissionWeapon candidate = hero.Equipment[slot];
+            if (candidate.IsEmpty || candidate.CurrentUsageItem?.WeaponClass != WeaponClass.Arrow || candidate.Amount <= 0) continue;
+            ammo = candidate;
+            break;
+        }
+
+        if (ammo.IsEmpty) return false;
+
+        Vec3 direction = victim.Position - hero.Position;
+        direction.z = 0f;
+        if (direction.LengthSquared <= 0.0001f) return false;
+
+        direction.Normalize();
+        MissionWeapon missileWeapon = new MissionWeapon(ammo.Item, ammo.ItemModifier, ammo.Banner);
+        missileWeapon.Amount = 1;
+        float speed = missileWeapon.CurrentUsageItem.MissileSpeed;
+        Vec3 start = hero.GetEyeGlobalPosition() + new Vec3(0f, 0f, 1f);
+        Vec3 up = Vec3.Up;
+        Mat3 orientation = Mat3.CreateMat3WithForward(in up);
+        Mission.Missile missile = mission.AddCustomMissile(hero, missileWeapon, start, up, orientation, speed, speed, false, null);
+
+        Vec3 velocity = direction * speed;
+        Blow blow = new Blow(hero.Index);
+        blow.BlowFlag = BlowFlags.None;
+        blow.Direction = direction;
+        blow.SwingDirection = direction;
+        blow.GlobalPosition = victim.Position + new Vec3(0f, 0f, 1.5f);
+        blow.BoneIndex = victim.Monster.HeadLookDirectionBoneIndex;
+        blow.StrikeType = StrikeType.Thrust;
+        blow.DamageType = DamageTypes.Pierce;
+        blow.VictimBodyPart = BoneBodyPartType.Head;
+        blow.WeaponRecord.FillAsMissileBlow(ammo.Item, missileWeapon.CurrentUsageItem, missile.Index,
+            hero.Monster.GetBoneToAttachForItemFlags(ammo.Item.ItemFlags), start, blow.GlobalPosition, velocity);
+        blow.BaseMagnitude = 40f;
+        blow.InflictedDamage = InjectedDamage;
+        blow.DamageCalculated = true;
+
+        AttackCollisionData collisionData = AttackCollisionData.GetAttackCollisionDataForDebugPurpose(
+            _attackBlockedWithShield: false, _correctSideShieldBlock: false, _isAlternativeAttack: false, _isColliderAgent: true,
+            _collidedWithShieldOnBack: false, _isMissile: true, _isMissileBlockedWithWeapon: false, _missileHasPhysics: false,
+            _entityExists: false, _thrustTipHit: false, _missileGoneUnderWater: false, _missileGoneOutOfBorder: false,
+            CombatCollisionResult.StrikeAgent, missile.Index, (int)StrikeType.Thrust, (int)DamageTypes.Pierce, blow.BoneIndex,
+            BoneBodyPartType.Head, -1, Agent.UsageDirection.None, -1, CombatHitResultFlags.NormalHit, 0f, 0f, 0f, 0f,
+            InjectedDamage, speed, 0f, 0f, Vec3.Up, direction, blow.GlobalPosition, velocity, start, victim.Velocity, Vec3.Up);
+        collisionData.InflictedDamage = InjectedDamage;
+        collisionData.BaseMagnitude = blow.BaseMagnitude;
+
+        mission.OnAgentHit(victim, hero, in blow, in collisionData, false, InjectedDamage);
+        return true;
     }
 
     private static Agent NearestEnemy(Mission mission, Agent hero, out float distance)
@@ -257,37 +330,6 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         return nearest;
     }
 
-    private static void PlaceBeside(Agent hero, Agent enemy, float meters)
-    {
-        Vec3 away = hero.Position - enemy.Position;
-        away.z = 0f;
-        if (away.LengthSquared <= 0.0001f) away = new Vec3(1f, 0f, 0f);
-
-        away.Normalize();
-        hero.TeleportToPosition(enemy.Position + (away * meters));
-        hero.ClearTargetFrame();
-    }
-
-    public CoopCommandResult Stop()
-    {
-        lock (gate)
-        {
-            // Agents of an earlier mission are gone with it; only touch the current mission's.
-            Mission mission = Mission.Current;
-            int restored = 0;
-            foreach (var pair in previousControllers)
-            {
-                if (mission == null || pair.Key.Mission != mission || !pair.Key.IsActive()) continue;
-                pair.Key.ClearTargetFrame();
-                pair.Key.Controller = pair.Value;
-                restored++;
-            }
-
-            previousControllers.Clear();
-            return new CoopCommandResult(true, $"HERO_COMBAT_STOPPED restored={restored}\nLIVE_TEST_JSON=" + Snapshot());
-        }
-    }
-
     public string Snapshot()
     {
         lock (gate)
@@ -300,15 +342,8 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                     .Select(agent => new
                     {
                         hero = ((CharacterObject)agent.Character).StringId,
-                        controller = agent.Controller.ToString(),
                         health = agent.Health,
                         position = new[] { (float)Math.Round(agent.Position.x, 1), (float)Math.Round(agent.Position.y, 1) },
-                        speed = (float)Math.Round(agent.GetCurrentVelocity().Length, 2),
-                        aiPaused = agent.IsPaused,
-                        wielded = agent.GetPrimaryWieldedItemIndex().ToString(),
-                        formation = agent.Formation == null
-                            ? "none"
-                            : $"{agent.Formation.FormationIndex} units={agent.Formation.CountOfUnits} order={agent.Formation.GetReadonlyMovementOrderReference().OrderType}",
                         nearestEnemyMeters = NearestEnemyMeters(mission, agent),
                         weapons = Enumerable.Range((int)EquipmentIndex.WeaponItemBeginSlot, 4)
                             .Select(slot => agent.Equipment[(EquipmentIndex)slot])
@@ -374,6 +409,8 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
     }
 
     private static CoopCommandResult Failed(string message) => new CoopCommandResult(false, message, "command_failed");
+
+    private const int InjectedDamage = 6;
 }
 
 public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
@@ -387,25 +424,29 @@ public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
 
     public string Prefix => "coop.debug.battle";
     public string Name => "hero_combat";
-    public string Description => "Lets the heroes this client controls fight under AI control and tallies their hit rewards.";
+    public string Description => "Injects melee and ranged hits by the heroes this client controls and tallies their hit rewards.";
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("action", "start, start_bow (adds a hunting bow and arrows first), melee (put the heroes beside the nearest enemy), shoot (fire one arrow from each hero at the nearest enemy), stop or state."),
+        new ExpectedArgs("action", "prepare (bow if missing, immortal), melee or ranged (inject hits on each hero's nearest enemy), restore or state."),
+        new ExpectedArgs("count", "Hits per hero for melee and ranged, default 1.", false),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (ModInformation.IsServer || args.Count != 1)
-            return new CoopCommandResult(false, "Run start, start_bow, stop or state on a client.", "command_failed");
+        if (ModInformation.IsServer || args.Count < 1 || args.Count > 2)
+            return new CoopCommandResult(false, "Run prepare, melee, ranged, restore or state on a client.", "command_failed");
+
+        int count = 1;
+        if (args.Count == 2 && (!int.TryParse(args[1], out count) || count < 1 || count > 50))
+            return new CoopCommandResult(false, "Invalid command argument value.", "command_failed");
 
         switch (args[0].ToLowerInvariant())
         {
-            case "start": return fixture.Start(giveBow: false);
-            case "start_bow": return fixture.Start(giveBow: true);
-            case "melee": return fixture.Melee();
-            case "shoot": return fixture.Shoot();
-            case "stop": return fixture.Stop();
+            case "prepare": return fixture.Prepare();
+            case "melee": return fixture.Hit(ranged: false, count);
+            case "ranged": return fixture.Hit(ranged: true, count);
+            case "restore": return fixture.Restore();
             case "state": return new CoopCommandResult(true, "HERO_COMBAT_STATE\nLIVE_TEST_JSON=" + fixture.Snapshot());
             default: return new CoopCommandResult(false, "Invalid command argument value.", "command_failed");
         }
