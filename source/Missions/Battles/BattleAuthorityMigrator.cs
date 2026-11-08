@@ -484,8 +484,15 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         interpolator.Forget(agent);
         if (mount != null) interpolator.Forget(mount);
 
-        ConvertPuppetToHostAi(agent, activateAi);
+        // A drained spawn record of a won hideout's surrendered bandit spawns awake as our own agent, so idle it again
         var hideout = Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>();
+        if (hideout?.IsSurrenderedDefender(agent) == true)
+        {
+            agent.Controller = AgentControllerType.None;
+            return;
+        }
+
+        ConvertPuppetToHostAi(agent, activateAi);
         if (!agent.IsRunningAway && agent.Formation != null && !IsShipCrew(agent.Formation) &&
             hideout?.PreserveStealthPosture != true && hideout?.HoldsSurrenderedDefenders != true)
             agent.Formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
