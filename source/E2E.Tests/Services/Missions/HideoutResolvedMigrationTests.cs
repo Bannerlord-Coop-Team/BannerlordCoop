@@ -2,15 +2,20 @@
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
+using Missions.Data;
 using Missions.Hideouts;
 using Missions.Messages;
 using Missions.Services.Network;
 using Moq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
@@ -85,15 +90,73 @@ public sealed class HideoutResolvedMigrationTests : MissionTestEnvironment
         Assert.Equal(1, result.DefenderTeam.ResetTacticCalls);
     }
 
-    // A retained spawn record of the departed host drains after the migration and goes through the late adoption
+    // The old host's bandit spawn record is still buffered (engine agent limit) when it leaves, then drains on the
+    // promoted host as its own agent through the spawner and the late adoption
     [Fact]
-    public void LateSpawnedBanditAfterADuelWin_IsNotCharged()
+    public void BufferedBanditRecordAfterADuelWin_DrainsIdleOnThePromotedHost()
     {
-        var result = AdoptDefenderInLiveBattle(HideoutPhase.Resolved, BattleSideEnum.Attacker, lateSpawn: true);
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var newHost = Clients.Skip(1).First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var agentId = Guid.NewGuid();
+        string? banditsId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            var bandits = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            bandits.Party.MapEventSide = mapEvent.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(bandits, out banditsId));
+        }, MapEventDisabledMethods);
 
-        Assert.NotEqual(AgentControllerType.AI, result.Mirror.Controller);
-        Assert.True(result.Mirror.IsAiPaused, "the late adoption woke a surrendered bandit");
-        Assert.False(result.Formation.MovementOrderSet, "the late adoption charged the surrendered bandit's formation");
+        try
+        {
+            newHost.Call(() =>
+            {
+                Assert.True(newHost.ObjectManager.TryGetObject<MobileParty>(banditsId!, out var bandits));
+                var banditsSide = bandits.MapEvent.DefenderSide.Parties.Single(p => p.Party == bandits.Party);
+                Assert.True(newHost.ObjectManager.TryGetId(banditsSide, out var banditsSideId));
+                var mission = fixture.CreateMission(newHost);
+                var controller = newHost.Resolve<CoopBattleController>();
+                var registry = newHost.Resolve<INetworkAgentRegistry>();
+                var broker = newHost.Resolve<IMessageBroker>();
+                controller.Session.TryBegin(mapEventId);
+                newHost.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }, epoch: 1));
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mission.Shell.MissionBehaviors.Add(CreateHideoutLogic(HideoutPhase.Resolved, BattleSideEnum.Attacker));
+
+                var filler = new List<Agent>();
+                while (filler.Count < 2000)
+                    filler.Add(mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                        .Controller(AgentControllerType.None).Team(mission.AttackerTeam.Shell)));
+                var record = new BattleAgentSpawnData(agentId, characterId, default, BattleSideEnum.Defender, 100f, "A",
+                    banditsSideId, 7, new Equipment(), new BodyProperties(), new MissionEquipmentData(new()),
+                    authorityRevision: 4);
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+                Assert.False(registry.TryGetAgentInfo(agentId, out _), "precondition: the record is buffered");
+
+                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                broker.Publish(this, new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), epoch: 2));
+                broker.Publish(this, new BattleHostMigrated(mapEventId, "A", "B"));
+
+                Assert.True(AgentMirror.TryGet(filler[0], out var freed));
+                freed.IsActive = false;
+                mission.DeleteAgent(filler[0]);
+                var spawner = (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller)!;
+                spawner.DrainPendingPuppets();
+
+                Assert.True(registry.TryGetAgentInfo(agentId, out var info));
+                Assert.Equal("B", info.CurrentAuthority);
+                Assert.NotEqual(AgentControllerType.AI, info.Agent.Controller);
+                Assert.True(MockFormation.ForShell(info.Agent.Formation, out var formation));
+                Assert.False(formation.MovementOrderSet, "the late adoption charged the surrendered bandit's formation");
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
     }
 
     [Fact]

@@ -531,6 +531,12 @@ public class PuppetSpawner : IPuppetSpawner
         {
             Mission.Current.MainAgent = agent;
         }
+        else if (isOwnAgent &&
+            Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.IsSurrenderedDefender(agent) == true)
+        {
+            // A won hideout's surrendered bandit drained after a migration stays idle like the adopted ones
+            agent.Controller = AgentControllerType.None;
+        }
         else if (isOwnAgent)
         {
             // One of our own troops arriving as a spawn record. It spawned AI-controlled and locally driven
