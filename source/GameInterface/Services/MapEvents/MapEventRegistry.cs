@@ -95,7 +95,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         // A hideout or siege assault defender who already left the mission still needs to collect the
         // server's staged loot, which StagedBattleResultUpdatePatch resumes on the next map tick.
         if (!hasStagedResults)
-            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+            CloseDestroyedMapEventEncounterIfNeeded(obj, id, localPartyWasInvolved);
     }
 
     private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
@@ -148,7 +148,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         return false;
     }
 
-    private void CloseDestroyedMapEventEncounterIfNeeded(string mapEventId, bool localPartyWasInvolved)
+    private void CloseDestroyedMapEventEncounterIfNeeded(MapEvent mapEvent, string mapEventId, bool localPartyWasInvolved)
     {
         if (!localPartyWasInvolved)
         {
@@ -173,6 +173,11 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         if (MobileParty.MainParty?.Party?.MapEventSide != null)
             MobileParty.MainParty.Party._mapEventSide = null;
 
+        // Vanilla's sally out "Return to the settlement" left this battle and pointed the encounter back at the
+        // besieged settlement before the server's finalize arrived, so Finish would drop that encounter.
+        if (IsBackInEncounterSettlement(mapEvent))
+            return;
+
         if (PlayerEncounter.Current != null)
         {
             PlayerEncounter.LeaveEncounter = true;
@@ -191,6 +196,19 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         }
 
         ForceCloseCurrentEncounterMenu();
+    }
+
+    private static bool IsBackInEncounterSettlement(MapEvent mapEvent)
+    {
+        var encounter = PlayerEncounter.Current;
+        var settlement = MobileParty.MainParty?.CurrentSettlement;
+        if (mapEvent == null) return false;
+        if (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) return false;
+        if (encounter == null) return false;
+        if (encounter._mapEvent == mapEvent) return false;
+        if (settlement == null) return false;
+
+        return encounter.EncounterSettlementAux == settlement;
     }
 
     private static bool IsBattlePresentationActive()
