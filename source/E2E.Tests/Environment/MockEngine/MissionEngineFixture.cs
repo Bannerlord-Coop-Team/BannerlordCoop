@@ -861,7 +861,10 @@ public sealed class MissionEngineFixture : IDisposable
         }
     }
 
-    /// <summary>Models the native death callback <c>Mission.OnAgentRemoved</c> notifying every mission behavior.</summary>
+    /// <summary>
+    /// Models the behavior loops of the native death callback <c>Mission.OnAgentRemoved</c>. Its kill count, team
+    /// deactivation and <c>Agent.OnRemove</c> (origin and components) are not modeled.
+    /// </summary>
     private static void DispatchAgentRemoved(
         Mission mission, Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
     {

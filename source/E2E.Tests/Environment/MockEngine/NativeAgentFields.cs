@@ -7,9 +7,10 @@ using TaleWorlds.MountAndBlade;
 namespace E2E.Tests.Environment.MockEngine;
 
 /// <summary>
-/// Writes a mirrored agent's state into the skip-constructor <see cref="Agent"/>'s own fields. Harmony compiles a
-/// patched method fully optimized, so a vanilla body there can inline <see cref="Agent"/> getters past the
-/// <see cref="MissionEngineFixture"/> shims and read these fields and native state pointers directly.
+/// Writes a mirrored agent's state into the skip-constructor <see cref="Agent"/>'s own fields. A patched vanilla
+/// method runs as Harmony's generated replacement, which the JIT compiles fully optimized, so it can inline
+/// <see cref="Agent"/> getters past the <see cref="MissionEngineFixture"/> shims and read these fields and native
+/// state pointers directly.
 /// </summary>
 public static class NativeAgentFields
 {

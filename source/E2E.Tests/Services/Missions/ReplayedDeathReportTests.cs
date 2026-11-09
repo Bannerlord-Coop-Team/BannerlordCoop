@@ -54,62 +54,68 @@ public class ReplayedDeathReportTests : MissionTestEnvironment
         }
 
         BattleSpawnGate.BeginBattle(mapEventId);
-
-        (CoopBattleController controller, Agent victim, Agent killerTroop) EnterMission(
-            EnvironmentInstance client, string mainPartyId)
+        try
         {
-            CoopBattleController controller = null!;
-            Agent victim = null!;
-            Agent killerTroop = null!;
-            client.Call(() =>
+            (CoopBattleController controller, Agent victim, Agent killerTroop) EnterMission(
+                EnvironmentInstance client, string mainPartyId)
             {
-                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
-                Campaign.Current.MainParty = mainParty;
-                Assert.NotNull(MapEvent.PlayerMapEvent?.TroopUpgradeTracker);
+                CoopBattleController controller = null!;
+                Agent victim = null!;
+                Agent killerTroop = null!;
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
+                    Campaign.Current.MainParty = mainParty;
+                    Assert.NotNull(MapEvent.PlayerMapEvent?.TroopUpgradeTracker);
 
-                var mission = CreateConnectedMission(fixture, client, mapEventId);
-                controller = client.Resolve<CoopBattleController>();
-                mission.Shell.MissionBehaviors.Add(ObjectHelper.SkipConstructor<BattleAgentLogic>());
-                mission.Shell.MissionBehaviors.Add(controller);
+                    var mission = CreateConnectedMission(fixture, client, mapEventId);
+                    controller = client.Resolve<CoopBattleController>();
+                    mission.Shell.MissionBehaviors.Add(ObjectHelper.SkipConstructor<BattleAgentLogic>());
+                    mission.Shell.MissionBehaviors.Add(controller);
 
-                victim = SpawnTroop(client, mission, "e2e_victim", partyIds[0], mission.AttackerTeam, client == owner);
-                killerTroop = SpawnTroop(client, mission, "e2e_killer", partyIds[1], mission.DefenderTeam, client == killer);
-                var registry = client.Resolve<INetworkAgentRegistry>();
-                Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
-                Assert.True(registry.TryRegisterAgent("killer", killerTroopId, killerTroop));
-            }, MapEventDisabledMethods);
-            return (controller, victim, killerTroop);
+                    victim = SpawnTroop(client, mission, "e2e_victim", partyIds[0], mission.AttackerTeam, client == owner);
+                    killerTroop = SpawnTroop(client, mission, "e2e_killer", partyIds[1], mission.DefenderTeam, client == killer);
+                    var registry = client.Resolve<INetworkAgentRegistry>();
+                    Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
+                    Assert.True(registry.TryRegisterAgent("killer", killerTroopId, killerTroop));
+                }, MapEventDisabledMethods);
+                return (controller, victim, killerTroop);
+            }
+
+            var ownerMission = EnterMission(owner, partyIds[0]);
+            var killerMission = EnterMission(killer, partyIds[1]);
+
+            // The killer's hit on its puppet routes to the owner on the next tick, the owner applies it natively
+            // and broadcasts the death, and the killer replays that death on its puppet.
+            killer.Call(() =>
+            {
+                var blow = new Blow(killerMission.killerTroop.Index)
+                {
+                    InflictedDamage = 150,
+                    DamageType = DamageTypes.Cut,
+                    VictimBodyPart = BoneBodyPartType.Chest,
+                    // The suppressed hit sound reads the native monster.
+                    BlowFlag = BlowFlags.NoSound,
+                };
+                blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
+                AttackCollisionData collisionData = default;
+                killerMission.victim.RegisterBlow(blow, in collisionData);
+                killerMission.controller.OnPreDisplayMissionTick(0.016f);
+            });
+
+            Assert.True(AgentMirror.TryGet(ownerMission.victim, out var ownerVictim));
+            Assert.True(AgentMirror.TryGet(killerMission.victim, out var replayedVictim));
+            Assert.False(ownerVictim.IsActive);
+            Assert.False(replayedVictim.IsActive);
+
+            Assert.Single(Server.InternalMessages.GetMessages<NetworkTroopScoreHit>());
+            Assert.Single(Server.InternalMessages.GetMessages<NetworkBattleHitReward>());
+            Assert.Single(Server.InternalMessages.GetMessages<NetworkCheckUpgradeAfterAgentRemoved>());
         }
-
-        var ownerMission = EnterMission(owner, partyIds[0]);
-        var killerMission = EnterMission(killer, partyIds[1]);
-
-        // The killer's hit on its puppet routes to the owner on the next tick, the owner applies it natively
-        // and broadcasts the death, and the killer replays that death on its puppet.
-        killer.Call(() =>
+        finally
         {
-            var blow = new Blow(killerMission.killerTroop.Index)
-            {
-                InflictedDamage = 150,
-                DamageType = DamageTypes.Cut,
-                VictimBodyPart = BoneBodyPartType.Chest,
-                // The suppressed hit sound reads the native monster.
-                BlowFlag = BlowFlags.NoSound,
-            };
-            blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
-            AttackCollisionData collisionData = default;
-            killerMission.victim.RegisterBlow(blow, in collisionData);
-            killerMission.controller.OnPreDisplayMissionTick(0.016f);
-        });
-
-        Assert.True(AgentMirror.TryGet(ownerMission.victim, out var ownerVictim));
-        Assert.True(AgentMirror.TryGet(killerMission.victim, out var replayedVictim));
-        Assert.False(ownerVictim.IsActive);
-        Assert.False(replayedVictim.IsActive);
-
-        Assert.Single(Server.InternalMessages.GetMessages<NetworkTroopScoreHit>());
-        Assert.Single(Server.InternalMessages.GetMessages<NetworkBattleHitReward>());
-        Assert.Single(Server.InternalMessages.GetMessages<NetworkCheckUpgradeAfterAgentRemoved>());
+            BattleSpawnGate.EndBattle();
+        }
     }
 
     /// <summary>Spawns a troop of the party, AI-controlled on its owner and a puppet everywhere else.</summary>
