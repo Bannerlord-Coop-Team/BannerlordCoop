@@ -309,7 +309,11 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             peer.Instance.Call(() =>
             {
                 peer.Handler.DrainPendingShots();
-                Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().RemoveAgent(peer.VictimId));
+                var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.RemoveAgent(peer.VictimId));
+                // The cosmetic id would still resolve after RemoveAgent, so a poll-thread lookup would pass unnoticed.
+                registry.ForgetCosmeticAgent(peer.Victim);
+                Assert.False(registry.TryGetCosmeticAgent(peer.VictimId, out _));
             });
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             byte[] wire = MessagePacket.Create(outcome!, serializer).Data;
