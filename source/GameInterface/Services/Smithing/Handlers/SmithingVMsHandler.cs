@@ -37,6 +37,7 @@ internal class SmithingVMsHandler : IHandler
 
         messageBroker.Subscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
 
+        messageBroker.Subscribe<CraftingVMFinalized>(Handle_CraftingVMFinalized);
         messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Subscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
@@ -49,6 +50,7 @@ internal class SmithingVMsHandler : IHandler
     {
         messageBroker.Unsubscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
 
+        messageBroker.Unsubscribe<CraftingVMFinalized>(Handle_CraftingVMFinalized);
         messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
@@ -60,6 +62,11 @@ internal class SmithingVMsHandler : IHandler
     private void Handle_CraftingVMCreated(MessagePayload<CraftingVMCreated> obj)
     {
         smithingVMsProvider.SetCurrentCraftingVM(obj.What.CraftingVM);
+    }
+
+    private void Handle_CraftingVMFinalized(MessagePayload<CraftingVMFinalized> obj)
+    {
+        smithingVMsProvider.ClearCurrentCraftingVM(obj.What.CraftingVM);
     }
 
     private void Handle_RefreshWeaponDesignVM(MessagePayload<RefreshWeaponDesignVM> obj)
@@ -164,13 +171,14 @@ internal class SmithingVMsHandler : IHandler
 
     private void RefreshWeaponDesignVM(Town town)
     {
-        var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
-        var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
-
-        if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
-
         GameThread.RunSafe(() =>
         {
+            // Read on the game thread, otherwise a screen closed before this runs still gets refreshed
+            var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+
+            if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
+
             using (new AllowedThread())
             {
                 currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();

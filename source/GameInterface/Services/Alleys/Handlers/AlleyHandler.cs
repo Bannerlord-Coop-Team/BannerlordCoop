@@ -25,6 +25,15 @@ using TaleWorlds.ObjectSystem;
 namespace GameInterface.Services.Alleys.Handlers;
 
 /// <summary>
+/// The alley attack operation other alley services share, so they don't depend on the whole
+/// <see cref="AlleyHandler"/>. Registered as the same instance as the handler.
+/// </summary>
+internal interface IAlleyAttacks
+{
+    void EndAttack(string alleyId);
+}
+
+/// <summary>
 /// Server-authoritative alley replication. The owner-change path turns the local
 /// <see cref="AlleyOwnerChanged"/> into a networked <see cref="ChangeAlleyOwner"/> the clients replay
 /// (keeping owner, derived <c>State</c> and <c>OwnedAlleys</c> consistent). The rest runs the vanilla
@@ -36,7 +45,7 @@ namespace GameInterface.Services.Alleys.Handlers;
 /// locally (like the take-over) and reports the result back for the server to adjudicate; an unanswered
 /// attack times out in the daily tick.
 /// </summary>
-internal class AlleyHandler : IHandler
+internal class AlleyHandler : IAlleyAttacks, IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AlleyHandler>();
 
@@ -480,12 +489,20 @@ internal class AlleyHandler : IHandler
         if (data.UnderAttackByAlleyId != null &&
             objectManager.TryGetObject<Alley>(data.UnderAttackByAlleyId, out var attacker) && attacker.Owner == victim)
         {
-            sessionInterface.ClearUnderAttackByAi(alleyId);
-            network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
+            EndAttack(alleyId);
         }
     }
 
     // --- AI attack/defense flow ---
+
+    /// <summary>
+    /// Ends the attack on this alley on the server and tells every client, so none keeps showing an attack the server dropped.
+    /// </summary>
+    public void EndAttack(string alleyId)
+    {
+        sessionInterface.ClearUnderAttackByAi(alleyId);
+        network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
+    }
 
     private void Handle_NetworkAlleyUnderAttack(MessagePayload<NetworkAlleyUnderAttack> payload)
     {

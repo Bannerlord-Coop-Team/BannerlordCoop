@@ -5,9 +5,9 @@ using Common.Network;
 using Common.Messaging;
 using Common.Logging;
 using Common.Util;
-using Coop.Core.Client.Services.Kingdoms.Handlers;
+using GameInterface.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
@@ -366,7 +366,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(KingdomName, request.KingdomName);
         Assert.False(string.IsNullOrWhiteSpace(request.CultureId));
 
@@ -3695,7 +3694,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             kingdom.AddDecision(decision);
             decisionData = client1.Resolve<IKingdomDecisionDataConverter>().Convert(decision);
             clientInfluenceAfterProposal = proposerClan.Influence;
-        }, new[] { AccessTools.Method(typeof(ClientKingdomHandler), "HandleLocalDecisionAdded") });
+        }, new[] { AccessTools.Method(typeof(KingdomHandler), "HandleLocalDecisionAdded") });
 
         Assert.Equal(initialInfluence, clientInfluenceAfterProposal, precision: 4);
         Assert.NotNull(decisionData);
@@ -4255,7 +4254,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(settlementId, request.SettlementId);
 
@@ -4311,7 +4309,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Null(request.PartyId);
         Assert.Null(request.SettlementId);
 
@@ -4340,11 +4337,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.Call(() =>
@@ -4406,11 +4403,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.Call(() =>
@@ -4557,7 +4554,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.SimulateMessage(
             client.NetPeer,
-            new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
+            new NetworkRequestCreateKingdom(KingdomName, player.CultureId, player.PartyId, settlementId));
         Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(
             Server.GetHandle<MobileParty>(player.PartyId)));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
@@ -4604,11 +4601,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.SimulateMessage(
@@ -5006,7 +5003,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     isAbstain: false,
                     isFinal: true);
                 Server.Resolve<IMessageBroker>().Publish(
-                    this, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+                    client1.NetPeer, new NetworkRequestKingdomDecisionVote(vote));
             });
         });
 

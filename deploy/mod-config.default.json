@@ -92,7 +92,7 @@
     "fastForwardEnabled": true,
 
     // Toggle auto pausing
-    // (Default) true: Pause when all players are occupied (in a battle or a settlement).
+    // (Default) true: Pause when all players are occupied (in a battle, a settlement or the screens after a battle).
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
 
@@ -127,6 +127,13 @@
     // Default is 6, meaning AI parties can only join a player battle within 6 hours of it starting.
     // If set to 0, AI parties will not join in player battles.
     "playerBattleAiJoinWindowHours": 6,
+
+    // Set how many real seconds AI parties leave a player alone after a battle.
+    // (Default) 0: Off. AI parties can attack a player as soon as their battle ends.
+    // Above 0: AI parties can't attack a player who is still in the loot, prisoner or other after battle screens,
+    // or for this many seconds after the player leaves them. The seconds count while paused too, and game speed
+    // doesn't change them. Other players can still attack.
+    "postBattleAiAmnestySeconds": 0,
 
     // Toggle speed limit when players are in a battle.
     // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.

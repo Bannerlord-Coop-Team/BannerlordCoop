@@ -93,10 +93,12 @@ internal class CaravansCampaignBehaviorInitializationHandler : IHandler
     {
         var tradeRumorTakenCaravans = new Dictionary<MobileParty, CampaignTime>();
 
-        // Null and key check for players without existing caravans data
-        if (caravansPlayerData?.PlayerTradeRumorTakenCaravans?.ContainsKey(playerHeroId) != true) return tradeRumorTakenCaravans;
+        // Null and key check for players without existing caravans data, and saves that already hold a null value
+        if (caravansPlayerData?.PlayerTradeRumorTakenCaravans == null) return tradeRumorTakenCaravans;
+        if (!caravansPlayerData.PlayerTradeRumorTakenCaravans.TryGetValue(playerHeroId, out var takenCaravans)) return tradeRumorTakenCaravans;
+        if (takenCaravans == null) return tradeRumorTakenCaravans;
 
-        foreach (KeyValuePair<string, long> tradeRumorTakenCaravan in caravansPlayerData.PlayerTradeRumorTakenCaravans[playerHeroId])
+        foreach (KeyValuePair<string, long> tradeRumorTakenCaravan in takenCaravans)
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(tradeRumorTakenCaravan.Key, out var caravan)) continue;
 

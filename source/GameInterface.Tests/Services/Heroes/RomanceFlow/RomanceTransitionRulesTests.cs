@@ -9,6 +9,8 @@ public class RomanceTransitionRulesTests
     [Theory]
     [InlineData(Romance.RomanceLevelEnum.Untested, Romance.RomanceLevelEnum.CourtshipStarted, true)]
     [InlineData(Romance.RomanceLevelEnum.MatchMadeByFamily, Romance.RomanceLevelEnum.CourtshipStarted, true)]
+    [InlineData(Romance.RomanceLevelEnum.CourtshipStarted, Romance.RomanceLevelEnum.CourtshipStarted, true)]
+    [InlineData(Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible, Romance.RomanceLevelEnum.CourtshipStarted, false)]
     [InlineData(Romance.RomanceLevelEnum.CourtshipStarted, Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible, true)]
     [InlineData(Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible, Romance.RomanceLevelEnum.CoupleAgreedOnMarriage, true)]
     [InlineData(Romance.RomanceLevelEnum.Untested, Romance.RomanceLevelEnum.CoupleAgreedOnMarriage, false)]

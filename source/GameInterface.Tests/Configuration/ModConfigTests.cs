@@ -299,6 +299,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
         Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(0, options.PostBattleAiAmnestySeconds);
         Assert.Equal(60, options.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
         Assert.True(options.EnsureUnaffiliatedWanderers);

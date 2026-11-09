@@ -151,7 +151,8 @@ public class HitRewardHandler : IHandler
                 data.LastSpeedBonus,
                 data.LastShotDifficulty,
                 data.IsSiegeEngineHit,
-                data.LastAttackerWeapon,
+                // vanilla only reads the weapon for a hero attacker (weapon skill xp)
+                data.AffectorCharacter.IsHero ? data.LastAttackerWeapon : null,
                 data.AttackType,
                 data.HitpointRatio,
                 data.DamageAmount,
@@ -286,6 +287,9 @@ public class HitRewardHandler : IHandler
 
             if (affectorCharacter.IsHero)
             {
+                // A client leaves the tracker null until the replicated tracker from the server arrives
+                if (troopUpgradeTracker == null) return;
+
                 Hero heroObject = affectorCharacter.HeroObject;
                 using (IEnumerator<SkillObject> enumerator = troopUpgradeTracker.CheckSkillUpgrades(heroObject).GetEnumerator())
                 {

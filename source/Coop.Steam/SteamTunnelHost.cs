@@ -134,9 +134,13 @@ public class SteamTunnelHost : ISessionTunnelHost, ISessionTunnelIdentityResolve
         if (!listening) return;
         listening = false;
 
+        // Wait out any in-flight pump tick first, so neither closing the listener (which closes its
+        // accepted connections inside Steam) nor the socket teardown below can race a receive, send or describe.
+        // A connection arriving meanwhile is refused because listening is already false.
+        bool pumpStopped = poller?.StopAndWait(TimeSpan.FromSeconds(1)) ?? true;
+        if (!pumpStopped)
+            Logger.Warning("Steam tunnel host pump did not stop within 1s; closing the listener anyway");
         transport.StopListening();
-        // Wait out any in-flight pump tick so the socket teardown below can't race it.
-        poller?.StopAndWait(TimeSpan.FromSeconds(1));
 
         KeyValuePair<uint, TunnelPeer>[] remaining;
         uint[] pending;

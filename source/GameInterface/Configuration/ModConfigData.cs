@@ -88,6 +88,8 @@ public sealed class ModOptionsData
 
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
+    public int? PostBattleAiAmnestySeconds { get; set; }
+
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
     public bool? EnsureUnaffiliatedWanderers { get; set; }
