@@ -116,49 +116,6 @@ public partial class MovementTrafficTests
         });
     }
 
-    [Fact]
-    public void PollMovement_BulkRateDroppingToPeerCapSendsAtMostOneOverCap()
-    {
-        using var fixture = new MissionEngineFixture();
-        var peer = Clients.First();
-        SetControllerId(peer, "owner");
-
-        peer.Call(() =>
-        {
-            var mock = fixture.CreateMission(peer);
-            var broker = peer.Resolve<IMessageBroker>();
-            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
-            using AgentMovementHandler handler = CreateHandlerWithFrozenCapClock(peer);
-            Agent agent = SpawnRider(mock);
-            Assert.True(AgentMirror.TryGet(agent, out var mirror));
-            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), 1, agent));
-            handler.Configure(MovementCadenceProfile.Battle);
-            Assert.True(handler.TrySetForcedBulkHz(60, out _));
-            broker.Publish(this, new NetworkMissionPeerEntered("receiver", "battle"));
-            broker.Publish(this, new NetworkMovementReceiverCap("receiver", 40, 1));
-
-            handler.PollMovement(0f);
-            double time = 1f / 45f;
-            handler.PollMovement(1f / 45f);
-            int sendsInWindow = 0;
-            for (int frame = 1; frame <= 46; frame++)
-            {
-                // Bulk drops to the cap 23 ms after a capped send, so the first every-poll send must still wait.
-                if (frame == 45)
-                    Assert.True(handler.TrySetForcedBulkHz(40, out _));
-                float frameSeconds = (1f / 45f) + (frame % 2 == 1 ? 0.001f : -0.001f);
-                time += frameSeconds;
-                int sentBefore = network.DirectPacketSends.Count;
-                mirror.Position = new Vec3(frame, 0f, 0f);
-                handler.PollMovement(frameSeconds);
-                if (time >= 0.045 && time < 1.045)
-                    sendsInWindow += network.DirectPacketSends.Count - sentBefore;
-            }
-
-            Assert.InRange(sendsInWindow, 40, 41);
-        });
-    }
-
     // Bulk drops from 60 Hz to the 40 Hz cap while the peer is still on its capped timer.
     [Theory]
     [InlineData(52, 0.0005f)]
