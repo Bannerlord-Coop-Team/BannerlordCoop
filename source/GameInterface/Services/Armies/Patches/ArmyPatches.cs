@@ -240,6 +240,15 @@ public class ArmyPatches
             ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
             return;
         }
+        // A stale entry, listed twice or in an army the party already left. Its leave would strip the party
+        // from its real army, and vanilla's removal notification reads the army name of a party with none
+        if (mobileParty._army != army)
+        {
+            Logger.Warning("Dropping stale entry of {PartyId} from army {ArmyName}", mobileParty.StringId, army.Name);
+            army._parties.Remove(mobileParty);
+            ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
+            return;
+        }
         army.LeaderParty.UpdateVersionNo();
         mobileParty.Ai.SetInitiative(1f, 1f, 24f);
         army._parties.Remove(mobileParty);
