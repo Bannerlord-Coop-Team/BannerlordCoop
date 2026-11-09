@@ -66,14 +66,14 @@ public partial class MissileHandler
 
         if (reaction == Mission.MissileCollisionReaction.Stick && victim != null)
         {
-            if (!networkAgentRegistry.TryGetAgentInfo(victim, out var victimInfo))
+            if (!networkAgentRegistry.TryGetCosmeticAgentId(victim, out Guid victimId))
             {
                 Logger.Warning("Failed to get Agent id for missile attachment to {Agent}", victim);
                 return;
             }
 
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
-                victimInfo.AgentId, boneIndex, isAttachedFrameLocal,
+                victimId, boneIndex, isAttachedFrameLocal,
                 shield ? (int)victim.GetOffhandWieldedItemIndex() : 0, 0f);
             return;
         }
@@ -177,17 +177,17 @@ public partial class MissileHandler
         if (message.Kind == MissileOutcomeKind.Body || message.Kind == MissileOutcomeKind.Shield)
         {
             if (!message.VictimId.HasValue
-                || !networkAgentRegistry.TryGetAgentInfo(message.VictimId.Value, out var victimInfo)
-                || victimInfo.Agent == null || victimInfo.Agent.Mission != mission)
+                || !networkAgentRegistry.TryGetCosmeticAgent(message.VictimId.Value, out var victim)
+                || victim == null || victim.Mission != mission)
             {
                 Logger.Warning("Failed to get Agent using {AgentId}", message.VictimId);
                 return;
             }
 
             if (message.Kind == MissileOutcomeKind.Shield)
-                victimInfo.Agent.AttachWeaponToWeapon((EquipmentIndex)message.ShieldSlot, weapon, null, ref frame);
+                victim.AttachWeaponToWeapon((EquipmentIndex)message.ShieldSlot, weapon, null, ref frame);
             else
-                victimInfo.Agent.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
+                victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
             return;
         }
 

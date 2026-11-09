@@ -38,6 +38,10 @@ public interface INetworkAgentRegistry : IDisposable
     bool RemoveAgent(Agent agent);
     bool TryGetAgentInfo(Agent agent, out CoopAgentInfo agentInfo);
     bool TryGetAgentInfo(Guid agentId, out CoopAgentInfo agentInfo);
+    // Cosmetic identities survive deregistration, but never native deletion or a mission reset.
+    bool TryGetCosmeticAgent(Guid agentId, out Agent agent);
+    bool TryGetCosmeticAgentId(Agent agent, out Guid agentId);
+    void ForgetCosmeticAgent(Agent agent);
     bool TryGetAgentInfo(string movementScopeId, ushort movementId, out CoopAgentInfo agentInfo);
     bool TryGetHeroAgentInfo(Hero hero, out CoopAgentInfo agentInfo);
     bool IsLocallyControlled(Guid agentId);
@@ -66,6 +70,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     private readonly object gate = new();
     private readonly Dictionary<Agent, CoopAgentInfo> AgentToInfo = new();
     private readonly Dictionary<Guid, CoopAgentInfo> IdToInfo = new();
+    private readonly Dictionary<Agent, Guid> cosmeticAgentIds = new();
+    private readonly Dictionary<Guid, Agent> cosmeticAgents = new();
     private readonly Dictionary<(string Scope, ushort MovementId), CoopAgentInfo> MovementIdToInfo = new();
     private readonly Dictionary<string, List<CoopAgentInfo>> ControllerAgentMap = new();
     private readonly IControllerIdProvider controllerIdProvider;
@@ -84,6 +90,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         {
             AgentToInfo.Clear();
             IdToInfo.Clear();
+            cosmeticAgentIds.Clear();
+            cosmeticAgents.Clear();
             MovementIdToInfo.Clear();
             ControllerAgentMap.Clear();
         }
@@ -223,6 +231,12 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
             AgentToInfo[agent] = agentInfo;
             IdToInfo[agentId] = agentInfo;
+            if (cosmeticAgents.TryGetValue(agentId, out var previousAgent))
+                cosmeticAgentIds.Remove(previousAgent);
+            if (cosmeticAgentIds.TryGetValue(agent, out Guid previousId))
+                cosmeticAgents.Remove(previousId);
+            cosmeticAgentIds[agent] = agentId;
+            cosmeticAgents[agentId] = agent;
             if (movementId != 0)
                 MovementIdToInfo[(movementScopeId, movementId)] = agentInfo;
 
@@ -301,6 +315,28 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         lock (gate)
         {
             return IdToInfo.TryGetValue(agentId, out agentInfo);
+        }
+    }
+
+    public bool TryGetCosmeticAgent(Guid agentId, out Agent agent)
+    {
+        lock (gate)
+            return cosmeticAgents.TryGetValue(agentId, out agent);
+    }
+
+    public bool TryGetCosmeticAgentId(Agent agent, out Guid agentId)
+    {
+        lock (gate)
+            return cosmeticAgentIds.TryGetValue(agent, out agentId);
+    }
+
+    public void ForgetCosmeticAgent(Agent agent)
+    {
+        lock (gate)
+        {
+            if (!cosmeticAgentIds.TryGetValue(agent, out Guid agentId)) return;
+            cosmeticAgentIds.Remove(agent);
+            cosmeticAgents.Remove(agentId);
         }
     }
 

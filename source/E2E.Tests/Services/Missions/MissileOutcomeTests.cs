@@ -141,6 +141,48 @@ public class MissileOutcomeTests : MissionTestEnvironment
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LethalHit_AttachesAfterBothVictimsWereDeregistered(bool shield)
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                using var deaths = new AgentDeathHandler(peer.Instance.Resolve<INetworkAgentRegistry>(), peer.Broker);
+                peer.Broker.Publish(this, new AgentDied(peer.Victim));
+                Assert.False(peer.Instance.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(peer.VictimId, out _));
+            });
+            NetworkMissileOutcome? outcome = null;
+            shooter.Instance.Call(() =>
+            {
+                var agents = shooter.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(agents.TryTransferAuthority("shooter", shooter.VictimId));
+                using var deaths = new AgentDeathHandler(agents, shooter.Broker);
+                shooter.Broker.Publish(this, new AgentDied(shooter.Victim));
+                Assert.False(agents.TryGetAgentInfo(shooter.VictimId, out _));
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim, shield);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                var attachment = Assert.Single(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                Assert.Equal(shield, attachment.Shield);
+                AssertFrame(Frame(true), attachment.Frame, exact: true);
+                Assert.Empty(peer.Mission.Shell._missilesDictionary);
+                peer.Mission.Shell.GetMissionBehavior<CoopMissionController>().OnAgentDeleted(peer.Victim);
+                var registry = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.False(registry.TryGetCosmeticAgent(peer.VictimId, out _));
+                Assert.False(registry.TryGetCosmeticAgentId(peer.Victim, out _));
+            });
+        });
+    }
+
     [Fact]
     public void GroundOutcome_UsesTheFinalGlobalItemFrame()
     {
@@ -443,6 +485,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
             var component = new Mock<ICoopMissionComponent>();
             component.SetupGet(value => value.MissileHandler).Returns(Handler);
+            component.SetupGet(value => value.AgentRegistry).Returns(agents);
             typeof(CoopMissionController).GetField("coopMissionComponent", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .SetValue(controller, component.Object);
             Mission.Shell.MissionBehaviors.Add(controller);
