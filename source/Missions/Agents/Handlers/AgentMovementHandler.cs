@@ -428,9 +428,9 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     // guards against a second call (the GC finalizer, or the DI scope also disposing this transient handler).
     private bool _disposed;
     private float bulkPollElapsed;
-    // Frame time summed in double every frame, read at bulk polls for per-peer cadence. A float sum rounds and drifts, which
-    // would let a send through a few ns early and put one more than the cap allows into a second.
-    private double bulkPollSeconds;
+    // Total frame time, summed in double every frame and read at bulk polls for per-peer cadence. A float sum rounds and
+    // drifts, which would let a send through a few ns early and put one more than the cap allows into a second.
+    private double cadenceClockSeconds;
     private float priorityPollElapsed;
     private float bulkSampleElapsed;
     private float prioritySampleElapsed;
@@ -652,7 +652,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 #endif
         MovementCadence rate = movementRateController.AdvanceFrame(dt);
         float elapsedSeconds = Math.Max(0f, dt);
-        bulkPollSeconds += elapsedSeconds;
+        cadenceClockSeconds += elapsedSeconds;
         bulkPollElapsed += elapsedSeconds;
         priorityPollElapsed += elapsedSeconds;
         bulkSampleElapsed += elapsedSeconds;
@@ -985,15 +985,15 @@ public partial class AgentMovementHandler : IAgentMovementHandler
     {
         float interval = 1f / Math.Max(1, receiverCapHz);
         // Whole bulk intervals after the last bulk slot, never after this poll.
-        double bulkSlot = bulkPollSeconds - bulkPollElapsed;
-        double earliestSlot = bulkPollSeconds - interval + CadenceEpsilonSeconds;
+        double bulkSlot = cadenceClockSeconds - bulkPollElapsed;
+        double earliestSlot = cadenceClockSeconds - interval + CadenceEpsilonSeconds;
         if (!recipient.HasBulkPoll)
         {
             recipient.HasBulkPoll = true;
             recipient.LastBulkPollTime = receiverCapHz >= bulkHz
                 ? Math.Max(bulkSlot, earliestSlot)
-                : bulkPollSeconds;
-            recipient.LastBulkDueTime = bulkPollSeconds;
+                : cadenceClockSeconds;
+            recipient.LastBulkDueTime = cadenceClockSeconds;
             return true;
         }
 
@@ -1001,12 +1001,12 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         recipient.LastBulkPollTime = Math.Max(
             recipient.LastBulkPollTime,
             recipient.LastBulkDueTime - interval + CadenceEpsilonSeconds);
-        if (bulkPollSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+        if (cadenceClockSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
             return false;
 
         double slot = Math.Max(recipient.LastBulkPollTime + interval, earliestSlot);
         recipient.LastBulkPollTime = receiverCapHz >= bulkHz ? Math.Max(slot, bulkSlot) : slot;
-        recipient.LastBulkDueTime = bulkPollSeconds;
+        recipient.LastBulkDueTime = cadenceClockSeconds;
         return true;
     }
 
