@@ -23,7 +23,7 @@ namespace E2E.Tests.Services.Missions;
 // Reused per-tick buffers must not change what is sent, or carry one tick's or peer's state into the next.
 public partial class MovementTrafficTests
 {
-    // SHA-256 prefix of every datagram the scenario below sends, recorded from the allocate-per-tick code on development.
+    // SHA-256 prefix of every datagram the scenario below sends, recorded on development before the per-tick buffers were reused.
     private static readonly string[] BufferReuseScenarioDatagrams =
     {
         "0|r1|MovementPacket|38|F47486E887B40468",
@@ -164,7 +164,7 @@ public partial class MovementTrafficTests
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
-    public void PollMovement_ScenarioDatagramsMatchTheAllocatePerTickBytes(int run)
+    public void PollMovement_ScenarioDatagramsMatchTheRecordedBytes(int run)
     {
         string[] datagrams = RunBufferReuseScenario(null);
 
