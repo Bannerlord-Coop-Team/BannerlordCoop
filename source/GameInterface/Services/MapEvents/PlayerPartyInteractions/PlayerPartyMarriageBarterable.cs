@@ -83,9 +83,13 @@ internal class PlayerPartyMarriageBarterable : Barterable
     // Every pair is listed on both sides so either player can propose it; the other side's copy hides once offered.
     public static IEnumerable<(Hero, Hero)> GetMarriageCandidates(PartyBase ownerParty, PartyBase otherParty)
     {
-        if (!TryGetLeaderClans(ownerParty, otherParty, out var ownerClan, out var otherClan)) yield break;
+        var ownerLeader = ownerParty?.LeaderHero;
+        var otherClan = otherParty?.LeaderHero?.Clan;
+        if (ownerLeader?.Clan == null || otherClan == null) yield break;
 
-        foreach (var hero in ownerClan.Heroes)
+        // A player who doesn't lead their clan can still offer their own marriage.
+        IEnumerable<Hero> heroes = ownerLeader.Clan.Leader == ownerLeader ? ownerLeader.Clan.Heroes : new[] { ownerLeader };
+        foreach (var hero in heroes)
         {
             foreach (var spouse in otherClan.Heroes)
             {
@@ -97,14 +101,19 @@ internal class PlayerPartyMarriageBarterable : Barterable
 
     public static bool CanOfferMarriage(PartyBase ownerParty, PartyBase otherParty, Hero hero, Hero spouse)
     {
-        if (!TryGetLeaderClans(ownerParty, otherParty, out var ownerClan, out var otherClan)) return false;
-        if (hero?.Clan != ownerClan || spouse?.Clan != otherClan) return false;
+        var ownerLeader = ownerParty?.LeaderHero;
+        var otherLeader = otherParty?.LeaderHero;
+        if (hero == null || spouse == null || ownerLeader == null || otherLeader == null) return false;
+
+        // The spouse always comes from the clan the other player leads, like a vanilla marriage barter with an AI clan leader.
+        if (spouse.Clan?.Leader != otherLeader) return false;
+        if (hero != ownerLeader && hero.Clan?.Leader != ownerLeader) return false;
         if (PlayerPartyPeaceBarterable.AreHostile(
             PlayerPartyPeaceBarterable.GetMapFaction(ownerParty),
             PlayerPartyPeaceBarterable.GetMapFaction(otherParty))) return false;
 
-        // Marriages involving player heroes go through the ProposeMarriage dialog instead.
-        if (hero.IsPlayerHero() || spouse.IsPlayerHero()) return false;
+        // Marriages between two players go through the ProposeMarriage dialog instead.
+        if (hero.IsPlayerHero() && spouse.IsPlayerHero()) return false;
 
         // Hero.MainHero isnt the trading player on the server, so check the party leaders explicitly.
         if (!ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) ||
@@ -112,14 +121,5 @@ internal class PlayerPartyMarriageBarterable : Barterable
             !permissions.CanManageHero(otherParty.LeaderHero, spouse)) return false;
 
         return Campaign.Current.Models.MarriageModel.IsCoupleSuitableForMarriage(hero, spouse);
-    }
-
-    private static bool TryGetLeaderClans(PartyBase ownerParty, PartyBase otherParty, out Clan ownerClan, out Clan otherClan)
-    {
-        ownerClan = ownerParty?.LeaderHero?.Clan;
-        otherClan = otherParty?.LeaderHero?.Clan;
-
-        return ownerClan != null && otherClan != null && ownerClan != otherClan &&
-               ownerClan.Leader == ownerParty.LeaderHero && otherClan.Leader == otherParty.LeaderHero;
     }
 }
