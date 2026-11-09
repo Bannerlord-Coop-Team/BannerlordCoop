@@ -147,6 +147,10 @@ internal class BattleHandler : IHandler
         // during MapEvent.Initialize, or an already-running one as a reinforcement);
         // the joining party's MapEventSide is already set by this point, so the live
         // count is accurate.
+        // A replicated add runs the native add on a client too. Only the server sends rosters, or a
+        // client's copy would replace the server's.
+        if (ModInformation.IsClient) return;
+
         CapFastForwardForMapEvent();
         RefreshFastForwardState();
 
@@ -188,8 +192,8 @@ internal class BattleHandler : IHandler
         ));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
-        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
-        // synced add (the client's own add is intercepted and routed to the server).
+        // blocks them now. Server-driven because this handler returns on a client, even when a replicated add
+        // raises MapEventInvolvedPartiesAdded there.
         var playerPartyIds = new List<string>();
         foreach (var addedParty in message.AddedParties)
         {
