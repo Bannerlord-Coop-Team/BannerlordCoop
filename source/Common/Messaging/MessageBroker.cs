@@ -56,13 +56,6 @@ public class MessageBroker : IMessageBroker
             // A handler or another thread swapped the array, so carry on in the new one after the last sequence
             // passed, which reaches subscribers added during this publish and skips removed ones without repeating any
             var latest = list.Items;
-            // Emptying a list drops its message type, so a subscriber added after that went into a new list,
-            // which another thread may have emptied and replaced again before this read it
-            while (latest.Length == 0 && subscribers.TryGetValue(typeof(T), out var replacement) && replacement != list)
-            {
-                list = replacement;
-                latest = list.Items;
-            }
             if (latest != items)
             {
                 items = latest;
@@ -83,7 +76,7 @@ public class MessageBroker : IMessageBroker
                     weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
                 lock (subscriptionLock)
                 {
-                    Replace(typeof(T), list, list.Items.Where(entry => entry.Handler.IsAlive).ToArray());
+                    list.Items = list.Items.Where(entry => entry.Handler.IsAlive).ToArray();
                 }
                 continue;
             }
@@ -133,16 +126,9 @@ public class MessageBroker : IMessageBroker
         {
             if (!subscribers.TryGetValue(typeof(T), out var list)) return;
 
-            Replace(typeof(T), list, list.Items.Where(entry => entry.Handler.IsAlive && !entry.Handler.Equals(handler)).ToArray());
+            // An emptied list stays registered, so a publish still walking it reaches a subscriber added after this
+            list.Items = list.Items.Where(entry => entry.Handler.IsAlive && !entry.Handler.Equals(handler)).ToArray();
         }
-    }
-
-    // Callers hold subscriptionLock. The message type is dropped once nothing is subscribed to it.
-    private void Replace(Type messageType, SubscriberList list, Subscription[] items)
-    {
-        list.Items = items;
-        if (items.Length == 0 && subscribers.TryGetValue(messageType, out var current) && current == list)
-            subscribers.TryRemove(messageType, out _);
     }
 
     public virtual void Dispose()

@@ -241,12 +241,10 @@ public class MessageBrokerTests
     }
 
     /// <summary>
-    /// Broker that exposes its own subscription table, because the entry and key counts are what these tests assert.
+    /// Broker that exposes its own subscription table, because the entry counts are what these tests assert.
     /// </summary>
     private sealed class ProbeBroker : MessageBroker
     {
-        public bool HasEntriesFor<T>() => subscribers.ContainsKey(typeof(T));
-
         public int EntryCountFor<T>() => subscribers.ContainsKey(typeof(T)) ? subscribers[typeof(T)].Count : 0;
     }
 
@@ -266,7 +264,7 @@ public class MessageBrokerTests
     }
 
     [Fact]
-    public void Unsubscribe_WhenOnlyDeadEntriesRemain_RemovesTheMessageTypeKey()
+    public void Unsubscribe_WhenOnlyDeadEntriesRemain_LeavesNoEntries()
     {
         var broker = new ProbeBroker();
         var collected = SubscribeCollectableSubscriber(broker);
@@ -277,7 +275,7 @@ public class MessageBrokerTests
 
         broker.Unsubscribe<ProbeMessage>(live.Handle);
 
-        Assert.False(broker.HasEntriesFor<ProbeMessage>());
+        Assert.Equal(0, broker.EntryCountFor<ProbeMessage>());
         GC.KeepAlive(live);
     }
 
@@ -425,7 +423,7 @@ public class MessageBrokerTests
     }
 
     [Fact]
-    public void Unsubscribe_FromInsideAPublishThatLeavesOnlyDeadEntries_RemovesTheMessageTypeKey()
+    public void Unsubscribe_FromInsideAPublishThatLeavesOnlyDeadEntries_LeavesNoEntries()
     {
         var broker = new ProbeBroker();
         var order = new List<string>();
@@ -438,7 +436,6 @@ public class MessageBrokerTests
         broker.Publish(this, new ProbeMessage());
 
         Assert.Equal(0, broker.EntryCountFor<ProbeMessage>());
-        Assert.False(broker.HasEntriesFor<ProbeMessage>());
         GC.KeepAlive(teardown);
     }
 
