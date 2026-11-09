@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Missions.Missiles.Message;
@@ -30,6 +31,9 @@ public class NetworkMissileOutcome : ICommand
     public Guid? VictimId { get; }
     [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
     public int BoneIndex { get; }
+    // The shooter's shield slot, so a victim who switched shields since keeps the missile on the one that was hit.
+    [ProtoMember(7)]
+    public EquipmentIndex ShieldSlot { get; }
     [ProtoMember(9)]
     public float RemainingLifeTime { get; }
     [ProtoMember(10)]
@@ -48,7 +52,8 @@ public class NetworkMissileOutcome : ICommand
     public NetworkMissileOutcome(Guid worldItemId, MissileOutcomeKind kind, Vec3 origin, float[] rotation,
         Guid? victimId, int boneIndex, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
-        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
+        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null,
+        EquipmentIndex shieldSlot = EquipmentIndex.WeaponItemBeginSlot)
     {
         WorldItemId = worldItemId;
         Kind = kind;
@@ -63,5 +68,6 @@ public class NetworkMissileOutcome : ICommand
         ParentShipObjectKey = parentShipObjectKey;
         ParentShipObjectIndex = parentShipObjectIndex;
         ParentEntityPath = parentEntityPath;
+        ShieldSlot = shieldSlot;
     }
 }

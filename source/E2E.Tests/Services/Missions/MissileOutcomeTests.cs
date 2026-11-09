@@ -62,7 +62,11 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 peer.Handler.DrainPendingShots();
                 replay = Assert.Single(peer.Mission.Shell._missilesDictionary).Value;
                 if (contactFirst) peer.Contact(replay, Mission.MissileCollisionReaction.Stick);
-                if (kind == MissileOutcomeKind.Shield) native.OffhandSlots[peer.Victim] = EquipmentIndex.Weapon2;
+                if (kind == MissileOutcomeKind.Shield)
+                {
+                    native.OffhandSlots[shooter.Victim] = EquipmentIndex.Weapon2;
+                    peer.HoldShield(EquipmentIndex.Weapon2);
+                }
                 Assert.Empty(peer.Items.GetAll());
             });
 
@@ -332,7 +336,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void ShieldOutcome_WaitsWhileTheVictimHasNoShieldOut()
+    public void ShieldOutcome_WaitsWhileTheShootersShieldSlotIsEmpty()
     {
         RunClients((shooter, peer, native) =>
         {
@@ -340,7 +344,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             peer.Instance.Call(() =>
             {
                 peer.Handler.DrainPendingShots();
-                native.OffhandSlots[peer.Victim] = EquipmentIndex.None;
+                peer.Victim.Equipment[EquipmentIndex.Weapon1] = MissionWeapon.Invalid;
             });
             NetworkMissileOutcome? sent = null;
             shooter.Instance.Call(() =>
@@ -353,13 +357,48 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             peer.Instance.Call(() =>
             {
                 Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
-                native.OffhandSlots[peer.Victim] = EquipmentIndex.Weapon2;
+                peer.HoldShield(EquipmentIndex.Weapon1);
                 peer.Handler.DrainPendingShots();
             });
             peer.Instance.PumpGameThread();
             NativeFixture.Attachment attached = Assert.Single(native.Attachments,
                 value => ReferenceEquals(value.Victim, peer.Victim));
-            Assert.Equal((int)EquipmentIndex.Weapon2, attached.Index);
+            Assert.Equal((int)EquipmentIndex.Weapon1, attached.Index);
+        });
+    }
+
+    // A victim who switches shields between the hit and the outcome keeps the missile on the shield that was hit.
+    [Fact]
+    public void ShieldOutcome_StaysOnTheHitShieldAfterTheVictimSwitchesShields()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            peer.Instance.Call(() => peer.Handler.DrainPendingShots());
+            NetworkMissileOutcome? sent = null;
+            shooter.Instance.Call(() =>
+            {
+                native.OffhandSlots[shooter.Victim] = EquipmentIndex.Weapon2;
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim, true);
+                sent = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+                Assert.Equal(EquipmentIndex.Weapon2, sent.ShieldSlot);
+            });
+            peer.Instance.Call(() =>
+            {
+                peer.HoldShield(EquipmentIndex.Weapon2);
+                peer.HoldShield(EquipmentIndex.Weapon3);
+                native.OffhandSlots[peer.Victim] = EquipmentIndex.Weapon3;
+            });
+            peer.Receive(sent!);
+            peer.Instance.Call(() =>
+            {
+                NativeFixture.Attachment attached = Assert.Single(native.Attachments,
+                    value => ReferenceEquals(value.Victim, peer.Victim));
+                Assert.True(attached.Shield);
+                Assert.Equal((int)EquipmentIndex.Weapon2, attached.Index);
+                AssertFrame(Frame(true), attached.Frame, exact: true);
+            });
         });
     }
 
@@ -886,6 +925,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 Assert.Equal(attach ? shooter.VictimId : (Guid?)null, copy.VictimId);
                 Assert.Equal(original.BoneIndex, copy.BoneIndex);
                 Assert.Equal(kind == MissileOutcomeKind.Shield ? 0 : original.BoneIndex, copy.BoneIndex);
+                Assert.Equal(kind == MissileOutcomeKind.Shield ? EquipmentIndex.Weapon1 : EquipmentIndex.WeaponItemBeginSlot, copy.ShieldSlot);
                 Assert.Equal(original.ParentMissionObjectId, copy.ParentMissionObjectId);
                 Assert.Equal(original.ParentWorldItemId, copy.ParentWorldItemId);
                 Assert.Equal(original.ParentShipId, copy.ParentShipId);
@@ -998,6 +1038,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
 
     private sealed class Client : IDisposable
     {
+        private readonly ItemObject shield = MissileShotReplayTests.CreateItem("missile_outcome_shield",
+            WeaponClass.LargeShield, WeaponFlags.HasHitPoints | WeaponFlags.CanBlockRanged, usingTableau: false);
         private readonly NativeFixture native;
         public EnvironmentInstance Instance { get; }
         public MockMission Mission { get; }
@@ -1032,6 +1074,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             AccessTools.Field(typeof(Mission), "_missionObjects").SetValue(Mission.Shell, new MBList<MissionObject>());
             Shooter = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Victim = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            // The native fixture's default offhand slot, since a shield outcome attaches only to a slot holding a shield.
+            HoldShield(EquipmentIndex.Weapon1);
             var agents = instance.Resolve<INetworkAgentRegistry>();
             Assert.True(agents.TryRegisterAgent("shooter", shooterId, Shooter));
             Assert.True(agents.TryRegisterAgent("peer", victimId, Victim));
@@ -1074,6 +1118,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             });
             return shot!;
         }
+
+        public void HoldShield(EquipmentIndex slot) => Victim.Equipment[slot] = new MissionWeapon(shield, null, null);
 
         public void Receive(IMessage message)
         {

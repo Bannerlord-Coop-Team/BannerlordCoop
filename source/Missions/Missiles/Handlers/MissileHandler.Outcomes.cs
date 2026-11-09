@@ -85,7 +85,8 @@ public partial class MissileHandler
             }
 
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
-                victimId, shield ? 0 : boneIndex, 0f);
+                victimId, shield ? 0 : boneIndex, 0f,
+                shieldSlot: shield ? victim.GetOffhandWieldedItemIndex() : EquipmentIndex.WeaponItemBeginSlot);
             return;
         }
 
@@ -193,7 +194,8 @@ public partial class MissileHandler
     private void SendOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame, Guid? victimId,
         int boneIndex, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
-        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
+        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null,
+        EquipmentIndex shieldSlot = EquipmentIndex.WeaponItemBeginSlot)
     {
         Mat3 rotation = frame.rotation;
         Quaternion quaternion = Quaternion.QuaternionFromMat3(rotation);
@@ -209,7 +211,7 @@ public partial class MissileHandler
 
         network.SendAll(new NetworkMissileOutcome(itemId, kind, frame.origin, orientation,
             victimId, boneIndex, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId,
-            parentShipObjectKey, parentShipObjectIndex, parentEntityPath));
+            parentShipObjectKey, parentShipObjectIndex, parentEntityPath, shieldSlot));
         sentOutcomes++;
         Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped} kind={Kind}",
             sentOutcomes, skippedOutcomes, kind);
@@ -289,9 +291,10 @@ public partial class MissileHandler
 
             if (message.Kind == MissileOutcomeKind.Shield)
             {
-                // A victim who put the shield away has no offhand slot, and vanilla would index slot -1; retry instead.
-                EquipmentIndex shieldSlot = victim.GetOffhandWieldedItemIndex();
-                if (shieldSlot < EquipmentIndex.WeaponItemBeginSlot || shieldSlot >= EquipmentIndex.NumAllWeaponSlots)
+                // The shooter's slot, so a later shield switch doesn't move it; wait while that slot holds no shield here.
+                EquipmentIndex shieldSlot = message.ShieldSlot;
+                if (shieldSlot < EquipmentIndex.WeaponItemBeginSlot || shieldSlot >= EquipmentIndex.NumAllWeaponSlots
+                    || victim.Equipment[shieldSlot].IsEmpty || !victim.Equipment[shieldSlot].IsShield())
                     return false;
                 victim.AttachWeaponToWeapon(shieldSlot, weapon, null, ref frame);
             }
