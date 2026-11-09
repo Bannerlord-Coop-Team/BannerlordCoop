@@ -198,7 +198,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         public readonly Dictionary<Guid, float> MovementPendingSince =
             new Dictionary<Guid, float>();
         public bool HasBulkPoll;
-        public double LastBulkPollTime;
+        public double LastBulkSlot;
         public double LastBulkDueTime;
         public readonly ReusableMovementBatches<AgentData> Movement =
             new ReusableMovementBatches<AgentData>();
@@ -990,7 +990,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         if (!recipient.HasBulkPoll)
         {
             recipient.HasBulkPoll = true;
-            recipient.LastBulkPollTime = receiverCapHz >= bulkHz
+            recipient.LastBulkSlot = receiverCapHz >= bulkHz
                 ? Math.Max(bulkSlot, earliestSlot)
                 : cadenceClockSeconds;
             recipient.LastBulkDueTime = cadenceClockSeconds;
@@ -998,14 +998,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
 
         // A raised cap shortens the interval, so the last slot can't trail the last due poll by more than the new one.
-        recipient.LastBulkPollTime = Math.Max(
-            recipient.LastBulkPollTime,
+        recipient.LastBulkSlot = Math.Max(
+            recipient.LastBulkSlot,
             recipient.LastBulkDueTime - interval + CadenceEpsilonSeconds);
-        if (cadenceClockSeconds - recipient.LastBulkPollTime + CadenceEpsilonSeconds < interval)
+        if (cadenceClockSeconds - recipient.LastBulkSlot + CadenceEpsilonSeconds < interval)
             return false;
 
-        double slot = Math.Max(recipient.LastBulkPollTime + interval, earliestSlot);
-        recipient.LastBulkPollTime = receiverCapHz >= bulkHz ? Math.Max(slot, bulkSlot) : slot;
+        double slot = Math.Max(recipient.LastBulkSlot + interval, earliestSlot);
+        recipient.LastBulkSlot = receiverCapHz >= bulkHz ? Math.Max(slot, bulkSlot) : slot;
         recipient.LastBulkDueTime = cadenceClockSeconds;
         return true;
     }
