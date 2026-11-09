@@ -46,6 +46,8 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventoryLocks)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InventoryPlayerData), nameof(InventoryPlayerData.PlayerInventorySortPreferences)));
 
+        PreserveWithMigration.Add(AccessTools.Property(typeof(HeroMeetingData), nameof(HeroMeetingData.PlayerScatteredCompanions)));
+
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerUnlockedFigureHeads)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerLastFigureheadLootTimes)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(NavalPlayerData), nameof(NavalPlayerData.PlayerSentTroops)));
