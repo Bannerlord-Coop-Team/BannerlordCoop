@@ -34,20 +34,22 @@ public class MissileShotReplayTests : MissionTestEnvironment
 
     public static IEnumerable<object[]> Shots()
     {
-        // Launcher class (none when the missile is thrown), missile class, tableau, rigid body.
-        yield return new object[] { WeaponClass.Bow, WeaponClass.Arrow, false, false };
-        yield return new object[] { WeaponClass.Crossbow, WeaponClass.Bolt, false, false };
-        yield return new object[] { WeaponClass.Undefined, WeaponClass.Javelin, false, false };
-        yield return new object[] { WeaponClass.Undefined, WeaponClass.ThrowingAxe, false, true };
-        yield return new object[] { WeaponClass.Undefined, WeaponClass.Stone, false, true };
+        // Launcher class (none when the missile is thrown), missile class, tableau, rigid body, skewed launch frame.
+        yield return new object[] { WeaponClass.Bow, WeaponClass.Arrow, false, false, false };
+        yield return new object[] { WeaponClass.Crossbow, WeaponClass.Bolt, false, false, false };
+        yield return new object[] { WeaponClass.Undefined, WeaponClass.Javelin, false, false, false };
+        yield return new object[] { WeaponClass.Undefined, WeaponClass.ThrowingAxe, false, true, false };
+        yield return new object[] { WeaponClass.Undefined, WeaponClass.Stone, false, true, false };
         // Vanilla has no throwable tableau item, but a modded one must keep its banner.
-        yield return new object[] { WeaponClass.Undefined, WeaponClass.ThrowingAxe, true, true };
+        yield return new object[] { WeaponClass.Undefined, WeaponClass.ThrowingAxe, true, true, false };
+        // A frame that isn't a rotation doesn't pack, so it travels exactly and the replay launches with it.
+        yield return new object[] { WeaponClass.Bow, WeaponClass.Arrow, false, false, true };
     }
 
     [Theory]
     [MemberData(nameof(Shots))]
     public void Shot_ReplaysOnThePeerWithTheShooterLaunch(
-        WeaponClass launcherClass, WeaponClass missileClass, bool usingTableau, bool hasRigidBody)
+        WeaponClass launcherClass, WeaponClass missileClass, bool usingTableau, bool hasRigidBody, bool skewedFrame)
     {
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony("e2e.missile-shot-replay." + Guid.NewGuid().ToString("N"));
@@ -78,6 +80,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
         orientation.RotateAboutUp(0.6f);
         orientation.RotateAboutSide(0.25f);
         orientation.RotateAboutForward(hasRigidBody ? 1.3f : 0f);
+        if (skewedFrame)
+            orientation = new Mat3(new Vec3(1f, 0.2f, 0f), new Vec3(0.1f, 1.5f, 0f), new Vec3(0f, 0f, 0.7f));
         var agentId = Guid.NewGuid();
 
         try
@@ -105,6 +109,9 @@ public class MissileShotReplayTests : MissionTestEnvironment
             var received = Assert.IsType<NetworkAgentShoot>(
                 serializer.Deserialize<IMessage>(MessagePacket.Create(sent!, serializer).Data));
             Assert.Equal(usingTableau ? ClanBannerCode : null, received.Banner?.Serialize());
+            Assert.Equal(skewedFrame, received.ExactOrientation.HasValue);
+            if (skewedFrame)
+                Assert.Equal(0UL, received.PackedOrientation);
 
             peerClient.Call(() =>
             {
@@ -128,7 +135,10 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 Assert.Equal(61f, launch.Speed);
                 Assert.Equal(55f, launch.BaseSpeed);
                 Assert.Equal(hasRigidBody, launch.HasRigidBody);
-                AssertWithinTolerance(orientation, launch.Orientation);
+                if (skewedFrame)
+                    Assert.Equal(orientation, launch.Orientation);
+                else
+                    AssertWithinTolerance(orientation, launch.Orientation);
                 MissionWeapon replayed = Assert.Single(ReplayedWeapons);
                 Assert.Same(missileItem, replayed.Item);
                 Assert.Equal(usingTableau ? ClanBannerCode : null, replayed.Banner?.Serialize());

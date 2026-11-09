@@ -131,7 +131,10 @@ public class MissileHandler : IMissileHandler
         Banner banner = missileItem.IsUsingTableau ? missileWeapon.Banner : null;
         Mat3? exactOrientation = null;
         if (!orientationCodec.TryPack(payload.What.Orientation, out ulong packedOrientation))
+        {
             exactOrientation = payload.What.Orientation;
+            packedOrientation = 0;
+        }
         network.SendAll(new NetworkAgentShoot(agentInfo.AgentId, payload.What.Position, payload.What.Direction,
             packedOrientation, exactOrientation, payload.What.HasRigidBody, missileItem.StringId, modifierId,
             banner, payload.What.BaseSpeed, payload.What.Speed, missileWeapon.CurrentUsageIndex, sequence));

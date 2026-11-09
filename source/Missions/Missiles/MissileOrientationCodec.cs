@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using TaleWorlds.Library;
 
 namespace Missions.Missiles;
