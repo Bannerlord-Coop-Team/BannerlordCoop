@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -72,8 +73,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IUdpBindDiagnostics bindDiagnostics,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
-        CancellationTokenSource sessionCancellation)
-        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation)
+        CancellationTokenSource sessionCancellation,
+        // Optional so the tests that build this server directly don't need a recorder.
+        IBattleBenchmarkRecorder battleBenchmark = null)
+        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation, battleBenchmark)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
@@ -173,7 +176,9 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        object received = serializer.Deserialize(reader.GetRemainingBytes());
+        byte[] payload = reader.GetRemainingBytes();
+        object received = serializer.Deserialize(payload);
+        battleBenchmark?.RecordPayloadReceived(received, payload.Length);
 
         if (received is IPacket packet)
         {
