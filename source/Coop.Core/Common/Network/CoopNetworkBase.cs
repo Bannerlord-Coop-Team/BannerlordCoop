@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -31,6 +32,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
     // Profiles outbound packets; dumps per-type counts and byte totals every 10 seconds (server only).
     private readonly PacketProfiler packetProfiler = new PacketProfiler(TimeSpan.FromSeconds(10));
     private readonly IReliableMessageBatcher<NetPeer> reliableMessageBatcher;
+    protected readonly IBattleBenchmarkRecorder battleBenchmark;
 
     // Guard against repeated container and explicit disposal.
     private int disposed;
@@ -41,7 +43,8 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
         INetworkConfig configuration,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
-        CancellationTokenSource sessionCancellation)
+        CancellationTokenSource sessionCancellation,
+        IBattleBenchmarkRecorder battleBenchmark = null)
     {
         if (reliableMessageBatcher == null)
             throw new ArgumentNullException(nameof(reliableMessageBatcher));
@@ -50,6 +53,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
         this.serializer = serializer;
         this.sessionCancellation = sessionCancellation;
         this.reliableMessageBatcher = reliableMessageBatcher;
+        this.battleBenchmark = battleBenchmark;
         this.reliableMessageBatcher.AggregateSent += RecordAggregateSent;
 
         netManager = new NetManager(this)
@@ -193,6 +197,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
             // Profile at the logical send so message traffic stays broken out by message type; the
             // envelope's framing overhead is recorded separately when a batch actually leaves.
             packetProfiler.Record(packet, payload.Length);
+            battleBenchmark?.RecordTypeSent(messagePacket.MessageType, payload.Length);
 
             if (immediate)
                 reliableMessageBatcher.SendImmediate(netPeer, payload, SendReliableMessagePayload);
@@ -203,6 +208,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
 
         byte[] data = serializer.Serialize(packet);
         packetProfiler.Record(packet, data.Length);
+        battleBenchmark?.RecordTypeSent(packet.GetType(), data.Length);
 
         // Buffered messages were logically sent before this packet; when it rides the reliable
         // stream, flush them first so that stream preserves the order (the transfer save relies on
@@ -249,6 +255,7 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
     private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
     {
         packetProfiler.Record(packet, framingOverhead);
+        battleBenchmark?.RecordTypeSent(typeof(AggregateMessagePacket), framingOverhead);
     }
 
     private static void SendReliableMessagePayload(NetPeer netPeer, byte[] payload)
