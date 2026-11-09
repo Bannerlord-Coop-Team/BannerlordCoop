@@ -169,8 +169,9 @@ public sealed class BattleBenchmarkReceivedMessages
 /// <summary>
 /// Message and packet traffic by type. Bytes are the serialized message or packet handed to the connection, before
 /// LiteNetLib's headers, once per peer it went to. A message sent inside an aggregate counts its own bytes, and the
-/// aggregate's framing counts under <c>AggregateMessagePacket</c> (sent: campaign connection only). A message relayed
-/// through the server counts under its own type and again inside <c>RelayPacket</c>.
+/// aggregate's framing counts under <c>AggregateMessagePacket</c>. A message relayed
+/// through the server counts under its own type and again inside <c>RelayPacket</c>, and the server counts each payload it
+/// forwards as a sent <c>RelayPacket</c>.
 /// </summary>
 public sealed class BattleBenchmarkMessageTraffic
 {

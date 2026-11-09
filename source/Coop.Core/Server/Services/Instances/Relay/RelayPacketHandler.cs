@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common.BattleBenchmark;
+using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
@@ -16,13 +17,15 @@ internal class RelayPacketHandler : IPacketHandler
     private static readonly ILogger Logger = LogManager.GetLogger<RelayPacketHandler>();
     private readonly IPacketManager packetManager;
     private readonly IMissionManager missionManager;
+    private readonly IBattleBenchmarkRecorder battleBenchmark;
 
     public PacketType PacketType => PacketType.Relay;
 
-    public RelayPacketHandler(IPacketManager packetManager, IMissionManager missionManager)
+    public RelayPacketHandler(IPacketManager packetManager, IMissionManager missionManager, IBattleBenchmarkRecorder battleBenchmark)
     {
         this.packetManager = packetManager;
         this.missionManager = missionManager;
+        this.battleBenchmark = battleBenchmark;
 
         packetManager.RegisterPacketHandler(this);
     }
@@ -43,5 +46,7 @@ internal class RelayPacketHandler : IPacketHandler
         }
 
         target.Send(relayPacket.Payload, relayPacket.DeliveryMethod);
+        // The payload leaves verbatim, never deserialized here, so the benchmark counts it as relay traffic.
+        battleBenchmark.RecordTypeSent(typeof(RelayPacket), relayPacket.Payload.Length);
     }
 }

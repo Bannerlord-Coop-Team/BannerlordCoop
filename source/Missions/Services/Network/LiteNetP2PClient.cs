@@ -155,6 +155,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         steamBridge.PeerDisconnected += Handle_SteamPeerDisconnected;
+        reliableMessageBatcher.AggregateSent += RecordAggregateSent;
     }
 
     public void Dispose()
@@ -168,6 +169,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         steamBridge.PeerDisconnected -= Handle_SteamPeerDisconnected;
+        reliableMessageBatcher.AggregateSent -= RecordAggregateSent;
         Stop();
     }
 
@@ -1100,6 +1102,12 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         int bytes = serializer.Serialize(new RelayPacket(deliveryMethod, relayInstanceId, controllerId, data)).Length;
         battleBenchmark.RecordSent(controllerId, deliveryMethod != DeliveryMethod.Unreliable, bytes,
             CampaignMaxSinglePacketBytes, relayed: true);
+    }
+
+    // The batched messages already counted their own bytes when sent; this adds the envelope's framing.
+    private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
+    {
+        battleBenchmark?.RecordTypeSent(typeof(AggregateMessagePacket), framingOverhead);
     }
 
     private void RecordRoute(string controllerId, ReceivePathEvent route, int bytes)

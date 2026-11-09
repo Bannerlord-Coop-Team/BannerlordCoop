@@ -666,18 +666,29 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     }
 
     /// <summary>Thread-safe count and bytes of one message or packet type in one direction.</summary>
+    // Locked so a write racing the report can't leave a type with a count and no bytes, or bytes and no count.
     private sealed class TypeCounter
     {
+        private readonly object gate = new object();
         private long count;
         private long bytes;
 
         public void Add(int byteCount)
         {
-            Interlocked.Increment(ref count);
-            Interlocked.Add(ref bytes, byteCount);
+            lock (gate)
+            {
+                count++;
+                bytes += byteCount;
+            }
         }
 
-        public (long Count, long Bytes) Read() => (Interlocked.Read(ref count), Interlocked.Read(ref bytes));
+        public (long Count, long Bytes) Read()
+        {
+            lock (gate)
+            {
+                return (count, bytes);
+            }
+        }
     }
 
     /// <summary>Thread-safe traffic totals for one direction of one route.</summary>
