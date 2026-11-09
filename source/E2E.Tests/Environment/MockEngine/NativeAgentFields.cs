@@ -7,10 +7,9 @@ using TaleWorlds.MountAndBlade;
 namespace E2E.Tests.Environment.MockEngine;
 
 /// <summary>
-/// Writes a mirrored agent's state into the skip-constructor <see cref="Agent"/>'s own fields. A patched vanilla
-/// method runs as Harmony's generated replacement, which the JIT compiles fully optimized, so it can inline
-/// <see cref="Agent"/> getters past the <see cref="MissionEngineFixture"/> shims and read these fields and native
-/// state pointers directly.
+/// Writes a mirrored agent's state into the skip-constructor <see cref="Agent"/>'s own fields and state pointers. A
+/// patched vanilla method runs as Harmony's generated replacement, which the JIT fully optimizes, so it can inline
+/// <see cref="Agent"/> getters past the <see cref="MissionEngineFixture"/> shims and read those directly.
 /// </summary>
 public static class NativeAgentFields
 {
@@ -21,8 +20,6 @@ public static class NativeAgentFields
     private static readonly UIntPtr KilledState = Cell((long)AgentState.Killed);
     private static readonly UIntPtr UnconsciousState = Cell((long)AgentState.Unconscious);
 
-    private static readonly AccessTools.FieldRef<Agent, Team> AgentTeam =
-        AccessTools.FieldRefAccess<Agent, Team>("<Team>k__BackingField");
     private static readonly AccessTools.FieldRef<Team, BattleSideEnum> TeamSide =
         AccessTools.FieldRefAccess<Team, BattleSideEnum>("<Side>k__BackingField");
 
@@ -32,7 +29,7 @@ public static class NativeAgentFields
         agent._character = mirror.Character;
         agent._health = mirror.Health;
         agent.Origin = mirror.Origin;
-        AgentTeam(agent) = mirror.Team;
+        agent.Team = mirror.Team;
         if (mirror.Team != null && MockTeam.ForShell(mirror.Team, out var team))
             TeamSide(mirror.Team) = team.Side;
         agent._flagsPointer = mirror.IsMount ? MountFlags : HumanFlags;
