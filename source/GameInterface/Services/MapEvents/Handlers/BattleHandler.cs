@@ -214,7 +214,8 @@ internal class BattleHandler : IHandler
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
     {
         // A player started a battle: cap fast-forward while any player is in a map event. Pausing once EVERY
-        // player is occupied (in a map event OR settlement) is handled separately by PlayerOccupancyPauseHandler.
+        // player is occupied (in a map event, a settlement or the post battle screens) is handled separately by
+        // PlayerOccupancyPauseHandler.
         CapFastForwardForMapEvent();
         RefreshFastForwardState();
     }
