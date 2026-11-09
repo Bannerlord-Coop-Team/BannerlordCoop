@@ -288,7 +288,13 @@ public partial class MissileHandler
                 return false;
 
             if (message.Kind == MissileOutcomeKind.Shield)
-                victim.AttachWeaponToWeapon(victim.GetOffhandWieldedItemIndex(), weapon, null, ref frame);
+            {
+                // A victim who put the shield away has no offhand slot, and vanilla would index slot -1; retry instead.
+                EquipmentIndex shieldSlot = victim.GetOffhandWieldedItemIndex();
+                if (shieldSlot < EquipmentIndex.WeaponItemBeginSlot || shieldSlot >= EquipmentIndex.NumAllWeaponSlots)
+                    return false;
+                victim.AttachWeaponToWeapon(shieldSlot, weapon, null, ref frame);
+            }
             else
                 victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
         }

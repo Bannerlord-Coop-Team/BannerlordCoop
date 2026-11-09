@@ -330,6 +330,38 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ShieldOutcome_WaitsWhileTheVictimHasNoShieldOut()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                native.OffhandSlots[peer.Victim] = EquipmentIndex.None;
+            });
+            NetworkMissileOutcome? sent = null;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim, true);
+                sent = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(sent!);
+            peer.Instance.Call(() =>
+            {
+                Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                native.OffhandSlots[peer.Victim] = EquipmentIndex.Weapon2;
+                peer.Handler.DrainPendingShots();
+            });
+            peer.Instance.PumpGameThread();
+            NativeFixture.Attachment attached = Assert.Single(native.Attachments,
+                value => ReferenceEquals(value.Victim, peer.Victim));
+            Assert.Equal((int)EquipmentIndex.Weapon2, attached.Index);
+        });
+    }
+
+    [Fact]
     public void SettledMissilePickup_RetiresTheOtherClientCopy()
     {
         RunClients((shooter, peer, native) =>
