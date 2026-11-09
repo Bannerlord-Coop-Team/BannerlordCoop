@@ -1177,13 +1177,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IPacket packet)
     {
-        // A message packet sends its message bytes, so serializing the packet itself would be thrown away.
-        if (packet is MessagePacket messagePacket)
-        {
-            SendMessagePacket(controllerId, messagePacket);
-            return;
-        }
-
         Send(controllerId, packet, movementPacketCompressor.Serialize(packet));
     }
 
