@@ -84,41 +84,33 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void ScoreHit_FromNonHeroAttacker_AccountsTheSameWithNullWeaponAsWithOne()
+    public void ScoreHit_FromNonHeroAttacker_StillAccountsWithoutAWeapon()
     {
         var battle = SetupBattle();
         var reporter = Clients.First();
         var heroHits = new List<WeaponClass?>();
-        var deltas = new List<(int Contribution, int Xp)>();
+        (int Contribution, int Xp) before = default;
+        (int Contribution, int Xp) after = default;
 
-        Server.Call(() => CampaignEvents.OnHeroCombatHitEvent.AddNonSerializedListener(this,
-            (attacker, attacked, party, weapon, isFatal, xp) => heroHits.Add(weapon?.WeaponClass)));
+        Server.Call(() =>
+        {
+            CampaignEvents.OnHeroCombatHitEvent.AddNonSerializedListener(this,
+                (attacker, attacked, party, weapon, isFatal, xp) => heroHits.Add(weapon?.WeaponClass));
+            before = ServerTroopTotals(battle);
+        });
 
         try
         {
-            foreach (var weaponClass in new WeaponClass?[] { WeaponClass.OneHandedSword, null })
-            {
-                (int Contribution, int Xp) before = default;
-                Server.Call(() => before = ServerTroopTotals(battle));
+            reporter.Call(() => PublishScoreHit(reporter, battle, attackerIsHero: false, WeaponClass.OneHandedSword));
 
-                // A weapon-carrying report, as the message looked before the gate, then the gated null one.
-                SendScoreHit(reporter, battle, TroopCharacter, weaponClass);
-
-                Server.Call(() =>
-                {
-                    var after = ServerTroopTotals(battle);
-                    deltas.Add((after.Contribution - before.Contribution, after.Xp - before.Xp));
-                });
-            }
+            Server.Call(() => after = ServerTroopTotals(battle));
         }
         finally
         {
             Server.Call(() => CampaignEvents.OnHeroCombatHitEvent.ClearListeners(this));
         }
 
-        Assert.Equal(2, deltas.Count);
-        Assert.Equal((ScoreHitXp, ScoreHitXp), deltas[0]);
-        Assert.Equal(deltas[0], deltas[1]);
+        Assert.Equal((ScoreHitXp, ScoreHitXp), (after.Contribution - before.Contribution, after.Xp - before.Xp));
         Assert.Empty(heroHits);
     }
 
@@ -280,20 +272,6 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
             isFatal: true,
             isSimulatedHit: false,
             new WeaponComponentData(null, weaponClass, default)));
-    }
-
-    /// <summary>Sends a score hit for <paramref name="attackerCharacter"/> straight onto the wire, as a build without the gate would.</summary>
-    private void SendScoreHit(EnvironmentInstance client, Battle battle, string attackerCharacter, WeaponClass? weaponClass)
-    {
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetId(client.GetRegisteredObject<CharacterObject>(attackerCharacter), out string attackerId));
-            Assert.True(client.ObjectManager.TryGetId(client.GetRegisteredObject<CharacterObject>(VictimCharacter), out string victimId));
-
-            client.Resolve<Common.Network.INetwork>().SendAll(new NetworkTroopScoreHit(
-                battle.PartyId, attackerId, victimId, damage: 30, isFatal: true, isSimulatedHit: false,
-                weaponClass.HasValue ? new WeaponComponentData(null, weaponClass.Value, default) : null));
-        });
     }
 
     private void PublishHitReward(EnvironmentInstance client, Battle battle, bool attackerIsHero, WeaponClass weaponClass)

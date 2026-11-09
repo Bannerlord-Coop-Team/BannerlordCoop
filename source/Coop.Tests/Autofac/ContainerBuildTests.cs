@@ -85,7 +85,6 @@ namespace Coop.Tests.Autofac
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
             Assert.Contains(missionCommands, command => command.Name == "cancel_owned_agent_drive");
             Assert.Contains(missionCommands, command => command.Name == "owned_agent_drive_state");
-            Assert.Contains(missionCommands, command => command.Name == "hero_combat");
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
                 registeredCommands

@@ -26,12 +26,9 @@ public interface IHeroCombatFixture : IHandler
 }
 
 /// <summary>
-/// DEBUG cheat for #4499: a hero agent can't be made to fight from a script (it is player controlled, and the AI of a
-/// lone general formation doesn't engage), so this injects hero hits through the hit path a native hit takes, and
-/// tallies each hero hit reward next to the skill xp vanilla gives for it, so the server's xp can be compared.
-/// Melee blows go through <c>Agent.RegisterBlow</c>, which the co-op damage router sends to the victim's owner.
-/// A ranged blow resolves its weapon from a live missile that only exists on the shooter's client, so it calls
-/// <c>Mission.OnAgentHit</c> directly and does not damage the victim.
+/// DEBUG cheat for #4499: a hero can't be made to fight from a script, so this injects hero hits through the native hit
+/// path and tallies each hero hit reward next to the skill xp vanilla gives for it, to compare with the server's xp.
+/// A ranged blow reads its weapon from a missile only the shooter's client has, so it skips <c>RegisterBlow</c>.
 /// </summary>
 internal sealed class HeroCombatFixture : IHeroCombatFixture
 {
@@ -46,6 +43,8 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         public double ExpectedSkillXp;
         public double RawXp;
     }
+
+    private const int InjectedDamage = 6;
 
     private readonly IMessageBroker messageBroker;
     private readonly object gate = new object();
@@ -143,7 +142,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         Mission mission = Mission.Current;
         Agent[] heroes = LocalHeroes(mission);
         if (heroes.Length == 0)
-            return Failed("This client controls no active hero agent");
+            return new CoopCommandResult(false, "This client controls no active hero agent", "command_failed");
 
         var notes = new List<string>();
         lock (gate)
@@ -165,7 +164,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         Mission mission = Mission.Current;
         Agent[] heroes = LocalHeroes(mission);
         if (heroes.Length == 0)
-            return Failed("This client controls no active hero agent");
+            return new CoopCommandResult(false, "This client controls no active hero agent", "command_failed");
 
         int injected = 0;
         foreach (Agent hero in heroes)
@@ -324,7 +323,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
     private static Agent NearestEnemy(Mission mission, Agent hero, out float distance)
     {
         distance = float.MaxValue;
-        if (hero.Mission != mission || !hero.IsActive() || hero.Team == null) return null;
+        if (hero.Team == null) return null;
 
         Agent nearest = null;
         foreach (Agent other in mission.Agents)
@@ -353,7 +352,7 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                         hero = ((CharacterObject)agent.Character).StringId,
                         health = agent.Health,
                         position = new[] { (float)Math.Round(agent.Position.x, 1), (float)Math.Round(agent.Position.y, 1) },
-                        nearestEnemyMeters = NearestEnemyMeters(mission, agent),
+                        nearestEnemyMeters = NearestEnemy(mission, agent, out float nearest) == null ? -1f : (float)Math.Round(nearest, 1),
                         weapons = Enumerable.Range((int)EquipmentIndex.WeaponItemBeginSlot, 4)
                             .Select(slot => agent.Equipment[(EquipmentIndex)slot])
                             .Select(weapon => weapon.IsEmpty ? "empty" : weapon.Item.StringId + ":" + weapon.CurrentUsageItem?.WeaponClass)
@@ -381,12 +380,6 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
                 nonHeroDamage = Math.Round(nonHeroDamage, 1),
             });
         }
-    }
-
-    private static float NearestEnemyMeters(Mission mission, Agent hero)
-    {
-        NearestEnemy(mission, hero, out float distance);
-        return distance == float.MaxValue ? -1f : (float)Math.Round(distance, 1);
     }
 
     private static string EquipBow(Agent agent)
@@ -417,9 +410,6 @@ internal sealed class HeroCombatFixture : IHeroCombatFixture
         return $"bow={slots[0]} arrows={slots[1]}";
     }
 
-    private static CoopCommandResult Failed(string message) => new CoopCommandResult(false, message, "command_failed");
-
-    private const int InjectedDamage = 6;
 }
 
 public sealed class HeroCombatFixtureCoopCommand : ICoopCommand
