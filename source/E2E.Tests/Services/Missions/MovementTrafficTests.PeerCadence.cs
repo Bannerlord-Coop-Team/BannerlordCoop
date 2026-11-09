@@ -285,10 +285,12 @@ public partial class MovementTrafficTests
                 }
                 float frameSeconds = frameSecondsAt(frame);
                 time += frameSeconds;
-                int sentBefore = network.DirectPacketSends.Count(send => send.ControllerId == "receiver");
+                int sentBefore = network.DirectPacketSends.Count(send =>
+                    send.ControllerId == "receiver" && send.Packet is MovementPacket);
                 mirror.Position = new Vec3(frame, 0f, 0f);
                 handler.PollMovement(frameSeconds);
-                if (network.DirectPacketSends.Count(send => send.ControllerId == "receiver") > sentBefore)
+                if (network.DirectPacketSends.Count(send =>
+                        send.ControllerId == "receiver" && send.Packet is MovementPacket) > sentBefore)
                     sends.Add((frame, time));
             }
         });
