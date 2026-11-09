@@ -28,6 +28,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -361,6 +362,69 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var approval = GetJoinApproval();
         Assert.True(approval.Approved);
         Assert.Equal(context.SettlementId, approval.SettlementId);
+        AssertJoinedSiege(context);
+    }
+
+    [Fact]
+    public void JoinRequest_FromNativeBesiegerEncounterOutsideTownGate_IsApproved()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var campPosition = Position(24.5f, 34.5f);
+        var arrivalPosition = Position(24.75f, 34.5f);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var settlement = CreatePresentedTownSiege(instance, context);
+                var camp = settlement.SiegeEvent.BesiegerCamp;
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                using (new AllowedThread())
+                {
+                    settlement._position = Position(20f, 30f);
+                    settlement.GatePosition = settlement.Position;
+                    camp.LeaderParty._besiegerCamp = camp;
+                    camp.LeaderParty.Position = campPosition;
+                    party.Position = arrivalPosition;
+                    party.SetShortTermBehavior(AiBehavior.EngageParty, camp.LeaderParty.Party);
+                }
+            }, SiegeCreationDisabledMethods);
+        }
+        ClearMessages();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            var party = MobileParty.MainParty;
+            var besieger = settlement.SiegeEvent.BesiegerCamp.LeaderParty;
+            EnsureEncounterModel();
+            Assert.True(((IInteractablePoint)besieger.Party).CanPartyInteract(party, 0f));
+            Assert.True(party.Position.Distance(settlement.GatePosition) > 0.55f);
+            Assert.True(party.Position.Distance(settlement.Position) > 0.55f);
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Campaign.Current.PlayerEncounter = encounter;
+            encounter.SetupFields(party.Party, besieger.Party);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Equal("join_siege_event", new DefaultEncounterGameMenuModel().GetEncounterMenu(
+                party.Party, besieger.Party, out var startBattle, out var joinBattle));
+            Assert.False(startBattle);
+            Assert.False(joinBattle);
+
+            new EncounterGameMenuBehavior().game_menu_join_siege_event_on_consequence(null);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinSiegeCamp>());
+        Assert.Equal(context.PartyId, request.PartyId);
+        Assert.Equal(context.SettlementId, request.SettlementId);
+        IgnoreEntryResults(client);
+        client.NetworkSentMessages.Clear();
+
+        // Replay the captured native request without the player-local menu continuation.
+        client.Call(() => client.Resolve<INetwork>().SendAll(request), SiegeCreationDisabledMethods);
+
+        Assert.True(GetJoinApproval().Approved);
         AssertJoinedSiege(context);
     }
 
