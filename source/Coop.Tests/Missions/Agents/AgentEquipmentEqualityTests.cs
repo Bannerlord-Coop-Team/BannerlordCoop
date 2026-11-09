@@ -54,6 +54,16 @@ public class AgentEquipmentEqualityTests
     }
 
     [Fact]
+    public void ArrowAmmoItemIdsAndModifiers_AreComparedByValueNotReference()
+    {
+        var left = new AgentArrowAmmoData(1, new string("arrows".ToCharArray()), new string("sharp".ToCharArray()), 30);
+        var right = new AgentArrowAmmoData(1, new string("arrows".ToCharArray()), new string("sharp".ToCharArray()), 30);
+
+        Assert.True(left.Equals(right));
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+    }
+
+    [Fact]
     public void ArrowAmmoOrderOrCount_IsDifferent()
     {
         var first = new AgentArrowAmmoData(1, "arrows", null, 30);
