@@ -24,7 +24,7 @@ public interface IMissileHandler : IHandler
 {
 #if DEBUG
     int ForcedBouncesRemaining { get; set; }
-    void PrepareForcedBounce(Mission.Missile missile, Agent victim, ref Mission.MissileCollisionReaction reaction);
+    void PrepareForcedBounce(ref AttackCollisionData collision, Agent victim, ref WeaponFlags flags);
 #endif
     void DrainPendingShots();
     bool IsReconstructionPending(Guid agentId, long shotSequence);
@@ -42,11 +42,17 @@ public partial class MissileHandler : IMissileHandler
 #if DEBUG
     public int ForcedBouncesRemaining { get; set; }
 
-    public void PrepareForcedBounce(Mission.Missile missile, Agent victim, ref Mission.MissileCollisionReaction reaction)
+    public void PrepareForcedBounce(ref AttackCollisionData collision, Agent victim, ref WeaponFlags flags)
     {
         if (disposed || ForcedBouncesRemaining <= 0 || victim != null
-            || reaction != Mission.MissileCollisionReaction.Stick || !localShots.ContainsKey(missile.Index)) return;
-        reaction = Mission.MissileCollisionReaction.BounceBack;
+            || !localShots.ContainsKey(collision.AffectorWeaponSlotOrMissileIndex)
+            || !flags.HasAnyFlag(WeaponFlags.AmmoSticksWhenShot) || flags.HasAnyFlag(WeaponFlags.Burning)
+            || collision.MissileGoneUnderWater || collision.MissileGoneOutOfBorder) return;
+        var material = PhysicsMaterial.GetFromIndex(collision.PhysicsMaterialIndex);
+        var materialFlags = material.IsValid ? material.GetFlags() : PhysicsMaterialFlags.None;
+        if ((materialFlags & (PhysicsMaterialFlags.DontStickMissiles | PhysicsMaterialFlags.AttacksCanPassThrough)) != 0) return;
+
+        flags &= ~WeaponFlags.AmmoSticksWhenShot;
         ForcedBouncesRemaining--;
         Logger.Debug("[MissileDebug] forced bounce remaining={Remaining}", ForcedBouncesRemaining);
     }

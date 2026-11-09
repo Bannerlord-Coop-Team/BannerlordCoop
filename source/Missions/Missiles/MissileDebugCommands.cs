@@ -3,6 +3,7 @@ using Common;
 using Common.Commands;
 using GameInterface.Services.MapEvents;
 using Missions.Agents;
+using Missions.Agents.Packets;
 using Missions.Battles;
 using Newtonsoft.Json;
 using System;
@@ -85,14 +86,22 @@ internal static class MissileDebugCommands
             var fallback = new List<(Agent Agent, EquipmentIndex Slot)>();
             foreach (Agent agent in mission.Agents)
             {
-                if (!agent.IsActive() || !agents.IsLocallyControlled(agent)) continue;
-                EquipmentIndex wielded = agent.GetPrimaryWieldedItemIndex();
+                if (!agent.IsHuman || !agent.IsActive() || !agents.IsLocallyControlled(agent)) continue;
+                var equipment = agent.Equipment;
+                if (!AgentEquipmentData.HasSafeWeaponSlots(equipment)) continue;
+                var loaded = new List<EquipmentIndex>();
                 for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.NumAllWeaponSlots; slot++)
                 {
-                    MissionWeapon weapon = agent.Equipment[slot];
+                    MissionWeapon weapon = equipment[slot];
                     if (weapon.IsEmpty || weapon.CurrentUsageItem?.IsRangedWeapon != true) continue;
                     MissionWeapon projectile = weapon.CurrentUsageItem.IsConsumable ? weapon : weapon.AmmoWeapon;
                     if (projectile.IsEmpty || projectile.Amount <= 0) continue;
+                    loaded.Add(slot);
+                }
+                if (loaded.Count == 0) continue;
+                EquipmentIndex wielded = agent.GetPrimaryWieldedItemIndex();
+                foreach (var slot in loaded)
+                {
                     if (slot == wielded) ready.Add((agent, slot));
                     else fallback.Add((agent, slot));
                 }
@@ -169,21 +178,32 @@ internal static class MissileDebugCommands
         public string Name => "destructibles";
         public string Description => "Lists destructible mission objects and their current state without changing them.";
         public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public IExpectedArgs[] ExpectedArgs { get; } =
+        {
+            new ExpectedArgs("offset", "Row offset 0..100000, default 0.", false),
+            new ExpectedArgs("limit", "Rows 1..64, default 16.", false)
+        };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (args.Count != 0) return new CoopCommandResult(false, "Expected no arguments.", "invalid_arguments");
+            int offset = 0, limit = 16;
+            if (args.Count > 2
+                || (args.Count > 0 && !int.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out offset))
+                || (args.Count > 1 && !int.TryParse(args[1], NumberStyles.None, CultureInfo.InvariantCulture, out limit))
+                || offset > 100000 || limit < 1 || limit > 64)
+                return new CoopCommandResult(false, "Expected offset 0..100000 and limit 1..64.", "invalid_arguments");
             if (ModInformation.IsServer || Mission.Current == null)
                 return new CoopCommandResult(false, "An active client mission is required.", "no_mission");
-            var rows = ReadDestructibles(Mission.Current).OrderBy(value => value.Object.Id.Id).Select(value =>
+            var all = ReadDestructibles(Mission.Current).OrderBy(value => value.Object.Id.Id).ToArray();
+            var rows = all.Skip(offset).Take(limit).Select(value =>
             {
                 Vec3 position = value.Object.GameEntity.GetGlobalFrame().origin;
                 return new { missionObjectId = value.Object.Id.Id, type = value.Object.GetType().Name,
                     state = value.Destruction._currentStateIndex, hitPoints = value.Destruction.HitPoint,
                     position = new { x = position.x, y = position.y, z = position.z } };
             }).ToArray();
-            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new { count = rows.Length, rows }));
+            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new { count = rows.Length, rows,
+                total = all.Length, offset, limit }));
         }
     }
 

@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common.Commands;
 using Common.Util;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions;
@@ -11,10 +12,13 @@ using Missions.Missiles.Patches;
 using Moq;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ComponentInterfaces;
+using TaleWorlds.ModuleManager;
 using Commands = global::Missions.Missiles.MissileDebugCommands;
 
 namespace E2E.Tests.Services.Missions;
@@ -26,6 +30,7 @@ public partial class MissileOutcomeTests
     {
         RunClients((shooter, peer, native) =>
         {
+            native.EnableDebugBounceCallback();
             peer.Receive(shooter.Shoot());
             NetworkMissileOutcome outcome = null!;
             shooter.Instance.Call(() =>
@@ -33,8 +38,23 @@ public partial class MissileOutcomeTests
                 var result = new Commands.ForceBounceMissilesCoopCommand().ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "1" }));
                 Assert.True(result.Succeeded, result.Output);
                 Assert.Contains("\"remaining\":1", result.Output);
-                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
-                    Mission.MissileCollisionReaction.Stick, Frame(false));
+                var missile = Assert.Single(shooter.Mission.Shell._missilesDictionary).Value;
+                var parent = native.AddParent(shooter, 37, new MatrixFrame(Mat3.Identity, new Vec3(500f, 600f, 700f)));
+                MatrixFrame impact = Frame(false);
+                native.EntityFrames[missile.Entity.Pointer] = impact;
+                var collision = BounceCollision(missile.Index, impact.origin);
+                shooter.Mission.Shell.MissileHitCallback(out _, ref collision, Vec3.Zero, impact.origin,
+                    Vec3.Zero, collision.MissileVelocity, impact, MatrixFrame.Identity, 0, shooter.Shooter, null,
+                    native.EntityOf(parent.GameEntity));
+                var spawn = Assert.Single(native.BounceSpawns);
+                var usage = missile.Weapon.CurrentUsageItem;
+                MatrixFrame expected = impact.TransformToParent(usage.GetMissileStartingFrame().TransformToParent(usage.StickingFrame))
+                    .TransformToParent(usage.GetMissileStartingFrame());
+                AssertFrame(expected, spawn.Frame, exact: false);
+                Assert.Null(spawn.Parent);
+                Assert.True(spawn.Velocity.LengthSquared > 0f && !float.IsInfinity(spawn.Velocity.LengthSquared));
+                Assert.True(spawn.AngularVelocity.LengthSquared > 0f && !float.IsInfinity(spawn.AngularVelocity.LengthSquared));
+                output.WriteLine($"forced bounce global={spawn.Frame.origin} velocity={spawn.Velocity} angularVelocity={spawn.AngularVelocity}");
                 var item = Assert.Single(shooter.Items.GetAll()).Value;
                 Assert.True(item.SpawnFlags.HasAnyFlag(Mission.WeaponSpawnFlags.WithPhysics));
                 Assert.False(item.SpawnFlags.HasAnyFlag(Mission.WeaponSpawnFlags.WithStaticPhysics));
@@ -55,8 +75,14 @@ public partial class MissileOutcomeTests
         }, realParenting: true);
     }
 
+    private static AttackCollisionData BounceCollision(int index, Vec3 position) =>
+        AttackCollisionData.GetAttackCollisionDataForDebugPurpose(false, false, false, false, false, true,
+            false, false, true, false, false, false, default, index, 0, 0, -1, default, -1, default, -1,
+            default, 0f, 0f, 0f, 0f, 0f, 50f, 0f, 0f, Vec3.Up, Vec3.Forward, position,
+            new Vec3(10f, 0f, -20f), Vec3.Zero, Vec3.Zero, Vec3.Up);
+
     [Fact]
-    public void DebugFireAt_CreatesAgentShotsThatReplayOnThePeer()
+    public void DebugFireAt_SkipsMountsAndUnarmedAgentsAndReplicatesHumanShots()
     {
         RunClients((shooter, peer, native) =>
         {
@@ -65,6 +91,17 @@ public partial class MissileOutcomeTests
             {
                 shooter.Shooter.Equipment[EquipmentIndex.Weapon0] = shooter.Weapon;
                 shooter.Shooter.SetWieldedItemIndexAsClient(Agent.HandIndex.MainHand, EquipmentIndex.Weapon0, true, false, 0);
+                var agents = shooter.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(agents.TryTransferAuthority("shooter", shooter.VictimId));
+                var mount = shooter.Mission.SpawnMount();
+                Assert.True(AgentMirror.TryGet(mount, out var mountMirror));
+                mountMirror.IsHuman = false;
+                Assert.True(agents.TryRegisterAgent("shooter", Guid.NewGuid(), mount));
+                var noEquipment = shooter.Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+                Assert.True(AgentMirror.TryGet(noEquipment, out var incomplete));
+                incomplete.Equipment = null!;
+                Assert.True(agents.TryRegisterAgent("shooter", Guid.NewGuid(), noEquipment));
+                native.UnsafeShooterReads.UnionWith(new[] { mount, shooter.Victim, noEquipment });
                 native.AddParent(shooter, 37, new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 2f)));
                 var result = new Commands.FireMissilesAtCoopCommand().ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "37", "3" }));
                 Assert.True(result.Succeeded, result.Output);
@@ -72,6 +109,12 @@ public partial class MissileOutcomeTests
                 Assert.Equal(3, (int)json["missiles"]!);
                 Assert.Single((JArray)json["shooters"]!);
                 Assert.Equal(3, shooter.Mission.Shell._missilesDictionary.Count);
+                shooter.Shooter.Equipment[EquipmentIndex.Weapon0] = MissionWeapon.Invalid;
+                native.UnsafeShooterReads.Add(shooter.Shooter);
+                var noShooter = new Commands.FireMissilesAtCoopCommand().ProcessCommand(
+                    new CoopCommandArgsFactory().FromValues(new[] { "37", "1" }));
+                Assert.False(noShooter.Succeeded);
+                Assert.Equal("no_shooter", noShooter.ErrorCode);
             });
             var shots = shooter.Network.NetworkSentMessages.GetMessages<NetworkAgentShoot>().ToArray();
             Assert.Equal(3, shots.Length);
@@ -94,12 +137,17 @@ public partial class MissileOutcomeTests
             {
                 var frame = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 30f));
                 var destruction = native.AddDestructible(shooter, 37, frame, out _, out var broken);
+                for (int i = 1; i < 70; i++)
+                    native.AddDestructible(shooter, 37 + i, frame, out _, out _).HitPoint = 100f;
                 destruction.HitPoint = 65f;
                 destruction.SetDestructionLevel(1, -1, 5f, Vec3.Zero, Vec3.Up, noEffects: true);
                 var result = new Commands.MissileDestructiblesCoopCommand().ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
                 Assert.True(result.Succeeded, result.Output);
                 var json = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
-                var row = Assert.Single((JArray)json["rows"]!);
+                var rows = (JArray)json["rows"]!;
+                Assert.Equal(16, rows.Count);
+                Assert.Equal(70, (int)json["total"]!);
+                var row = rows[0];
                 Assert.Equal(37, (int)row["missionObjectId"]!);
                 Assert.Equal(nameof(DestructableComponent), (string)row["type"]!);
                 Assert.Equal(1, (int)row["state"]!);
@@ -107,6 +155,15 @@ public partial class MissileOutcomeTests
                 Assert.Equal(10f, (float)row["position"]!["x"]!);
                 Assert.Same(broken, destruction.CurrentState);
                 Assert.Equal(65f, destruction.HitPoint);
+                var last = new Commands.MissileDestructiblesCoopCommand().ProcessCommand(
+                    new CoopCommandArgsFactory().FromValues(new[] { "64", "64" }));
+                Assert.True(last.Succeeded, last.Output);
+                var page = JObject.Parse(last.Output.Substring("LIVE_TEST_JSON=".Length));
+                Assert.Equal(70, (int)page["total"]!);
+                Assert.Equal(6, (int)page["count"]!);
+                Assert.Equal(101, (int)page["rows"]![0]!["missionObjectId"]!);
+                Assert.Equal(new[] { "missionObjectId", "type", "state", "hitPoints", "position" },
+                    ((JObject)page["rows"]![0]!).Properties().Select(value => value.Name));
             });
         }, realParenting: true);
     }
@@ -200,8 +257,79 @@ public partial class MissileOutcomeTests
 
     private sealed partial class NativeFixture
     {
+        private MissionGameModels? previousBounceModels;
+        private bool bounceModelsInstalled;
+        private FieldInfo? bounceVoiceBridge;
+        private object? previousBounceVoices;
+        public sealed record BounceSpawn(MatrixFrame Frame, GameEntity? Parent, Vec3 Velocity, Vec3 AngularVelocity);
+        public List<BounceSpawn> BounceSpawns { get; } = new();
+        public HashSet<Agent> UnsafeShooterReads { get; } = new();
+
+        public void EnableDebugBounceCallback()
+        {
+            previousBounceModels = MissionGameModels.Current;
+            _ = new MissionGameModels(new GameModel[] { Mock.Of<AgentApplyDamageModel>() });
+            bounceModelsInstalled = true;
+            bounceVoiceBridge = AccessTools.Field(typeof(MBAPI), "IMBVoiceManager");
+            previousBounceVoices = bounceVoiceBridge.GetValue(null);
+            object voices = typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create), Type.EmptyTypes)!
+                .MakeGenericMethod(bounceVoiceBridge.FieldType, typeof(EntityEngine)).Invoke(null, null)!;
+            var voiceIds = new Dictionary<string, int>();
+            ((EntityEngine)voices).Call = (method, args) =>
+            {
+                if (method.Name != "GetVoiceTypeIndex") throw new InvalidOperationException("Unexpected voice call: " + method.Name);
+                string id = (string)args[0]!;
+                if (!voiceIds.TryGetValue(id, out int index)) voiceIds.Add(id, index = voiceIds.Count);
+                return index;
+            };
+            bounceVoiceBridge.SetValue(null, voices);
+            Patch(typeof(ModuleHelper), nameof(ModuleHelper.GetModuleFullPath), nameof(DebugModulePath));
+            Patch(typeof(PhysicsMaterial), nameof(PhysicsMaterial.GetFromName), nameof(DebugMaterial));
+            Patch(typeof(ManagedParameters), nameof(ManagedParameters.GetManagedParameter), nameof(DebugManagedParameter));
+            Patch(typeof(Mission), "GetAttackCollisionResults", nameof(DebugAttackResults));
+            Patch(typeof(Mission), "CreateMissileBlow", nameof(DebugMissileBlow));
+            Patch(typeof(Mission), nameof(Mission.RegisterBlow), nameof(Skip));
+            Patch(typeof(MBMissile), nameof(MBMissile.GetPosition), nameof(DebugMissilePosition));
+            Patch(typeof(Mission), "AddSoundAlarmFactorToAgents", nameof(Skip));
+            harmony.Patch(AccessTools.Method(typeof(Mission), "SpawnWeaponAux"),
+                postfix: new HarmonyMethod(typeof(NativeFixture), nameof(DebugBounceSpawn)));
+            harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.MissileHitCallback)),
+                postfix: Method(nameof(RebuildCollision)));
+        }
+
+        private static void DebugBounceSpawn(WeakGameEntity weaponEntity, Vec3 globalVelocity, Vec3 globalAngularVelocity)
+        {
+            current.BounceSpawns.Add(new BounceSpawn(weaponEntity.GetGlobalFrame(), current.ParentOf(weaponEntity),
+                globalVelocity, globalAngularVelocity));
+        }
+        private static bool DebugMaterial(ref PhysicsMaterial __result) { __result = PhysicsMaterial.InvalidPhysicsMaterial; return false; }
+        private static bool DebugModulePath(string __0, ref string __result)
+        {
+            if (__0 != "Native") return true;
+            __result = System.IO.Path.Combine(System.Environment.GetEnvironmentVariable("BANNERLORD_DIR")!, "Modules", "Native")
+                + System.IO.Path.DirectorySeparatorChar;
+            return false;
+        }
+        private static bool DebugManagedParameter(ManagedParametersEnum managedParameterEnum, ref float __result)
+        {
+            __result = managedParameterEnum == ManagedParametersEnum.ProjectileMaxPenetrationSpeed ? 50f : 0f;
+            return false;
+        }
+        private static bool DebugAttackResults(out WeaponComponentData shieldOnBack, out CombatLogData combatLog)
+        {
+            shieldOnBack = null!;
+            combatLog = default;
+            return false;
+        }
+        private static bool DebugMissileBlow(ref Blow __result) { __result = default; return false; }
+        private static bool DebugMissilePosition(MBMissile __instance, ref Vec3 __result)
+        {
+            __result = ((Mission.Missile)__instance).Entity.GetGlobalFrame().origin;
+            return false;
+        }
         public void EnableDebugAgentShots()
         {
+            Patch(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(DebugWieldedIndex));
             var add = AccessTools.Method(typeof(Mission), nameof(Mission.AddMissileSingleUsageAux));
             harmony.Unpatch(add, HarmonyPatchType.Prefix, harmony.Id);
             // Capture the real wielded weapon before the terminal native-add stub returns.
@@ -246,6 +374,11 @@ public partial class MissileOutcomeTests
         }
 
         private static bool DebugEye(Agent __instance, ref Vec3 __result) { __result = __instance.Position + Vec3.Up * 1.5f; return false; }
+        private static void DebugWieldedIndex(Agent __instance)
+        {
+            if (current.UnsafeShooterReads.Contains(__instance))
+                throw new NullReferenceException("Native wielded-index access on an agent without valid shooter equipment.");
+        }
         private static bool DebugSpeed(ref int __result) { __result = 50; return false; }
         private static bool DebugTime(ref float __result) { __result = 0f; return false; }
         private static bool DebugAim(Vec3 vecToTarget, ref float __result)

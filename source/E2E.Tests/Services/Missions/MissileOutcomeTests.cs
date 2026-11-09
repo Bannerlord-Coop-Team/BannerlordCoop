@@ -827,6 +827,11 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             item = new ItemObject { StringId = "outcome_javelin" };
             item.AddWeapon(new WeaponComponentData(item, WeaponClass.Javelin,
                 WeaponFlags.RangedWeapon | WeaponFlags.Consumable), null);
+#if DEBUG
+            item.Weight = 1f;
+            item.PrimaryWeapon.WeaponLength = 100;
+            item.PrimaryWeapon.WeaponFlags |= WeaponFlags.AmmoSticksWhenShot;
+#endif
         });
         Guid shooterId = Guid.NewGuid();
         Guid victimId = Guid.NewGuid();
@@ -1181,12 +1186,15 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 (typeof(MissileItemDropPatch), typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile)),
                 (typeof(MissileRemovedPatch), typeof(Mission), nameof(Mission.OnMissileRemoved)),
                 (typeof(MissilePhysicsSettledPatch), typeof(SpawnedItemEntity), nameof(SpawnedItemEntity.DisableDynamicBody)),
+#if DEBUG
+                (typeof(MissileForcedBouncePatch), typeof(Mission), nameof(Mission.MissileHitCallback)),
+#endif
             };
             foreach (var (patchType, targetType, name) in targets)
             {
                 MethodInfo target = AccessTools.Method(targetType, name);
                 Patches? patches = Harmony.GetPatchInfo(target);
-                if (patches == null || !patches.Prefixes.Concat(patches.Postfixes)
+                if (patches == null || !patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Transpilers)
                     .Any(patch => patch.PatchMethod.DeclaringType == patchType))
                     harmony.CreateClassProcessor(patchType).Patch();
             }
@@ -1391,6 +1399,10 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         public void Dispose()
         {
             harmony.UnpatchAll(harmony.Id);
+#if DEBUG
+            if (bounceModelsInstalled) MissionGameModels.Current = previousBounceModels;
+            if (bounceVoiceBridge != null) bounceVoiceBridge.SetValue(null, previousBounceVoices);
+#endif
             if (entityBridge != null) entityBridge.SetValue(null, originalEntityBridge);
             current = null!;
         }
