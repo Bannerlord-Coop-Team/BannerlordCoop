@@ -18,7 +18,7 @@ E2E.Tests.Services.Armies.ArmyDisbanderTests	0.92
 E2E.Tests.Services.Armies.ArmyObjectiveTests	1.06
 E2E.Tests.Services.Armies.ArmyRemovalReceiveTests	0.96
 E2E.Tests.Services.Armies.ArmySettlementOwnershipReplayTests	0.78
-E2E.Tests.Services.Armies.KingdomCreationTests	2.25
+E2E.Tests.Services.Armies.KingdomCreationTests	0.94
 E2E.Tests.Services.Armies.PlayerArmyWaitBehaviorTests	1.13
 E2E.Tests.Services.Barters.BarterClientCompletionTests	1.18
 E2E.Tests.Services.BasicCharacterObjects.BasicCharacterObjectSyncTests	0.85
@@ -39,8 +39,8 @@ E2E.Tests.Services.Companions.CompanionDismissalSyncTests	0.92
 E2E.Tests.Services.Companions.CompanionHiredStatisticsTests	0.94
 E2E.Tests.Services.Companions.CompanionRescueSyncTests	0.96
 E2E.Tests.Services.Connections.CreateCharacterStateRollbackTests	0.23
-E2E.Tests.Services.Connections.DisconnectHandlerEndGameTests	0.38
-E2E.Tests.Services.CraftingTemplates.CraftingTemplateLifetimeTests	1.68
+E2E.Tests.Services.Connections.DisconnectHandlerEndGameTests	0.39
+E2E.Tests.Services.CraftingTemplates.CraftingTemplateLifetimeTests	0.74
 E2E.Tests.Services.Crime.CrimePaymentTests	0.94
 E2E.Tests.Services.Crime.HostileCrimeTests	0.94
 E2E.Tests.Services.CultureObjects.CultureObjectLifetimeTests	0.84
@@ -59,7 +59,7 @@ E2E.Tests.Services.Heroes.CharacterRelationManagerSyncTests	0.75
 E2E.Tests.Services.Heroes.HeroCollectionTests	1.22
 E2E.Tests.Services.Heroes.HeroCreationTests	0.84
 E2E.Tests.Services.Heroes.HeroGoldCoalescingTests	1.15
-E2E.Tests.Services.Heroes.HeroMeetingPersistenceTests	3.03
+E2E.Tests.Services.Heroes.HeroMeetingPersistenceTests	0.60
 E2E.Tests.Services.Heroes.HeroSetNameTests	1.12
 E2E.Tests.Services.Heroes.HeroSyncTests	0.93
 E2E.Tests.Services.Heroes.LordBarterSyncTests	1.04
@@ -168,7 +168,7 @@ E2E.Tests.Services.MapEventParties.MapEventPartySyncTests	1.13
 E2E.Tests.Services.MapEventSides.MapEventSideSyncTests	0.57
 E2E.Tests.Services.MapEvents.BattleInstanceCreationTests	0.94
 E2E.Tests.Services.MapEvents.BattleMissionIdentityTests	1.50
-E2E.Tests.Services.MapEvents.BattleMissionStartHandlerTests	1.37
+E2E.Tests.Services.MapEvents.BattleMissionStartHandlerTests	1.06
 E2E.Tests.Services.MapEvents.BattleMissionStartRoutingTests	0.00
 E2E.Tests.Services.MapEvents.BattleModeExclusionTests	1.07
 E2E.Tests.Services.MapEvents.BattleResultDistributionTests	1.03
@@ -201,11 +201,11 @@ E2E.Tests.Services.MapEvents.SiegeDefenseSideTests	0.94
 E2E.Tests.Services.MapEvents.StalledMapEventTests	1.09
 E2E.Tests.Services.MapTracks.MapTrackFactionTests	0.89
 E2E.Tests.Services.Missions.ActionEquipmentSyncTests	1.69
-E2E.Tests.Services.Missions.AgentActionPacketSerializationTests	0.38
+E2E.Tests.Services.Missions.AgentActionPacketSerializationTests	0.42
 E2E.Tests.Services.Missions.AgentDataNavalDeckWireTests	0.13
 E2E.Tests.Services.Missions.AgentEquipmentDataTests	0.08
 E2E.Tests.Services.Missions.AgentFormationAssignerTests	1.25
-E2E.Tests.Services.Missions.AgentGuardStateTests	0.34
+E2E.Tests.Services.Missions.AgentGuardStateTests	0.35
 E2E.Tests.Services.Missions.AgentHitSoundTests	1.76
 E2E.Tests.Services.Missions.AgentMountDataTests	0.07
 E2E.Tests.Services.Missions.AgentOrderPresentationTests	0.09
@@ -251,7 +251,7 @@ E2E.Tests.Services.Missions.BattleSurgeryRewardTests	1.16
 E2E.Tests.Services.Missions.BattleTroopAssignmentTests	0.92
 E2E.Tests.Services.Missions.BattleTroopHealthAuthorizationTests	1.27
 E2E.Tests.Services.Missions.BattleTroopLedgerTests	0.04
-E2E.Tests.Services.Missions.BattleTroopReserveBuilderTests	1.20
+E2E.Tests.Services.Missions.BattleTroopReserveBuilderTests	0.96
 E2E.Tests.Services.Missions.CoopBattleMissionSpawnHandlerSizingTests	0.02
 E2E.Tests.Services.Missions.CoopBattleResultCommitTests	1.44
 E2E.Tests.Services.Missions.CoopDeploymentPatchTests	0.13
@@ -315,7 +315,7 @@ E2E.Tests.Services.Missions.NetworkMeleeHitPresentationSerializationTests	0.00
 E2E.Tests.Services.Missions.NetworkMissionJoinInfoSerializationTests	0.00
 E2E.Tests.Services.Missions.NonHostDisconnectAuthorityTests	1.33
 E2E.Tests.Services.Missions.PartyIdentityTests	1.12
-E2E.Tests.Services.Missions.PilotSeatPatchRegistrationTests	0.56
+E2E.Tests.Services.Missions.PilotSeatPatchRegistrationTests	0.62
 E2E.Tests.Services.Missions.RapidGuardTransitionSyncTests	1.33
 E2E.Tests.Services.Missions.ReinforcementFielderMigrationReserveTests	1.40
 E2E.Tests.Services.Missions.ReinforcementFormationOrderTests	0.40
@@ -344,7 +344,7 @@ E2E.Tests.Services.Missions.Tournaments.TournamentRemoteMissionStartTests	1.42
 E2E.Tests.Services.Missions.Tournaments.TournamentRoundResultPresentationTests	0.06
 E2E.Tests.Services.Missions.Tournaments.TournamentSpawnManifestDiagnosticsTests	0.07
 E2E.Tests.Services.Missions.Tournaments.TournamentSpectatorRulesTests	0.06
-E2E.Tests.Services.Missions.Tournaments.TournamentWorldItemDropTests	0.37
+E2E.Tests.Services.Missions.Tournaments.TournamentWorldItemDropTests	0.47
 E2E.Tests.Services.Missions.Tournaments.TournamentWorldItemOrderingTests	1.01
 E2E.Tests.Services.Missions.TroopScoreHitVerticalTests	0.97
 E2E.Tests.Services.Missions.VanillaOrderVoiceManifestTests	0.04
@@ -356,8 +356,8 @@ E2E.Tests.Services.MobileParties.MercenaryStockSyncTests	1.13
 E2E.Tests.Services.MobileParties.MobilePartyDisorganizationTests	0.86
 E2E.Tests.Services.MobileParties.MobilePartyMovementTests	0.89
 E2E.Tests.Services.MobileParties.MobilePartyPropertyTests	1.15
-E2E.Tests.Services.MobileParties.MobilePartyTradeGoldCoalescingTests	2.35
-E2E.Tests.Services.MobileParties.PartyCreationTests	1.88
+E2E.Tests.Services.MobileParties.MobilePartyTradeGoldCoalescingTests	1.01
+E2E.Tests.Services.MobileParties.PartyCreationTests	0.81
 E2E.Tests.Services.MobileParties.PartyDestructionTests	1.01
 E2E.Tests.Services.MobileParties.PartyVisibilitySweepTests	1.12
 E2E.Tests.Services.MobileParties.PlayerPartyTroopXpBaselineProviderTests	0.92
@@ -378,7 +378,7 @@ E2E.Tests.Services.Party.PartyScreenPrisonerReleaseTests	0.14
 E2E.Tests.Services.Party.PartyScreenTransferXpGainTests	0.81
 E2E.Tests.Services.Party.QuestTroopScreenTests	0.75
 E2E.Tests.Services.PartyBases.PartyBaseLifetimeTests	0.75
-E2E.Tests.Services.PartyBases.PartyBaseSyncTests	3.83
+E2E.Tests.Services.PartyBases.PartyBaseSyncTests	1.06
 E2E.Tests.Services.PartyComponents.BanditPartyComponentTests	0.85
 E2E.Tests.Services.PartyComponents.CaravanPartyComponentTests	1.00
 E2E.Tests.Services.PartyComponents.CustomPartyComponentTests	1.13
@@ -444,13 +444,13 @@ E2E.Tests.Services.TroopRosters.TroopRosterZeroCountXpDeltaTests	0.84
 E2E.Tests.Services.UI.CoopFinalizerTests	0.20
 E2E.Tests.Services.UI.PlayerJournalHistoryTests	0.85
 E2E.Tests.Services.UI.PlayerKillFeedColorSyncTests	0.99
-E2E.Tests.Services.UI.ServerQuestNotificationTests	2.37
+E2E.Tests.Services.UI.ServerQuestNotificationTests	0.99
 E2E.Tests.Services.UI.ServerQuestViewDataTests	0.75
 E2E.Tests.Services.VillageMarketDatas.VillageMarketDataSyncTest	0.67
 E2E.Tests.Services.Villages.VillageHostileActionTests	1.08
 E2E.Tests.Services.Villages.VillageSyncTests	0.94
 E2E.Tests.Services.Workshops.WorkshopCreationTests	0.85
-E2E.Tests.Services.Workshops.WorkshopDataRepairTests	1.28
+E2E.Tests.Services.Workshops.WorkshopDataRepairTests	0.90
 E2E.Tests.Services.Workshops.WorkshopPurchaseConversationTests	1.05
 E2E.Tests.Services.Workshops.WorkshopTests	1.05
 E2E.Tests.Util.MethodCallRecorderTests	0.00

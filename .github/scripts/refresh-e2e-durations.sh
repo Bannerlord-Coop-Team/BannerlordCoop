@@ -100,8 +100,9 @@ awk '
             class_start[job] = last_end[job]
             cases[job] = 0
         }
-        # The first test in every shard pays a 13-25 s one-off bootstrap, not its own cost.
-        if (first_test[job]) {
+        # The first harness test in every shard pays a 13-25 s one-off bootstrap, not its own cost.
+        # Lightweight tests can finish before it, so it is the first one that took 10 s or more.
+        if (first_test[job] && seconds >= 10) {
             class_start[job] += seconds
             if (class_start[job] > now) class_start[job] = now
             first_test[job] = 0
