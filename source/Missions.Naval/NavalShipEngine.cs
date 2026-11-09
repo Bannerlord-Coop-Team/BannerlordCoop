@@ -654,6 +654,21 @@ public class NavalShipEngine : INavalShipEngine
         return false;
     }
 
+    public bool TryDescribeObject(MissionObject hull, MissionObject missionObject, out string objectKey, out int objectIndex)
+    {
+        objectKey = EntityPath(missionObject.GameEntity, hull.GameEntity);
+        objectIndex = objectKey == null ? -1
+            : missionObject.GameEntity.GetScriptComponents<MissionObject>().ToList().IndexOf(missionObject);
+        return objectIndex >= 0;
+    }
+
+    public MissionObject ResolveObject(MissionObject hull, string objectKey, int objectIndex)
+    {
+        if (objectIndex < 0) return null;
+        var entity = ResolvePath(hull.GameEntity, objectKey);
+        return entity.IsValid ? entity.GetScriptComponents<MissionObject>().ElementAtOrDefault(objectIndex) : null;
+    }
+
     /// <summary>
     /// The entity's indexed, named child path below <paramref name="hullEntity"/>, or null outside it. Named child
     /// paths are content identities, never process-local native pointers.

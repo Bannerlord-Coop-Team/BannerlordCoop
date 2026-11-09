@@ -488,6 +488,117 @@ public class MissileOutcomeTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void DestructibleOutcome_UsesVanillaStateParentingThroughAStateChange()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            DestructableComponent source = null!, target = null!;
+            GameEntity sourceState = null!, targetState = null!, sourceBroken = null!, targetBroken = null!;
+            var parentFrame = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 30f));
+            shooter.Instance.Call(() => source = native.AddDestructible(shooter, 37, parentFrame, out sourceState, out sourceBroken));
+            peer.Instance.Call(() => target = native.AddDestructible(peer, 37, parentFrame, out targetState, out targetBroken));
+            peer.Receive(shooter.Shoot());
+            NetworkMissileOutcome outcome = null!;
+            SpawnedItemEntity sourceItem = null!, targetItem = null!;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(false), parent: source);
+                sourceItem = Assert.Single(shooter.Items.GetAll()).Value;
+                Assert.Same(sourceState, native.ParentOf(sourceItem.GameEntity));
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(outcome);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                targetItem = Assert.Single(peer.Items.GetAll()).Value;
+                Assert.Same(targetState, native.ParentOf(targetItem.GameEntity));
+                Assert.True((sourceItem.GameEntity.GetGlobalFrame().origin - targetItem.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
+                target.SetDestructionLevel(1, -1, 5f, Vec3.Zero, Vec3.Up, noEffects: true);
+                Assert.Same(targetBroken, target.CurrentState);
+            });
+            shooter.Instance.Call(() =>
+            {
+                source.SetDestructionLevel(1, -1, 5f, Vec3.Zero, Vec3.Up, noEffects: true);
+                Assert.Same(sourceBroken, source.CurrentState);
+            });
+            var movingState = new MatrixFrame(Mat3.Identity, new Vec3(50f, 0f, 5f));
+            native.EntityFrames[sourceState.Pointer] = movingState;
+            native.EntityFrames[targetState.Pointer] = movingState;
+            native.EntityFrames[targetBroken.Pointer] = new MatrixFrame(Mat3.Identity, new Vec3(-100f, 0f, 0f));
+            Assert.Same(targetState, native.ParentOf(targetItem.GameEntity));
+            MatrixFrame expected = parentFrame.TransformToParent(movingState).TransformToParent(Frame(false));
+            Assert.True((expected.origin - targetItem.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
+            Assert.True((sourceItem.GameEntity.GetGlobalFrame().origin - targetItem.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
+        }, realParenting: true);
+    }
+
+#if COOP_NAVAL
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RuntimeShipChildOutcome_ResolvesTheNavalPathAndFollowsTheChild(bool bounce)
+    {
+        var shipEngine = new global::Missions.Naval.NavalShipEngine(null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        RunClients((shooter, peer, native) =>
+        {
+            MissionObject sourceHull = null!, targetHull = null!, sourceChild = null!, targetChild = null!;
+            Guid shipId = Guid.NewGuid();
+            var hullFrame = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 30f));
+            var childFrame = new MatrixFrame(Mat3.Identity, new Vec3(3f, 4f, 5f));
+            shooter.Instance.Call(() =>
+            {
+                sourceHull = native.AddParent(shooter, 37, hullFrame, runtime: true);
+                sourceChild = native.AddShipChild(shooter, sourceHull, 38, childFrame);
+                Assert.True(shooter.Ships.TryRegister(new NetworkShipInfo(shipId, "shooter", null, false, sourceHull, null)));
+            });
+            peer.Instance.Call(() =>
+            {
+                targetHull = native.AddParent(peer, 70, hullFrame, runtime: true);
+                targetChild = native.AddShipChild(peer, targetHull, 71, childFrame);
+                Assert.True(peer.Ships.TryRegister(new NetworkShipInfo(shipId, "shooter", null, false, targetHull, null)));
+            });
+            peer.Receive(shooter.Shoot());
+            NetworkMissileOutcome outcome = null!;
+            shooter.Instance.Call(() =>
+            {
+                MatrixFrame local = Frame(false);
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    bounce ? Mission.MissileCollisionReaction.BounceBack : Mission.MissileCollisionReaction.Stick,
+                    bounce ? sourceChild.GameEntity.GetGlobalFrame().TransformToParent(in local) : local,
+                    parent: bounce ? null : sourceChild);
+                if (bounce)
+                {
+                    native.SettleParent = sourceChild;
+                    Assert.Single(shooter.Items.GetAll()).Value.DisableDynamicBody();
+                }
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+                Assert.Equal(shipId, outcome.ParentShipId);
+                Assert.Equal("0:platform/0:ballista", outcome.ParentShipObjectKey);
+                Assert.Equal(1, outcome.ParentShipObjectIndex);
+                Assert.Null(outcome.ParentMissionObjectId);
+            });
+            peer.Receive(outcome);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                var item = Assert.Single(peer.Items.GetAll()).Value;
+                Assert.Same(native.EntityOf(targetChild.GameEntity), native.ParentOf(item.GameEntity));
+                MatrixFrame movingChild = childFrame;
+                movingChild.origin += new Vec3(5f, 0f, 2f);
+                movingChild.rotation.RotateAboutUp(0.7f);
+                native.EntityFrames[targetChild.GameEntity.Pointer] = movingChild;
+                MatrixFrame expected = targetChild.GameEntity.GetGlobalFrame().TransformToParent(Frame(false));
+                Assert.True((expected.origin - item.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
+                var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+                output.WriteLine($"{outcome.Kind} parent=ship-child key={outcome.ParentShipObjectKey} index={outcome.ParentShipObjectIndex}: MessagePacket.Data={MessagePacket.Create(outcome, serializer).Data.Length} bytes");
+            });
+        }, realParenting: true, shipEngine);
+    }
+#endif
+
+    [Fact]
     public void CapacityPressure_EvictsCompletedHistoryBeforeAnUnresolvedShot()
     {
         RunClients((shooter, peer, native) =>
@@ -620,10 +731,11 @@ public class MissileOutcomeTests : MissionTestEnvironment
         });
     }
 
-    private void RunClients(Action<Client, Client, NativeFixture> test)
+    private void RunClients(Action<Client, Client, NativeFixture> test, bool realParenting = false, INavalShipEngine? shipEngine = null)
     {
         using var engine = new MissionEngineFixture();
         using var native = new NativeFixture();
+        if (realParenting) native.EnableRealParenting();
         EnvironmentInstance first = Clients.First();
         EnvironmentInstance second = Clients.Skip(1).First();
         SetControllerId(first, "shooter");
@@ -640,8 +752,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
         Guid victimId = Guid.NewGuid();
         Client? shooter = null;
         Client? peer = null;
-        first.Call(() => shooter = new Client(first, engine, native, item!, shooterId, victimId));
-        second.Call(() => peer = new Client(second, engine, native, item!, shooterId, victimId));
+        first.Call(() => shooter = new Client(first, engine, native, item!, shooterId, victimId, shipEngine));
+        second.Call(() => peer = new Client(second, engine, native, item!, shooterId, victimId, shipEngine));
         native.ApplyProductPatches();
         try { test(shooter!, peer!, native); }
         finally
@@ -686,6 +798,12 @@ public class MissileOutcomeTests : MissionTestEnvironment
         }
     }
 
+    public class EntityEngine : DispatchProxy
+    {
+        public Func<MethodInfo, object?[], object?> Call { get; set; } = null!;
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => Call(targetMethod!, args!);
+    }
+
     private sealed class Client : IDisposable
     {
         private readonly NativeFixture native;
@@ -705,12 +823,18 @@ public class MissileOutcomeTests : MissionTestEnvironment
         private readonly WeaponPickupHandler pickups;
 
         public Client(EnvironmentInstance instance, MissionEngineFixture engine, NativeFixture native,
-            ItemObject item, Guid shooterId, Guid victimId)
+            ItemObject item, Guid shooterId, Guid victimId, INavalShipEngine? shipEngine)
         {
             this.native = native;
             Instance = instance;
             VictimId = victimId;
             Mission = engine.CreateMission(instance);
+            if (native.RealParenting)
+            {
+                Mission.Shell.Scene = ObjectHelper.SkipConstructor<Scene>();
+                GC.SuppressFinalize(Mission.Shell.Scene);
+                Mission.Shell.CurrentState = TaleWorlds.MountAndBlade.Mission.State.Continuing;
+            }
             Mission.Shell._missilesDictionary = new Dictionary<int, Mission.Missile>();
             Mission.Shell._missilesList = new MBList<Mission.Missile>();
             AccessTools.Field(typeof(Mission), "_missionObjects").SetValue(Mission.Shell, new MBList<MissionObject>());
@@ -729,8 +853,9 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Network.RouteMessages = false;
             Spawner = new RecordingSpawner(native);
             native.Spawners[Mission.Shell] = Spawner;
-            Handler = new MissileHandler(Network, Broker, agents, Spawner, Items);
-            drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), Spawner);
+            IWeaponDropWorldItemSpawner spawner = native.RealParenting ? new WeaponDropWorldItemSpawner() : Spawner;
+            Handler = new MissileHandler(Network, Broker, agents, spawner, Items, shipEngine);
+            drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), spawner);
             pickups = new WeaponPickupHandler(agents, Items, Network, Broker, instance.Resolve<IObjectManager>());
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
             var component = new Mock<ICoopMissionComponent>();
@@ -837,6 +962,13 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public MatrixFrame? DropFrameOverride { get; set; }
         public MissionObject? SettleParent { get; set; }
         public Dictionary<SpawnedItemEntity, GameEntity?> SnapParents { get; } = new();
+        private readonly Dictionary<UIntPtr, GameEntity> parents = new();
+        private readonly Dictionary<UIntPtr, List<GameEntity>> children = new();
+        private readonly Dictionary<UIntPtr, List<ScriptComponentBehavior>> scripts = new();
+        private readonly Dictionary<UIntPtr, string> names = new();
+        private FieldInfo? entityBridge;
+        private object? originalEntityBridge;
+        public bool RealParenting { get; private set; }
         public sealed record Attachment(Agent Victim, bool Shield, int Index, MatrixFrame Frame);
 
         public NativeFixture()
@@ -864,6 +996,96 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Patch(typeof(WeaponPickupHandler), nameof(WeaponPickupHandler.IsWorldItemAvailable), nameof(AvailableItem));
             Patch(typeof(Agent), nameof(Agent.EquipWeaponWithNewEntity), nameof(Equip));
             Patch(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply), nameof(Skip));
+        }
+
+        public void EnableRealParenting()
+        {
+            // Initialize NativeObject under the empty engine-class table before allocating a Scene shell.
+            NewEntity();
+            RealParenting = true;
+            entityBridge = AccessTools.Field(AccessTools.TypeByName("TaleWorlds.Engine.EngineApplicationInterface"), "IGameEntity");
+            originalEntityBridge = entityBridge.GetValue(null);
+            object proxy = typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create), Type.EmptyTypes)!
+                .MakeGenericMethod(entityBridge.FieldType, typeof(EntityEngine)).Invoke(null, null)!;
+            ((EntityEngine)proxy).Call = InvokeEntity;
+            entityBridge.SetValue(null, proxy);
+            harmony.Patch(AccessTools.Method(typeof(GameEntityExtensions), nameof(GameEntityExtensions.Instantiate),
+                new[] { typeof(Scene), typeof(MissionWeapon), typeof(bool), typeof(bool) }), prefix: Method(nameof(InstantiateWeapon)));
+            Patch(typeof(Mission), "SpawnWeaponAux", nameof(InitializeWeapon));
+            // Rebuild callers after the terminal native stubs, keeping vanilla's managed parenting intact.
+            harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponWithNewEntityAux)),
+                postfix: Method(nameof(RebuildCollision)));
+        }
+
+        public GameEntity EntityOf(WeakGameEntity entity) => entities.Keys.Single(value => value.Pointer == entity.Pointer);
+        public GameEntity? ParentOf(WeakGameEntity entity) => parents.GetValueOrDefault(entity.Pointer);
+
+        public MatrixFrame GlobalFrame(UIntPtr pointer) => parents.TryGetValue(pointer, out var parent)
+            ? GlobalFrame(parent.Pointer).TransformToParent(EntityFrames[pointer]) : EntityFrames[pointer];
+
+        private object? InvokeEntity(MethodInfo method, object?[] args)
+        {
+            UIntPtr pointer = args.Length > 0 && args[0] is UIntPtr value ? value : UIntPtr.Zero;
+            switch (method.Name)
+            {
+                case "GetName": return names[pointer];
+                case "GetParentPointer": return parents.GetValueOrDefault(pointer)?.Pointer ?? UIntPtr.Zero;
+                case "GetParent": return parents.GetValueOrDefault(pointer);
+                case "GetChildCount": return children[pointer].Count;
+                case "GetChildPointer": return children[pointer][(int)args[1]!].Pointer;
+                case "GetChild": return children[pointer][(int)args[1]!];
+                case "GetScriptComponentCount": return scripts[pointer].Count;
+                case "GetScriptComponentAtIndex": return scripts[pointer][(int)args[1]!];
+                case "GetGlobalFrame": args[1] = GlobalFrame(pointer); return null;
+                case "SetGlobalFrame":
+                    var frame = (MatrixFrame)args[1]!;
+                    EntityFrames[pointer] = parents.TryGetValue(pointer, out var frameParent)
+                        ? GlobalFrame(frameParent.Pointer).TransformToLocalNonOrthogonal(in frame) : frame;
+                    return null;
+                case "AddChild":
+                    var childPointer = (UIntPtr)args[1]!;
+                    MatrixFrame global = GlobalFrame(childPointer);
+                    if (parents.TryGetValue(childPointer, out var oldParent))
+                        children[oldParent.Pointer].RemoveAll(child => child.Pointer == childPointer);
+                    parents[childPointer] = entities.Keys.Single(entity => entity.Pointer == pointer);
+                    children[pointer].Add(entities.Keys.Single(entity => entity.Pointer == childPointer));
+                    if ((bool)args[2]!)
+                        EntityFrames[childPointer] = GlobalFrame(pointer).TransformToLocalNonOrthogonal(in global);
+                    return null;
+                case "CreateAndAddScriptComponent":
+                    var entity = entities.Keys.Single(entity => entity.Pointer == pointer);
+                    var item = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
+                    item._ownerGameEntity = entity;
+                    item._gameEntity = entity.WeakEntity;
+                    item.Id = new MissionObjectId(100 + entities.Count, true);
+                    entities[entity] = item;
+                    scripts[pointer].Add(item);
+                    Mission.Current._missionObjects.Add(item);
+                    return null;
+                case "GetSkeleton": return null;
+                case "GetBodyFlags": return (uint)0;
+                case "SetVisibilityExcludeParents":
+                case "SetPhysicsState":
+                case "SetFrameChanged": return null;
+                default: throw new InvalidOperationException("Unexpected native entity call: " + method.Name);
+            }
+        }
+
+        private static bool InstantiateWeapon(ref GameEntity __result)
+        {
+            __result = current.NewEntity();
+            return false;
+        }
+
+        private static bool InitializeWeapon(WeakGameEntity weaponEntity, MissionWeapon weapon,
+            Mission.WeaponSpawnFlags spawnFlags, bool hasLifeTime, ref SpawnedItemEntity __result)
+        {
+            __result = current.entities[current.EntityOf(weaponEntity)]!;
+            __result._weapon = weapon;
+            __result.SpawnFlags = spawnFlags;
+            __result._hasLifeTime = hasLifeTime;
+            __result._deletionTimer = new TaleWorlds.Core.Timer(Mission.Current.CurrentTime, 175f);
+            return false;
         }
 
         public void ApplyProductPatches()
@@ -901,6 +1123,10 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 AccessTools.DeclaredProperty(AccessTools.TypeByName("TaleWorlds.DotNet.NativeObject"), "Pointer")
                     .SetValue(entity, new UIntPtr((uint)entities.Count + 1));
                 entities.Add(entity, null);
+                EntityFrames[entity.Pointer] = MatrixFrame.Identity;
+                children[entity.Pointer] = new List<GameEntity>();
+                scripts[entity.Pointer] = new List<ScriptComponentBehavior>();
+                names[entity.Pointer] = "entity";
                 return entity;
             }
             finally
@@ -918,12 +1144,49 @@ public class MissileOutcomeTests : MissionTestEnvironment
             parent._gameEntity = entity.WeakEntity;
             EntityFrames[entity.Pointer] = frame;
             client.Mission.Shell._missionObjects.Add(parent);
+            scripts[entity.Pointer].Add(parent);
             if (parent is SpawnedItemEntity item)
             {
                 item._ownerGameEntity = entity;
                 client.Spawner.Frames[item] = frame;
                 ItemSpawners[item] = client.Spawner;
             }
+            return parent;
+        }
+
+        public MissionObject AddShipChild(Client client, MissionObject hull, int id, MatrixFrame localFrame)
+        {
+            var platform = NewEntity();
+            names[platform.Pointer] = "platform";
+            hull.GameEntity.AddChild(platform.WeakEntity);
+            var child = AddParent(client, id, localFrame, runtime: true);
+            names[child.GameEntity.Pointer] = "ballista";
+            platform.AddChild(EntityOf(child.GameEntity));
+            var other = ObjectHelper.SkipConstructor<SynchedMissionObject>();
+            other._gameEntity = child.GameEntity;
+            scripts[child.GameEntity.Pointer].Insert(0, other);
+            return child;
+        }
+
+        public DestructableComponent AddDestructible(Client client, int id, MatrixFrame frame,
+            out GameEntity state, out GameEntity broken)
+        {
+            var root = NewEntity();
+            EntityFrames[root.Pointer] = frame;
+            var parent = ObjectHelper.SkipConstructor<DestructableComponent>();
+            parent._gameEntity = root.WeakEntity;
+            parent.Id = new MissionObjectId(id, false);
+            scripts[root.Pointer].Add(parent);
+            client.Mission.Shell._missionObjects.Add(parent);
+            state = NewEntity();
+            broken = NewEntity();
+            names[broken.Pointer] = "broken";
+            root.AddChild(state);
+            root.AddChild(broken);
+            parent.CurrentState = state;
+            parent._originalState = state;
+            parent._referenceEntity = root;
+            parent._destructionStates = new[] { "broken" };
             return parent;
         }
         private void Patch(Type type, string target, string prefix) =>
@@ -950,7 +1213,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
         }
         private static bool WeakGlobalFrame(WeakGameEntity __instance, ref MatrixFrame __result)
         {
-            if (!current.EntityFrames.TryGetValue(__instance.Pointer, out __result)) return true;
+            if (!current.EntityFrames.ContainsKey(__instance.Pointer)) return true;
+            __result = current.GlobalFrame(__instance.Pointer);
             return false;
         }
         private static bool AddMissile(out GameEntity missileEntity, ref int __result)
@@ -969,6 +1233,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             in MatrixFrame attachLocalFrame,
             Mission.WeaponSpawnFlags spawnFlags, ref MissionObjectId __result)
         {
+            if (current.RealParenting) return true;
             Mission.Missile missile = __instance._missilesDictionary[missileIndex];
             MissionWeapon weapon = missile.Weapon;
             current.Spawners[__instance].TrySpawn(ref weapon, spawnFlags, true, 175f,
@@ -993,6 +1258,14 @@ public class MissileOutcomeTests : MissionTestEnvironment
             __instance._physicsStopped = true;
             if (current.SettleParent != null)
             {
+                if (current.RealParenting)
+                {
+                    MatrixFrame global = __instance.GameEntity.GetGlobalFrame();
+                    __instance._groundEntityWhenDisabled = current.EntityOf(current.SettleParent.GameEntity);
+                    current.SettleParent.GameEntity.AddChild(__instance.GameEntity);
+                    __instance.GameEntity.SetGlobalFrame(in global);
+                    return false;
+                }
                 var spawner = current.ItemSpawners[__instance];
                 MatrixFrame frame = spawner.Frames[__instance];
                 var parent = current.SettleParent;
@@ -1007,6 +1280,13 @@ public class MissileOutcomeTests : MissionTestEnvironment
             current.SnapCalls++;
             __instance._physicsStopped = true;
             current.SnapParents[__instance] = parent;
+            if (current.RealParenting)
+            {
+                parent?.AddChild(__instance._ownerGameEntity);
+                MatrixFrame global = parent == null ? frame : parent.GetGlobalFrame().TransformToParent(in frame);
+                __instance.GameEntity.SetGlobalFrame(in global);
+                return false;
+            }
             current.ItemSpawners[__instance].Frames[__instance] = parent == null
                 ? frame : current.EntityFrames[parent.Pointer].TransformToParent(in frame);
             return false;
@@ -1021,6 +1301,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public void Dispose()
         {
             harmony.UnpatchAll(harmony.Id);
+            if (entityBridge != null) entityBridge.SetValue(null, originalEntityBridge);
             current = null!;
         }
     }

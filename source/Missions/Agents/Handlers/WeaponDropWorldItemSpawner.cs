@@ -77,13 +77,29 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         item = null;
         if (!IsReady || weapon.IsEmpty) return false;
 
-        GameEntity entity = Mission.Current.SpawnWeaponWithNewEntityAux(
-            weapon,
-            spawnFlags,
-            frame,
-            forcedSpawnIndex: -1,
-            attachedMissionObject: parent,
-            hasLifeTime);
+        GameEntity entity;
+        const Mission.WeaponSpawnFlags stuckFlags = Mission.WeaponSpawnFlags.AsMissile | Mission.WeaponSpawnFlags.WithStaticPhysics;
+        if ((spawnFlags & stuckFlags) == stuckFlags)
+        {
+            entity = GameEntityExtensions.Instantiate(Mission.Current.Scene, weapon,
+                spawnFlags.HasAnyFlag(Mission.WeaponSpawnFlags.WithHolster), needBatchedVersion: true);
+            // Destructible objects parent stuck missiles to their current state rather than the root.
+            parent?.AddStuckMissile(entity);
+            MatrixFrame globalFrame = parent == null ? frame : parent.GameEntity.GetGlobalFrame().TransformToParent(in frame);
+            entity.SetGlobalFrame(in globalFrame);
+            entity.CreateAndAddScriptComponent(nameof(SpawnedItemEntity), callScriptCallbacks: true);
+            Mission.Current.SpawnWeaponAux(entity.WeakEntity, weapon, spawnFlags, Vec3.Zero, Vec3.Zero, hasLifeTime);
+        }
+        else
+        {
+            entity = Mission.Current.SpawnWeaponWithNewEntityAux(
+                weapon,
+                spawnFlags,
+                frame,
+                forcedSpawnIndex: -1,
+                attachedMissionObject: parent,
+                hasLifeTime);
+        }
         item = entity?.GetFirstScriptOfType<SpawnedItemEntity>();
         if (item == null)
         {

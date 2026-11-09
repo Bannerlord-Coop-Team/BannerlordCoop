@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using Missions.Agents.Handlers;
 using Missions.Agents;
+using Missions.Battles;
 using Missions.Missiles.Message;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,7 @@ public partial class MissileHandler
     private static readonly TimeSpan PendingOutcomeLifetime = TimeSpan.FromSeconds(30);
     private readonly IWeaponDropWorldItemSpawner worldItemSpawner;
     private readonly INetworkWorldItemRegistry worldItemRegistry;
+    private readonly INavalShipEngine shipEngine;
     private readonly Dictionary<Guid, ReplayOutcome> replayOutcomes = new();
     private readonly Queue<Guid> completedOutcomeOrder = new();
     private readonly Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)> pendingOutcomes = new();
@@ -136,6 +138,8 @@ public partial class MissileHandler
         int? sceneId = null;
         Guid? worldItemId = null;
         Guid? shipId = null;
+        string shipObjectKey = null;
+        int? shipObjectIndex = null;
         if (parent != null)
         {
             if (!parent.Id.CreatedAtRuntime)
@@ -146,21 +150,35 @@ public partial class MissileHandler
             {
                 // The component owns the actual mission's transient ship registry.
                 var ships = Mission.Current.GetMissionBehavior<CoopMissionController>()?.MissionComponent.ShipRegistry;
-                if (ships == null || !ships.TryGetByHull(parent, out var ship))
+                if (ships != null && ships.TryGetByHull(parent, out var ship))
+                    shipId = ship.ShipId;
+                else if (ships != null && shipEngine != null)
+                {
+                    foreach (var candidate in ships.Ships)
+                    {
+                        if (candidate.Hull == null || !shipEngine.TryDescribeObject(candidate.Hull, parent,
+                            out shipObjectKey, out int objectIndex)) continue;
+                        shipObjectIndex = objectIndex;
+                        shipId = candidate.ShipId;
+                        break;
+                    }
+                }
+                if (!shipId.HasValue)
                 {
                     Logger.Warning("Failed to get network identity for missile parent {ParentId}", parent.Id);
                     return;
                 }
-                shipId = ship.ShipId;
             }
             frame = parent.GameEntity.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
         }
-        SendOutcome(itemId, kind, frame, null, 0, 0, remainingLifeTime, sceneId, worldItemId, shipId);
+        SendOutcome(itemId, kind, frame, null, 0, 0, remainingLifeTime, sceneId, worldItemId, shipId,
+            shipObjectKey, shipObjectIndex);
     }
 
     private void SendOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame, Guid? victimId,
         int boneIndex, int shieldSlot, float remainingLifeTime,
-        int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null)
+        int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
+        string parentShipObjectKey = null, int? parentShipObjectIndex = null)
     {
         Mat3 rotation = frame.rotation;
         Quaternion quaternion = Quaternion.QuaternionFromMat3(rotation);
@@ -175,7 +193,8 @@ public partial class MissileHandler
             : new[] { quaternion.X, quaternion.Y, quaternion.Z, quaternion.W };
 
         network.SendAll(new NetworkMissileOutcome(itemId, kind, frame.origin, orientation,
-            victimId, boneIndex, shieldSlot, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId));
+            victimId, boneIndex, shieldSlot, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId,
+            parentShipObjectKey, parentShipObjectIndex));
         sentOutcomes++;
         Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped} kind={Kind}",
             sentOutcomes, skippedOutcomes, kind);
@@ -305,7 +324,10 @@ public partial class MissileHandler
             var ships = mission.GetMissionBehavior<CoopMissionController>()?.MissionComponent.ShipRegistry;
             if (ships == null || !ships.TryGet(message.ParentShipId.Value, out var ship) || ship.Hull == null)
                 return false;
-            parent = ship.Hull;
+            parent = message.ParentShipObjectIndex.HasValue
+                ? shipEngine?.ResolveObject(ship.Hull, message.ParentShipObjectKey ?? string.Empty, message.ParentShipObjectIndex.Value)
+                : ship.Hull;
+            return parent != null;
         }
         return true;
     }

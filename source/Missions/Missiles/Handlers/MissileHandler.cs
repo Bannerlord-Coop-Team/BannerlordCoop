@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
 using Missions.Agents;
+using Missions.Battles;
 using Missions.Missiles.Message;
 using Serilog;
 using System;
@@ -64,13 +65,14 @@ public partial class MissileHandler : IMissileHandler
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
         INetworkAgentRegistry networkAgentRegistry, IWeaponDropWorldItemSpawner worldItemSpawner,
-        INetworkWorldItemRegistry worldItemRegistry)
+        INetworkWorldItemRegistry worldItemRegistry, INavalShipEngine shipEngine = null)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
         this.worldItemSpawner = worldItemSpawner;
         this.worldItemRegistry = worldItemRegistry;
+        this.shipEngine = shipEngine;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
