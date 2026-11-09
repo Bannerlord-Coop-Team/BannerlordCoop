@@ -137,6 +137,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                     payload.PartyId,
                     payload.SettlementId,
                     rejectionReason);
+                settlementInterface.CorrectPartyPosition(mobileParty);
                 RejectSettlementEncounter(peer, payload, rejectionReason);
                 return;
             }
