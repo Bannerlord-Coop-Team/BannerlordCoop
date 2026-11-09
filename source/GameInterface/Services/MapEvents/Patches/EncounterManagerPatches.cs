@@ -79,7 +79,15 @@ internal class EncounterManagerPatches
         if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
             return false;
 
-        if (ModInformation.IsServer && TryRequestServerPlayerConversation(attackerParty, defenderParty))
+        if (ModInformation.IsClient) return true;
+
+        if (attackerParty?.MobileParty?.IsPlayerParty() == false && InteractionPatches.IsClosedToAiJoins(defenderParty?.MapEvent))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty.MobileParty);
+            return false;
+        }
+
+        if (TryRequestServerPlayerConversation(attackerParty, defenderParty))
             return false;
 
         return true;

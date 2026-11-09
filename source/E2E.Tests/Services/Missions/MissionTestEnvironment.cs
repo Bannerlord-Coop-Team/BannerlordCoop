@@ -8,6 +8,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -161,8 +162,17 @@ public class MissionTestEnvironment : E2ETestEnvironment
             RegisterAsPlayerParty(controllerIds[i], heroIds[i], partyIds[i]);
         }
 
+        OpenAiJoinWindow(mapEventId!);
+
         return (mapEventId!, partyIds, heroIds);
     }
+
+    /// <summary>
+    /// Opens the AI join window a live player battle opens when it starts. Fixtures that register their players after
+    /// <see cref="MapEvent.Initialize"/> never get one, so the server would block their later AI joins.
+    /// </summary>
+    protected void OpenAiJoinWindow(string mapEventId) =>
+        Server.Call(() => InteractionPatches.OpenAiJoinWindowAndPublish(Server.GetRegisteredObject<MapEvent>(mapEventId), () => { }));
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
     protected void RegisterAsPlayerParty(
