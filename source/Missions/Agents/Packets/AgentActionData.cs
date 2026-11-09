@@ -465,7 +465,7 @@ namespace Missions.Agents.Packets
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
             Action0Speed = action0Speed;
-            Action1Index = cache1.Index;
+            Action1IndexWire = cache1.Index + 1;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
             Action1Speed = action1Speed;
@@ -474,16 +474,17 @@ namespace Missions.Agents.Packets
                 && guardReactionChannel <= 1
                     ? guardReactionChannel
                     : -1;
-            GuardPresentationChannel =
+            int guardPresentationChannel =
                 agent.HasMount && validGuardReactionChannel >= 0
                     ? validGuardReactionChannel
                     : GetGuardPresentationChannel(agent);
-            GuardActionChannel =
-                validGuardReactionChannel >= 0
+            GuardPresentationChannelWire = guardPresentationChannel + 1;
+            GuardActionChannelWire =
+                (validGuardReactionChannel >= 0
                     ? validGuardReactionChannel
                     : GetGuardActionChannel(
                         agent,
-                        GuardPresentationChannel);
+                        guardPresentationChannel)) + 1;
             GuardActionIsDefending =
                 GuardActionChannel >= 0
                 && IsDefendingAction(
@@ -786,8 +787,10 @@ namespace Missions.Agents.Packets
         public float Action1Progress { get; }
         [ProtoMember(5)]
         public ulong Action1Flag { get; }
+        // Shifted by one so protobuf omits act_none (-1) instead of writing a 10-byte varint.
         [ProtoMember(6)]
-        public int Action1Index { get; }
+        private int Action1IndexWire { get; set; }
+        public int Action1Index => Action1IndexWire - 1;
         [ProtoMember(7)]
         public uint MovementFlag { get; }
         [ProtoMember(8)]
@@ -796,10 +799,13 @@ namespace Missions.Agents.Packets
         public byte StateFlags { get; private set; }
         [ProtoMember(10)]
         public int GuardState { get; }
+        // Shifted by one so protobuf omits the usual no-channel (-1) value.
         [ProtoMember(11)]
-        public int GuardPresentationChannel { get; }
+        private int GuardPresentationChannelWire { get; set; }
+        public int GuardPresentationChannel => GuardPresentationChannelWire - 1;
         [ProtoMember(12)]
-        public int GuardActionChannel { get; }
+        private int GuardActionChannelWire { get; set; }
+        public int GuardActionChannel => GuardActionChannelWire - 1;
         // Nullable keeps packets from older peers (where these fields are absent) at the native 1x default.
         [ProtoMember(13)]
         public float? Action0Speed { get; }
