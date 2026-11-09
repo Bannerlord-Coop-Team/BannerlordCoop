@@ -29,6 +29,8 @@ These commands are in every build, Release included. The scenario staging below 
 When no window is recording the instrumentation does nothing measurable: the timed call sites in
 `CoopMissionController` and the traffic counters on the mission and campaign connections only read a flag (the
 per-type counters also take the message's type), and `GameThread.Update` only checks its `FrameObserver` for null.
+The first window turns on .NET's per-process allocation counting (`AppDomain.MonitoringIsEnabled`), which can't be
+turned off again, so it stays on until the game exits; both sides of an A/B run with it on.
 
 ## What a report holds
 
@@ -80,7 +82,7 @@ save every run. The local runner that stages them, builds both sides and alterna
 run the same steps.
 
 Field battle, about 1,000 agents, on the bench save, where `looters_1` is the looter party testclient attacks
-(`coop.debug.mobile_party.list` lists the parties in another save):
+(`coop.debug.mobileparty.list` lists the parties in another save):
 
 ```text
 server:  coop.debug.set_time_mode Pause force-live-test

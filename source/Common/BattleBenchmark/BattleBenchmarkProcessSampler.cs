@@ -9,6 +9,7 @@ public interface IBattleBenchmarkProcessSampler
     /// <summary>Turns on per-process allocation counting, which cannot be turned off again.</summary>
     void EnableAllocationMonitoring();
 
+    /// <summary>Reads the counters; <see cref="EnableAllocationMonitoring"/> must have run first.</summary>
     BattleBenchmarkProcessSample Sample();
 }
 
@@ -29,7 +30,7 @@ public class BattleBenchmarkProcessSampler : IBattleBenchmarkProcessSampler
             GC.CollectionCount(0),
             GC.CollectionCount(1),
             GC.CollectionCount(2),
-            AppDomain.MonitoringIsEnabled ? AppDomain.CurrentDomain.MonitoringTotalAllocatedMemorySize : -1,
+            AppDomain.CurrentDomain.MonitoringTotalAllocatedMemorySize,
             GC.GetTotalMemory(false),
             process.TotalProcessorTime,
             process.WorkingSet64,
@@ -45,7 +46,7 @@ public readonly struct BattleBenchmarkProcessSample
     public int Gen1Collections { get; }
     public int Gen2Collections { get; }
 
-    /// <summary>Bytes allocated by the process so far, or -1 when allocation monitoring is off.</summary>
+    /// <summary>Bytes allocated by the process so far.</summary>
     public long AllocatedBytes { get; }
 
     public long ManagedHeapBytes { get; }

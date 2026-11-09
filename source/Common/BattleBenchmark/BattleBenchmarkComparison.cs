@@ -89,9 +89,10 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         {
             using JsonDocument document = JsonDocument.Parse(json);
             JsonElement root = document.RootElement;
-            JsonElement process = root.GetProperty("Process");
-            string role = process.GetProperty("Role").GetString();
-            string controllerId = process.TryGetProperty("ControllerId", out JsonElement id) && id.ValueKind == JsonValueKind.String
+            JsonElement process = root.GetProperty(nameof(BattleBenchmarkReport.Process));
+            string role = process.GetProperty(nameof(BattleBenchmarkProcessInfo.Role)).GetString();
+            string controllerId = process.TryGetProperty(nameof(BattleBenchmarkProcessInfo.ControllerId), out JsonElement id) &&
+                                  id.ValueKind == JsonValueKind.String
                 ? id.GetString()
                 : null;
             var metrics = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -298,7 +299,7 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
                 {
                     // Route lists are keyed by route name so the same route lines up across runs.
                     string key = item.ValueKind == JsonValueKind.Object &&
-                                 item.TryGetProperty("Route", out JsonElement route) &&
+                                 item.TryGetProperty(nameof(BattleBenchmarkRouteTraffic.Route), out JsonElement route) &&
                                  route.ValueKind == JsonValueKind.String
                         ? route.GetString()
                         : index.ToString(CultureInfo.InvariantCulture);
@@ -322,7 +323,7 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         {
             using JsonDocument document = JsonDocument.Parse(json);
             return document.RootElement.ValueKind == JsonValueKind.Object &&
-                   document.RootElement.TryGetProperty("Schema", out JsonElement schema) &&
+                   document.RootElement.TryGetProperty(nameof(BattleBenchmarkReport.Schema), out JsonElement schema) &&
                    schema.ValueKind == JsonValueKind.String &&
                    schema.GetString() == BattleBenchmarkReport.CurrentSchema;
         }

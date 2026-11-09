@@ -88,7 +88,6 @@ public sealed class BattleBenchmarkGarbage
     public int Gen1Collections { get; set; }
     public int Gen2Collections { get; set; }
 
-    /// <summary>-1 when the runtime does not count allocations.</summary>
     public long AllocatedBytes { get; set; }
     public double AllocatedBytesPerSecond { get; set; }
 }

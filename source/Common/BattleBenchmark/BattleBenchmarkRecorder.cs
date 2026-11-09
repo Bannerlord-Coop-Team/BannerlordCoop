@@ -267,7 +267,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     public void RecordReliableMessageSent(string route, int bytes)
     {
         ConcurrentDictionary<string, RouteCounters> window = routes;
-        if (!recording || route == null) return;
+        if (!recording) return;
 
         window.GetOrAdd(route, CreateRoute).Sent.AddReliableMessage(bytes);
     }
@@ -275,7 +275,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     public void RecordSent(string route, bool reliable, int bytes, int maxSinglePacketBytes, bool relayed)
     {
         ConcurrentDictionary<string, RouteCounters> window = routes;
-        if (!recording || route == null) return;
+        if (!recording) return;
 
         TrafficTotals sent = window.GetOrAdd(route, CreateRoute).Sent;
         if (reliable)
@@ -287,7 +287,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     public void RecordReceived(string route, bool reliable, int bytes)
     {
         ConcurrentDictionary<string, RouteCounters> window = routes;
-        if (!recording || route == null) return;
+        if (!recording) return;
 
         TrafficTotals received = window.GetOrAdd(route, CreateRoute).Received;
         if (reliable)
@@ -311,7 +311,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     public void RecordReceivedMessage(Type messageType)
     {
         ConcurrentDictionary<Type, StrongBox<long>> window = receivedMessages;
-        if (!recording || messageType == null) return;
+        if (!recording) return;
 
         Interlocked.Increment(ref window.GetOrAdd(messageType, CreateMessageCount).Value);
     }
@@ -436,8 +436,6 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         BattleBenchmarkMissionState missionEnd)
     {
         double seconds = ToSeconds(endTimestamp - startTimestamp);
-        missionEnd ??= BattleBenchmarkMissionState.None;
-        missionStart ??= BattleBenchmarkMissionState.None;
 
         // A network thread that passed its recording check just before the window closed can still add to the counters,
         // so read each one once and derive every total from those reads.
@@ -489,12 +487,8 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
                 Gen0Collections = endSample.Gen0Collections - startSample.Gen0Collections,
                 Gen1Collections = endSample.Gen1Collections - startSample.Gen1Collections,
                 Gen2Collections = endSample.Gen2Collections - startSample.Gen2Collections,
-                AllocatedBytes = startSample.AllocatedBytes < 0 || endSample.AllocatedBytes < 0
-                    ? -1
-                    : endSample.AllocatedBytes - startSample.AllocatedBytes,
-                AllocatedBytesPerSecond = startSample.AllocatedBytes < 0 || endSample.AllocatedBytes < 0
-                    ? -1
-                    : PerSecond(endSample.AllocatedBytes - startSample.AllocatedBytes, seconds),
+                AllocatedBytes = endSample.AllocatedBytes - startSample.AllocatedBytes,
+                AllocatedBytesPerSecond = PerSecond(endSample.AllocatedBytes - startSample.AllocatedBytes, seconds),
             },
             Cpu = new BattleBenchmarkCpu
             {

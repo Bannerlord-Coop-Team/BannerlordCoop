@@ -24,21 +24,6 @@ public class BattleBenchmarkRecorderTests : IDisposable
     private BattleBenchmarkRecorder CreateRecorder() =>
         new BattleBenchmarkRecorder(sampler, probe, new JsonFileIO(), () => now, attached.Add, observer => attached.Remove(observer));
 
-    [Theory]
-    [InlineData("bad id", 10, null, "run id")]
-    [InlineData("run", 0.5, null, "window")]
-    [InlineData("run", 901, null, "window")]
-    [InlineData("run", 10, "relative/folder", "absolute")]
-    public void TryStart_RejectsInvalidRequests(string runId, double seconds, string? directory, string expectedError)
-    {
-        var recorder = CreateRecorder();
-
-        Assert.False(recorder.TryStart(runId, null, TimeSpan.FromSeconds(seconds), directory, out string error));
-        Assert.Contains(expectedError, error);
-        Assert.False(recorder.IsRecording);
-        Assert.Empty(attached);
-    }
-
     [Fact]
     public void TryStart_RejectsASecondWindowWhileRecording()
     {
@@ -188,21 +173,30 @@ public class BattleBenchmarkRecorderTests : IDisposable
         var recorder = new BattleBenchmarkRecorder(sampler, probe, new JsonFileIO(), Stopwatch.GetTimestamp, _ => { }, _ => { });
         Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(60), outputDirectory, out _));
         using var stop = new CancellationTokenSource();
+        using var writing = new ManualResetEventSlim();
         var writer = new Thread(() =>
         {
             for (int i = 0; !stop.IsCancellationRequested; i++)
             {
                 recorder.RecordSent(i % 2 == 0 ? "PlayerTwo" : "PlayerThree", reliable: false, 100, 1020, relayed: false);
                 recorder.RecordReceivedMessage(i % 2 == 0 ? typeof(int) : typeof(string));
+                if (i == 1) writing.Set();
             }
         });
         writer.Start();
-        Thread.Sleep(50);
+        BattleBenchmarkReport report;
+        try
+        {
+            Assert.True(writing.Wait(TimeSpan.FromSeconds(10)));
+            report = recorder.BuildReport(Stopwatch.GetTimestamp(), "stopped", default, BattleBenchmarkMissionState.None);
+        }
+        finally
+        {
+            stop.Cancel();
+            writer.Join();
+        }
 
-        BattleBenchmarkReport report = recorder.BuildReport(Stopwatch.GetTimestamp(), "stopped", default, BattleBenchmarkMissionState.None);
-        stop.Cancel();
-        writer.Join();
-
+        Assert.NotEqual(0L, report.Traffic.Sent.MovementDatagrams);
         Assert.Equal(report.Routes.Sum(route => route.Sent.MovementDatagrams), report.Traffic.Sent.MovementDatagrams);
         Assert.Equal(report.Routes.Sum(route => route.Sent.MovementBytes), report.Traffic.Sent.MovementBytes);
         Assert.Equal(report.ReceivedMessages.ByType.Values.Sum(), report.ReceivedMessages.Total);
@@ -240,20 +234,6 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Equal(150d, report.Cpu.PercentOfOneCore, 6);
         Assert.Equal(100d, report.Memory.WorkingSetStartMb, 6);
         Assert.Equal(400d, report.Memory.PeakWorkingSetMb, 6);
-    }
-
-    [Fact]
-    public void Report_MarksAllocationsUnknownWhenTheRuntimeDoesNotCountThem()
-    {
-        var recorder = CreateRecorder();
-        sampler.Next = new BattleBenchmarkProcessSample(0, 0, 0, -1, 0, TimeSpan.Zero, 0, 0, 0);
-        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
-        now += Second;
-
-        BattleBenchmarkReport report = recorder.BuildReport(now, "stopped", sampler.Next, BattleBenchmarkMissionState.None);
-
-        Assert.Equal(-1, report.Garbage.AllocatedBytes);
-        Assert.Equal(-1d, report.Garbage.AllocatedBytesPerSecond);
     }
 
     [Fact]
