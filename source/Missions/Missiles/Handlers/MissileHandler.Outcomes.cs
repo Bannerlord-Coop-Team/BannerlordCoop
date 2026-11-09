@@ -64,6 +64,17 @@ public partial class MissileHandler
             : Guid.Empty;
     }
 
+
+    // #4536 TEMPORARY measurement logging.
+    private static string DiagFrame(MatrixFrame f) => string.Format(System.Globalization.CultureInfo.InvariantCulture,
+        "{0:R},{1:R},{2:R}|{3:R},{4:R},{5:R}|{6:R},{7:R},{8:R}|{9:R},{10:R},{11:R}",
+        f.origin.x, f.origin.y, f.origin.z, f.rotation.s.x, f.rotation.s.y, f.rotation.s.z,
+        f.rotation.f.x, f.rotation.f.y, f.rotation.f.z, f.rotation.u.x, f.rotation.u.y, f.rotation.u.z);
+
+    private void DiagShooter(Guid id, string reaction, Guid? victim, int bone, bool shield, MatrixFrame frame) =>
+        Logger.Information("[MissileDiag] shooter worldItem={Id} reaction={Reaction} victim={Victim} bone={Bone} shield={Shield} frame={Frame}",
+            id, reaction, victim?.ToString() ?? "-", bone, shield, DiagFrame(frame));
+
     public void ReportCollision(Guid worldItemId, Mission.Missile missile, Mission.MissileCollisionReaction reaction,
         MatrixFrame frame, Agent victim, bool shield, sbyte boneIndex, MissionObject parent)
     {
@@ -71,6 +82,7 @@ public partial class MissileHandler
 
         if (reaction == Mission.MissileCollisionReaction.BecomeInvisible)
         {
+            DiagShooter(worldItemId, "invisible", null, -1, false, frame);
             skippedOutcomes++;
             Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped}", sentOutcomes, skippedOutcomes);
             return;
@@ -84,6 +96,7 @@ public partial class MissileHandler
                 return;
             }
 
+            DiagShooter(worldItemId, shield ? "shield" : "body", victimId, shield ? 0 : boneIndex, shield, frame);
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
                 victimId, shield ? 0 : boneIndex, 0f);
             return;
@@ -98,6 +111,7 @@ public partial class MissileHandler
 
         if (reaction == Mission.MissileCollisionReaction.BounceBack)
         {
+            DiagShooter(worldItemId, "bounce-start", null, -1, false, frame);
             if (bouncingItems.Count < MaxTrackedOutcomes)
                 bouncingItems[item] = worldItemId;
             else
@@ -106,6 +120,7 @@ public partial class MissileHandler
         else if (reaction == Mission.MissileCollisionReaction.Stick
             && worldItemSpawner.TryGetState(item, out var globalFrame, out float lifeTime))
         {
+            DiagShooter(worldItemId, "ground", null, -1, false, globalFrame);
             SendWorldOutcome(worldItemId, MissileOutcomeKind.Ground, globalFrame, lifeTime, parent, item.GameEntity.Parent);
         }
     }
@@ -133,6 +148,7 @@ public partial class MissileHandler
                 return;
             }
         }
+        DiagShooter(itemId, "bounce", null, -1, false, frame);
         SendWorldOutcome(itemId, MissileOutcomeKind.BounceSettled, frame, lifeTime, parent);
     }
 
@@ -297,6 +313,10 @@ public partial class MissileHandler
             }
             else
                 victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
+            Logger.Information("[MissileDiag] peer worldItem={Id} kind={Kind} victim={Victim} bone={Bone} frame={Frame}",
+                message.WorldItemId, message.Kind == MissileOutcomeKind.Shield ? "shield" : "body",
+                message.VictimId?.ToString() ?? "-", message.Kind == MissileOutcomeKind.Shield ? 0 : message.BoneIndex,
+                DiagFrame(frame));
         }
         else
         {
@@ -321,6 +341,8 @@ public partial class MissileHandler
             if (settledBounce)
                 item.StopPhysicsAndSetFrameForClient(frame, attachmentParent);
             messageBroker.Publish(this, new MissileItemIdentified(item, message.WorldItemId));
+            Logger.Information("[MissileDiag] peer worldItem={Id} kind={Kind} victim=- bone=-1 frame={Frame}",
+                message.WorldItemId, settledBounce ? "bounce" : "ground", DiagFrame(item.GameEntity.GetGlobalFrame()));
         }
 
         replay.Applied = true;
