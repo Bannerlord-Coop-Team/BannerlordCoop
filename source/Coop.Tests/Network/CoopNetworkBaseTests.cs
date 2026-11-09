@@ -49,8 +49,8 @@ public class CoopNetworkBaseTests
         var live = peers.CreatePeer();
         live.Setup(live.Id, "127.0.0.2");
         var sent = new System.Collections.Generic.List<NetPeer>();
-        batcher.Send(aborted, new byte[] { 1 }, (peer, _) => sent.Add(peer));
-        batcher.Send(live, new byte[] { 2 }, (peer, _) => sent.Add(peer));
+        batcher.Send(aborted, new byte[] { 1 }, 1020, (peer, _) => sent.Add(peer));
+        batcher.Send(live, new byte[] { 2 }, 1020, (peer, _) => sent.Add(peer));
         Assert.Empty(sent);
         ((IBufferedNetwork)network).DiscardPendingMessages(aborted);
         batcher.FlushAll(_ => true, (peer, _) => sent.Add(peer));

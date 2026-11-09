@@ -10,11 +10,6 @@
          BANNERLORD_DIR at runtime. Game projects check it in Directory.Build.targets. -->
     <BannerlordDir>$([MSBuild]::EnsureTrailingSlash('$(BANNERLORD_DIR)'))</BannerlordDir>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(CoopDebugModules)' == ''">
-    <!-- Extra modules the coop launch profiles add after StoryMode in _MODULES_, from the COOP_DEBUG_MODULES env var
-         (for example *NavalDLC). Empty when unset, so the default module list is used. See the README. -->
-    <CoopDebugModules>$(COOP_DEBUG_MODULES)</CoopDebugModules>
-  </PropertyGroup>
   <PropertyGroup>
     <!-- Whether to build and ship the War Sails (NavalDLC) code. Defaults to whether War Sails is installed;
          pass -p:CoopNavalDlc=false to build as a machine without it would. -->
