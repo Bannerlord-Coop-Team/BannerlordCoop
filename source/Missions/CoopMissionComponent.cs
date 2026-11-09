@@ -1,4 +1,5 @@
-﻿using Missions.Agents.Handlers;
+﻿using Common.BattleBenchmark;
+using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Missiles.Handlers;
 
@@ -20,6 +21,7 @@ public interface ICoopMissionComponent
     //IAgentDamageHandler AgentDamageHandler { get; }
     IAgentDeathHandler AgentDeathHandler { get; }
     //INetworkMissileRegistry NetworkMissileRegistry { get; }
+    IBattleBenchmarkRecorder BattleBenchmark { get; }
 }
 
 public class CoopMissionComponent : ICoopMissionComponent
@@ -45,6 +47,7 @@ public class CoopMissionComponent : ICoopMissionComponent
 
     public IAgentDeathHandler AgentDeathHandler { get; }
 
+    public IBattleBenchmarkRecorder BattleBenchmark { get; }
 
     //public INetworkMissileRegistry NetworkMissileRegistry { get; }
 
@@ -60,8 +63,9 @@ public class CoopMissionComponent : ICoopMissionComponent
         IShieldDamageHandler shieldDamageHandler,
         ICombatHitPresentationHandler combatHitPresentationHandler,
         //IAgentDamageHandler agentDamageHandler,
-        IAgentDeathHandler agentDeathHandler
+        IAgentDeathHandler agentDeathHandler,
         //INetworkMissileRegistry networkMissileRegistry
+        IBattleBenchmarkRecorder battleBenchmark
         )
     {
         AgentRegistry = agentRegistry;
@@ -77,5 +81,6 @@ public class CoopMissionComponent : ICoopMissionComponent
         //AgentDamageHandler = agentDamageHandler;
         AgentDeathHandler = agentDeathHandler;
         //NetworkMissileRegistry = networkMissileRegistry;
+        BattleBenchmark = battleBenchmark;
     }
 }
