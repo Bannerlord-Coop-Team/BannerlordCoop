@@ -67,7 +67,8 @@ internal class AlternativeSolutionPickerPatches
         var issue = Hero.OneToOneConversationHero?.Issue;
         if (ModInformation.IsClient && issue != null && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
         {
-            picker.Close(issue, cancel: true);
+            // This line runs from the picker's closed callback, and PartyScreenHelper pops the screen itself once that returns
+            picker.Close(issue, cancel: true, popScreen: false);
             return false;
         }
         return true;
@@ -78,6 +79,6 @@ internal class AlternativeSolutionPickerPatches
     private static void FinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
-            picker.Close(__instance, cancel: true);
+            picker.Close(__instance, cancel: true, popScreen: true);
     }
 }

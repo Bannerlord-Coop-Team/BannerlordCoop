@@ -1431,7 +1431,7 @@ public class MerchantOutlawsTests : IDisposable
                         PartyScreenHelper.CloseScreen(isForced: false);
                         break;
                     case PickerExit.IssueEnds:
-                        picker.Close(issue, cancel: true);
+                        picker.Close(issue, cancel: true, popScreen: true);
                         break;
                 }
 
