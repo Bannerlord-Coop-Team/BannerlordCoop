@@ -136,7 +136,12 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 Assert.Equal(55f, launch.BaseSpeed);
                 Assert.Equal(hasRigidBody, launch.HasRigidBody);
                 if (skewedFrame)
-                    Assert.Equal(orientation, launch.Orientation);
+                {
+                    // Mat3 equality skips the side vector, so all three rows are compared.
+                    Assert.Equal(orientation.s, launch.Orientation.s);
+                    Assert.Equal(orientation.f, launch.Orientation.f);
+                    Assert.Equal(orientation.u, launch.Orientation.u);
+                }
                 else
                     AssertWithinTolerance(orientation, launch.Orientation);
                 MissionWeapon replayed = Assert.Single(ReplayedWeapons);
