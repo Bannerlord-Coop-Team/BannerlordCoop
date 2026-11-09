@@ -238,6 +238,8 @@ public partial class MissileHandler : IMissileHandler
         if (disposed || dropped.Item == null) return;
 
         // The missile index is finishing now, so any other entry left at it belongs to an older missile.
+        if (reconstructedShots.ContainsKey(dropped.MissileIndex))
+            Logger.Warning("[MissileDiag] peer-own-drop missileIndex={Index}", dropped.MissileIndex);
         bool hasLocal = localShots.TryGetValue(dropped.MissileIndex, out var localShot);
         bool hasReconstructed = reconstructedShots.TryGetValue(dropped.MissileIndex, out var reconstructedShot);
         localShots.Remove(dropped.MissileIndex);
