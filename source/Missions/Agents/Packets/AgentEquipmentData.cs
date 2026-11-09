@@ -28,6 +28,7 @@ namespace Missions.Agents.Packets
 
         internal static bool TryCapture(Agent agent, out AgentEquipmentData data)
         {
+            // MatchesLive reads the same fields without allocating, so a field added here needs a matching check there.
             data = default;
             if (!TryRead(agent, out EquipmentIndex mainHandIndex,
                     out EquipmentIndex offHandIndex, out int mainHandUsageIndex))
