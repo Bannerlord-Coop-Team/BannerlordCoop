@@ -8,6 +8,7 @@ namespace Missions.Messages;
 /// field changes and replayed to joiners; appliers are idempotent. Machines are scene-placed, so
 /// their MissionObjectId matches across clients loading the same scene and levels.
 /// </summary>
+// The int sentinels are shifted by one on the wire so protobuf omits their usual -1 instead of a 10-byte varint.
 [ProtoContract(SkipConstructor = true)]
 public class NetworkSiegeMachineState : IEvent
 {
@@ -17,22 +18,26 @@ public class NetworkSiegeMachineState : IEvent
     [ProtoMember(2)]
     public readonly float HitPoints;
     /// <summary>Destruction state index; -1 when not destructible.</summary>
+    public int DestructionState => destructionStateWire - 1;
     [ProtoMember(3)]
-    public readonly int DestructionState;
+    private readonly int destructionStateWire;
     /// <summary>CastleGate.GateState; -1 for non-gates.</summary>
+    public int GateState => gateStateWire - 1;
     [ProtoMember(4)]
-    public readonly int GateState;
+    private readonly int gateStateWire;
     /// <summary>SiegeLadder.LadderState; -1 for non-ladders.</summary>
+    public int LadderState => ladderStateWire - 1;
     [ProtoMember(5)]
-    public readonly int LadderState;
+    private readonly int ladderStateWire;
     /// <summary>Path progress of a ram/tower; -1 when the machine has no movement component.</summary>
     [ProtoMember(6)]
     public readonly float MoveDistance;
     [ProtoMember(7)]
     public readonly bool HasArrived;
     /// <summary>RangedSiegeWeapon.WeaponState; -1 for non-ranged machines. Drives the peer's wind-up/reload arm animation.</summary>
+    public int WeaponState => weaponStateWire - 1;
     [ProtoMember(8)]
-    public readonly int WeaponState;
+    private readonly int weaponStateWire;
     /// <summary>The simulator's aim targets (RangedSiegeWeapon.TargetDirection/TargetReleaseAngle);
     /// -1000 sentinel for non-ranged or non-simulated machines (-1 collides with a valid angle).
     /// Receivers replay vanilla's own speed-limited approach toward them, so the body turns smoothly.</summary>
@@ -48,8 +53,9 @@ public class NetworkSiegeMachineState : IEvent
     [ProtoMember(11)]
     public readonly int HostEpoch;
     /// <summary>StonePile.AmmoCount; -1 for non-stone-pile machines.</summary>
+    public int StoneAmmo => stoneAmmoWire - 1;
     [ProtoMember(12)]
-    public readonly int StoneAmmo;
+    private readonly int stoneAmmoWire;
     /// <summary>Whether <see cref="StoneAmmo"/> was captured by the sender.</summary>
     [ProtoMember(13)]
     public readonly bool HasStoneAmmo;
@@ -59,8 +65,9 @@ public class NetworkSiegeMachineState : IEvent
     /// <summary>Per-machine claim generation known by the sender.</summary>
     [ProtoMember(15)]
     public readonly int AuthorityRevision;
+    public int MangonelAmmo => mangonelAmmoWire - 1;
     [ProtoMember(16)]
-    public readonly int MangonelAmmo;
+    private readonly int mangonelAmmoWire;
     [ProtoMember(17)]
     public readonly bool HasMangonelAmmo;
     public NetworkSiegeMachineState(
@@ -82,20 +89,20 @@ public class NetworkSiegeMachineState : IEvent
     {
         MachineId = machineId;
         HitPoints = hitPoints;
-        DestructionState = destructionState;
-        GateState = gateState;
-        LadderState = ladderState;
+        destructionStateWire = destructionState + 1;
+        gateStateWire = gateState + 1;
+        ladderStateWire = ladderState + 1;
         MoveDistance = moveDistance;
         HasArrived = hasArrived;
-        WeaponState = weaponState;
+        weaponStateWire = weaponState + 1;
         AimDirection = aimDirection;
         AimReleaseAngle = aimReleaseAngle;
         HostEpoch = hostEpoch;
-        StoneAmmo = stoneAmmo;
+        stoneAmmoWire = stoneAmmo + 1;
         HasStoneAmmo = stoneAmmo >= 0;
         SenderControllerId = senderControllerId;
         AuthorityRevision = authorityRevision;
-        MangonelAmmo = mangonelAmmo;
+        mangonelAmmoWire = mangonelAmmo + 1;
         HasMangonelAmmo = mangonelAmmo >= 0;
     }
 }

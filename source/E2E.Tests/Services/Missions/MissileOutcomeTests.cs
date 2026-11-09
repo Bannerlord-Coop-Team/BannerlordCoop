@@ -14,11 +14,13 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Battles;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Missions.Missiles.Patches;
 using Moq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -721,8 +723,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                     long sequence = shot.ShotSequence + i;
                     if (i < 8192)
                         peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
-                            shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
-                            shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
+                            shot.PackedOrientation, shot.ExactOrientation, shot.HasRigidBody, shot.MissileItemId,
+                            shot.ItemModifierId, shot.Banner, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
                     peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, sequence),
                         outcome.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
                         outcome.RemainingLifeTime));
@@ -745,8 +747,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 Assert.False(pending.Contains(outcome.WorldItemId));
                 long rejectedSequence = shot.ShotSequence + 8193;
                 peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
-                    shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
-                    shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, rejectedSequence));
+                    shot.PackedOrientation, shot.ExactOrientation, shot.HasRigidBody, shot.MissileItemId,
+                    shot.ItemModifierId, shot.Banner, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, rejectedSequence));
                 peer.Handler.DrainPendingShots();
                 Assert.False(peer.Handler.IsReconstructionPending(shot.AgentId, rejectedSequence));
                 Assert.Equal(8192, unresolved.Count);
@@ -768,8 +770,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             NetworkAgentShoot shot = shooter.Shoot();
             peer.Receive(shot);
             long secondSequence = shot.ShotSequence + 8193;
-            peer.Receive(new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity, shot.Orientation,
-                shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner, shot.MissileIndex,
+            peer.Receive(new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity, shot.PackedOrientation,
+                shot.ExactOrientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
                 shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, secondSequence));
             peer.Instance.Call(() => peer.Handler.DrainPendingShots());
             NetworkMissileOutcome? outcome = null;
@@ -785,8 +787,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
                 {
                     long sequence = shot.ShotSequence + i;
                     peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
-                        shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
-                        shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
+                        shot.PackedOrientation, shot.ExactOrientation, shot.HasRigidBody, shot.MissileItemId,
+                        shot.ItemModifierId, shot.Banner, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
                     peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, sequence),
                         outcome!.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
                         outcome.RemainingLifeTime));
@@ -956,6 +958,29 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
         }
     }
 
+    private static readonly object NativeObjectLock = new();
+
+    // NativeObject's type initializer reads the engine's class table once and stays failed if that throws, which a
+    // headless entity comparison would do; run it against an empty table first so every later test can build entities.
+    internal static void InitializeNativeObject()
+    {
+        lock (NativeObjectLock)
+        {
+            var managed = AccessTools.Field(AccessTools.TypeByName("TaleWorlds.DotNet.LibraryApplicationInterface"), "IManaged");
+            object? original = managed.GetValue(null);
+            managed.SetValue(null, typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create), Type.EmptyTypes)!
+                .MakeGenericMethod(managed.FieldType, typeof(EmptyEngineClassTable)).Invoke(null, null));
+            try
+            {
+                RuntimeHelpers.RunClassConstructor(AccessTools.TypeByName("TaleWorlds.DotNet.NativeObject").TypeHandle);
+            }
+            finally
+            {
+                managed.SetValue(null, original);
+            }
+        }
+    }
+
     public class EmptyEngineClassTable : DispatchProxy
     {
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
@@ -1021,7 +1046,8 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
             Spawner = new RecordingSpawner(native);
             native.Spawners[Mission.Shell] = Spawner;
             IWeaponDropWorldItemSpawner spawner = native.RealParenting ? new WeaponDropWorldItemSpawner() : Spawner;
-            Handler = new MissileHandler(Network, Broker, agents, spawner, Items, new MissionObjectPath(), shipEngine);
+            Handler = new MissileHandler(Network, Broker, agents, new MissileOrientationCodec(), spawner, Items,
+                new MissionObjectPath(), shipEngine);
             drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), spawner);
             pickups = new WeaponPickupHandler(agents, Items, Network, Broker, instance.Resolve<IObjectManager>());
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
@@ -1290,27 +1316,17 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
 
         public GameEntity NewEntity()
         {
-            var managed = AccessTools.Field(AccessTools.TypeByName("TaleWorlds.DotNet.LibraryApplicationInterface"), "IManaged");
-            object? original = managed.GetValue(null);
-            managed.SetValue(null, typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create), Type.EmptyTypes)!
-                .MakeGenericMethod(managed.FieldType, typeof(EmptyEngineClassTable)).Invoke(null, null));
-            try
-            {
-                var entity = ObjectHelper.SkipConstructor<GameEntity>();
-                GC.SuppressFinalize(entity);
-                AccessTools.DeclaredProperty(AccessTools.TypeByName("TaleWorlds.DotNet.NativeObject"), "Pointer")
-                    .SetValue(entity, new UIntPtr((uint)entities.Count + 1));
-                entities.Add(entity, null);
-                EntityFrames[entity.Pointer] = MatrixFrame.Identity;
-                children[entity.Pointer] = new List<GameEntity>();
-                scripts[entity.Pointer] = new List<ScriptComponentBehavior>();
-                names[entity.Pointer] = "entity";
-                return entity;
-            }
-            finally
-            {
-                managed.SetValue(null, original);
-            }
+            InitializeNativeObject();
+            var entity = ObjectHelper.SkipConstructor<GameEntity>();
+            GC.SuppressFinalize(entity);
+            AccessTools.DeclaredProperty(AccessTools.TypeByName("TaleWorlds.DotNet.NativeObject"), "Pointer")
+                .SetValue(entity, new UIntPtr((uint)entities.Count + 1));
+            entities.Add(entity, null);
+            EntityFrames[entity.Pointer] = MatrixFrame.Identity;
+            children[entity.Pointer] = new List<GameEntity>();
+            scripts[entity.Pointer] = new List<ScriptComponentBehavior>();
+            names[entity.Pointer] = "entity";
+            return entity;
         }
 
         public MissionObject AddParent(Client client, int id, MatrixFrame frame, bool runtime = false, bool worldItem = false)

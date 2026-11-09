@@ -256,49 +256,67 @@ internal static class MissileDebugCommands
                 : new CoopCommandResult(false, output, "hit_rejected");
         }
     }
+}
 
-    public sealed class StuckMissilesCoopCommand : ICoopCommand
+/// <summary>
+/// Lists this client's stuck-missile world items by network id with their global frame, without changing mission
+/// state. Every client names a stuck missile with the same id, so two clients' pages can be compared row by row.
+/// </summary>
+public sealed class StuckMissilesCoopCommand : ICoopCommand
+{
+    private const int MaximumOffset = 100000;
+    private const int MaximumLimit = 64;
+    private readonly INetworkWorldItemRegistry worldItemRegistry;
+
+    public StuckMissilesCoopCommand(INetworkWorldItemRegistry worldItemRegistry)
     {
-        private readonly INetworkWorldItemRegistry worldItemRegistry;
-        public StuckMissilesCoopCommand(INetworkWorldItemRegistry worldItemRegistry) => this.worldItemRegistry = worldItemRegistry;
-        public string Prefix => "coop.debug.missile";
-        public string Name => "stuck";
-        public string Description => "Lists stuck missiles by network id with their global frames and parent names.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } =
-        {
-            new ExpectedArgs("offset", "Row offset 0..100000, default 0.", false),
-            new ExpectedArgs("limit", "Rows 1..64, default 16.", false)
-        };
+        this.worldItemRegistry = worldItemRegistry;
+    }
 
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+    public string Prefix => "coop.debug.missile";
+    public string Name => "stuck";
+    public string Description => "Lists stuck-missile world items ordered by network id with their global frame and parent name, without changing mission state.";
+    public CoopCommandSide Side => CoopCommandSide.Client;
+    public IExpectedArgs[] ExpectedArgs { get; } =
+    {
+        new ExpectedArgs("offset", "Row offset 0..100000 in network id order, default 0.", false),
+        new ExpectedArgs("limit", "Rows 1..64, default 16.", false)
+    };
+
+    public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+    {
+        int offset = 0, limit = 16;
+        if (args.Count > 2
+            || (args.Count > 0 && !int.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out offset))
+            || (args.Count > 1 && !int.TryParse(args[1], NumberStyles.None, CultureInfo.InvariantCulture, out limit))
+            || offset > MaximumOffset || limit < 1 || limit > MaximumLimit)
+            return new CoopCommandResult(false, "Expected offset 0..100000 and limit 1..64.", "invalid_arguments");
+
+        if (Mission.Current == null)
+            return new CoopCommandResult(false, "No active mission.", "no_mission");
+
+        KeyValuePair<Guid, SpawnedItemEntity>[] stuck = worldItemRegistry.GetAll()
+            .Where(entry => entry.Value != null && !entry.Value.IsRemoved
+                && entry.Value.GameEntity.IsValid && entry.Value.IsStuckMissile())
+            .OrderBy(entry => entry.Key)
+            .ToArray();
+
+        var output = new StringBuilder();
+        output.Append("STUCK_MISSILES total=").Append(stuck.Length.ToString(CultureInfo.InvariantCulture))
+            .Append(" offset=").Append(offset.ToString(CultureInfo.InvariantCulture));
+        foreach (KeyValuePair<Guid, SpawnedItemEntity> entry in stuck.Skip(offset).Take(limit))
         {
-            int offset = 0, limit = 16;
-            if (args.Count > 2
-                || (args.Count > 0 && !int.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out offset))
-                || (args.Count > 1 && !int.TryParse(args[1], NumberStyles.None, CultureInfo.InvariantCulture, out limit))
-                || offset > 100000 || limit < 1 || limit > 64)
-                return new CoopCommandResult(false, "Expected offset 0..100000 and limit 1..64.", "invalid_arguments");
-            if (ModInformation.IsServer || Mission.Current == null)
-                return new CoopCommandResult(false, "An active client mission is required.", "no_mission");
-            var stuck = worldItemRegistry.GetAll().Where(entry => entry.Value != null && !entry.Value.IsRemoved
-                && entry.Value.GameEntity.IsValid && entry.Value.IsStuckMissile()).OrderBy(entry => entry.Key).ToArray();
-            var output = new StringBuilder();
-            output.Append("STUCK_MISSILES total=").Append(stuck.Length.ToString(CultureInfo.InvariantCulture))
-                .Append(" offset=").Append(offset.ToString(CultureInfo.InvariantCulture));
-            foreach (var entry in stuck.Skip(offset).Take(limit))
-            {
-                var frame = entry.Value.GameEntity.GetGlobalFrame();
-                Vec3 o = frame.origin, s = frame.rotation.s, f = frame.rotation.f, u = frame.rotation.u;
-                var parent = entry.Value.GameEntity.Parent;
-                output.Append('\n').Append(string.Format(CultureInfo.InvariantCulture,
-                    "STUCK_MISSILE worldItem={0} item={1} amount={2} o={3:R},{4:R},{5:R} s={6:R},{7:R},{8:R} " +
-                    "f={9:R},{10:R},{11:R} u={12:R},{13:R},{14:R} parent={15}", entry.Key,
-                    entry.Value.WeaponCopy.Item?.StringId, entry.Value.WeaponCopy.Amount, o.x, o.y, o.z,
-                    s.x, s.y, s.z, f.x, f.y, f.z, u.x, u.y, u.z, parent.IsValid ? parent.Name : "none"));
-            }
-            return new CoopCommandResult(true, output.ToString());
+            MatrixFrame frame = entry.Value.GameEntity.GetGlobalFrame();
+            var parent = entry.Value.GameEntity.Parent;
+            Vec3 o = frame.origin, s = frame.rotation.s, f = frame.rotation.f, u = frame.rotation.u;
+            output.Append('\n').Append(string.Format(CultureInfo.InvariantCulture,
+                "STUCK_MISSILE worldItem={0} item={1} amount={2} o={3:R},{4:R},{5:R} s={6:R},{7:R},{8:R} " +
+                "f={9:R},{10:R},{11:R} u={12:R},{13:R},{14:R} parent={15}",
+                entry.Key, entry.Value.WeaponCopy.Item?.StringId, entry.Value.WeaponCopy.Amount,
+                o.x, o.y, o.z, s.x, s.y, s.z, f.x, f.y, f.z, u.x, u.y, u.z, parent.IsValid ? parent.Name : "none"));
         }
+
+        return new CoopCommandResult(true, output.ToString());
     }
 }
 #endif

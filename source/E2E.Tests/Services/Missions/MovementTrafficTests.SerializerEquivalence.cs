@@ -346,6 +346,13 @@ public partial class MovementTrafficTests
             return payload;
         }
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
+        {
+            byte[] payload = inner.SerializeSnapshots(packet, snapshotIds);
+            run.Candidates.Add(DescribeWire(serializer, packet, payload));
+            return payload;
+        }
+
         public bool TryRestore(IPacket packet, out IPacket restored) => inner.TryRestore(packet, out restored);
     }
 

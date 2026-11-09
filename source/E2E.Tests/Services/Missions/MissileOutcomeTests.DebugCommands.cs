@@ -7,6 +7,7 @@ using HarmonyLib;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Missiles;
 using Missions.Missiles.Message;
 using Missions.Missiles.Patches;
 using Moq;
@@ -252,7 +253,7 @@ public partial class MissileOutcomeTests
                     Mission.MissileCollisionReaction.Stick, Frame(true), parent: parent);
                 parent.SetDestructionLevel(1, -1, 5f, Vec3.Zero, Vec3.Up, noEffects: true);
                 var item = Assert.Single(shooter.Items.GetAll());
-                var result = new Commands.StuckMissilesCoopCommand(shooter.Items).ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "0", "64" }));
+                var result = new StuckMissilesCoopCommand(shooter.Items).ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "0", "64" }));
                 Assert.True(result.Succeeded, result.Output);
                 Assert.StartsWith("STUCK_MISSILES total=1 offset=0\nSTUCK_MISSILE worldItem=" + item.Key, result.Output);
                 Assert.Contains("item=outcome_javelin amount=1", result.Output);
