@@ -65,7 +65,7 @@ public partial class MissileHandler : IMissileHandler
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
         INetworkAgentRegistry networkAgentRegistry, IWeaponDropWorldItemSpawner worldItemSpawner,
-        INetworkWorldItemRegistry worldItemRegistry, INavalShipEngine shipEngine = null)
+        INetworkWorldItemRegistry worldItemRegistry, IMissionObjectPath objectPath, INavalShipEngine shipEngine = null)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -73,6 +73,7 @@ public partial class MissileHandler : IMissileHandler
         this.worldItemSpawner = worldItemSpawner;
         this.worldItemRegistry = worldItemRegistry;
         this.shipEngine = shipEngine;
+        this.objectPath = objectPath;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);

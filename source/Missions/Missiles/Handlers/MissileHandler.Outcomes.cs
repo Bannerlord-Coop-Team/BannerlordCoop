@@ -22,6 +22,7 @@ public partial class MissileHandler
     private readonly IWeaponDropWorldItemSpawner worldItemSpawner;
     private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly INavalShipEngine shipEngine;
+    private readonly IMissionObjectPath objectPath;
     private readonly Dictionary<Guid, ReplayOutcome> replayOutcomes = new();
     // Completed identities suppress duplicates without entering the per-frame retry and expiry scan.
     private readonly HashSet<Guid> completedOutcomes = new();
@@ -105,7 +106,7 @@ public partial class MissileHandler
         else if (reaction == Mission.MissileCollisionReaction.Stick
             && worldItemSpawner.TryGetState(item, out var globalFrame, out float lifeTime))
         {
-            SendWorldOutcome(worldItemId, MissileOutcomeKind.Ground, globalFrame, lifeTime, parent);
+            SendWorldOutcome(worldItemId, MissileOutcomeKind.Ground, globalFrame, lifeTime, parent, item.GameEntity.Parent);
         }
     }
 
@@ -136,13 +137,14 @@ public partial class MissileHandler
     }
 
     private void SendWorldOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame,
-        float remainingLifeTime, MissionObject parent)
+        float remainingLifeTime, MissionObject parent, WeakGameEntity attachmentParent = default)
     {
         int? sceneId = null;
         Guid? worldItemId = null;
         Guid? shipId = null;
         string shipObjectKey = null;
         int? shipObjectIndex = null;
+        string parentEntityPath = null;
         if (parent != null)
         {
             if (!parent.Id.CreatedAtRuntime)
@@ -172,16 +174,26 @@ public partial class MissileHandler
                     return;
                 }
             }
-            frame = parent.GameEntity.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
+            if (kind == MissileOutcomeKind.BounceSettled) attachmentParent = parent.GameEntity;
+            if (attachmentParent != parent.GameEntity)
+            {
+                parentEntityPath = objectPath.Describe(attachmentParent, parent.GameEntity);
+                if (parentEntityPath == null)
+                {
+                    Logger.Warning("Failed to get entity path for missile parent {ParentId}", parent.Id);
+                    return;
+                }
+            }
+            frame = attachmentParent.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
         }
         SendOutcome(itemId, kind, frame, null, 0, 0, remainingLifeTime, sceneId, worldItemId, shipId,
-            shipObjectKey, shipObjectIndex);
+            shipObjectKey, shipObjectIndex, parentEntityPath);
     }
 
     private void SendOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame, Guid? victimId,
         int boneIndex, int shieldSlot, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
-        string parentShipObjectKey = null, int? parentShipObjectIndex = null)
+        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
     {
         Mat3 rotation = frame.rotation;
         Quaternion quaternion = Quaternion.QuaternionFromMat3(rotation);
@@ -197,7 +209,7 @@ public partial class MissileHandler
 
         network.SendAll(new NetworkMissileOutcome(itemId, kind, frame.origin, orientation,
             victimId, boneIndex, shieldSlot, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId,
-            parentShipObjectKey, parentShipObjectIndex));
+            parentShipObjectKey, parentShipObjectIndex, parentEntityPath));
         sentOutcomes++;
         Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped} kind={Kind}",
             sentOutcomes, skippedOutcomes, kind);
@@ -283,17 +295,25 @@ public partial class MissileHandler
         else
         {
             if (!TryResolveParent(message, mission, out var parent)) return false;
+            GameEntity attachmentParent = null;
+            if (parent != null)
+            {
+                var entity = message.ParentEntityPath == null ? parent.GameEntity
+                    : objectPath.Resolve(parent.GameEntity, message.ParentEntityPath);
+                if (!entity.IsValid) return false;
+                attachmentParent = GameEntity.CreateFromWeakEntity(entity);
+            }
 
             bool settledBounce = message.Kind == MissileOutcomeKind.BounceSettled;
             Mission.WeaponSpawnFlags flags = Mission.WeaponSpawnFlags.AsMissile
                 | (settledBounce ? Mission.WeaponSpawnFlags.WithPhysics : Mission.WeaponSpawnFlags.WithStaticPhysics);
-            if (!worldItemSpawner.TrySpawn(ref weapon, flags, true, message.RemainingLifeTime, frame, out var item, parent))
+            if (!worldItemSpawner.TrySpawn(ref weapon, flags, true, message.RemainingLifeTime, frame, out var item, parent,
+                settledBounce ? null : attachmentParent))
                 return false;
 
             // Spawn at the final frame because co-op does not tick vanilla's multiplayer frame fade.
             if (settledBounce)
-                item.StopPhysicsAndSetFrameForClient(frame,
-                    parent == null ? null : GameEntity.CreateFromWeakEntity(parent.GameEntity));
+                item.StopPhysicsAndSetFrameForClient(frame, attachmentParent);
             messageBroker.Publish(this, new MissileItemIdentified(item, message.WorldItemId));
         }
 

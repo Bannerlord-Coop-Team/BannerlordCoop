@@ -487,8 +487,10 @@ public class MissileOutcomeTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void DestructibleOutcome_UsesVanillaStateParentingThroughAStateChange()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DestructibleOutcome_KeepsTheShootersStateWhenThePeerChangesState(bool destructionBeforeReceipt)
     {
         RunClients((shooter, peer, native) =>
         {
@@ -497,17 +499,25 @@ public class MissileOutcomeTests : MissionTestEnvironment
             var parentFrame = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 30f));
             shooter.Instance.Call(() => source = native.AddDestructible(shooter, 37, parentFrame, out sourceState, out sourceBroken));
             peer.Instance.Call(() => target = native.AddDestructible(peer, 37, parentFrame, out targetState, out targetBroken));
+            var stateOffset = new MatrixFrame(Mat3.Identity, new Vec3(3f, 4f, 5f));
+            native.EntityFrames[sourceState.Pointer] = stateOffset;
+            native.EntityFrames[targetState.Pointer] = stateOffset;
             peer.Receive(shooter.Shoot());
             NetworkMissileOutcome outcome = null!;
             SpawnedItemEntity sourceItem = null!, targetItem = null!;
+            MatrixFrame attachLocal = default;
             shooter.Instance.Call(() =>
             {
                 shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
                     Mission.MissileCollisionReaction.Stick, Frame(false), parent: source);
                 sourceItem = Assert.Single(shooter.Items.GetAll()).Value;
                 Assert.Same(sourceState, native.ParentOf(sourceItem.GameEntity));
+                MatrixFrame sourceFrame = sourceItem.GameEntity.GetGlobalFrame();
+                attachLocal = sourceState.GetGlobalFrame().TransformToLocalNonOrthogonal(in sourceFrame);
                 outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
             });
+            if (destructionBeforeReceipt)
+                peer.Instance.Call(() => target.SetDestructionLevel(1, -1, 5f, Vec3.Zero, Vec3.Up, noEffects: true));
             peer.Receive(outcome);
             peer.Instance.Call(() =>
             {
@@ -528,9 +538,11 @@ public class MissileOutcomeTests : MissionTestEnvironment
             native.EntityFrames[targetState.Pointer] = movingState;
             native.EntityFrames[targetBroken.Pointer] = new MatrixFrame(Mat3.Identity, new Vec3(-100f, 0f, 0f));
             Assert.Same(targetState, native.ParentOf(targetItem.GameEntity));
-            MatrixFrame expected = parentFrame.TransformToParent(movingState).TransformToParent(Frame(false));
+            MatrixFrame expected = parentFrame.TransformToParent(movingState).TransformToParent(attachLocal);
             Assert.True((expected.origin - targetItem.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
             Assert.True((sourceItem.GameEntity.GetGlobalFrame().origin - targetItem.GameEntity.GetGlobalFrame().origin).Length < 0.001f);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            output.WriteLine($"Ground parent=destructible: MessagePacket.Data={MessagePacket.Create(outcome, serializer).Data.Length} bytes");
         }, realParenting: true);
     }
 
@@ -922,7 +934,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Spawner = new RecordingSpawner(native);
             native.Spawners[Mission.Shell] = Spawner;
             IWeaponDropWorldItemSpawner spawner = native.RealParenting ? new WeaponDropWorldItemSpawner() : Spawner;
-            Handler = new MissileHandler(Network, Broker, agents, spawner, Items, shipEngine);
+            Handler = new MissileHandler(Network, Broker, agents, spawner, Items, new MissionObjectPath(), shipEngine);
             drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), spawner);
             pickups = new WeaponPickupHandler(agents, Items, Network, Broker, instance.Resolve<IObjectManager>());
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
@@ -992,7 +1004,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
             return Frames.TryGetValue(item, out frame);
         }
         public bool TrySpawn(ref MissionWeapon weapon, Mission.WeaponSpawnFlags spawnFlags, bool hasLifeTime,
-            float remainingLifeTime, MatrixFrame frame, out SpawnedItemEntity item, MissionObject? parent = null)
+            float remainingLifeTime, MatrixFrame frame, out SpawnedItemEntity item, MissionObject? parent = null,
+            GameEntity? attachmentParent = null)
         {
             SpawnCount++;
             item = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
@@ -1007,6 +1020,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             {
                 Parents[item] = parent;
                 LocalFrames[item] = frame;
+                native.SetParent(entity, parent);
             }
             native.ItemSpawners[item] = this;
             return true;
@@ -1049,6 +1063,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Patch(typeof(GameEntity), nameof(GameEntity.SetVisibilityExcludeParents), nameof(Skip));
             Patch(typeof(GameEntity), nameof(GameEntity.CreateFromWeakEntity), nameof(FromWeak));
             Patch(typeof(WeakGameEntity), nameof(WeakGameEntity.GetGlobalFrame), nameof(WeakGlobalFrame));
+            Patch(typeof(WeakGameEntity), "get_Parent", nameof(WeakParent));
             Patch(typeof(MissionWeapon), nameof(MissionWeapon.GetWeaponData), nameof(SkipWeaponData));
             Patch(typeof(MissionWeapon), nameof(MissionWeapon.GetWeaponStatsDataForUsage), nameof(SkipStats));
             Patch(typeof(Mission), nameof(Mission.AddMissileSingleUsageAux), nameof(AddMissile));
@@ -1087,6 +1102,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
 
         public GameEntity EntityOf(WeakGameEntity entity) => entities.Keys.Single(value => value.Pointer == entity.Pointer);
         public GameEntity? ParentOf(WeakGameEntity entity) => parents.GetValueOrDefault(entity.Pointer);
+        public void SetParent(GameEntity entity, MissionObject parent) => parents[entity.Pointer] = EntityOf(parent.GameEntity);
 
         public MatrixFrame GlobalFrame(UIntPtr pointer) => parents.TryGetValue(pointer, out var parent)
             ? GlobalFrame(parent.Pointer).TransformToParent(EntityFrames[pointer]) : EntityFrames[pointer];
@@ -1283,6 +1299,11 @@ public class MissileOutcomeTests : MissionTestEnvironment
         {
             if (!current.EntityFrames.ContainsKey(__instance.Pointer)) return true;
             __result = current.GlobalFrame(__instance.Pointer);
+            return false;
+        }
+        private static bool WeakParent(WeakGameEntity __instance, ref WeakGameEntity __result)
+        {
+            __result = current.ParentOf(__instance)?.WeakEntity ?? WeakGameEntity.Invalid;
             return false;
         }
         private static bool AddMissile(out GameEntity missileEntity, ref int __result)

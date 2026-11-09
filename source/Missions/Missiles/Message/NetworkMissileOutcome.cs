@@ -44,11 +44,13 @@ public class NetworkMissileOutcome : ICommand
     public string ParentShipObjectKey { get; }
     [ProtoMember(14)]
     public int? ParentShipObjectIndex { get; }
+    [ProtoMember(15)]
+    public string ParentEntityPath { get; }
 
     public NetworkMissileOutcome(Guid worldItemId, MissileOutcomeKind kind, Vec3 origin, float[] rotation,
         Guid? victimId, int boneIndex, int shieldSlot, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
-        string parentShipObjectKey = null, int? parentShipObjectIndex = null)
+        string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
     {
         WorldItemId = worldItemId;
         Kind = kind;
@@ -63,5 +65,6 @@ public class NetworkMissileOutcome : ICommand
         ParentShipId = parentShipId;
         ParentShipObjectKey = parentShipObjectKey;
         ParentShipObjectIndex = parentShipObjectIndex;
+        ParentEntityPath = parentEntityPath;
     }
 }
