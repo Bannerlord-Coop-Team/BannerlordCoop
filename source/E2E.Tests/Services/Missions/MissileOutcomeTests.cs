@@ -29,7 +29,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 [Collection(nameof(Tournaments.TournamentCombatInfrastructureCollection))]
-public class MissileOutcomeTests : MissionTestEnvironment
+public partial class MissileOutcomeTests : MissionTestEnvironment
 {
     private readonly ITestOutputHelper output;
 
@@ -1028,7 +1028,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public bool TryRemove(SpawnedItemEntity item) => Frames.Remove(item);
     }
 
-    private sealed class NativeFixture : IDisposable
+    private sealed partial class NativeFixture : IDisposable
     {
         private static NativeFixture current = null!;
         private readonly Harmony harmony = new("e2e.missile-outcome." + Guid.NewGuid().ToString("N"));
@@ -1150,6 +1150,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 case "GetBodyFlags": return (uint)0;
                 case "SetVisibilityExcludeParents":
                 case "SetPhysicsState":
+                case "BurstEntityParticle":
                 case "SetFrameChanged": return null;
                 default: throw new InvalidOperationException("Unexpected native entity call: " + method.Name);
             }

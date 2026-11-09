@@ -28,7 +28,7 @@ public class MissileCollisionPatch
     }
 
     static void Prefix(Mission __instance, int missileIndex, ref Mission.MissileCollisionReaction collisionReaction,
-        out CollisionState __state)
+        Agent attachedAgent, out CollisionState __state)
     {
         __state = default;
         if (AllowedThread.IsThisThreadAllowed()) return;
@@ -36,6 +36,9 @@ public class MissileCollisionPatch
         IMissileHandler handler = __instance.GetMissionBehavior<CoopMissionController>()?.MissionComponent.MissileHandler;
         if (handler == null || !__instance._missilesDictionary.TryGetValue(missileIndex, out var missile)) return;
 
+#if DEBUG
+        handler.PrepareForcedBounce(missile, attachedAgent, ref collisionReaction);
+#endif
         Guid itemId = handler.PrepareCollision(missile, ref collisionReaction);
         __state = new CollisionState(handler, missile, itemId);
     }

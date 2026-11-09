@@ -22,6 +22,10 @@ namespace Missions.Missiles.Handlers;
 /// <summary>Synchronizes missiles fired by registered mission agents.</summary>
 public interface IMissileHandler : IHandler
 {
+#if DEBUG
+    int ForcedBouncesRemaining { get; set; }
+    void PrepareForcedBounce(Mission.Missile missile, Agent victim, ref Mission.MissileCollisionReaction reaction);
+#endif
     void DrainPendingShots();
     bool IsReconstructionPending(Guid agentId, long shotSequence);
     bool TryGetLocalShot(int missileIndex, out Guid agentId, out long shotSequence);
@@ -35,6 +39,18 @@ public interface IMissileHandler : IHandler
 /// <inheritdoc/>
 public partial class MissileHandler : IMissileHandler
 {
+#if DEBUG
+    public int ForcedBouncesRemaining { get; set; }
+
+    public void PrepareForcedBounce(Mission.Missile missile, Agent victim, ref Mission.MissileCollisionReaction reaction)
+    {
+        if (disposed || ForcedBouncesRemaining <= 0 || victim != null
+            || reaction != Mission.MissileCollisionReaction.Stick || !localShots.ContainsKey(missile.Index)) return;
+        reaction = Mission.MissileCollisionReaction.BounceBack;
+        ForcedBouncesRemaining--;
+        Logger.Debug("[MissileDebug] forced bounce remaining={Remaining}", ForcedBouncesRemaining);
+    }
+#endif
     private static readonly ILogger Logger = LogManager.GetLogger<MissileHandler>();
 
     private readonly IBattleNetwork network;
