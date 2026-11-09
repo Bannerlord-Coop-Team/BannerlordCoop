@@ -120,7 +120,7 @@ public class LiteNetP2PClientBroadcastTests
             this.inner = inner;
         }
 
-        public int SerializeCalls { get; private set; }
+        public int SerializeCalls { get; set; }
 
         public T Deserialize<T>(byte[] data) => inner.Deserialize<T>(data);
 
@@ -168,6 +168,10 @@ public class LiteNetP2PClientBroadcastTests
                 new ReliableMessageBatcher<string>(PlainSerializer),
                 () => new Common.Logging.ReceivePathDiagnostics());
             Client.ConnectToInstance("broadcast-test");
+
+            // Each controller's relay budget is probed once with the same serializer, so fill them before counting.
+            Client.GetMaxUnreliablePayloadBytes();
+            CountingSerializer.SerializeCalls = 0;
         }
 
         // Flushing walks every peer's buffer in no set order, so only the order within one peer is fixed.
