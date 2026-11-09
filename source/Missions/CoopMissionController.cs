@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.BattleBenchmark;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
@@ -76,13 +77,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Capture continuous movement on the game thread so each snapshot reads one coherent engine state. A
         // background poll can race native movement/input updates and send a moved position with stale input,
         // leaving peers to interpolate a sliding puppet with no locomotion animation.
-        coopMissionComponent.AgentMovementHandler.PollMovement(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.MovementSend))
+            coopMissionComponent.AgentMovementHandler.PollMovement(dt);
 
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
         // per-packet correction was bound to the bursty movement-poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
-        coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.MovementApply))
+            coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
         // Continuous movement setters can replace defend input after the mission boundary. Restore the held
         // flags without restarting the guard command so native animation keeps its own timeline.
@@ -109,7 +112,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Native Agent processing realizes authoritative AI and player actions after the input boundary.
         // Diff them here so peers receive the displayed action instead of retaining an earlier pose.
         // A headless mission participant would need an equivalent non-display boundary for AI action sync.
-        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.ActionPoll))
+            coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
 
         coopMissionComponent.AgentMovementHandler
             .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
