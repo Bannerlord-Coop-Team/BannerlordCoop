@@ -88,9 +88,9 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     private List<NetPeer> GetPeersAboveThreshold(int threshold)
     {
-        // Loading peers aren't measured by their reliable queue. Once the held stream is released the
-        // connection enters CampaignState and normal overload backpressure applies if its reliable world
-        // channel cannot keep up.
+        // Loading peers aren't measured here: their bulk save fragments are expected join traffic and count
+        // toward the pre-entry backlog below instead. Once the held stream is released the connection enters
+        // CampaignState and normal overload backpressure applies if its reliable world channel cannot keep up.
         var livePeers = connectionCollection
             .Where(logic => logic.IsLoading == false)
             .Select(logic => logic.Peer)
@@ -236,7 +236,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
                 if (!preEntryBackpressureStartedUtc.TryGetValue(entry.Peer, out var startedUtc))
                 {
-                    if (queueDepth <= config.MaxPacketsInQueue) continue;
+                    // While paused, a peer above the resume threshold holds the pause, so it needs the deadline too
+                    if (queueDepth <= config.MaxPacketsInQueue && automaticPauseLease == null) continue;
 
                     startedUtc = utcNow;
                     preEntryBackpressureStartedUtc.Add(entry.Peer, startedUtc);
