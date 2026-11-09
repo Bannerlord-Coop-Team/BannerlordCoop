@@ -64,6 +64,51 @@ public partial class MissileHandler
             : Guid.Empty;
     }
 
+
+    // #4544 TEMPORARY shield-switch diagnostics.
+    public static string DiagShieldMode = "off";
+    public static DateTime DiagShieldUntil;
+    private DateTime diagShieldNext;
+
+    private static string DiagFrame(MatrixFrame f) => string.Format(System.Globalization.CultureInfo.InvariantCulture,
+        "{0:R},{1:R},{2:R}|{3:R},{4:R},{5:R}|{6:R},{7:R},{8:R}|{9:R},{10:R},{11:R}",
+        f.origin.x, f.origin.y, f.origin.z, f.rotation.s.x, f.rotation.s.y, f.rotation.s.z,
+        f.rotation.f.x, f.rotation.f.y, f.rotation.f.z, f.rotation.u.x, f.rotation.u.y, f.rotation.u.z);
+
+    private static string DiagSlotItem(Agent agent, EquipmentIndex slot) =>
+        slot < EquipmentIndex.WeaponItemBeginSlot || slot >= EquipmentIndex.NumAllWeaponSlots ? "-"
+            : agent.Equipment[slot].IsEmpty ? "empty" : agent.Equipment[slot].Item?.StringId ?? "?";
+
+    private void DiagToggleShields()
+    {
+        if (DiagShieldMode == "off" || DateTime.UtcNow > DiagShieldUntil || DateTime.UtcNow < diagShieldNext) return;
+        diagShieldNext = DateTime.UtcNow.AddMilliseconds(250);
+        Mission mission = Mission.Current;
+        if (mission == null) return;
+        int toggled = 0;
+        foreach (Agent agent in mission.Agents)
+        {
+            if (!agent.IsHuman || !agent.IsActive()) continue;
+            bool own = networkAgentRegistry.IsLocallyControlled(agent);
+            if (own != (DiagShieldMode == "own")) continue;
+            EquipmentIndex shieldSlot = EquipmentIndex.None;
+            for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.NumAllWeaponSlots; slot++)
+            {
+                if (agent.Equipment[slot].IsEmpty || !agent.Equipment[slot].IsShield()) continue;
+                shieldSlot = slot;
+                break;
+            }
+            if (shieldSlot == EquipmentIndex.None) continue;
+            using var allowed = own ? null : new AllowedThread();
+            if (agent.GetOffhandWieldedItemIndex() == shieldSlot)
+                agent.TryToSheathWeaponInHand(Agent.HandIndex.OffHand, Agent.WeaponWieldActionType.Instant);
+            else
+                agent.TryToWieldWeaponInSlot(shieldSlot, Agent.WeaponWieldActionType.Instant, false);
+            toggled++;
+        }
+        Logger.Information("[MissileDiag] shield-toggle mode={Mode} toggled={Toggled}", DiagShieldMode, toggled);
+    }
+
     public void ReportCollision(Guid worldItemId, Mission.Missile missile, Mission.MissileCollisionReaction reaction,
         MatrixFrame frame, Agent victim, bool shield, sbyte boneIndex, MissionObject parent)
     {
@@ -84,6 +129,10 @@ public partial class MissileHandler
                 return;
             }
 
+            if (shield)
+                Logger.Information("[MissileDiag] shield-send worldItem={Id} victim={Victim} slot={Slot} item={Item} frame={Frame}",
+                    worldItemId, victimId, victim.GetOffhandWieldedItemIndex(), DiagSlotItem(victim, victim.GetOffhandWieldedItemIndex()),
+                    DiagFrame(frame));
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
                 victimId, shield ? 0 : boneIndex, 0f,
                 shieldSlot: shield ? victim.GetOffhandWieldedItemIndex() : EquipmentIndex.WeaponItemBeginSlot);
@@ -295,7 +344,14 @@ public partial class MissileHandler
                 EquipmentIndex shieldSlot = message.ShieldSlot;
                 if (shieldSlot < EquipmentIndex.WeaponItemBeginSlot || shieldSlot >= EquipmentIndex.NumAllWeaponSlots
                     || victim.Equipment[shieldSlot].IsEmpty || !victim.Equipment[shieldSlot].IsShield())
+                {
+                    Logger.Information("[MissileDiag] shield-wait worldItem={Id} slot={Slot} offhand={Offhand} item={Item}",
+                        message.WorldItemId, shieldSlot, victim.GetOffhandWieldedItemIndex(), DiagSlotItem(victim, shieldSlot));
                     return false;
+                }
+                Logger.Information("[MissileDiag] shield-apply worldItem={Id} victim={Victim} slot={Slot} offhand={Offhand} item={Item} own={Own} frame={Frame}",
+                    message.WorldItemId, message.VictimId, shieldSlot, victim.GetOffhandWieldedItemIndex(),
+                    DiagSlotItem(victim, shieldSlot), networkAgentRegistry.IsLocallyControlled(victim), DiagFrame(frame));
                 victim.AttachWeaponToWeapon(shieldSlot, weapon, null, ref frame);
             }
             else

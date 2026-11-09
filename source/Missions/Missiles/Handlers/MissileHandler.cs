@@ -197,6 +197,7 @@ public partial class MissileHandler : IMissileHandler
 
     public void DrainPendingShots()
     {
+        DiagToggleShields();
         if (replayOutcomes.Count > 0 || pendingOutcomes.Count > 0 || bouncingItems.Count > 0)
             GameThread.RunSafe(() => PruneOutcomes(DateTime.UtcNow));
         int count = pendingShots.Count;

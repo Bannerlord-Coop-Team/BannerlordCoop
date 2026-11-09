@@ -20,6 +20,31 @@ namespace Missions.Missiles;
 
 internal static class MissileDebugCommands
 {
+    // #4544 TEMPORARY shield-switch driver.
+    public sealed class DiagToggleShieldsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.missile";
+        public string Name => "diag_toggle_shields";
+        public string Description => "TEMPORARY: flips agents' shields in and out of the offhand every 0.25 s.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } =
+        {
+            new ExpectedArgs("mode", "own, copies or off."),
+            new ExpectedArgs("seconds", "Seconds 1..600.")
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (args.Count != 2 || (args[0] != "own" && args[0] != "copies" && args[0] != "off")
+                || !int.TryParse(args[1], NumberStyles.None, CultureInfo.InvariantCulture, out int seconds)
+                || seconds < 1 || seconds > 600)
+                return new CoopCommandResult(false, "Expected own|copies|off and seconds 1..600.", "invalid_arguments");
+            Handlers.MissileHandler.DiagShieldMode = args[0];
+            Handlers.MissileHandler.DiagShieldUntil = DateTime.UtcNow.AddSeconds(seconds);
+            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new { mode = args[0], seconds }));
+        }
+    }
+
     public sealed class ForceBounceMissilesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.missile";
