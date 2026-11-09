@@ -10,7 +10,6 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -196,7 +195,7 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
         return Assert.IsType<T>(serializer.Deserialize<IMessage>(packet.Data));
     }
 
-    private sealed record Battle(string MapEventId, string MobilePartyId, string PartyId, string HeroId);
+    private sealed record Battle(string MapEventId, string MobilePartyId, string PartyId);
 
     /// <summary>
     /// A coop battle whose attacker-side party holds a hero troop and a regular troop, with a victim
@@ -205,7 +204,7 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
     private Battle SetupBattle()
     {
         var (mapEventId, partyIds, heroIds) = SetupCoopBattleWithHeroes("attacker", "defender");
-        EnsureServerCampaignModels();
+        EnsureServerCampaignModels(ScoreHitXp);
 
         foreach (var instance in new[] { Server }.Concat(Clients))
         {
@@ -243,7 +242,7 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
         });
 
         Assert.NotNull(mapEventPartyId);
-        return new Battle(mapEventId, partyIds[0], mapEventPartyId!, heroIds[0]);
+        return new Battle(mapEventId, partyIds[0], mapEventPartyId!);
     }
 
     private MapEventParty ServerParty(Battle battle)
@@ -299,43 +298,5 @@ public class HitWeaponHeroOnlyTests : MissionTestEnvironment
             isSneakAttack: false,
             affectedAgentHealth: 0f,
             isAffectorUnderCommand: false));
-    }
-
-    /// <summary>
-    /// The harness boots a <see cref="Campaign"/> without the campaign-start flow that would populate
-    /// <c>Campaign.Models</c>, so give the server the xp model the native scorer runs through.
-    /// </summary>
-    private void EnsureServerCampaignModels()
-    {
-        Server.Call(() =>
-        {
-            var gameModels = new GameModels(new List<GameModel>
-            {
-                new FixedCombatXpModel(),
-                new DefaultMilitaryPowerModel(),
-                new DefaultCharacterStatsModel(),
-            });
-            Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
-            Campaign.Current._gameModels = gameModels;
-        });
-    }
-
-    private sealed class FixedCombatXpModel : CombatXpModel
-    {
-        public override float CaptainRadius => 0f;
-
-        public override SkillObject GetSkillForWeapon(WeaponComponentData weapon, bool isSiegeEngineHit) => null;
-
-        public override ExplainedNumber GetXpFromHit(
-            CharacterObject attackerTroop,
-            CharacterObject captain,
-            CharacterObject attackedTroop,
-            PartyBase attackerParty,
-            int damage,
-            bool isFatal,
-            MissionTypeEnum missionType) =>
-            new ExplainedNumber(ScoreHitXp);
-
-        public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }
 }
