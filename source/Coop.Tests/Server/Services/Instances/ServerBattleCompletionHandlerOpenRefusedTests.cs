@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Network;
 using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
@@ -83,6 +84,7 @@ public class ServerBattleCompletionHandlerOpenRefusedTests : IDisposable
 
         handler = new ServerBattleCompletionHandler(
             broker,
+            Mock.Of<INetwork>(),
             missionManager,
             Mock.Of<IObjectManager>(),
             playerManager,

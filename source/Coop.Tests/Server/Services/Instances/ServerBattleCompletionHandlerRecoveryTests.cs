@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Network;
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core.Server.Services.Instances;
@@ -90,6 +91,7 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
 
         handler = new ServerBattleCompletionHandler(
             broker,
+            Mock.Of<INetwork>(),
             missionManager,
             objectManager.Object,
             playerManager.Object,

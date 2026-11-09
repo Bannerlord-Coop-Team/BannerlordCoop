@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Network;
 using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
@@ -31,6 +32,7 @@ public class ServerBattleCompletionHandlerKeptHostTests : IDisposable
         missionManager.Setup(manager => manager.TakeExpiredConclusions()).Returns(Array.Empty<string>());
         handler = new ServerBattleCompletionHandler(
             broker,
+            Mock.Of<INetwork>(),
             missionManager.Object,
             Mock.Of<IObjectManager>(),
             Mock.Of<IPlayerManager>(),

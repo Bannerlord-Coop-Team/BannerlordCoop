@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
@@ -27,6 +28,7 @@ public class ServerBattleCompletionHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<ServerBattleCompletionHandler>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IMissionManager missionManager;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
@@ -45,6 +47,7 @@ public class ServerBattleCompletionHandler : IHandler
 
     public ServerBattleCompletionHandler(
         IMessageBroker messageBroker,
+        INetwork network,
         IMissionManager missionManager,
         IObjectManager objectManager,
         IPlayerManager playerManager,
@@ -52,6 +55,7 @@ public class ServerBattleCompletionHandler : IHandler
         IBattleCompletionTracker completionTracker)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.missionManager = missionManager;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
@@ -376,6 +380,24 @@ public class ServerBattleCompletionHandler : IHandler
             conclusionRetries.Remove(mapEventId);
             keptHostDeadlines.Remove(mapEventId);
             completionTracker.Clear(mapEventId);
+
+            if (!missionManager.TryGetControllers(mapEventId, out var members))
+                return;
+
+            // Our own conclusion already holds this fence, so winning it means something else (peace, say) ended the
+            // battle mid mission. Holding it also drops the players' late results, as nothing is left to apply them to.
+            bool endedMidMission = missionManager.TryBeginActiveInstanceConclusion(mapEventId, members);
+            if (!endedMidMission)
+                return;
+
+            missionManager.CompleteInstanceConclusion(mapEventId, succeeded: true);
+            Logger.Warning("Battle {Instance} was finalized with {Count} player(s) still in its mission; ending their missions",
+                mapEventId, members.Count);
+            foreach (var controllerId in members)
+            {
+                if (playerManager.TryGetPeer(controllerId, out var peer))
+                    network.Send(peer, new NetworkEndBattleMission(mapEventId));
+            }
         });
     }
 
