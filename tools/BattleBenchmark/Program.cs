@@ -46,7 +46,7 @@ switch (positional.FirstOrDefault())
             return 3;
         }
         output = comparison.Render(comparison.Compare(baseline, candidate, includeAll, filter), baseline.Count, candidate.Count) +
-                 comparison.RenderMessageTypes(baseline, candidate);
+                 comparison.RenderMessageTypes(baseline, candidate, filter);
         break;
     }
     case "summary" when positional.Count == 2:

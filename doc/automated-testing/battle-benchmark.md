@@ -15,7 +15,8 @@ coop.debug.benchmark.start field-A-01 120 C:\bench\run01 field
 Arguments: a run id (letters, digits, dots, dashes, underscores), the window in seconds (1 to 900), an optional absolute
 output folder (default `CoopBenchmark` next to the game executable) and an optional label. The process writes
 `<folder>/<run id>/<role>-<controller id>-<pid>.json` when the window ends. The role is `server`, `battle-host` or
-`client`.
+`client`. Use a new run id for each run: a report left in the run folder by an earlier process makes `compare` stop
+with "more than one report".
 
 - `coop.debug.benchmark.status` reports whether a window is recording and the last report path.
 - `coop.debug.benchmark.stop` ends the window early and writes the report.
@@ -26,8 +27,8 @@ output folder (default `CoopBenchmark` next to the game executable) and an optio
 These commands are in every build, Release included. The scenario staging below uses DEBUG-only fixture commands.
 
 When no window is recording the instrumentation does nothing measurable: the timed call sites in
-`CoopMissionController` and the traffic counters in `LiteNetP2PClient` and `MessagePacketHandler` only read a flag, and
-`GameThread.Update` only checks its `FrameObserver` for null.
+`CoopMissionController` and the traffic counters on the mission and campaign connections only read a flag (the
+per-type counters also take the message's type), and `GameThread.Update` only checks its `FrameObserver` for null.
 
 ## What a report holds
 
@@ -56,7 +57,8 @@ dotnet run --project tools/BattleBenchmark -- summary <runs> [--all] [--filter <
 `compare` prints one Markdown table per process role: each metric's baseline and candidate mean ± standard deviation
 [min, max], the delta and the delta in percent. The verdict is `separated` only when every candidate run lies above,
 or every one below, every baseline run; otherwise the change is `within noise`. With fewer than 3 runs on either side
-it says `too few runs`. Without `--all` it shows the headline metrics only. After those tables, "Bytes per message type"
+it says `too few runs`. Without `--all` it shows the headline metrics only; `--filter` narrows every table, the
+per-type one included. After those tables, "Bytes per message type"
 has one table per process role and direction: each type's bytes per second (mean ± spread, delta, verdict), messages
 per second and bytes per message, largest change first. That is where a bandwidth change shows: the bytes per message
 of the type it touches, times its rate. `summary` prints one set's mean and spread, for posting baseline numbers.

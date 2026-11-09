@@ -1234,8 +1234,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
-            battleBenchmark?.RecordSent(controllerId, packet.DeliveryMethod != DeliveryMethod.Unreliable, data.Length,
-                peer.GetMaxSinglePacketSize(packet.DeliveryMethod), relayed: false);
+            if (battleBenchmark?.IsRecording == true)
+                battleBenchmark.RecordSent(controllerId, packet.DeliveryMethod != DeliveryMethod.Unreliable, data.Length,
+                    peer.GetMaxSinglePacketSize(packet.DeliveryMethod), relayed: false);
             Send(peer, packet, data);
             return;
         }
@@ -1280,8 +1281,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
-            battleBenchmark?.RecordSent(controllerId, reliable: true, data.Length,
-                peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered), relayed: false);
+            if (battleBenchmark?.IsRecording == true)
+                battleBenchmark.RecordSent(controllerId, reliable: true, data.Length,
+                    peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered), relayed: false);
             peer.Send(data, DeliveryMethod.ReliableOrdered);
             return;
         }

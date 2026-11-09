@@ -27,7 +27,7 @@ public interface IBattleBenchmarkComparison
 
     string Render(IReadOnlyList<BattleBenchmarkMetricComparison> comparisons, int baselineRuns, int candidateRuns);
 
-    string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate);
+    string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate, string filter = null);
 
     string RenderSummary(IReadOnlyList<BattleBenchmarkRun> runs, bool includeAll, string filter = null);
 }
@@ -105,7 +105,13 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         {
             bool shared = group.Count() > 1;
             foreach (var process in group)
-                byKey[shared ? $"{process.Role}:{process.ControllerId}" : process.Role] = process.Metrics;
+            {
+                string key = shared ? $"{process.Role}:{process.ControllerId}" : process.Role;
+                // A rerun into the same folder leaves the old process's report next to the new one.
+                if (byKey.ContainsKey(key))
+                    throw new InvalidDataException($"Run {name} has more than one report for {key}; remove the stale one.");
+                byKey[key] = process.Metrics;
+            }
         }
         return new BattleBenchmarkRun(name, byKey);
     }
@@ -151,7 +157,8 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         var text = new StringBuilder();
         text.AppendLine($"Baseline runs: {baselineRuns}, candidate runs: {candidateRuns}. " +
                         "Spread is the sample standard deviation and [min, max] across runs. " +
-                        "\"separated\" means every candidate run is on the same side of every baseline run.");
+                        "\"separated\" means every candidate run is on the same side of every baseline run. " +
+                        "With 3 runs a side any one metric separates by chance one time in ten, so judge a change by the metric it targets.");
         foreach (var group in comparisons.GroupBy(comparison => comparison.ProcessKey))
         {
             text.AppendLine();
@@ -171,10 +178,11 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
     /// <summary>
     /// Renders bytes per second per message or packet type, per process key and direction, largest change first. A type
     /// missing from a report that has the per-type counts had none in that run, so it counts as 0 there. Types with no
-    /// bytes in any run are left out.
+    /// bytes in any run are left out, and so are types whose bytes metric doesn't match <paramref name="filter"/>.
     /// </summary>
-    public string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate)
+    public string RenderMessageTypes(IReadOnlyList<BattleBenchmarkRun> baseline, IReadOnlyList<BattleBenchmarkRun> candidate, string filter = null)
     {
+        Regex filterPattern = string.IsNullOrEmpty(filter) ? null : new Regex(filter, RegexOptions.IgnoreCase);
         var text = new StringBuilder();
         text.AppendLine();
         text.AppendLine("## Bytes per message type");
@@ -212,6 +220,7 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
                     .Distinct()
                     .Select(type => (Type: type, Bytes: Rate(type, "BytesPerSecond"), Count: Rate(type, "CountPerSecond")))
                     .Where(row => row.Bytes.Baseline.Maximum > 0 || row.Bytes.Candidate.Maximum > 0)
+                    .Where(row => filterPattern == null || filterPattern.IsMatch(row.Bytes.Metric))
                     // Rounded so float residue on an unchanged type doesn't decide the order; the busiest type goes first then.
                     .OrderByDescending(row => double.IsNaN(row.Bytes.Delta) ? double.MaxValue : Math.Round(Math.Abs(row.Bytes.Delta), 3))
                     .ThenByDescending(row => Math.Max(row.Bytes.Baseline.Mean, row.Bytes.Candidate.Mean))

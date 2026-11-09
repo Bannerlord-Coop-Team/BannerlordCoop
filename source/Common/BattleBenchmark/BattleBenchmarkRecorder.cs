@@ -172,9 +172,10 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
 
     public bool TryStart(string runId, string label, TimeSpan window, string outputDirectory, out string error)
     {
-        if (runId == null || !RunIdPattern.IsMatch(runId))
+        // "." and ".." would put the report in the output folder or its parent instead of a run folder.
+        if (runId == null || !RunIdPattern.IsMatch(runId) || runId == "." || runId == "..")
         {
-            error = "The run id must be 1 to 64 letters, digits, dots, dashes or underscores.";
+            error = "The run id must be 1 to 64 letters, digits, dots, dashes or underscores, and not . or ..";
             return false;
         }
         if (window < MinimumWindow || window > MaximumWindow)
