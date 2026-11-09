@@ -36,7 +36,6 @@ public class ClanJoinConfirmation : IClanJoinConfirmation
         };
         var paragraphs = new List<string>
         {
-            GameTexts.FindText("str_coop_clan_experimental_warning").ToString(),
             GameTexts.FindText(descriptionTextId)
                 .SetTextVariable("CLAN_NAME", targetClan.Name)
                 .SetTextVariable("LEADER_NAME", targetClan.Leader.Name).ToString(),

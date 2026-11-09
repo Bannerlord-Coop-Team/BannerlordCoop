@@ -50,6 +50,12 @@ public interface INetworkAgentRegistry : IDisposable
     IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId);
 
     /// <summary>
+    /// Replaces the contents of <paramref name="destination"/> with the snapshot <see cref="GetAgents(string)"/>
+    /// returns, so a per-tick caller can reuse one list instead of allocating an array each call.
+    /// </summary>
+    void GetAgents(string controllerId, List<CoopAgentInfo> destination);
+
+    /// <summary>
     /// Every controller id that currently holds at least one registered agent (by CURRENT authority, the
     /// same keying as <see cref="GetAgents"/>). Snapshot — safe to iterate while the registry mutates.
     /// </summary>
@@ -408,6 +414,23 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
             // Snapshot under the lock — the underlying list can be mutated by register/remove.
             return agents.ToArray();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void GetAgents(string controllerId, List<CoopAgentInfo> destination)
+    {
+        destination.Clear();
+        if (string.IsNullOrEmpty(controllerId))
+        {
+            Logger.Error($"{nameof(controllerId)} is null or empty.");
+            return;
+        }
+
+        lock (gate)
+        {
+            if (ControllerAgentMap.TryGetValue(controllerId, out var agents))
+                destination.AddRange(agents);
         }
     }
 

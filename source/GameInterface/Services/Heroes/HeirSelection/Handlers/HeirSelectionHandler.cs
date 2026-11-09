@@ -288,8 +288,7 @@ internal class HeirSelectionHandler : IHandler
                     showingWaitInquiry = true;
                     InformationManager.ShowInquiry(new InquiryData(
                         GameTexts.FindText("str_coop_succession_wait_title").ToString(),
-                        GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
-                        GameTexts.FindText("str_coop_succession_wait_description"), true, false,
+                        GameTexts.FindText("str_coop_succession_wait_description").ToString(), true, false,
                         GameTexts.FindText("str_coop_succession_disconnect").ToString(), string.Empty,
                         () => messageBroker.Publish(this, new PlayerDisconnectRequested()), null));
                     return;

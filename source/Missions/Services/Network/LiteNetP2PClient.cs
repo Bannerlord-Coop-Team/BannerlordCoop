@@ -1216,6 +1216,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         reliableMessageBatcher.Send(
             controllerId,
             messagePacket.Data,
+            GetMaxReliablePayloadBytes(controllerId),
             SendReliableMessagePayload);
     }
 
@@ -1282,6 +1283,21 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             relayInstanceId,
             controllerId,
             data));
+    }
+
+    // Largest reliable payload that leaves as one datagram on the controller's current route, so batches don't fragment.
+    private int GetMaxReliablePayloadBytes(string controllerId)
+    {
+        if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
+            return peer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered);
+
+        string currentInstanceId;
+        lock (peerGate)
+        {
+            currentInstanceId = instanceId;
+        }
+
+        return GetMaxRelayPayloadBytes(currentInstanceId, controllerId);
     }
 
     private bool IsControllerConnected(string controllerId)
