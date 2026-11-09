@@ -29,6 +29,7 @@ public partial class MissileHandler
     private readonly Queue<Guid> completedOutcomeOrder = new();
     private readonly Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)> pendingOutcomes = new();
     private readonly Dictionary<SpawnedItemEntity, Guid> bouncingItems = new();
+    private readonly HashSet<int> missingSceneParentIds = new();
     private long sentOutcomes;
     private long skippedOutcomes;
 
@@ -84,8 +85,7 @@ public partial class MissileHandler
             }
 
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
-                victimId, shield ? 0 : boneIndex,
-                shield ? (int)victim.GetOffhandWieldedItemIndex() : 0, 0f);
+                victimId, shield ? 0 : boneIndex, 0f);
             return;
         }
 
@@ -186,12 +186,12 @@ public partial class MissileHandler
             }
             frame = attachmentParent.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
         }
-        SendOutcome(itemId, kind, frame, null, 0, 0, remainingLifeTime, sceneId, worldItemId, shipId,
+        SendOutcome(itemId, kind, frame, null, 0, remainingLifeTime, sceneId, worldItemId, shipId,
             shipObjectKey, shipObjectIndex, parentEntityPath);
     }
 
     private void SendOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame, Guid? victimId,
-        int boneIndex, int shieldSlot, float remainingLifeTime,
+        int boneIndex, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
         string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
     {
@@ -208,7 +208,7 @@ public partial class MissileHandler
             : new[] { quaternion.X, quaternion.Y, quaternion.Z, quaternion.W };
 
         network.SendAll(new NetworkMissileOutcome(itemId, kind, frame.origin, orientation,
-            victimId, boneIndex, shieldSlot, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId,
+            victimId, boneIndex, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId,
             parentShipObjectKey, parentShipObjectIndex, parentEntityPath));
         sentOutcomes++;
         Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped} kind={Kind}",
@@ -288,7 +288,7 @@ public partial class MissileHandler
                 return false;
 
             if (message.Kind == MissileOutcomeKind.Shield)
-                victim.AttachWeaponToWeapon((EquipmentIndex)message.ShieldSlot, weapon, null, ref frame);
+                victim.AttachWeaponToWeapon(victim.GetOffhandWieldedItemIndex(), weapon, null, ref frame);
             else
                 victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
         }
@@ -336,13 +336,16 @@ public partial class MissileHandler
         parent = null;
         if (message.ParentMissionObjectId.HasValue)
         {
+            int id = message.ParentMissionObjectId.Value;
+            if (missingSceneParentIds.Contains(id)) return false;
             foreach (MissionObject candidate in mission.MissionObjects)
             {
-                if (candidate.Id.CreatedAtRuntime || candidate.Id.Id != message.ParentMissionObjectId.Value) continue;
+                if (candidate.Id.CreatedAtRuntime || candidate.Id.Id != id) continue;
                 parent = candidate;
-                break;
+                return true;
             }
-            return parent != null;
+            missingSceneParentIds.Add(id);
+            return false;
         }
         if (message.ParentWorldItemId.HasValue)
         {

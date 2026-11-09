@@ -127,6 +127,7 @@ public partial class MissileHandler : IMissileHandler
         completedOutcomeOrder.Clear();
         pendingOutcomes.Clear();
         bouncingItems.Clear();
+        missingSceneParentIds.Clear();
         while (pendingShots.TryDequeue(out _)) { }
     }
 
@@ -186,7 +187,8 @@ public partial class MissileHandler : IMissileHandler
 
     public void DrainPendingShots()
     {
-        GameThread.RunSafe(() => PruneOutcomes(DateTime.UtcNow));
+        if (replayOutcomes.Count > 0 || pendingOutcomes.Count > 0 || bouncingItems.Count > 0)
+            GameThread.RunSafe(() => PruneOutcomes(DateTime.UtcNow));
         int count = pendingShots.Count;
         for (int i = 0; i < count && pendingShots.TryDequeue(out var pending); i++)
         {

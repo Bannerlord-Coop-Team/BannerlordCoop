@@ -30,8 +30,6 @@ public class NetworkMissileOutcome : ICommand
     public Guid? VictimId { get; }
     [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
     public int BoneIndex { get; }
-    [ProtoMember(8, DataFormat = DataFormat.ZigZag)]
-    public int ShieldSlot { get; }
     [ProtoMember(9)]
     public float RemainingLifeTime { get; }
     [ProtoMember(10)]
@@ -48,7 +46,7 @@ public class NetworkMissileOutcome : ICommand
     public string ParentEntityPath { get; }
 
     public NetworkMissileOutcome(Guid worldItemId, MissileOutcomeKind kind, Vec3 origin, float[] rotation,
-        Guid? victimId, int boneIndex, int shieldSlot, float remainingLifeTime,
+        Guid? victimId, int boneIndex, float remainingLifeTime,
         int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null,
         string parentShipObjectKey = null, int? parentShipObjectIndex = null, string parentEntityPath = null)
     {
@@ -58,7 +56,6 @@ public class NetworkMissileOutcome : ICommand
         Rotation = rotation;
         VictimId = victimId;
         BoneIndex = boneIndex;
-        ShieldSlot = shieldSlot;
         RemainingLifeTime = remainingLifeTime;
         ParentMissionObjectId = parentMissionObjectId;
         ParentWorldItemId = parentWorldItemId;
