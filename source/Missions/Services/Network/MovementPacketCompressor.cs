@@ -33,8 +33,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 {
     internal const int MaxUncompressedBytes = 4096;
 
-    // ProtoMessageWrapper.Data, the packets' snapshot array (field 3), and CompressedMovementPacket's two fields.
-    private const byte WrapperDataTag = 0x12;
+    // The packets' snapshot array (field 3) and CompressedMovementPacket's two fields.
     private const int SnapshotField = 3;
     private const byte SnapshotTag = (SnapshotField << 3) | 2;
     private const byte UncompressedLengthTag = 0x08;
@@ -182,22 +181,22 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             }
 
             packetSnapshots[i] = encoded;
-            snapshotBytes += 1 + GetVarintLength((uint)encoded.Length) + encoded.Length;
+            snapshotBytes += 1 + ProtoBufSerializer.GetVarintLength((uint)encoded.Length) + encoded.Length;
         }
 
         byte[] header = serializer.Serialize(packetWithoutSnapshots);
-        ReadWrapper(header, out int typeFieldLength, out int bodyOffset, out int bodyLength);
+        ProtoBufSerializer.ReadWrapper(header, out int typeFieldLength, out int bodyOffset, out int bodyLength);
         int split = FindFirstFieldAfter(header, bodyOffset, bodyOffset + bodyLength, SnapshotField);
         int packetBodyLength = bodyLength + snapshotBytes;
-        int length = typeFieldLength + 1 + GetVarintLength((uint)packetBodyLength) + packetBodyLength;
+        int length = typeFieldLength + 1 + ProtoBufSerializer.GetVarintLength((uint)packetBodyLength) + packetBodyLength;
 
         byte[] buffer = ArrayPool<byte>.Shared.Rent(length);
         try
         {
             Buffer.BlockCopy(header, 0, buffer, 0, typeFieldLength);
             int offset = typeFieldLength;
-            buffer[offset++] = WrapperDataTag;
-            offset = WriteVarint(buffer, offset, (uint)packetBodyLength);
+            buffer[offset++] = ProtoBufSerializer.DataTag;
+            offset = ProtoBufSerializer.WriteVarint(buffer, offset, (uint)packetBodyLength);
             Buffer.BlockCopy(header, bodyOffset, buffer, offset, split - bodyOffset);
             offset += split - bodyOffset;
 
@@ -207,7 +206,7 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             {
                 EncodedSnapshot encoded = packetSnapshots[i];
                 buffer[offset++] = SnapshotTag;
-                offset = WriteVarint(buffer, offset, (uint)encoded.Length);
+                offset = ProtoBufSerializer.WriteVarint(buffer, offset, (uint)encoded.Length);
                 Buffer.BlockCopy(encoded.Captured ? captured : perPacket, encoded.Offset, buffer, offset, encoded.Length);
                 offset += encoded.Length;
             }
@@ -260,20 +259,20 @@ public class MovementPacketCompressor : IMovementPacketCompressor
     {
         byte[] typeField = compressedTypeField ??= ReadTypeField(
             serializer.Serialize(new CompressedMovementPacket(1, new byte[1])));
-        int bodyLength = 1 + GetVarintLength((uint)uncompressedLength) +
-            1 + GetVarintLength((uint)payloadLength) + payloadLength;
-        int length = typeField.Length + 1 + GetVarintLength((uint)bodyLength) + bodyLength;
+        int bodyLength = 1 + ProtoBufSerializer.GetVarintLength((uint)uncompressedLength) +
+            1 + ProtoBufSerializer.GetVarintLength((uint)payloadLength) + payloadLength;
+        int length = typeField.Length + 1 + ProtoBufSerializer.GetVarintLength((uint)bodyLength) + bodyLength;
         if (length >= uncompressedLength) return null;
 
         var envelope = new byte[length];
         Buffer.BlockCopy(typeField, 0, envelope, 0, typeField.Length);
         int offset = typeField.Length;
-        envelope[offset++] = WrapperDataTag;
-        offset = WriteVarint(envelope, offset, (uint)bodyLength);
+        envelope[offset++] = ProtoBufSerializer.DataTag;
+        offset = ProtoBufSerializer.WriteVarint(envelope, offset, (uint)bodyLength);
         envelope[offset++] = UncompressedLengthTag;
-        offset = WriteVarint(envelope, offset, (uint)uncompressedLength);
+        offset = ProtoBufSerializer.WriteVarint(envelope, offset, (uint)uncompressedLength);
         envelope[offset++] = CompressedPayloadTag;
-        offset = WriteVarint(envelope, offset, (uint)payloadLength);
+        offset = ProtoBufSerializer.WriteVarint(envelope, offset, (uint)payloadLength);
         Buffer.BlockCopy(payload, 0, envelope, offset, payloadLength);
         return envelope;
     }
@@ -289,28 +288,10 @@ public class MovementPacketCompressor : IMovementPacketCompressor
 
     private static byte[] ReadTypeField(byte[] wrapped)
     {
-        ReadWrapper(wrapped, out int typeFieldLength, out _, out _);
+        ProtoBufSerializer.ReadWrapper(wrapped, out int typeFieldLength, out _, out _);
         var typeField = new byte[typeFieldLength];
         Buffer.BlockCopy(wrapped, 0, typeField, 0, typeFieldLength);
         return typeField;
-    }
-
-    // ProtoMessageWrapper is an optional TypeId varint (field 1) followed by the length-prefixed Data (field 2).
-    private static void ReadWrapper(byte[] wrapped, out int typeFieldLength, out int bodyOffset, out int bodyLength)
-    {
-        int offset = 0;
-        if (wrapped[offset] != WrapperDataTag)
-        {
-            offset++;
-            ReadVarint(wrapped, ref offset);
-        }
-        typeFieldLength = offset;
-        if (wrapped[offset++] != WrapperDataTag)
-            throw new InvalidOperationException("Unexpected movement packet wrapper layout.");
-        bodyLength = checked((int)ReadVarint(wrapped, ref offset));
-        bodyOffset = offset;
-        if (bodyOffset + bodyLength != wrapped.Length)
-            throw new InvalidOperationException("Unexpected movement packet wrapper length.");
     }
 
     // protobuf-net writes fields in number order, so the snapshot field goes before the first higher-numbered one.
@@ -319,19 +300,19 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         while (offset < end)
         {
             int fieldStart = offset;
-            ulong tag = ReadVarint(data, ref offset);
+            ulong tag = ProtoBufSerializer.ReadVarint(data, ref offset);
             if ((int)(tag >> 3) > fieldNumber) return fieldStart;
 
             switch ((int)(tag & 7))
             {
                 case 0:
-                    ReadVarint(data, ref offset);
+                    ProtoBufSerializer.ReadVarint(data, ref offset);
                     break;
                 case 1:
                     offset += 8;
                     break;
                 case 2:
-                    int fieldLength = checked((int)ReadVarint(data, ref offset));
+                    int fieldLength = checked((int)ProtoBufSerializer.ReadVarint(data, ref offset));
                     offset += fieldLength;
                     break;
                 case 5:
@@ -342,39 +323,6 @@ public class MovementPacketCompressor : IMovementPacketCompressor
             }
         }
         return end;
-    }
-
-    private static ulong ReadVarint(byte[] data, ref int offset)
-    {
-        ulong value = 0;
-        for (int shift = 0; ; shift += 7)
-        {
-            byte b = data[offset++];
-            value |= (ulong)(b & 0x7F) << shift;
-            if (b < 0x80) return value;
-        }
-    }
-
-    private static int GetVarintLength(uint value)
-    {
-        int length = 1;
-        while (value >= 0x80)
-        {
-            value >>= 7;
-            length++;
-        }
-        return length;
-    }
-
-    private static int WriteVarint(byte[] destination, int offset, uint value)
-    {
-        while (value >= 0x80)
-        {
-            destination[offset++] = (byte)(value | 0x80);
-            value >>= 7;
-        }
-        destination[offset++] = (byte)value;
-        return offset;
     }
 
     private static bool IsMovement(IPacket packet)
