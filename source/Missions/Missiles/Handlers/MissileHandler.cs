@@ -328,11 +328,11 @@ public partial class MissileHandler : IMissileHandler
             Logger.Warning("Dropping missile replay: {Count} shots are unresolved", replayOutcomes.Count);
             return true;
         }
-        if (pendingOutcomes.TryGetValue(worldItemId, out var pendingOutcome))
+        if (outcome.Message != null)
         {
-            outcome.Expires = pendingOutcome.Expires;
-            if (!TryApplyOutcome(pendingOutcome.Message, outcome)) return false;
-            pendingOutcomes.Remove(worldItemId);
+            if (outcome.Expires <= DateTime.UtcNow) return true;
+            if (!TryApplyOutcome(outcome.Message, outcome)) return false;
+            replayOutcomes.Remove(worldItemId);
         }
         if (outcome.Applied) return true;
 

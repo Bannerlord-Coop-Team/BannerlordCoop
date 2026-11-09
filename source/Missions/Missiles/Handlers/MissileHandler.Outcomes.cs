@@ -35,6 +35,7 @@ public partial class MissileHandler
     {
         public MissionWeapon Weapon { get; }
         public Mission.Missile Missile { get; set; }
+        public NetworkMissileOutcome Message { get; set; }
         public bool Applied { get; set; }
         public DateTime Expires { get; set; }
 
@@ -210,24 +211,25 @@ public partial class MissileHandler
 
             NetworkMissileOutcome message = payload.What;
             if (completedOutcomes.Contains(message.WorldItemId)) return;
-            replayOutcomes.TryGetValue(message.WorldItemId, out var replay);
-            bool alreadyPending = pendingOutcomes.TryGetValue(message.WorldItemId, out var pending);
-            if (!alreadyPending)
-                pending = (message, DateTime.UtcNow.Add(PendingOutcomeLifetime));
-            if (replay != null && TryApplyOutcome(pending.Message, replay))
+            if (replayOutcomes.TryGetValue(message.WorldItemId, out var replay))
             {
-                pendingOutcomes.Remove(message.WorldItemId);
+                if (replay.Message == null)
+                {
+                    replay.Message = message;
+                    replay.Expires = DateTime.UtcNow.Add(PendingOutcomeLifetime);
+                }
+                if (replay.Expires > DateTime.UtcNow && TryApplyOutcome(replay.Message, replay))
+                    replayOutcomes.Remove(message.WorldItemId);
                 return;
             }
-            if (alreadyPending) return;
-            // Keep admitted work until its deadline, rejecting newest arrivals when all slots are unresolved.
+            if (pendingOutcomes.ContainsKey(message.WorldItemId)) return;
+            // Only outcomes whose shots have not arrived need a separate bounded slot.
             if (pendingOutcomes.Count >= MaxTrackedOutcomes)
             {
                 Logger.Warning("Dropping missile outcome: {Count} shots are pending", pendingOutcomes.Count);
                 return;
             }
-            pendingOutcomes.Add(message.WorldItemId, pending);
-            if (replay != null) replay.Expires = pending.Expires;
+            pendingOutcomes.Add(message.WorldItemId, (message, DateTime.UtcNow.Add(PendingOutcomeLifetime)));
         });
     }
 
@@ -239,6 +241,12 @@ public partial class MissileHandler
         if (replayOutcomes.Count >= MaxTrackedOutcomes) return false;
 
         replay = new ReplayOutcome(weapon);
+        if (pendingOutcomes.TryGetValue(itemId, out var pending))
+        {
+            replay.Message = pending.Message;
+            replay.Expires = pending.Expires;
+            pendingOutcomes.Remove(itemId);
+        }
         replayOutcomes.Add(itemId, replay);
         return true;
     }
@@ -290,7 +298,6 @@ public partial class MissileHandler
         }
 
         replay.Applied = true;
-        replayOutcomes.Remove(message.WorldItemId);
         completedOutcomes.Add(message.WorldItemId);
         completedOutcomeOrder.Enqueue(message.WorldItemId);
         Mission.Missile missile = replay.Missile;
@@ -345,13 +352,9 @@ public partial class MissileHandler
         {
             if (pending.Value.Expires <= now)
             {
-                Logger.Warning("Failed to apply missile outcome using {WorldItemId}: victim={VictimId} parent={ParentId}",
-                    pending.Key, pending.Value.Message.VictimId, pending.Value.Message.ParentMissionObjectId);
+                Logger.Warning("Failed to get missile shot using {WorldItemId}", pending.Key);
                 (finished ??= new List<Guid>()).Add(pending.Key);
             }
-            else if (replayOutcomes.TryGetValue(pending.Key, out var replay)
-                && TryApplyOutcome(pending.Value.Message, replay))
-                (finished ??= new List<Guid>()).Add(pending.Key);
         }
         if (finished != null)
             foreach (Guid itemId in finished) pendingOutcomes.Remove(itemId);
@@ -360,6 +363,13 @@ public partial class MissileHandler
         foreach (var replay in replayOutcomes)
         {
             if (replay.Value.Expires <= now)
+            {
+                if (replay.Value.Message != null)
+                    Logger.Warning("Failed to apply missile outcome using {WorldItemId}: victim={VictimId} parent={ParentId}",
+                        replay.Key, replay.Value.Message.VictimId, replay.Value.Message.ParentMissionObjectId);
+                (expired ??= new List<Guid>()).Add(replay.Key);
+            }
+            else if (replay.Value.Message != null && TryApplyOutcome(replay.Value.Message, replay.Value))
                 (expired ??= new List<Guid>()).Add(replay.Key);
         }
         if (expired != null)

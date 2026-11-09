@@ -636,6 +636,14 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 var unresolved = (System.Collections.IDictionary)AccessTools.Field(typeof(MissileHandler), "replayOutcomes").GetValue(peer.Handler)!;
                 var pending = (System.Collections.IDictionary)AccessTools.Field(typeof(MissileHandler), "pendingOutcomes").GetValue(peer.Handler)!;
                 Assert.Equal(8192, unresolved.Count);
+                int remainingSlots = 8192 - pending.Count;
+                for (int i = 0; i < remainingSlots; i++)
+                {
+                    long sequence = shot.ShotSequence + 8194 + i;
+                    peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, sequence),
+                        outcome.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
+                        outcome.ShieldSlot, outcome.RemainingLifeTime));
+                }
                 Assert.Equal(8192, pending.Count);
                 peer.Broker.Publish(this, outcome);
                 Assert.Equal(8192, pending.Count);
@@ -650,9 +658,6 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 Assert.Single(peer.Mission.Shell._missilesDictionary);
                 Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", peer.VictimId, peer.Victim));
                 peer.Handler.DrainPendingShots();
-                Assert.Equal(8191, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
-                Assert.Single(unresolved);
-                peer.Broker.Publish(this, outcome);
                 Assert.Equal(8192, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
                 Assert.Empty(unresolved);
                 Assert.Empty(peer.Mission.Shell._missilesDictionary);
@@ -731,17 +736,18 @@ public class MissileOutcomeTests : MissionTestEnvironment
             peer.Receive(outcome!);
             peer.Instance.Call(() =>
             {
-                var pending = (Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)>)
-                    AccessTools.Field(typeof(MissileHandler), "pendingOutcomes").GetValue(peer.Handler)!;
-                DateTime deadline = Assert.Single(pending).Value.Expires;
+                var unresolved = (System.Collections.IDictionary)AccessTools.Field(typeof(MissileHandler), "replayOutcomes").GetValue(peer.Handler)!;
+                object replay = Assert.Single(unresolved.Values.Cast<object>());
+                PropertyInfo expires = AccessTools.Property(replay.GetType(), "Expires");
+                DateTime deadline = (DateTime)expires.GetValue(replay)!;
                 peer.Handler.DrainPendingShots();
-                Assert.Equal(deadline, Assert.Single(pending).Value.Expires);
+                Assert.Equal(deadline, (DateTime)expires.GetValue(replay)!);
                 MethodInfo prune = AccessTools.Method(typeof(MissileHandler), "PruneOutcomes");
                 prune.Invoke(peer.Handler, new object[] { deadline.AddTicks(-1) });
-                Assert.Single(pending);
+                Assert.Single(unresolved);
                 Assert.Single(peer.Mission.Shell._missilesDictionary);
                 prune.Invoke(peer.Handler, new object[] { deadline });
-                Assert.Empty(pending);
+                Assert.Empty(unresolved);
                 Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", peer.VictimId, peer.Victim));
                 peer.Handler.DrainPendingShots();
                 Assert.Single(peer.Mission.Shell._missilesDictionary);
