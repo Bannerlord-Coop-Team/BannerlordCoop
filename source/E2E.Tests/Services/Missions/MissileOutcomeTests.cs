@@ -183,6 +183,38 @@ public class MissileOutcomeTests : MissionTestEnvironment
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissileLandingAfterShooterDeath_StillRegistersTheCanonicalWorldItem(bool nativeDeleted)
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            NetworkAgentShoot shot = shooter.Shoot();
+            peer.Receive(shot);
+            NetworkMissileOutcome? outcome = null;
+            Guid itemId = MissileHandler.CreateMissileItemId(shot.AgentId, shot.ShotSequence);
+            shooter.Instance.Call(() =>
+            {
+                using var deaths = new AgentDeathHandler(shooter.Instance.Resolve<INetworkAgentRegistry>(), shooter.Broker);
+                shooter.Broker.Publish(this, new AgentDied(shooter.Shooter));
+                if (nativeDeleted)
+                    shooter.Mission.Shell.GetMissionBehavior<CoopMissionController>().OnAgentDeleted(shooter.Shooter);
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(false));
+                Assert.True(shooter.Items.TryGet(itemId, out var item));
+                Assert.True(item.IsStuckMissile());
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                Assert.True(peer.Items.TryGet(itemId, out _));
+            });
+        });
+    }
+
     [Fact]
     public void GroundOutcome_UsesTheFinalGlobalItemFrame()
     {
@@ -333,6 +365,219 @@ public class MissileOutcomeTests : MissionTestEnvironment
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AttachmentBeforeVictimRegistration_WaitsWithoutRemovingTheFlyingReplay(bool shield)
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            Mission.Missile? flying = null;
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                flying = Assert.Single(peer.Mission.Shell._missilesDictionary).Value;
+                var agents = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(agents.RemoveAgent(peer.VictimId));
+                agents.ForgetCosmeticAgent(peer.Victim);
+            });
+            NetworkMissileOutcome? outcome = null;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim, shield);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                Assert.Same(flying, Assert.Single(peer.Mission.Shell._missilesDictionary).Value);
+                Assert.DoesNotContain(flying!.Entity, native.RemovedEntities);
+                Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", peer.VictimId, peer.Victim));
+                peer.Handler.DrainPendingShots();
+                var attachment = Assert.Single(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                Assert.Equal(shield, attachment.Shield);
+                AssertFrame(Frame(true), attachment.Frame, exact: true);
+                Assert.Empty(peer.Mission.Shell._missilesDictionary);
+            });
+        });
+    }
+
+    [Theory]
+    [InlineData(false, "scene", false)]
+    [InlineData(true, "scene", false)]
+    [InlineData(false, "item", false)]
+    [InlineData(true, "item", false)]
+    [InlineData(false, "ship", false)]
+    [InlineData(true, "ship", false)]
+    [InlineData(false, "scene", true)]
+    [InlineData(true, "scene", true)]
+    public void ParentedOutcome_FollowsThePeersMovingParent(bool bounce, string identity, bool scaled)
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            MissionObject? sourceParent = null;
+            MissionObject? targetParent = null;
+            Guid canonicalId = Guid.NewGuid();
+            var sourceParentFrame = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 30f));
+            var targetParentFrame = new MatrixFrame(Mat3.Identity, new Vec3(40f, 50f, 60f));
+            if (scaled)
+            {
+                sourceParentFrame.rotation.s *= 1.5f;
+                sourceParentFrame.rotation.f *= 2f;
+                sourceParentFrame.rotation.u *= 0.8f;
+                targetParentFrame.rotation = sourceParentFrame.rotation;
+            }
+            shooter.Instance.Call(() => sourceParent = native.AddParent(shooter, 37, sourceParentFrame,
+                identity != "scene", identity == "item"));
+            peer.Instance.Call(() => targetParent = native.AddParent(peer, identity == "scene" ? 37 : 75,
+                targetParentFrame, identity != "scene", identity == "item"));
+            if (identity == "item")
+            {
+                shooter.Items.Register(canonicalId, (SpawnedItemEntity)sourceParent!);
+                peer.Items.Register(canonicalId, (SpawnedItemEntity)targetParent!);
+            }
+            if (identity == "ship")
+            {
+                Assert.True(shooter.Ships.TryRegister(new NetworkShipInfo(canonicalId, "shooter", null, false, sourceParent!, null)));
+                Assert.True(peer.Ships.TryRegister(new NetworkShipInfo(canonicalId, "shooter", null, false, targetParent!, null)));
+            }
+            NetworkMissileOutcome? outcome = null;
+            MatrixFrame localFrame = Frame(false);
+            shooter.Instance.Call(() =>
+            {
+                MatrixFrame contactFrame = bounce ? sourceParentFrame.TransformToParent(in localFrame) : localFrame;
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    bounce ? Mission.MissileCollisionReaction.BounceBack : Mission.MissileCollisionReaction.Stick,
+                    contactFrame, parent: bounce ? null : sourceParent);
+                if (bounce)
+                {
+                    native.SettleParent = sourceParent;
+                    Assert.True(shooter.Items.TryGet(MissileHandler.CreateMissileItemId(
+                        Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkAgentShoot>()).AgentId,
+                        Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkAgentShoot>()).ShotSequence), out var item));
+                    item.DisableDynamicBody();
+                }
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+                Assert.Equal(identity == "scene" ? 37 : (int?)null, outcome.ParentMissionObjectId);
+                Assert.Equal(identity == "item" ? canonicalId : (Guid?)null, outcome.ParentWorldItemId);
+                Assert.Equal(identity == "ship" ? canonicalId : (Guid?)null, outcome.ParentShipId);
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                Assert.True(peer.Items.TryGet(outcome!.WorldItemId, out var item));
+                Assert.Same(targetParent, peer.Spawner.Parents[item]);
+                Assert.True((localFrame.origin - peer.Spawner.LocalFrames[item].origin).Length < 0.0001f);
+                MatrixFrame moved = targetParentFrame;
+                moved.origin += new Vec3(100f, -20f, 5f);
+                moved.rotation.RotateAboutUp(0.7f);
+                native.EntityFrames[targetParent!.GameEntity.Pointer] = moved;
+                Assert.True(peer.Spawner.TryGetState(item, out var frame, out _));
+                Assert.True((frame.origin - moved.TransformToParent(in localFrame).origin).Length < 0.001f);
+                if (bounce)
+                    Assert.Equal(targetParent.GameEntity.Pointer, native.SnapParents[item]!.Pointer);
+                var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+                output.WriteLine($"{outcome.Kind} parent={identity} scaled={scaled}: MessagePacket.Data={MessagePacket.Create(outcome, serializer).Data.Length} bytes");
+            });
+        });
+    }
+
+    [Fact]
+    public void CapacityPressure_EvictsCompletedHistoryBeforeAnUnresolvedShot()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            NetworkAgentShoot shot = shooter.Shoot();
+            peer.Receive(shot);
+            long secondSequence = shot.ShotSequence + 8193;
+            peer.Receive(new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity, shot.Orientation,
+                shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner, shot.MissileIndex,
+                shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, secondSequence));
+            peer.Instance.Call(() => peer.Handler.DrainPendingShots());
+            NetworkMissileOutcome? outcome = null;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Instance.Call(() =>
+            {
+                for (int i = 1; i <= 8192; i++)
+                {
+                    long sequence = shot.ShotSequence + i;
+                    peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
+                        shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
+                        shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
+                    peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, sequence),
+                        outcome!.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
+                        outcome.ShieldSlot, outcome.RemainingLifeTime));
+                }
+                peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, secondSequence),
+                    outcome!.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
+                    outcome.ShieldSlot, outcome.RemainingLifeTime));
+                Assert.Single(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+                peer.Handler.DrainPendingShots();
+                Assert.Equal(8193, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
+                Assert.Single(peer.Mission.Shell._missilesDictionary);
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                Assert.Empty(peer.Mission.Shell._missilesDictionary);
+                Assert.Equal(8194, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
+            });
+        });
+    }
+
+    [Fact]
+    public void MissingVictim_ExpiresAtTheOriginalDeadlineWithoutRemovingTheReplay()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            peer.Receive(shooter.Shoot());
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                var agents = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(agents.RemoveAgent(peer.VictimId));
+                agents.ForgetCosmeticAgent(peer.Victim);
+            });
+            NetworkMissileOutcome? outcome = null;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Receive(outcome!);
+            peer.Instance.Call(() =>
+            {
+                var pending = (Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)>)
+                    AccessTools.Field(typeof(MissileHandler), "pendingOutcomes").GetValue(peer.Handler)!;
+                DateTime deadline = Assert.Single(pending).Value.Expires;
+                peer.Handler.DrainPendingShots();
+                Assert.Equal(deadline, Assert.Single(pending).Value.Expires);
+                MethodInfo prune = AccessTools.Method(typeof(MissileHandler), "PruneOutcomes");
+                prune.Invoke(peer.Handler, new object[] { deadline.AddTicks(-1) });
+                Assert.Single(pending);
+                Assert.Single(peer.Mission.Shell._missilesDictionary);
+                prune.Invoke(peer.Handler, new object[] { deadline });
+                Assert.Empty(pending);
+                Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", peer.VictimId, peer.Victim));
+                peer.Handler.DrainPendingShots();
+                Assert.Single(peer.Mission.Shell._missilesDictionary);
+                Assert.DoesNotContain(native.Attachments, value => ReferenceEquals(value.Victim, peer.Victim));
+            });
+        });
+    }
+
+    [Theory]
     [InlineData(MissileOutcomeKind.Ground, false)]
     [InlineData(MissileOutcomeKind.Ground, true)]
     [InlineData(MissileOutcomeKind.BounceSettled, false)]
@@ -365,7 +610,10 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 Assert.Equal(attach ? shooter.VictimId : (Guid?)null, copy.VictimId);
                 Assert.Equal(original.BoneIndex, copy.BoneIndex);
                 Assert.Equal(original.ShieldSlot, copy.ShieldSlot);
-                Assert.Equal(original.IsAttachedFrameLocal, copy.IsAttachedFrameLocal);
+                Assert.Equal(kind == MissileOutcomeKind.Shield ? 0 : original.BoneIndex, copy.BoneIndex);
+                Assert.Equal(original.ParentMissionObjectId, copy.ParentMissionObjectId);
+                Assert.Equal(original.ParentWorldItemId, copy.ParentWorldItemId);
+                Assert.Equal(original.ParentShipId, copy.ParentShipId);
                 Assert.Equal(original.RemainingLifeTime, copy.RemainingLifeTime);
                 output.WriteLine($"{kind} exact={exact}: MessagePacket.Data={packet.Data.Length} bytes; rotation={copy.Rotation.Length * 4} bytes");
             });
@@ -450,6 +698,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public IMessageBroker Broker { get; }
         public MockBattleNetwork Network { get; }
         public NetworkWorldItemRegistry Items { get; } = new();
+        public NetworkShipRegistry Ships { get; } = new();
         public RecordingSpawner Spawner { get; }
         public MissileHandler Handler { get; }
         private readonly WeaponDropHandler drops;
@@ -464,6 +713,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Mission = engine.CreateMission(instance);
             Mission.Shell._missilesDictionary = new Dictionary<int, Mission.Missile>();
             Mission.Shell._missilesList = new MBList<Mission.Missile>();
+            AccessTools.Field(typeof(Mission), "_missionObjects").SetValue(Mission.Shell, new MBList<MissionObject>());
             Shooter = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Victim = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             var agents = instance.Resolve<INetworkAgentRegistry>();
@@ -479,13 +729,14 @@ public class MissileOutcomeTests : MissionTestEnvironment
             Network.RouteMessages = false;
             Spawner = new RecordingSpawner(native);
             native.Spawners[Mission.Shell] = Spawner;
-            Handler = new MissileHandler(Network, Broker, agents, Spawner);
+            Handler = new MissileHandler(Network, Broker, agents, Spawner, Items);
             drops = new WeaponDropHandler(agents, Items, Broker, Network, instance.Resolve<IObjectManager>(), Spawner);
             pickups = new WeaponPickupHandler(agents, Items, Network, Broker, instance.Resolve<IObjectManager>());
             var controller = ObjectHelper.SkipConstructor<CoopBattleController>();
             var component = new Mock<ICoopMissionComponent>();
             component.SetupGet(value => value.MissileHandler).Returns(Handler);
             component.SetupGet(value => value.AgentRegistry).Returns(agents);
+            component.SetupGet(value => value.ShipRegistry).Returns(Ships);
             typeof(CoopMissionController).GetField("coopMissionComponent", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .SetValue(controller, component.Object);
             Mission.Shell.MissionBehaviors.Add(controller);
@@ -514,10 +765,10 @@ public class MissileOutcomeTests : MissionTestEnvironment
         }
 
         public void Contact(Mission.Missile missile, Mission.MissileCollisionReaction reaction,
-            MatrixFrame? frame = null, Agent? victim = null, bool shield = false)
+            MatrixFrame? frame = null, Agent? victim = null, bool shield = false, MissionObject? parent = null)
         {
             Mission.Shell.HandleMissileCollisionReaction(missile.Index, reaction, frame ?? MatrixFrame.Identity,
-                true, missile.ShooterAgent, victim, shield, 7, null, Vec3.Zero, Vec3.Zero, -1);
+                true, missile.ShooterAgent, victim, shield, 7, parent, Vec3.Zero, Vec3.Zero, -1);
             Mission.Shell.OnMissileRemoved(missile.Index);
         }
 
@@ -533,6 +784,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
     {
         private readonly NativeFixture native;
         public Dictionary<SpawnedItemEntity, MatrixFrame> Frames { get; } = new();
+        public Dictionary<SpawnedItemEntity, MissionObject> Parents { get; } = new();
+        public Dictionary<SpawnedItemEntity, MatrixFrame> LocalFrames { get; } = new();
         public int SpawnCount { get; private set; }
         public bool IsReady { get; set; } = true;
         public RecordingSpawner(NativeFixture native) => this.native = native;
@@ -541,17 +794,27 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public bool TryGetState(SpawnedItemEntity item, out MatrixFrame frame, out float remainingLifeTime)
         {
             remainingLifeTime = 175f;
+            if (Parents.TryGetValue(item, out var parent))
+                Frames[item] = parent.GameEntity.GetGlobalFrame().TransformToParent(LocalFrames[item]);
             return Frames.TryGetValue(item, out frame);
         }
         public bool TrySpawn(ref MissionWeapon weapon, Mission.WeaponSpawnFlags spawnFlags, bool hasLifeTime,
-            float remainingLifeTime, MatrixFrame frame, out SpawnedItemEntity item)
+            float remainingLifeTime, MatrixFrame frame, out SpawnedItemEntity item, MissionObject? parent = null)
         {
             SpawnCount++;
             item = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
             item._weapon = weapon;
             item.SpawnFlags = spawnFlags;
             item.Id = new MissionObjectId(100 + SpawnCount, true);
-            Frames.Add(item, frame);
+            GameEntity entity = native.NewEntity();
+            item._ownerGameEntity = entity;
+            item._gameEntity = entity.WeakEntity;
+            Frames.Add(item, parent == null ? frame : parent.GameEntity.GetGlobalFrame().TransformToParent(in frame));
+            if (parent != null)
+            {
+                Parents[item] = parent;
+                LocalFrames[item] = frame;
+            }
             native.ItemSpawners[item] = this;
             return true;
         }
@@ -563,6 +826,7 @@ public class MissileOutcomeTests : MissionTestEnvironment
         private static NativeFixture current = null!;
         private readonly Harmony harmony = new("e2e.missile-outcome." + Guid.NewGuid().ToString("N"));
         private readonly Dictionary<GameEntity, SpawnedItemEntity?> entities = new();
+        public Dictionary<UIntPtr, MatrixFrame> EntityFrames { get; } = new();
         public Dictionary<Mission, RecordingSpawner> Spawners { get; } = new();
         public Dictionary<SpawnedItemEntity, RecordingSpawner> ItemSpawners { get; } = new();
         public HashSet<GameEntity> RemovedEntities { get; } = new();
@@ -571,6 +835,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
         public int SnapCalls { get; private set; }
         public int PickupCalls { get; private set; }
         public MatrixFrame? DropFrameOverride { get; set; }
+        public MissionObject? SettleParent { get; set; }
+        public Dictionary<SpawnedItemEntity, GameEntity?> SnapParents { get; } = new();
         public sealed record Attachment(Agent Victim, bool Shield, int Index, MatrixFrame Frame);
 
         public NativeFixture()
@@ -581,6 +847,8 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 .MakeGenericMethod(typeof(SpawnedItemEntity)), prefix: Method(nameof(GetItem)));
             Patch(typeof(GameEntity), nameof(GameEntity.Remove), nameof(RemoveEntity));
             Patch(typeof(GameEntity), nameof(GameEntity.SetVisibilityExcludeParents), nameof(Skip));
+            Patch(typeof(GameEntity), nameof(GameEntity.CreateFromWeakEntity), nameof(FromWeak));
+            Patch(typeof(WeakGameEntity), nameof(WeakGameEntity.GetGlobalFrame), nameof(WeakGlobalFrame));
             Patch(typeof(MissionWeapon), nameof(MissionWeapon.GetWeaponData), nameof(SkipWeaponData));
             Patch(typeof(MissionWeapon), nameof(MissionWeapon.GetWeaponStatsDataForUsage), nameof(SkipStats));
             Patch(typeof(Mission), nameof(Mission.AddMissileSingleUsageAux), nameof(AddMissile));
@@ -640,6 +908,24 @@ public class MissileOutcomeTests : MissionTestEnvironment
                 managed.SetValue(null, original);
             }
         }
+
+        public MissionObject AddParent(Client client, int id, MatrixFrame frame, bool runtime = false, bool worldItem = false)
+        {
+            MissionObject parent = worldItem ? ObjectHelper.SkipConstructor<SpawnedItemEntity>()
+                : ObjectHelper.SkipConstructor<SynchedMissionObject>();
+            parent.Id = new MissionObjectId(id, runtime);
+            GameEntity entity = NewEntity();
+            parent._gameEntity = entity.WeakEntity;
+            EntityFrames[entity.Pointer] = frame;
+            client.Mission.Shell._missionObjects.Add(parent);
+            if (parent is SpawnedItemEntity item)
+            {
+                item._ownerGameEntity = entity;
+                client.Spawner.Frames[item] = frame;
+                ItemSpawners[item] = client.Spawner;
+            }
+            return parent;
+        }
         private void Patch(Type type, string target, string prefix) =>
             harmony.Patch(AccessTools.Method(type, target), prefix: Method(prefix));
         private static HarmonyMethod Method(string name) => new(typeof(NativeFixture), name) { priority = Priority.First };
@@ -657,6 +943,16 @@ public class MissileOutcomeTests : MissionTestEnvironment
             current.RemovedEntities.Add(__instance);
             return false;
         }
+        private static bool FromWeak(WeakGameEntity weakEntity, ref GameEntity? __result)
+        {
+            __result = current.entities.Keys.Single(value => value.Pointer == weakEntity.Pointer);
+            return false;
+        }
+        private static bool WeakGlobalFrame(WeakGameEntity __instance, ref MatrixFrame __result)
+        {
+            if (!current.EntityFrames.TryGetValue(__instance.Pointer, out __result)) return true;
+            return false;
+        }
         private static bool AddMissile(out GameEntity missileEntity, ref int __result)
         {
             current.ReconstructedMissiles++;
@@ -669,13 +965,14 @@ public class MissileOutcomeTests : MissionTestEnvironment
             __instance.OnMissileRemoved(missileIndex);
             return false;
         }
-        private static bool DropMissile(Mission __instance, int missileIndex, in MatrixFrame attachLocalFrame,
+        private static bool DropMissile(Mission __instance, int missileIndex, MissionObject? attachedMissionObject,
+            in MatrixFrame attachLocalFrame,
             Mission.WeaponSpawnFlags spawnFlags, ref MissionObjectId __result)
         {
             Mission.Missile missile = __instance._missilesDictionary[missileIndex];
             MissionWeapon weapon = missile.Weapon;
             current.Spawners[__instance].TrySpawn(ref weapon, spawnFlags, true, 175f,
-                current.DropFrameOverride ?? attachLocalFrame, out var item);
+                current.DropFrameOverride ?? attachLocalFrame, out var item, attachedMissionObject);
             current.entities[missile.Entity] = item;
             __result = item.Id;
             return false;
@@ -691,12 +988,27 @@ public class MissileOutcomeTests : MissionTestEnvironment
             return false;
         }
         private static bool Offhand(ref EquipmentIndex __result) { __result = EquipmentIndex.Weapon1; return false; }
-        private static bool DisablePhysics(SpawnedItemEntity __instance) { __instance._physicsStopped = true; return false; }
-        private static bool Snap(SpawnedItemEntity __instance, MatrixFrame frame)
+        private static bool DisablePhysics(SpawnedItemEntity __instance)
+        {
+            __instance._physicsStopped = true;
+            if (current.SettleParent != null)
+            {
+                var spawner = current.ItemSpawners[__instance];
+                MatrixFrame frame = spawner.Frames[__instance];
+                var parent = current.SettleParent;
+                __instance._groundEntityWhenDisabled = current.entities.Keys.Single(value => value.Pointer == parent.GameEntity.Pointer);
+                spawner.Parents[__instance] = parent;
+                spawner.LocalFrames[__instance] = parent.GameEntity.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
+            }
+            return false;
+        }
+        private static bool Snap(SpawnedItemEntity __instance, MatrixFrame frame, GameEntity? parent)
         {
             current.SnapCalls++;
             __instance._physicsStopped = true;
-            current.ItemSpawners[__instance].Frames[__instance] = frame;
+            current.SnapParents[__instance] = parent;
+            current.ItemSpawners[__instance].Frames[__instance] = parent == null
+                ? frame : current.EntityFrames[parent.Pointer].TransformToParent(in frame);
             return false;
         }
         private static bool Pickup() { current.PickupCalls++; return false; }

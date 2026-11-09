@@ -30,15 +30,20 @@ public class NetworkMissileOutcome : ICommand
     public Guid? VictimId { get; }
     [ProtoMember(6, DataFormat = DataFormat.ZigZag)]
     public int BoneIndex { get; }
-    [ProtoMember(7)]
-    public bool IsAttachedFrameLocal { get; }
     [ProtoMember(8, DataFormat = DataFormat.ZigZag)]
     public int ShieldSlot { get; }
     [ProtoMember(9)]
     public float RemainingLifeTime { get; }
+    [ProtoMember(10)]
+    public int? ParentMissionObjectId { get; }
+    [ProtoMember(11)]
+    public Guid? ParentWorldItemId { get; }
+    [ProtoMember(12)]
+    public Guid? ParentShipId { get; }
 
     public NetworkMissileOutcome(Guid worldItemId, MissileOutcomeKind kind, Vec3 origin, float[] rotation,
-        Guid? victimId, int boneIndex, bool isAttachedFrameLocal, int shieldSlot, float remainingLifeTime)
+        Guid? victimId, int boneIndex, int shieldSlot, float remainingLifeTime,
+        int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null)
     {
         WorldItemId = worldItemId;
         Kind = kind;
@@ -46,8 +51,10 @@ public class NetworkMissileOutcome : ICommand
         Rotation = rotation;
         VictimId = victimId;
         BoneIndex = boneIndex;
-        IsAttachedFrameLocal = isAttachedFrameLocal;
         ShieldSlot = shieldSlot;
         RemainingLifeTime = remainingLifeTime;
+        ParentMissionObjectId = parentMissionObjectId;
+        ParentWorldItemId = parentWorldItemId;
+        ParentShipId = parentShipId;
     }
 }

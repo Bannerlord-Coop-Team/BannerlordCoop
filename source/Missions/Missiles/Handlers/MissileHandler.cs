@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Handlers;
+using Missions.Agents;
 using Missions.Missiles.Message;
 using Serilog;
 using System;
@@ -27,7 +28,7 @@ public interface IMissileHandler : IHandler
         bool isMountFallback, Vec3 impactVelocity);
     Guid PrepareCollision(Mission.Missile missile, ref Mission.MissileCollisionReaction reaction);
     void ReportCollision(Guid worldItemId, Mission.Missile missile, Mission.MissileCollisionReaction reaction,
-        MatrixFrame frame, bool isAttachedFrameLocal, Agent victim, bool shield, sbyte boneIndex);
+        MatrixFrame frame, Agent victim, bool shield, sbyte boneIndex, MissionObject parent);
 }
 
 /// <inheritdoc/>
@@ -62,12 +63,14 @@ public partial class MissileHandler : IMissileHandler
     }
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
-        INetworkAgentRegistry networkAgentRegistry, IWeaponDropWorldItemSpawner worldItemSpawner)
+        INetworkAgentRegistry networkAgentRegistry, IWeaponDropWorldItemSpawner worldItemSpawner,
+        INetworkWorldItemRegistry worldItemRegistry)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
         this.worldItemSpawner = worldItemSpawner;
+        this.worldItemRegistry = worldItemRegistry;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
@@ -95,7 +98,7 @@ public partial class MissileHandler : IMissileHandler
         localShots.Clear();
         reconstructedShots.Clear();
         replayOutcomes.Clear();
-        replayOutcomeOrder.Clear();
+        completedOutcomeOrder.Clear();
         pendingOutcomes.Clear();
         bouncingItems.Clear();
         while (pendingShots.TryDequeue(out _)) { }
@@ -157,7 +160,7 @@ public partial class MissileHandler : IMissileHandler
 
     public void DrainPendingShots()
     {
-        PruneOutcomes();
+        GameThread.RunSafe(() => PruneOutcomes(DateTime.UtcNow));
         int count = pendingShots.Count;
         for (int i = 0; i < count && pendingShots.TryDequeue(out var pending); i++)
         {
@@ -225,8 +228,8 @@ public partial class MissileHandler : IMissileHandler
         (Guid AgentId, long ShotSequence) shot;
         if (hasReconstructed && dropped.Missile != null && ReferenceEquals(reconstructedShot.Missile, dropped.Missile))
             shot = (reconstructedShot.AgentId, reconstructedShot.ShotSequence);
-        else if (hasLocal && networkAgentRegistry.TryGetAgentInfo(dropped.Shooter, out var shooterInfo)
-            && localShot.AgentId == shooterInfo.AgentId)
+        else if (hasLocal && networkAgentRegistry.TryGetCosmeticAgentId(dropped.Shooter, out Guid shooterId)
+            && localShot.AgentId == shooterId)
             shot = localShot;
         else
             return;
@@ -316,19 +319,12 @@ public partial class MissileHandler : IMissileHandler
         missileWeapon.Amount = 1;
 
         Guid worldItemId = CreateMissileItemId(shot.AgentId, shot.ShotSequence);
-        if (!replayOutcomes.TryGetValue(worldItemId, out var outcome))
-        {
-            while (replayOutcomeOrder.Count >= MaxTrackedOutcomes)
-                replayOutcomes.Remove(replayOutcomeOrder.Dequeue());
-            outcome = new ReplayOutcome(missileWeapon);
-            replayOutcomes.Add(worldItemId, outcome);
-            replayOutcomeOrder.Enqueue(worldItemId);
-        }
+        if (!TryTrackOutcome(worldItemId, missileWeapon, out var outcome)) return false;
         if (pendingOutcomes.TryGetValue(worldItemId, out var pendingOutcome))
         {
-            if (!worldItemSpawner.IsReady) return false;
+            outcome.Expires = pendingOutcome.Expires;
+            if (!TryApplyOutcome(pendingOutcome.Message, outcome)) return false;
             pendingOutcomes.Remove(worldItemId);
-            ApplyOutcome(pendingOutcome.Message, outcome);
         }
         if (outcome.Applied) return true;
 

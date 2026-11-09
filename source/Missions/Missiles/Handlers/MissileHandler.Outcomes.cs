@@ -2,10 +2,12 @@
 using Common.Messaging;
 using Common.Util;
 using Missions.Agents.Handlers;
+using Missions.Agents;
 using Missions.Missiles.Message;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -17,8 +19,9 @@ public partial class MissileHandler
     private const float RotationRoundTripToleranceSquared = 4e-12f;
     private static readonly TimeSpan PendingOutcomeLifetime = TimeSpan.FromSeconds(30);
     private readonly IWeaponDropWorldItemSpawner worldItemSpawner;
+    private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly Dictionary<Guid, ReplayOutcome> replayOutcomes = new();
-    private readonly Queue<Guid> replayOutcomeOrder = new();
+    private readonly Queue<Guid> completedOutcomeOrder = new();
     private readonly Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)> pendingOutcomes = new();
     private readonly Dictionary<SpawnedItemEntity, Guid> bouncingItems = new();
     private long sentOutcomes;
@@ -29,10 +32,12 @@ public partial class MissileHandler
         public MissionWeapon Weapon { get; }
         public Mission.Missile Missile { get; set; }
         public bool Applied { get; set; }
+        public DateTime Expires { get; set; }
 
         public ReplayOutcome(MissionWeapon weapon)
         {
             Weapon = weapon;
+            Expires = DateTime.UtcNow.Add(PendingOutcomeLifetime);
         }
     }
 
@@ -53,7 +58,7 @@ public partial class MissileHandler
     }
 
     public void ReportCollision(Guid worldItemId, Mission.Missile missile, Mission.MissileCollisionReaction reaction,
-        MatrixFrame frame, bool isAttachedFrameLocal, Agent victim, bool shield, sbyte boneIndex)
+        MatrixFrame frame, Agent victim, bool shield, sbyte boneIndex, MissionObject parent)
     {
         if (disposed || worldItemId == Guid.Empty) return;
 
@@ -73,13 +78,17 @@ public partial class MissileHandler
             }
 
             SendOutcome(worldItemId, shield ? MissileOutcomeKind.Shield : MissileOutcomeKind.Body, frame,
-                victimId, boneIndex, isAttachedFrameLocal,
+                victimId, shield ? 0 : boneIndex,
                 shield ? (int)victim.GetOffhandWieldedItemIndex() : 0, 0f);
             return;
         }
 
         SpawnedItemEntity item = missile.Entity?.GetFirstScriptOfType<SpawnedItemEntity>();
         if (item == null) return;
+
+        // The shot still names its item even if native deletion already retired the shooter identity.
+        if (!worldItemRegistry.TryGetId(item, out Guid registeredId) || registeredId != worldItemId)
+            messageBroker.Publish(this, new MissileItemIdentified(item, worldItemId));
 
         if (reaction == Mission.MissileCollisionReaction.BounceBack)
         {
@@ -91,7 +100,7 @@ public partial class MissileHandler
         else if (reaction == Mission.MissileCollisionReaction.Stick
             && worldItemSpawner.TryGetState(item, out var globalFrame, out float lifeTime))
         {
-            SendOutcome(worldItemId, MissileOutcomeKind.Ground, globalFrame, null, 0, false, 0, lifeTime);
+            SendWorldOutcome(worldItemId, MissileOutcomeKind.Ground, globalFrame, lifeTime, parent);
         }
     }
 
@@ -101,12 +110,57 @@ public partial class MissileHandler
         if (disposed || !bouncingItems.TryGetValue(item, out Guid itemId)) return;
 
         bouncingItems.Remove(item);
-        if (worldItemSpawner.TryGetState(item, out var frame, out float lifeTime))
-            SendOutcome(itemId, MissileOutcomeKind.BounceSettled, frame, null, 0, false, 0, lifeTime);
+        if (!worldItemSpawner.TryGetState(item, out var frame, out float lifeTime)) return;
+
+        MissionObject parent = null;
+        if (item._groundEntityWhenDisabled != null)
+        {
+            foreach (MissionObject candidate in Mission.Current.MissionObjects)
+            {
+                if (candidate.GameEntity != item._groundEntityWhenDisabled.WeakEntity) continue;
+                parent = candidate;
+                break;
+            }
+            if (parent == null)
+            {
+                Logger.Warning("Failed to get mission object for settled missile parent {WorldItemId}", itemId);
+                return;
+            }
+        }
+        SendWorldOutcome(itemId, MissileOutcomeKind.BounceSettled, frame, lifeTime, parent);
+    }
+
+    private void SendWorldOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame,
+        float remainingLifeTime, MissionObject parent)
+    {
+        int? sceneId = null;
+        Guid? worldItemId = null;
+        Guid? shipId = null;
+        if (parent != null)
+        {
+            if (!parent.Id.CreatedAtRuntime)
+                sceneId = parent.Id.Id;
+            else if (parent is SpawnedItemEntity item && worldItemRegistry.TryGetId(item, out Guid parentId))
+                worldItemId = parentId;
+            else
+            {
+                // The component owns the actual mission's transient ship registry.
+                var ships = Mission.Current.GetMissionBehavior<CoopMissionController>()?.MissionComponent.ShipRegistry;
+                if (ships == null || !ships.TryGetByHull(parent, out var ship))
+                {
+                    Logger.Warning("Failed to get network identity for missile parent {ParentId}", parent.Id);
+                    return;
+                }
+                shipId = ship.ShipId;
+            }
+            frame = parent.GameEntity.GetGlobalFrame().TransformToLocalNonOrthogonal(in frame);
+        }
+        SendOutcome(itemId, kind, frame, null, 0, 0, remainingLifeTime, sceneId, worldItemId, shipId);
     }
 
     private void SendOutcome(Guid itemId, MissileOutcomeKind kind, MatrixFrame frame, Guid? victimId,
-        int boneIndex, bool isAttachedFrameLocal, int shieldSlot, float remainingLifeTime)
+        int boneIndex, int shieldSlot, float remainingLifeTime,
+        int? parentMissionObjectId = null, Guid? parentWorldItemId = null, Guid? parentShipId = null)
     {
         Mat3 rotation = frame.rotation;
         Quaternion quaternion = Quaternion.QuaternionFromMat3(rotation);
@@ -121,7 +175,7 @@ public partial class MissileHandler
             : new[] { quaternion.X, quaternion.Y, quaternion.Z, quaternion.W };
 
         network.SendAll(new NetworkMissileOutcome(itemId, kind, frame.origin, orientation,
-            victimId, boneIndex, isAttachedFrameLocal, shieldSlot, remainingLifeTime));
+            victimId, boneIndex, shieldSlot, remainingLifeTime, parentMissionObjectId, parentWorldItemId, parentShipId));
         sentOutcomes++;
         Logger.Debug("[MissileOutcome] sent={Sent} skipped={Skipped} kind={Kind}",
             sentOutcomes, skippedOutcomes, kind);
@@ -134,36 +188,88 @@ public partial class MissileHandler
             if (disposed) return;
 
             NetworkMissileOutcome message = payload.What;
-            if (worldItemSpawner.IsReady && replayOutcomes.TryGetValue(message.WorldItemId, out var replay))
-                ApplyOutcome(message, replay);
-            else if (pendingOutcomes.Count < MaxTrackedOutcomes)
-                pendingOutcomes[message.WorldItemId] = (message, DateTime.UtcNow.Add(PendingOutcomeLifetime));
-            else
-                Logger.Warning("Dropping missile outcome: {Count} shots are pending", pendingOutcomes.Count);
+            replayOutcomes.TryGetValue(message.WorldItemId, out var replay);
+            if (replay?.Applied == true) return;
+
+            if (!pendingOutcomes.TryGetValue(message.WorldItemId, out var pending))
+            {
+                // Known shots already own bounded replay slots and must not lose their outcomes to unknown shots.
+                if (pendingOutcomes.Count >= MaxTrackedOutcomes && replay == null)
+                {
+                    Logger.Warning("Dropping missile outcome: {Count} shots are pending", pendingOutcomes.Count);
+                    return;
+                }
+                pending = (message, DateTime.UtcNow.Add(PendingOutcomeLifetime));
+                pendingOutcomes.Add(message.WorldItemId, pending);
+            }
+            if (replay == null) return;
+
+            replay.Expires = pending.Expires;
+            if (TryApplyOutcome(pending.Message, replay))
+                pendingOutcomes.Remove(message.WorldItemId);
         });
     }
 
-    private void ApplyOutcome(NetworkMissileOutcome message, ReplayOutcome replay)
+    private bool TryTrackOutcome(Guid itemId, MissionWeapon weapon, out ReplayOutcome replay)
     {
-        if (replay.Applied) return;
-        replay.Applied = true;
+        if (replayOutcomes.TryGetValue(itemId, out replay)) return true;
+        while (replayOutcomes.Count >= MaxTrackedOutcomes && completedOutcomeOrder.Count > 0)
+            replayOutcomes.Remove(completedOutcomeOrder.Dequeue());
+        if (replayOutcomes.Count >= MaxTrackedOutcomes) return false;
+
+        replay = new ReplayOutcome(weapon);
+        replayOutcomes.Add(itemId, replay);
+        return true;
+    }
+
+    private bool TryApplyOutcome(NetworkMissileOutcome message, ReplayOutcome replay)
+    {
+        if (replay.Applied) return true;
+        Mission mission = Mission.Current;
+        if (mission == null || !worldItemSpawner.IsReady) return false;
 
         float[] rotation = message.Rotation;
         if (rotation == null || (rotation.Length != 4 && rotation.Length != 9))
-        {
-            Logger.Warning("Missing rotation for missile outcome {WorldItemId}", message.WorldItemId);
-            return;
-        }
+            return false;
         Mat3 orientation = rotation.Length == 4
             ? new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]).ToMat3()
             : new Mat3(new Vec3(rotation[0], rotation[1], rotation[2]),
                 new Vec3(rotation[3], rotation[4], rotation[5]), new Vec3(rotation[6], rotation[7], rotation[8]));
         var frame = new MatrixFrame(orientation, message.Origin);
 
-        Mission mission = Mission.Current;
-        if (mission == null) return;
-
         using var allowed = new AllowedThread();
+        MissionWeapon weapon = replay.Weapon;
+        if (message.Kind == MissileOutcomeKind.Body || message.Kind == MissileOutcomeKind.Shield)
+        {
+            if (!message.VictimId.HasValue
+                || !networkAgentRegistry.TryGetCosmeticAgent(message.VictimId.Value, out var victim)
+                || victim == null || victim.Mission != mission)
+                return false;
+
+            if (message.Kind == MissileOutcomeKind.Shield)
+                victim.AttachWeaponToWeapon((EquipmentIndex)message.ShieldSlot, weapon, null, ref frame);
+            else
+                victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
+        }
+        else
+        {
+            if (!TryResolveParent(message, mission, out var parent)) return false;
+
+            bool settledBounce = message.Kind == MissileOutcomeKind.BounceSettled;
+            Mission.WeaponSpawnFlags flags = Mission.WeaponSpawnFlags.AsMissile
+                | (settledBounce ? Mission.WeaponSpawnFlags.WithPhysics : Mission.WeaponSpawnFlags.WithStaticPhysics);
+            if (!worldItemSpawner.TrySpawn(ref weapon, flags, true, message.RemainingLifeTime, frame, out var item, parent))
+                return false;
+
+            // Spawn at the final frame because co-op does not tick vanilla's multiplayer frame fade.
+            if (settledBounce)
+                item.StopPhysicsAndSetFrameForClient(frame,
+                    parent == null ? null : GameEntity.CreateFromWeakEntity(parent.GameEntity));
+            messageBroker.Publish(this, new MissileItemIdentified(item, message.WorldItemId));
+        }
+
+        replay.Applied = true;
+        completedOutcomeOrder.Enqueue(message.WorldItemId);
         Mission.Missile missile = replay.Missile;
         replay.Missile = null;
         if (missile != null && mission._missilesDictionary.TryGetValue(missile.Index, out var flying)
@@ -172,64 +278,66 @@ public partial class MissileHandler
             missile.Entity.Remove(81);
             mission.RemoveMissileAsClient(missile.Index);
         }
-
-        MissionWeapon weapon = replay.Weapon;
-        if (message.Kind == MissileOutcomeKind.Body || message.Kind == MissileOutcomeKind.Shield)
-        {
-            if (!message.VictimId.HasValue
-                || !networkAgentRegistry.TryGetCosmeticAgent(message.VictimId.Value, out var victim)
-                || victim == null || victim.Mission != mission)
-            {
-                Logger.Warning("Failed to get Agent using {AgentId}", message.VictimId);
-                return;
-            }
-
-            if (message.Kind == MissileOutcomeKind.Shield)
-                victim.AttachWeaponToWeapon((EquipmentIndex)message.ShieldSlot, weapon, null, ref frame);
-            else
-                victim.AttachWeaponToBone(weapon, null, (sbyte)message.BoneIndex, ref frame);
-            return;
-        }
-
-        bool settledBounce = message.Kind == MissileOutcomeKind.BounceSettled;
-        Mission.WeaponSpawnFlags flags = Mission.WeaponSpawnFlags.AsMissile
-            | (settledBounce ? Mission.WeaponSpawnFlags.WithPhysics : Mission.WeaponSpawnFlags.WithStaticPhysics);
-        if (!worldItemSpawner.TrySpawn(ref weapon, flags, true, message.RemainingLifeTime, frame, out var item))
-        {
-            Logger.Warning("Failed to spawn missile world item {WorldItemId}", message.WorldItemId);
-            return;
-        }
-
-        // Co-op does not tick vanilla's native multiplayer frame fade, so spawn at the settled frame first.
-        if (settledBounce)
-            item.StopPhysicsAndSetFrameForClient(frame, null);
-        messageBroker.Publish(this, new MissileItemIdentified(item, message.WorldItemId));
+        return true;
     }
 
-    private void PruneOutcomes()
+    private bool TryResolveParent(NetworkMissileOutcome message, Mission mission, out MissionObject parent)
+    {
+        parent = null;
+        if (message.ParentMissionObjectId.HasValue)
+        {
+            foreach (MissionObject candidate in mission.MissionObjects)
+            {
+                if (candidate.Id.CreatedAtRuntime || candidate.Id.Id != message.ParentMissionObjectId.Value) continue;
+                parent = candidate;
+                break;
+            }
+            return parent != null;
+        }
+        if (message.ParentWorldItemId.HasValue)
+        {
+            if (!worldItemRegistry.TryGet(message.ParentWorldItemId.Value, out var item)
+                || !worldItemSpawner.IsPresent(item)) return false;
+            parent = item;
+        }
+        if (message.ParentShipId.HasValue)
+        {
+            var ships = mission.GetMissionBehavior<CoopMissionController>()?.MissionComponent.ShipRegistry;
+            if (ships == null || !ships.TryGet(message.ParentShipId.Value, out var ship) || ship.Hull == null)
+                return false;
+            parent = ship.Hull;
+        }
+        return true;
+    }
+
+    private void PruneOutcomes(DateTime now)
     {
         if (disposed) return;
 
-        List<Guid> expired = null;
-        DateTime now = DateTime.UtcNow;
+        List<Guid> finished = null;
         foreach (var pending in pendingOutcomes)
         {
-            if (pending.Value.Expires <= now
-                || (worldItemSpawner.IsReady && replayOutcomes.ContainsKey(pending.Key)))
-                (expired ??= new List<Guid>()).Add(pending.Key);
+            if (pending.Value.Expires <= now)
+            {
+                Logger.Warning("Failed to apply missile outcome using {WorldItemId}: victim={VictimId} parent={ParentId}",
+                    pending.Key, pending.Value.Message.VictimId, pending.Value.Message.ParentMissionObjectId);
+                (finished ??= new List<Guid>()).Add(pending.Key);
+            }
+            else if (replayOutcomes.TryGetValue(pending.Key, out var replay)
+                && TryApplyOutcome(pending.Value.Message, replay))
+                (finished ??= new List<Guid>()).Add(pending.Key);
+        }
+        if (finished != null)
+            foreach (Guid itemId in finished) pendingOutcomes.Remove(itemId);
+
+        List<Guid> expired = null;
+        foreach (var replay in replayOutcomes)
+        {
+            if (!replay.Value.Applied && replay.Value.Expires <= now)
+                (expired ??= new List<Guid>()).Add(replay.Key);
         }
         if (expired != null)
-        {
-            foreach (Guid itemId in expired)
-            {
-                var pending = pendingOutcomes[itemId];
-                pendingOutcomes.Remove(itemId);
-                if (pending.Expires <= now)
-                    Logger.Warning("Failed to get missile shot using {WorldItemId}", itemId);
-                else
-                    GameThread.RunSafe(() => ApplyOutcome(pending.Message, replayOutcomes[itemId]));
-            }
-        }
+            foreach (Guid itemId in expired) replayOutcomes.Remove(itemId);
 
         List<SpawnedItemEntity> removed = null;
         foreach (var bounce in bouncingItems)

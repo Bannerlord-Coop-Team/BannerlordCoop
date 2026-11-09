@@ -21,7 +21,8 @@ public interface IWeaponDropWorldItemSpawner
         bool hasLifeTime,
         float remainingLifeTime,
         MatrixFrame frame,
-        out SpawnedItemEntity item);
+        out SpawnedItemEntity item,
+        MissionObject parent = null);
     bool TryRemove(SpawnedItemEntity item);
 }
 
@@ -70,7 +71,8 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         bool hasLifeTime,
         float remainingLifeTime,
         MatrixFrame frame,
-        out SpawnedItemEntity item)
+        out SpawnedItemEntity item,
+        MissionObject parent = null)
     {
         item = null;
         if (!IsReady || weapon.IsEmpty) return false;
@@ -80,7 +82,7 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
             spawnFlags,
             frame,
             forcedSpawnIndex: -1,
-            attachedMissionObject: null,
+            attachedMissionObject: parent,
             hasLifeTime);
         item = entity?.GetFirstScriptOfType<SpawnedItemEntity>();
         if (item == null)

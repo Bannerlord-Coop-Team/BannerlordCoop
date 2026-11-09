@@ -41,13 +41,13 @@ public class MissileCollisionPatch
     }
 
     static void Postfix(CollisionState __state, Mission.MissileCollisionReaction collisionReaction,
-        MatrixFrame attachLocalFrame, bool isAttachedFrameLocal, Agent attachedAgent,
-        bool attachedToShield, sbyte attachedBoneIndex)
+        MatrixFrame attachLocalFrame, Agent attachedAgent,
+        bool attachedToShield, sbyte attachedBoneIndex, MissionObject attachedMissionObject)
     {
         if (__state.WorldItemId == Guid.Empty) return;
 
         __state.Handler.ReportCollision(__state.WorldItemId, __state.Missile, collisionReaction,
-            attachLocalFrame, isAttachedFrameLocal, attachedAgent, attachedToShield, attachedBoneIndex);
+            attachLocalFrame, attachedAgent, attachedToShield, attachedBoneIndex, attachedMissionObject);
     }
 }
 

@@ -1414,7 +1414,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         {
             this.agentRegistry = agentRegistry;
             this.shotMap = shotMap;
-            missiles = new MissileHandler(network, Broker, agentRegistry, Spawner);
+            missiles = new MissileHandler(network, Broker, agentRegistry, Spawner, Items);
             drops = CreateHandler(observer, agentRegistry, Items, objectManager, Spawner, Broker);
             pickups = new WeaponPickupHandler(agentRegistry, Items, network, Broker, objectManager);
         }
@@ -6030,7 +6030,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             bool hasLifeTime,
             float remainingLifeTime,
             MatrixFrame frame,
-            out SpawnedItemEntity item)
+            out SpawnedItemEntity item,
+            MissionObject parent = null)
         {
             SpawnCount++;
             item = AddPresent(weapon);
