@@ -81,6 +81,7 @@ public readonly struct ModOptions
     public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
     [ProtoMember(29)]
     public readonly int PostBattleAiAmnestySeconds { get; } = 0;
+    [ProtoMember(30)]
     public readonly List<string> PreferredBattleHosts { get; } = new();
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
