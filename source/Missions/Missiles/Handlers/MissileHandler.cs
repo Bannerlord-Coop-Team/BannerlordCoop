@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
+using Missions.Agents.Handlers;
 using Missions.Missiles.Message;
 using Serilog;
 using System;
@@ -24,10 +25,13 @@ public interface IMissileHandler : IHandler
     bool TryGetLocalShot(int missileIndex, out Guid agentId, out long shotSequence);
     void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId,
         bool isMountFallback, Vec3 impactVelocity);
+    Guid PrepareCollision(Mission.Missile missile, ref Mission.MissileCollisionReaction reaction);
+    void ReportCollision(Guid worldItemId, Mission.Missile missile, Mission.MissileCollisionReaction reaction,
+        MatrixFrame frame, bool isAttachedFrameLocal, Agent victim, bool shield, sbyte boneIndex);
 }
 
 /// <inheritdoc/>
-public class MissileHandler : IMissileHandler
+public partial class MissileHandler : IMissileHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MissileHandler>();
 
@@ -58,15 +62,18 @@ public class MissileHandler : IMissileHandler
     }
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
-        INetworkAgentRegistry networkAgentRegistry)
+        INetworkAgentRegistry networkAgentRegistry, IWeaponDropWorldItemSpawner worldItemSpawner)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
+        this.worldItemSpawner = worldItemSpawner;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
         messageBroker.Subscribe<MissileRemoved>(Handle_MissileRemoved);
+        messageBroker.Subscribe<NetworkMissileOutcome>(ReceiveOutcome);
+        messageBroker.Subscribe<MissilePhysicsSettled>(HandlePhysicsSettled);
     }
 
     ~MissileHandler() => Dispose();
@@ -81,10 +88,17 @@ public class MissileHandler : IMissileHandler
         messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Unsubscribe<MissileItemDropped>(Handle_MissileItemDropped);
         messageBroker.Unsubscribe<MissileRemoved>(Handle_MissileRemoved);
+        messageBroker.Unsubscribe<NetworkMissileOutcome>(ReceiveOutcome);
+        messageBroker.Unsubscribe<MissilePhysicsSettled>(HandlePhysicsSettled);
         pendingReconstructions.Clear();
         impactHints.Clear();
         localShots.Clear();
         reconstructedShots.Clear();
+        replayOutcomes.Clear();
+        replayOutcomeOrder.Clear();
+        pendingOutcomes.Clear();
+        bouncingItems.Clear();
+        while (pendingShots.TryDequeue(out _)) { }
     }
 
     private void AgentShootSend(MessagePayload<AgentShoot> payload)
@@ -143,6 +157,7 @@ public class MissileHandler : IMissileHandler
 
     public void DrainPendingShots()
     {
+        PruneOutcomes();
         int count = pendingShots.Count;
         for (int i = 0; i < count && pendingShots.TryDequeue(out var pending); i++)
         {
@@ -227,6 +242,10 @@ public class MissileHandler : IMissileHandler
     {
         if (disposed) return;
 
+        if (reconstructedShots.TryGetValue(payload.What.MissileIndex, out var shot)
+            && replayOutcomes.TryGetValue(CreateMissileItemId(shot.AgentId, shot.ShotSequence), out var replay)
+            && ReferenceEquals(replay.Missile, shot.Missile))
+            replay.Missile = null;
         localShots.Remove(payload.What.MissileIndex);
         reconstructedShots.Remove(payload.What.MissileIndex);
     }
@@ -271,21 +290,6 @@ public class MissileHandler : IMissileHandler
         if (mission == null)
             return false;
 
-        Agent agent = null;
-        if (networkAgentRegistry.TryGetAgentInfo(shot.AgentId, out var info)
-            && info.Agent != null && info.Agent.Mission == mission && info.Agent.IsActive()
-            && !networkAgentRegistry.IsLocallyControlled(info.Agent))
-        {
-            agent = info.Agent;
-        }
-        else if (BattleSpawnGate.IsCoopBattleActive)
-        {
-            agent = FindStandInShooter(mission);
-        }
-
-        if (agent == null)
-            return false;
-
         ItemObject missileItem = string.IsNullOrEmpty(shot.MissileItemId)
             ? null
             : MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
@@ -310,6 +314,33 @@ public class MissileHandler : IMissileHandler
 
         missileWeapon.CurrentUsageIndex = shot.CurrentUsageIndex;
         missileWeapon.Amount = 1;
+
+        Guid worldItemId = CreateMissileItemId(shot.AgentId, shot.ShotSequence);
+        if (!replayOutcomes.TryGetValue(worldItemId, out var outcome))
+        {
+            while (replayOutcomeOrder.Count >= MaxTrackedOutcomes)
+                replayOutcomes.Remove(replayOutcomeOrder.Dequeue());
+            outcome = new ReplayOutcome(missileWeapon);
+            replayOutcomes.Add(worldItemId, outcome);
+            replayOutcomeOrder.Enqueue(worldItemId);
+        }
+        if (pendingOutcomes.TryGetValue(worldItemId, out var pendingOutcome))
+        {
+            if (!worldItemSpawner.IsReady) return false;
+            pendingOutcomes.Remove(worldItemId);
+            ApplyOutcome(pendingOutcome.Message, outcome);
+        }
+        if (outcome.Applied) return true;
+
+        Agent agent = null;
+        if (networkAgentRegistry.TryGetAgentInfo(shot.AgentId, out var info)
+            && info.Agent != null && info.Agent.Mission == mission && info.Agent.IsActive()
+            && !networkAgentRegistry.IsLocallyControlled(info.Agent))
+            agent = info.Agent;
+        else if (BattleSpawnGate.IsCoopBattleActive)
+            agent = FindStandInShooter(mission);
+
+        if (agent == null) return false;
 
         ImpactHint hint = default;
         Vec3 impactTarget = default;
@@ -362,6 +393,7 @@ public class MissileHandler : IMissileHandler
         mission._missilesList.Add(missile);
         mission._missilesDictionary[index] = missile;
         reconstructedShots[index] = (missile, shot.AgentId, shot.ShotSequence);
+        outcome.Missile = missile;
 
         Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
             shot.ShotSequence, shot.MissileIndex, index);
