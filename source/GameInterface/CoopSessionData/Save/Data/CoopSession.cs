@@ -12,6 +12,7 @@ using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Traits;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 using System;
@@ -42,6 +43,7 @@ public interface ICoopSession
     OrderOfBattlePlayerData OrderOfBattlePlayerData { get; }
     StatisticsPlayerData StatisticsPlayerData { get; }
     IncidentsPlayerData IncidentsPlayerData { get; }
+    ViewDataPlayerData ViewDataPlayerData { get; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -98,6 +100,8 @@ public class CoopSession : ICoopSession
     public IncidentsPlayerData IncidentsPlayerData { get; }
     [ProtoMember(17)]
     public NavalPlayerData NavalPlayerData { get; }
+    [ProtoMember(18)]
+    public ViewDataPlayerData ViewDataPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -116,7 +120,8 @@ public class CoopSession : ICoopSession
         PlayerTraitData playerTraitData = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
         StatisticsPlayerData statisticsPlayerData = null,
-        IncidentsPlayerData incidentsPlayerData = null)
+        IncidentsPlayerData incidentsPlayerData = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -135,5 +140,6 @@ public class CoopSession : ICoopSession
         OrderOfBattlePlayerData = orderOfBattlePlayerData ?? new OrderOfBattlePlayerData(new());
         StatisticsPlayerData = statisticsPlayerData ?? new StatisticsPlayerData(new());
         IncidentsPlayerData = incidentsPlayerData ?? new IncidentsPlayerData(new(), new(), new(), new(), new());
+        ViewDataPlayerData = viewDataPlayerData ?? new ViewDataPlayerData(new());
     }
 }
