@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ArtisanProducts;
 using HarmonyLib;
+using Moq;
 using System;
 using TaleWorlds.CampaignSystem;
 using Xunit;
@@ -16,7 +18,7 @@ public class ArtisanProductsCaptureTests
     [Fact]
     public void AcceptCapture_PreservesTheQuotedAmountRewardAndDeadline()
     {
-        var strategy = new ArtisanProductsQuestSolutionAcceptStrategy();
+        var strategy = new ArtisanProductsQuestSolutionAcceptStrategy(new Mock<IIssueOwnerResolver>().Object);
         var source = ObjectHelper.SkipConstructor<Issue>();
         var quest = ObjectHelper.SkipConstructor<Quest>();
         AccessTools.Field(typeof(Quest), nameof(Quest._amountOfRawGoodsToBeDelivered)).SetValue(quest, 73);
@@ -42,7 +44,7 @@ public class ArtisanProductsCaptureTests
     [Fact]
     public void AcceptCapture_WithNoQuestIsEmpty()
     {
-        Assert.Empty(new ArtisanProductsQuestSolutionAcceptStrategy().Capture(ObjectHelper.SkipConstructor<Issue>()));
+        Assert.Empty(new ArtisanProductsQuestSolutionAcceptStrategy(new Mock<IIssueOwnerResolver>().Object).Capture(ObjectHelper.SkipConstructor<Issue>()));
     }
 
     [Fact]
@@ -50,6 +52,6 @@ public class ArtisanProductsCaptureTests
     {
         var issue = ObjectHelper.SkipConstructor<Issue>();
         issue.IssueQuest = ObjectHelper.SkipConstructor<Quest>();
-        Assert.Throws<System.IO.EndOfStreamException>(() => new ArtisanProductsQuestSolutionAcceptStrategy().Apply(issue, Array.Empty<byte>()));
+        Assert.Throws<System.IO.EndOfStreamException>(() => new ArtisanProductsQuestSolutionAcceptStrategy(new Mock<IIssueOwnerResolver>().Object).Apply(issue, Array.Empty<byte>()));
     }
 }
