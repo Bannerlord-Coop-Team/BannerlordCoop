@@ -52,7 +52,7 @@ public partial class MissileHandler : IMissileHandler
         var materialFlags = material.IsValid ? material.GetFlags() : PhysicsMaterialFlags.None;
         if ((materialFlags & (PhysicsMaterialFlags.DontStickMissiles | PhysicsMaterialFlags.AttacksCanPassThrough)) != 0) return;
 
-        flags &= ~WeaponFlags.AmmoSticksWhenShot;
+        flags &= ~(WeaponFlags.AmmoSticksWhenShot | WeaponFlags.AmmoBreakOnBounceBackMask);
         ForcedBouncesRemaining--;
         Logger.Debug("[MissileDebug] forced bounce remaining={Remaining}", ForcedBouncesRemaining);
     }

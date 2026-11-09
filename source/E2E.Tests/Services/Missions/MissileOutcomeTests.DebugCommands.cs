@@ -25,12 +25,20 @@ namespace E2E.Tests.Services.Missions;
 
 public partial class MissileOutcomeTests
 {
-    [Fact]
-    public void DebugForceBounce_UsesVanillaCollisionAndSendsOnlyAtSettlement()
+    [Theory]
+    [InlineData(WeaponClass.Javelin, (WeaponFlags)0)]
+    [InlineData(WeaponClass.Arrow, WeaponFlags.AmmoBreaksOnBounceBack)]
+    public void DebugForceBounce_UsesVanillaCollisionAndSendsOnlyAtSettlement(WeaponClass weaponClass, WeaponFlags breakFlags)
     {
         RunClients((shooter, peer, native) =>
         {
             native.EnableDebugBounceCallback();
+            shooter.Instance.Call(() =>
+            {
+                var usage = shooter.Weapon.Item.PrimaryWeapon;
+                usage.WeaponClass = weaponClass;
+                usage.WeaponFlags |= breakFlags;
+            });
             peer.Receive(shooter.Shoot());
             NetworkMissileOutcome outcome = null!;
             shooter.Instance.Call(() =>
@@ -285,6 +293,7 @@ public partial class MissileOutcomeTests
             bounceVoiceBridge.SetValue(null, voices);
             Patch(typeof(ModuleHelper), nameof(ModuleHelper.GetModuleFullPath), nameof(DebugModulePath));
             Patch(typeof(PhysicsMaterial), nameof(PhysicsMaterial.GetFromName), nameof(DebugMaterial));
+            Patch(typeof(ParticleSystemManager), nameof(ParticleSystemManager.GetRuntimeIdByName), nameof(Skip));
             Patch(typeof(ManagedParameters), nameof(ManagedParameters.GetManagedParameter), nameof(DebugManagedParameter));
             Patch(typeof(Mission), "GetAttackCollisionResults", nameof(DebugAttackResults));
             Patch(typeof(Mission), "CreateMissileBlow", nameof(DebugMissileBlow));
