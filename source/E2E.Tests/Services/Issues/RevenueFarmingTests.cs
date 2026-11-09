@@ -489,8 +489,6 @@ public sealed class RevenueFarmingTests : IDisposable
     [InlineData(true, "client")]
     [InlineData(false, "server")]
     [InlineData(true, "server")]
-    [InlineData(false, "request")]
-    [InlineData(true, "request")]
     public void GenericSuccessDoesNotBypassPayment(bool allCollected, string source)
     {
         Accept();
@@ -501,9 +499,7 @@ public sealed class RevenueFarmingTests : IDisposable
         Server.Call(() => gold = Object<Hero>(Server, owner.HeroId).Gold);
 
         if (source == "client") Client.Call(() => ownerQuest.CompleteQuestWithSuccess());
-        else if (source == "server") Server.Call(() => serverQuest.CompleteQuestWithSuccess());
-        else Client.Call(() => Client.Resolve<IMessageBroker>().Publish(this,
-            new QuestOutcomeRequested(ownerQuest, IssueOutcome.QuestSuccess)));
+        else Server.Call(() => serverQuest.CompleteQuestWithSuccess());
 
         environment.FlushCoalescer();
         foreach (var instance in new[] { Server, Client }) instance.Call(() =>

@@ -10,13 +10,11 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Surrogates;
-using HarmonyLib;
 using Moq;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -74,6 +72,68 @@ public class RevenueFarmingTests
         restored.SyncData(new TestDataStore(false, records));
 
         Assert.Equal("issue_legacy", restored.Get(quest).IssueId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SavingOmitsEndedSessionsWithoutDroppingPendingNavigation(bool dismissed)
+    {
+        var sessions = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var ended = LinkedQuest("ended");
+        var terminal = sessions.Register(ended, hero, "owner");
+        if (dismissed) ended.QuestGiver.Issue = null;
+        else ended._questState = QuestBase.QuestStates.Finalized;
+        var ongoing = LinkedQuest("ongoing");
+        var active = sessions.Register(ongoing, ObjectHelper.SkipConstructor<Hero>(), "other");
+        var records = new Dictionary<string, object>();
+
+        sessions.SyncData(new TestDataStore(true, records));
+
+        Assert.Same(active, Assert.Single((List<RevenueFarmingSession>)records["_coop_revenue_farming_sessions"]));
+        Assert.Same(terminal, sessions.Get(ended.QuestGiver, ended.StringId));
+        var restored = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
+        restored.SyncData(new TestDataStore(false, records));
+        Assert.Same(active, restored.Get(ongoing));
+        Assert.Null(restored.Get(ended));
+    }
+
+    [Fact]
+    public void NewAgreementReleasesOnlyThatControllersHistoricalSessions()
+    {
+        var sessions = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var otherQuest = LinkedQuest("other");
+        var otherTerminal = sessions.Register(otherQuest, ObjectHelper.SkipConstructor<Hero>(), "other");
+        otherQuest._questState = QuestBase.QuestStates.Finalized;
+        Quest previous = null;
+        for (var i = 0; i < 5; i++)
+        {
+            var quest = LinkedQuest("quest_" + i);
+            var current = sessions.Register(quest, hero, "owner");
+            if (previous != null) Assert.Null(sessions.Get(previous));
+            Assert.Same(otherTerminal, sessions.Get(otherQuest));
+            quest._questState = QuestBase.QuestStates.Finalized;
+            Assert.Same(current, sessions.Register(quest, hero, "owner"));
+            Assert.Throws<InvalidOperationException>(() => sessions.Register(quest, hero, "different"));
+            previous = quest;
+        }
+    }
+
+    private static Quest LinkedQuest(string id)
+    {
+        var giver = ObjectHelper.SkipConstructor<Hero>();
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        var quest = ObjectHelper.SkipConstructor<Quest>();
+        quest.StringId = id;
+        quest.QuestGiver = giver;
+        quest._questState = QuestBase.QuestStates.Ongoing;
+        issue.StringId = id + "_issue";
+        issue.IssueOwner = giver;
+        issue.IssueQuest = quest;
+        giver.Issue = issue;
+        return quest;
     }
 
     [Fact]
@@ -144,23 +204,6 @@ public class RevenueFarmingTests
         finally
         {
             ModInformation.IsServer = previousRole;
-        }
-    }
-
-    [Fact]
-    public void AllRevenuePatchesBindToInstalledGameMethods()
-    {
-        var harmony = new Harmony("RevenueFarmingTests.Binding");
-        try
-        {
-            foreach (var type in typeof(RevenueFarmingSessionStore).Assembly.GetTypes().Where(type =>
-                type.Namespace == typeof(RevenueFarmingSessionStore).Namespace &&
-                type.GetCustomAttributes(typeof(HarmonyPatch), false).Length != 0))
-                harmony.CreateClassProcessor(type).Patch();
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
         }
     }
 

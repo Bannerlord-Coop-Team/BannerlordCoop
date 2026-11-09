@@ -34,7 +34,8 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         this.controller = controller;
     }
 
-    public Quest LocalQuest => sessions.FirstOrDefault(session => IsActive(session) && IsLocal(session.Quest))?.Quest;
+    public Quest LocalQuest => sessions.FirstOrDefault(session => IsActive(session) &&
+        session.ControllerId == controller.ControllerId)?.Quest;
 
     public bool IsLocal(Quest quest) => Get(quest) is { } session &&
         session.ControllerId == controller.ControllerId;
@@ -68,6 +69,7 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
             return session;
         }
 
+        sessions.RemoveAll(previous => previous.ControllerId == controllerId && !IsActive(previous));
         session = new RevenueFarmingSession(quest, playerHero, controllerId, quest.QuestGiver?.Issue?.StringId);
         sessions.Add(session);
         return session;
@@ -75,10 +77,12 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
 
     public void SyncData(IDataStore dataStore)
     {
-        dataStore.SyncData("_coop_revenue_farming_sessions", ref sessions);
+        // Keep terminal navigation in memory, without making completed quests permanent save roots.
+        var savedSessions = dataStore.IsSaving ? sessions.Where(IsActive).ToList() : sessions;
+        dataStore.SyncData("_coop_revenue_farming_sessions", ref savedSessions);
         if (dataStore.IsLoading)
         {
-            sessions = sessions?.Where(session => session?.Quest != null && session.PlayerHero != null).ToList() ?? new();
+            sessions = savedSessions?.Where(session => session?.Quest != null && session.PlayerHero != null).ToList() ?? new();
             foreach (var session in sessions)
             {
                 if (session.IssueId == null && session.Quest.QuestGiver?.Issue?.IssueQuest == session.Quest)
