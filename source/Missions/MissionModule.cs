@@ -60,6 +60,7 @@ public class MissionModule : Module
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
         builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
             .SingleInstance().AutoActivate();
+        builder.RegisterType<HeroCombatFixture>().As<IHeroCombatFixture>().SingleInstance().AutoActivate();
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();

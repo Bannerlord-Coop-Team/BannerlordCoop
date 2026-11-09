@@ -151,7 +151,8 @@ public class HitRewardHandler : IHandler
                 data.LastSpeedBonus,
                 data.LastShotDifficulty,
                 data.IsSiegeEngineHit,
-                data.LastAttackerWeapon,
+                // vanilla only reads the weapon for a hero attacker (weapon skill xp)
+                data.AffectorCharacter.IsHero ? data.LastAttackerWeapon : null,
                 data.AttackType,
                 data.HitpointRatio,
                 data.DamageAmount,
