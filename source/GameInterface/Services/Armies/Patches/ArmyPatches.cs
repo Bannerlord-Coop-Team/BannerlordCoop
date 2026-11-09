@@ -235,17 +235,8 @@ public class ArmyPatches
         Army army,
         MobileParty clientMobileParty)
     {
-        if (!army._parties.Contains(mobileParty))
+        if (!IsListedMember(mobileParty, army))
         {
-            ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
-            return;
-        }
-        // A stale entry, listed twice or in an army the party already left. Its leave would strip the party
-        // from its real army, and vanilla's removal notification reads the army name of a party with none
-        if (mobileParty._army != army)
-        {
-            Logger.Warning("Dropping stale entry of {PartyId} from army {ArmyName}", mobileParty.StringId, army.Name);
-            army._parties.Remove(mobileParty);
             ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
             return;
         }
@@ -361,6 +352,18 @@ public class ArmyPatches
 
     private static bool IsAttachedToLeader(MobileParty mobileParty, Army army) =>
         army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty;
+
+    // A stale entry, listed twice or in an army the party already left, is dropped without a leave. Its leave would
+    // strip the party from its real army, and vanilla's removal notification reads the army name of a party with none
+    private static bool IsListedMember(MobileParty mobileParty, Army army)
+    {
+        if (!army._parties.Contains(mobileParty)) return false;
+        if (mobileParty._army == army) return true;
+
+        Logger.Warning("Dropping stale entry of {PartyId} from army {ArmyName}", mobileParty.StringId, army.Name);
+        army._parties.Remove(mobileParty);
+        return false;
+    }
 
     // A removal that stopped after _parties.Remove (#3892) leaves the party linked to this army but out
     // of its list, so the normal removal and both disband paths would skip it. A party that joined

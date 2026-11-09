@@ -171,7 +171,6 @@ public class ArmyDisbanderTests : MapEventTestBase
             var oldLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var newLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            follower.Party.SetCustomName(new TextObject("follower"));
             var oldArmy = new Army(kingdom, oldLeader, Army.ArmyTypes.Raider);
             var newArmy = new Army(kingdom, newLeader, Army.ArmyTypes.Raider);
             follower.Army = newArmy;
@@ -190,6 +189,32 @@ public class ArmyDisbanderTests : MapEventTestBase
             disbander.Disband(newArmy, Army.ArmyDispersionReason.Unknown);
 
             Assert.Null(follower.Army);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void StaleArmyEntryStillAttachedToItsLeader_IsDetachedAndKeepsItsArmy()
+    {
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var oldLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var newLeader = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var oldArmy = new Army(kingdom, oldLeader, Army.ArmyTypes.Raider);
+            var newArmy = new Army(kingdom, newLeader, Army.ArmyTypes.Raider);
+            follower.Army = newArmy;
+            follower.AttachedTo = oldLeader;
+            oldArmy._parties.Add(follower);
+
+            ObjectHelper.SkipConstructor<DefaultNotificationsCampaignBehavior>().RegisterEvents();
+
+            Server.Resolve<IArmyDisbander>().Disband(oldArmy, Army.ArmyDispersionReason.Unknown);
+
+            Assert.Same(newArmy, follower.Army);
+            Assert.Null(follower.AttachedTo);
+            Assert.Contains(follower, newArmy.Parties);
         }, MapEventDisabledMethods);
     }
 }
