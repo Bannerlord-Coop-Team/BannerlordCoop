@@ -42,8 +42,6 @@ namespace Missions.Agents.Packets
             this.indexSource = indexSource;
         }
 
-        internal int Count => names.Count;
-
         internal string GetName(int actionCode)
         {
             if (names.TryGetValue(actionCode, out string cached)) return cached;
@@ -65,7 +63,7 @@ namespace Missions.Agents.Packets
             return entry;
         }
 
-        /// <summary>Index the name resolves to, asking the index source only until it answers with a valid one.</summary>
+        /// <summary>Index the name resolves to, asking the index source only until it answers with a valid one. The name must not be null.</summary>
         internal int ResolveIndex(int actionCode, string name)
         {
             Entry entry = Describe(actionCode, name);

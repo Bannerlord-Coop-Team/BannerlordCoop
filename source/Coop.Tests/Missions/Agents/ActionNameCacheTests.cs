@@ -45,7 +45,6 @@ public class ActionNameCacheTests
         Assert.Null(cache.GetName(7));
         Assert.Null(cache.GetName(7));
         Assert.Equal(2, nameReads);
-        Assert.Equal(0, cache.Count);
 
         names[7] = "act_idle";
         Assert.Equal("act_idle", cache.GetName(7));

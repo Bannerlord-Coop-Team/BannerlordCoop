@@ -26,6 +26,7 @@ namespace Missions.Agents.Packets
             typeof(MBAPI).GetField("IMBAnimation", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         private static MethodInfo getActionNameWithCode;
 
+        // Static because every caller, including the Harmony-patched lookup, is static, and action codes are fixed per process.
         private static readonly ActionNameCache NameCache = new ActionNameCache(
             ReadNativeActionName,
             actionName => ActionIndexCache.Create(actionName).Index);
