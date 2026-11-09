@@ -23,6 +23,8 @@ public partial class MissileHandler
     private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly INavalShipEngine shipEngine;
     private readonly Dictionary<Guid, ReplayOutcome> replayOutcomes = new();
+    // Completed identities suppress duplicates without entering the per-frame retry and expiry scan.
+    private readonly HashSet<Guid> completedOutcomes = new();
     private readonly Queue<Guid> completedOutcomeOrder = new();
     private readonly Dictionary<Guid, (NetworkMissileOutcome Message, DateTime Expires)> pendingOutcomes = new();
     private readonly Dictionary<SpawnedItemEntity, Guid> bouncingItems = new();
@@ -207,33 +209,33 @@ public partial class MissileHandler
             if (disposed) return;
 
             NetworkMissileOutcome message = payload.What;
+            if (completedOutcomes.Contains(message.WorldItemId)) return;
             replayOutcomes.TryGetValue(message.WorldItemId, out var replay);
-            if (replay?.Applied == true) return;
-
-            if (!pendingOutcomes.TryGetValue(message.WorldItemId, out var pending))
-            {
-                // Known shots already own bounded replay slots and must not lose their outcomes to unknown shots.
-                if (pendingOutcomes.Count >= MaxTrackedOutcomes && replay == null)
-                {
-                    Logger.Warning("Dropping missile outcome: {Count} shots are pending", pendingOutcomes.Count);
-                    return;
-                }
+            bool alreadyPending = pendingOutcomes.TryGetValue(message.WorldItemId, out var pending);
+            if (!alreadyPending)
                 pending = (message, DateTime.UtcNow.Add(PendingOutcomeLifetime));
-                pendingOutcomes.Add(message.WorldItemId, pending);
-            }
-            if (replay == null) return;
-
-            replay.Expires = pending.Expires;
-            if (TryApplyOutcome(pending.Message, replay))
+            if (replay != null && TryApplyOutcome(pending.Message, replay))
+            {
                 pendingOutcomes.Remove(message.WorldItemId);
+                return;
+            }
+            if (alreadyPending) return;
+            // Keep admitted work until its deadline, rejecting newest arrivals when all slots are unresolved.
+            if (pendingOutcomes.Count >= MaxTrackedOutcomes)
+            {
+                Logger.Warning("Dropping missile outcome: {Count} shots are pending", pendingOutcomes.Count);
+                return;
+            }
+            pendingOutcomes.Add(message.WorldItemId, pending);
+            if (replay != null) replay.Expires = pending.Expires;
         });
     }
 
     private bool TryTrackOutcome(Guid itemId, MissionWeapon weapon, out ReplayOutcome replay)
     {
         if (replayOutcomes.TryGetValue(itemId, out replay)) return true;
-        while (replayOutcomes.Count >= MaxTrackedOutcomes && completedOutcomeOrder.Count > 0)
-            replayOutcomes.Remove(completedOutcomeOrder.Dequeue());
+        while (replayOutcomes.Count + completedOutcomes.Count >= MaxTrackedOutcomes && completedOutcomeOrder.Count > 0)
+            completedOutcomes.Remove(completedOutcomeOrder.Dequeue());
         if (replayOutcomes.Count >= MaxTrackedOutcomes) return false;
 
         replay = new ReplayOutcome(weapon);
@@ -288,6 +290,8 @@ public partial class MissileHandler
         }
 
         replay.Applied = true;
+        replayOutcomes.Remove(message.WorldItemId);
+        completedOutcomes.Add(message.WorldItemId);
         completedOutcomeOrder.Enqueue(message.WorldItemId);
         Mission.Missile missile = replay.Missile;
         replay.Missile = null;
@@ -355,7 +359,7 @@ public partial class MissileHandler
         List<Guid> expired = null;
         foreach (var replay in replayOutcomes)
         {
-            if (!replay.Value.Applied && replay.Value.Expires <= now)
+            if (replay.Value.Expires <= now)
                 (expired ??= new List<Guid>()).Add(replay.Key);
         }
         if (expired != null)

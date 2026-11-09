@@ -599,6 +599,68 @@ public class MissileOutcomeTests : MissionTestEnvironment
 #endif
 
     [Fact]
+    public void AllUnresolvedCapacity_RejectsNewWorkWithoutEvictingAdmittedShots()
+    {
+        RunClients((shooter, peer, native) =>
+        {
+            NetworkAgentShoot shot = shooter.Shoot();
+            peer.Receive(shot);
+            peer.Instance.Call(() =>
+            {
+                peer.Handler.DrainPendingShots();
+                var agents = peer.Instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(agents.RemoveAgent(peer.VictimId));
+                agents.ForgetCosmeticAgent(peer.Victim);
+            });
+            NetworkMissileOutcome outcome = null!;
+            shooter.Instance.Call(() =>
+            {
+                shooter.Contact(Assert.Single(shooter.Mission.Shell._missilesDictionary).Value,
+                    Mission.MissileCollisionReaction.Stick, Frame(true), shooter.Victim);
+                outcome = Assert.Single(shooter.Network.NetworkSentMessages.GetMessages<NetworkMissileOutcome>());
+            });
+            peer.Instance.Call(() =>
+            {
+                for (int i = 1; i <= 8192; i++)
+                {
+                    long sequence = shot.ShotSequence + i;
+                    if (i < 8192)
+                        peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
+                            shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
+                            shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, sequence));
+                    peer.Broker.Publish(this, new NetworkMissileOutcome(MissileHandler.CreateMissileItemId(shot.AgentId, sequence),
+                        outcome.Kind, outcome.Origin, outcome.Rotation, outcome.VictimId, outcome.BoneIndex,
+                        outcome.ShieldSlot, outcome.RemainingLifeTime));
+                }
+                peer.Handler.DrainPendingShots();
+                var unresolved = (System.Collections.IDictionary)AccessTools.Field(typeof(MissileHandler), "replayOutcomes").GetValue(peer.Handler)!;
+                var pending = (System.Collections.IDictionary)AccessTools.Field(typeof(MissileHandler), "pendingOutcomes").GetValue(peer.Handler)!;
+                Assert.Equal(8192, unresolved.Count);
+                Assert.Equal(8192, pending.Count);
+                peer.Broker.Publish(this, outcome);
+                Assert.Equal(8192, pending.Count);
+                Assert.False(pending.Contains(outcome.WorldItemId));
+                long rejectedSequence = shot.ShotSequence + 8193;
+                peer.Broker.Publish(this, new NetworkAgentShoot(shot.AgentId, shot.Position, shot.Velocity,
+                    shot.Orientation, shot.HasRigidBody, shot.MissileItemId, shot.ItemModifierId, shot.Banner,
+                    shot.MissileIndex, shot.BaseSpeed, shot.Speed, shot.CurrentUsageIndex, rejectedSequence));
+                peer.Handler.DrainPendingShots();
+                Assert.False(peer.Handler.IsReconstructionPending(shot.AgentId, rejectedSequence));
+                Assert.Equal(8192, unresolved.Count);
+                Assert.Single(peer.Mission.Shell._missilesDictionary);
+                Assert.True(peer.Instance.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", peer.VictimId, peer.Victim));
+                peer.Handler.DrainPendingShots();
+                Assert.Equal(8191, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
+                Assert.Single(unresolved);
+                peer.Broker.Publish(this, outcome);
+                Assert.Equal(8192, native.Attachments.Count(value => ReferenceEquals(value.Victim, peer.Victim)));
+                Assert.Empty(unresolved);
+                Assert.Empty(peer.Mission.Shell._missilesDictionary);
+            });
+        });
+    }
+
+    [Fact]
     public void CapacityPressure_EvictsCompletedHistoryBeforeAnUnresolvedShot()
     {
         RunClients((shooter, peer, native) =>

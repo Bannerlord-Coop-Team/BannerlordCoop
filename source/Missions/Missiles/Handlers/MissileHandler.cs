@@ -100,6 +100,7 @@ public partial class MissileHandler : IMissileHandler
         localShots.Clear();
         reconstructedShots.Clear();
         replayOutcomes.Clear();
+        completedOutcomes.Clear();
         completedOutcomeOrder.Clear();
         pendingOutcomes.Clear();
         bouncingItems.Clear();
@@ -321,7 +322,12 @@ public partial class MissileHandler : IMissileHandler
         missileWeapon.Amount = 1;
 
         Guid worldItemId = CreateMissileItemId(shot.AgentId, shot.ShotSequence);
-        if (!TryTrackOutcome(worldItemId, missileWeapon, out var outcome)) return false;
+        if (completedOutcomes.Contains(worldItemId)) return true;
+        if (!TryTrackOutcome(worldItemId, missileWeapon, out var outcome))
+        {
+            Logger.Warning("Dropping missile replay: {Count} shots are unresolved", replayOutcomes.Count);
+            return true;
+        }
         if (pendingOutcomes.TryGetValue(worldItemId, out var pendingOutcome))
         {
             outcome.Expires = pendingOutcome.Expires;
