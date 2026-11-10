@@ -60,10 +60,12 @@ public class MissionModule : Module
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
         builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
             .SingleInstance().AutoActivate();
+        builder.RegisterType<HeroCombatFixture>().As<IHeroCombatFixture>().SingleInstance().AutoActivate();
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         builder.RegisterType<RangedSiegeWeaponPresentation>().As<IRangedSiegeWeaponPresentation>().InstancePerDependency();
+        builder.RegisterType<MissionObjectPath>().As<IMissionObjectPath>().InstancePerDependency();
         base.Load(builder);
 
         // The container is one co-op session; child scopes own only transient mission graphs.
@@ -94,6 +96,9 @@ public class MissionModule : Module
             .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudgetFactory>()
             .As<IMovementTrafficBudgetFactory>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementRouteBackoff>()
+            .As<IMovementRouteBackoff>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
@@ -295,6 +300,7 @@ public class MissionModule : Module
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().SingleInstance();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
+        builder.RegisterType<MissileOrientationCodec>().As<IMissileOrientationCodec>().InstancePerDependency();
         builder.RegisterType<MissilePickupArbiter>().As<IMissilePickupArbiter>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
         builder.RegisterType<NavalDeckMovementProbe>().As<INavalDeckMovementProbe>().InstancePerDependency();

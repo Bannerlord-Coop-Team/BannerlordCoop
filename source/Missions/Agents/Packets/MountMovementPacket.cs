@@ -62,5 +62,9 @@ namespace Missions.Agents.Packets
         internal MountMovementPacket WithAuthorityRevisions(long[] revisions) => MountIds == null
             ? new MountMovementPacket(MountGuids, Mounts, SenderControllerId, revisions, SampleSequence)
             : new MountMovementPacket(IdentityScopeId, MountIds, Mounts, SenderControllerId, revisions, SampleSequence);
+        // The packet without its snapshot array, so cached snapshot encodings can be spliced in.
+        internal MountMovementPacket WithoutMounts() => MountIds == null
+            ? new MountMovementPacket(MountGuids, null, SenderControllerId, AuthorityRevisions, SampleSequence)
+            : new MountMovementPacket(IdentityScopeId, MountIds, null, SenderControllerId, AuthorityRevisions, SampleSequence);
     }
 }

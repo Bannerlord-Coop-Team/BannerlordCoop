@@ -56,6 +56,27 @@ internal class SettlementEncounterDistanceValidator : ISettlementEncounterDistan
             maximumDistance + PositionSyncDriftSlack))
             return true;
 
+        // Vanilla also opens the siege menu when the player encounters a besieging party.
+        if (!party.IsCurrentlyAtSea && settlement.SiegeEvent?.BesiegerCamp is { } camp)
+        {
+            float maximumPartyDistance = encounterModel.NeededMaximumLandDistanceForEncounteringMobileParty;
+            if (party.Army != null)
+            {
+                maximumPartyDistance = MBMath.ClampFloat(
+                    maximumPartyDistance * MathF.Sqrt(party.Army.LeaderParty.AttachedParties.Count + 1),
+                    maximumPartyDistance,
+                    encounterModel.MaximumAllowedLandDistanceForEncounteringMobilePartyInArmy);
+            }
+
+            foreach (var besieger in camp.GetInvolvedPartiesForEventType())
+            {
+                if (besieger.IsActive &&
+                    !besieger.MobileParty.IsCurrentlyAtSea &&
+                    party.Position.Distance(besieger.Position) <= maximumPartyDistance + PositionSyncDriftSlack)
+                    return true;
+            }
+        }
+
         // Vanilla PlayerEncounter.DoEnd enters the settlement right after its assault is won, while
         // the winner still stands in the siege camp slot the server rolled for it.
         if (settlement.LastAttackerParty == party &&

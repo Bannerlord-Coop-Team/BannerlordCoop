@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Network.Session;
 using Common.Util;
 using Serilog;
 using System;
@@ -67,6 +68,9 @@ public class SteamTunnelClient : IDisposable
         Logger.Information("Steam tunnel pump on 127.0.0.1:{Port} connecting to host {HostSteamId}",
             LocalPort, hostSteamId.ToString());
     }
+
+    /// <summary>Reads the delivery health of this client's Steam connection.</summary>
+    public bool TryGetHealth(out RouteHealth health) => transport.TryGetConnectionHealth(connection, out health);
 
     private void Update(TimeSpan deltaTime)
     {

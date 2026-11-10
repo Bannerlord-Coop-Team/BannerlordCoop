@@ -1,4 +1,5 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Network.Session;
+using Common.PacketHandlers;
 using LiteNetLib;
 using Missions;
 using Missions.Agents.Handlers;
@@ -499,6 +500,52 @@ public sealed class MovementTrafficBudgetTests
         Guid[] canonicalIds,
         int[] data) => new SizedPacket(data.Length);
 
+    private delegate bool TryGetRouteHealthCallback(string controllerId, out RouteHealth health);
+
+    // The whole path: bytes through the sender measure the route, its health cuts the ceiling, the next configure applies it.
+    [Fact]
+    public void Sender_CongestedRouteLowersItsBudgetFromTheBytesItSent()
+    {
+        var currentHealth = new RouteHealth(190, RouteHealth.UnknownQuality, 0);
+        var network = new Mock<IBattleNetwork>();
+        network
+            .Setup(value => value.TryGetRouteHealth("receiver", out It.Ref<RouteHealth>.IsAny))
+            .Returns(new TryGetRouteHealthCallback((string controllerId, out RouteHealth health) =>
+            {
+                health = currentHealth;
+                return true;
+            }));
+        var sender = new MovementBatchSender(
+            network.Object,
+            new SizedPacketCompressor(),
+            () => new MovementTrafficBudget(int.MaxValue, int.MaxValue));
+        const int snapshotsPerSecond = 40_000;
+        const double configuredBytesPerSecond = 10_000_000d;
+
+        for (int second = 0; second < 4; second++)
+        {
+            sender.ConfigureRecipient("receiver", configuredBytesPerSecond, snapshotsPerSecond * 10);
+            var batch = new MovementBatch<int>(null);
+            batch.CanonicalIds.Add(Guid.NewGuid());
+            batch.Data.Add(snapshotsPerSecond);
+            sender.Send(
+                "receiver",
+                Array.Empty<MovementBatch<int>>(),
+                batch,
+                snapshotsPerSecond * 10,
+                (scope, compactIds, canonicalIds, data) => new SizedPacket(data[0]),
+                onSent: null);
+            sender.BeginFrame(1f);
+            currentHealth = new RouteHealth(1900, RouteHealth.UnknownQuality, 0);
+        }
+
+        sender.ConfigureRecipient("receiver", configuredBytesPerSecond, snapshotsPerSecond * 10);
+        Assert.Equal(400_000d * 0.7d, sender.GetRouteBytesPerSecond()["receiver"], precision: 3);
+
+        sender.ConfigureRecipient("receiver", 1000d, snapshotsPerSecond * 10);
+        Assert.Equal(1000d, sender.GetRouteBytesPerSecond()["receiver"]);
+    }
+
     private sealed class QueueBudgetFactory : IMovementTrafficBudgetFactory
     {
         private readonly Queue<IMovementTrafficBudget> budgets;
@@ -516,6 +563,8 @@ public sealed class MovementTrafficBudgetTests
     {
         public byte[] Serialize(IPacket packet) =>
             new byte[((SizedPacket)packet).Count * 10];
+
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
 
         public bool TryRestore(IPacket packet, out IPacket restored)
         {

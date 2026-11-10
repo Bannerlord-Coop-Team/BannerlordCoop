@@ -1462,6 +1462,8 @@ public partial class MovementTrafficTests : MissionTestEnvironment
             return new byte[Math.Max(1, snapshots) * bytesPerSnapshot];
         }
 
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds) => Serialize(packet);
+
         public bool TryRestore(IPacket packet, out IPacket restored)
         {
             restored = packet;
@@ -1484,6 +1486,12 @@ public partial class MovementTrafficTests : MissionTestEnvironment
         {
             SerializeCalls++;
             return inner.Serialize(packet);
+        }
+
+        public byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds)
+        {
+            SerializeCalls++;
+            return inner.SerializeSnapshots(packet, snapshotIds);
         }
 
         public bool TryRestore(IPacket packet, out IPacket restored)
@@ -1533,6 +1541,9 @@ public partial class MovementTrafficTests : MissionTestEnvironment
                     : 0d,
                 traffic,
                 includesAuthoritativeAgents);
+
+        public void ReportRecipientBulkSend(string controllerId) =>
+            inner.ReportRecipientBulkSend(controllerId);
 
         public void ReportReceive(
             double queueMilliseconds,

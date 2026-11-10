@@ -33,7 +33,8 @@ internal enum HostDepartureOutcome
 /// </summary>
 internal interface IBattleHostSuccession
 {
-    /// <summary>Elects the first mission-ready requester as host, in the battle's next hosting generation (BR-010, BR-102).</summary>
+    /// <summary>Elects the given requester as host, in the battle's next hosting generation (BR-010, BR-102): the first
+    /// mission-ready one, or in a hideout its assault leader or the earliest player that waited for it.</summary>
     BattleHostAssignment Elect(string mapEventId, string hostControllerId, bool isNaval);
 
     /// <summary>Appends a mission-ready member to the successor line (BR-013); false when it is the host or already queued.</summary>

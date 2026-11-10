@@ -1,4 +1,5 @@
 ﻿using System;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Framework.Interface;
 
@@ -10,4 +11,7 @@ public interface IQuestEventRelay
 {
     // Server: runs the listener with that name and parameters on every running registered quest that has one
     void Relay(string listenerName, Type[] parameterTypes, params object[] arguments);
+
+    // Server: same, only on the quests that player owns, for an event about that player like a desertion
+    void RelayToOwner(Hero owner, string listenerName, Type[] parameterTypes, params object[] arguments);
 }
