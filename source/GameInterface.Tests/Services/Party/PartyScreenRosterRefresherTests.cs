@@ -199,6 +199,34 @@ public class PartyScreenRosterRefresherTests
     }
 
     /// <summary>
+    /// Moving the healthy troops and upgrading the wounded rest leaves no moved troop to heal, so a heal resets
+    /// instead of healing the garrison's own wounded.
+    /// </summary>
+    [Fact]
+    public void ServerHeal_AfterHealthyTransferAndWoundedUpgrade_ResetsWithoutTouchingOppositeStack()
+    {
+        var character = new CharacterObject();
+        var upgraded = new CharacterObject();
+        var logic = CreateLogic(character, 10, 5, out var visible);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 10, false, 5);
+        logic._initialData.LeftMemberRoster.AddToCounts(character, 10, false, 5);
+        Transfer(visible, logic.CurrentData.LeftMemberRoster, character, 5, 0);
+        visible.AddToCounts(character, -5, false, -5);
+        visible.AddToCounts(upgraded, 5, false, 5);
+        int notificationCount = 0;
+
+        CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, 0, false, -1),
+            () => notificationCount++);
+
+        Assert.Equal(1, notificationCount);
+        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 10, 5);
+    }
+
+    /// <summary>
     /// A stack the server removes with no pending edit carries no xp into the opposite side's own stack.
     /// </summary>
     [Fact]

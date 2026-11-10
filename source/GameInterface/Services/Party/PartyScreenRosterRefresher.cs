@@ -569,7 +569,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
         /// <summary>
         /// Replays the local edit on the server's element. Wounded and xp this side can no longer hold follow
-        /// the troops the edit moved to the opposite side; fails when no such move can account for them.
+        /// the troops the edit moved to the opposite side; fails unless a pure transfer accounts for them.
         /// </summary>
         public static bool TryRebase(
             RosterElementState authoritative,
@@ -586,20 +586,21 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             long number = authoritative.Number - removed;
             if (number < 0 || number > int.MaxValue) return false;
 
-            // Upgrades and recruits also take troops off this side, so only what the opposite side gained was moved.
-            long transferred = Math.Max(0L, Math.Min(removed, (long)previousOpposite.Number - oppositeBaseline.Number));
             long wounded = authoritative.Wounded +
                 ((long)previousSide.Wounded - previousBaseline.Wounded);
             long keptWounded = Math.Min(number, Math.Max(0L, wounded));
             long movedWounded = wounded - keptWounded;
-            if (Math.Abs(movedWounded) > transferred) return false;
-
             // Vanilla TransferTroop carries an emptied stack's xp to the destination, so the server's xp change
-            // follows it when every troop the edit took off went there. A stack the server removed carries nothing.
+            // follows it. A stack the server removed itself carries nothing.
             long movedXp = number == 0 && authoritative.Number > 0
                 ? (long)authoritative.Xp - previousBaseline.Xp
                 : 0;
-            if (movedXp != 0 && transferred != removed) return false;
+
+            // Only a pure transfer, every troop taken off here landing on the opposite side, tells which troops the
+            // change belongs to. An upgrade or recruit in the same edit is ambiguous, so it resets instead.
+            bool isPureTransfer = removed > 0 &&
+                (long)previousOpposite.Number - oppositeBaseline.Number >= removed;
+            if ((movedWounded != 0 || movedXp != 0) && !isPureTransfer) return false;
 
             long xp = number == 0
                 ? 0
