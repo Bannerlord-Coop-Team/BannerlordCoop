@@ -59,6 +59,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -1531,6 +1532,77 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
             message => message.KingdomId == kingdomId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PeaceDecision_AfterForcedPeace_CancelsWithoutCampaignTimeAdvancing(bool restoreRound)
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var friend = CreateSyncedPlayerContext("PeaceDecisionFriend", _ => false);
+        string npcClanId = CreateSyncedNpcClan();
+        string kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        string targetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(npcClanId, kingdomId);
+        ConfigureClanInKingdom(friend.ClanId, targetId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetId);
+        ConfigureWarEverywhere(kingdomId, targetId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(npcClanId, out var proposer));
+            kingdom.AddDecision(new MakePeaceKingdomDecision(proposer, target), true);
+            Assert.IsType<MakePeaceKingdomDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+        });
+
+        foreach (var endpoint in Clients.Prepend(Server))
+        {
+            endpoint.Call(() =>
+            {
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                var decision = Assert.Single(kingdom.UnresolvedDecisions);
+                Campaign.Current.CampaignInformationManager._mapNotices.Add(
+                    new KingdomDecisionMapNotification(kingdom, decision, TextObject.GetEmpty()));
+            });
+        }
+
+        Server.Call(() =>
+        {
+            var command = new KingdomDebugCommand.KingdomMakePeaceCoopCommand(Server.Resolve<ICommandObjectResolver>());
+            var args = new CoopCommandArgsFactory().FromValues(new[] { kingdomId, targetId, ControllerId });
+            Assert.True(command.ProcessCommand(args).Succeeded);
+            if (restoreRound) GetConcreteVoteManager(Server).Reset();
+
+            CampaignTime before = CampaignTime.Now;
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow);
+            Assert.Equal(before, CampaignTime.Now);
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.Empty(kingdom.UnresolvedDecisions);
+            Assert.Empty(GetVoteManager(Server).CaptureActiveRoundStatuses());
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message => message.KingdomId == kingdomId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        foreach (var endpoint in Clients.Prepend(Server))
+        {
+            endpoint.Call(() =>
+            {
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+                Assert.Empty(kingdom.UnresolvedDecisions);
+                Assert.False(kingdom.IsAtWarWith(target));
+                Assert.DoesNotContain(Campaign.Current.CampaignInformationManager._mapNotices,
+                    notice => notice is KingdomDecisionMapNotification decisionNotice && decisionNotice.KingdomOfDecision == kingdom);
+            });
+        }
     }
 
     [Fact]
