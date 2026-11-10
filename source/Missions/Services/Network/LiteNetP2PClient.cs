@@ -1245,10 +1245,11 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         if (missionContext.TryGetPeer(controllerId, out NetPeer peer))
         {
             RecordRoute(controllerId, ReceivePathEvent.MissionPeerSend, data.Length);
-            if (battleBenchmark?.IsRecording == true)
-                battleBenchmark.RecordSent(controllerId, packet.DeliveryMethod != DeliveryMethod.Unreliable, data.Length,
-                    peer.GetMaxSinglePacketSize(packet.DeliveryMethod), relayed: false);
-            Send(peer, packet, data);
+            DeliveryMethod? sent = Send(peer, packet, data);
+            if (sent.HasValue && battleBenchmark?.IsRecording == true)
+                battleBenchmark.RecordSent(controllerId,
+                    sent.Value != DeliveryMethod.Unreliable && sent.Value != DeliveryMethod.Sequenced, data.Length,
+                    peer.GetMaxSinglePacketSize(sent.Value), relayed: false);
             return;
         }
 
@@ -1522,13 +1523,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         Send(netPeer, packet, movementPacketCompressor.Serialize(packet));
     }
 
-    private void Send(NetPeer netPeer, IPacket packet, byte[] data)
+    // Returns the method the packet left with, or null when it was dropped as an oversized movement packet.
+    private DeliveryMethod? Send(NetPeer netPeer, IPacket packet, byte[] data)
     {
         DeliveryMethod? selectedMethod = SelectDeliveryMethod(
             packet,
             data.Length,
             netPeer.GetMaxSinglePacketSize(packet.DeliveryMethod));
-        if (!selectedMethod.HasValue) return;
+        if (!selectedMethod.HasValue) return null;
 
         DeliveryMethod method = selectedMethod.Value;
         bool fragmentable = method == DeliveryMethod.ReliableOrdered || method == DeliveryMethod.ReliableUnordered;
@@ -1536,12 +1538,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         try
         {
             netPeer.Send(data, method);
+            return method;
         }
         catch (TooBigPacketException) when (!fragmentable)
         {
             DeliveryMethod? retryMethod = SelectDeliveryMethod(packet, data.Length, 0);
             if (retryMethod.HasValue)
                 netPeer.Send(data, retryMethod.Value);
+            return retryMethod;
         }
     }
 
