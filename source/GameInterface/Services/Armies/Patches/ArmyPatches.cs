@@ -327,7 +327,6 @@ public class ArmyPatches
             {
                 Campaign.Current.CameraFollowParty = mobileParty.Party;
             }
-            army.StopTrackingTargetSettlement();
         }
         mobileParty.Party.SetVisualAsDirty();
         if (clientMobileParty != null)

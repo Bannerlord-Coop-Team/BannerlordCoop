@@ -988,7 +988,7 @@ public sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInter
         {
             if (!CanObserveRockAgent(shot.AgentId)) return;
             AppendRockEvidence(rockProjectiles, new { kind = "peer_packet", agentId = shot.AgentId.ToString("N"),
-                itemId = shot.MissileItemId, missileIndex = shot.MissileIndex, shotSequence = shot.ShotSequence,
+                itemId = shot.MissileItemId, shotSequence = shot.ShotSequence,
                 frame = tick, utc = DateTime.UtcNow.ToString("O") });
         });
     }

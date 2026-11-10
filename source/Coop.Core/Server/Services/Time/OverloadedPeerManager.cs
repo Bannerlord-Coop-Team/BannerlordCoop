@@ -141,7 +141,9 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             bool queueExceeded = queueDepth > NetworkJoinLimits.MaxReplayPackets ||
                                  connectionMessageQueue.HasCatchUpOverflowed(entry.Peer);
             bool bytesExceeded = pendingBytes > NetworkJoinLimits.MaxReplayPendingBytes;
-            if (!timedOut && !queueExceeded && !bytesExceeded) continue;
+            // The capped join ignores further baseline requests, so nothing can make it progress again
+            bool baselinesExhausted = entry.State.HasExhaustedBaselines;
+            if (!timedOut && !queueExceeded && !bytesExceeded && !baselinesExhausted) continue;
 
             // Make the join terminal before disconnecting. Network receive is polled after this
             // check, so an acknowledgement already in flight cannot restart synchronization.
@@ -149,9 +151,11 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
             string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
             int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
-            string disconnectCode = timedOut
-                ? "JoinReplayAppliedTimeout"
-                : "JoinReplayQueueLimit";
+            string disconnectCode = baselinesExhausted
+                ? "JoinBaselineLimit"
+                : timedOut
+                    ? "JoinReplayAppliedTimeout"
+                    : "JoinReplayQueueLimit";
 
             joinCatchUpProgress.Remove(entry.Peer);
 

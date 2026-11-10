@@ -147,6 +147,10 @@ internal class BattleHandler : IHandler
         // during MapEvent.Initialize, or an already-running one as a reinforcement);
         // the joining party's MapEventSide is already set by this point, so the live
         // count is accurate.
+        // A replicated add runs the native add on a client too. Only the server sends rosters, or a
+        // client's copy would replace the server's.
+        if (ModInformation.IsClient) return;
+
         CapFastForwardForMapEvent();
         RefreshFastForwardState();
 
@@ -188,8 +192,8 @@ internal class BattleHandler : IHandler
         ));
 
         // Tell any player parties just added to the battle to drop their "hold on" PvP popup — the battle menu
-        // blocks them now. Server-driven because the client-side MapEventInvolvedPartiesAdded never fires for a
-        // synced add (the client's own add is intercepted and routed to the server).
+        // blocks them now. Server-driven because this handler returns on a client, even when a replicated add
+        // raises MapEventInvolvedPartiesAdded there.
         var playerPartyIds = new List<string>();
         foreach (var addedParty in message.AddedParties)
         {
@@ -210,7 +214,8 @@ internal class BattleHandler : IHandler
     private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
     {
         // A player started a battle: cap fast-forward while any player is in a map event. Pausing once EVERY
-        // player is occupied (in a map event OR settlement) is handled separately by PlayerOccupancyPauseHandler.
+        // player is occupied (in a map event, a settlement or the post battle screens) is handled separately by
+        // PlayerOccupancyPauseHandler.
         CapFastForwardForMapEvent();
         RefreshFastForwardState();
     }

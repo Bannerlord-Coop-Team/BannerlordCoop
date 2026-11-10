@@ -197,7 +197,11 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
             if (immediate)
                 reliableMessageBatcher.SendImmediate(netPeer, payload, SendReliableMessagePayload);
             else
-                reliableMessageBatcher.Send(netPeer, payload, SendReliableMessagePayload);
+                reliableMessageBatcher.Send(
+                    netPeer,
+                    payload,
+                    netPeer.GetMaxSinglePacketSize(DeliveryMethod.ReliableOrdered),
+                    SendReliableMessagePayload);
             return;
         }
 
