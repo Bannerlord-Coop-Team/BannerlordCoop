@@ -43,10 +43,12 @@ public class NavalShipEngine : INavalShipEngine
     private readonly ICoopShipSnapshotRegistry snapshots;
     private readonly INavalShipDamageGate damageGate;
     private readonly IRangedSiegeWeaponPresentation weaponPresentation;
+    private readonly IBattleAgentFader fader;
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
         INavalCopyWeaponStates copyWeaponStates, INavalForeignHullRegistry foreignHulls, INavalRopeRegistry ropeRegistry,
-        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate, IRangedSiegeWeaponPresentation weaponPresentation)
+        ICoopShipSnapshotRegistry snapshots, INavalShipDamageGate damageGate, IRangedSiegeWeaponPresentation weaponPresentation,
+        IBattleAgentFader fader)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
@@ -57,6 +59,7 @@ public class NavalShipEngine : INavalShipEngine
         this.snapshots = snapshots;
         this.damageGate = damageGate;
         this.weaponPresentation = weaponPresentation;
+        this.fader = fader;
     }
 
     // This battle's copies, which the launcher hands to the behaviour that steers them.
@@ -853,13 +856,14 @@ public class NavalShipEngine : INavalShipEngine
 
     public float ReadMitigatedDamage(MissionObject hull) => snapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
 
-    // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
+    // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way. Crew off its hull, such as at another ship's helm,
+    // still holds its station, which vanilla's removal no longer frees once the mission ended.
     public void WithdrawAgent(Agent agent)
     {
         if (!agent.IsActive()) return;
 
         agent.SetIsPhysicsForceClosed(false);
-        agent.FadeOut(true, true);
+        fader.FadeOut(agent, hideInstantly: true, hideMount: true);
     }
 
     public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;

@@ -157,6 +157,8 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
         Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
         Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
+        // The naval withdrawal lets a parked agent's physics back on before fading it.
+        Prefix(typeof(Agent), nameof(Agent.SetIsPhysicsForceClosed), nameof(Agent_SetIsPhysicsForceClosed));
         // Retreat/adoption paths: own-party classification reads the origin, the adoption clears a mount's
         // interpolation target, and the retreat despawn fades the withdrawing troops out.
         Prefix(typeof(Agent), "get_Origin", nameof(Agent_get_Origin));
@@ -931,6 +933,9 @@ public sealed class MissionEngineFixture : IDisposable
         // No visual loop headless — accept the call so freshly spawned (reinforcement) agents don't deref natives.
         return !AgentMirror.TryGet(__instance, out _);
     }
+
+    // Mock agents have no physics to close, so the call is accepted without reaching native code.
+    private static bool Agent_SetIsPhysicsForceClosed(Agent __instance) => !AgentMirror.TryGet(__instance, out _);
 
     private static bool Agent_get_Origin(Agent __instance, ref IAgentOriginBase __result)
     {

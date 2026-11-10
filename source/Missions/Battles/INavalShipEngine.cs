@@ -190,8 +190,8 @@ public interface INavalShipEngine
     float ReadMitigatedDamage(MissionObject hull);
 
     /// <summary>
-    /// [Game thread] Takes an agent out of the battle the way vanilla takes a removed hull's crew: it fades out, which reads as
-    /// a rout, not a casualty.
+    /// [Game thread] Takes an agent out of the battle the way vanilla takes a removed hull's crew: it leaves any station and
+    /// fades out, which reads as a rout, not a casualty.
     /// </summary>
     void WithdrawAgent(Agent agent);
 

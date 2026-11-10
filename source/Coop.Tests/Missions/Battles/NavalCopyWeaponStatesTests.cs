@@ -50,7 +50,7 @@ public class NavalCopyWeaponStatesTests
     public void ApplyWeaponState_RemembersTheAuthoritysState()
     {
         var store = new Mock<INavalCopyWeaponStates>();
-        var engine = new NavalShipEngine(null!, null!, null!, store.Object, null!, null!, null!, null!, null!);
+        var engine = new NavalShipEngine(null!, null!, null!, store.Object, null!, null!, null!, null!, null!, null!);
         var weapon = ShipTestHulls.CreateWeapon();
         AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(weapon, NavalShipEngineTests.ValidEntity());
         var state = State(RangedSiegeWeapon.WeaponState.LoadingAmmo, 0);
@@ -65,7 +65,7 @@ public class NavalCopyWeaponStatesTests
     public void SimulatedWeapons_ForgetTheirStates_AndClearingForgetsAll()
     {
         var store = new Mock<INavalCopyWeaponStates>();
-        var engine = new NavalShipEngine(null!, null!, null!, store.Object, null!, null!, null!, null!, null!);
+        var engine = new NavalShipEngine(null!, null!, null!, store.Object, null!, null!, null!, null!, null!, null!);
         var own = new List<MissionObject> { ShipTestHulls.CreateWeapon() };
 
         engine.SetSimulatedWeapons(own);

@@ -598,14 +598,14 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public float ReadMitigatedDamage(MissionObject hull) => Of(hull).MitigatedDamage;
 
-    // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
+    // The live engine releases the agent's station and fades it out, which the mission fixture's patches mirror.
     public void WithdrawAgent(Agent agent)
     {
         if (!agent.IsActive()) return;
 
         decks.Remove(agent);
         parkedFrom.Remove(agent);
-        agent.FadeOut(true, true);
+        new BattleAgentFader().FadeOut(agent, hideInstantly: true, hideMount: true);
         Withdrawn.Add(agent);
     }
 
