@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Common.Network.Session;
+using Serilog;
 using Steamworks;
 using System;
 using System.Collections.Concurrent;
@@ -87,7 +88,24 @@ public abstract class SteamNetworkingTunnelTransportBase :
         return $"sendRate={status.m_nSendRateBytesPerSecond}B/s out={status.m_flOutBytesPerSec:F0}B/s " +
             $"in={status.m_flInBytesPerSec:F0}B/s pendingReliable={status.m_cbPendingReliable} " +
             $"unacked={status.m_cbSentUnackedReliable} ping={status.m_nPing}ms " +
-            $"quality={status.m_flConnectionQualityLocal:F2} route={DescribeRoute(connection)}";
+            $"quality={status.m_flConnectionQualityLocal:F2} qualityRemote={status.m_flConnectionQualityRemote:F2} " +
+            $"route={DescribeRoute(connection)}";
+    }
+
+    // The remote quality is how much of what this side sends arrives, which is what a sender backs off on.
+    public bool TryGetConnectionHealth(uint connection, out RouteHealth health)
+    {
+        health = default;
+        var status = default(SteamNetConnectionRealTimeStatus_t);
+        var lanes = default(SteamNetConnectionRealTimeLaneStatus_t);
+        var result = GetConnectionRealTimeStatus(new HSteamNetConnection(connection), ref status, 0, ref lanes);
+        if (result != EResult.k_EResultOK) return false;
+
+        health = new RouteHealth(
+            status.m_nPing,
+            status.m_flConnectionQualityRemote,
+            (long)status.m_cbPendingReliable + status.m_cbPendingUnreliable);
+        return true;
     }
 
     // Names the current route, so a ping change in the stats can be matched to a route switch.

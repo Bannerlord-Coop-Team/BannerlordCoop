@@ -1,4 +1,5 @@
-﻿using Coop.Steam;
+﻿using Common.Network.Session;
+using Coop.Steam;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +19,7 @@ namespace Coop.Tests.Steam
             new List<(uint, byte[], bool)>();
         private readonly Dictionary<uint, Queue<byte[]>> pendingReceives = new Dictionary<uint, Queue<byte[]>>();
         private readonly Dictionary<uint, ulong> remoteSteamIds = new Dictionary<uint, ulong>();
+        private readonly Dictionary<uint, RouteHealth> connectionHealth = new Dictionary<uint, RouteHealth>();
 
         public uint NextConnection = 501;
         public ulong ConnectedHost;
@@ -149,6 +151,23 @@ namespace Coop.Tests.Steam
         }
 
         public string DescribeConnection(uint connection) => "fake";
+
+        public bool TryGetConnectionHealth(uint connection, out RouteHealth health)
+        {
+            lock (gate)
+            {
+                return connectionHealth.TryGetValue(connection, out health);
+            }
+        }
+
+        /// <summary>Scripts the health <see cref="TryGetConnectionHealth"/> reports for a connection.</summary>
+        public void SetConnectionHealth(uint connection, RouteHealth health)
+        {
+            lock (gate)
+            {
+                connectionHealth[connection] = health;
+            }
+        }
 
         public void Dispose()
         {

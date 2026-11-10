@@ -66,6 +66,12 @@ public interface INavalShipEngine
     /// <summary>The usable point at <paramref name="stationKey"/> below <paramref name="hull"/>; null when it is not there.</summary>
     UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex);
 
+    /// <summary>The object's content path and script index below a hull; false outside that hull.</summary>
+    bool TryDescribeObject(MissionObject hull, MissionObject missionObject, out string objectKey, out int objectIndex);
+
+    /// <summary>The mission object at a content path and script index below a hull; null when unavailable.</summary>
+    MissionObject ResolveObject(MissionObject hull, string objectKey, int objectIndex);
+
     /// <summary>[Game thread] Seats a puppet at, or releases it from, a station the way the owner did.</summary>
     void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse);
 

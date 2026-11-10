@@ -179,6 +179,12 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnRemoveBehavior() => OnEndMissionInternal();
 
+    public override void OnAgentDeleted(Agent affectedAgent)
+    {
+        coopMissionComponent.AgentRegistry.ForgetCosmeticAgent(affectedAgent);
+        base.OnAgentDeleted(affectedAgent);
+    }
+
     public override void OnEndMissionInternal()
     {
         if (ended) return;

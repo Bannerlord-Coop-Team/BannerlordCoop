@@ -649,8 +649,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     {
         agent.Controller = AgentControllerType.AI;
 
-        // A fleeing puppet already left its formation when the authoritative transition was mirrored. Keep it
-        // routed during migration instead of assigning it to a formation and charging it back into combat.
+        // Keep a fleeing puppet routed during migration instead of assigning it to a formation and charging it back
+        // into combat. Its authority refresh tells peers the flag it carries.
         if (agent.IsRunningAway)
         {
             if (wakeAi)

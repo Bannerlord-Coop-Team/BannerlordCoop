@@ -68,6 +68,7 @@ public class MissionModule : Module
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         builder.RegisterType<RangedSiegeWeaponPresentation>().As<IRangedSiegeWeaponPresentation>().InstancePerDependency();
+        builder.RegisterType<MissionObjectPath>().As<IMissionObjectPath>().InstancePerDependency();
         base.Load(builder);
 
         // The container is one co-op session; child scopes own only transient mission graphs.
@@ -102,6 +103,9 @@ public class MissionModule : Module
             .InstancePerDependency();
         builder.RegisterType<MovementTrafficBudgetFactory>()
             .As<IMovementTrafficBudgetFactory>()
+            .InstancePerDependency();
+        builder.RegisterType<MovementRouteBackoff>()
+            .As<IMovementRouteBackoff>()
             .InstancePerDependency();
         builder.RegisterType<MovementBatchSender>()
             .As<IMovementBatchSender>()
