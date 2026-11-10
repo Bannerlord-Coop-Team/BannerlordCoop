@@ -53,7 +53,6 @@ public class MilitiaSettlementPatchTests
     }
 
     [Theory]
-    [InlineData(false, false)]
     [InlineData(true, true)]
     public void NativeSetter_WhenNotSynchronizing_PreservesNativeChangeWithoutPublishing(
         bool isServer, bool allowOriginal)
@@ -64,6 +63,17 @@ public class MilitiaSettlementPatchTests
         Assert.Empty(messages);
         Assert.Equal(100.5f, settlement.Militia);
         Assert.Equal(0.5f, settlement._readyMilitia);
+    }
+
+    [Fact]
+    public void NativeSetter_OnClient_LeavesMilitiaAndRosterUnchanged()
+    {
+        var settlement = CreateSettlement(100, true);
+        var messages = SetMilitia(settlement, 0f, isServer: false, allowOriginal: false);
+
+        Assert.Empty(messages);
+        Assert.Equal(100f, settlement.Militia);
+        Assert.Equal(100, settlement.MilitiaPartyComponent.MobileParty.MemberRoster.TotalManCount);
     }
 
     private static List<SettlementChangedMilitia> SetMilitia(

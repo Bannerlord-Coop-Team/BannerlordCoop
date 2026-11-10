@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -111,6 +112,17 @@ public class ResolveCharacterState : ConnectionStateBase
                     clientModules.Select(ConvertToModuleInfo),
                     out error,
                     DisplayNames(clientModules, serverModules));
+
+                // Decisions are addressed by list index, so a player who can't rebuild a synced decision type
+                // (or proposes one the server can't) would shift every later vote. This also replaces the lone Coop
+                // reason, which the client would otherwise join on.
+                if (!KingdomDecisionTypeRegistry.Matches(obj.What.KingdomDecisionTypes, out string decisionTypeError))
+                {
+                    error = (result || string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
+                        ? decisionTypeError
+                        : error + Environment.NewLine + decisionTypeError;
+                    result = false;
+                }
 
                 // The client joins anyway on the lone Coop reason, so only log real refusals.
                 if (!result && !string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))

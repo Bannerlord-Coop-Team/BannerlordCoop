@@ -7,9 +7,11 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Alleys.Patches;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -47,6 +49,9 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         AddHeroToPartyRoster(ownerHeroId, partyIds[0]);
         AddHeroToPartyRoster(overseerHeroId, partyIds[1]);
         SetMainHero(clients[0], ownerHeroId);
+        // The server only applies an alley request from the peer that controls the hero it is about.
+        ConnectRegisteredPlayer(clients[0], "AlleyOwner");
+        ConnectRegisteredPlayer(clients[1], "AlleyOverseer");
         ConfigureTownSettlement(settlementId, ownerHeroId);
 
         string playerAlleyId = CreateAlley(settlementId, "player_alley");
@@ -79,6 +84,17 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         string overseerId,
         params TroopRosterElementData[] garrison)
     {
+        // The take over moves the chosen troops out of the owner's party, so the party needs them first.
+        Server.Call(() =>
+        {
+            MobileParty party = Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId);
+            foreach (var element in garrison)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(element.CharacterId, out var character));
+                if (!character.IsHero) party.MemberRoster.AddToCounts(character, element.Number);
+            }
+        });
+
         client.Call(() =>
         {
             Alley alley = client.GetRegisteredObject<Alley>(scenario.PlayerAlleyId);
@@ -87,8 +103,15 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             TroopRoster roster = CreateRoster(client, garrison);
             client.Resolve<IMessageBroker>().Publish(
                 this,
-                new AlleyAcquiredRequested(alley, owner, overseer, roster));
+                new AlleyAcquiredRequested(alley, owner, overseer, roster, alley.Owner));
         });
+    }
+
+    // Runs the prefix vanilla StartCommonAreaBattle runs first. Its own body needs a live mission with agents.
+    protected static void StartFight(EnvironmentInstance client, string alleyId)
+    {
+        var prefix = AccessTools.Method(typeof(MissionAlleyHandlerPatches), "StartCommonAreaBattlePrefix");
+        client.Call(() => prefix.Invoke(null, new object[] { client.GetRegisteredObject<Alley>(alleyId) }));
     }
 
     public void ForceAttack(AlleyDomainScenario scenario)
@@ -214,7 +237,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             Configure(client);
     }
 
-    private void ConfigureHeroIdentity(string heroId)
+    protected void ConfigureHeroIdentity(string heroId)
     {
         uint id = unchecked((uint)StringComparer.Ordinal.GetHashCode(heroId)) | 1u;
 
@@ -267,7 +290,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             Configure(client);
     }
 
-    private string CreateAlley(string settlementId, string tag)
+    protected string CreateAlley(string settlementId, string tag)
     {
         string alleyId = null;
         Server.Call(() =>

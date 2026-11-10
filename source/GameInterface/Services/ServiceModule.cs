@@ -3,6 +3,7 @@ using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Alleys.Handlers;
 using GameInterface.Services.Locations.Conversations;
 using Serilog;
 using System;
@@ -19,27 +20,37 @@ internal class ServiceModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
-        foreach (var type in GetHandlers())
+        foreach (var type in GetHandlers().Where(t => GameInterfaceModule.ShouldRegister(t)))
         {
             if (type == typeof(LocationConversationTracker))
             {
                 builder.RegisterType<LocationConversationTracker>()
                     .AsSelf()
                     .As<ILocationConversationTracker>()
-                    .InstancePerLifetimeScope()
+                    .SingleInstance()
                     .AutoActivate();
                 continue;
             }
 
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            if (type == typeof(AlleyHandler))
+            {
+                builder.RegisterType<AlleyHandler>()
+                    .AsSelf()
+                    .As<IAlleyAttacks>()
+                    .SingleInstance()
+                    .AutoActivate();
+                continue;
+            }
+
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         foreach (var type in GetAuditors())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
-        foreach (var type in GetGameAbstractions())
+        foreach (var type in GetGameAbstractions().Where(t => GameInterfaceModule.ShouldRegister(t)))
         {
             var interfaceToRegister = type.GetInterfaces().SingleOrDefault(
                 i => typeof(IGameAbstraction).IsAssignableFrom(i) &&
@@ -49,7 +60,7 @@ internal class ServiceModule : Module
             {
                 Logger.Verbose("Registering {type} GameInterface Service", type.Name);
 
-                builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
+                builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
             }
             else
             {

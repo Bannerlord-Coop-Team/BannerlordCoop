@@ -19,9 +19,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.LiveTesting;
 
-[CollectionDefinition(nameof(GauntletAutomationCollection), DisableParallelization = true)]
-public sealed class GauntletAutomationCollection { }
-
 [Collection(nameof(GauntletAutomationCollection))]
 public class GauntletWidgetAdapterTests
 {

@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -209,6 +210,7 @@ public class AcceptVisibilityTests : IDisposable
             // Only the placeholder the daily tick reads, the sender's real entry is not copied
             Assert.Single(otherIssue.JournalEntries);
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
+            Campaign.Current.IssueManager.DailyTick();
         });
 
         Assert.Empty(otherUpdates);
@@ -339,15 +341,19 @@ public class AcceptVisibilityTests : IDisposable
     }
 
     [Theory]
-    [InlineData(IssueOutcome.QuestSuccess)]
-    [InlineData(IssueOutcome.QuestCancel)]
-    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome)
+    [InlineData(IssueOutcome.QuestSuccess, false)]
+    [InlineData(IssueOutcome.QuestCancel, false)]
+    [InlineData(IssueOutcome.QuestSuccess, true)]
+    [InlineData(IssueOutcome.QuestCancel, true)]
+    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome, bool knowsOwner)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         var otherIssue = AddIssue(Other, notableId);
         ListenForIssueUpdatesOnTheOtherClient();
         ListenForQuestCompletionsOnTheOtherClient();
         LoadQuestSolutionFromSave(otherIssue, notableId);
+        if (knowsOwner)
+            Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId)));
 
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 
@@ -362,8 +368,7 @@ public class AcceptVisibilityTests : IDisposable
         });
 
         Assert.Empty(otherQuestCompletions);
-        var update = Assert.Single(otherUpdates);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
     }
 
     [Fact]
@@ -453,6 +458,9 @@ public class AcceptVisibilityTests : IDisposable
         StartLordSolutionOnTheOwner(ownerIssue, notableId);
         Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
 
+        Owner.Call(() => Owner.SimulateMessage(this, new NetworkIssueJournal(notableId, IssueId, false,
+            new[] { new IssueJournalEntry(new JournalLog(CampaignTime.Now, outcome == IssueOutcome.LordAcceptedCounterOffer
+                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog)) })));
         Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 

@@ -12,6 +12,8 @@ internal sealed class ChatVM : ViewModel
     internal const string AllChannelId = "__all__";
     internal const string EventsChannelId = "__events__";
     internal const string GlobalChannelId = "__global__";
+    internal const string ClanChannelId = "__clan__";
+    internal const string KingdomChannelId = "__kingdom__";
     private const int MaxHistoryPerChannel = 50;
     private const int VisibleHistoryLines = 12;
     internal const float DefaultChatBoxSizeX = 520f;
@@ -30,12 +32,13 @@ internal sealed class ChatVM : ViewModel
         new Dictionary<string, List<ChatLineVM>>(StringComparer.Ordinal);
 
     private ChatChannelVM selectedChannel;
+    private string clanId;
+    private string kingdomId;
     private string writtenText = string.Empty;
     private bool isOpen;
-    private bool playerChatEnabled = true;
     private float chatBoxSizeX;
     private float chatBoxSizeY;
-    // Closed fade feed: Events + Global + DMs (All stays public-only)
+    // Closed-panel fade feed (Events, Global, Clan, Kingdom, DMs). All stays Events+Global only.
     private readonly List<ChatLineVM> passiveHistory = new List<ChatLineVM>();
 
     public ChatVM(
@@ -57,9 +60,12 @@ internal sealed class ChatVM : ViewModel
         chatBoxSizeX = DefaultChatBoxSizeX;
         chatBoxSizeY = DefaultChatBoxSizeY;
 
-        EnsureFixedChannel(AllChannelId, "All", ChatChannelKind.All);
-        EnsureFixedChannel(EventsChannelId, "Events", ChatChannelKind.Events);
-        EnsureFixedChannel(GlobalChannelId, "Global", ChatChannelKind.Global);
+        EnsureFixedChannel(AllChannelId, "All", ChatChannelKind.All, addToList: true);
+        EnsureFixedChannel(EventsChannelId, "Events", ChatChannelKind.Events, addToList: true);
+        EnsureFixedChannel(GlobalChannelId, "Global", ChatChannelKind.Global, addToList: true);
+        // Listed only while the local player belongs to that group
+        EnsureFixedChannel(ClanChannelId, "Clan", ChatChannelKind.Clan, addToList: false);
+        EnsureFixedChannel(KingdomChannelId, "Kingdom", ChatChannelKind.Kingdom, addToList: false);
         SelectChannel(channelsById[AllChannelId]);
     }
 
@@ -79,32 +85,21 @@ internal sealed class ChatVM : ViewModel
     {
         get
         {
-            if (selectedChannel == null) return "All";
             if (selectedChannel.IsDirect)
                 return $"Direct message: {selectedChannel.Name.TrimEnd(' ', '*')}";
             if (selectedChannel.IsEvents) return "Events";
             if (selectedChannel.IsGlobal) return "Global chat";
+            if (selectedChannel.IsClan) return "Clan chat";
+            if (selectedChannel.IsKingdom) return "Kingdom chat";
             return "All";
         }
     }
 
     [DataSourceProperty]
-    public bool IsMuteButtonVisible => selectedChannel?.IsDirect == true;
+    public bool IsMuteButtonVisible => selectedChannel.IsDirect;
 
     [DataSourceProperty]
-    public string MuteButtonText => selectedChannel?.IsMuted == true ? "Unmute" : "Mute";
-
-    public bool IsPlayerChatEnabled
-    {
-        get => playerChatEnabled;
-        private set
-        {
-            if (playerChatEnabled == value) return;
-            playerChatEnabled = value;
-            OnPropertyChanged(nameof(IsPlayerChatEnabled));
-            UpdateVisibleLines();
-        }
-    }
+    public string MuteButtonText => selectedChannel.IsMuted ? "Unmute" : "Mute";
 
     [DataSourceProperty]
     public string WrittenText
@@ -136,9 +131,9 @@ internal sealed class ChatVM : ViewModel
         }
     }
 
-    /// <summary>False on Events (read-only) or when the panel is closed.</summary>
+    /// <summary>False when closed or the selected channel has no send target.</summary>
     [DataSourceProperty]
-    public bool IsChatInputEnabled => isOpen && selectedChannel?.IsEvents != true;
+    public bool IsChatInputEnabled => isOpen && selectedChannel.SendChannel != null;
 
     [DataSourceProperty]
     public float ChatBoxSizeX
@@ -170,13 +165,11 @@ internal sealed class ChatVM : ViewModel
 
     public void ActionSend()
     {
-        if (!IsPlayerChatEnabled) return;
-        if (selectedChannel == null || selectedChannel.IsEvents) return;
+        if (selectedChannel.SendChannel is not ChatChannel channel) return;
 
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
 
-        var channel = selectedChannel.IsDirect ? ChatChannel.Direct : ChatChannel.Global;
         string recipientControllerId = channel == ChatChannel.Direct
             ? selectedChannel.ControllerId
             : string.Empty;
@@ -208,41 +201,35 @@ internal sealed class ChatVM : ViewModel
 
     public void SetOpen(bool open)
     {
-        if (open && !IsPlayerChatEnabled) return;
-
         IsOpen = open;
 
         // opening shows the selected tab, so whatever arrived on it while closed is now seen
         if (open) selectedChannel?.SetSelected(true);
     }
 
-    public void SetPlayerChatEnabled(bool enabled)
-    {
-        if (!enabled && IsOpen)
-            SetOpen(false);
-
-        IsPlayerChatEnabled = enabled;
-    }
-
     public void Tick(float dt)
     {
-        // All reuses Events/Global line instances
-        // Only tick the source lists
-        TickHistory(EventsChannelId, dt);
-        TickHistory(GlobalChannelId, dt);
+        // Skip All: it reuses Events/Global line instances
         foreach (var pair in histories)
         {
-            if (IsFixedChannelId(pair.Key)) continue;
+            if (string.Equals(pair.Key, AllChannelId, StringComparison.Ordinal)) continue;
             for (int i = 0; i < pair.Value.Count; i++)
                 pair.Value[i].HandleFading(dt);
         }
     }
 
+    /// <summary>Lists Clan and Kingdom tabs before DMs when the local player belongs to them.</summary>
+    public void SetGroupChannelMembership(string clanId, string kingdomId)
+    {
+        UpdateGroupChannel(ClanChannelId, ref this.clanId, clanId);
+        UpdateGroupChannel(KingdomChannelId, ref this.kingdomId, kingdomId);
+    }
+
     public void AddParticipant(string controllerId, string displayName)
     {
         if (string.IsNullOrWhiteSpace(controllerId) ||
-            IsFixedChannelId(controllerId) ||
-            string.Equals(controllerId, getLocalControllerId(), StringComparison.Ordinal))
+            string.Equals(controllerId, getLocalControllerId(), StringComparison.Ordinal) ||
+            IsReservedChannelId(controllerId))
         {
             return;
         }
@@ -259,8 +246,8 @@ internal sealed class ChatVM : ViewModel
         foreach (var participant in participants)
         {
             if (string.IsNullOrWhiteSpace(participant.ControllerId) ||
-                IsFixedChannelId(participant.ControllerId) ||
                 string.Equals(participant.ControllerId, getLocalControllerId(), StringComparison.Ordinal) ||
+                IsReservedChannelId(participant.ControllerId) ||
                 !availableIds.Add(participant.ControllerId))
             {
                 continue;
@@ -269,7 +256,7 @@ internal sealed class ChatVM : ViewModel
             availableParticipants.Add(participant);
         }
 
-        if (selectedChannel?.IsDirect == true && !availableIds.Contains(selectedChannel.ControllerId))
+        if (selectedChannel.IsDirect && !availableIds.Contains(selectedChannel.ControllerId))
             SelectChannel(channelsById[AllChannelId]);
 
         var directChannels = new List<ChatChannelVM>();
@@ -313,6 +300,16 @@ internal sealed class ChatVM : ViewModel
                 line = $"[Global] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
                 AddParticipant(message.SenderControllerId, message.SenderName);
                 break;
+            case ChatChannel.Clan:
+                channelId = ClanChannelId;
+                line = $"[Clan] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
+                AddParticipant(message.SenderControllerId, message.SenderName);
+                break;
+            case ChatChannel.Kingdom:
+                channelId = KingdomChannelId;
+                line = $"[Kingdom] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
+                AddParticipant(message.SenderControllerId, message.SenderName);
+                break;
             case ChatChannel.Direct:
                 bool sentByLocalPlayer = string.Equals(
                     message.SenderControllerId,
@@ -329,13 +326,18 @@ internal sealed class ChatVM : ViewModel
                     : $"[From {otherName}] {otherName}: {message.Text}";
                 break;
             case ChatChannel.System:
-                channelId = string.IsNullOrEmpty(message.RecipientControllerId)
-                    ? selectedChannel?.IsDirect == true
-                        ? selectedChannel.ControllerId
-                        : GlobalChannelId
-                    : message.RecipientControllerId;
-                if (channelId != GlobalChannelId)
+                if (string.IsNullOrEmpty(message.RecipientControllerId))
+                {
+                    // All is skipped by Tick. Events is read-only. Both map to Global.
+                    channelId = selectedChannel.IsAll || selectedChannel.IsEvents
+                        ? GlobalChannelId
+                        : selectedChannel.ControllerId;
+                }
+                else
+                {
+                    channelId = message.RecipientControllerId;
                     EnsureDirectChannel(channelId, DisplayName(message.RecipientName, channelId));
+                }
                 line = $"[Chat] {message.Text}";
                 break;
             default:
@@ -348,14 +350,67 @@ internal sealed class ChatVM : ViewModel
             incomingDirect);
     }
 
-    private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind)
+    private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind, bool addToList)
     {
         if (channelsById.ContainsKey(channelId)) return;
 
         var channel = new ChatChannelVM(channelId, displayName, kind, SelectChannel);
         channelsById.Add(channelId, channel);
         histories.Add(channelId, new List<ChatLineVM>());
-        Channels.Add(channel);
+        if (addToList) Channels.Add(channel);
+    }
+
+    private void SetFixedChannelListed(string channelId, bool listed)
+    {
+        if (!channelsById.TryGetValue(channelId, out var channel)) return;
+
+        bool present = Channels.Contains(channel);
+        if (listed == present) return;
+
+        if (!listed)
+        {
+            if (ReferenceEquals(selectedChannel, channel))
+                SelectChannel(channelsById[AllChannelId]);
+            Channels.Remove(channel);
+            return;
+        }
+
+        Channels.Insert(IndexForGroupChannel(channel.Kind), channel);
+    }
+
+    private void UpdateGroupChannel(string channelId, ref string previousFactionId, string factionId)
+    {
+        if (!string.Equals(previousFactionId, factionId, StringComparison.Ordinal))
+        {
+            if (!string.IsNullOrEmpty(previousFactionId))
+                ClearGroupChannelHistory(channelId);
+            previousFactionId = factionId;
+        }
+
+        SetFixedChannelListed(channelId, !string.IsNullOrEmpty(factionId));
+    }
+
+    private void ClearGroupChannelHistory(string channelId)
+    {
+        var history = histories[channelId];
+        passiveHistory.RemoveAll(line => history.Contains(line));
+        history.Clear();
+        channelsById[channelId].ClearUnreadMessages();
+
+        if (!IsOpen || string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal))
+            UpdateVisibleLines();
+    }
+
+    private int IndexForGroupChannel(ChatChannelKind kind)
+    {
+        // All/Events/Global are always 0..2
+        if (kind == ChatChannelKind.Clan) return 3;
+        return Channels.Contains(channelsById[ClanChannelId]) ? 4 : 3;
+    }
+
+    private bool IsReservedChannelId(string controllerId)
+    {
+        return channelsById.TryGetValue(controllerId, out var channel) && !channel.IsDirect;
     }
 
     private ChatChannelVM EnsureDirectChannel(string controllerId, string displayName)
@@ -401,7 +456,7 @@ internal sealed class ChatVM : ViewModel
         history.Add(line);
         ChatLineVM trimmed = TrimHistory(history);
 
-        // Also append to All (public feeds only)
+        // All is Events+Global only (not Clan, Kingdom, or DMs)
         ChatLineVM allTrimmed = null;
         bool feedsAll = channelId == EventsChannelId || channelId == GlobalChannelId;
         if (feedsAll)
@@ -411,13 +466,12 @@ internal sealed class ChatVM : ViewModel
             allTrimmed = TrimHistory(allHistory);
         }
 
-        // Closed fade feed includes Global, Events, DMs
         passiveHistory.Add(line);
         ChatLineVM passiveTrimmed = TrimHistory(passiveHistory);
 
         bool viewingThisChannel = IsOpen &&
-            string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
-        bool viewingAll = IsOpen && selectedChannel?.IsAll == true && feedsAll;
+            string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal);
+        bool viewingAll = IsOpen && selectedChannel.IsAll && feedsAll;
         if (!IsOpen)
         {
             AppendVisibleLine(line, passiveTrimmed);
@@ -446,8 +500,6 @@ internal sealed class ChatVM : ViewModel
 
     private void AppendVisibleLine(ChatLineVM line, ChatLineVM trimmed)
     {
-        if (line.IsPlayerChat && !IsPlayerChatEnabled) return;
-
         if (trimmed != null)
             VisibleLines.Remove(trimmed);
         if (!IsOpen && VisibleLines.Count >= VisibleHistoryLines)
@@ -464,68 +516,30 @@ internal sealed class ChatVM : ViewModel
         IList<ChatLineVM> history;
         if (!IsOpen)
             history = passiveHistory;
-        else if (!histories.TryGetValue(
-                     selectedChannel?.ControllerId ?? AllChannelId,
-                     out var channelHistory))
+        else if (!histories.TryGetValue(selectedChannel.ControllerId, out var channelHistory))
             return;
         else
             history = channelHistory;
 
-        // Closed: filter first, then take the last N eligible passive lines
-        int firstLine = 0;
-        if (!IsOpen)
-        {
-            firstLine = history.Count;
-            int eligible = 0;
-            for (int i = history.Count - 1; i >= 0 && eligible < VisibleHistoryLines; i--)
-            {
-                if (history[i].IsPlayerChat && !IsPlayerChatEnabled) continue;
-                eligible++;
-                firstLine = i;
-            }
-        }
+        int firstLine = !IsOpen
+            ? Math.Max(0, history.Count - VisibleHistoryLines)
+            : 0;
 
         for (int i = firstLine; i < history.Count; i++)
-        {
-            var historyLine = history[i];
-            if (historyLine.IsPlayerChat && !IsPlayerChatEnabled) continue;
-            VisibleLines.Add(historyLine);
-        }
+            VisibleLines.Add(history[i]);
 
         FeedScrolledToBottomRequested?.Invoke();
     }
 
-    private void TickHistory(string channelId, float dt)
-    {
-        if (!histories.TryGetValue(channelId, out var history)) return;
-        for (int i = 0; i < history.Count; i++)
-            history[i].HandleFading(dt);
-    }
-
     private void RefreshForceVisible()
     {
-        TickHistoryForceVisible(EventsChannelId);
-        TickHistoryForceVisible(GlobalChannelId);
+        // Skip All: it reuses Events/Global line instances
         foreach (var pair in histories)
         {
-            if (IsFixedChannelId(pair.Key)) continue;
+            if (string.Equals(pair.Key, AllChannelId, StringComparison.Ordinal)) continue;
             for (int i = 0; i < pair.Value.Count; i++)
                 pair.Value[i].ToggleForceVisible(IsOpen);
         }
-    }
-
-    private void TickHistoryForceVisible(string channelId)
-    {
-        if (!histories.TryGetValue(channelId, out var history)) return;
-        for (int i = 0; i < history.Count; i++)
-            history[i].ToggleForceVisible(IsOpen);
-    }
-
-    private static bool IsFixedChannelId(string channelId)
-    {
-        return string.Equals(channelId, AllChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, EventsChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal);
     }
 
     private static string DisplayName(string name, string controllerId)

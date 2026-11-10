@@ -203,6 +203,19 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         VerifyCharged(Times.Once());
     }
 
+    [Fact]
+    public void PortCheckThatThrows_StillRepliesRejected()
+    {
+        action.Setup(service => service.CanBreakOutFromPort(party, settlement)).Throws(new InvalidOperationException("check failed"));
+
+        Send("throws", isFromPort: true);
+
+        var result = Assert.Single(Results());
+        Assert.Equal("throws", result.RequestId);
+        Assert.False(result.Approved);
+        VerifyCharged(Times.Never());
+    }
+
     private void SacrificePays()
     {
         sacrifice.Setup(step => step.TryApply(party, It.IsAny<int>(), It.IsAny<Action>()))

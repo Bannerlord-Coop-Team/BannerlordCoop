@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -11,11 +12,14 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Tests.Services.Issues;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Services.Network;
+using System.Diagnostics;
 using Xunit.Abstractions;
 using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
@@ -38,14 +42,17 @@ public class TestEnvironment
     private readonly MeshNetworkRouter meshOrchestrator;
 
     private readonly bool registerGameInterface;
+    private readonly Action<ContainerBuilder>? configureDependencies;
 
     /// <summary>
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false,
+        Action<ContainerBuilder>? configureDependencies = null)
     {
         this.registerGameInterface = registerGameInterface;
+        this.configureDependencies = configureDependencies;
         meshOrchestrator = new MeshNetworkRouter(meshScheduler);
 
         Server = CreateServer(output);
@@ -67,18 +74,19 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
-        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().SingleInstance();
 
         // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh
         // traffic routes between client instances. Inert for campaign tests, which never resolve IBattleNetwork.
         builder.RegisterInstance(meshOrchestrator).AsSelf().SingleInstance();
-        builder.RegisterType<MockBattleNetwork>().AsSelf().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<MockBattleNetwork>().AsSelf().As<IBattleNetwork>().SingleInstance();
 
         builder.RegisterType<ClientInstance>().AsSelf();
 
         AddSharedDependencies(builder);
 
-        container = builder.Build();
+        configureDependencies?.Invoke(builder);
+        container = BuildWithNavalServices(builder);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -93,7 +101,7 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
-        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
@@ -102,13 +110,29 @@ public class TestEnvironment
             .As<IBattlesFoughtUploader>()
             .SingleInstance();
 
-        container = builder.Build();
+        configureDependencies?.Invoke(builder);
+        container = BuildWithNavalServices(builder);
 
         var instance = container.Resolve<ServerInstance>()!;
 
         networkOrchestrator.AddServer(instance);
 
         return instance;
+    }
+
+    // Naval sync is tested here with fakes, so the modules register it; the flag goes back for the run itself.
+    private static IContainer BuildWithNavalServices(ContainerBuilder builder)
+    {
+        bool previous = ModInformation.IsNavalEnabled;
+        ModInformation.IsNavalEnabled = true;
+        try
+        {
+            return builder.Build();
+        }
+        finally
+        {
+            ModInformation.IsNavalEnabled = previous;
+        }
     }
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
@@ -133,11 +157,25 @@ public class TestEnvironment
             .InstancePerDependency();
         builder.RegisterInstance(new FixedBattleSizeProvider(1000))
             .As<IBattleSizeProvider>();
+        // The wall-clock receiver-cap heartbeat sends from a timer thread into the single-threaded mesh scheduler, and
+        // deadlocks teardown: Dispose waits for that callback while holding the GameInstance lock it is blocked on.
+        builder.Register(context => new MovementRateController(
+                context.Resolve<IBattleNetwork>(),
+                context.Resolve<IMessageBroker>(),
+                context.Resolve<IControllerIdProvider>(),
+                context.Resolve<IMissionContext>(),
+                Stopwatch.GetTimestamp,
+                Stopwatch.Frequency,
+                MovementRateController.ReadFrameLimitHz,
+                enableHeartbeat: false,
+                context.Resolve<IMovementNetworkSettings>()))
+            .As<IMovementRateController>()
+            .InstancePerDependency();
 
-        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().SingleInstance();
+        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
-        //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+        //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().SingleInstance().AutoActivate();
 
         return builder;
     }

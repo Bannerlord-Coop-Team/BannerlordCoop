@@ -224,6 +224,10 @@ internal class CompanionsCampaignBehaviorPatches
         if (__result == null)
         {
             List<CharacterObject> list = __instance._companionsOfTemplates[__instance.GetCompanionTemplateTypeToSpawn()];
+
+            // A mod can have no templates for the picked type, keep vanilla's null so no companion spawns
+            if (list.Count == 0) return;
+
             list.Shuffle<CharacterObject>();
 
             var random = new Random();

@@ -48,8 +48,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         var issue = IssueManager.GetIssueOfQuest(quest);
         var registered = issue != null && registry.IsRegistered(issue.GetType());
 
-        // A vanilla listener replayed on a client can end a quest there, only the server's ending may
-        if (registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive)
+        if (IsClientEndingOutsideReplay(registered))
         {
             return false;
         }
@@ -79,12 +78,14 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     {
         observed = null;
 
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        var registered = registry.IsRegistered(issue.GetType());
+
+        if (IsClientEndingOutsideReplay(registered))
         {
-            return true;
+            return false;
         }
 
-        if (!registry.IsRegistered(issue.GetType()))
+        if (CallOriginalPolicy.IsOriginalAllowed() || !registered)
         {
             return true;
         }
@@ -139,11 +140,19 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return false;
         }
 
+        if (!issue.IssueOwner.IsAlive)
+        {
+            issue.CompleteIssueWithCancel();
+            return false;
+        }
+
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             Logger.Error("Alternative solution of {issue} has no owning player, it is tried again tomorrow", issue.StringId);
             return false;
         }
+
+        if (ownerHero.PartyBelongedTo == null) return false;
 
         var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
 
@@ -211,7 +220,23 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
     }
 
+    // A vanilla listener replayed on a client, like a war or a settlement entry, can end a quest or issue there, only the server's ending may
+    private static bool IsClientEndingOutsideReplay(bool registered)
+    {
+        return registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive;
+    }
+
     public void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase
+    {
+        RunAsOwners(listener, _ => true);
+    }
+
+    public void RunAsOwner<TQuest>(Hero owner, Action<TQuest> listener) where TQuest : QuestBase
+    {
+        RunAsOwners(listener, ownerHero => ownerHero == owner);
+    }
+
+    private void RunAsOwners<TQuest>(Action<TQuest> listener, Func<Hero, bool> isOwnerIncluded) where TQuest : QuestBase
     {
         if (ModInformation.IsClient)
         {
@@ -231,6 +256,8 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
                     Logger.Warning("{issue} has a running quest but no owning player", issue.StringId);
                     continue;
                 }
+
+                if (!isOwnerIncluded(ownerHero)) continue;
 
                 using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
                 {

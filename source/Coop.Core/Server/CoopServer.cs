@@ -44,7 +44,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IPacketManager packetManager;
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
-    private readonly IServerAdmissionGate admissionGate;
+    private readonly IServerJoinAdmission joinAdmission;
     private readonly IJoinPeerTerminator peerTerminator;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
@@ -63,7 +63,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
-        IServerAdmissionGate admissionGate,
+        IServerJoinAdmission joinAdmission,
         IJoinPeerTerminator peerTerminator,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
@@ -80,7 +80,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.packetManager = packetManager;
         this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
-        this.admissionGate = admissionGate;
+        this.joinAdmission = joinAdmission;
         this.peerTerminator = peerTerminator;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
@@ -96,6 +96,14 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        // A connection check such as the tools' Check server button sends no full join data.
+        if (!HasPasswordData(request.Data))
+        {
+            Logger.Information("Client connection rejected for {Endpoint}: incomplete join data", request.RemoteEndPoint);
+            Reject(request, ConnectionRejectCode.IncorrectPassword);
+            return;
+        }
+
         string suppliedPassword;
         try
         {
@@ -116,7 +124,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         }
 
         // Checked after the password, so a wrong password learns nothing about a pending restart.
-        if (!admissionGate.IsOpen)
+        if (!joinAdmission.IsOpen)
         {
             Logger.Information("Client connection rejected for {Endpoint}: the server is restarting", request.RemoteEndPoint);
             Reject(request, ConnectionRejectCode.ServerRestarting);
@@ -125,6 +133,15 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
         request.Accept();
+    }
+
+    // LiteNetLib prefixes a string with its byte count plus one, and GetString reads that many bytes without checking they arrived.
+    private static bool HasPasswordData(NetDataReader data)
+    {
+        if (data.AvailableBytes < sizeof(ushort)) return false;
+
+        int byteCount = Math.Max(data.PeekUShort() - 1, 0);
+        return data.AvailableBytes - sizeof(ushort) >= byteCount;
     }
 
     private static void Reject(ConnectionRequest request, ConnectionRejectCode code)
@@ -179,8 +196,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnPeerConnected(NetPeer peer)
     {
-        // Registered under the gate, so a shutdown closing it either drains this peer or it never joins.
-        if (admissionGate.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
+        // Registered inside `TryAdmit`, so a shutdown closing joins either drains this peer or it never joins.
+        if (joinAdmission.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
 
         Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
         peerTerminator.Disconnect(peer, ServerShutdownCoordinator.DisconnectReason);

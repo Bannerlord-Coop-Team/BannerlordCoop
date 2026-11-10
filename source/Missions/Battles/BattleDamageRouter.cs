@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Agents;
@@ -784,8 +786,20 @@ public class BattleDamageRouter : IBattleDamageRouter
         if (healthAfter > 0 && victim.Character is CharacterObject character && character.IsHero
             && character.HeroObject is Hero hero)
         {
-            hero.HitPoints = Math.Max(1, (int)healthAfter);
+            RequestSurvivingHeroHealth(hero, healthAfter);
         }
+    }
+
+    // Agent health reaches Hero.HitPoints only at the agent's removal, so the hero's health owner asks the server to mirror
+    // surviving damage; Hero.HitPoints is server-authoritative, so a client never writes it (as CoopAgentOrigin reports it).
+    private void RequestSurvivingHeroHealth(Hero hero, float health)
+    {
+        if (!hero.IsHealthControlledByThisInstance()) return;
+
+        int hitPoints = Math.Max(1, (int)health);
+        if (hero.HitPoints == hitPoints) return;
+
+        messageBroker.Publish(this, new HeroHitPointsChangeRequested(hero, hitPoints));
     }
 
     internal static bool RemoveIncompatibleDismountFlag(

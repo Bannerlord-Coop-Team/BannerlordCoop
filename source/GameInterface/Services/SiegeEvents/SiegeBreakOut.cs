@@ -22,6 +22,8 @@ public interface ISiegeBreakOut
     bool CanBreakOutFromPort(MobileParty party, Settlement settlement);
     void SetBreakInPending(bool pending);
     bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered);
+    // The caller makes sure the regulars can pay the losses, as ISiegeSacrifice.TryApply does. Vanilla's random pick
+    // never ends once the regulars run out.
     TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties);
     void ShowDebrief(TroopRoster casualties, int armyCasualties, bool isFromPort);
     void ShowBreakInDebrief(TroopRoster casualties, int armyCasualties);
@@ -74,8 +76,6 @@ public class SiegeBreakOut : ISiegeBreakOut
         var parties = leadsArmy ? army.Parties.ToArray() : new[] { party };
         var model = Campaign.Current.Models.TroopSacrificeModel;
         int available = parties.Sum(member => member.MemberRoster.TotalRegulars);
-        // Vanilla's random pick never ends once the regulars run out.
-        losses = Math.Min(losses, available);
 
         // The server selects the sacrificed troops once; normal roster patches replicate the losses.
         for (int loss = 0; loss < losses; loss++)

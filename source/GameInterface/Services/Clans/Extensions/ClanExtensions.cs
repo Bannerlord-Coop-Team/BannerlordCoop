@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Extensions;
 
-internal static class ClanExtensions
+public static class ClanExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<Clan>();
 

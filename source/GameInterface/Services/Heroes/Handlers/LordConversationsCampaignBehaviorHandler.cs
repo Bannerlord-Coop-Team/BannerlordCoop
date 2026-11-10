@@ -113,6 +113,13 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            // A captured or freed lord has no party. A stale dialog must not take one out of another party.
+            if (conversationHero.PartyBelongedTo != null && conversationHero.PartyBelongedTo != mainParty.MobileParty)
+            {
+                Logger.Warning("Ignored taking {HeroId} prisoner because it is in {PartyId}",
+                    data.ConversationHeroId, conversationHero.PartyBelongedTo.StringId);
+                return;
+            }
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },

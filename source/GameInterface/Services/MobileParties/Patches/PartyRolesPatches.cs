@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Roles;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -7,6 +8,10 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+/// <summary>
+/// Sends a client's party role changes to the server. A client applying a replicated change, such as a hero
+/// leaving a party, runs vanilla locally instead, since the server already made the same change.
+/// </summary>
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyRolesPatches
 {
@@ -14,7 +19,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool RemoveAllPartyRolesOfHeroPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new RemoveAllPartyRolesOfHero(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -26,7 +31,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool RemovePartyRoleOfHeroPrefix(MobileParty __instance, Hero hero, PartyRole partyRole)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new RemovePartyRoleOfHero(hero, __instance, partyRole);
         MessageBroker.Instance.Publish(__instance, message);
@@ -38,7 +43,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool RemoveOnePartyRoleOfHeroPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new RemoveOnePartyRoleOfHero(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -50,7 +55,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartyScoutPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartyScout(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -62,7 +67,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartyQuartermasterPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartyQuartermaster(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -74,7 +79,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartyEngineerPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartyEngineer(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -86,7 +91,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartySurgeonPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartySurgeon(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -98,7 +103,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartyFirstMatePrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartyFirstMate(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);
@@ -110,7 +115,7 @@ internal class PartyRolesPatches
     [HarmonyPrefix]
     public static bool SetPartyNavigatorPrefix(MobileParty __instance, Hero hero)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new SetPartyNavigator(hero, __instance);
         MessageBroker.Instance.Publish(__instance, message);

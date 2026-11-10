@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -193,6 +194,7 @@ internal class HeroInterface : IHeroInterface
         // reloaded party outside on this client only (the server's save keeps it inside); keep it
         // inside and rebuild the local in-settlement state afterwards.
         LeaveSettlementActionPatches.SuppressForPlayerSwitch = true;
+        PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = true;
         try
         {
             ChangePlayerCharacterAction.Apply(playerHero);
@@ -200,6 +202,7 @@ internal class HeroInterface : IHeroInterface
         finally
         {
             LeaveSettlementActionPatches.SuppressForPlayerSwitch = false;
+            PlayerSwitchQuestCancelGatePatch.SuppressForPlayerSwitch = false;
         }
 
         LogPlayerSwitchState("after", player, playerHero, playerParty);

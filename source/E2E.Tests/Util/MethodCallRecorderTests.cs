@@ -48,6 +48,19 @@ public class MethodCallRecorderTests
         Assert.Equal(1, existing.Count);
     }
 
+    [Fact]
+    public void RecordsCallsWithoutSuppressingTheOriginal()
+    {
+        var firstMethod = AccessTools.Method(typeof(MethodCallRecorderTests), nameof(FirstCall));
+        var secondMethod = AccessTools.Method(typeof(MethodCallRecorderTests), nameof(SecondCall));
+        using var recorder = new MethodCallRecorder(Priority.Last, runOriginal: true, firstMethod, secondMethod);
+
+        Assert.Throws<InvalidOperationException>(FirstCall);
+        Assert.Throws<InvalidOperationException>(() => SecondCall("encounter"));
+
+        Assert.Equal(2, recorder.Count);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void FirstCall() => throw new InvalidOperationException();
 

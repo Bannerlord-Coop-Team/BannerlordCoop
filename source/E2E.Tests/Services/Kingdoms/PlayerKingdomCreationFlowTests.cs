@@ -5,15 +5,16 @@ using Common.Network;
 using Common.Messaging;
 using Common.Logging;
 using Common.Util;
-using Coop.Core.Client.Services.Kingdoms.Handlers;
+using GameInterface.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Entity;
@@ -41,12 +42,14 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Tests.Services.Kingdoms;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -364,7 +367,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(KingdomName, request.KingdomName);
         Assert.False(string.IsNullOrWhiteSpace(request.CultureId));
 
@@ -825,6 +827,98 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         public void OnGameStateChanged() { }
     }
 
+    // Vanilla firing a mercenary clan that is owed pay clears that clan's influence, paid or not, and leaves the
+    // ruler's own influence alone. Paying first moves the debt in gold and clears it while the clan still serves,
+    // then the dialog takes the no debt line and ends the contract.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RulerFiresMercenaryClan_ClearsTheMercenaryClansInfluenceOnly(bool payDebt)
+    {
+        var client = Clients.First();
+        var ruler = CreateSyncedPlayerContext(ControllerId, client);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        var mercenary = CreateSyncedPlayerContext("FiredMercenary", _ => false);
+        RemovePlayerRegistration(Server, "FiredMercenary");
+        foreach (var instance in Clients)
+        {
+            RemovePlayerRegistration(instance, "FiredMercenary");
+        }
+        ConfigureClanInKingdom(mercenary.ClanId, kingdomId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var mercenaryClan = instance.GetRegisteredObject<Clan>(mercenary.ClanId);
+                using (new AllowedThread())
+                {
+                    mercenaryClan.IsUnderMercenaryService = true;
+                    mercenaryClan.MercenaryAwardMultiplier = 2;
+                    mercenaryClan.Influence = 40f;
+                    instance.GetRegisteredObject<Clan>(ruler.ClanId).Influence = 100f;
+                    instance.GetRegisteredObject<Hero>(ruler.HeroId).Gold = 1000;
+                    instance.GetRegisteredObject<Hero>(mercenary.HeroId).Gold = 0;
+                }
+            });
+        }
+        Server.Call(() => Assert.Same(
+            Server.GetRegisteredObject<Hero>(ruler.HeroId), Server.GetRegisteredObject<Kingdom>(kingdomId).Leader));
+
+        var harmony = new Harmony($"e2e.fire-mercenary.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(GetOneToOneConversationHeroPrefix))));
+        try
+        {
+            OneToOneConversationHeroOverride = client.GetRegisteredObject<Hero>(mercenary.HeroId);
+            if (payDebt)
+            {
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryWithPayingDebtOnConsequence");
+                Server.PumpGameThread();
+                Server.Call(() =>
+                {
+                    Assert.Equal(0f, Server.GetRegisteredObject<Clan>(mercenary.ClanId).Influence, precision: 2);
+                    Assert.Equal(920, Server.GetRegisteredObject<Hero>(ruler.HeroId).Gold);
+                    Assert.Equal(80, Server.GetRegisteredObject<Hero>(mercenary.HeroId).Gold);
+                });
+                // With the debt paid the dialog takes the no debt line, which ends the contract.
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryOnConsequencePrefix");
+            }
+            else
+            {
+                client.NetworkSentMessages.Clear();
+                RunMercenaryConsequence(client, "ConversationPlayerWantToFireMercenaryWithoutPayingDebtOnConsequencePrefix");
+                // Leaving the kingdom already clears the debt, so no separate spend goes out.
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkChangeClanInfluence>());
+            }
+            Server.PumpGameThread();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            OneToOneConversationHeroOverride = null;
+        }
+
+        Server.Call(() =>
+        {
+            var mercenaryClan = Server.GetRegisteredObject<Clan>(mercenary.ClanId);
+            Assert.Null(mercenaryClan.Kingdom);
+            Assert.False(mercenaryClan.IsUnderMercenaryService);
+            Assert.Equal(0f, mercenaryClan.Influence, precision: 2);
+            Assert.Equal(100f, Server.GetRegisteredObject<Clan>(ruler.ClanId).Influence, precision: 2);
+        });
+    }
+
+    private static void RunMercenaryConsequence(EnvironmentInstance client, string prefixName)
+    {
+        client.Call(() =>
+        {
+            var prefix = AccessTools.Method(typeof(MercenaryServiceConversationPatch), prefixName);
+            Assert.False((bool)prefix.Invoke(null, new object[] { new LordConversationsCampaignBehavior() }));
+        });
+    }
+
     [Fact]
     public void ClanChangedFactionNotification_AllowsNullKingdomEndpoints()
     {
@@ -1030,6 +1124,143 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
 
         client1.Call(() => Assert.Null(activeDecisionsVm.CurrentDecision));
+    }
+
+    [Fact]
+    public void KingdomDecisionAdded_UnsupportedModTypeInPlayerKingdom_ServerAiAppliesItAndKeepsVoteIndexesAligned()
+    {
+        var (kingdomId, targetKingdomId) = AddModDecisionThenWar(proposerClan => new TestModKingdomDecision(proposerClan), out var modDecision);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+        });
+        Assert.Equal(1, modDecision.AppliedOutcomes);
+        Assert.IsType<DeclareWarDecisionData>(Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkAddDecision>(),
+            message => message.KingdomId == kingdomId).Data);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            });
+        }
+
+        VoteWarFromBothClients(kingdomId, warIndex: 0);
+
+        AssertWarResolved(kingdomId, targetKingdomId, warIndex: 0);
+        Assert.Equal(1, modDecision.AppliedOutcomes);
+    }
+
+    [Fact]
+    public void KingdomDecisionAdded_RegisteredModType_ReachesClientsAtTheServersIndex()
+    {
+        KingdomDecisionTypeRegistry.Register<RegisteredModKingdomDecision>(
+            decision => Encoding.UTF8.GetBytes(decision.Note),
+            payload =>
+            {
+                var decision = ObjectHelper.SkipConstructor<RegisteredModKingdomDecision>();
+                decision.Note = Encoding.UTF8.GetString(payload);
+                return decision;
+            });
+        try
+        {
+            var (kingdomId, targetKingdomId) = AddModDecisionThenWar(
+                proposerClan => new RegisteredModKingdomDecision(proposerClan) { Note = "council seat" }, out var modDecision);
+
+            Assert.Equal(0, modDecision.AppliedOutcomes);
+            foreach (var instance in new[] { Server }.Concat(Clients))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                    Assert.Equal(2, kingdom.UnresolvedDecisions.Count);
+                    var registered = Assert.IsType<RegisteredModKingdomDecision>(kingdom.UnresolvedDecisions[0]);
+                    Assert.Equal("council seat", registered.Note);
+                    Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[1]);
+                });
+            }
+
+            VoteWarFromBothClients(kingdomId, warIndex: 1);
+
+            AssertWarResolved(kingdomId, targetKingdomId, warIndex: 1);
+        }
+        finally
+        {
+            KingdomDecisionTypeRegistry.Unregister<RegisteredModKingdomDecision>();
+        }
+    }
+
+    public class RegisteredModKingdomDecision : TestModKingdomDecision
+    {
+        public RegisteredModKingdomDecision(Clan proposerClan) : base(proposerClan) { }
+    }
+
+    // Two online player clans in one kingdom, each leading its party like in a live game, so they count as
+    // human players; the server adds the mod's decision first, then a war decision.
+    private (string KingdomId, string TargetKingdomId) AddModDecisionThenWar<TDecision>(
+        Func<Clan, TDecision> createModDecision,
+        out TDecision modDecision) where TDecision : TestModKingdomDecision
+    {
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetPlayer = CreateSyncedPlayerContext("TargetKingdom", _ => false);
+
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(player2.ClanId, kingdomId);
+        ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetKingdomId);
+        LeadPlayerPartiesEverywhere(player1, player2);
+
+        TDecision added = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+
+            added = createModDecision(proposerClan);
+            kingdom.AddDecision(added);
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
+        });
+
+        modDecision = added;
+        return (kingdomId, targetKingdomId);
+    }
+
+    private void VoteWarFromBothClients(string kingdomId, int warIndex)
+    {
+        foreach (var client in Clients.Take(2))
+        {
+            client.SimulateMessage(this, new KingdomDecisionVoteRequested(new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex: warIndex,
+                outcomeIndex: 0,
+                supportWeight: (int)Supporter.SupportWeights.FullyPush,
+                isAbstain: false,
+                isFinal: true)));
+        }
+    }
+
+    private void AssertWarResolved(string kingdomId, string targetKingdomId, int warIndex)
+    {
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId && message.DecisionIndex == warIndex && message.OutcomeIndex == 0);
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
+            message => message.Faction1Id == kingdomId && message.Faction2Id == targetKingdomId);
     }
 
     [Fact]
@@ -3556,7 +3787,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             kingdom.AddDecision(decision);
             decisionData = client1.Resolve<IKingdomDecisionDataConverter>().Convert(decision);
             clientInfluenceAfterProposal = proposerClan.Influence;
-        }, new[] { AccessTools.Method(typeof(ClientKingdomHandler), "HandleLocalDecisionAdded") });
+        }, new[] { AccessTools.Method(typeof(KingdomHandler), "HandleLocalDecisionAdded") });
 
         Assert.Equal(initialInfluence, clientInfluenceAfterProposal, precision: 4);
         Assert.NotNull(decisionData);
@@ -4116,7 +4347,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Equal(player.PartyId, request.PartyId);
         Assert.Equal(settlementId, request.SettlementId);
 
@@ -4172,7 +4402,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(this, new KingdomCreationRequested(KingdomName, player.CultureId));
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal(ControllerId, request.ControllerId);
         Assert.Null(request.PartyId);
         Assert.Null(request.SettlementId);
 
@@ -4201,11 +4430,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.Call(() =>
@@ -4267,11 +4496,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.Call(() =>
@@ -4418,7 +4647,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.SimulateMessage(
             client.NetPeer,
-            new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
+            new NetworkRequestCreateKingdom(KingdomName, player.CultureId, player.PartyId, settlementId));
         Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(
             Server.GetHandle<MobileParty>(player.PartyId)));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
@@ -4465,11 +4694,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        var handler = client.Resolve<ClientKingdomHandler>();
-        var pending = AccessTools.Method(typeof(ClientKingdomHandler), "CapturePendingSettlementRestore")
+        var handler = client.Resolve<KingdomHandler>();
+        var pending = AccessTools.Method(typeof(KingdomHandler), "CapturePendingSettlementRestore")
             .Invoke(handler, Array.Empty<object>());
         Assert.NotNull(pending);
-        AccessTools.Field(typeof(ClientKingdomHandler), "pendingKingdomCreationSettlement")
+        AccessTools.Field(typeof(KingdomHandler), "pendingKingdomCreationSettlement")
             .SetValue(handler, pending);
 
         client.SimulateMessage(
@@ -4867,7 +5096,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     isAbstain: false,
                     isFinal: true);
                 Server.Resolve<IMessageBroker>().Publish(
-                    this, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+                    client1.NetPeer, new NetworkRequestKingdomDecisionVote(vote));
             });
         });
 

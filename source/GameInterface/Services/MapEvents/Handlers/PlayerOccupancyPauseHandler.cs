@@ -15,8 +15,8 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MapEvents.Handlers;
 
 /// <summary>
-/// [Server] Pauses the campaign once every player is "occupied" in a map event or settlement, then restores the
-/// speed this handler paused when a player becomes free on the campaign map.
+/// [Server] Pauses the campaign once every player is "occupied" in a map event, a settlement or the post battle
+/// screens, then restores the speed this handler paused when a player becomes free on the campaign map.
 /// </summary>
 internal class PlayerOccupancyPauseHandler : IHandler
 {
@@ -26,18 +26,21 @@ internal class PlayerOccupancyPauseHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ITimeControlInterface timeControlInterface;
+    private readonly PostBattleScreens postBattleScreens;
     private IAutomaticPauseLease occupancyPauseLease;
 
     public PlayerOccupancyPauseHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IPlayerManager playerManager,
-        ITimeControlInterface timeControlInterface)
+        ITimeControlInterface timeControlInterface,
+        PostBattleScreens postBattleScreens)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.timeControlInterface = timeControlInterface;
+        this.postBattleScreens = postBattleScreens;
 
         messageBroker.Subscribe<PartyOccupancyChanged>(Handle_PartyOccupancyChanged);
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
@@ -121,8 +124,8 @@ internal class PlayerOccupancyPauseHandler : IHandler
             .ToArray();
     }
 
-    // Every player's party is in a map event or a settlement (i.e. none is free on the campaign map). An empty
-    // session is not "all occupied", so it never pauses with no players.
+    // Every player's party is in a map event, a settlement or the post battle screens (i.e. none is free on the
+    // campaign map). An empty session is not "all occupied", so it never pauses with no players.
     private bool AllPlayersOccupied()
     {
         var connectedPlayers = playerManager.Players.Where(playerManager.IsConnected).ToList();
@@ -135,7 +138,7 @@ internal class PlayerOccupancyPauseHandler : IHandler
         });
     }
 
-    private static bool IsPlayerOccupied(MobileParty playerParty)
+    private bool IsPlayerOccupied(MobileParty playerParty)
     {
         var mapEvent = playerParty.MapEvent;
         if (mapEvent != null && mapEvent.IsActiveSlowVillageRaid())
@@ -144,6 +147,6 @@ internal class PlayerOccupancyPauseHandler : IHandler
         if (playerParty.CurrentSettlement != null)
             return true;
 
-        return mapEvent != null;
+        return mapEvent != null || postBattleScreens.IsInScreens(playerParty);
     }
 }
