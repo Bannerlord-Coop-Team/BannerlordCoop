@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment.MockEngine;
@@ -265,5 +266,11 @@ public partial class MovementTrafficTests
         public void SendAllBut(string controllerId, IMessage message) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes(string controllerId) => throw new NotSupportedException();
         public int GetMaxUnreliablePayloadBytes() => throw new NotSupportedException();
+
+        public bool TryGetRouteHealth(string controllerId, out RouteHealth health)
+        {
+            health = default;
+            return false;
+        }
     }
 }
