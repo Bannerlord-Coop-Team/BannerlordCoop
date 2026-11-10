@@ -644,6 +644,15 @@ namespace Missions.Agents.Handlers
                         pickupId: pickupId));
             }
             network.SendAll(message);
+            if (message.IsStuckMissile)
+            {
+                Logger.Debug(
+                    "Sent stuck missile pickup agent={AgentId} worldItem={WorldItemId} item={ItemId} consumed={Consumed}",
+                    agentId,
+                    worldItemId,
+                    itemObjectId,
+                    message.WorldItemConsumed);
+            }
         }
 
         private void HandleWorldItemIdentityResolved(MessagePayload<WorldItemIdentityResolved> payload)
@@ -868,6 +877,15 @@ namespace Missions.Agents.Handlers
                     pickupId: message.PickupId));
             TrackResolvedPickup(message.PickupId);
             RetryPendingNetworkPickups(message.WorldItemId);
+            if (message.IsStuckMissile)
+            {
+                Logger.Debug(
+                    "Applied stuck missile pickup agent={AgentId} worldItem={WorldItemId} item={ItemId} consumed={Consumed}",
+                    message.AgentId,
+                    message.WorldItemId,
+                    message.ItemObjectId,
+                    message.WorldItemConsumed);
+            }
         }
 
         // [Game thread] Ranks a pickup that consumed a stuck missile against the others of that missile and takes back
@@ -1611,18 +1629,20 @@ namespace Missions.Agents.Handlers
                 ApplyDetachedWeaponPickup(agent, equipmentIndex, ref resultingSlotWeapon);
         }
 
-        private static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical)
+        // Only a tableau item shows its banner, and replayed missiles arrive without one.
+        internal static bool WeaponMatches(MissionWeapon current, MissionWeapon canonical)
         {
             if (current.IsEmpty || canonical.IsEmpty)
                 return current.IsEmpty && canonical.IsEmpty;
 
             return ReferenceEquals(current.Item, canonical.Item) &&
                 ReferenceEquals(current.ItemModifier, canonical.ItemModifier) &&
-                string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal) &&
+                (!current.Item.IsUsingTableau ||
+                 string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal)) &&
                 current.RawDataForNetwork == canonical.RawDataForNetwork;
         }
 
-        private static bool WorldItemMatchesPickup(
+        internal static bool WorldItemMatchesPickup(
             MissionWeapon current,
             MissionWeapon canonical,
             bool compareDataValue)
@@ -1632,7 +1652,8 @@ namespace Missions.Agents.Handlers
 
             return ReferenceEquals(current.Item, canonical.Item) &&
                 ItemModifiersMatch(current.ItemModifier, canonical.ItemModifier) &&
-                string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal) &&
+                (!current.Item.IsUsingTableau ||
+                 string.Equals(current.Banner?.Serialize(), canonical.Banner?.Serialize(), StringComparison.Ordinal)) &&
                 (!compareDataValue ||
                  current.RawDataForNetwork == canonical.RawDataForNetwork);
         }
