@@ -482,6 +482,8 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
+        var playerIsDefender = serverDetected && request.DefenderId == playerPartyId;
+
         // A requester cannot replace its own live engagement with another target.
         if (!ConversationPartyHold.TryEngage(
                 conversationPartyTracker,
@@ -489,7 +491,7 @@ internal class ConversationRequestHandler : IHandler
                 playerPartyId,
                 aiPartyBase.MobileParty,
                 aiPartyId,
-                serverDetected && request.DefenderId == playerPartyId,
+                playerIsDefender,
                 request.RequestId))
         {
             Logger.Debug(
@@ -498,6 +500,10 @@ internal class ConversationRequestHandler : IHandler
             network.Send(requestingPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
             return;
         }
+
+        var playerParty = playerPartyBase.MobileParty;
+        if (playerIsDefender && playerParty.BesiegerCamp == null)
+            playerParty.SetMoveModeHold();
 
         SendAllowConversation(requestingPeer, request);
     }
