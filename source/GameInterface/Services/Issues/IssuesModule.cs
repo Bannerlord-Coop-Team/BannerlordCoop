@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Services.Issues.Framework.Dismissal;
 using GameInterface.Services.Issues.Framework.Dispatch;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
@@ -55,6 +56,7 @@ internal class IssuesModule : Module
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
         builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();
+        builder.RegisterType<TextObjectComparer>().As<ITextObjectComparer>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
