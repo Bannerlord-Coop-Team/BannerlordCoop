@@ -8,6 +8,8 @@ using E2E.Tests.Environment.MockEngine;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Missions;
+using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
@@ -51,6 +53,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
     public void Shot_ReplaysOnThePeerWithTheShooterLaunch(
         WeaponClass launcherClass, WeaponClass missileClass, bool usingTableau, bool hasRigidBody, bool skewedFrame)
     {
+        // The replay compares its native-add entity with null, which runs NativeObject's type initializer.
+        MissileOutcomeTests.InitializeNativeObject();
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony("e2e.missile-shot-replay." + Guid.NewGuid().ToString("N"));
         PatchNativeMissileAdd(harmony);
@@ -97,7 +101,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 network.RouteMessages = false;
                 using var broker = new MessageBroker();
                 using var handler = new MissileHandler(network, broker,
-                    shooterClient.Resolve<INetworkAgentRegistry>(), new MissileOrientationCodec());
+                    shooterClient.Resolve<INetworkAgentRegistry>(), new MissileOrientationCodec(),
+                    new WeaponDropWorldItemSpawner(), shooterClient.Resolve<INetworkWorldItemRegistry>(), new MissionObjectPath());
 
                 broker.Publish(this, new AgentShoot(shooter, wielded, position, direction, orientation,
                     55f, 61f, hasRigidBody, missileIndex: 7));
@@ -123,7 +128,8 @@ public class MissileShotReplayTests : MissionTestEnvironment
                 Assert.True(registry.TryRegisterAgent("shooter", agentId, shooterCopy));
                 using var broker = new MessageBroker();
                 using var handler = new MissileHandler(peerClient.Resolve<MockBattleNetwork>(), broker, registry,
-                    new MissileOrientationCodec());
+                    new MissileOrientationCodec(), new WeaponDropWorldItemSpawner(), peerClient.Resolve<INetworkWorldItemRegistry>(),
+                    new MissionObjectPath());
 
                 broker.Publish(this, received);
                 handler.DrainPendingShots();

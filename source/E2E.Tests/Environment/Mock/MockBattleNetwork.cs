@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Tests.Utils;
 using E2E.Tests.Environment;
@@ -153,4 +154,10 @@ public class MockBattleNetwork : IBattleNetwork
             : MaxUnreliablePayloadBytes;
 
     public int GetMaxUnreliablePayloadBytes() => MaxUnreliablePayloadBytes;
+
+    public bool TryGetRouteHealth(string controllerId, out RouteHealth health)
+    {
+        health = default;
+        return false;
+    }
 }

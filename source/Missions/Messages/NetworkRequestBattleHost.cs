@@ -8,7 +8,8 @@ namespace Missions.Messages;
 /// BR-010), asking the server to elect (or report) the authoritative battle host for the map event. Carries
 /// the requester's controller id so the server can record the mission-ready order (BR-013) — the first to
 /// become ready is the host unless the server prefers a listed player (BR-010), the rest the successor line.
-/// The server replies with
+/// In a hideout the assault leader hosts instead, unless it leaves or is not ready within 90 s, and players
+/// ready before it wait for it. The server replies with
 /// <see cref="NetworkBattleHostAssigned"/> plus the requester's owned reserves (the NPC grant for the host).
 /// </summary>
 [ProtoContract]
