@@ -366,7 +366,7 @@ public class LordNeedsHorsesTests : IDisposable
                 }
                 else
                 {
-                    picker.Close(issue, cancel: true);
+                    picker.Close(issue, cancel: true, popScreen: true);
                     Assert.Equal(0, callbacks);
                 }
                 Assert.False(picker.TryGetIssue(issue.AlternativeSolutionSentTroops, out _, out _));

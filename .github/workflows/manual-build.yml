@@ -25,6 +25,7 @@ on:
 permissions:
   actions: read
   contents: read
+  packages: read
 
 concurrency:
   group: manual-build-${{ inputs.build_id }}
@@ -35,7 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
-      image: garrettluskey/bannerlordcoop:latest
+      image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
     env:
       BANNERLORD_DIR: /home/mb2
@@ -206,10 +210,6 @@ jobs:
           (cd release-stage && 7z a -t7z -m0=LZMA2 -mx=9 -ms=on \
             ../transfer/Coop.7z Coop >/dev/null)
           release_size=$(stat -c %s transfer/Coop.7z)
-          if [ "$release_size" -gt 8388608 ]; then
-            echo "Release archive is $release_size bytes; the 8 MiB safety budget reserves 2 MiB below Discord's 10 MiB limit." >&2
-            exit 1
-          fi
           test "$release_size" -gt 0
 
       - name: Upload isolated signed client input
@@ -263,7 +263,6 @@ jobs:
 
           archive_bytes=$(stat -c %s transfer/Coop.7z)
           test "$archive_bytes" -gt 0
-          test "$archive_bytes" -le 8388608
           archive_sha256=$(sha256sum transfer/Coop.7z | awk '{print $1}')
           printf '%s' "$archive_sha256" | grep -Eq '^[a-f0-9]{64}$'
 

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Settlements;
 using GameInterface.Services.GameDebug.Messages;
@@ -216,7 +217,19 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             var leftSettlement = mobileParty.CurrentSettlement;
             LeaveSettlementMapEvent(mobileParty);
+
+            // Vanilla disembarks before leaving, otherwise leaving at sea resets the anchor
+            if (payload.LeaveType == SettlementLeaveType.Disembark && leftSettlement != null)
+            {
+                settlementInterface.PartyDisembark(mobileParty, leftSettlement);
+            }
+
             settlementInterface.PartyLeaveSettlement(mobileParty);
+
+            if (payload.LeaveType == SettlementLeaveType.SetSail && leftSettlement != null)
+            {
+                settlementInterface.PartySetSail(mobileParty, leftSettlement);
+            }
 
             network.Send(
                 peer,

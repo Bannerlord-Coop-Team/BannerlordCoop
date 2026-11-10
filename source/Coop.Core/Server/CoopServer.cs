@@ -96,6 +96,14 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        // A connection check such as the tools' Check server button sends no full join data.
+        if (!HasPasswordData(request.Data))
+        {
+            Logger.Information("Client connection rejected for {Endpoint}: incomplete join data", request.RemoteEndPoint);
+            Reject(request, ConnectionRejectCode.IncorrectPassword);
+            return;
+        }
+
         string suppliedPassword;
         try
         {
@@ -125,6 +133,15 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
         request.Accept();
+    }
+
+    // LiteNetLib prefixes a string with its byte count plus one, and GetString reads that many bytes without checking they arrived.
+    private static bool HasPasswordData(NetDataReader data)
+    {
+        if (data.AvailableBytes < sizeof(ushort)) return false;
+
+        int byteCount = Math.Max(data.PeekUShort() - 1, 0);
+        return data.AvailableBytes - sizeof(ushort) >= byteCount;
     }
 
     private static void Reject(ConnectionRequest request, ConnectionRejectCode code)

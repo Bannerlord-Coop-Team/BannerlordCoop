@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.CampaignService.Statistics.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.CampaignService.Messages;
@@ -15,10 +16,18 @@ internal readonly struct NetworkClientGameOver : ICommand
     [ProtoMember(3)]
     public readonly bool ClanSurvives;
 
-    public NetworkClientGameOver(string playerHeroId, string appointedLeaderId = null, bool clanSurvives = false)
+    [ProtoMember(4)]
+    public readonly StatisticsData Statistics;
+
+    public NetworkClientGameOver(
+        string playerHeroId,
+        string appointedLeaderId = null,
+        bool clanSurvives = false,
+        StatisticsData statistics = null)
     {
         PlayerHeroId = playerHeroId;
         AppointedLeaderId = appointedLeaderId;
         ClanSurvives = clanSurvives;
+        Statistics = statistics;
     }
 }

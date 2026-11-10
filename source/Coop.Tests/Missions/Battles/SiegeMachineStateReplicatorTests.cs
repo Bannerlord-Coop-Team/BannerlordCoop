@@ -42,6 +42,7 @@ public class SiegeMachineStateReplicatorTests
             AccessTools.Field(typeof(RangedSiegeWeapon), "LoadAmmoStandingPoint").SetValue(weapon, point);
             AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(point, true);
             AccessTools.Field(typeof(SiegeMachineStateReplicator), "peerWeaponState").SetValue(sut, new Dictionary<int, int>());
+            AccessTools.Field(typeof(SiegeMachineStateReplicator), "weaponPresentation").SetValue(sut, new RangedSiegeWeaponPresentation());
             pointActivationCalls = 0;
             var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyWeaponAnimation");
             if (!catchUp) apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.Reloading });
@@ -193,6 +194,53 @@ public class SiegeMachineStateReplicatorTests
         Assert.Equal(original.HostEpoch, result.HostEpoch);
         Assert.Equal(original.SenderControllerId, result.SenderControllerId);
         Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(127)]
+    [InlineData(128)]
+    [InlineData(int.MaxValue)]
+    public void NetworkSiegeMachineState_RoundTripsShiftedSentinelFields(int value)
+    {
+        var original = new NetworkSiegeMachineState(12, 100f, value, value, value, 5f, false, value,
+            -1000f, -1000f, stoneAmmo: value, mangonelAmmo: value);
+
+        var result = ProtoBuf.Serializer.DeepClone(original);
+
+        Assert.Equal(value, result.DestructionState);
+        Assert.Equal(value, result.GateState);
+        Assert.Equal(value, result.LadderState);
+        Assert.Equal(value, result.WeaponState);
+        Assert.Equal(value, result.StoneAmmo);
+        Assert.Equal(value, result.MangonelAmmo);
+        Assert.Equal(value >= 0, result.HasStoneAmmo);
+        Assert.Equal(value >= 0, result.HasMangonelAmmo);
+    }
+
+    [Fact]
+    public void NetworkSiegeMachineState_WritesNoBytesForAbsentSentinels()
+    {
+        var absent = new NetworkSiegeMachineState(12, 100f, -1, -1, -1, 5f, false, -1, -1000f, -1000f);
+        var zero = new NetworkSiegeMachineState(12, 100f, 0, 0, 0, 5f, false, 0, -1000f, -1000f,
+            stoneAmmo: 0, mangonelAmmo: 0);
+
+        int absentBytes = SerializedLength(absent);
+        int zeroBytes = SerializedLength(zero);
+
+        // At 0 each shifted sentinel and each set ammo flag costs a tag and a one-byte value; fields 16 and 17 have two-byte tags.
+        const int sentinelBytes = (5 * 2) + 3;
+        const int ammoFlagBytes = 2 + 3;
+        Assert.Equal(zeroBytes - sentinelBytes - ammoFlagBytes, absentBytes);
+    }
+
+    private static int SerializedLength(NetworkSiegeMachineState state)
+    {
+        using var stream = new MemoryStream();
+        RuntimeTypeModel.Default.Serialize(stream, state);
+        return (int)stream.Length;
     }
 
     [Fact]

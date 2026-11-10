@@ -35,4 +35,7 @@ public interface IOutcomeDispatcher
 
     // Server: runs a vanilla quest listener on every running quest of that type, as its owning player
     void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase;
+
+    // Server: same, only on the quests that player owns
+    void RunAsOwner<TQuest>(Hero owner, Action<TQuest> listener) where TQuest : QuestBase;
 }

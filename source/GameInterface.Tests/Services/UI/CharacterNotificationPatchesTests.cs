@@ -8,6 +8,7 @@ using GameInterface.Services.UI.Notifications.Patches;
 using Moq;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
@@ -36,7 +37,8 @@ public class CharacterNotificationPatchesTests
         try
         {
             ModInformation.IsServer = isServer;
-            Assert.Equal(expected, CharacterNotificationPatches.Prefix(hero));
+            var tracker = ObjectHelper.SkipConstructor<ViewDataTrackerCampaignBehavior>();
+            Assert.Equal(expected, CharacterNotificationPatches.Prefix(tracker, hero, out _));
         }
         finally
         {

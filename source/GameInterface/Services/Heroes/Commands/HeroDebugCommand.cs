@@ -837,19 +837,19 @@ public class HeroDebugCommand
             return Succeeded($"Hero BannerItem: {hero.BannerItem.Item?.StringId ?? "none"}");
         }
     }
-    // coop.debug.hero.list_issues
+    // coop.debug.hero.issues
     /// <summary>
-    /// Lists all available issues
+    /// Lists heroes with active issues and the concrete type of each issue
     /// </summary>
     /// <param name="args">none are used</param>
-    /// <returns>returns all issues available </returns>
+    /// <returns>hero StringId, issue StringId and issue type of every active issue</returns>
     public sealed class HeroIssuesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
 
         public string Name => "issues";
 
-        public string Description => "Lists heroes with active issues.";
+        public string Description => "Lists heroes with active issues and each issue's type.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
@@ -866,12 +866,17 @@ public class HeroDebugCommand
             foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes()
                 .Where(h => h.Issue != null))
             {
-                stringBuilder.AppendLine($"Name: '{hero.StringId}', Game StringId: '{hero.Issue.StringId}'");
+                stringBuilder.AppendLine(FormatHeroIssue(hero));
             }
 
             if (stringBuilder.Length == 0) return Failed("No heroes with issues found");
 
             return Succeeded(stringBuilder.ToString());
+        }
+
+        internal static string FormatHeroIssue(Hero hero)
+        {
+            return $"Hero StringId: '{hero.StringId}', Issue StringId: '{hero.Issue.StringId}', Issue Type: '{hero.Issue.GetType().FullName}'";
         }
     }
     // coop.debug.hero.set_issue

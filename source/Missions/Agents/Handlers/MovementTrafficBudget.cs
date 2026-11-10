@@ -125,9 +125,11 @@ public sealed class MovementTrafficBudget : IMovementTrafficBudget
         if (reportElapsed < ReportIntervalSeconds) return frame;
 
         Logger.Information(
-            "[BattleTraffic] Movement {BytesPerSecond:0} payload bytes/s per route, {Deferred} deferred snapshot(s), " +
+            "[BattleTraffic] Movement {BytesPerSecond:0} payload bytes/s per route, effective budget " +
+            "{BudgetBytesPerSecond:0} bytes/s, {Deferred} deferred snapshot(s), " +
             "maximum deferred age {MaximumAge:0.000}s, {Available} budget bytes available",
             sentBytes / Math.Max(reportElapsed, 0.001f),
+            bytesPerSecond,
             maximumDeferredSnapshots,
             this.maximumDeferredAgeSeconds,
             AvailableBytes);

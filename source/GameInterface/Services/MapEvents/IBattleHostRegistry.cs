@@ -14,13 +14,32 @@ public class BattleHostAssignment
     public string HostControllerId { get; }
     public IReadOnlyList<string> SuccessorControllerIds { get; }
     public int Epoch { get; }
+    /// <summary>[Server] A battle at sea, recorded at the election and kept by every later assignment; false on a client.</summary>
+    public bool IsNaval { get; }
+    /// <summary>[Server] The naval host left after its result and stays host until the conclusion; false on a client.</summary>
+    public bool KeptAfterResult { get; }
 
-    public BattleHostAssignment(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch = 0)
+    public BattleHostAssignment(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch = 0,
+        bool isNaval = false, bool keptAfterResult = false)
     {
         HostControllerId = hostControllerId;
         SuccessorControllerIds = successorControllerIds;
         Epoch = epoch;
+        IsNaval = isNaval;
+        KeptAfterResult = keptAfterResult;
     }
+
+    /// <summary>The same host and hosting generation with another successor line.</summary>
+    public BattleHostAssignment WithSuccessors(IReadOnlyList<string> successorControllerIds) =>
+        new BattleHostAssignment(HostControllerId, successorControllerIds, Epoch, IsNaval, KeptAfterResult);
+
+    /// <summary>The same assignment, kept after its naval host left with the result.</summary>
+    public BattleHostAssignment AsKeptAfterResult() =>
+        new BattleHostAssignment(HostControllerId, SuccessorControllerIds, Epoch, IsNaval, keptAfterResult: true);
+
+    /// <summary>The next hosting generation under a promoted host, still at sea when this one was.</summary>
+    public BattleHostAssignment PromotedTo(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch) =>
+        new BattleHostAssignment(hostControllerId, successorControllerIds, epoch, IsNaval);
 }
 
 /// <summary>

@@ -19,7 +19,7 @@ public class ProtoBufSerializer : ICommonSerializer
     private const int InitialPayloadBytes = 4096;
     // ProtoMessageWrapper tags: field 1 as a varint, field 2 length-delimited.
     private const byte TypeIdTag = 0x08;
-    private const byte DataTag = 0x12;
+    public const byte DataTag = 0x12;
 
     private readonly ISerializableTypeMapper typeMapper;
     private readonly ArrayPool<byte> bufferPool;
@@ -118,7 +118,36 @@ public class ProtoBufSerializer : ICommonSerializer
         return result;
     }
 
-    private static int GetVarintLength(ulong value)
+    // Reads the layout WrapPayload writes: an optional TypeId field, then the Data tag, its length and the payload.
+    public static void ReadWrapper(byte[] wrapped, out int typeIdLength, out int dataOffset, out int dataLength)
+    {
+        int offset = 0;
+        if (wrapped[offset] != DataTag)
+        {
+            offset++;
+            ReadVarint(wrapped, ref offset);
+        }
+        typeIdLength = offset;
+        if (wrapped[offset++] != DataTag)
+            throw new InvalidOperationException("Unexpected ProtoMessageWrapper layout.");
+        dataLength = checked((int)ReadVarint(wrapped, ref offset));
+        dataOffset = offset;
+        if (dataOffset + dataLength != wrapped.Length)
+            throw new InvalidOperationException("Unexpected ProtoMessageWrapper length.");
+    }
+
+    public static ulong ReadVarint(byte[] data, ref int offset)
+    {
+        ulong value = 0;
+        for (int shift = 0; ; shift += 7)
+        {
+            byte b = data[offset++];
+            value |= (ulong)(b & 0x7F) << shift;
+            if (b < 0x80) return value;
+        }
+    }
+
+    public static int GetVarintLength(ulong value)
     {
         int length = 1;
         while (value >= 0x80)
@@ -129,7 +158,7 @@ public class ProtoBufSerializer : ICommonSerializer
         return length;
     }
 
-    private static int WriteVarint(byte[] destination, int offset, ulong value)
+    public static int WriteVarint(byte[] destination, int offset, ulong value)
     {
         while (value >= 0x80)
         {

@@ -14,6 +14,8 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
@@ -22,9 +24,10 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 /// player is gone is ended silently, so its notable does not stay stuck on it. For this first
 /// iteration of quests, this will be the behavior, but this will change in the future.
 /// </summary>
-internal class ActiveIssueDismisser : IHandler
+internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
+    private const string ReturnedTroopsText = "{=V5Za6d4h}Your troops have returned from their mission.";
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
@@ -149,6 +152,7 @@ internal class ActiveIssueDismisser : IHandler
     private void DismissQuest(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
 
         var quest = issue.IssueQuest;
         var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
@@ -168,14 +172,27 @@ internal class ActiveIssueDismisser : IHandler
 
         if (announce)
         {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
+            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel, issueOwnerId));
         }
+    }
+
+    public void Dismiss(IssueBase issue, IssueOutcome outcome)
+    {
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
+        if (issue.IsSolvingWithAlternative) DismissTroops(issue, announce: false);
+        else DismissQuest(issue, announce: false);
+
+        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
     }
 
     private void DismissTroops(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
 
+        if (!issue.JournalEntries.Any(log => log.LogText?.Value == ReturnedTroopsText))
+            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(ReturnedTroopsText)));
+        messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(
+            issue, IssueBase.IssueUpdateDetails.IssueCancel));
         issueDismisser.Dismiss(issue);
 
         if (announce)

@@ -4,7 +4,6 @@ using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest;
 
@@ -23,19 +22,6 @@ internal class VillageNeedsToolsWorldEventPatches
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
         RunAsOwners(quest => quest.RaidCompleted(winnerSide, raidEvent));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        // Only forcing supplies or volunteers can be a coercion of the quest giver
-        if (!mapEvent.IsForcingSupplies && !mapEvent.IsForcingVolunteers)
-        {
-            return;
-        }
-
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
