@@ -74,6 +74,64 @@ public class PartyScreenRosterRefresherTests
         Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
     }
 
+    /// <summary>
+    /// Vanilla transfers keep a moved-out stack as a zero-count element, so the quarter-daily heal on the
+    /// server's copy of that stack must merge instead of resetting the garrison edit (#4563).
+    /// </summary>
+    [Fact]
+    public void ServerHeal_OnFullyMovedWoundedStack_KeepsPendingTransfer()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 22, 22, out var visible);
+        visible.AddToCounts(character, -22, false, -22, 0, false);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 22, false, 22);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, 0, false, -1),
+            () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        Assert.True(logic.IsThereAnyChanges());
+        AssertRoster(visible, character, 0, 0);
+        AssertRoster(logic._initialData.RightMemberRoster, character, 22, 21);
+        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 22, 22);
+    }
+
+    /// <summary>
+    /// Daily training xp for a stack the player already moved out must merge instead of resetting the edit.
+    /// </summary>
+    [Fact]
+    public void ServerXp_OnFullyMovedStack_KeepsPendingTransfer()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 22, 0, out var visible);
+        visible.AddXpToTroop(character, 100);
+        logic._initialData.RightMemberRoster.AddXpToTroop(character, 100);
+        visible.AddToCounts(character, -22, false, 0, 0, false);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 22, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.SetElementXp(roster.FindIndexOfTroop(troop), 150),
+            () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        Assert.True(logic.IsThereAnyChanges());
+        AssertRoster(visible, character, 0, 0);
+        Assert.Equal(0, visible.GetElementXp(visible.FindIndexOfTroop(character)));
+        Assert.Equal(150, logic._initialData.RightMemberRoster.GetElementXp(0));
+        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 22, 0);
+    }
+
     [Fact]
     public void ServerUpdate_RefreshesSavedPopupStateWithoutNotification()
     {

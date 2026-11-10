@@ -458,6 +458,9 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         MBInformationManager.AddQuickInformation(new TextObject(PendingChangesResetMessage));
     }
 
+    /// <summary>
+    /// One troop's counts in a roster, rebased from the screen-open snapshot onto a server update.
+    /// </summary>
     private readonly struct RosterElementState
     {
         public bool Exists { get; }
@@ -486,34 +489,31 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 element.Xp);
         }
 
+        /// <summary>
+        /// Replays the local edit on top of the authoritative element, failing only when the troops it moved no longer exist.
+        /// </summary>
         public static bool TryRebase(
             RosterElementState authoritative,
             RosterElementState previousBaseline,
             RosterElementState previousVisible,
             out RosterElementState rebased)
         {
+            rebased = default;
             long number = authoritative.Number +
                 ((long)previousVisible.Number - previousBaseline.Number);
-            long wounded = authoritative.Wounded +
-                ((long)previousVisible.Wounded - previousBaseline.Wounded);
-            long xp = authoritative.Xp +
-                ((long)previousVisible.Xp - previousBaseline.Xp);
-            if (number < 0 ||
-                number > int.MaxValue ||
-                wounded < 0 ||
-                wounded > number ||
-                xp < 0 ||
-                xp > int.MaxValue ||
-                (number == 0 && xp != 0))
-            {
-                rebased = default;
-                return false;
-            }
+            if (number < 0 || number > int.MaxValue) return false;
+
+            // A heal or wound on troops the player moved can push wounded outside the stack left here, so clamp it.
+            long wounded = Math.Min(number, Math.Max(0L, authoritative.Wounded +
+                ((long)previousVisible.Wounded - previousBaseline.Wounded)));
+            // Xp on an emptied stack is discarded on Done, so it cant conflict with a server xp change.
+            long xp = number == 0
+                ? 0
+                : authoritative.Xp + ((long)previousVisible.Xp - previousBaseline.Xp);
+            if (xp < 0 || xp > int.MaxValue) return false;
 
             bool localExistenceChanged = previousVisible.Exists != previousBaseline.Exists;
             bool exists = number != 0 ||
-                wounded != 0 ||
-                xp != 0 ||
                 (localExistenceChanged ? previousVisible.Exists : authoritative.Exists);
             rebased = new RosterElementState(
                 exists,
