@@ -2,7 +2,7 @@
 using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Kingdoms.Messages
+namespace GameInterface.Services.Kingdoms.Messages
 {
     /// <summary>
     /// Add decision network message.

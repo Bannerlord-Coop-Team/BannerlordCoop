@@ -279,6 +279,32 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
+    public void ExhaustedBaselines_EndJoinAtOnceWithBaselineLimitReason()
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var peer = AddConnectedPeer(connections);
+        var state = StartInitialCatchUp(connections, peer);
+        var terminator = new Mock<IJoinPeerTerminator>();
+        using var manager = CreateWatchdog(new Mock<IConnectionMessageQueue>().Object, terminator.Object);
+        var started = DateTime.UtcNow;
+        for (int sent = 1; sent < LoadingState.MaxBaselinesPerJoin; sent++)
+        {
+            SendAndDrain(state, peer, JoinSyncSignal.BaselineRequested);
+        }
+
+        manager.CheckForOverloadedPeers(started);
+        Assert.False(state.IsAborted);
+        Assert.Empty(terminator.Invocations);
+
+        SendAndDrain(state, peer, JoinSyncSignal.BaselineRequested);
+        manager.CheckForOverloadedPeers(started + TimeSpan.FromSeconds(1));
+
+        Assert.True(state.IsAborted);
+        Assert.Single(terminator.Invocations);
+        terminator.Verify(value => value.Disconnect(peer, "JoinBaselineLimit"), Times.Once());
+    }
+
+    [Fact]
     public void JoinApplicationProgress_RenewsOnlyThatPeersWatchdog()
     {
         var connections = serverComponent.Container.Resolve<ConnectionCollection>();

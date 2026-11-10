@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Client.Services.MobileParties.Messages;
+namespace GameInterface.Services.MobileParties.Messages;
 
 /// <summary>
 /// Message from the server commanding a party to enter a settlement.

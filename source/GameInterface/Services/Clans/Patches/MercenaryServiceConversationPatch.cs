@@ -97,8 +97,8 @@ internal class MercenaryServiceConversationPatch
         var kingdom = Hero.OneToOneConversationHero.Clan.Kingdom;
         var clan = Hero.OneToOneConversationHero.Clan;
         MessageBroker.Instance.Publish(__instance, new PlayerRelationChange(Hero.OneToOneConversationHero.Clan.Leader, -(int)(3f + MathF.Sqrt((float)((int)((float)num / 100f))))));
+        // Leaving the kingdom on the server clears the clan's influence, so no separate spend is sent.
         MessageBroker.Instance.Publish(__instance, new MercenaryServiceDismissalAccepted(kingdom, clan));
-        MessageBroker.Instance.Publish(__instance, new ChangeClanInfluence(Hero.OneToOneConversationHero.Clan, (int)(Hero.OneToOneConversationHero.Clan.Influence)));
         return false;
     }
     [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_player_want_to_fire_mercenary_with_paying_debt_on_consequence))]
