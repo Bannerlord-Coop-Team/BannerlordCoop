@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -88,6 +89,25 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
 
         Assert.False(mission.EndMissionCalled);
         Assert.Empty(notices);
+    }
+
+    // Native CheckMissionEnded sets MissionEnded when the result is ready but keeps the mission open on the scoreboard.
+    [Theory]
+    [InlineData(Mission.State.Continuing, true)]
+    [InlineData(Mission.State.EndingNextFrame, false)]
+    [InlineData(Mission.State.Over, false)]
+    public void EndMessageAfterTheResultIsReady_EndsOnlyAMissionNotTearingDown(Mission.State state, bool expectEnded)
+    {
+        var (mapEventId, _) = SetupCoopBattle(ControllerIds);
+        var client = Clients.First();
+        using var fixture = new MissionEngineFixture();
+        var mission = OpenBattleMission(fixture, client, mapEventId);
+        mission.Shell._missionEnded = true;
+        mission.Shell.CurrentState = state;
+
+        client.SimulateMessage(Server.NetPeer, new NetworkEndBattleMission(mapEventId));
+
+        Assert.Equal(expectEnded, mission.EndMissionCalled);
     }
 
     [Fact]
