@@ -27,6 +27,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 using GameInterface.Services.Save.Messages;
 using LiteNetLib;
 using LiteNetLib.Utils;
@@ -497,7 +498,8 @@ public class ServerJoinAdmissionTests
             Mock.Of<IServerOptionsProvider>(),
             Mock.Of<IJoinCampaignBaselineSender>(),
             Mock.Of<IJoinCampaignKingdomBaseLineSender>(),
-            Mock.Of<IJoinValidationDenialLog>());
+            Mock.Of<IJoinValidationDenialLog>(),
+            Mock.Of<ILootShipHold>());
     }
 
     /// <summary>The real join admission, which also signals once a shutdown has started closing it.</summary>

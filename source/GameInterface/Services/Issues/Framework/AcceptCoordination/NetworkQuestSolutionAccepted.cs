@@ -26,7 +26,6 @@ public readonly struct NetworkQuestSolutionAccepted : ICommand
 
     [ProtoMember(7)]
     public readonly bool HasQuestDueTime;
-
     public NetworkQuestSolutionAccepted(
         string issueOwnerId,
         string issueId,

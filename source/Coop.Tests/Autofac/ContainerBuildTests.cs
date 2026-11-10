@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Commands;
 using Common.LogicStates;
 using Common.Network;
@@ -15,6 +16,13 @@ using GameInterface.Services.Missions;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Voice;
 using Missions;
+#if DEBUG || COOP_NAVAL
+using GameInterface.Services.MapEvents;
+using Missions.Battles;
+#endif
+#if COOP_NAVAL
+using Missions.Naval;
+#endif
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -71,7 +79,7 @@ namespace Coop.Tests.Autofac
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(41, missionCommands.Length);
+            Assert.Equal(52, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
@@ -87,6 +95,46 @@ namespace Coop.Tests.Autofac
             Assert.Equal(15, missionCommands.Length);
 #endif
         }
+
+#if COOP_NAVAL
+        [Fact]
+        public void Client_Container_WithNavalMissionModule_Build()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+            // Missions.Naval only loads with NavalDLC co-op active, which also turns GameInterface's naval services on.
+            builder.RegisterModule<ClientModule>();
+            builder.RegisterModule<GameInterfaceModule>();
+            // NavalAssemblyModule registers it in the game; registered directly here to test this module's services alone.
+            builder.RegisterModule<NavalMissionModule>();
+            bool previousNavalEnabled = ModInformation.IsNavalEnabled;
+            ModInformation.IsNavalEnabled = true;
+            IContainer built;
+            try
+            {
+                built = builder.Build();
+            }
+            finally
+            {
+                ModInformation.IsNavalEnabled = previousNavalEnabled;
+            }
+            using var container = built;
+
+            Assert.IsType<CoopNavalBattleLauncher>(container.Resolve<ICoopNavalBattleLauncher>());
+            Assert.IsType<NavalShipEngine>(container.Resolve<INavalShipEngine>());
+            Assert.IsType<NavalBattleServicesFactory>(container.Resolve<INavalBattleServicesFactory>());
+            Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
+            Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
+#if DEBUG
+            Assert.IsType<NavalDebugHulls>(container.Resolve<INavalDebugHulls>());
+#endif
+
+            ICoopCommand[] navalCommands = container.Resolve<IEnumerable<ICoopCommand>>()
+                .Where(command => command.GetType().Assembly == typeof(NavalMissionModule).Assembly)
+                .ToArray();
+            Assert.Contains(navalCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.naval.inspect");
+            Assert.Contains(navalCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.naval.rope_status");
+        }
+#endif
 
         [Fact]
         public void Server_Container_Build()

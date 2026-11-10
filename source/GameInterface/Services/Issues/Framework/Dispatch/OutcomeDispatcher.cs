@@ -228,6 +228,16 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
     public void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase
     {
+        RunAsOwners(listener, _ => true);
+    }
+
+    public void RunAsOwner<TQuest>(Hero owner, Action<TQuest> listener) where TQuest : QuestBase
+    {
+        RunAsOwners(listener, ownerHero => ownerHero == owner);
+    }
+
+    private void RunAsOwners<TQuest>(Action<TQuest> listener, Func<Hero, bool> isOwnerIncluded) where TQuest : QuestBase
+    {
         if (ModInformation.IsClient)
         {
             return;
@@ -246,6 +256,8 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
                     Logger.Warning("{issue} has a running quest but no owning player", issue.StringId);
                     continue;
                 }
+
+                if (!isOwnerIncluded(ownerHero)) continue;
 
                 using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
                 {

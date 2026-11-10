@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -222,6 +223,12 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
 
         if (mapEvent.IsRaid || mapEvent.IsSiegeAssault || mapEvent.IsForcingSupplies ||
             mapEvent.IsForcingVolunteers || mapEvent.MapEventSettlement?.IsHideout == true)
+            return false;
+
+        // Vanilla excludes nearby parties from the poachers' village battle.
+        if (Campaign.Current.IssueManager.Issues.Values.Any(issue =>
+                issue.IssueQuest is TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavior.MerchantArmyOfPoachersIssueQuest quest &&
+                quest.IsOngoing && quest._poachersParty?.MapEvent == mapEvent))
             return false;
 
         return InteractionPatches.IsWithinAiJoinWindow(mapEvent) && mapEvent.ContainsPlayerParty();

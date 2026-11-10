@@ -21,6 +21,11 @@ internal class PlayerPartyBarterVMPatches
     static void ConstructorPostfix(BarterVM __instance)
         => PlayerPartyTradeContext.SetBarterVM(__instance);
 
+    [HarmonyPatch(nameof(BarterVM.InitBarterList))]
+    [HarmonyPrefix]
+    static void InitBarterListPrefix(BarterVM __instance, BarterData args)
+        => PlayerPartyTradeContext.AddMarriageGroupLists(__instance, args);
+
     [HarmonyPatch(nameof(BarterVM.OfferItemAdd))]
     [HarmonyPrefix]
     static bool OfferItemAddPrefix(BarterItemVM barterItemVM)

@@ -21,6 +21,10 @@ switched off, and a server running one cancels any quest a nightly save still ha
   its verification recipe is [here](../../../../doc/automated-testing/headman-needs-grain.md).
 - Quests are not saved between sessions. A quest ends when its player leaves or the server restarts.
 
+Army of Poachers supports direct village battles, negotiation and sending a companion.
+The owner receives its journal and personal rewards; other players may accept separate copies.
+See [the verification recipe](../../../../../doc/automated-testing/quests/army-of-poachers.md).
+
 ## Trying it in game
 
 Use a server and a client. All commands are `coop.debug.issues.*`.

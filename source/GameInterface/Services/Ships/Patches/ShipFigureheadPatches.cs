@@ -7,6 +7,7 @@ namespace GameInterface.Services.Ships.Patches;
 /// Invalidates a ship's cached version when its figurehead is set by AutoSync.
 /// </summary>
 [HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipFigureheadPatches
 {
     /// <summary>

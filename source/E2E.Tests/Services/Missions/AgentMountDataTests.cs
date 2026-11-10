@@ -141,4 +141,29 @@ public class AgentMountDataTests
 
         Assert.Equal(5f, Assert.Single(result.Mounts).MountSpeed);
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(127)]
+    [InlineData(128)]
+    [InlineData(int.MaxValue)]
+    public void MountMovementPacket_RoundTripsMountAction1Index(int action1Index)
+    {
+        using var fixture = new MissionEngineFixture();
+        Agent sourceHorse = new MockMission().SpawnMount();
+        Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
+        sourceHorseMirror.Action1Index = action1Index;
+        var horseId = Guid.NewGuid();
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
+        byte[] wire = serializer.Serialize(
+            new MountMovementPacket(
+                new[] { horseId },
+                new[] { new AgentMountData(sourceHorse, horseId) }));
+        var result = Assert.IsType<MountMovementPacket>(serializer.Deserialize<IPacket>(wire));
+
+        Assert.Equal(action1Index, Assert.Single(result.Mounts).MountAction1Index);
+    }
 }
