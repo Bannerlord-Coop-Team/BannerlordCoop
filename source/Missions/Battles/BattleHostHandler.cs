@@ -374,7 +374,7 @@ internal class BattleHostHandler : IHandler
 
     /// <summary>[Server] Elect the host (first MISSION-READY requester wins, or the best ranked preferred host
     /// after a bounded hold, BR-010, or in a hideout the assault leader, with ready allies waiting until it hosts,
-    /// leaves or runs out its 90 s) and add later ready requesters to the successor line in arrival
+    /// leaves or runs out its 90 s, also after a preferred host hold) and add later ready requesters to the successor line in arrival
     /// (= mission-ready) order, preferred ones first by rank (BR-013), except in a hideout, where it follows the
     /// hideout state ready requests; broadcast the assignment.
     /// A duplicate/late requester just gets a re-confirm.</summary>

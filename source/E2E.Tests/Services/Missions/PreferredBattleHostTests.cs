@@ -157,11 +157,11 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
     }
 
     [Fact]
-    public void PreferredHostReenteringAHideoutAfterLeaving_IsWaitedForAgain()
+    public void PreferredAssaultLeaderReenteringAHideoutAfterLeaving_ClearsItsDepartureAndIsWaitedForAgain()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
         var clients = Clients.ToArray();
-        // The preferred host leads the assault, since a connected hideout assault leader hosts anyway
+        // The preferred host leads the assault, so the hold and the hideout leader wait both wait for it once re-entry clears its departure
         SetPreferredHosts("ctrl-A");
         ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
         Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
@@ -173,6 +173,30 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         AssertNoHost(mapEventId);
 
         MakeMissionReady(clients[0], mapEventId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            Assert.Equal("ctrl-A", assignment.HostControllerId);
+        });
+    }
+
+    [Fact]
+    public void PreferredHostThatIsNotTheHideoutLeader_HoldsTheElectionThenTheLeaderHosts()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        SetPreferredHosts("ctrl-C");
+        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+
+        // The assault leader would host at once, so only the hold for the loading preferred host keeps the election open
+        EnterBattle(clients[2], mapEventId, missionReady: false);
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        AssertNoHost(mapEventId);
+
+        MakeMissionReady(clients[2], mapEventId);
 
         Server.Call(() =>
         {
