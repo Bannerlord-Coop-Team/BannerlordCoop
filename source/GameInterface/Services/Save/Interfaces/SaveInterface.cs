@@ -23,7 +23,7 @@ public interface ISaveInterface : IGameAbstraction
     /// <summary>True while the campaign's SaveHandler has a save queued or running.</summary>
     bool IsSaving { get; }
 
-    /// <summary>Queues a named save on the campaign's SaveHandler. False when no campaign is loaded.</summary>
+    /// <summary>Queues a named save on the campaign's SaveHandler. False when no campaign is loaded or nothing was queued.</summary>
     bool TryQueueSave(string saveName);
 
     /// <summary>The slot every save of an ironman campaign goes to, or null when the campaign is not ironman.</summary>
@@ -47,7 +47,8 @@ internal class SaveInterface : ISaveInterface
         if (saveHandler == null) return false;
 
         saveHandler.SaveAs(saveName);
-        return true;
+        // A host that blocks the native save queue drops the request, so report whether it was queued.
+        return saveHandler.IsSaving;
     }
 
     public SaveResults SaveCurrentGame()
