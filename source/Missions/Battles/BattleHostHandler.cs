@@ -37,8 +37,10 @@ namespace Missions.Battles;
 /// mission has FINISHED LOADING (<see cref="BattleMissionReady"/>, published by
 /// <c>CoopBattleController.AfterStart</c>) it asks the server to elect via
 /// <see cref="NetworkRequestBattleHost"/>, and stores the reply (<see cref="NetworkBattleHostAssigned"/>).
-/// Server: the first MISSION-READY client becomes the battle's host (BR-010); later ready clients append to
-/// the successor line in mission-ready order (BR-013), so migration promotes the earliest still in the
+/// Server: the first MISSION-READY client becomes the battle's host (BR-010), except in a hideout, where ready
+/// clients wait for the assault leader to host unless it leaves or is not ready within 90 s; later ready clients append to
+/// the successor line in mission-ready order (BR-013), except in a hideout, where it follows the hideout state
+/// ready requests, so migration promotes the earliest still in the
 /// mission. The unowned (NPC) reserves are issued to the elected host together with the election, and every
 /// ready client's reply includes its sides with explicit empties so its spawn sizing can proceed. The result
 /// is cached, so a duplicate request just re-confirms, and every change is broadcast to all clients.
@@ -87,6 +89,11 @@ internal class BattleHostHandler : IHandler
         public readonly List<PendingHealthWithdrawal> HealthWithdrawals = new();
         public readonly Dictionary<string, PendingReturn> DeferredHealthGrants = new();
         public HostEndpoint HostEndpoint;
+        // Mission-ready players of a hideout battle waiting for its assault leader to be elected host, in arrival order
+        public readonly List<HostEndpoint> HideoutHostCandidates = new List<HostEndpoint>();
+        public DateTime HideoutLeaderWaitStartedUtc;
+        // Left this battle and have not entered it again, however they left; only the hideout leader wait reads it
+        public readonly HashSet<string> DepartedControllers = new HashSet<string>();
     }
 
     private sealed class PartyHealthReports
@@ -122,6 +129,9 @@ internal class BattleHostHandler : IHandler
     /// Internal-settable so tests can drive the deadline without wall-clock waits.
     /// </summary>
     internal TimeSpan FlushAckDeadline { get; set; } = TimeSpan.FromSeconds(2.5);
+    // How long ready players of a hideout battle wait for a connected assault leader that never gets ready, long enough
+    // for a slow scene load so the ally does not take the duel again
+    internal TimeSpan HideoutLeaderWaitDeadline { get; set; } = TimeSpan.FromSeconds(90);
 
     // [Server] Return grants are deferred behind the shrunk host's flush acks (BR-033 handshake).
     // The ledger only holds the host's last THROTTLED progress report, so the returner must not be served
@@ -322,7 +332,8 @@ internal class BattleHostHandler : IHandler
 
     /// <summary>[Client] The battle mission FINISHED LOADING (we are mission-ready, BR-010): ask the server to
     /// elect (or report) the host. The server records these requests in arrival order, so its per-battle
-    /// connection order is the mission-ready order (BR-013).</summary>
+    /// connection order is the mission-ready order (BR-013), except in a hideout, where it follows the hideout state
+    /// ready requests.</summary>
     private void Handle_BattleMissionReady(MessagePayload<BattleMissionReady> payload)
     {
         if (ModInformation.IsServer) return;
@@ -339,8 +350,10 @@ internal class BattleHostHandler : IHandler
         Logger.Information("[BattleHost] Mission ready — requested host election for battle {MapEventId}", mapEventId);
     }
 
-    /// <summary>[Server] Elect the host (first MISSION-READY requester wins, BR-010) and append later ready
-    /// requesters to the successor line in arrival (= mission-ready, BR-013) order; broadcast the assignment.
+    /// <summary>[Server] Elect the host (first MISSION-READY requester wins, BR-010, or in a hideout the assault
+    /// leader, with ready allies waiting until it hosts, leaves or runs out its 90 s) and append later ready
+    /// requesters to the successor line in arrival (= mission-ready, BR-013) order, except in a hideout, where it
+    /// follows the hideout state ready requests; broadcast the assignment.
     /// A duplicate/late requester just gets a re-confirm.</summary>
     private void Handle_NetworkRequestBattleHost(MessagePayload<NetworkRequestBattleHost> payload)
     {
@@ -352,7 +365,8 @@ internal class BattleHostHandler : IHandler
 
         // Reads campaign collections and the shared assignment, so run on the main thread. That also
         // serializes requests for one battle: the first the server processes becomes the host, the rest
-        // append in arrival (= mission-ready) order, so concurrent requests cannot double-elect.
+        // append in arrival (= mission-ready) order, except in a hideout, where it follows the hideout state ready
+        // requests, so concurrent requests cannot double-elect.
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
@@ -382,12 +396,28 @@ internal class BattleHostHandler : IHandler
                     network.Send(requester, succession.ToMessage(mapEventId, existing));
                 }
             }
+            else if (ShouldAwaitHideoutLeader(mapEventId, mapEvent, requesterId))
+            {
+                // The hideout boss duel runs on the host's own hero, so the assault leader must host it
+                var runtimeState = GetOrCreateRuntimeState(mapEventId);
+                var candidates = runtimeState.HideoutHostCandidates;
+                if (candidates.Count == 0)
+                    runtimeState.HideoutLeaderWaitStartedUtc = DateTime.UtcNow;
+                if (!candidates.Any(candidate => candidate.ControllerId == requesterId))
+                    candidates.Add(new HostEndpoint { ControllerId = requesterId, Peer = requester });
+                Logger.Information("[BattleHost] {Requester} is ready for hideout battle {MapEventId}; waiting for its assault leader to host",
+                    requesterId, mapEventId);
+            }
             else
             {
-                // BR-102: epoch 1 for a fresh battle, or one past the last generation if this map event was abandoned and re-entered.
-                var assignment = succession.Elect(mapEventId, requesterId, mapEvent.IsNavalMapEvent);
-                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
-                    requesterId, mapEventId, assignment.Epoch);
+                // A leader's peer clears a frame before its departure runs, so a connected player already waiting still hosts
+                // first. A connected leader asking takes over from the waiting players, unless it is still marked absent.
+                var waiting = battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) ? runtimeState.HideoutHostCandidates : null;
+                bool anotherPlayerWaits = waiting?.Count > 0 && waiting[0].ControllerId != requesterId;
+                bool leaderGone = anotherPlayerWaits && !ShouldAwaitHideoutLeader(mapEventId, mapEvent, controllerId: null);
+                bool waiterElected = leaderGone && TryElectFirstHideoutCandidate(mapEventId, mapEvent, runtimeState);
+                if (!waiterElected)
+                    ElectHost(mapEventId, mapEvent, requesterId);
             }
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
@@ -915,6 +945,16 @@ internal class BattleHostHandler : IHandler
 
         var now = DateTime.UtcNow;
         foreach (var battle in battleRuntimeStates.ToArray())
+        {
+            if (battle.Value.HideoutHostCandidates.Count == 0 || now < battle.Value.HideoutLeaderWaitStartedUtc + HideoutLeaderWaitDeadline ||
+                hostRegistry.TryGet(battle.Key, out _) || !objectManager.TryGetObject<MapEvent>(battle.Key, out var waitingEvent))
+                continue;
+
+            if (TryElectFirstHideoutCandidate(battle.Key, waitingEvent, battle.Value))
+                Logger.Warning("[BattleHost] Assault leader of hideout battle {MapEventId} was not ready within {Deadline}; elected the earliest connected ready player",
+                    battle.Key, HideoutLeaderWaitDeadline);
+        }
+        foreach (var battle in battleRuntimeStates.ToArray())
             foreach (var withdrawal in battle.Value.HealthWithdrawals.ToArray())
                 if (now >= withdrawal.RetryUtc && objectManager.TryGetObject<MapEvent>(battle.Key, out var mapEvent))
                     RequestWithdrawalHealth(battle.Key, mapEvent, battle.Value, withdrawal);
@@ -1084,7 +1124,10 @@ internal class BattleHostHandler : IHandler
                         report.Value.Owner = null;
 
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
+            {
+                ElectAwaitingHideoutHost(mapEventId, mapEvent, controllerId);
                 return; // no host elected yet — the departure bookkeeping above is all that applies
+            }
 
             if (FinishHostDeparture(mapEventId, mapEvent, controllerId)) return;
 
@@ -1169,6 +1212,8 @@ internal class BattleHostHandler : IHandler
 
         MarkDeparted(mapEventId, controllerId);
         CancelPendingReturns(mapEventId, controllerId);
+        if (!hasAssignment)
+            ElectAwaitingHideoutHost(mapEventId, mapEvent, controllerId);
         if (HasWithdrawn(mapEventId, controllerId))
         {
             Logger.Information("[BattleHost] {Controller} disconnected after withdrawing from battle {MapEventId}; its parties stay out of the host's reserve scope",
@@ -1309,6 +1354,7 @@ internal class BattleHostHandler : IHandler
         var runtimeState = GetOrCreateRuntimeState(mapEventId);
         runtimeState.PresentControllers.Add(controllerId);
         runtimeState.WithdrawnControllers.Remove(controllerId);
+        runtimeState.DepartedControllers.Remove(controllerId);
     }
 
     private void TrackOfflineControllersInHostScope(string mapEventId, MapEvent mapEvent,
@@ -1330,6 +1376,7 @@ internal class BattleHostHandler : IHandler
         if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)) return;
         runtimeState.PresentControllers.Remove(controllerId);
         runtimeState.DeferredHealthGrants.Remove(controllerId);
+        runtimeState.DepartedControllers.Add(controllerId);
     }
 
     private void RefreshHostAfterMemberDrop(string mapEventId, MapEvent mapEvent, string hostControllerId,
@@ -1370,6 +1417,70 @@ internal class BattleHostHandler : IHandler
             network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
         ClearBattleRecords(mapEventId);
         messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        return true;
+    }
+
+    private void ElectHost(string mapEventId, MapEvent mapEvent, string hostControllerId)
+    {
+        if (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
+            runtimeState.HideoutHostCandidates.Clear();
+        // BR-102: epoch 1 for a fresh battle, or one past the last generation if this map event was abandoned and re-entered.
+        var assignment = succession.Elect(mapEventId, hostControllerId, mapEvent.IsNavalMapEvent);
+        Logger.Information("[BattleHost] Elected host {Host} for battle {MapEventId} at epoch {Epoch}",
+            hostControllerId, mapEventId, assignment.Epoch);
+    }
+
+    // [Server, game thread] A hideout battle waits for its assault leader while that player is still connected and taking part,
+    // and never when the leader is the player asking or the one leaving
+    private bool ShouldAwaitHideoutLeader(string mapEventId, MapEvent mapEvent, string controllerId)
+    {
+        if (!mapEvent.IsHideoutBattle) return false;
+        var leaderParty = mapEvent.AttackerSide?.LeaderParty?.MobileParty;
+        if (leaderParty == null) return false;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) || party != leaderParty)
+                continue;
+
+            // A hideout departure never marks the leader withdrawn, so a retreat only shows up as departed
+            bool gone = battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)
+                && (runtimeState.AbsentControllers.Contains(player.ControllerId)
+                    || runtimeState.DepartedControllers.Contains(player.ControllerId));
+            return player.ControllerId != controllerId && playerManager.IsConnected(player) && !gone;
+        }
+
+        return false;
+    }
+
+    // [Server, game thread] The assault leader left before hosting, so the earliest waiting player hosts instead of hanging
+    private void ElectAwaitingHideoutHost(string mapEventId, MapEvent mapEvent, string departedControllerId)
+    {
+        if (mapEvent == null || hostRegistry.TryGet(mapEventId, out _) ||
+            !battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState))
+            return;
+
+        var candidates = runtimeState.HideoutHostCandidates;
+        candidates.RemoveAll(candidate => candidate.ControllerId == departedControllerId);
+        if (candidates.Count == 0 || ShouldAwaitHideoutLeader(mapEventId, mapEvent, departedControllerId))
+            return;
+
+        TryElectFirstHideoutCandidate(mapEventId, mapEvent, runtimeState);
+    }
+
+    // [Server, game thread] Elects the earliest waiting player still connected; a waiter whose peer already cleared
+    // (its departure not run yet) is dropped, and with nobody left no one is elected
+    private bool TryElectFirstHideoutCandidate(string mapEventId, MapEvent mapEvent, BattleRuntimeState runtimeState)
+    {
+        var candidates = runtimeState.HideoutHostCandidates;
+        candidates.RemoveAll(candidate => candidate.Peer == null
+            || !playerManager.TryGetPlayer(candidate.Peer, out var player) || !playerManager.IsConnected(player));
+        if (candidates.Count == 0) return false;
+
+        var host = candidates[0];
+        ElectHost(mapEventId, mapEvent, host.ControllerId);
+        RememberHostPeer(mapEventId, host.ControllerId, host.Peer);
+        SendOwnedReserves(mapEventId, mapEvent, host.Peer, host.ControllerId, includeEmptySides: true);
         return true;
     }
 }

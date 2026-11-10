@@ -281,7 +281,8 @@ public class CoopBattleController : CoopMissionController
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
     // the behaviors only once Mission.IsLoadingFinished turned true, so this is the moment this client has
     // FINISHED LOADING the battle mission. Announce it so BattleHostHandler requests the host election —
-    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order. The
+    // the server's per-battle order becomes the mission-ready order (BR-013), not the entry order, except in a
+    // hideout, where it follows the hideout state ready requests. The
     // session began at entry (PlayerEnteredBattle -> BattleInstanceLifecycle), well before loading finishes.
     public override void AfterStart()
     {
