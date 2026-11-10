@@ -80,13 +80,14 @@ internal class VillagerConversationsPatches
     [HarmonyPrefix]
     public static bool ConversationVillageFarmerTookPrisonerOnConsequencePrefix(ref VillagerCampaignBehavior __instance)
     {
+        if (!ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface)) return true;
+
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
         // EndConversation clears ConversationParty before this consequence runs.
         __instance.SetPlayerInteraction(encounteredMobileParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
 
         // Call helper function to implement vanilla open loot screen logic
-        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
         itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var _, out var itemRosterElements);
 
         // Open prisoner transfer screen
@@ -154,7 +155,7 @@ internal class VillagerConversationsPatches
     public static bool ConversationVillageFarmerSurrenderOnLeaveConsequencePrefix(ref VillagerCampaignBehavior __instance)
     {
         // Call helper function to implement vanilla open loot screen logic
-        ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
+        if (!ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface)) return true;
         itemRosterInterface.OpenPartyLootScreen(MobileParty.ConversationParty, out var _, out var itemRosterElements);
 
         // Locally set player interaction, and then save in CoopSession on server
