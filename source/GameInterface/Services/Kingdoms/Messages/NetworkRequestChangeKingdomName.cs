@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Kingdoms.Messages;
+namespace GameInterface.Services.Kingdoms.Messages;
 
 /// <summary>
 /// Requests that the server rename a kingdom

@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Registry.Auto;
@@ -45,7 +46,9 @@ internal class LifetimePatches<T>
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed managed {name}", __instance.GetType());
+            // MobilePartyAiLifetimePatches.RemoveParty_Postfix owns the MobileParty removal error, with id and caller
+            if (typeof(T) != typeof(MobileParty))
+                Logger.Error("Client destroyed managed {name}", __instance.GetType());
             return;
         }
 

@@ -14,6 +14,7 @@ using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 
@@ -59,6 +60,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public NavalPlayerData NavalPlayerData { get; }
     [ProtoMember(17)]
     public string[] HeldLootShipIds { get; }
+    [ProtoMember(18)]
+    public ViewDataPlayerData ViewDataPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -77,7 +80,8 @@ public record NetworkGameSaveDataReceived : IEvent
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null,
         OrderOfBattlePlayerData orderOfBattlePlayerData = null,
-        string[] heldLootShipIds = null)
+        string[] heldLootShipIds = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -96,5 +100,6 @@ public record NetworkGameSaveDataReceived : IEvent
         ClanFinance = clanFinance;
         OrderOfBattlePlayerData = orderOfBattlePlayerData;
         HeldLootShipIds = heldLootShipIds;
+        ViewDataPlayerData = viewDataPlayerData;
     }
 }

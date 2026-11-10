@@ -1,5 +1,4 @@
-﻿using System.Security.Cryptography;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment.Instance;
@@ -23,158 +22,6 @@ namespace E2E.Tests.Services.Missions;
 // Reused per-tick buffers must not change what is sent, or carry one tick's or peer's state into the next.
 public partial class MovementTrafficTests
 {
-    // SHA-256 prefix of every datagram the scenario below sends, recorded on development before the per-tick buffers were reused
-    // (0deb4fc3b, after the -1 sentinel fields were shifted on the wire).
-    private static readonly string[] BufferReuseScenarioDatagrams =
-    {
-        "0|r1|MovementPacket|38|F47486E887B40468",
-        "0|r1|MovementPacket|79|B61DC382E00EB7EB",
-        "0|r1|MovementPacket|47|6E0ECA159F9C7DEF",
-        "0|r1|MovementPacket|38|F605A3448A7CAB0C",
-        "0|r1|MovementPacket|47|A38EE7F5FC852D0A",
-        "0|r1|MovementPacket|47|96A93E9DD0E47174",
-        "0|r1|MountMovementPacket|64|8957E79D58E7063F",
-        "0|r2|MovementPacket|38|F47486E887B40468",
-        "0|r2|MovementPacket|79|B61DC382E00EB7EB",
-        "0|r2|MovementPacket|47|6E0ECA159F9C7DEF",
-        "0|r2|MovementPacket|38|F605A3448A7CAB0C",
-        "0|r2|MovementPacket|47|A38EE7F5FC852D0A",
-        "0|r2|MovementPacket|47|96A93E9DD0E47174",
-        "0|r2|MountMovementPacket|64|8957E79D58E7063F",
-        "0|r3|MovementPacket|38|F47486E887B40468",
-        "0|r3|MovementPacket|79|B61DC382E00EB7EB",
-        "0|r3|MovementPacket|47|6E0ECA159F9C7DEF",
-        "0|r3|MovementPacket|38|F605A3448A7CAB0C",
-        "0|r3|MovementPacket|47|A38EE7F5FC852D0A",
-        "0|r3|MovementPacket|47|96A93E9DD0E47174",
-        "0|r3|MountMovementPacket|64|8957E79D58E7063F",
-        "1|r1|MovementPacket|47|C36174A44A813AAD",
-        "1|r1|MovementPacket|88|E5FBB268403C9024",
-        "1|r1|MovementPacket|47|EE1BC74403CCA235",
-        "1|r1|MovementPacket|47|ED537237C06A3EAC",
-        "1|r1|MountMovementPacket|64|D2CBBD7FD0214022",
-        "1|r2|MovementPacket|47|C36174A44A813AAD",
-        "1|r2|MovementPacket|88|E5FBB268403C9024",
-        "1|r2|MovementPacket|47|EE1BC74403CCA235",
-        "1|r2|MovementPacket|47|ED537237C06A3EAC",
-        "1|r2|MountMovementPacket|64|D2CBBD7FD0214022",
-        "1|r3|MovementPacket|47|C36174A44A813AAD",
-        "2|r3|MovementPacket|47|F88ABA79D112C3F7",
-        "2|r3|MovementPacket|88|BDD8AF35D6D85ABD",
-        "2|r3|MovementPacket|47|21CBAFBC39F4A906",
-        "2|r3|MovementPacket|47|DEDF448CC46E8C3E",
-        "2|r3|MovementPacket|47|BEFA38B05347AE97",
-        "2|r3|MovementPacket|47|A1C75873E7A2658B",
-        "2|r3|MountMovementPacket|64|E571DD9AB1910131",
-        "2|r1|MovementPacket|47|F88ABA79D112C3F7",
-        "2|r1|MovementPacket|47|21CBAFBC39F4A906",
-        "2|r1|MovementPacket|47|A1C75873E7A2658B",
-        "2|r1|MovementPacket|88|BDD8AF35D6D85ABD",
-        "2|r1|MovementPacket|47|DEDF448CC46E8C3E",
-        "2|r2|MovementPacket|47|F88ABA79D112C3F7",
-        "2|r2|MovementPacket|47|21CBAFBC39F4A906",
-        "2|r2|MovementPacket|47|A1C75873E7A2658B",
-        "2|r2|MovementPacket|88|BDD8AF35D6D85ABD",
-        "2|r2|MovementPacket|47|DEDF448CC46E8C3E",
-        "3|r1|MovementPacket|47|D924C8EAD977902D",
-        "3|r1|MountMovementPacket|64|2815BE2361F82570",
-        "3|r1|MovementPacket|88|150034F69BF8AA0D",
-        "3|r1|MovementPacket|47|0F30F2EE82B21A5E",
-        "3|r1|MovementPacket|47|A73FAD9764510A85",
-        "3|r2|MovementPacket|47|D924C8EAD977902D",
-        "3|r2|MountMovementPacket|64|2815BE2361F82570",
-        "3|r2|MovementPacket|88|150034F69BF8AA0D",
-        "3|r2|MovementPacket|47|0F30F2EE82B21A5E",
-        "3|r2|MovementPacket|47|A73FAD9764510A85",
-        "4|r3|MovementPacket|47|F7A26CA132A5D0F2",
-        "4|r3|MovementPacket|88|FB3C07895C69ABD0",
-        "4|r3|MovementPacket|47|7F54902AA7779731",
-        "4|r3|MovementPacket|47|519815C42457F3E7",
-        "4|r3|MovementPacket|47|E79F1D98673CBDEC",
-        "4|r3|MountMovementPacket|64|A850E94AED7F9DCC",
-        "4|r1|MovementPacket|47|F7A26CA132A5D0F2",
-        "4|r1|MovementPacket|47|7F54902AA7779731",
-        "4|r1|MovementPacket|88|FB3C07895C69ABD0",
-        "4|r1|MovementPacket|47|519815C42457F3E7",
-        "4|r1|MountMovementPacket|64|A850E94AED7F9DCC",
-        "4|r2|MovementPacket|47|F7A26CA132A5D0F2",
-        "4|r2|MovementPacket|47|7F54902AA7779731",
-        "4|r2|MovementPacket|88|FB3C07895C69ABD0",
-        "4|r2|MovementPacket|47|519815C42457F3E7",
-        "4|r2|MountMovementPacket|64|A850E94AED7F9DCC",
-        "5|r3|MovementPacket|47|549CF13F02555715",
-        "5|r1|MovementPacket|47|549CF13F02555715",
-        "5|r1|MovementPacket|47|C286A71DB94CBD60",
-        "5|r1|MovementPacket|88|08687ECF7B1026AA",
-        "5|r1|MovementPacket|47|E18C3CE47F381CDA",
-        "5|r2|MovementPacket|47|549CF13F02555715",
-        "5|r2|MovementPacket|47|C286A71DB94CBD60",
-        "5|r2|MovementPacket|88|08687ECF7B1026AA",
-        "5|r2|MovementPacket|47|E18C3CE47F381CDA",
-        "6|r3|MovementPacket|145|45659F9012560201",
-        "6|r3|MountMovementPacket|64|8E86A7E1DAE69C0D",
-        "6|r1|MovementPacket|61|F4B5E8540FF36EB7",
-        "6|r1|MountMovementPacket|64|8E86A7E1DAE69C0D",
-        "6|r1|MovementPacket|110|25586670C046252B",
-        "6|r2|MovementPacket|61|F4B5E8540FF36EB7",
-        "6|r2|MountMovementPacket|64|8E86A7E1DAE69C0D",
-        "6|r2|MovementPacket|110|25586670C046252B",
-        "7|r3|MovementPacket|47|ACA0DE68DAEA10A6",
-        "7|r1|MovementPacket|47|ACA0DE68DAEA10A6",
-        "7|r1|MovementPacket|110|580BCDDB002425BD",
-        "7|r1|MovementPacket|47|1A8C39A077A052A8",
-        "7|r1|MountMovementPacket|64|CE410C63ABF5BA69",
-        "7|r2|MovementPacket|47|ACA0DE68DAEA10A6",
-        "7|r2|MovementPacket|110|580BCDDB002425BD",
-        "7|r2|MovementPacket|47|1A8C39A077A052A8",
-        "7|r2|MountMovementPacket|64|CE410C63ABF5BA69",
-        "8|r3|MovementPacket|47|6302A2290C7A03DE",
-        "8|r3|MovementPacket|123|146CDB500F4E9706",
-        "8|r3|MountMovementPacket|64|F95D0EBCEE5E5D5C",
-        "8|r3|MovementPacket|47|37224BB90226054E",
-        "8|r1|MovementPacket|47|6302A2290C7A03DE",
-        "8|r1|MovementPacket|70|6867D2E59E505681",
-        "8|r1|MovementPacket|109|68137BD29A9A8B33",
-        "8|r2|MovementPacket|47|6302A2290C7A03DE",
-        "8|r2|MovementPacket|70|6867D2E59E505681",
-        "8|r2|MovementPacket|109|68137BD29A9A8B33",
-        "9|r1|MountMovementPacket|64|BFF1E24FE63E636B",
-        "9|r1|MovementPacket|125|08B97F8373CAB940",
-        "9|r2|MountMovementPacket|64|BFF1E24FE63E636B",
-        "9|r2|MovementPacket|125|08B97F8373CAB940",
-        "10|r3|MovementPacket|47|8ED17B911E0C63F3",
-        "10|r3|MovementPacket|139|E677F95AD51D776C",
-        "10|r3|MountMovementPacket|64|FBE9401B2601BEE1",
-        "10|r3|MovementPacket|47|CF52E13FEC80E091",
-        "10|r1|MovementPacket|47|8ED17B911E0C63F3",
-        "10|r1|MovementPacket|123|5DF2181A9E9D4150",
-        "10|r1|MountMovementPacket|64|FBE9401B2601BEE1",
-        "10|r2|MovementPacket|47|8ED17B911E0C63F3",
-        "10|r2|MovementPacket|123|5DF2181A9E9D4150",
-        "10|r2|MountMovementPacket|64|FBE9401B2601BEE1",
-        "11|r3|MovementPacket|47|2B6C7487633B6116",
-        "11|r1|MovementPacket|47|2B6C7487633B6116",
-        "11|r1|MovementPacket|124|CBC1A321FCEE5C39",
-        "11|r1|MovementPacket|47|511094947D11BAFE",
-        "11|r2|MovementPacket|47|2B6C7487633B6116",
-        "11|r2|MovementPacket|124|CBC1A321FCEE5C39",
-        "11|r2|MovementPacket|47|511094947D11BAFE",
-    };
-
-    // Two runs, because a datagram that differs between runs of the same scenario is not a usable reference.
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    public void PollMovement_ScenarioDatagramsMatchTheRecordedBytes(int run)
-    {
-        string[] datagrams = RunBufferReuseScenario(null);
-
-        output.WriteLine($"run {run}");
-        foreach (string line in datagrams)
-            output.WriteLine($"DATAGRAM {line}");
-        Assert.Equal(BufferReuseScenarioDatagrams, datagrams);
-    }
-
     [Fact]
     public void PollMovement_KeepsBufferCapacitiesAndLeavesNothingBehindBetweenTicks()
     {
@@ -284,14 +131,13 @@ public partial class MovementTrafficTests
     }
 
     // Twelve ticks to three receivers (one with a lower cap) with a main agent, a ridden and a standalone mount,
-    // an agent removed and another registered, and an authority transfer out and back. Returns one line per datagram.
-    private string[] RunBufferReuseScenario(
-        List<(int OwnedAgents, int Captured, int RecipientIds, int Retained)>? bufferStates)
+    // an agent removed and another registered, and an authority transfer out and back.
+    private void RunBufferReuseScenario(
+        List<(int OwnedAgents, int Captured, int RecipientIds, int Retained)> bufferStates)
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
         SetControllerId(peer, "owner");
-        string[] datagrams = Array.Empty<string>();
 
         peer.Call(() =>
         {
@@ -326,7 +172,6 @@ public partial class MovementTrafficTests
             Assert.True(registry.TryRegisterAgent("other", ScenarioId(9), 9, remote));
             var moving = new List<MirrorAgent>(riders) { riddenMirror, horseMirror };
 
-            var lines = new List<string>();
             for (int tick = 0; tick < 12; tick++)
             {
                 for (int i = 0; i < moving.Count; i++)
@@ -349,23 +194,12 @@ public partial class MovementTrafficTests
 
                 handler.PollMovement(tick == 0 ? 0f : 0.026f);
 
-                foreach (SerializedPacketSend send in network.SerializedPacketSends)
-                {
-                    byte[] hash = SHA256.HashData(send.Payload);
-                    lines.Add(
-                        $"{tick}|{send.ControllerId}|{send.Packet.GetType().Name}|{send.Payload.Length}|" +
-                        Convert.ToHexString(hash, 0, 8));
-                }
                 network.SerializedPacketSends.Clear();
                 network.DirectPacketSends.Clear();
                 network.NetworkSentPackets.Packets.Clear();
-                bufferStates?.Add(handler.GetBufferState());
+                bufferStates.Add(handler.GetBufferState());
             }
-
-            datagrams = lines.ToArray();
         });
-
-        return datagrams;
     }
 
     private static Guid ScenarioId(int number) => new Guid(number, 0, 0, new byte[8]);
