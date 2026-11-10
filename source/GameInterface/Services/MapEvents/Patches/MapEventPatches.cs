@@ -26,6 +26,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -851,6 +852,11 @@ internal class InteractionPatches
 
         return mapEvent.ContainsPlayerParty() && !IsInitializingBattle(mapEvent) && !IsWithinAiJoinWindow(mapEvent);
     }
+
+    // A party arriving at a siege joins the camp leader's battle, or the settlement's own when defending its port.
+    internal static bool IsSiegeClosedToAiJoins(Settlement settlement) =>
+        settlement?.SiegeEvent != null &&
+        (IsClosedToAiJoins(settlement.SiegeEvent.BesiegerCamp?.LeaderParty?.MapEvent) || IsClosedToAiJoins(settlement.Party?.MapEvent));
 
     // Every server battle is marked, because a player can be added partway through, e.g. attached to an AI army leader.
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]

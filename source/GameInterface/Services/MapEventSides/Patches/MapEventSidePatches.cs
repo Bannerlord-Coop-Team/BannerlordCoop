@@ -61,8 +61,6 @@ internal class MapEventSidePatches
                 return false;
             }
 
-            if (mobileParty == null) return true;
-
             return true;
         }
 

@@ -50,6 +50,14 @@ internal class EncounterManagerPatches
         if (TryRequestActiveSlowRaidConversation(attackerParty, settlement))
             return false;
 
+        // Vanilla puts a late besieger in the camp, or a port defender in the town, before the blocked MapEventSide join
+        if (ModInformation.IsServer && !attackerParty.IsPlayerParty() && attackerParty.BesiegedSettlement != settlement &&
+            InteractionPatches.IsSiegeClosedToAiJoins(settlement))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty);
+            return false;
+        }
+
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
