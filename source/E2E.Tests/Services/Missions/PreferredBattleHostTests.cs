@@ -205,6 +205,27 @@ public class PreferredBattleHostTests : MissionTestEnvironment, IDisposable
         });
     }
 
+    [Fact]
+    public void PreferredHostWaitingForTheHideoutLeader_DoesNotHoldTheLeader()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        SetPreferredHosts("ctrl-C");
+        ConnectPeers(clients, "ctrl-A", "ctrl-B", "ctrl-C");
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(mapEventId)._mapEventType = MapEvent.BattleTypes.Hideout);
+
+        // The ready preferred host waits for the assault leader, so the leader hosts as soon as it is ready
+        EnterBattle(clients[2], mapEventId);
+        AssertNoHost(mapEventId);
+        EnterBattle(clients[0], mapEventId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            Assert.Equal("ctrl-A", assignment.HostControllerId);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

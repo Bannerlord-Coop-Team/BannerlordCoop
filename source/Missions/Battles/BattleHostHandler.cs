@@ -476,7 +476,8 @@ internal class BattleHostHandler : IHandler
         SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
     }
 
-    // A preferred host the held election waits for: in the battle and connected, and not departed, withdrawn or absent.
+    // A preferred host the held election waits for: in the battle and connected, and not departed, withdrawn or absent,
+    // nor already ready and waiting for its hideout assault leader.
     private bool IsLoadingPreferredHost(string mapEventId, MapEvent mapEvent, Player player)
     {
         var controllerId = player.ControllerId;
@@ -484,7 +485,8 @@ internal class BattleHostHandler : IHandler
         {
             bool isGone = runtimeState.DepartedControllers.Contains(controllerId) ||
                 runtimeState.WithdrawnControllers.Contains(controllerId) ||
-                runtimeState.AbsentControllers.Contains(controllerId);
+                runtimeState.AbsentControllers.Contains(controllerId) ||
+                runtimeState.HideoutHostCandidates.Any(candidate => candidate.ControllerId == controllerId);
             if (isGone) return false;
         }
         return playerManager.IsConnected(player) && IsRequesterInBattle(mapEvent, controllerId);

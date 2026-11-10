@@ -108,8 +108,9 @@ A hideout battle is the exception, because its boss duel runs on the host's own 
 player whose party leads the attacker side is connected and has not left the battle, players who
 become ready before it wait and the leader becomes the host when it is ready. If the leader leaves,
 withdraws or disconnects before hosting, or is not ready within 90 seconds of the first waiting
-player, the earliest waiting player becomes the host instead. This applies when
-`preferredBattleHosts` is set too.
+player, the earliest waiting player becomes the host instead. With `preferredBattleHosts` set the
+leader still hosts, and players released from the hold line up by rank, so if the leader is gone
+the best-ranked ready player becomes the host.
 
 The campaign server shall arbitrate the election (BR-101) and shall issue the unowned (NPC) troop
 reserves to the elected host together with the election, so that the host fields the NPC troops
