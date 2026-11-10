@@ -1592,6 +1592,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             Assert.Empty(kingdom.UnresolvedDecisions);
             Assert.Empty(GetVoteManager(Server).CaptureActiveRoundStatuses());
+            for (int tick = 0; tick < 200; tick++)
+            {
+                GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow);
+            }
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message => message.KingdomId == kingdomId);

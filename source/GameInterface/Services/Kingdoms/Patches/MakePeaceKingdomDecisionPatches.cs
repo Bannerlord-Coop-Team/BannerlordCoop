@@ -1,4 +1,4 @@
-using GameInterface.Services.Kingdoms.Extentions;
+﻿using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
