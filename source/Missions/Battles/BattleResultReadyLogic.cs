@@ -21,6 +21,7 @@ public class BattleResultReadyLogic : MissionLogic
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly INetwork relayNetwork;
     private bool hasResolvedMissionResult;
+    private bool endRequestedWhileLoading;
 
     public BattleResultReadyLogic(
         IBattleResultCommitter resultCommitter,
@@ -90,9 +91,30 @@ public class BattleResultReadyLogic : MissionLogic
                 Mission.CurrentState == Mission.State.Over)
                 return;
 
-            messageBroker.Publish(this, new SendInformationMessage("This battle has ended. Returning to the map."));
-            Mission.EndMission();
+            // Ending a loading mission makes MissionState skip TickLoading, so wait for its first tick after loading.
+            if (Mission.CurrentState != Mission.State.Continuing)
+            {
+                endRequestedWhileLoading = true;
+                return;
+            }
+
+            EndBattleMission();
         }, context: nameof(Handle_NetworkEndBattleMission));
+    }
+
+    public override void OnMissionTick(float dt)
+    {
+        if (!endRequestedWhileLoading)
+            return;
+
+        endRequestedWhileLoading = false;
+        EndBattleMission();
+    }
+
+    private void EndBattleMission()
+    {
+        messageBroker.Publish(this, new SendInformationMessage("This battle has ended. Returning to the map."));
+        Mission.EndMission();
     }
 
     // Only report retreats triggered by the retreat action

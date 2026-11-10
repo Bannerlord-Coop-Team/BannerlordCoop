@@ -110,6 +110,29 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         Assert.Equal(expectEnded, mission.EndMissionCalled);
     }
 
+    // The refused entry reply can land while the scene still loads, and native AfterStart sets Continuing once it is done.
+    [Fact]
+    public void EndMessageWhileTheMissionLoads_EndsItOnTheFirstTickAfterLoading()
+    {
+        var (mapEventId, _) = SetupCoopBattle(ControllerIds);
+        var client = Clients.First();
+        using var fixture = new MissionEngineFixture();
+        var mission = OpenBattleMission(fixture, client, mapEventId);
+        var logic = mission.Shell.MissionBehaviors.OfType<BattleResultReadyLogic>().Single();
+        var notices = RecordNotices(client);
+        mission.Shell.CurrentState = Mission.State.Initializing;
+
+        client.SimulateMessage(Server.NetPeer, new NetworkEndBattleMission(mapEventId));
+        Assert.False(mission.EndMissionCalled);
+
+        mission.Shell.CurrentState = Mission.State.Continuing;
+        client.Call(() => logic.OnMissionTick(0f));
+        client.Call(() => logic.OnMissionTick(0f));
+
+        Assert.True(mission.EndMissionCalled);
+        Assert.Single(notices);
+    }
+
     [Fact]
     public void ServerFinalizesBattle_WhileAJoinerIsStillEntering_EndsTheJoinersMission()
     {
@@ -194,6 +217,7 @@ public class MapEventFinalizedMidMissionTests : MissionTestEnvironment
         client.Call(() =>
         {
             mission = fixture.CreateMission(client);
+            mission.Shell.CurrentState = Mission.State.Continuing;
             var logic = new BattleResultReadyLogic(
                 Mock.Of<IBattleResultCommitter>(),
                 Mock.Of<ISiegeEngineStateReporter>(),
