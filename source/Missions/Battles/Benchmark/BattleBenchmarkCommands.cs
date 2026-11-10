@@ -128,32 +128,41 @@ internal static class BattleBenchmarkCommands
         }
     }
 
-    // coop.debug.benchmark.camera 50 80
+    // coop.debug.benchmark.camera 50 80, then coop.debug.benchmark.camera off
     /// <summary>
     /// Fixes the mission camera beside the battle: level with the midpoint between the two sides' average positions,
     /// <c>distance</c> metres off the line between them and <c>height</c> metres up, looking at the midpoint.
+    /// <c>off</c> gives the normal camera back.
     /// </summary>
     public sealed class CameraCoopCommand : ICoopCommand
     {
         internal const float DefaultHeight = 50f;
         internal const float DefaultDistance = 80f;
+        internal const string Off = "off";
+
+        // The command registry keeps this instance for the session, so later calls move this camera instead of adding one.
+        private Camera camera;
 
         public string Prefix => CommandPrefix;
 
         public string Name => "camera";
 
-        public string Description => "Fixes the mission camera beside the battle so render cost is comparable between runs.";
+        public string Description =>
+            "Fixes the mission camera beside the battle so render cost is comparable between runs; off gives the normal camera back.";
 
         public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("height", $"Metres above the midpoint; defaults to {DefaultHeight}.", false),
+            new ExpectedArgs("height", $"Metres above the midpoint, defaults to {DefaultHeight}; or {Off} to give the normal camera back.", false),
             new ExpectedArgs("distance", $"Metres off the line between the sides; defaults to {DefaultDistance}.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
+            if (args.Count > 0 && string.Equals(args[0], Off, StringComparison.OrdinalIgnoreCase))
+                return Release();
+
             float height = DefaultHeight;
             float distance = DefaultDistance;
             if ((args.Count > 0 && !float.TryParse(args[0], NumberStyles.Float, CultureInfo.InvariantCulture, out height)) ||
@@ -181,13 +190,25 @@ internal static class BattleBenchmarkCommands
             var side = new Vec3(-axis.y, axis.x, 0f);
             Vec3 eye = target + (side * distance) + (Vec3.Up * height);
 
-            Camera camera = Camera.CreateCamera();
+            camera ??= Camera.CreateCamera();
             camera.FillParametersFrom(missionScreen.CombatCamera);
             camera.LookAt(eye, target, Vec3.Up);
             missionScreen.CustomCamera = camera;
 
             return Succeeded($"BATTLE_BENCHMARK_CAMERA eye={Describe(eye)} target={Describe(target)} " +
                              $"attackers={attackers.Length} defenders={defenders.Length}");
+        }
+
+        // Same release as the mount camera in BattleDebugCommands: vanilla skips its own camera update while CustomCamera is set.
+        private CoopCommandResult Release()
+        {
+            if (ReferenceEquals(camera, null)) return Failed("No benchmark camera is set");
+
+            if (ScreenManager.TopScreen is MissionScreen missionScreen && ReferenceEquals(missionScreen.CustomCamera, camera))
+                missionScreen.CustomCamera = null;
+            camera.ReleaseCamera();
+            camera = null;
+            return Succeeded("BATTLE_BENCHMARK_CAMERA_RELEASED");
         }
 
         private static string Describe(Vec3 position) =>
