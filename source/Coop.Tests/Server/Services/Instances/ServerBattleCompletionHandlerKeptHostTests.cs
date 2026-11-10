@@ -5,6 +5,7 @@ using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -37,7 +38,8 @@ public class ServerBattleCompletionHandlerKeptHostTests : IDisposable
             Mock.Of<IObjectManager>(),
             Mock.Of<IPlayerManager>(),
             hostRegistry.Object,
-            completionTracker.Object);
+            completionTracker.Object,
+            Mock.Of<IBattleTroopReserveBuilder>());
     }
 
     public void Dispose() => handler.Dispose();

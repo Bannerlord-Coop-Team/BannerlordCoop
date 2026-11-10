@@ -8,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -78,7 +79,8 @@ public class ServerBattleCompletionHandlerAbandonedJoinTests : IDisposable
             Mock.Of<IObjectManager>(),
             playerManager,
             hostRegistry.Object,
-            completionTracker.Object);
+            completionTracker.Object,
+            Mock.Of<IBattleTroopReserveBuilder>());
 
         hostPeer = RegisterPlayer(HostControllerId, port: 52300);
         Assert.True(missionManager.TryEnterMission(hostPeer, HostControllerId, MapEventId, out _));

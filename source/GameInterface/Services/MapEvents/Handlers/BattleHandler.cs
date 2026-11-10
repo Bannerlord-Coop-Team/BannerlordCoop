@@ -75,7 +75,6 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
 
         messageBroker.Subscribe<NetworkBattleModeSet>(Handle_NetworkBattleModeSet);
-        messageBroker.Subscribe<NetworkEndBattleMission>(Handle_NetworkEndBattleMission);
 
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -92,7 +91,6 @@ internal class BattleHandler : IHandler
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
 
         messageBroker.Unsubscribe<NetworkBattleModeSet>(Handle_NetworkBattleModeSet);
-        messageBroker.Unsubscribe<NetworkEndBattleMission>(Handle_NetworkEndBattleMission);
 
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
@@ -132,25 +130,6 @@ internal class BattleHandler : IHandler
 
             BattleModeRegistry.Begin(mapEventId, mode);
             RefreshCurrentEncounterMenu();
-        });
-    }
-
-    /// <summary>
-    /// [Client] The server finalized the battle this player is fighting (a peace decision, say). Leave its mission now,
-    /// since the result could no longer be applied. The usual map event teardown runs once the mission has closed.
-    /// </summary>
-    private void Handle_NetworkEndBattleMission(MessagePayload<NetworkEndBattleMission> payload)
-    {
-        var mapEventId = payload.What.MapEventId;
-        GameThread.RunSafe(() =>
-        {
-            var mission = Mission.Current;
-            if (mission == null)
-                return;
-
-            Logger.Information("Server ended battle {MapEventId} while it was still being fought; leaving its mission", mapEventId);
-            messageBroker.Publish(this, new SendInformationMessage("This battle ended on the campaign map, so no result was applied. Returning to the map."));
-            mission.EndMission();
         });
     }
 
