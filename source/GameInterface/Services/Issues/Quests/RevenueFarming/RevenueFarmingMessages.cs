@@ -16,7 +16,6 @@ public enum RevenueFarmingAction : byte
     BetrayGiver,
     BetrayDemand,
     Refresh,
-    Desert,
 }
 
 [ProtoContract(SkipConstructor = true)]

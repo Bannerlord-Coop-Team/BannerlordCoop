@@ -58,7 +58,8 @@ internal class RevenueFarmingCallbackPatch
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach (var name in new[] { nameof(Quest.HourlyTick), nameof(Quest.OnWarDeclared), nameof(Quest.OnClanChangedKingdom),
-            nameof(Quest.OnVillageRaid), nameof(Quest.OnMapEventStarted), nameof(Quest.OnMapEventEnded), nameof(Quest.OnSettlementOwnerChanged) })
+            nameof(Quest.OnVillageRaid), nameof(Quest.OnMapEventStarted), nameof(Quest.OnMapEventEnded), nameof(Quest.OnSettlementOwnerChanged),
+            nameof(Quest.OnPlayerDeserted) })
             yield return AccessTools.Method(typeof(Quest), name);
     }
 
@@ -137,18 +138,6 @@ internal class RevenueFarmingPaymentPromptPatch
         if (ModInformation.IsClient) return ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) && sessions.IsLocal(__instance);
         session.AwaitingPayment = true;
         __instance.CollectingRevenues = false;
-        return false;
-    }
-}
-
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerDeserted))]
-internal class RevenueFarmingDesertionPatch
-{
-    private static bool Prefix(Quest __instance)
-    {
-        if (ModInformation.IsClient && ContainerProvider.TryResolve<IRevenueFarmingActions>(out var actions))
-            actions.Request(__instance, RevenueFarmingAction.Desert);
         return false;
     }
 }

@@ -597,6 +597,41 @@ public sealed class RevenueFarmingTests : IDisposable
     }
 
     [Fact]
+    public void SharedDesertionRelayStopsOnlyTheRetreatingOwnersCollection()
+    {
+        Accept();
+        Collect();
+        var statesBefore = Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Count();
+        var requestsBefore = Client.NetworkSentMessages.GetMessages<RequestRevenueFarmingAction>().Count();
+        Server.Call(() =>
+        {
+            var other = Object<Hero>(Server, scenario.OtherHeroId);
+            using (new MainHeroSubstitutionScope(other, other.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnPlayerDesertedBattle(3);
+            Assert.True(Quest(Server).CollectingRevenues);
+        });
+        Assert.Equal(statesBefore, Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Count());
+
+        Server.Call(() =>
+        {
+            var hero = Object<Hero>(Server, owner.HeroId);
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnPlayerDesertedBattle(3);
+        });
+        environment.FlushCoalescer();
+
+        foreach (var instance in new[] { Server, Client }) instance.Call(() =>
+        {
+            Assert.True(Quest(instance).IsOngoing);
+            Assert.False(Quest(instance).CollectingRevenues);
+            Assert.Equal(0, Quest(instance).RevenueVillages[0].CollectedAmount);
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Skip(statesBefore));
+        Assert.Equal(requestsBefore, Client.NetworkSentMessages.GetMessages<RequestRevenueFarmingAction>().Count());
+        Observer.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+    }
+
+    [Fact]
     public void TheServerDoesNotRemoveTheOwnersClientMapTracking()
     {
         Accept();
