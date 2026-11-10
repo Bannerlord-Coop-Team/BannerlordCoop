@@ -104,11 +104,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         var visible = new ScreenElement(
             GetVisibleRoster(logic, baseline),
             GetVisibleRoster(logic, oppositeBaseline),
-            character);
+            character,
+            HasNonTransferEdit(logic.CurrentData, character));
         var saved = new ScreenElement(
             GetSavedRoster(logic, baseline),
             GetSavedRoster(logic, oppositeBaseline),
-            character);
+            character,
+            HasNonTransferEdit(logic._savedData, character));
         var previousBaseline = RosterElementState.Read(baseline, character);
         var previousOppositeBaseline = RosterElementState.Read(oppositeBaseline, character);
 
@@ -252,6 +254,15 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             return logic._initialData.LeftPrisonerRoster;
         return logic._initialData.RightPrisonerRoster;
     }
+
+    /// <summary>
+    /// Whether the screen data records an upgrade or prisoner recruit touching the troop, the vanilla edits
+    /// that add or remove it without a transfer.
+    /// </summary>
+    private static bool HasNonTransferEdit(PartyScreenData data, CharacterObject character)
+        => data != null &&
+           (data.UpgradedTroopsHistory.Any(upgrade => upgrade.Item1 == character || upgrade.Item2 == character) ||
+            data.RecruitedPrisonersHistory.Any(recruit => recruit.Item1 == character));
 
     private static void RemoveZeroCounts(TroopRoster roster)
     {
@@ -481,6 +492,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
         private readonly TroopRoster oppositeRoster;
         private readonly CharacterObject character;
+        private readonly bool hasNonTransferEdit;
         private readonly RosterElementState previousOpposite;
         private RosterElementState rebasedOpposite;
 
@@ -490,11 +502,16 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         public bool OppositeChanged => !rebasedOpposite.Matches(previousOpposite);
 
         // Reads both rosters before the server change is applied, since the visible roster can be the live one.
-        public ScreenElement(TroopRoster roster, TroopRoster oppositeRoster, CharacterObject character)
+        public ScreenElement(
+            TroopRoster roster,
+            TroopRoster oppositeRoster,
+            CharacterObject character,
+            bool hasNonTransferEdit)
         {
             Roster = roster;
             this.oppositeRoster = oppositeRoster;
             this.character = character;
+            this.hasNonTransferEdit = hasNonTransferEdit;
             if (roster == null) return;
 
             Previous = RosterElementState.Read(roster, character);
@@ -516,6 +533,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 authoritative,
                 previousBaseline,
                 oppositeBaseline,
+                hasNonTransferEdit,
                 Previous,
                 previousOpposite,
                 out var rebasedSide,
@@ -575,6 +593,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             RosterElementState authoritative,
             RosterElementState previousBaseline,
             RosterElementState oppositeBaseline,
+            bool hasNonTransferEdit,
             RosterElementState previousSide,
             RosterElementState previousOpposite,
             out RosterElementState rebasedSide,
@@ -597,8 +616,9 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 : 0;
 
             // Only a pure transfer, every troop taken off here landing on the opposite side, tells which troops the
-            // change belongs to. An upgrade or recruit in the same edit is ambiguous, so it resets instead.
-            bool isPureTransfer = removed > 0 &&
+            // change belongs to. An upgrade or recruit of the troop can hide in the counts, so it resets instead.
+            bool isPureTransfer = !hasNonTransferEdit &&
+                removed > 0 &&
                 (long)previousOpposite.Number - oppositeBaseline.Number >= removed;
             if ((movedWounded != 0 || movedXp != 0) && !isPureTransfer) return false;
 
