@@ -1,12 +1,14 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Missions.Battles;
 
 /// <summary>
-/// Turns the battle host's water time samples into this client's water time: once begun the written time never runs
-/// backwards, since forward gaps jump and backward ones are only ever slewed.
+/// Turns the battle host's water time samples into this client's water time: once begun it never runs backwards, and once
+/// the battle shows only a host change jumps it forward, so the sea phase doesn't snap under the hulls.
 /// </summary>
 public interface IBattleWaterTimeEstimator
 {
@@ -38,12 +40,16 @@ public interface IBattleWaterTimeEstimator
 /// <inheritdoc cref="IBattleWaterTimeEstimator"/>
 public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<BattleWaterTimeEstimator>();
+
     // Weight of a new windowed offset in the smoothed target; one sample a second settles in a few seconds.
     internal const double SmoothingFactor = 0.3;
     // The applied offset moves at most this fraction of the local advance: waves run at 75% to 125% speed, never backwards.
     internal const double SlewFraction = 0.25;
-    // A forward gap beyond this (20 water units = 2 s of mission time) jumps instead of slewing.
+    // A forward gap beyond this (20 water units = 2 s of mission time) is adopted at once, or caught up faster mid-battle.
     internal const double SnapThreshold = 20.0;
+    // Catching up a persistent gap runs the waves at up to double speed, so a stalled clock recovers in as long as it stood.
+    internal const double CatchUpFraction = 1.0;
     // Transit delay only ever makes an offset look smaller, so the window's largest offset is the best estimate.
     internal const int SampleWindow = 3;
 
@@ -53,6 +59,10 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     // The next host sample jumps at once when far enough ahead: the first one, and the first after a host change.
     private bool adoptionArmed;
     private bool jumpPending;
+    // A persistent forward gap slews at the catch-up rate until the applied offset reaches the target.
+    private bool catchingUp;
+    // Whether the local clock has moved since Begin; until then the battle is still behind the loading screen.
+    private bool shown;
 
     public bool HasHostTime { get; private set; }
 
@@ -89,7 +99,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
             return;
         }
 
-        if (window.Count == SampleWindow && window.Min() - AppliedOffset > SnapThreshold) JumpTo(window.Max());
+        if (window.Count == SampleWindow && window.Min() - AppliedOffset > SnapThreshold) CatchUpTo(window.Max());
     }
 
     public void RearmAdoption()
@@ -111,6 +121,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     {
         double step = lastLocal.HasValue ? Math.Max(0.0, localTime - lastLocal.Value) : 0.0;
         lastLocal = localTime;
+        shown |= step > 0.0;
         if (isHost) return Hold(localTime);
 
         if (jumpPending && TargetOffset > AppliedOffset)
@@ -119,18 +130,36 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
         }
         else
         {
-            double maxStep = SlewFraction * step;
-            AppliedOffset += Math.Max(-maxStep, Math.Min(maxStep, TargetOffset - AppliedOffset));
+            double maxForward = (catchingUp ? CatchUpFraction : SlewFraction) * step;
+            AppliedOffset += Math.Max(-SlewFraction * step, Math.Min(maxForward, TargetOffset - AppliedOffset));
         }
         jumpPending = false;
+        catchingUp &= AppliedOffset < TargetOffset;
         return (float)(localTime + AppliedOffset);
     }
 
     // Sets a forward target the next advance jumps to.
     private void JumpTo(double offset)
     {
+        if (shown)
+            Logger.Information("[NavalSync] Water time jumped forward {Gap} to the battle host's", offset - AppliedOffset);
         TargetOffset = offset;
         jumpPending = true;
+    }
+
+    // Sets a forward target the advances catch up to at the faster rate; behind the loading screen it jumps instead.
+    private void CatchUpTo(double offset)
+    {
+        if (!shown)
+        {
+            JumpTo(offset);
+            return;
+        }
+
+        if (!catchingUp)
+            Logger.Information("[NavalSync] Water time {Gap} behind the battle host, catching up", offset - AppliedOffset);
+        TargetOffset = offset;
+        catchingUp = true;
     }
 
     // A host is the time source: it keeps the offset it has, so a promoted host continues from its own current water time.
@@ -138,6 +167,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     {
         TargetOffset = AppliedOffset;
         jumpPending = false;
+        catchingUp = false;
         window.Clear();
         return (float)(localTime + AppliedOffset);
     }

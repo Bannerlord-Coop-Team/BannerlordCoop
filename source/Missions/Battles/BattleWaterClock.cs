@@ -111,7 +111,7 @@ public class BattleWaterClock : IBattleWaterClock
 
         Estimator.RearmAdoption();
         int epoch = migrated.Epoch > 0 ? migrated.Epoch : session.HostEpoch;
-        network.Send(newHost, new NetworkBattleWaterTime(waterClock.WrittenTime, epoch, fromHost: false));
+        network.Send(newHost, new NetworkBattleWaterTime(session.InstanceId, waterClock.WrittenTime, epoch, fromHost: false));
     }
 
     // Applies the report held from before this client became the host, if it was sent for this host epoch.
@@ -131,7 +131,7 @@ public class BattleWaterClock : IBattleWaterClock
         if (sinceBroadcast < BroadcastIntervalSeconds) return;
 
         sinceBroadcast = 0f;
-        network.SendAll(new NetworkBattleWaterTime(waterTime, session.HostEpoch));
+        network.SendAll(new NetworkBattleWaterTime(session.InstanceId, waterTime, session.HostEpoch));
     }
 
     // [Poller thread] Read and applied on the game thread, where the local clock and the session are read.
@@ -147,6 +147,7 @@ public class BattleWaterClock : IBattleWaterClock
     internal void AcceptWaterTime(NetworkBattleWaterTime sample)
     {
         if (!waterClock.IsInstalled) return;
+        if (sample.BattleInstanceId != session.InstanceId) return;
         if (float.IsNaN(sample.WaterTime) || float.IsInfinity(sample.WaterTime)) return;
         if (!sample.FromHost)
         {
@@ -211,7 +212,7 @@ public class BattleWaterClock : IBattleWaterClock
     {
         if (!redirected || !session.IsLocalHost || session.IsOwn(controllerId)) return;
 
-        network.Send(controllerId, new NetworkBattleWaterTime(waterClock.WrittenTime, session.HostEpoch));
+        network.Send(controllerId, new NetworkBattleWaterTime(session.InstanceId, waterClock.WrittenTime, session.HostEpoch));
     }
 
     // Drops the subscriptions and gives the engine its own clock back for the next scene.

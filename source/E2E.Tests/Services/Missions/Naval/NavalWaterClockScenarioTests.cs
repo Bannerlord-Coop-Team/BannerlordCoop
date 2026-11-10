@@ -59,6 +59,52 @@ public class NavalWaterClockScenarioTests : NavalBattleTestEnvironment
         AssertNeverBackwards(waterC);
     }
 
+    [Fact]
+    public void FollowerClockStall_CatchesUpWithoutAMidBattleWaterJump()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var waterA = WaterOf(a);
+        var waterB = WaterOf(b);
+        waterA.Installed = true;
+        waterA.Vanilla = 5000f;
+        waterB.Installed = true;
+        waterB.Vanilla = 300f;
+
+        // 20 s with A hosting, so B has adopted A's time and settled on it.
+        for (int tick = 0; tick < 400; tick++)
+        {
+            Advance(a);
+            Advance(b);
+        }
+        Assert.InRange(waterB.WrittenTime, waterA.WrittenTime - 1f, waterA.WrittenTime + 1f);
+        int settledWrites = waterB.Written.Count;
+
+        // B's mission clock stands for 5 s, as vanilla ticks a paused mission with a zero step, while A's samples keep coming.
+        for (int tick = 0; tick < 100; tick++)
+        {
+            Advance(a);
+            b.Tick(0f);
+        }
+
+        for (int tick = 0; tick < 600; tick++)
+        {
+            Advance(a);
+            Advance(b);
+        }
+
+        // Waves never run faster than double speed mid-battle, so one tick moves the water at most two ticks' worth.
+        float maxStep = 2f * TickSeconds * FakeWaterClock.UnitsPerSecond;
+        for (int i = settledWrites; i < waterB.Written.Count; i++)
+        {
+            float step = waterB.Written[i] - waterB.Written[i - 1];
+            Assert.True(step <= maxStep + 0.01f, $"water jumped {step} at write {i}: {waterB.Written[i - 1]} to {waterB.Written[i]}");
+        }
+        Assert.InRange(waterB.WrittenTime, waterA.WrittenTime - 1f, waterA.WrittenTime + 1f);
+        AssertNeverBackwards(waterB);
+    }
+
     // The client's in-memory water clock, which the harness registers per client.
     private static FakeWaterClock WaterOf(NavalPeer peer) => peer.Instance.Resolve<FakeWaterClock>();
 

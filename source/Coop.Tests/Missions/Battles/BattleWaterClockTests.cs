@@ -37,7 +37,7 @@ public class BattleWaterClockTests
         session.SetupGet(s => s.IsLocalHost).Returns(true);
 
         clock.Tick(5f);
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(5000f, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 5000f, 2));
         clock.SendTimeTo("peer");
         clock.Dispose();
 
@@ -63,7 +63,7 @@ public class BattleWaterClockTests
     public void Start_AfterAHostTimeArrivedDuringLoading_BeginsAtTheHostTime()
     {
         waterClock.Vanilla = 1000f;
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(700f, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 700f, 2));
 
         clock.Start();
 
@@ -88,7 +88,7 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(5000f, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 5000f, 2));
         waterClock.Vanilla = 1000.25f;
         clock.Tick(0.016f);
 
@@ -101,7 +101,7 @@ public class BattleWaterClockTests
     {
         waterClock.Vanilla = 1000f;
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(5000f, 1));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 5000f, 1));
 
         Assert.Equal(0, clock.SamplesAccepted);
         Assert.False(clock.Estimator.HasHostTime);
@@ -110,8 +110,8 @@ public class BattleWaterClockTests
     [Fact]
     public void Client_DropsANonFiniteHostTime()
     {
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(float.NaN, 2));
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(float.PositiveInfinity, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", float.NaN, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", float.PositiveInfinity, 2));
 
         Assert.Equal(0, clock.SamplesAccepted);
     }
@@ -135,7 +135,7 @@ public class BattleWaterClockTests
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         waterClock.Vanilla = 1000f;
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(5000f, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 5000f, 2));
         clock.Tick(0.5f);
         waterClock.Vanilla = 1004f;
         clock.Tick(0.4f);
@@ -202,8 +202,8 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 3, fromHost: false));
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(2500f, 3, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 3000f, 3, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 2500f, 3, fromHost: false));
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         session.SetupGet(s => s.HostEpoch).Returns(3);
         waterClock.Vanilla = 1000.5f;
@@ -218,7 +218,7 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 4, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 3000f, 4, fromHost: false));
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         session.SetupGet(s => s.HostEpoch).Returns(3);
         waterClock.Vanilla = 1000.5f;
@@ -238,7 +238,7 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 2, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 3000f, 2, fromHost: false));
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         session.SetupGet(s => s.HostEpoch).Returns(3);
         waterClock.Vanilla = 1000.5f;
@@ -254,7 +254,7 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 3, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 3000f, 3, fromHost: false));
         waterClock.Vanilla = 1000.5f;
         clock.Tick(0.016f);
 
@@ -267,7 +267,7 @@ public class BattleWaterClockTests
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
 
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(3000f, 2, fromHost: false));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 3000f, 2, fromHost: false));
         waterClock.Vanilla = 1000.5f;
         clock.Tick(0.016f);
 
@@ -299,11 +299,12 @@ public class BattleWaterClockTests
     public void Message_SurvivesTheWire()
     {
         using var stream = new MemoryStream();
-        Serializer.Serialize(stream, new NetworkBattleWaterTime(4321.25f, 3, fromHost: false));
+        Serializer.Serialize(stream, new NetworkBattleWaterTime("battle", 4321.25f, 3, fromHost: false));
         stream.Position = 0;
 
         var copy = Serializer.Deserialize<NetworkBattleWaterTime>(stream);
 
+        Assert.Equal("battle", copy.BattleInstanceId);
         Assert.Equal(4321.25f, copy.WaterTime);
         Assert.Equal(3, copy.HostEpoch);
         Assert.False(copy.FromHost);
@@ -314,7 +315,7 @@ public class BattleWaterClockTests
     public void DebugLine_ReportsPatchVanillaAndOffset()
     {
         waterClock.Vanilla = 1000f;
-        clock.AcceptWaterTime(new NetworkBattleWaterTime(1002.5f, 2));
+        clock.AcceptWaterTime(new NetworkBattleWaterTime("battle", 1002.5f, 2));
         clock.Tick(0.016f);
 
         string line = NavalWaterClockCoopCommand.Describe(waterClock, clock);

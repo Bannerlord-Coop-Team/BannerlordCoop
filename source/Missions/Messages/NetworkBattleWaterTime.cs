@@ -16,9 +16,12 @@ public sealed class NetworkBattleWaterTime : IEvent
     [ProtoMember(2)] public readonly int HostEpoch;
     /// <summary>Whether the battle host sent it; false for a client's report to a new host.</summary>
     [ProtoMember(3)] public readonly bool FromHost;
+    /// <summary>The battle's instance id; the host epoch restarts every battle, so a sample from another battle is dropped.</summary>
+    [ProtoMember(4)] public readonly string BattleInstanceId;
 
-    public NetworkBattleWaterTime(float waterTime, int hostEpoch, bool fromHost = true)
+    public NetworkBattleWaterTime(string battleInstanceId, float waterTime, int hostEpoch, bool fromHost = true)
     {
+        BattleInstanceId = battleInstanceId;
         WaterTime = waterTime;
         HostEpoch = hostEpoch;
         FromHost = fromHost;
