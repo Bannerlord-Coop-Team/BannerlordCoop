@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -33,10 +34,11 @@ internal sealed class RevenueFarmingStateHandler : IHandler
     private readonly IRevenueFarmingSessionStore sessions;
     private readonly IRevenueFarmingActions actions;
     private readonly IIssueConversationGuard conversationGuard;
+    private readonly IRevenueFarmingExecutionScope execution;
 
     public RevenueFarmingStateHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IPlayerManager players,
         IIssueOwnershipRegistry ownership, IRevenueFarmingSessionStore sessions, IRevenueFarmingActions actions,
-        IIssueConversationGuard conversationGuard)
+        IIssueConversationGuard conversationGuard, IRevenueFarmingExecutionScope execution)
     {
         this.broker = broker;
         this.network = network;
@@ -46,6 +48,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         this.sessions = sessions;
         this.actions = actions;
         this.conversationGuard = conversationGuard;
+        this.execution = execution;
         broker.Subscribe<RequestRevenueFarmingAction>(HandleRequest);
         broker.Subscribe<RevenueFarmingChanged>(HandleChanged);
         broker.Subscribe<NetworkRevenueFarmingState>(HandleState);
@@ -157,11 +160,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
                 AdditionalProgress = village._customProgress,
             };
         }).ToArray();
-        var journal = quest.JournalEntries.Select(log => new RevenueFarmingJournalState
-        {
-            TimeTicks = log.LogTime.NumTicks, Text = log.LogText, TaskName = log.TaskName,
-            Progress = log.CurrentProgress, Range = log.Range, Type = (int)log.Type,
-        }).ToArray();
+        var journal = quest.JournalEntries.Select(log => new IssueJournalEntry(log)).ToArray();
         return new NetworkRevenueFarmingState(
             giverId, quest.StringId, session.Revision, quest._totalRequestedDenars, quest.CollectingRevenues,
             quest._allRevenuesAreCollected, session.Incident, session.AwaitingPayment, collectionId, villages,
@@ -194,6 +193,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             }
             var newLog = state.Journal.Length > quest.JournalEntries.Count;
             var newPrompt = state.AwaitingPayment && (!session.AwaitingPayment || state.RefreshPresentation);
+            using var journalReplay = new QuestJournalReplay();
             using (new AllowedThread())
             {
                 session.Revision = state.Revision;
@@ -219,8 +219,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
                     quest._currentVillageEvents[key] = state.UsedIncidents.Contains(key);
                 quest._journalEntries.Clear();
                 foreach (var log in state.Journal)
-                    quest._journalEntries.Add(new JournalLog(new CampaignTime(log.TimeTicks), log.Text, log.TaskName,
-                        log.Progress, log.Range, (LogType)log.Type));
+                    quest._journalEntries.Add(log.ToJournalLog());
                 quest._questProgressLog = quest._journalEntries[state.ProgressLogIndex];
             }
             if (!sessions.IsLocal(quest)) return;
@@ -237,17 +236,17 @@ internal sealed class RevenueFarmingStateHandler : IHandler
                 float.IsNaN(village.AdditionalProgress) || float.IsInfinity(village.AdditionalProgress)) ||
             state.Villages.Select(village => village.SettlementId).Distinct().Count() != state.Villages.Length ||
             state.Journal == null || state.ProgressLogIndex < 0 || state.ProgressLogIndex >= state.Journal.Length ||
-            state.Journal.Any(log => log?.Text == null) || state.UsedIncidents == null ||
+            state.Journal.Any(log => log.Text == null) || state.UsedIncidents == null ||
             state.UsedIncidents.Any(id => !quest._currentVillageEvents.ContainsKey(id)) ||
             (state.Incident != null && !quest._currentVillageEvents.ContainsKey(state.Incident)))
             throw new ArgumentException("Revenue Farming state does not match the accepted quest.");
     }
 
-    private static void Present(RevenueFarmingSession session, NetworkRevenueFarmingState state, bool newPrompt, Settlement menuSettlement)
+    private void Present(RevenueFarmingSession session, NetworkRevenueFarmingState state, bool newPrompt, Settlement menuSettlement)
     {
         if (newPrompt)
         {
-            using (new RevenueFarmingExecutionScope(session, publish: false)) session.Quest.ShowQuestResolvePopUp();
+            using (execution.Enter(session, publish: false)) session.Quest.ShowQuestResolvePopUp();
         }
         var currentMenu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
         if (state.Menu == "town" || state.Menu == "castle")

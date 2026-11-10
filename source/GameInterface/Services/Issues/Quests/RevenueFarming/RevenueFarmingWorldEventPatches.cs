@@ -20,10 +20,11 @@ internal class RevenueFarmingWorldEventPatches
     {
         Run(quest =>
         {
-            if (!ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) || sessions.Get(quest) is not { } session) return;
+            if (!ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) || sessions.Get(quest) is not { } session ||
+                !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return;
             if (quest.QuestDueTime.IsPast)
             {
-                using (new RevenueFarmingExecutionScope(session)) quest.CompleteQuestWithTimeOut();
+                using (execution.Enter(session)) quest.CompleteQuestWithTimeOut();
             }
             if (quest.IsOngoing && !session.AwaitingPayment) quest.HourlyTick();
         });

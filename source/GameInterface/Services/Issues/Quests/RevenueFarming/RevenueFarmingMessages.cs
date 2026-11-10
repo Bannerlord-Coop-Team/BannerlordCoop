@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using GameInterface.Services.Issues.Framework.Finalization;
 using System;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
@@ -60,7 +60,7 @@ public readonly struct NetworkRevenueFarmingState : ICommand
         get => _usedIncidents ?? Array.Empty<string>();
         init => _usedIncidents = value;
     }
-    [ProtoMember(12)] public RevenueFarmingJournalState[] Journal { get; init; }
+    [ProtoMember(12)] public IssueJournalEntry[] Journal { get; init; }
     [ProtoMember(13)] public int ProgressLogIndex { get; init; }
     [ProtoMember(14)] public string Menu { get; init; }
     [ProtoMember(15)] public bool FinishEncounter { get; init; }
@@ -70,7 +70,7 @@ public readonly struct NetworkRevenueFarmingState : ICommand
 
     public NetworkRevenueFarmingState(string giverId, string questId, int revision, int requestedDenars,
         bool collecting, bool allCollected, string incident, bool awaitingPayment, string collectionSettlementId,
-        RevenueFarmingVillageState[] villages, string[] usedIncidents, RevenueFarmingJournalState[] journal,
+        RevenueFarmingVillageState[] villages, string[] usedIncidents, IssueJournalEntry[] journal,
         int progressLogIndex, string menu, bool finishEncounter, bool refreshPresentation, string menuSettlementId,
         bool isFinalizing)
     {
@@ -111,15 +111,4 @@ public sealed class RevenueFarmingVillageState
     [ProtoMember(5)] public bool EventOccurred { get; set; }
     [ProtoMember(6)] public bool Raided { get; set; }
     [ProtoMember(7)] public float AdditionalProgress { get; set; }
-}
-
-[ProtoContract]
-public sealed class RevenueFarmingJournalState
-{
-    [ProtoMember(1)] public long TimeTicks { get; set; }
-    [ProtoMember(2)] public TextObject Text { get; set; }
-    [ProtoMember(3)] public TextObject TaskName { get; set; }
-    [ProtoMember(4)] public int Progress { get; set; }
-    [ProtoMember(5)] public int Range { get; set; }
-    [ProtoMember(6)] public int Type { get; set; }
 }

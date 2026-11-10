@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Network;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.ObjectManager;
@@ -18,6 +20,7 @@ using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -48,30 +51,6 @@ public class RevenueFarmingTests
             Assert.False(sessions.IsLocal(otherQuest));
         }
         Assert.Throws<InvalidOperationException>(() => sessions.Register(localQuest, otherHero, "other"));
-    }
-
-    [Fact]
-    public void LoadingLegacySessionBackfillsIssueIdFromLinkedIssue()
-    {
-        var giver = ObjectHelper.SkipConstructor<Hero>();
-        var issue = ObjectHelper.SkipConstructor<Issue>();
-        issue.IssueOwner = giver;
-        issue.StringId = "issue_legacy";
-        var quest = ObjectHelper.SkipConstructor<Quest>();
-        quest.QuestGiver = giver;
-        issue.IssueQuest = quest;
-        giver.Issue = issue;
-
-        var legacy = new RevenueFarmingSession(quest, ObjectHelper.SkipConstructor<Hero>(), "owner", null);
-        var records = new Dictionary<string, object>
-        {
-            ["_coop_revenue_farming_sessions"] = new List<RevenueFarmingSession> { legacy },
-        };
-        var restored = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
-
-        restored.SyncData(new TestDataStore(false, records));
-
-        Assert.Equal("issue_legacy", restored.Get(quest).IssueId);
     }
 
     [Theory]
@@ -141,6 +120,7 @@ public class RevenueFarmingTests
     {
         var model = RuntimeTypeModel.Create();
         model.Add(typeof(TextObject), false).SetSurrogate(typeof(TextObjectSurrogate));
+        model.Add(typeof(CampaignTime), false).SetSurrogate(typeof(CampaignTimeSurrogate));
         var text = new TextObject("{=revenue-test}{AMOUNT} collected in {VILLAGE}");
         text.SetTextVariable("AMOUNT", 120);
         text.SetTextVariable("VILLAGE", new TextObject("Danustica"));
@@ -154,7 +134,7 @@ public class RevenueFarmingTests
                 SettlementId = "village", CollectedAmount = 120, HourlyGain = 40,
                 AdditionalProgress = 0.35f, EventOccurred = true,
             } },
-            Journal = new[] { new RevenueFarmingJournalState { TimeTicks = 9123, Text = text, Progress = 1, Range = 3 } },
+            Journal = new[] { new IssueJournalEntry(new JournalLog(new CampaignTime(9123L), text, null, 1, 3)) },
         };
 
         using var stream = new MemoryStream();
@@ -174,7 +154,7 @@ public class RevenueFarmingTests
         Assert.Empty(copy.UsedIncidents);
         Assert.Null(copy.Incident);
         var log = Assert.Single(copy.Journal);
-        Assert.Equal(9123, log.TimeTicks);
+        Assert.Equal(9123, log.Time.NumTicks);
         Assert.Equal(120, log.Text.Attributes["AMOUNT"]);
         Assert.Equal("Danustica", ((TextObject)log.Text.Attributes["VILLAGE"]).Value);
     }
@@ -192,8 +172,9 @@ public class RevenueFarmingTests
             hero.PartyBelongedTo = ObjectHelper.SkipConstructor<MobileParty>();
             var session = new RevenueFarmingSession(quest, hero, "owner") { Revision = 9 };
             var sessions = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
+            using var execution = new RevenueFarmingExecutionScope(Mock.Of<IMessageBroker>());
             var actions = new RevenueFarmingActions(sessions, Mock.Of<IObjectManager>(),
-                Mock.Of<INetwork>());
+                Mock.Of<INetwork>(), execution);
 
             Assert.False(actions.Execute(session, new RequestRevenueFarmingAction
             {

@@ -208,6 +208,72 @@ public sealed class RevenueFarmingTests : IDisposable
     }
 
     [Fact]
+    public void ApplyingVillageCompletionDoesNotEchoTheReceivedJournal()
+    {
+        Accept();
+        var requestsBefore = Client.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        for (var i = 0; i < villageIds.Length; i++)
+        {
+            var id = villageIds[i];
+            Move(id);
+            Server.Call(() => Quest(Server).RevenueVillages.Single(village =>
+                village.Village.Settlement == Object<Settlement>(Server, id)).EventOccurred = true);
+            Client.Call(() => Client.Resolve<IRevenueFarmingActions>().Request(Quest(Client), RevenueFarmingAction.Collect));
+            for (var hour = 0; hour < 10; hour++) Tick();
+
+            foreach (var instance in new[] { Server, Client }) instance.Call(() =>
+                Assert.Equal(i + 1, Quest(instance)._questProgressLog.CurrentProgress));
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(requestsBefore));
+        }
+    }
+
+    [Fact]
+    public void ExecutionScopeIsClientLocalAndRestoredBeforePublishing()
+    {
+        Accept();
+        var published = 0;
+        var restored = false;
+        Quest observedClientQuest = null;
+        Server.Call(() =>
+        {
+            var execution = Server.Resolve<IRevenueFarmingExecutionScope>();
+            var broker = Server.Resolve<IMessageBroker>();
+            var previousHero = Hero.MainHero;
+            var previousParty = Campaign.Current.MainParty;
+            void OnChanged(MessagePayload<RevenueFarmingChanged> payload)
+            {
+                published++;
+                restored = execution.Current == null && Hero.MainHero == previousHero && Campaign.Current.MainParty == previousParty;
+                Client.Call(() => observedClientQuest = RevenueFarmingIssueBehavior.Instance);
+            }
+            broker.Subscribe<RevenueFarmingChanged>(OnChanged);
+            try
+            {
+                using (execution.Enter(Session(Server)))
+                {
+                    var outer = execution.Current;
+                    Client.Call(() => Assert.Null(Client.Resolve<IRevenueFarmingExecutionScope>().Current));
+                    Observer.Call(() => Assert.Null(RevenueFarmingIssueBehavior.Instance));
+                    using (execution.Enter(Session(Server)))
+                    {
+                        Assert.NotSame(outer, execution.Current);
+                        Quest(Server).RevenueVillages[0].CollectedAmount++;
+                    }
+                    Assert.Same(outer, execution.Current);
+                    Assert.Equal(0, published);
+                }
+            }
+            finally
+            {
+                broker.Unsubscribe<RevenueFarmingChanged>(OnChanged);
+            }
+        });
+        Assert.Equal(1, published);
+        Assert.True(restored);
+        Assert.Same(Quest(Client), observedClientQuest);
+    }
+
+    [Fact]
     public void CollectionStateWaitsBehindHeldWorkForTheGiver()
     {
         Accept();
@@ -750,7 +816,8 @@ public sealed class RevenueFarmingTests : IDisposable
 
     private static bool RandomPrefix(ref float __result)
     {
-        if (!incidentDraw.HasValue || !Common.ModInformation.IsServer || RevenueFarmingExecutionScope.Current == null) return true;
+        if (!incidentDraw.HasValue || Common.ModInformation.IsClient ||
+            !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) || execution.Current == null) return true;
         __result = incidentDraw.Value;
         return false;
     }

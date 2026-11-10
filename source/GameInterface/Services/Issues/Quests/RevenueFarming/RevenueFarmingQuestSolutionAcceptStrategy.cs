@@ -22,14 +22,16 @@ internal sealed class RevenueFarmingQuestSolutionAcceptStrategy : IQuestSolution
     private readonly IRevenueFarmingSessionStore sessions;
     private readonly IControllerIdProvider controller;
     private readonly IIssueOwnerResolver owners;
+    private readonly IRevenueFarmingExecutionScope execution;
 
     public RevenueFarmingQuestSolutionAcceptStrategy(IObjectManager objects, IRevenueFarmingSessionStore sessions,
-        IControllerIdProvider controller, IIssueOwnerResolver owners)
+        IControllerIdProvider controller, IIssueOwnerResolver owners, IRevenueFarmingExecutionScope execution)
     {
         this.objects = objects;
         this.sessions = sessions;
         this.controller = controller;
         this.owners = owners;
+        this.execution = execution;
     }
 
     public byte[] Capture(IssueBase issue)
@@ -91,7 +93,7 @@ internal sealed class RevenueFarmingQuestSolutionAcceptStrategy : IQuestSolution
         foreach (var village in villages)
         {
             if (!village.Village.Settlement.IsUnderRaid && !village.Village.Settlement.IsRaided) continue;
-            using (new RevenueFarmingExecutionScope(session)) quest.OnVillageRaid(village.Village);
+            using (execution.Enter(session)) quest.OnVillageRaid(village.Village);
         }
     }
 }

@@ -9,11 +9,14 @@ internal sealed class RevenueFarmingFinalizationProofStrategy : IFinalizationPro
 {
     private readonly IRevenueFarmingSessionStore sessions;
     private readonly IRevenueFarmingActions actions;
+    private readonly IRevenueFarmingExecutionScope execution;
 
-    public RevenueFarmingFinalizationProofStrategy(IRevenueFarmingSessionStore sessions, IRevenueFarmingActions actions)
+    public RevenueFarmingFinalizationProofStrategy(IRevenueFarmingSessionStore sessions, IRevenueFarmingActions actions,
+        IRevenueFarmingExecutionScope execution)
     {
         this.sessions = sessions;
         this.actions = actions;
+        this.execution = execution;
     }
 
     public bool TryRunBranch(QuestBase quest, byte proof)
@@ -26,7 +29,7 @@ internal sealed class RevenueFarmingFinalizationProofStrategy : IFinalizationPro
         if (actions.Execute(session, new RequestRevenueFarmingAction(null, quest.StringId, session.Revision, action))) return true;
         if (session.AwaitingPayment && quest.QuestDueTime.IsPast && session.PlayerHero.Gold < revenue._totalRequestedDenars)
         {
-            using (new RevenueFarmingExecutionScope(session)) quest.CompleteQuestWithTimeOut();
+            using (execution.Enter(session)) quest.CompleteQuestWithTimeOut();
         }
         else
         {

@@ -7,6 +7,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -34,7 +35,8 @@ internal class RevenueFarmingInstancePatch
 {
     private static bool Prefix(ref Quest __result)
     {
-        __result = RevenueFarmingExecutionScope.Current?.Session.Quest;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        __result = execution.Current?.Session.Quest;
         if (__result == null && ModInformation.IsClient && ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions))
             __result = sessions.LocalQuest;
         return false;
@@ -63,19 +65,20 @@ internal class RevenueFarmingCallbackPatch
             yield return AccessTools.Method(typeof(Quest), name);
     }
 
-    private static bool Prefix(QuestBase __instance, MethodBase __originalMethod, out RevenueFarmingExecutionScope __state)
+    private static bool Prefix(QuestBase __instance, MethodBase __originalMethod, out IDisposable __state)
     {
         __state = null;
         if (__instance is not Quest quest) return true;
         if (ModInformation.IsClient)
             return false;
-        if (RevenueFarmingExecutionScope.Current?.Session.Quest == quest) return true;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        if (execution.Current?.Session.Quest == quest) return true;
         if (!ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) || sessions.Get(quest) is not { } session) return false;
 
         if (__originalMethod.Name == "HourlyTick" && !quest.CollectingRevenues &&
             (quest._allRevenuesAreCollected || !quest.RevenueVillages.All(village => village.GetIsCompleted()))) return false;
 
-        __state = new RevenueFarmingExecutionScope(session);
+        __state = execution.Enter(session);
         if (__originalMethod.Name == "HourlyTick" && quest.CollectingRevenues)
         {
             var party = session.PlayerHero.PartyBelongedTo;
@@ -87,7 +90,7 @@ internal class RevenueFarmingCallbackPatch
         return true;
     }
 
-    private static void Finalizer(RevenueFarmingExecutionScope __state) => __state?.Dispose();
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
 
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
@@ -97,7 +100,8 @@ internal class RevenueFarmingTerminalStatePatch
     private static void Prefix(QuestBase __instance)
     {
         if (ModInformation.IsClient || __instance is not Quest quest ||
-            RevenueFarmingExecutionScope.Current?.Session is not { } session || session.Quest != quest) return;
+            !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) ||
+            execution.Current?.Session is not { } session || session.Quest != quest) return;
         quest.CollectingRevenues = false;
         session.AwaitingPayment = false;
         session.Incident = null;
@@ -113,7 +117,8 @@ internal class RevenueFarmingTimeoutPatch
     private static bool Prefix(ref bool doNotResolveTheQuest)
     {
         if (ModInformation.IsClient) return false;
-        var session = RevenueFarmingExecutionScope.Current?.Session;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var session = execution.Current?.Session;
         if (session?.AwaitingPayment != true) return true;
         doNotResolveTheQuest = session.PlayerHero.Gold >= session.Quest._totalRequestedDenars;
         return false;
@@ -133,7 +138,8 @@ internal class RevenueFarmingPaymentPromptPatch
 {
     private static bool Prefix(Quest __instance)
     {
-        var session = RevenueFarmingExecutionScope.Current?.Session;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var session = execution.Current?.Session;
         if (session?.Quest != __instance) return false;
         if (ModInformation.IsClient) return ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) && sessions.IsLocal(__instance);
         session.AwaitingPayment = true;
@@ -172,7 +178,8 @@ internal class RevenueFarmingPaymentActionPatch
 
     private static bool Prefix(Quest __instance, MethodBase __originalMethod)
     {
-        if (ModInformation.IsServer) return RevenueFarmingExecutionScope.Current?.Session.Quest == __instance;
+        if (ModInformation.IsServer) return !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) ||
+            execution.Current?.Session.Quest == __instance;
         if (!ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) ||
             !ContainerProvider.TryResolve<IRevenueFarmingActions>(out var actions)) return false;
         var demand = sessions.Get(__instance)?.AwaitingPayment == true;
@@ -197,7 +204,8 @@ internal class RevenueFarmingMenuActionPatch
 
     private static bool Prefix(MethodBase __originalMethod)
     {
-        if (ModInformation.IsServer) return RevenueFarmingExecutionScope.Current != null;
+        if (ModInformation.IsServer) return !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) ||
+            execution.Current != null;
         if (ContainerProvider.TryResolve<IRevenueFarmingActions>(out var actions))
         {
             actions.Request(RevenueFarmingIssueBehavior.Instance, __originalMethod.Name switch
@@ -255,7 +263,8 @@ internal class RevenueFarmingMenuCapturePatch
     [HarmonyPriority(Priority.First)]
     private static bool Prefix(string menuId)
     {
-        var scope = RevenueFarmingExecutionScope.Current;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var scope = execution.Current;
         if (ModInformation.IsClient || scope == null) return true;
         scope.Menu = menuId;
         var session = scope.Session;
@@ -272,7 +281,8 @@ internal class RevenueFarmingEncounterCapturePatch
     [HarmonyPriority(Priority.First)]
     private static bool Prefix()
     {
-        var scope = RevenueFarmingExecutionScope.Current;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var scope = execution.Current;
         if (ModInformation.IsClient || scope == null) return true;
         scope.FinishEncounter = true;
         return false;
@@ -285,7 +295,8 @@ internal class RevenueFarmingConversationEndPatch
 {
     private static bool Prefix()
     {
-        var session = RevenueFarmingExecutionScope.Current?.Session;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var session = execution.Current?.Session;
         return session == null || (ModInformation.IsClient &&
             ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) && sessions.IsLocal(session.Quest));
     }
@@ -296,7 +307,8 @@ internal class RevenueFarmingConversationEndPatch
 internal class RevenueFarmingTimeControlPatch
 {
     [HarmonyPriority(Priority.First)]
-    private static bool Prefix() => ModInformation.IsClient || RevenueFarmingExecutionScope.Current == null;
+    private static bool Prefix() => ModInformation.IsClient ||
+        !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) || execution.Current == null;
 }
 
 [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
@@ -306,7 +318,8 @@ internal class RevenueFarmingSettlementPatch
     [HarmonyPriority(Priority.First)]
     private static bool Prefix(ref Settlement __result)
     {
-        var session = RevenueFarmingExecutionScope.Current?.Session;
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        var session = execution.Current?.Session;
         if (ModInformation.IsClient || session == null) return true;
         __result = session.PlayerHero.PartyBelongedTo?.CurrentSettlement;
         return false;
@@ -323,8 +336,9 @@ internal class RevenueFarmingSuccessGuardPatch
         if (__instance is not Quest) return true;
         if (ModInformation.IsClient) return QuestEndingReplay.IsActive;
         // Generic success skips the vanilla branch that pays the giver or steward.
-        return RevenueFarmingExecutionScope.Current?.Session.Quest == __instance &&
-            RevenueFarmingExecutionScope.Current.Action is RevenueFarmingAction.PayGiver or
+        if (!ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution)) return true;
+        return execution.Current?.Session.Quest == __instance &&
+            execution.Current.Action is RevenueFarmingAction.PayGiver or
                 RevenueFarmingAction.PayDemand or RevenueFarmingAction.PaySteward;
     }
 }
@@ -341,13 +355,14 @@ internal class RevenueFarmingFinalizationScopePatch
     }
 
     [HarmonyPriority(Priority.First)]
-    private static void Prefix(QuestBase __instance, out RevenueFarmingExecutionScope __state)
+    private static void Prefix(QuestBase __instance, out IDisposable __state)
     {
         __state = null;
-        if (ModInformation.IsClient || __instance is not Quest quest || RevenueFarmingExecutionScope.Current?.Session.Quest == quest) return;
+        if (ModInformation.IsClient || __instance is not Quest quest ||
+            !ContainerProvider.TryResolve<IRevenueFarmingExecutionScope>(out var execution) || execution.Current?.Session.Quest == quest) return;
         if (ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) && sessions.Get(quest) is { } session)
-            __state = new RevenueFarmingExecutionScope(session);
+            __state = execution.Enter(session);
     }
 
-    private static void Finalizer(RevenueFarmingExecutionScope __state) => __state?.Dispose();
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }

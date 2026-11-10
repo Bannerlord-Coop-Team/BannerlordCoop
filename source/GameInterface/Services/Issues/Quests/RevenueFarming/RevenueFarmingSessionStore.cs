@@ -64,8 +64,6 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         {
             if (session.PlayerHero != playerHero || session.ControllerId != controllerId)
                 throw new InvalidOperationException("Revenue Farming quest already has another owner.");
-            if (session.IssueId == null && quest.QuestGiver?.Issue?.IssueQuest == quest)
-                session.IssueId = quest.QuestGiver.Issue.StringId;
             return session;
         }
 
@@ -83,11 +81,6 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         if (dataStore.IsLoading)
         {
             sessions = savedSessions?.Where(session => session?.Quest != null && session.PlayerHero != null).ToList() ?? new();
-            foreach (var session in sessions)
-            {
-                if (session.IssueId == null && session.Quest.QuestGiver?.Issue?.IssueQuest == session.Quest)
-                    session.IssueId = session.Quest.QuestGiver.Issue.StringId;
-            }
         }
     }
 }

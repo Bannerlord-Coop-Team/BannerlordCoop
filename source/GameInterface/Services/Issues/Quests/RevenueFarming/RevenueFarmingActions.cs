@@ -24,12 +24,15 @@ internal sealed class RevenueFarmingActions : IRevenueFarmingActions
     private readonly IRevenueFarmingSessionStore sessions;
     private readonly IObjectManager objects;
     private readonly INetwork network;
+    private readonly IRevenueFarmingExecutionScope execution;
 
-    public RevenueFarmingActions(IRevenueFarmingSessionStore sessions, IObjectManager objects, INetwork network)
+    public RevenueFarmingActions(IRevenueFarmingSessionStore sessions, IObjectManager objects, INetwork network,
+        IRevenueFarmingExecutionScope execution)
     {
         this.sessions = sessions;
         this.objects = objects;
         this.network = network;
+        this.execution = execution;
     }
 
     public void Request(Quest quest, RevenueFarmingAction action, string incident = null, int option = 0)
@@ -55,7 +58,7 @@ internal sealed class RevenueFarmingActions : IRevenueFarmingActions
         if (!hero.IsAlive) return false;
         if (request.Action != RevenueFarmingAction.PayDemand && request.Action != RevenueFarmingAction.BetrayDemand &&
             (hero.IsPrisoner || hero.PartyBelongedTo == null || hero.PartyBelongedTo != session.PlayerParty)) return false;
-        using (new RevenueFarmingExecutionScope(session, action: request.Action))
+        using (execution.Enter(session, action: request.Action))
         {
             var behavior = Campaign.Current.GetCampaignBehavior<RevenueFarmingIssueBehavior>();
             var args = new MenuCallbackArgs((MenuContext)null, null);

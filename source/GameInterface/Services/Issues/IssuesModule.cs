@@ -64,6 +64,7 @@ internal class IssuesModule : Module
             .SingleInstance();
 
         builder.RegisterType<RevenueFarmingSessionStore>().As<IRevenueFarmingSessionStore>().InstancePerLifetimeScope();
+        builder.RegisterType<RevenueFarmingExecutionScope>().As<IRevenueFarmingExecutionScope>().InstancePerLifetimeScope();
         builder.RegisterType<RevenueFarmingActions>().As<IRevenueFarmingActions>().InstancePerDependency();
 
         base.Load(builder);
