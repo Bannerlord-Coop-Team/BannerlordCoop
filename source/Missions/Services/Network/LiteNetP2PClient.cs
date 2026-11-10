@@ -1155,9 +1155,14 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void SendAll(IMessage message)
     {
-        foreach (var controllerId in missionContext.ControllersInMission)
+        IReadOnlyCollection<string> controllers = missionContext.ControllersInMission;
+        if (controllers.Count == 0) return;
+
+        // The payload has nothing per peer, so every controller's batcher gets the same bytes.
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        foreach (var controllerId in controllers)
         {
-            Send(controllerId, message);
+            SendMessagePacket(controllerId, packet);
         }
     }
 
@@ -1176,12 +1181,16 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     public void Send(string controllerId, IMessage message)
     {
-        Send(controllerId, MessagePacket.Create(message, serializer));
+        SendMessagePacket(controllerId, MessagePacket.Create(message, serializer));
     }
 
     public void SendAllBut(string excludedId, IMessage message)
     {
-        SendAllBut(excludedId, MessagePacket.Create(message, serializer));
+        MessagePacket packet = MessagePacket.Create(message, serializer);
+        foreach (var controllerId in missionContext.ControllersInMission.Where(id => id != excludedId))
+        {
+            SendMessagePacket(controllerId, packet);
+        }
     }
 
     public void SendAllBut(string excludedId, IPacket packet)
@@ -1202,24 +1211,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (packet is MessagePacket messagePacket)
         {
-            battleBenchmark?.RecordReliableMessageSent(controllerId, messagePacket.Data.Length);
-            battleBenchmark?.RecordTypeSent(messagePacket.MessageType, messagePacket.Data.Length);
-            // Spawn admission must see a bare message before later authority changes reach the game thread.
-            if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
-            {
-                reliableMessageBatcher.SendImmediate(
-                    controllerId,
-                    messagePacket.Data,
-                    SendReliableMessagePayload);
-            }
-            else
-            {
-                reliableMessageBatcher.Send(
-                    controllerId,
-                    messagePacket.Data,
-                    GetMaxReliablePayloadBytes(controllerId),
-                    SendReliableMessagePayload);
-            }
+            SendMessagePacket(controllerId, messagePacket);
             return;
         }
 
@@ -1236,6 +1228,27 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         SendPacketToController(controllerId, packet, data);
+    }
+
+    private void SendMessagePacket(string controllerId, MessagePacket messagePacket)
+    {
+        battleBenchmark?.RecordReliableMessageSent(controllerId, messagePacket.Data.Length);
+        battleBenchmark?.RecordTypeSent(messagePacket.MessageType, messagePacket.Data.Length);
+        // Spawn admission must see a bare message before later authority changes reach the game thread.
+        if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
+        {
+            reliableMessageBatcher.SendImmediate(
+                controllerId,
+                messagePacket.Data,
+                SendReliableMessagePayload);
+            return;
+        }
+
+        reliableMessageBatcher.Send(
+            controllerId,
+            messagePacket.Data,
+            GetMaxReliablePayloadBytes(controllerId),
+            SendReliableMessagePayload);
     }
 
     private void SendPacketToController(string controllerId, IPacket packet, byte[] data)

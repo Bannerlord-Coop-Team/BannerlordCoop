@@ -192,6 +192,7 @@ internal static class MovementDebugCommands
                 $"deferred={state.MaximumDeferredSnapshots}",
                 $"deferredAge={state.MaximumDeferredAgeSeconds.ToString("0.000", CultureInfo.InvariantCulture)}",
                 $"bulkPolls={state.BulkPollsPerSecond}",
+                $"peerBulkHz={string.Join(",", state.PeerBulkHz.Select(peer => $"{peer.Key}:{peer.Value}"))}",
                 $"priorityOnlyPolls={state.PriorityOnlyPollsPerSecond}",
                 $"initialConfiguredBulkHz={debugControl.InitialConfiguredBulkHz}",
                 $"syntheticReceivePressureActive={debugControl.SyntheticReceivePressureActive.ToString().ToLowerInvariant()}",
