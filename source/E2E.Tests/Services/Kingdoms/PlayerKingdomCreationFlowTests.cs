@@ -1535,9 +1535,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PeaceDecision_AfterForcedPeace_CancelsWithoutCampaignTimeAdvancing(bool restoreRound)
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void PeaceDecision_NpcProposal_ClearsAfterDeclineOrForcedPeace(bool restoreRound, bool forcePeace)
     {
         var client = Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
@@ -1573,13 +1574,18 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             });
         }
 
-        Server.Call(() =>
+        if (forcePeace) Server.Call(() =>
         {
             var command = new KingdomDebugCommand.KingdomMakePeaceCoopCommand(Server.Resolve<ICommandObjectResolver>());
             var args = new CoopCommandArgsFactory().FromValues(new[] { kingdomId, targetId, ControllerId });
             Assert.True(command.ProcessCommand(args).Succeeded);
             if (restoreRound) GetConcreteVoteManager(Server).Reset();
+        });
+        else client.SimulateMessage(this,
+            new KingdomDecisionVoteRequested(CreateMakePeaceVote(kingdomId, shouldMakePeace: false)));
 
+        Server.Call(() =>
+        {
             CampaignTime before = CampaignTime.Now;
             GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow);
             Assert.Equal(before, CampaignTime.Now);
@@ -1589,8 +1595,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message => message.KingdomId == kingdomId);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        if (forcePeace)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        }
+        else
+        {
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMakePeace>());
+        }
         foreach (var endpoint in Clients.Prepend(Server))
         {
             endpoint.Call(() =>
@@ -1598,7 +1612,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
                 Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
                 Assert.Empty(kingdom.UnresolvedDecisions);
-                Assert.False(kingdom.IsAtWarWith(target));
+                Assert.Equal(!forcePeace, kingdom.IsAtWarWith(target));
                 Assert.DoesNotContain(Campaign.Current.CampaignInformationManager._mapNotices,
                     notice => notice is KingdomDecisionMapNotification decisionNotice && decisionNotice.KingdomOfDecision == kingdom);
             });
