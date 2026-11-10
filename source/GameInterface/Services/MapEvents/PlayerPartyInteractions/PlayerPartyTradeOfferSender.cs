@@ -6,7 +6,7 @@ using System.Linq;
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
 // Coalesces the local trade offer into one send per flush, because vanilla recomputes it after every item change.
-internal interface IPlayerPartyTradeOfferSender
+public interface IPlayerPartyTradeOfferSender
 {
     // Records that the local offer may have changed since the last flush.
     void MarkChanged();

@@ -680,9 +680,15 @@ namespace Coop
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
-            if (ModInformation.IsClient && Coop.Running &&
-                ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceClient>(out var voiceClient))
-                voiceClient.Tick();
+            if (ModInformation.IsClient && Coop.Running)
+            {
+                if (ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceClient>(out var voiceClient))
+                    voiceClient.Tick();
+
+                // Sends the coalesced trade offer at most once a frame, even when the trade overlay failed to show.
+                if (ContainerProvider.TryResolve<IPlayerPartyTradeOfferSender>(out var offerSender))
+                    offerSender.Flush();
+            }
 
             TryManagedServerAutoStart();
 
