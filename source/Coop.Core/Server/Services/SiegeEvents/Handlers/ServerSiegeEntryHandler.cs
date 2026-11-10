@@ -409,7 +409,10 @@ internal class ServerSiegeEntryHandler : IHandler
         else if (party.BesiegerCamp != null)
             rejectionReason = "your party is already in another siege camp";
         else if (!distanceValidator.TryValidate(party, settlement, out var distanceRejectionReason))
+        {
             rejectionReason = distanceRejectionReason;
+            settlementInterface.CorrectPartyPosition(party);
+        }
         else if ((party.ActualClan != null && party.ActualClan == settlement.OwnerClan) ||
             (party.MapFaction != null && party.MapFaction == settlement.MapFaction))
             rejectionReason = "your party belongs to the defending faction";
