@@ -1,7 +1,12 @@
 ﻿using Common.Util;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.TroopRosters.Logging;
+using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
@@ -75,61 +80,128 @@ public class PartyScreenRosterRefresherTests
     }
 
     /// <summary>
-    /// Vanilla transfers keep a moved-out stack as a zero-count element, so the quarter-daily heal on the
-    /// server's copy of that stack must merge instead of resetting the garrison edit (#4563).
+    /// Vanilla transfers keep a moved-out stack as a zero-count element. A heal on the server's copy of the
+    /// stack must follow the troops into the garrison, also after a popup cancel, so Done commits it (#4563).
     /// </summary>
     [Fact]
-    public void ServerHeal_OnFullyMovedWoundedStack_KeepsPendingTransfer()
+    public void ServerHeal_AfterFullTransfer_CommitsHealToDestination()
     {
         var character = new CharacterObject();
         var logic = CreateLogic(character, 22, 22, out var visible);
-        visible.AddToCounts(character, -22, false, -22, 0, false);
-        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 22, false, 22);
+        Transfer(visible, logic.CurrentData.LeftMemberRoster, character, 22, 22);
+        logic.SavePartyScreenData();
         int notificationCount = 0;
 
-        var applied = CreateRefresher().TryApply(
+        CreateRefresher().TryApply(
             logic,
             visible,
             character,
             (roster, troop) => roster.AddToCounts(troop, 0, false, -1),
             () => notificationCount++);
+        logic.ResetToLastSavedPartyScreenData(false);
 
-        Assert.True(applied);
+        var serverParty = CreateRoster(character, 22, 21);
+        var serverGarrison = TroopRoster.CreateDummyTroopRoster();
         Assert.Equal(0, notificationCount);
-        Assert.True(logic.IsThereAnyChanges());
-        AssertRoster(visible, character, 0, 0);
-        AssertRoster(logic._initialData.RightMemberRoster, character, 22, 21);
-        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 22, 22);
+        Assert.True(CommitDone(
+            character,
+            (visible, logic._initialData.RightMemberRoster, serverParty),
+            (logic.CurrentData.LeftMemberRoster, logic._initialData.LeftMemberRoster, serverGarrison)));
+        Assert.Equal(-1, serverParty.FindIndexOfTroop(character));
+        AssertRoster(serverGarrison, character, 22, 21);
     }
 
     /// <summary>
-    /// Daily training xp for a stack the player already moved out must merge instead of resetting the edit.
+    /// A wound on more troops than a partial transfer left behind lands on the troops it moved.
     /// </summary>
     [Fact]
-    public void ServerXp_OnFullyMovedStack_KeepsPendingTransfer()
+    public void ServerWound_AfterPartialTransfer_CommitsExcessWoundToDestination()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 30, 0, out var visible);
+        Transfer(visible, logic.CurrentData.LeftMemberRoster, character, 20, 0);
+        int notificationCount = 0;
+
+        CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, 0, false, 15),
+            () => notificationCount++);
+
+        var serverParty = CreateRoster(character, 30, 15);
+        var serverGarrison = TroopRoster.CreateDummyTroopRoster();
+        Assert.Equal(0, notificationCount);
+        Assert.True(CommitDone(
+            character,
+            (visible, logic._initialData.RightMemberRoster, serverParty),
+            (logic.CurrentData.LeftMemberRoster, logic._initialData.LeftMemberRoster, serverGarrison)));
+        AssertRoster(serverParty, character, 10, 10);
+        AssertRoster(serverGarrison, character, 20, 5);
+    }
+
+    /// <summary>
+    /// Daily training xp for a stack the player already moved out must reach the moved troops on Done.
+    /// </summary>
+    [Fact]
+    public void ServerXp_AfterFullTransfer_CommitsXpToDestination()
     {
         var character = new CharacterObject();
         var logic = CreateLogic(character, 22, 0, out var visible);
         visible.AddXpToTroop(character, 100);
         logic._initialData.RightMemberRoster.AddXpToTroop(character, 100);
-        visible.AddToCounts(character, -22, false, 0, 0, false);
-        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 22, false, 0, 100);
+        Transfer(visible, logic.CurrentData.LeftMemberRoster, character, 22, 0, 100);
         int notificationCount = 0;
 
-        var applied = CreateRefresher().TryApply(
+        CreateRefresher().TryApply(
             logic,
             visible,
             character,
             (roster, troop) => roster.SetElementXp(roster.FindIndexOfTroop(troop), 150),
             () => notificationCount++);
 
-        Assert.True(applied);
+        var serverParty = CreateRoster(character, 22, 0, 150);
+        var serverGarrison = TroopRoster.CreateDummyTroopRoster();
         Assert.Equal(0, notificationCount);
-        Assert.True(logic.IsThereAnyChanges());
-        AssertRoster(visible, character, 0, 0);
-        Assert.Equal(0, visible.GetElementXp(visible.FindIndexOfTroop(character)));
-        Assert.Equal(150, logic._initialData.RightMemberRoster.GetElementXp(0));
-        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 22, 0);
+        Assert.True(CommitDone(
+            character,
+            (visible, logic._initialData.RightMemberRoster, serverParty),
+            (logic.CurrentData.LeftMemberRoster, logic._initialData.LeftMemberRoster, serverGarrison)));
+        Assert.Equal(-1, serverParty.FindIndexOfTroop(character));
+        AssertRoster(serverGarrison, character, 22, 0);
+        Assert.Equal(150, serverGarrison.GetElementXp(serverGarrison.FindIndexOfTroop(character)));
+    }
+
+    /// <summary>
+    /// Prisoner healing uses the same transfer layout, so a heal follows prisoners moved to the dungeon.
+    /// </summary>
+    [Fact]
+    public void ServerPrisonerHeal_AfterFullTransfer_CommitsHealToDestination()
+    {
+        var prisoner = new CharacterObject();
+        var logic = CreateLogic(new CharacterObject(), 5, 0, out _);
+        var prisoners = logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right];
+        prisoners.AddToCounts(prisoner, 10, false, 10);
+        logic._initialData.RightPrisonerRoster.AddToCounts(prisoner, 10, false, 10);
+        Transfer(prisoners, logic.CurrentData.LeftPrisonerRoster, prisoner, 10, 10);
+        int notificationCount = 0;
+
+        CreateRefresher().TryApply(
+            logic,
+            prisoners,
+            prisoner,
+            (roster, troop) => roster.AddToCounts(troop, 0, false, -2),
+            () => notificationCount++);
+
+        var serverPrisoners = CreateRoster(prisoner, 10, 8);
+        var serverDungeon = TroopRoster.CreateDummyTroopRoster();
+        Assert.Equal(0, notificationCount);
+        Assert.True(CommitDone(
+            prisoner,
+            (prisoners, logic._initialData.RightPrisonerRoster, serverPrisoners),
+            (logic.CurrentData.LeftPrisonerRoster, logic._initialData.LeftPrisonerRoster, serverDungeon)));
+        Assert.Equal(-1, serverPrisoners.FindIndexOfTroop(prisoner));
+        AssertRoster(serverDungeon, prisoner, 10, 8);
     }
 
     [Fact]
@@ -384,6 +456,46 @@ public class PartyScreenRosterRefresherTests
         return logic;
     }
 
+    // Mirrors vanilla TransferTroop: the source keeps a zero-count element and its xp.
+    private static void Transfer(
+        TroopRoster source,
+        TroopRoster destination,
+        CharacterObject character,
+        int number,
+        int wounded,
+        int xp = 0)
+    {
+        source.AddToCounts(character, -number, false, -wounded, 0, false);
+        destination.AddToCounts(character, number, false, wounded, xp, false);
+    }
+
+    private static TroopRoster CreateRoster(CharacterObject character, int number, int wounded, int xp = 0)
+    {
+        var roster = TroopRoster.CreateDummyTroopRoster();
+        roster.AddToCounts(character, number, false, wounded, xp);
+        return roster;
+    }
+
+    // Packs each screen roster against its snapshot and applies the deltas to the server rosters, as Done does.
+    private static bool CommitDone(
+        CharacterObject character,
+        params (TroopRoster current, TroopRoster initial, TroopRoster server)[] rosters)
+    {
+        uint characterId = 1;
+        var resolved = character;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(m => m.TryGetHandleWithLogging(character, out characterId)).Returns(true);
+        objectManager.Setup(m => m.TryGetObjectWithLogging(characterId, out resolved)).Returns(true);
+        var troopRosters = new TroopRosterInterface(
+            objectManager.Object,
+            new NullTroopRosterLogger(),
+            new Mock<IRecruitmentSideEffects>().Object);
+
+        return troopRosters.TryApplyTroopRosterDeltas(rosters
+            .Select(roster => (roster.server, troopRosters.PackTroopRosterDelta(roster.current, roster.initial)))
+            .ToList());
+    }
+
     private static PartyScreenRosterRefresher CreateRefresher(RecordingLockPreserver lockPreserver = null)
         => new PartyScreenRosterRefresher(
             new PartyScreenRosterBaselineProvider(),
@@ -406,6 +518,13 @@ public class PartyScreenRosterRefresherTests
         Assert.True(index >= 0);
         Assert.Equal(number, roster.GetElementNumber(index));
         Assert.Equal(wounded, roster.GetElementWoundedNumber(index));
+    }
+
+    private sealed class NullTroopRosterLogger : ITroopRosterLogger
+    {
+        public void Debug(TroopRoster troopRoster, string messageTemplate, params object[] propertyValues) { }
+
+        public void Debug(string troopRosterId, string messageTemplate, params object[] propertyValues) { }
     }
 
     private sealed class RecordingLockPreserver : IPartyScreenLockPreserver
