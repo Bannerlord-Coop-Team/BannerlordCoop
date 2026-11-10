@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Kingdoms.Messages;
@@ -25,6 +25,10 @@ public class KingdomCreationRequestSyncTest
         var client1 = TestEnvironment.Clients.First();
         var server = TestEnvironment.Server;
         client1.Resolve<IControllerIdProvider>().SetControllerId("player1");
+        // The server acts for the controller registered to the sending peer.
+        var playerManager = server.Resolve<IPlayerManager>();
+        playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
+        playerManager.SetPeer("player1", client1.NetPeer);
 
         GameThreadTestRunner.Run(() =>
             client1.SimulateMessage(this, new KingdomCreationRequested("Real Kingdom", "empire")));
@@ -34,7 +38,6 @@ public class KingdomCreationRequestSyncTest
         Assert.Equal(1, server.InternalMessages.GetMessageCount<CreateKingdom>());
 
         var networkRequest = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestCreateKingdom>());
-        Assert.Equal("player1", networkRequest.ControllerId);
         Assert.Equal("Real Kingdom", networkRequest.KingdomName);
         Assert.Equal("empire", networkRequest.CultureId);
         Assert.Null(networkRequest.PartyId);
@@ -56,13 +59,14 @@ public class KingdomCreationRequestSyncTest
         var settlement = server.CreateRegisteredObject<Settlement>("settlement1");
         settlement._partiesCache = new MBList<MobileParty>();
         playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
+        playerManager.SetPeer("player1", TestEnvironment.Clients.First().NetPeer);
 
         Assert.Null(party.CurrentSettlement);
 
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
-                this,
-                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
+                TestEnvironment.Clients.First().NetPeer,
+                new NetworkRequestCreateKingdom("Real Kingdom", "empire", "party1", "settlement1")));
 
         Assert.Same(settlement, party.CurrentSettlement);
         Assert.True(server.ObjectManager.TryGetHandle(party, out var partyHandle));
@@ -76,9 +80,13 @@ public class KingdomCreationRequestSyncTest
     public void ServerNetworkRequestCreateKingdom_Publishes_CreateKingdomCommand()
     {
         var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+        var playerManager = server.Resolve<IPlayerManager>();
+        playerManager.AddPlayer(new Player("player1", "hero1", null, "clan1", "character1"));
+        playerManager.SetPeer("player1", client1.NetPeer);
 
         GameThreadTestRunner.Run(() =>
-            server.SimulateMessage(this, new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire")));
+            server.SimulateMessage(client1.NetPeer, new NetworkRequestCreateKingdom("Real Kingdom", "empire")));
 
         var serverCommand = Assert.Single(server.InternalMessages.GetMessages<CreateKingdom>());
         Assert.Equal("player1", serverCommand.ControllerId);
@@ -124,11 +132,12 @@ public class KingdomCreationRequestSyncTest
         var settlement = server.CreateRegisteredObject<Settlement>("settlement1");
         settlement._partiesCache = new MBList<MobileParty>();
         playerManager.AddPlayer(new Player("player1", "hero1", "party1", "clan1", "character1"));
+        playerManager.SetPeer("player1", TestEnvironment.Clients.First().NetPeer);
 
         GameThreadTestRunner.Run(() =>
             server.SimulateMessage(
-                this,
-                new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
+                TestEnvironment.Clients.First().NetPeer,
+                new NetworkRequestCreateKingdom("Real Kingdom", "empire", "party1", "settlement1")));
 
         using (new AllowedThread())
         {

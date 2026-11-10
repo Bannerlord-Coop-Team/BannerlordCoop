@@ -714,27 +714,28 @@ internal class ConversationRequestHandler : IHandler
         pendingConversationRequestId = null;
         activeConversationRequestId = null;
         hasActiveConversationRequest = false;
+        var finishedMapEventId = payload.What.FinishedMapEventId;
 
         // Release every request id the server may still hold; null only covers legacy or server-detected engagements.
         if (pendingRequestId != null)
-            SendConversationEndedToServer(pendingRequestId);
+            SendConversationEndedToServer(pendingRequestId, finishedMapEventId);
 
         if (hadActiveConversationRequest &&
             (pendingRequestId == null || activeRequestId != pendingRequestId))
-            SendConversationEndedToServer(activeRequestId);
+            SendConversationEndedToServer(activeRequestId, finishedMapEventId);
 
         if (pendingRequestId == null && !hadActiveConversationRequest)
-            SendConversationEndedToServer(null);
+            SendConversationEndedToServer(null, finishedMapEventId);
     }
 
     /// <summary>
     /// [Client] Tell the server this player's conversation is over (the encounter finished, or an approved one
     /// failed to start), so it releases the held party.
     /// </summary>
-    private void SendConversationEndedToServer(string requestId)
+    private void SendConversationEndedToServer(string requestId, string finishedMapEventId = null)
     {
         // On a client, SendAll targets the server (its only connected peer).
-        network.SendAll(new NetworkConversationEnded(requestId));
+        network.SendAll(new NetworkConversationEnded(requestId, finishedMapEventId));
     }
 
     /// <summary>[Server] A client's encounter finished: release the AI party held for that player, if any.</summary>

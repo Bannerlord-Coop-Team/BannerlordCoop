@@ -1,5 +1,5 @@
 ﻿using Common.Util;
-using Coop.Core.Server.Services.Kingdoms.Messages;
+using GameInterface.Services.Kingdoms.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Configuration;

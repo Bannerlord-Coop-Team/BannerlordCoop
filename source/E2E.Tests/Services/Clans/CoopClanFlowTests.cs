@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using Coop.Core.Server.Services.Kingdoms.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Buildings.Messages;
