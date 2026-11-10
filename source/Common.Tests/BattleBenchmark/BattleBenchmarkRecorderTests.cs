@@ -1,6 +1,8 @@
 ﻿using Common.BattleBenchmark;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
+using LiteNetLib;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -144,6 +146,28 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Equal(new[] { "Int32", "String", "AggregateMessagePacket" }, traffic.Received.ByType.Keys);
         Assert.Equal(22, traffic.Received.ByType["AggregateMessagePacket"].Bytes);
         Assert.Equal(72 + 40, traffic.Received.Total.Bytes);
+    }
+
+    [Fact]
+    public void Report_CountsReceivedReliableMessagesLikeTheSentOnes()
+    {
+        var recorder = CreateRecorder();
+        recorder.RecordReliableMessagesReceived("PlayerTwo", new ReceivedMessage(), 99);
+
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
+        recorder.RecordReliableMessagesReceived("PlayerTwo", new AggregateMessagePacket(new[] { new byte[30], new byte[20], new byte[10] }), 72);
+        recorder.RecordReliableMessagesReceived("PlayerTwo", new ReceivedMessage(), 40);
+        recorder.RecordReliableMessagesReceived("PlayerTwo", new ReceivedPacket(DeliveryMethod.ReliableUnordered), 300);
+        recorder.RecordReliableMessagesReceived("PlayerTwo", new ReceivedPacket(DeliveryMethod.Unreliable), 500);
+        now += Second;
+
+        BattleBenchmarkReport report = recorder.BuildReport(now, "stopped", sampler.Sample(), BattleBenchmarkMissionState.None);
+
+        BattleBenchmarkTrafficCounts received = Assert.Single(report.Routes).Received;
+        Assert.Equal(5, received.ReliableMessages);
+        Assert.Equal(30 + 20 + 10 + 40 + 300, received.ReliableMessageBytes);
+        Assert.Equal(5d, received.ReliableMessagesPerSecond, 6);
+        Assert.Equal(5, report.Traffic.Received.ReliableMessages);
     }
 
     [Fact]
@@ -301,5 +325,20 @@ public class BattleBenchmarkRecorderTests : IDisposable
         public bool Throw { get; set; }
 
         public BattleBenchmarkMissionState Capture() => Throw ? throw new InvalidOperationException("probe failed") : State;
+    }
+
+    private sealed class ReceivedMessage : IMessage
+    {
+    }
+
+    private readonly struct ReceivedPacket : IPacket
+    {
+        public ReceivedPacket(DeliveryMethod deliveryMethod)
+        {
+            DeliveryMethod = deliveryMethod;
+        }
+
+        public PacketType PacketType => PacketType.Test;
+        public DeliveryMethod DeliveryMethod { get; }
     }
 }

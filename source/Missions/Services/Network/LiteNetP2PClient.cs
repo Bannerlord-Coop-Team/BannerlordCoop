@@ -1610,6 +1610,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
                 (instanceId == null || generation.Value != instanceGeneration ||
                     !mappedPeerControllers.ContainsKey(peer))) return;
 
+            if (battleBenchmark?.IsRecording == true && mappedPeerControllers.TryGetValue(peer, out string sender))
+                battleBenchmark.RecordReliableMessagesReceived(sender, received, serializedPacket.Length);
+
             if (received is NetworkSpawnBattleAgents spawn)
             {
                 // Reserve the spawn's queue position before a departure can invalidate this peer.

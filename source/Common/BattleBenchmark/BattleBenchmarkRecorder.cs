@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.PacketHandlers;
 using Common.Serialization;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -38,6 +39,12 @@ public interface IBattleBenchmarkRecorder
 
     /// <summary>Counts one message handed to the reliable channel, before batching.</summary>
     void RecordReliableMessageSent(string route, int bytes);
+
+    /// <summary>
+    /// Counts the reliable messages in one payload taken off a mission peer, as <see cref="RecordReliableMessageSent"/>
+    /// counted them: each message of an aggregate, a bare message, or a packet sent on a reliable method.
+    /// </summary>
+    void RecordReliableMessagesReceived(string route, object payload, int bytes);
 
     /// <summary>
     /// Counts one send handed to LiteNetLib: a movement datagram, or a reliable packet that leaves as one datagram up to
@@ -270,6 +277,27 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
         if (!recording) return;
 
         window.GetOrAdd(route, CreateRoute).Sent.AddReliableMessage(bytes);
+    }
+
+    public void RecordReliableMessagesReceived(string route, object payload, int bytes)
+    {
+        ConcurrentDictionary<string, RouteCounters> window = routes;
+        if (!recording || payload == null) return;
+
+        switch (payload)
+        {
+            case AggregateMessagePacket aggregate:
+                TrafficTotals received = window.GetOrAdd(route, CreateRoute).Received;
+                foreach (byte[] message in aggregate.Messages ?? Array.Empty<byte[]>())
+                    received.AddReliableMessage(message?.Length ?? 0);
+                break;
+            case IPacket packet when packet.DeliveryMethod != DeliveryMethod.ReliableOrdered &&
+                                     packet.DeliveryMethod != DeliveryMethod.ReliableUnordered:
+                break;
+            default:
+                window.GetOrAdd(route, CreateRoute).Received.AddReliableMessage(bytes);
+                break;
+        }
     }
 
     public void RecordSent(string route, bool reliable, int bytes, int maxSinglePacketBytes, bool relayed)
