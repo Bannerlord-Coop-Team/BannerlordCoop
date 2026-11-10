@@ -2614,6 +2614,39 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SubmittedOverdueDecision_DoesNotForceKingdomScreen(bool rejoined)
+    {
+        var (client, _, player, otherPlayer, kingdomId) = SetUpPlayerDeclareWarVotes("OverdueDecisionTarget");
+        client.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            decision.TriggerTime = CampaignTime.HoursFromNow(-1);
+            Assert.True(decision.NeedsPlayerResolution);
+            var manager = GetConcreteVoteManager(client);
+            if (rejoined)
+            {
+                manager.Reset();
+                manager.ApplyRoundStatus(CreateTwoClanRoundStatus(kingdomId, player.ClanId, otherPlayer.ClanId, 60));
+            }
+            else
+            {
+                SubmitDeclareWarVoteFromPanel(new KingdomDecisionsVM(() => { }), decision);
+            }
+
+            Assert.True(manager.IsSubmittedDecision(decision));
+            for (int frame = 0; frame < 200; frame++)
+            {
+                // MapScreen uses this getter to reopen the kingdom screen on every map frame.
+                Assert.False(decision.NeedsPlayerResolution);
+            }
+            Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+    }
+
     [Fact]
     public void KingdomDecisionRoundStatus_RemapsLocalCandidateSetAndOrderToServerKeys()
     {
