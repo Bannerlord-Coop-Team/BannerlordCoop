@@ -190,7 +190,7 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             error = $"The window must be from {MinimumWindow.TotalSeconds:0} to {MaximumWindow.TotalSeconds:0} seconds.";
             return false;
         }
-        if (!string.IsNullOrEmpty(outputDirectory) && !Path.IsPathRooted(outputDirectory))
+        if (!string.IsNullOrEmpty(outputDirectory) && !IsFullyQualified(outputDirectory))
         {
             error = "The output directory must be an absolute path.";
             return false;
@@ -204,11 +204,25 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
                 return false;
             }
 
-            this.runId = runId;
-            this.label = label;
-            this.outputDirectory = string.IsNullOrEmpty(outputDirectory)
+            string directory = string.IsNullOrEmpty(outputDirectory)
                 ? Path.Combine(Environment.CurrentDirectory, DefaultDirectoryName)
                 : outputDirectory;
+            // A folder that can't be written fails here, not after the window when the report has nowhere to go.
+            string runDirectory = Path.Combine(directory, runId);
+            try
+            {
+                Directory.CreateDirectory(runDirectory);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException ||
+                                              exception is NotSupportedException || exception is ArgumentException)
+            {
+                error = $"Could not create the report folder {runDirectory}: {exception.Message}";
+                return false;
+            }
+
+            this.runId = runId;
+            this.label = label;
+            this.outputDirectory = directory;
             this.window = window;
             windowTicks = (long)(window.TotalSeconds * Stopwatch.Frequency);
             frameSamples = new long[Math.Max(MinimumFrameSamples, (int)(window.TotalSeconds * FrameSamplesPerSecond))];
@@ -629,6 +643,14 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
             if (previous == current) return;
             current = previous;
         }
+    }
+
+    // Path.IsPathRooted also passes Windows drive-relative (C:bench) and root-relative (\bench) paths.
+    internal static bool IsFullyQualified(string path)
+    {
+        if (Path.DirectorySeparatorChar == '/') return Path.IsPathRooted(path);
+        if (path.Length >= 2 && path[0] is ('\\' or '/') && path[1] is ('\\' or '/')) return true;
+        return path.Length >= 3 && char.IsLetter(path[0]) && path[1] == ':' && path[2] is ('\\' or '/');
     }
 
     private static string SafeFileName(string value) =>

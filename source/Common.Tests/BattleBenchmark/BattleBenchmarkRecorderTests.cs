@@ -37,6 +37,38 @@ public class BattleBenchmarkRecorderTests : IDisposable
         Assert.Single(attached);
     }
 
+    [Theory]
+    [InlineData(@"C:bench")]
+    [InlineData(@"\bench")]
+    [InlineData("bench")]
+    public void TryStart_RejectsAnOutputFolderThatIsNotFullyQualified(string folder)
+    {
+        var recorder = CreateRecorder();
+
+        Assert.False(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), folder, out string error));
+        Assert.Contains("absolute", error);
+        Assert.False(recorder.IsRecording);
+        Assert.Empty(attached);
+    }
+
+    [Fact]
+    public void TryStart_CreatesTheRunFolder_OrFailsBeforeTheWindowWhenItCannot()
+    {
+        // A file where the output folder should be makes the run folder impossible to create.
+        Directory.CreateDirectory(outputDirectory);
+        string blocked = Path.Combine(outputDirectory, "blocked");
+        File.WriteAllText(blocked, string.Empty);
+        var recorder = CreateRecorder();
+
+        Assert.False(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), blocked, out string error));
+        Assert.Contains(blocked, error);
+        Assert.False(recorder.IsRecording);
+        Assert.Empty(attached);
+
+        Assert.True(recorder.TryStart("run", null, TimeSpan.FromSeconds(10), outputDirectory, out _));
+        Assert.True(Directory.Exists(Path.Combine(outputDirectory, "run")));
+    }
+
     [Fact]
     public void Window_EndsOnTheFirstFramePastItsLength_AndWritesTheReport()
     {
@@ -276,7 +308,8 @@ public class BattleBenchmarkRecorderTests : IDisposable
         disposed.Dispose();
         Assert.False(disposed.IsRecording);
         Assert.Empty(attached);
-        Assert.False(Directory.Exists(Path.Combine(outputDirectory, "disposed")));
+        // TryStart made the run folder; Dispose leaves it without a report.
+        Assert.Empty(Directory.GetFiles(Path.Combine(outputDirectory, "disposed")));
     }
 
     [Fact]
