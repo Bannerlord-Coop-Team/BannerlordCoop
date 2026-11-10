@@ -33,31 +33,34 @@ jobs:
     timeout-minutes: 5
     outputs:
       should_publish: ${{ steps.decide.outputs.should_publish }}
+      release_date: ${{ steps.due.outputs.release_date }}
     steps:
       - name: Resolve due nightly date
         id: due
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
-        run: |
-          set -eu
-          due_epoch=$(date +%s)
-          due_hour=$(TZ=America/Chicago date +%H)
-          due_minute=$(TZ=America/Chicago date +%M)
-          if [ "$due_hour" -lt 23 ] || { [ "$due_hour" -eq 23 ] && [ "$due_minute" -lt 57 ]; }; then
-            due_epoch=$((due_epoch - 86400))
-          fi
-          due_date=$(TZ=America/Chicago date -d "@$due_epoch" +%F)
-          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
-            if ! printf '%s' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-              echo 'release_date must use YYYY-MM-DD' >&2
-              exit 1
-            fi
-            if [ "$REQUESTED_RELEASE_DATE" != "$due_date" ]; then
-              echo 'release_date must be the currently due nightly' >&2
-              exit 1
-            fi
-          fi
-          printf 'release_date=%s\n' "$due_date" >> "$GITHUB_OUTPUT"
+        with:
+          script: |
+            const parts = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit',
+              hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+            }).formatToParts(new Date());
+            const values = new Map(parts.map((part) => [part.type, part.value]));
+            const localDate = `${values.get('year')}-${values.get('month')}-${values.get('day')}`;
+            const due = new Date(`${localDate}T12:00:00.000Z`);
+            const minutes = (Number(values.get('hour')) * 60) + Number(values.get('minute'));
+            // Subtract a calendar day, because a DST day can have 23 or 25 hours.
+            if (minutes < (23 * 60) + 57) due.setUTCDate(due.getUTCDate() - 1);
+            const releaseDate = due.toISOString().slice(0, 10);
+            const requested = process.env.REQUESTED_RELEASE_DATE;
+            if (requested && !/^\d{4}-\d{2}-\d{2}$/.test(requested)) {
+              throw new Error('release_date must use YYYY-MM-DD');
+            }
+            if (requested && requested !== releaseDate) {
+              throw new Error('release_date must be the currently due nightly');
+            }
+            core.setOutput('release_date', releaseDate);
 
       - name: Keep a late scheduled nightly from overwriting a published one
         id: decide
@@ -113,11 +116,12 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'nightly-release.yml',
               branch: 'development',
-              status: 'success',
               per_page: 30,
             });
             const published = response.data.workflow_runs.find((run) =>
               run.id !== context.runId
+              && run.status === 'completed'
+              && run.conclusion === 'success'
               && (
                 belongsToNightlyReleaseWindow(run.created_at, releaseDate)
                 || belongsToNightlyReleaseWindow(run.updated_at, releaseDate)
@@ -163,9 +167,6 @@ jobs:
       - name: Trust checkout directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install timezone data
-        run: apk add --no-cache tzdata >/dev/null
-
       - name: Find previous nightly commit
         id: previous
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -177,10 +178,10 @@ jobs:
               repo: context.repo.repo,
               workflow_id: 'nightly-release.yml',
               branch: 'development',
-              status: 'success',
               per_page: 20,
             });
             for (const run of response.data.workflow_runs) {
+              if (run.status !== 'completed' || run.conclusion !== 'success') continue;
               const jobs = await github.rest.actions.listJobsForWorkflowRun({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -238,35 +239,12 @@ jobs:
         id: release
         env:
           PREVIOUS_SHA: ${{ steps.previous.outputs.result }}
-          REQUESTED_RELEASE_DATE: ${{ inputs.release_date }}
+          RELEASE_DATE: ${{ needs.guard.outputs.release_date }}
         run: |
           set -eu
-          due_epoch=$(date +%s)
-          due_hour=$(TZ=America/Chicago date +%H)
-          due_minute=$(TZ=America/Chicago date +%M)
-          if [ "$due_hour" -lt 23 ] || { [ "$due_hour" -eq 23 ] && [ "$due_minute" -lt 57 ]; }; then
-            due_epoch=$((due_epoch - 86400))
-          fi
-          due_date=$(TZ=America/Chicago date -d "@$due_epoch" +%F)
-          if [ -n "$REQUESTED_RELEASE_DATE" ]; then
-            if ! printf '%s\n' "$REQUESTED_RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
-              echo 'release_date must use YYYY-MM-DD' >&2
-              exit 1
-            fi
-            release_epoch=$(TZ=America/Chicago date -d "$REQUESTED_RELEASE_DATE 12:00:00" +%s)
-            if [ "$(TZ=America/Chicago date -d "@$release_epoch" +%F)" != "$REQUESTED_RELEASE_DATE" ]; then
-              echo 'release_date is not a valid calendar date' >&2
-              exit 1
-            fi
-            if [ "$REQUESTED_RELEASE_DATE" != "$due_date" ]; then
-              echo 'release_date must be the currently due nightly' >&2
-              exit 1
-            fi
-          else
-            release_epoch=$due_epoch
-          fi
-          release_date=$(TZ=America/Chicago date -d "@$release_epoch" +%F)
-          display_date=$(TZ=America/Chicago date -d "@$release_epoch" +%m-%d-%Y)
+          printf '%s\n' "$RELEASE_DATE" | grep -Eq '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          release_date=$RELEASE_DATE
+          display_date="${RELEASE_DATE#*-}-${RELEASE_DATE%%-*}"
           file_name="Coop $display_date.7z"
           head_sha=$(git rev-parse HEAD)
           base_sha="$PREVIOUS_SHA"
