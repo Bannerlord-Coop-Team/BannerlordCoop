@@ -402,6 +402,8 @@ public class ServerBattleCompletionHandler : IHandler
             return;
 
         // Membership only changes on the game thread, so the members read above are the ones the fence checks.
+        // With only pending joiners the battle may never have had an instance; its fence record then lasts until
+        // ConclusionRetention expires and MaxConcludedInstances caps the records, so it does not leak.
         bool fenced = hasMembers
             ? missionManager.TryBeginActiveInstanceConclusion(mapEventId, members)
             : missionManager.TryBeginEmptyInstanceConclusion(mapEventId);
