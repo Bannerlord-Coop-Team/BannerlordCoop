@@ -13,12 +13,11 @@ internal class ChangeProductionTypeOfWorkshopActionPatches
 {
     [HarmonyPatch(nameof(ChangeProductionTypeOfWorkshopAction.Apply))]
     [HarmonyPrefix]
-    public static bool ApplyPrefix(Workshop workshop, WorkshopType newWorkshopType)
+    public static bool ApplyPrefix(Workshop workshop, WorkshopType newWorkshopType, bool ignoreCost = false)
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Vanilla only calls Apply from paid player changes, so the server always charges the owner
-        var message = new ProductionTypeOfWorkshopChanged(workshop, newWorkshopType);
+        var message = new ProductionTypeOfWorkshopChanged(workshop, newWorkshopType, ignoreCost);
         MessageBroker.Instance.Publish(null, message);
 
         return false;

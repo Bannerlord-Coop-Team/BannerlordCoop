@@ -12,11 +12,16 @@ internal readonly struct ChangeProductionTypeOfWorkshop : ICommand
     [ProtoMember(2)]
     public readonly string WorkshopTypeId;
 
+    [ProtoMember(3)]
+    public readonly bool IgnoreCost;
+
     public ChangeProductionTypeOfWorkshop(
         string workshopId,
-        string workshopTypeId)
+        string workshopTypeId,
+        bool ignoreCost)
     {
         WorkshopId = workshopId;
         WorkshopTypeId = workshopTypeId;
+        IgnoreCost = ignoreCost;
     }
 }

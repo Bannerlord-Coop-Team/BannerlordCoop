@@ -13,7 +13,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using MathF = TaleWorlds.Library.MathF;
 
@@ -103,22 +102,7 @@ internal class PartyScreenLogicPatches
         {
             partyScreenMode = activePartyState.PartyScreenMode;
         }
-        // Refuse instead of running vanilla, since vanilla would apply the party change on this client only
-        if (!ContainerProvider.TryResolve<IGarrisonDonationContext>(out var garrisonDonation))
-        {
-            Logger.Error("Ignoring a party screen Done because {type} could not be resolved", nameof(IGarrisonDonationContext));
-            __result = false;
-            return false;
-        }
-
-        bool flag;
-        Settlement garrisonDonationSettlement;
-        // The donate garrison Done handler records its town in this scope, so the server moves the troops in the same Done
-        using (garrisonDonation.BeginDone())
-        {
-            flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
-            garrisonDonationSettlement = garrisonDonation.DonationSettlement;
-        }
+        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
@@ -157,8 +141,7 @@ internal class PartyScreenLogicPatches
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
                 donatedPrisonersRoster,
-                forceTransferId,
-                garrisonDonationSettlement
+                forceTransferId
             );
 
             MessageBroker.Instance.Publish(__instance, message);

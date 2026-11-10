@@ -13,6 +13,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,6 +51,8 @@ internal class PartyScreenHelperHandler : IHandler
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
+        messageBroker.Subscribe<GarrisonDonated>(Handle_GarrisonDonated);
+        messageBroker.Subscribe<DonateToGarrison>(Handle_DonateToGarrison);
         messageBroker.Subscribe<GarrisonManaged>(Handle_GarrisonManaged);
         messageBroker.Subscribe<DoManageGarrison>(Handle_DoManageGarrison);
         messageBroker.Subscribe<PrisonersReleasedAndTaken>(Handle_PrisonersReleasedAndTaken);
@@ -60,6 +63,8 @@ internal class PartyScreenHelperHandler : IHandler
     {
         messageBroker.Unsubscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Unsubscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
+        messageBroker.Unsubscribe<GarrisonDonated>(Handle_GarrisonDonated);
+        messageBroker.Unsubscribe<DonateToGarrison>(Handle_DonateToGarrison);
         messageBroker.Unsubscribe<GarrisonManaged>(Handle_GarrisonManaged);
         messageBroker.Unsubscribe<DoManageGarrison>(Handle_DoManageGarrison);
         messageBroker.Unsubscribe<PrisonersReleasedAndTaken>(Handle_PrisonersReleasedAndTaken);
@@ -128,6 +133,69 @@ internal class PartyScreenHelperHandler : IHandler
         });
     }
 
+    // Client side: sends the troops donated on the garrison screen to the server.
+    private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
+        var troops = new List<DonateTroop>();
+
+        for (int i = 0; i < obj.What.LeftMemberRoster.Count; i++)
+        {
+            var element = obj.What.LeftMemberRoster.GetElementCopyAtIndex(i);
+
+            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId))
+                continue;
+
+            troops.Add(new DonateTroop(
+                characterId,
+                element.Number));
+        }
+
+        // Done is allowed without moving any troops, nothing to send then
+        if (troops.Count == 0) return;
+
+        var message = new DonateToGarrison(currentSettlementId, troops);
+
+        network.SendAll(message);
+    }
+
+    // Server side: adds the donated troops to the settlement's garrison, creating it if needed.
+    private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
+    {
+        // protobuf drops an empty list so Troops arrives as null, the foreach below would NRE and kill the dedicated server
+        if (obj.What.Troops == null || obj.What.Troops.Count == 0) return;
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
+
+        GameThread.RunSafe(() =>
+        {
+            MobileParty garrisonParty = currentSettlement.Town.GarrisonParty;
+            if (garrisonParty == null)
+            {
+                currentSettlement.AddGarrisonParty();
+                garrisonParty = currentSettlement.Town.GarrisonParty;
+            }
+            foreach (var troop in obj.What.Troops)
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(
+                    troop.CharacterId,
+                    out var character))
+                    continue;
+
+                garrisonParty.AddElementToMemberRoster(
+                    character,
+                    troop.Count,
+                    false);
+
+                if (character.IsHero)
+                {
+                    EnterSettlementAction.ApplyForCharacterOnly(
+                        character.HeroObject,
+                        currentSettlement);
+                }
+            }
+        });
+    }
+
     private void Handle_GarrisonManaged(MessagePayload<GarrisonManaged> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
@@ -146,11 +214,6 @@ internal class PartyScreenHelperHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.TryGetSenderHero(obj.Who, out var senderHero) || senderHero.PartyBelongedTo?.CurrentSettlement != currentSettlement)
-            {
-                logger.Warning("Ignoring a garrison change for {SettlementId} from a peer whose party is not there", obj.What.CurrentSettlementId);
-                return;
-            }
             for (int i = 0; i < leftMemberRoster.Count; i++)
             {
                 TroopRosterElement elementCopyAtIndex = leftMemberRoster.GetElementCopyAtIndex(i);

@@ -37,7 +37,6 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly Settlement DonationSettlement;
     public readonly FlattenedTroopRoster DonatedPrisonersRoster;
     public readonly string ForceTransferId;
-    public readonly Settlement GarrisonDonationSettlement;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,
@@ -63,8 +62,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         bool applyReleasedAndTakenPrisonerActions = false,
         Settlement donationSettlement = null,
         FlattenedTroopRoster donatedPrisonersRoster = null,
-        string forceTransferId = null,
-        Settlement garrisonDonationSettlement = null)
+        string forceTransferId = null)
     {
         MainHero = mainHero;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -90,6 +88,5 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         DonationSettlement = donationSettlement;
         DonatedPrisonersRoster = donatedPrisonersRoster;
         ForceTransferId = forceTransferId;
-        GarrisonDonationSettlement = garrisonDonationSettlement;
     }
 }

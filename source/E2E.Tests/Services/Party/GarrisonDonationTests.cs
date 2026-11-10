@@ -2,25 +2,20 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.MapEventParties;
-using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
-using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.Party.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
 /// <summary>
-/// Covers the garrison troop donation, which the server applies together with the donate screen's Done.
+/// Covers the garrison troop donation round trip, including the empty donation that used to crash the dedicated server.
 /// </summary>
 public class GarrisonDonationTests : IDisposable
 {
@@ -33,77 +28,103 @@ public class GarrisonDonationTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
 
-    // The accepted Done moves the donated troops from the party to the garrison in one step.
+    // Done on the donate screen with nothing moved must not send anything.
     [Fact]
-    public void DonationDone_MovesTheTroopsFromThePartyToTheGarrison()
+    public void EmptyDonation_IsNotSentToServer()
+    {
+        string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        PublishGarrisonDonated(settlementId, TroopRoster.CreateDummyTroopRoster());
+
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<DonateToGarrison>());
+    }
+
+    // Moved troops are sent to the server with their ids and counts.
+    [Fact]
+    public void Donation_IsSentToServer()
+    {
+        string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject(characterId, out CharacterObject character));
+            roster.AddToCounts(character, 3);
+        });
+
+        PublishGarrisonDonated(settlementId, roster);
+
+        var message = Assert.Single(Client.NetworkSentMessages.GetMessages<DonateToGarrison>());
+        var troop = Assert.Single(message.Troops);
+        Assert.Equal(characterId, troop.CharacterId);
+        Assert.Equal(3, troop.Count);
+    }
+
+    // A donate screen Done after the party left the town is refused, so the party keeps the troops.
+    [Fact]
+    public void DonationDone_AfterLeavingTheTown_IsRefused()
+    {
+        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        bool result = true;
+        bool runOriginal = true;
+
+        Client.Call(() =>
+        {
+            Assert.Null(Hero.MainHero.CurrentSettlement);
+            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
+            roster.AddToCounts(Client.GetRegisteredObject<CharacterObject>(characterId), 3);
+
+            runOriginal = PartyScreenHelperPatches.DonateGarrisonDoneHandlerPrefix(ref result, roster);
+        });
+
+        Assert.False(runOriginal);
+        Assert.False(result);
+    }
+
+    // An empty donation from an older client arrives with null troops and must not touch the garrison.
+    [Fact]
+    public void EmptyDonation_ArrivesWithNullTroops_AndLeavesGarrisonUntouched()
+    {
+        string settlementId = CreateTownSettlement();
+
+        Send(new DonateToGarrison(settlementId, new List<DonateTroop>()));
+
+        // protobuf drops the empty list, so the server sees null rather than an empty list
+        Assert.Null(Assert.Single(Server.InternalMessages.GetMessages<DonateToGarrison>()).Troops);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+            Assert.Null(settlement.Town.GarrisonParty);
+        });
+    }
+
+    // A real donation creates the garrison and adds the troops on the server.
+    [Fact]
+    public void Donation_AddsTroopsToGarrison()
     {
         string settlementId = CreateTownSettlement();
         string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        string heroId = RegisterDonor(settlementId);
-        Server.Call(() => Server.GetRegisteredObject<Hero>(heroId).PartyBelongedTo.MemberRoster
-            .AddToCounts(Server.GetRegisteredObject<CharacterObject>(characterId), 3));
 
-        Send(CreateDonationDone(heroId, settlementId, characterId, 3));
+        Send(new DonateToGarrison(settlementId, new List<DonateTroop> { new DonateTroop(characterId, 3) }));
 
         Server.Call(() =>
         {
-            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
-            var character = Server.GetRegisteredObject<CharacterObject>(characterId);
-            int partyCount = Server.GetRegisteredObject<Hero>(heroId).PartyBelongedTo.MemberRoster.GetTroopCount(character);
-            int garrisonCount = settlement.Town.GarrisonParty?.MemberRoster.GetTroopCount(character) ?? 0;
-            Assert.Equal(0, partyCount);
-            Assert.Equal(3, garrisonCount);
+            Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+            Assert.True(Server.ObjectManager.TryGetObject(characterId, out CharacterObject character));
+            Assert.NotNull(settlement.Town.GarrisonParty);
+            Assert.Equal(3, settlement.Town.GarrisonParty.MemberRoster.GetTroopCount(character));
         });
     }
 
-    // The donor is the client's player, with its party in the given town.
-    private string RegisterDonor(string settlementId)
+    // Raises the client-side garrison donated event as the patched vanilla handler would.
+    private void PublishGarrisonDonated(string settlementId, TroopRoster roster)
     {
-        string donorHeroId = null;
-        Server.Call(() =>
+        Client.Call(() =>
         {
-            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            party._currentSettlement = Server.GetRegisteredObject<Settlement>(settlementId);
-            Assert.True(Server.ObjectManager.TryGetId(party, out var partyId));
-            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
-
-            var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("Donor", heroId, partyId, null, null)));
-            playerManager.SetPeer("Donor", Client.NetPeer);
-            donorHeroId = heroId;
+            Assert.True(Client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+            Client.SimulateMessage(this, new GarrisonDonated(settlement, roster));
         });
-        return donorHeroId;
-    }
-
-    // The Done a donate screen sends: the donated troops fill the empty left roster and leave the donor's own roster.
-    private NetworkCompleteDoneLogic CreateDonationDone(string heroId, string settlementId, string characterId, int count)
-    {
-        uint characterHandle = Server.GetHandle<CharacterObject>(characterId);
-        var emptyRoster = new TroopRosterData(Array.Empty<TroopRosterElementData>());
-        var donatedDelta = new TroopRosterData(new[] { new TroopRosterElementData(characterHandle, count, 0, 0) });
-        var donorDelta = new TroopRosterData(new[] { new TroopRosterElementData(characterHandle, -count, 0, 0) });
-
-        return new NetworkCompleteDoneLogic(
-            heroId,
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            donatedDelta,
-            emptyRoster,
-            donorDelta,
-            emptyRoster,
-            Array.Empty<ItemRosterElement>(),
-            new UpgradedTroopHistoryData(new List<UpgradedTroopHistoryElementData>()),
-            leftPartyId: null,
-            leftPrisonerRosterId: null,
-            partyGoldChangeAmount: 0,
-            partyInfluenceChangeAmount: 0,
-            partyMoraleChangeAmount: 0,
-            doNotApplyGoldTransactions: true,
-            default,
-            Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage,
-            new TroopRosterOrderData(new()),
-            garrisonDonationSettlementId: settlementId);
+        TestEnvironment.FlushCoalescer();
     }
 
     // Creates a server settlement with an owned town and no garrison yet.
@@ -131,8 +152,8 @@ public class GarrisonDonationTests : IDisposable
         return settlementId;
     }
 
-    // Sends the Done from the client over the test network.
-    private void Send(NetworkCompleteDoneLogic message)
+    // Sends the donation from the client over the test network.
+    private void Send(DonateToGarrison message)
     {
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();

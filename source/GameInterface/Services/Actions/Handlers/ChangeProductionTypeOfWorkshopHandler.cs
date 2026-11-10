@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
@@ -44,20 +43,17 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.What.Workshop, out var workshopId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.What.WorkshopType, out var workshopTypeId)) return;
 
-        var message = new ChangeProductionTypeOfWorkshop(workshopId, workshopTypeId);
+        var message = new ChangeProductionTypeOfWorkshop(workshopId, workshopTypeId, obj.What.IgnoreCost);
         network.SendAll(message);
     }
     
     private void Handle_ChangeProductionTypeOfWorkshop(MessagePayload<ChangeProductionTypeOfWorkshop> obj)
     {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
-            if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
+        if (!objectManager.TryGetObjectWithLogging<Workshop>(obj.What.WorkshopId, out var workshop)) return;
+        if (!objectManager.TryGetObjectWithLogging<WorkshopType>(obj.What.WorkshopTypeId, out var workshopType)) return;
 
-            ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType);
+        ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, obj.What.IgnoreCost);
 
-            messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
-        }, context: nameof(ChangeProductionTypeOfWorkshopHandler));
+        messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
     }
 }
