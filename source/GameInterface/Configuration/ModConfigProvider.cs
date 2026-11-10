@@ -78,6 +78,8 @@ public readonly struct ModOptions
     public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
     [ProtoMember(28)]
     public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
+    [ProtoMember(29)]
+    public readonly int PostBattleAiAmnestySeconds { get; } = 0;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -96,6 +98,7 @@ public readonly struct ModOptions
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
         BlockAiWarDeclarationsOnOfflinePlayers = modOptionsData.BlockAiWarDeclarationsOnOfflinePlayers ?? BlockAiWarDeclarationsOnOfflinePlayers;
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
+        PostBattleAiAmnestySeconds = modOptionsData.PostBattleAiAmnestySeconds ?? PostBattleAiAmnestySeconds;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;

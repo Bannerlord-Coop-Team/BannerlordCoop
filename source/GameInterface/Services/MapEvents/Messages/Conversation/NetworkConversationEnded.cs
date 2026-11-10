@@ -12,9 +12,16 @@ internal readonly struct NetworkConversationEnded : ICommand
 {
     [ProtoMember(1)]
     public readonly string RequestId;
+    /// <summary>
+    /// The map event whose encounter PlayerEncounter.Finish just closed. Null for a failed or stale approval or an
+    /// encounter without a battle.
+    /// </summary>
+    [ProtoMember(2)]
+    public readonly string FinishedMapEventId;
 
-    public NetworkConversationEnded(string requestId = null)
+    public NetworkConversationEnded(string requestId = null, string finishedMapEventId = null)
     {
         RequestId = requestId;
+        FinishedMapEventId = finishedMapEventId;
     }
 }

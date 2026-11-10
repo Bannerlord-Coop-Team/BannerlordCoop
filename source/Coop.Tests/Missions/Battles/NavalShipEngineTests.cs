@@ -18,6 +18,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>R41a-2: which points the naval engine seats a puppet on. A null agent shows whether the use was reached.</summary>
+[Collection("Mission.Current")]
 public class NavalShipEngineTests
 {
     // W2: re-seating a puppet onto a picked-up item bound it to a freed object, a native AV.

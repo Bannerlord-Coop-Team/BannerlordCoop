@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Kingdoms.Messages
+namespace GameInterface.Services.Kingdoms.Messages
 {
     /// <summary>
     /// Network message replicating a kingdom policy add/remove to clients.
