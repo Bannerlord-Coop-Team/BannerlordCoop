@@ -1,4 +1,4 @@
-﻿using Common.BattleBenchmark;
+﻿using BattleBenchmark;
 
 // dotnet run --project tools/BattleBenchmark -- compare <baseline-dir> <candidate-dir> [--all] [--filter <regex>] [--out <file>]
 // dotnet run --project tools/BattleBenchmark -- summary <runs-dir> [--all] [--filter <regex>] [--out <file>]

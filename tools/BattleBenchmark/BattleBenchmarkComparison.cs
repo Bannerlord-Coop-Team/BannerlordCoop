@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.BattleBenchmark;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -7,11 +8,11 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace Common.BattleBenchmark;
+namespace BattleBenchmark;
 
 /// <summary>
 /// Loads battle benchmark runs and compares a baseline set with a candidate set: every metric's mean, run-to-run spread
-/// and delta, per process role. Used by the <c>tools/BattleBenchmark</c> command line tool.
+/// and delta, per process role.
 /// </summary>
 public interface IBattleBenchmarkComparison
 {

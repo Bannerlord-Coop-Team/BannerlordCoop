@@ -1,4 +1,5 @@
-﻿using Common.BattleBenchmark;
+﻿using BattleBenchmark;
+using Common.BattleBenchmark;
 using Common.Serialization;
 using System.Diagnostics;
 using System.Text.Json;
