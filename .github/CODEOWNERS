@@ -47,7 +47,9 @@
 /source/GameInterface/Services/Heroes/ @jordanbrymora @ShoT-UPfps @garrettluskey
 /source/GameInterface/Services/Hideouts/ @EgardA
 /source/GameInterface/Services/Inventory/ @jordanbrymora
-/source/GameInterface/Services/Issues/ @ShoT-UPfps @casey-johnson
+# @casey-johnson paused while his PC is replaced, restore the line below when hes back
+# /source/GameInterface/Services/Issues/ @ShoT-UPfps @casey-johnson
+/source/GameInterface/Services/Issues/ @ShoT-UPfps
 /source/GameInterface/Services/ItemComponents/ @garrettluskey @jordanbrymora
 /source/GameInterface/Services/ItemModifiers/ @garrettluskey @jordanbrymora
 /source/GameInterface/Services/ItemObjects/ @garrettluskey @jordanbrymora
