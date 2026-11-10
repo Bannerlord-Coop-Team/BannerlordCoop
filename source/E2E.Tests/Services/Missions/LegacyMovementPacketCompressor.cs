@@ -56,4 +56,7 @@ internal sealed class LegacyMovementPacketCompressor : IMovementPacketCompressor
 
     public bool TryRestore(IPacket packet, out IPacket restored) =>
         throw new NotSupportedException();
+
+    public int GetSerializedLength(CompressedMovementPacket packet) =>
+        throw new NotSupportedException();
 }

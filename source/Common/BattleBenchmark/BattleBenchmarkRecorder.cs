@@ -355,6 +355,8 @@ public class BattleBenchmarkRecorder : IBattleBenchmarkRecorder, IGameThreadFram
     public void RecordPayloadReceived(object payload, int bytes)
     {
         if (!recording || payload == null) return;
+        // Its handler counts it once restored, under the movement packet it carries, as the sender counted it.
+        if (payload is IPacket packet && packet.PacketType == PacketType.CompressedMovement) return;
 
         if (payload is AggregateMessagePacket aggregate)
         {
