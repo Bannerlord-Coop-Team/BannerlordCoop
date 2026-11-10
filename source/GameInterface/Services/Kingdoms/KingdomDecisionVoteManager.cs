@@ -18,10 +18,12 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.MapNotificationTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core.ViewModelCollection.ImageIdentifiers;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -748,6 +750,17 @@ namespace GameInterface.Services.Kingdoms
         {
             if (decision == null) return;
 
+            var notices = Campaign.Current?.CampaignInformationManager?._mapNotices;
+            if (notices != null)
+            {
+                foreach (KingdomDecisionMapNotification notice in notices
+                             .OfType<KingdomDecisionMapNotification>()
+                             .Where(notice => notice.Decision == decision).ToList())
+                {
+                    notices.Remove(notice);
+                    MBInformationManager.MapNoticeRemoved(notice);
+                }
+            }
             DecisionStates.Remove(decision);
             LocalSubmittedDecisions.Remove(decision);
             foreach (KingdomDecision staleDecision in DecisionStates.Keys
@@ -1759,7 +1772,20 @@ namespace GameInterface.Services.Kingdoms
 
                 foreach (KingdomDecision decision in kingdom.UnresolvedDecisions.ToList())
                 {
-                    if (decision == null || DecisionStates.ContainsKey(decision)) continue;
+                    if (decision == null) continue;
+                    // The campaign can be paused in the kingdom screen after console-forced peace.
+                    if (decision is MakePeaceKingdomDecision peaceDecision && peaceDecision.ShouldBeCancelledInternal())
+                    {
+                        kingdom.RemoveDecision(decision);
+                        if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision)
+                            && peaceDecision.FactionToMakePeaceWith is Kingdom proposingKingdom)
+                        {
+                            messageBroker.Publish(this, new PeaceOfferPendingStatusChanged(proposingKingdom, kingdom, false));
+                        }
+                        CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, kingdom.IsPlayerKingdom());
+                        continue;
+                    }
+                    if (DecisionStates.ContainsKey(decision)) continue;
                     if (!HasEligiblePlayerClan(decision)) continue;
 
                     RegisterDecision(decision);
