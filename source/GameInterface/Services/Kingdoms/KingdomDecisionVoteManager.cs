@@ -23,7 +23,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.Core.ViewModelCollection.ImageIdentifiers;
-using TaleWorlds.Core;
+using MBInformationManager = TaleWorlds.Core.MBInformationManager;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
