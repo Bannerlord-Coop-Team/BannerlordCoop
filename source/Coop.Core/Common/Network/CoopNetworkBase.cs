@@ -213,6 +213,10 @@ public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventLis
         byte[] data = serializer.Serialize(packet);
         packetProfiler.Record(packet, data.Length);
         battleBenchmark?.RecordTypeSent(packet.GetType(), data.Length);
+        // A mission send relayed through the server counts on its mission route, measured from the buffer sent here.
+        if (packet is RelayPacket relay && battleBenchmark?.IsRecording == true)
+            battleBenchmark.RecordSent(relay.ControllerId, relay.DeliveryMethod != DeliveryMethod.Unreliable, data.Length,
+                netPeer.GetMaxSinglePacketSize(relay.DeliveryMethod), relayed: true);
 
         // Buffered messages were logically sent before this packet; when it rides the reliable
         // stream, flush them first so that stream preserves the order (the transfer save relies on

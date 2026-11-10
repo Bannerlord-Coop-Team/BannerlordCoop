@@ -1093,17 +1093,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         return diagnostics;
     }
 
-    // The campaign connection never turns on MTU discovery, so it keeps LiteNetLib's initial MTU.
-    private static readonly int CampaignMaxSinglePacketBytes = NetConstants.InitialMtu - NetConstants.ChanneledHeaderSize;
-
-    // A relayed send leaves as its own serialized relay packet on the campaign connection; the benchmark counts that.
-    private void RecordRelayedBenchmarkSend(string controllerId, DeliveryMethod deliveryMethod, string relayInstanceId, byte[] data)
-    {
-        int bytes = serializer.Serialize(new RelayPacket(deliveryMethod, relayInstanceId, controllerId, data)).Length;
-        battleBenchmark.RecordSent(controllerId, deliveryMethod != DeliveryMethod.Unreliable, bytes,
-            CampaignMaxSinglePacketBytes, relayed: true);
-    }
-
     // The batched messages already counted their own bytes when sent; this adds the envelope's framing.
     private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
     {
@@ -1289,8 +1278,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
-        if (battleBenchmark?.IsRecording == true)
-            RecordRelayedBenchmarkSend(controllerId, packet.DeliveryMethod, relayInstanceId, data);
         relayNetwork.SendAll(new RelayPacket(
             packet.DeliveryMethod,
             relayInstanceId,
@@ -1317,8 +1304,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         }
 
         RecordRoute(controllerId, ReceivePathEvent.CampaignRelaySend, data.Length);
-        if (battleBenchmark?.IsRecording == true)
-            RecordRelayedBenchmarkSend(controllerId, DeliveryMethod.ReliableOrdered, relayInstanceId, data);
         relayNetwork.SendAll(new RelayPacket(
             DeliveryMethod.ReliableOrdered,
             relayInstanceId,
