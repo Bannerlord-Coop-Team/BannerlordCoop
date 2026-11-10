@@ -165,7 +165,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 
     container:
       image: ghcr.io/bannerlord-coop-team/bannerlordcoop:latest
@@ -191,7 +191,7 @@ jobs:
 
       - name: Run E2E test shard
         working-directory: source
-        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
+        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 12
 
   sign:
     name: Sign release module
