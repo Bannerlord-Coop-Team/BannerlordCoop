@@ -110,6 +110,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             GetSavedRoster(logic, oppositeBaseline),
             character);
         var previousBaseline = RosterElementState.Read(baseline, character);
+        var previousOppositeBaseline = RosterElementState.Read(oppositeBaseline, character);
 
         if (ReferenceEquals(authoritativeRoster, visible.Roster))
         {
@@ -118,8 +119,8 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
         applyAuthoritative(authoritativeRoster, character);
         var authoritative = RosterElementState.Read(authoritativeRoster, character);
-        bool canRebase = visible.TryRebase(authoritative, previousBaseline) &&
-            saved.TryRebase(authoritative, previousBaseline);
+        bool canRebase = visible.TryRebase(authoritative, previousBaseline, previousOppositeBaseline) &&
+            saved.TryRebase(authoritative, previousBaseline, previousOppositeBaseline);
 
         authoritative.Write(baseline, character);
         if (!canRebase)
@@ -504,13 +505,17 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         /// <summary>
         /// Rebases both rosters onto the server's element; a screen without saved popup state has nothing to rebase.
         /// </summary>
-        public bool TryRebase(RosterElementState authoritative, RosterElementState previousBaseline)
+        public bool TryRebase(
+            RosterElementState authoritative,
+            RosterElementState previousBaseline,
+            RosterElementState oppositeBaseline)
         {
             if (Roster == null) return true;
 
             bool rebased = RosterElementState.TryRebase(
                 authoritative,
                 previousBaseline,
+                oppositeBaseline,
                 Previous,
                 previousOpposite,
                 out var rebasedSide,
@@ -563,12 +568,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         }
 
         /// <summary>
-        /// Replays the local edit on the server's element. Wounded and xp this side can no longer hold
-        /// follow the moved troops to the opposite side; fails when either side cant take its share.
+        /// Replays the local edit on the server's element. Wounded and xp this side can no longer hold follow
+        /// the troops the edit moved to the opposite side; fails when no such move can account for them.
         /// </summary>
         public static bool TryRebase(
             RosterElementState authoritative,
             RosterElementState previousBaseline,
+            RosterElementState oppositeBaseline,
             RosterElementState previousSide,
             RosterElementState previousOpposite,
             out RosterElementState rebasedSide,
@@ -576,20 +582,30 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         {
             rebasedSide = default;
             rebasedOpposite = previousOpposite;
-            long number = authoritative.Number +
-                ((long)previousSide.Number - previousBaseline.Number);
+            long removed = (long)previousBaseline.Number - previousSide.Number;
+            long number = authoritative.Number - removed;
             if (number < 0 || number > int.MaxValue) return false;
 
+            // Upgrades and recruits also take troops off this side, so only what the opposite side gained was moved.
+            long transferred = Math.Max(0L, Math.Min(removed, (long)previousOpposite.Number - oppositeBaseline.Number));
             long wounded = authoritative.Wounded +
                 ((long)previousSide.Wounded - previousBaseline.Wounded);
             long keptWounded = Math.Min(number, Math.Max(0L, wounded));
-            // Vanilla TransferTroop carries an emptied stack's xp to the destination, so the server's xp change follows it.
-            long movedXp = number == 0 ? (long)authoritative.Xp - previousBaseline.Xp : 0;
+            long movedWounded = wounded - keptWounded;
+            if (Math.Abs(movedWounded) > transferred) return false;
+
+            // Vanilla TransferTroop carries an emptied stack's xp to the destination, so the server's xp change
+            // follows it when every troop the edit took off went there. A stack the server removed carries nothing.
+            long movedXp = number == 0 && authoritative.Number > 0
+                ? (long)authoritative.Xp - previousBaseline.Xp
+                : 0;
+            if (movedXp != 0 && transferred != removed) return false;
+
             long xp = number == 0
                 ? 0
                 : authoritative.Xp + ((long)previousSide.Xp - previousBaseline.Xp);
             if (xp < 0 || xp > int.MaxValue) return false;
-            if (!previousOpposite.TryAbsorb(wounded - keptWounded, movedXp, out rebasedOpposite)) return false;
+            if (!previousOpposite.TryAbsorb(movedWounded, movedXp, out rebasedOpposite)) return false;
 
             bool localExistenceChanged = previousSide.Exists != previousBaseline.Exists;
             bool exists = number != 0 ||

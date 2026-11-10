@@ -173,6 +173,59 @@ public class PartyScreenRosterRefresherTests
     }
 
     /// <summary>
+    /// Upgrading a stack moves nothing to the garrison, so a heal on it cant land on the garrison's own stack.
+    /// </summary>
+    [Fact]
+    public void ServerHeal_AfterUpgrade_ResetsWithoutTouchingOppositeStack()
+    {
+        var character = new CharacterObject();
+        var upgraded = new CharacterObject();
+        var logic = CreateLogic(character, 5, 5, out var visible);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 10, false, 5);
+        logic._initialData.LeftMemberRoster.AddToCounts(character, 10, false, 5);
+        visible.AddToCounts(character, -5, false, -5);
+        visible.AddToCounts(upgraded, 5, false, 5);
+        int notificationCount = 0;
+
+        CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, 0, false, -1),
+            () => notificationCount++);
+
+        Assert.Equal(1, notificationCount);
+        AssertRoster(logic.CurrentData.LeftMemberRoster, character, 10, 5);
+    }
+
+    /// <summary>
+    /// A stack the server removes with no pending edit carries no xp into the opposite side's own stack.
+    /// </summary>
+    [Fact]
+    public void ServerRemovesUneditedStack_LeavesOppositeStackXp()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 5, 0, out var visible);
+        visible.AddXpToTroop(character, 100);
+        logic._initialData.RightMemberRoster.AddXpToTroop(character, 100);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 10, false, 0, 200);
+        logic._initialData.LeftMemberRoster.AddToCounts(character, 10, false, 0, 200);
+        int notificationCount = 0;
+
+        CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, -5),
+            () => notificationCount++);
+
+        var garrison = logic.CurrentData.LeftMemberRoster;
+        Assert.Equal(0, notificationCount);
+        Assert.Equal(-1, visible.FindIndexOfTroop(character));
+        Assert.Equal(200, garrison.GetElementXp(garrison.FindIndexOfTroop(character)));
+    }
+
+    /// <summary>
     /// Prisoner healing uses the same transfer layout, so a heal follows prisoners moved to the dungeon.
     /// </summary>
     [Fact]
@@ -469,6 +522,7 @@ public class PartyScreenRosterRefresherTests
         destination.AddToCounts(character, number, false, wounded, xp, false);
     }
 
+    // Builds an ownerless roster holding one stack, standing in for a server roster.
     private static TroopRoster CreateRoster(CharacterObject character, int number, int wounded, int xp = 0)
     {
         var roster = TroopRoster.CreateDummyTroopRoster();
@@ -520,10 +574,13 @@ public class PartyScreenRosterRefresherTests
         Assert.Equal(wounded, roster.GetElementWoundedNumber(index));
     }
 
+    // Discards roster diagnostics; ITroopRosterLogger is internal, so Moq cant proxy it.
     private sealed class NullTroopRosterLogger : ITroopRosterLogger
     {
+        // Ignores a roster-keyed diagnostic.
         public void Debug(TroopRoster troopRoster, string messageTemplate, params object[] propertyValues) { }
 
+        // Ignores an id-keyed diagnostic.
         public void Debug(string troopRosterId, string messageTemplate, params object[] propertyValues) { }
     }
 
