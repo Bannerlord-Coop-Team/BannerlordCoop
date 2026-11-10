@@ -3,6 +3,7 @@ using Common.PacketHandlers;
 using LiteNetLib;
 using Missions;
 using Missions.Agents.Handlers;
+using Missions.Agents.Packets;
 using Missions.Services.Network;
 using Moq;
 using System;
@@ -571,6 +572,8 @@ public sealed class MovementTrafficBudgetTests
             restored = packet;
             return true;
         }
+
+        public int GetSerializedLength(CompressedMovementPacket packet) => throw new NotSupportedException();
     }
 
     private sealed class SizedPacket : IPacket

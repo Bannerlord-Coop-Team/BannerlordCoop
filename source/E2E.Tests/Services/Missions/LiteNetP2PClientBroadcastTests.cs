@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.BattleBenchmark;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Data;
 using Common.Network.Session;
@@ -99,6 +100,20 @@ public class LiteNetP2PClientBroadcastTests
         }
     }
 
+    [Fact]
+    public void SendAll_RecordingDoesNotSerializeTheRelayAgain()
+    {
+        var recorder = new Mock<IBattleBenchmarkRecorder>();
+        recorder.SetupGet(value => value.IsRecording).Returns(true);
+        using var fixture = new Fixture(Controllers, recorder.Object);
+
+        fixture.Client.SendAll(CreateDeath(6));
+        fixture.Client.FlushPendingMessages();
+
+        Assert.Equal(1, fixture.CountingSerializer.SerializeCalls);
+        Assert.Equal(Controllers, fixture.RelayedTargets());
+    }
+
     private static NetworkBattleAgentDied CreateDeath(int value)
     {
         return new NetworkBattleAgentDied(
@@ -141,7 +156,7 @@ public class LiteNetP2PClientBroadcastTests
         public readonly List<RelayPacket> Relayed = new();
         public readonly LiteNetP2PClient Client;
 
-        public Fixture(string[] controllers)
+        public Fixture(string[] controllers, IBattleBenchmarkRecorder? battleBenchmark = null)
         {
             CountingSerializer = new CountingSerializer(PlainSerializer);
             var config = new Mock<INetworkConfig>();
@@ -166,7 +181,8 @@ public class LiteNetP2PClientBroadcastTests
                 Mock.Of<ISteamMissionBridge>(),
                 new MovementPacketCompressor(CountingSerializer),
                 new ReliableMessageBatcher<string>(PlainSerializer),
-                () => new Common.Logging.ReceivePathDiagnostics());
+                () => new Common.Logging.ReceivePathDiagnostics(),
+                battleBenchmark);
             Client.ConnectToInstance("broadcast-test");
 
             // Each controller's relay budget is probed once with the same serializer, so fill them before counting.

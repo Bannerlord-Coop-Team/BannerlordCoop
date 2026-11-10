@@ -354,6 +354,8 @@ public partial class MovementTrafficTests
         }
 
         public bool TryRestore(IPacket packet, out IPacket restored) => inner.TryRestore(packet, out restored);
+
+        public int GetSerializedLength(CompressedMovementPacket packet) => inner.GetSerializedLength(packet);
     }
 
     private static string DescribeWire(ICommonSerializer serializer, IPacket packet, byte[] payload)
