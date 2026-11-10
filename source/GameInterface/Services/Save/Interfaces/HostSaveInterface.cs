@@ -18,8 +18,10 @@ public interface IHostSaveInterface : IGameAbstraction
 /// <summary>Queues saves on the campaign's SaveHandler, whose OnSaveEnded patch publishes GameSaveCompleted.</summary>
 internal class HostSaveInterface : IHostSaveInterface
 {
+    /// <summary>True while the campaign's SaveHandler has a save queued or running.</summary>
     public bool IsSaving => Campaign.Current?.SaveHandler?.IsSaving == true;
 
+    /// <summary>Queues the save on the campaign's SaveHandler and reports whether it was really queued.</summary>
     public bool TryQueueSave(string saveName)
     {
         var saveHandler = Campaign.Current?.SaveHandler;
