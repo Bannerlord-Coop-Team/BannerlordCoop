@@ -1,6 +1,9 @@
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -44,27 +47,35 @@ internal static class PendingPlayerPeaceOfferCancellationPatch
 }
 
 /// <summary>
-/// Reproduces native's ruling-clan support for an inbound player peace offer without relying on
-/// the process-local <see cref="Clan.PlayerClan"/>, which is absent on a dedicated server.
+/// Uses registered player kingdoms for native's ruling-clan peace support on every endpoint.
 /// </summary>
 [HarmonyPatch(typeof(MakePeaceKingdomDecision), nameof(MakePeaceKingdomDecision.DetermineSupport))]
-internal static class PendingPlayerPeaceOfferSupportPatch
+internal static class MakePeaceKingdomDecisionSupportPatch
 {
-    [HarmonyPrefix]
-    private static bool DetermineSupportPrefix(
-        MakePeaceKingdomDecision __instance,
-        Clan clan,
-        DecisionOutcome possibleOutcome,
-        ref float __result)
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> DetermineSupportTranspiler(IEnumerable<CodeInstruction> instructions)
     {
-        if (!CoopKingdomElection.IsPendingPlayerPeaceOffer(__instance)
-            || clan != __instance.Kingdom.RulingClan
-            || possibleOutcome is not MakePeaceKingdomDecision.MakePeaceDecisionOutcome peaceOutcome)
+        var codes = instructions.ToList();
+        var playerClanGetter = AccessTools.PropertyGetter(typeof(Clan), nameof(Clan.PlayerClan));
+        var mapFactionGetter = AccessTools.PropertyGetter(typeof(Clan), nameof(Clan.MapFaction));
+        var kingdomGetter = AccessTools.PropertyGetter(typeof(KingdomDecision), nameof(KingdomDecision.Kingdom));
+        for (int i = 0; i < codes.Count - 3; i++)
         {
-            return true;
+            if (!codes[i].Calls(playerClanGetter) || !codes[i + 1].Calls(mapFactionGetter)
+                || codes[i + 2].opcode != OpCodes.Ldarg_0 || !codes[i + 3].Calls(kingdomGetter)) continue;
+
+            // Native dereferences PlayerClan before checking whether this is an opponent's offer.
+            codes[i].opcode = OpCodes.Ldarg_0;
+            codes[i].operand = null;
+            codes[i + 1].opcode = OpCodes.Call;
+            codes[i + 1].operand = kingdomGetter;
+            codes[i + 2].opcode = OpCodes.Call;
+            codes[i + 2].operand = AccessTools.Method(typeof(KingdomExtensions), nameof(KingdomExtensions.IsPlayerKingdom));
+            codes[i + 3].opcode = OpCodes.Ldc_I4_1;
+            codes[i + 3].operand = null;
+            return codes;
         }
 
-        __result = peaceOutcome.ShouldPeaceBeDeclared ? 200f : 0f;
-        return false;
+        throw new InvalidOperationException("Could not replace the local player faction check in peace decision support.");
     }
 }
