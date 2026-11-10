@@ -29,6 +29,7 @@ namespace GameInterface.Services.Save.Commands
         {
             private readonly ISaveInterface saveInterface;
 
+            /// <summary>Takes the save interface that queues the save on the host.</summary>
             public SaveSaveAsCoopCommand(ISaveInterface saveInterface)
             {
                 this.saveInterface = saveInterface;

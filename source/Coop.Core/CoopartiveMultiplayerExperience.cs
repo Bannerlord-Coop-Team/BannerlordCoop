@@ -21,6 +21,7 @@ using GameInterface.AutoSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using Serilog;
@@ -44,6 +45,8 @@ namespace Coop.Core
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
         private readonly string coopLogFilePath;
+        // A host that persists saves itself (the dedicated server) replaces the native SaveHandler backend.
+        private readonly IHostSaveInterface hostSaveInterface;
         // Set when startup decided this process must not host (a War Sails mismatch); every host attempt shows it instead.
         private readonly object containerGate = new object();
         private readonly bool standaloneServerProcess;
@@ -66,7 +69,8 @@ namespace Coop.Core
         public CoopartiveMultiplayerExperience(
             bool standaloneServerProcess = false,
             Action<string> setCrashPhase = null,
-            string coopLogFilePath = null)
+            string coopLogFilePath = null,
+            IHostSaveInterface hostSaveInterface = null)
         {
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
@@ -75,6 +79,7 @@ namespace Coop.Core
             this.standaloneServerProcess = standaloneServerProcess;
             this.setCrashPhase = setCrashPhase ?? (_ => { });
             this.coopLogFilePath = coopLogFilePath;
+            this.hostSaveInterface = hostSaveInterface;
 
             if (!standaloneServerProcess)
             {
@@ -492,6 +497,9 @@ namespace Coop.Core
             builder.RegisterInstance(new SessionAdvertisementConfig { Visibility = visibility })
                 .AsSelf()
                 .SingleInstance();
+            // Registered after the modules so it replaces the native backend GameInterfaceModule registers.
+            if (hostSaveInterface != null)
+                builder.RegisterInstance(hostSaveInterface).As<IHostSaveInterface>().ExternallyOwned();
             container = builder.Build();
 
             GameInterface.ContainerProvider.SetContainer(container);
