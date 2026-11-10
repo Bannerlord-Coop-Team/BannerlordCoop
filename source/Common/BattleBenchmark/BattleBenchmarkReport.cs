@@ -142,7 +142,10 @@ public sealed class BattleBenchmarkTrafficCounts
     public double ReliablePacketsPerSecond { get; set; }
     public double ReliableBytesPerSecond { get; set; }
 
-    /// <summary>Datagrams on the wire: one per reliable packet up to the single-packet size, fragments above it.</summary>
+    /// <summary>
+    /// Datagrams on the wire, estimated from packet size without resends: one per reliable packet up to the single-packet
+    /// size, fragments above it.
+    /// </summary>
     public long ReliableDatagrams { get; set; }
     public double ReliableDatagramsPerSecond { get; set; }
 

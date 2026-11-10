@@ -13,16 +13,21 @@ coop.debug.benchmark.start field-A-01 120 C:\bench\run01 field
 ```
 
 Arguments: a run id (letters, digits, dots, dashes, underscores), the window in seconds (1 to 900), an optional absolute
-output folder (default `CoopBenchmark` next to the game executable) and an optional label. The process writes
+output folder (default `CoopBenchmark` next to the game executable) and an optional label. The process creates
+`<folder>/<run id>` when the window starts, so a folder it can't write fails the start command, and writes
 `<folder>/<run id>/<role>-<controller id>-<pid>.json` when the window ends. The role is `server`, `battle-host` or
 `client`. Use a new run id for each run: a report left in the run folder by an earlier process makes `compare` stop
 with "more than one report".
+
+Reports carry platform user ids: the controller id in the file name, in `Process.ControllerId` and in the route
+names. Redact them before posting a report publicly.
 
 - `coop.debug.benchmark.status` reports whether a window is recording and the last report path.
 - `coop.debug.benchmark.stop` ends the window early and writes the report.
 - `coop.debug.benchmark.camera [height] [distance]` (client) fixes the mission camera beside the battle: level with
   the midpoint between the two sides' average positions, 80 m to the side and 50 m up by default, looking at the
-  midpoint. Run it after the charge order so render cost is comparable between runs.
+  midpoint. Run it after the charge order so render cost is comparable between runs. `coop.debug.benchmark.camera off`
+  gives the normal camera back.
 
 These commands are in every build, Release included. The scenario staging below uses DEBUG-only fixture commands.
 
@@ -41,7 +46,7 @@ turned off again, so it stays on until the game exits; both sides of an A/B run 
 | `Garbage` | Gen0, gen1 and gen2 collections, allocated bytes and bytes per second over the window. |
 | `Cpu` | Process CPU seconds and percent of one core. |
 | `Memory` | Working set at start and end, peak working set since the process started, private and managed heap at the end. |
-| `Traffic`, `Routes` | Mission traffic, left out on the server, which is never a mission peer. Per peer and in total, sent and received: movement datagrams and bytes, reliable messages (one per message: sent before batching, received as each one comes out of a batch) and bytes, reliable packets (what went to LiteNetLib: a batch or a reliable packet) and bytes, each also per second. Sent traffic also has `ReliableDatagrams` (what LiteNetLib puts on the wire: one per packet up to its single-packet size, 1,020 B at the 1,024 B MTU neither connection raises, otherwise `ceil(bytes / (size - 6))` fragments), `OversizedReliablePackets` (packets that fragmented), and reliable bytes per second split into `Direct` (mission peer) and `Relayed` (the serialized relay packet on the campaign connection). Received reliable packets arrive reassembled, so they have no datagram count. Received traffic covers the direct mission connection only: the server forwards relayed payloads on the campaign connection, where they can't be told apart from campaign traffic, so relayed traffic shows in the sender's `Relayed*` counts. |
+| `Traffic`, `Routes` | Mission traffic, left out on the server, which is never a mission peer. Per peer and in total, sent and received: movement datagrams and bytes, reliable messages (one per message: sent before batching, received as each one comes out of a batch) and bytes, reliable packets (what went to LiteNetLib: a batch or a reliable packet) and bytes, each also per second. Sent traffic also has `ReliableDatagrams` (an estimate from packet size of what LiteNetLib puts on the wire, without resends: one per packet up to its single-packet size, 1,020 B at the 1,024 B MTU neither connection raises, otherwise `ceil(bytes / (size - 6))` fragments), `OversizedReliablePackets` (packets that fragmented), and reliable bytes per second split into `Direct` (mission peer) and `Relayed` (the serialized relay packet on the campaign connection). Received reliable packets arrive reassembled, so they have no datagram count. Received traffic covers the direct mission connection only: the server forwards relayed payloads on the campaign connection, where they can't be told apart from campaign traffic, so relayed traffic shows in the sender's `Relayed*` counts. |
 | `ReceivedMessages` | Every message received, by type, and the total per second. On the dedicated server this is the battle traffic it receives. |
 | `MessageTraffic` | Every message and packet sent and received, on the campaign connection and the mission peers together: per type and in total, the count, bytes, count and bytes per second, and bytes per message. Bytes are the serialized message or packet handed to the connection or taken off it, before LiteNetLib's headers, once per peer. Movement counts as `MovementPacket` or `MountMovementPacket` on both sides, with the LZ4 envelope's bytes when compression won. A message inside an aggregate counts its own bytes and the aggregate's framing counts under `AggregateMessagePacket`. A message relayed through the server counts under its own type and again inside `RelayPacket`, and the server counts each payload it forwards as a sent `RelayPacket`. On the dedicated server this is all of its traffic. |
 | `MissionStart`, `MissionEnd` | In mission, battle host, active agents, agents this process owns, scene. |
