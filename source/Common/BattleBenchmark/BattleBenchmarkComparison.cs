@@ -53,6 +53,11 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         @"^MessageTraffic\.(?<direction>Sent|Received)\.ByType\.(?<type>.+)\.(?<metric>BytesPerSecond|CountPerSecond|AverageBytes)$",
         RegexOptions.Compiled);
 
+    // A type's counts and rates; a run with none of the type has no entry, so it counts as 0. Its average size has no value then.
+    private static readonly Regex ZeroWhenMissingPattern = new Regex(
+        @"^MessageTraffic\.(?<direction>Sent|Received)\.ByType\..+\.(Count|Bytes|CountPerSecond|BytesPerSecond)$",
+        RegexOptions.Compiled);
+
     // Identity and bookkeeping fields, not measurements.
     private static readonly HashSet<string> IgnoredPaths = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -209,8 +214,8 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
                     return new BattleBenchmarkMetricComparison(
                         processKey,
                         metric,
-                        BattleBenchmarkSpread.Of(baselineRuns.Select(metrics => metrics.TryGetValue(metric, out double value) ? value : 0d)),
-                        BattleBenchmarkSpread.Of(candidateRuns.Select(metrics => metrics.TryGetValue(metric, out double value) ? value : 0d)));
+                        BattleBenchmarkSpread.Of(Values(baseline, processKey, metric)),
+                        BattleBenchmarkSpread.Of(Values(candidate, processKey, metric)));
                 }
 
                 var rows = baselineRuns.Concat(candidateRuns)
@@ -333,12 +338,19 @@ public class BattleBenchmarkComparison : IBattleBenchmarkComparison
         }
     }
 
+    // Compare and RenderMessageTypes both read through this, so the two tables count the same runs.
     private static IEnumerable<double> Values(IEnumerable<BattleBenchmarkRun> runs, string processKey, string metric)
     {
+        Match perType = ZeroWhenMissingPattern.Match(metric);
+        // Reports written before the per-type counts existed have no total, so they are left out.
+        string total = perType.Success ? $"MessageTraffic.{perType.Groups["direction"].Value}.Total.BytesPerSecond" : null;
         foreach (BattleBenchmarkRun run in runs)
         {
-            if (run.Processes.TryGetValue(processKey, out var metrics) && metrics.TryGetValue(metric, out double value))
+            if (!run.Processes.TryGetValue(processKey, out var metrics)) continue;
+            if (metrics.TryGetValue(metric, out double value))
                 yield return value;
+            else if (total != null && metrics.ContainsKey(total))
+                yield return 0d;
         }
     }
 

@@ -128,6 +128,33 @@ public class BattleBenchmarkComparisonTests : IDisposable
         Assert.DoesNotContain("### server received", table);
     }
 
+    [Fact]
+    public void CompareAndRenderMessageTypes_BothCountARunWithoutTheTypeAsZero()
+    {
+        IReadOnlyList<BattleBenchmarkRun> baseline = new[]
+        {
+            TypeRun("b1", ("NetworkMove", 1000, 10)),
+            TypeRun("b2", ("NetworkMove", 1000, 10)),
+            TypeRun("b3", ("NetworkMove", 1000, 10)),
+        };
+        IReadOnlyList<BattleBenchmarkRun> candidate = new[]
+        {
+            TypeRun("c1", ("NetworkMove", 500, 5)),
+            TypeRun("c2", ("NetworkMove", 500, 5)),
+            TypeRun("c3"),
+        };
+
+        BattleBenchmarkMetricComparison row = Assert.Single(comparison.Compare(
+            baseline, candidate, includeAll: true, filter: @"ByType\.NetworkMove\.BytesPerSecond$"));
+        string table = comparison.RenderMessageTypes(baseline, candidate);
+
+        Assert.Equal(3, row.Candidate.Count);
+        Assert.Equal(1000d / 3, row.Candidate.Mean, 9);
+        Assert.Equal("separated", row.Verdict);
+        Assert.Contains("| NetworkMove | 1,000 ± 0 [1,000, 1,000] (n=3) | 333.3 ± 288.7 [0, 500.0] (n=3) | -666.7 | -66.7% | " +
+                        "separated |", table);
+    }
+
     private BattleBenchmarkRun TypeRun(string name, params (string Type, double BytesPerSecond, double CountPerSecond)[] types)
     {
         var byType = types.ToDictionary(
