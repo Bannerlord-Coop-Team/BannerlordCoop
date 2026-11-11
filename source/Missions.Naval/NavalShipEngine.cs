@@ -724,13 +724,15 @@ public class NavalShipEngine : INavalShipEngine
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
         agent != null && point != null && agent.IsActive() && point.UserAgent == agent && agent.CurrentlyUsedGameObject == point;
 
-    // Re-pinned every tick, because vanilla's seat lock alone lets a seated foreign actor slide.
+    // Re-pinned every tick as vanilla's UsableMissionObject.OnTick pins, because its seat lock alone lets a seated foreign actor
+    // slide. A hook's seat only locks the position, so the puppet keeps its own facing there.
     public void PinToStation(Agent agent, UsableMissionObject point)
     {
-        if (!point.LockUserFrames) return;
+        if (!point.LockUserFrames && !point.LockUserPositions) return;
 
         var frame = point.GetUserFrameForAgent(agent);
-        agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
+        if (point.LockUserFrames) agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
+        else agent.SetTargetPosition(frame.Origin.AsVec2);
     }
 
     public StationSeatPose ReadSeatPose(Agent agent, UsableMissionObject point)

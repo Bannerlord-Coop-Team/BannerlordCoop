@@ -296,8 +296,11 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public bool IsMainAgent(Agent agent) => agent != null && agent == Mission.Current?.MainAgent;
 
-    // A fake hull has no agent physics, so nothing drifts off a station to pin back.
-    public void PinToStation(Agent agent, UsableMissionObject point) { }
+    /// <summary>Runs each re-pin through a real engine's pinning; unset, nothing is pinned, as a fake hull has no agent physics.</summary>
+    public Action<Agent, UsableMissionObject>? Pin { get; set; }
+
+    // Hands the re-pin to the test's pinning, if any.
+    public void PinToStation(Agent agent, UsableMissionObject point) => Pin?.Invoke(agent, point);
 
     public void ReleaseHull(MissionObject hull)
     {

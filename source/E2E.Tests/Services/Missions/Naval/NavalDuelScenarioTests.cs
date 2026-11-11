@@ -1,6 +1,10 @@
 ﻿using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions.Naval;
@@ -187,4 +191,57 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         Assert.True((onA.Position - onA.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"owner sits at {onA.Position}");
         Assert.True((onB.Position - onB.StationFrame.origin).DistanceSquared(spawnOffset) < 1e-8f, $"copy sits at {onB.Position}");
     }
+
+#if COOP_NAVAL
+    private const string HookKey = "4:attachment_machine_holder/28:attachment_point_machine_nested/3:pilot";
+    private static readonly Vec3 HookOffset = new(-3f, 6f, 2f);
+
+    // A's crew mans a grappling hook, whose seat vanilla only position-locks, and A's hull gets under way. B keeps its copy of
+    // the crew walking to the hook on the moved hull, otherwise the copy walks to where the hook was and off the side.
+    [Fact]
+    public void Duel_ACopysHookmanAsItsHullGetsUnderWay_IsKeptAtTheHook()
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var copyOfA = b.Hull(hullA);
+        var hookOnB = MissionTestObjects.CreateStandingPoint<HookStandingPoint>();
+        hookOnB.Hull = copyOfA;
+        // As ShipAttachmentMachine.OnDeploymentFinished leaves a hook's pilot seat.
+        hookOnB.LockUserFrames = false;
+        hookOnB.LockUserPositions = true;
+        copyOfA.Stations[(HookKey, 0)] = hookOnB;
+        b.Engine.Pin = ((global::Missions.Naval.NavalShipEngine)RuntimeHelpers.GetUninitializedObject(
+            typeof(global::Missions.Naval.NavalShipEngine))).PinToStation;
+
+        a.UseStation(crewOnA, a.Hull(hullA).Station(HookKey), inUse: true);
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+        a.Hull(hullA).Frame = new MatrixFrame(Mat3.Identity, new Vec3(20f, 0f, 0f));
+        battle.TickAll(3);
+
+        Assert.Equal(20f, copyOfA.Frame.origin.x, 3);
+        Assert.True(AgentMirror.TryGet(crewOnB, out var copy));
+        var hook = copyOfA.Frame.TransformToParent(HookOffset).AsVec2;
+        Assert.True(copy.LastTargetPosition.DistanceSquared(hook) < 1e-6f,
+            $"B's copy walks to {copy.LastTargetPosition}, the hook is at {hook}");
+        Assert.Same(crewOnB, copyOfA.SeatedAt(HookKey));
+    }
+
+    /// <summary>A hook's pilot seat on a fake hull: its user frame rides the hull's current frame, as a prefab point's does.</summary>
+    private sealed class HookStandingPoint : StandingPoint
+    {
+        public FakeHull Hull { get; set; } = null!;
+
+        // The seat at its offset on the hull's current frame.
+        public override WorldFrame GetUserFrameForAgent(Agent agent) => new(Hull.Frame.rotation,
+            new WorldPosition(UIntPtr.Zero, Hull.Frame.TransformToParent(HookOffset)));
+    }
+#endif
 }

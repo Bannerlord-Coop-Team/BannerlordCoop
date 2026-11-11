@@ -12,6 +12,9 @@ internal static class MissionTestObjects
 
     internal static StandingPoint CreateStandingPoint() => Uninitialized<StandingPoint>();
 
+    // A constructor-skipped standing point of a test subclass, such as one with its own user frame.
+    internal static T CreateStandingPoint<T>() where T : StandingPoint => Uninitialized<T>();
+
     internal static RangedSiegeWeapon CreateShipWeapon() => Uninitialized<Ballista>();
 
     // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills; run
