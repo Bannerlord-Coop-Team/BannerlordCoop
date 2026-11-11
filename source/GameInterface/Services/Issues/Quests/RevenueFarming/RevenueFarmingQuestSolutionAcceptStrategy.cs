@@ -58,11 +58,14 @@ internal sealed class RevenueFarmingQuestSolutionAcceptStrategy : IQuestSolution
     {
         // Other players have an issue without a quest, so no personal state is created for them.
         if (issue.IssueQuest is not Quest quest) return;
-        if (!owners.TryResolveOwnerHero(issue, out var hero) || !owners.TryGetOwnerControllerId(issue, out var owner))
+        if (!owners.TryGetOwnerControllerId(issue, out var owner))
             throw new InvalidOperationException("Revenue Farming acceptance has no owning player.");
         // A losing client's predicted quest stays untouched until the framework applies its rejection.
         var existing = sessions.Get(quest);
-        if (existing != null && (existing.PlayerHero != hero || existing.ControllerId != owner)) return;
+        if (existing != null && existing.ControllerId != owner) return;
+        if (!owners.TryResolveOwnerHero(issue, out var hero))
+            throw new InvalidOperationException("Revenue Farming acceptance has no owning player.");
+        if (existing != null && existing.PlayerHero != hero) return;
         using var stream = new MemoryStream(captured);
         using var reader = new BinaryReader(stream);
         var questId = reader.ReadString();
