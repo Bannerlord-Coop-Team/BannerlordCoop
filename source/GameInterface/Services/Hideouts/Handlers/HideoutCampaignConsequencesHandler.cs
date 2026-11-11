@@ -299,7 +299,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
             (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent))
             return;
 
-        var rewards = new ClearRewardSnapshot(settlement) { MapEvent = mapEvent, Component = component };
+        var rewards = new ClearRewardSnapshot(settlement) { Component = component };
         foreach (var player in playerManager.Players)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
@@ -322,7 +322,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         if (rewards.MapEvent.BattleState != BattleState.AttackerVictory)
             return;
 
-        // Snapshot before the clear, because LeaveSettlementAction removes the parties from Settlement.Parties.
+        // Snapshot before the clear, because OnHideoutCleared takes the parties out of Settlement.Parties.
         var playersInside = rewards.Settlement.Parties.Where(playerManager.Contains).ToArray();
         // Native PlayerEncounter.DoEnd clears the hideout through its component; the dedicated server has no player encounter.
         rewards.Component.OnHideoutCleared(rewards.Settlement);
@@ -490,8 +490,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     private sealed class ClearRewardSnapshot
     {
         public Settlement Settlement { get; }
-        public MapEvent MapEvent { get; set; }
         public HideoutEventComponent Component { get; set; }
+        public MapEvent MapEvent => Component?.MapEvent;
         public List<(Hero Hero, MobileParty Party)> Participants { get; } = new();
         public HashSet<Hero> ClaimedHeroes { get; } = new();
 
