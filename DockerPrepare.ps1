@@ -23,6 +23,8 @@ Copy-Item "${MBBinDir}" -Force -Filter "TaleWorlds*.dll" -Destination "${Assembl
 Copy-Item "${MBModulesDir}\Native" -Force -Filter "TaleWorlds*.dll" -Destination "${AssembliesTempDir}\Modules\Native" -Recurse
 Copy-Item "${MBModulesDir}\SandBox" -Force -Filter "SandBox*.dll" -Destination "${AssembliesTempDir}\Modules\SandBox" -Recurse
 Copy-Item "${MBModulesDir}\NavalDLC" -Force -Filter "NavalDLC*.dll" -Destination "${AssembliesTempDir}\Modules\NavalDLC" -Recurse
+# The naval tests patch NavalInitializationCampaignBehavior.OnCharacterCreationIsOver, which references StoryMode
+Copy-Item "${MBModulesDir}\StoryMode" -Force -Filter "StoryMode*.dll" -Destination "${AssembliesTempDir}\Modules\StoryMode" -Recurse
 
 # Copy game UI and module data used by tests
 $Modules = @("Native", "SandBox", "NavalDLC")

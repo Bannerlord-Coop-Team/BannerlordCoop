@@ -35,7 +35,8 @@ public class BattleFinalizeHandlerRetryTests : IDisposable
             Mock.Of<ISettlementInterface>(),
             Mock.Of<IBattleHostRegistry>(),
             Mock.Of<IPlayerManager>(),
-            leaderReconciler);
+            leaderReconciler,
+            Mock.Of<IBattleHostRetentionPolicy>());
     }
 
     [Fact]

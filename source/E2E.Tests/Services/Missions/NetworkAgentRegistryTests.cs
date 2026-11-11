@@ -18,6 +18,24 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class NetworkAgentRegistryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CosmeticIdentity_SurvivesDeregistrationUntilDeletionOrReset(bool reset)
+    {
+        var (registry, agent, id) = RegisterAgent("owner", "owner");
+        Assert.True(registry.RemoveAgent(id));
+        Assert.False(registry.TryGetAgentInfo(id, out _));
+        Assert.True(registry.TryGetCosmeticAgent(id, out var corpse));
+        Assert.Same(agent, corpse);
+        Assert.True(registry.TryGetCosmeticAgentId(agent, out Guid cosmeticId));
+        Assert.Equal(id, cosmeticId);
+        if (reset) registry.Clear();
+        else registry.ForgetCosmeticAgent(agent);
+        Assert.False(registry.TryGetCosmeticAgent(id, out _));
+        Assert.False(registry.TryGetCosmeticAgentId(agent, out _));
+    }
+
     private static NetworkAgentRegistry NewRegistry(string localControllerId)
     {
         var provider = new Mock<IControllerIdProvider>();

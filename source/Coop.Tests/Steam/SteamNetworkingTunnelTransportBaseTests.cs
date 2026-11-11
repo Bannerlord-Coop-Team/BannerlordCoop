@@ -3,9 +3,12 @@ using Moq;
 using Serilog;
 using Steamworks;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Coop.Tests.Steam
@@ -83,6 +86,140 @@ namespace Coop.Tests.Steam
             Assert.Single(transport.RawClosedConnections);
         }
 
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void Receive_AfterConnectionCloses_NeverReachesSteam(bool closedByPeer)
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            SeedOwnedConnection(transport, connection, 76561198000000042);
+            transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+
+            if (closedByPeer)
+            {
+                transport.DispatchConnectionState(
+                    connection,
+                    ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer);
+            }
+            else
+            {
+                transport.CloseConnection(connection);
+            }
+
+            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Assert.Single(transport.ReceivedConnections);
+            Assert.Single(transport.RawClosedConnections);
+        }
+
+        // Closing the listener makes Steam close its accepted connections, so a late receive must not reach Steam
+        [Fact]
+        public void Receive_AfterListenerStops_NeverReachesSteam()
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            transport.ListenForClients(0);
+            transport.DispatchConnectionState(
+                connection,
+                ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting,
+                listenSocket: 43);
+            transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]);
+
+            transport.StopListening();
+
+            Assert.Equal(0, transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Assert.Single(transport.ReceivedConnections);
+        }
+
+        [Fact]
+        public void CloseDuringReceive_WaitsForTheReceiveToReturn()
+        {
+            const uint connection = 42;
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>());
+            SeedOwnedConnection(transport, connection, 76561198000000042);
+            using var entered = new ManualResetEventSlim();
+            using var release = new ManualResetEventSlim();
+            transport.DuringReceive = () =>
+            {
+                entered.Set();
+                release.Wait();
+            };
+
+            var receive = Task.Run(() => transport.ReceiveDatagram(connection, new byte[SteamTunnel.MaxDatagramBytes]));
+            Task close;
+            bool closedDuringReceive;
+            try
+            {
+                Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+                close = Task.Run(() => transport.CloseConnection(connection));
+                // An ungated close finishes at once, while the pump tick is still inside Steam's receive
+                closedDuringReceive = close.Wait(TimeSpan.FromMilliseconds(200));
+            }
+            finally
+            {
+                release.Set();
+            }
+
+            Assert.True(receive.Wait(TimeSpan.FromSeconds(5)));
+            Assert.True(close.Wait(TimeSpan.FromSeconds(5)));
+            Assert.False(closedDuringReceive);
+            Assert.Equal(connection, Assert.Single(transport.RawClosedConnections));
+        }
+
+        // The stats line has to name the route, because ping alone cant tell a route switch apart.
+        [Theory]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Relayed, "route=relayed")]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Relayed | Constants.k_nSteamNetworkConnectionInfoFlags_Fast, "route=relayed")]
+        [InlineData(0, "route=direct")]
+        [InlineData(Constants.k_nSteamNetworkConnectionInfoFlags_Fast, "route=direct")]
+        public void DescribeConnection_NamesRouteFromConnectionFlags(int flags, string expectedRoute)
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = flags,
+            };
+            SeedOwnedConnection(transport, 42, 76561198000000042);
+
+            Assert.EndsWith(expectedRoute, transport.DescribeConnection(42));
+        }
+
+        // A failed info read must not lose the rest of the stats line.
+        [Fact]
+        public void DescribeConnection_ReportsUnknownRouteWhenInfoIsUnavailable()
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = null,
+            };
+            SeedOwnedConnection(transport, 42, 76561198000000042);
+
+            string description = transport.DescribeConnection(42);
+
+            Assert.StartsWith("sendRate=", description);
+            Assert.EndsWith("route=unknown", description);
+        }
+
+        // A join that fails before finding a route has no Relayed flag, which must not read as direct.
+        [Theory]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connecting)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_FindingRoute)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ClosedByPeer)]
+        [InlineData(ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_ProblemDetectedLocally)]
+        public void DescribeConnection_ReportsUnknownRouteWhenNotConnected(ESteamNetworkingConnectionState state)
+        {
+            using var transport = new TestSteamNetworkingTunnelTransport(Mock.Of<ILogger>())
+            {
+                RealTimeStatusResult = EResult.k_EResultOK,
+                ConnectionInfoFlags = 0,
+                ConnectionInfoState = state,
+            };
+            SeedOwnedConnection(transport, 42, 76561198000000042);
+
+            Assert.EndsWith("route=unknown", transport.DescribeConnection(42));
+        }
+
         private static void SeedOwnedConnection(
             SteamNetworkingTunnelTransportBase transport,
             uint connection,
@@ -90,12 +227,12 @@ namespace Coop.Tests.Steam
         {
             const BindingFlags privateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
             var transportType = typeof(SteamNetworkingTunnelTransportBase);
-            var ownedConnections = Assert.IsType<HashSet<uint>>(
+            var ownedConnections = Assert.IsType<ConcurrentDictionary<uint, byte>>(
                 transportType.GetField("ownedConnections", privateInstance)?.GetValue(transport));
             var remoteIdentities = Assert.IsType<TunnelConnectionIdentityRegistry>(
                 transportType.GetField("remoteIdentities", privateInstance)?.GetValue(transport));
 
-            ownedConnections.Add(connection);
+            ownedConnections.TryAdd(connection, 0);
             remoteIdentities.Record(connection, remoteSteamId);
         }
 
@@ -115,7 +252,13 @@ namespace Coop.Tests.Steam
             {
             }
 
+            public EResult RealTimeStatusResult { get; set; } = EResult.k_EResultFail;
+            public int? ConnectionInfoFlags { get; set; }
+            public ESteamNetworkingConnectionState ConnectionInfoState { get; set; } =
+                ESteamNetworkingConnectionState.k_ESteamNetworkingConnectionState_Connected;
             public List<uint> RawClosedConnections { get; } = new List<uint>();
+            public List<uint> ReceivedConnections { get; } = new List<uint>();
+            public Action? DuringReceive { get; set; }
             public List<(ESteamNetworkingConfigValue Key, ESteamNetworkingConfigScope Scope, IntPtr ScopeObject, int Value)>
                 ConfiguredValues { get; } =
                     new List<(ESteamNetworkingConfigValue, ESteamNetworkingConfigScope, IntPtr, int)>();
@@ -124,19 +267,24 @@ namespace Coop.Tests.Steam
             public SteamNetworkingConfigValue_t[] ListenOptions { get; private set; } =
                 Array.Empty<SteamNetworkingConfigValue_t>();
 
-            public void DispatchConnectionState(uint connection, ESteamNetworkingConnectionState state)
+            public void DispatchConnectionState(uint connection, ESteamNetworkingConnectionState state, uint listenSocket = 0)
             {
                 statusChangedHandler!(new SteamNetConnectionStatusChangedCallback_t
                 {
                     m_hConn = new HSteamNetConnection(connection),
-                    m_info = CreateConnectionInfo(state),
+                    m_info = CreateConnectionInfo(state, listenSocket),
                 });
             }
 
             private static SteamNetConnectionInfo_t CreateConnectionInfo(
-                ESteamNetworkingConnectionState state)
+                ESteamNetworkingConnectionState state,
+                uint listenSocket)
             {
-                object boxedInfo = new SteamNetConnectionInfo_t { m_eState = state };
+                object boxedInfo = new SteamNetConnectionInfo_t
+                {
+                    m_eState = state,
+                    m_hListenSocket = new HSteamListenSocket { m_HSteamListenSocket = listenSocket },
+                };
                 var endDebugField = typeof(SteamNetConnectionInfo_t).GetField(
                     "m_szEndDebug_",
                     BindingFlags.Instance | BindingFlags.NonPublic);
@@ -183,7 +331,14 @@ namespace Coop.Tests.Steam
                 HSteamNetConnection conn,
                 ref SteamNetConnectionRealTimeStatus_t status,
                 int lanes,
-                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus) => EResult.k_EResultFail;
+                ref SteamNetConnectionRealTimeLaneStatus_t laneStatus) => RealTimeStatusResult;
+
+            // Scripts the route flags, where null stands for Steam refusing the read.
+            protected override bool GetConnectionInfo(HSteamNetConnection conn, out SteamNetConnectionInfo_t info)
+            {
+                info = new SteamNetConnectionInfo_t { m_nFlags = ConnectionInfoFlags ?? 0, m_eState = ConnectionInfoState };
+                return ConnectionInfoFlags.HasValue;
+            }
 
             protected override HSteamNetConnection ConnectP2P(
                 ref SteamNetworkingIdentity identity,
@@ -234,7 +389,12 @@ namespace Coop.Tests.Steam
             protected override int ReceiveMessagesOnConnection(
                 HSteamNetConnection conn,
                 IntPtr[] messages,
-                int maxMessages) => 0;
+                int maxMessages)
+            {
+                ReceivedConnections.Add(conn.m_HSteamNetConnection);
+                DuringReceive?.Invoke();
+                return 0;
+            }
         }
     }
 }

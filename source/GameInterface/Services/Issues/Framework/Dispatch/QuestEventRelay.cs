@@ -26,33 +26,40 @@ internal class QuestEventRelay : IQuestEventRelay
 
     public void Relay(string listenerName, Type[] parameterTypes, params object[] arguments)
     {
-        dispatcher.RunAsOwners<QuestBase>(quest =>
+        dispatcher.RunAsOwners<QuestBase>(quest => InvokeListener(quest, listenerName, parameterTypes, arguments));
+    }
+
+    public void RelayToOwner(Hero owner, string listenerName, Type[] parameterTypes, params object[] arguments)
+    {
+        dispatcher.RunAsOwner<QuestBase>(owner, quest => InvokeListener(quest, listenerName, parameterTypes, arguments));
+    }
+
+    private void InvokeListener(QuestBase quest, string listenerName, Type[] parameterTypes, object[] arguments)
+    {
+        var issue = quest.QuestGiver?.Issue;
+        if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()) ||
+            (listenerName == "OnHeroKilled" && cancellation.IsPending(issue)))
         {
-            var issue = quest.QuestGiver?.Issue;
-            if (issue?.IssueQuest != quest || !registry.IsRegistered(issue.GetType()) ||
-                (listenerName == "OnHeroKilled" && cancellation.IsPending(issue)))
+            return;
+        }
+
+        // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
+        var key = (Quest: quest.GetType(), Listener: listenerName);
+        if (MissingListeners.ContainsKey(key)) return;
+
+        if (!Listeners.TryGetValue(key, out var listener))
+        {
+            listener = FindListener(key.Quest, key.Listener, parameterTypes);
+            if (listener == null)
             {
+                MissingListeners.TryAdd(key, 0);
                 return;
             }
 
-            // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
-            var key = (Quest: quest.GetType(), Listener: listenerName);
-            if (MissingListeners.ContainsKey(key)) return;
+            Listeners.TryAdd(key, listener);
+        }
 
-            if (!Listeners.TryGetValue(key, out var listener))
-            {
-                listener = FindListener(key.Quest, key.Listener, parameterTypes);
-                if (listener == null)
-                {
-                    MissingListeners.TryAdd(key, 0);
-                    return;
-                }
-
-                Listeners.TryAdd(key, listener);
-            }
-
-            listener.Invoke(quest, arguments);
-        });
+        listener.Invoke(quest, arguments);
     }
 
     // GetMethod does not return a private method declared on a base type, so each type is asked for its own

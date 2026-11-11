@@ -682,6 +682,19 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             request => request.Operation != LordSolutionOperation.Start);
         Assert.Equal(acceptMerchant ? LordSolutionOperation.AcceptCounterOffer : LordSolutionOperation.RefuseCounterOffer, decision.Operation);
         Assert.Equal(0f, decision.Difficulty);
+        if (!acceptMerchant && leaveTown)
+        {
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionRejected>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.Equal(100, Get<Clan>(Server, clanId).Influence);
+            Assert.True(ownerIssue.IsSolvingWithLordSolution);
+            Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+            Assert.Equal(10000, Get<Hero>(Server, scenario.OwnerHeroId).Gold);
+            Assert.Equal(1, ownerIssue.JournalEntries.Count);
+            Assert.Empty(observerIssue.JournalEntries);
+            ClientA.Call(() => Assert.False(ClientA.Resolve<ILordSolutionCoordinator>().IsDecisionPending(ownerIssue)));
+            return;
+        }
         var outcome = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome;
         Assert.Equal(acceptMerchant ? IssueOutcome.LordAcceptedCounterOffer : IssueOutcome.LordRefusedCounterOffer, outcome);
         AssertFinished(acceptMerchant ? 2470 : 2530, acceptMerchant ? 10000 : 10900);

@@ -32,8 +32,8 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))`. Clients replay what the
    server announced and never roll or pay anything again.
 2. A quest with a `FinalizationProofStrategy` ends through its branch, not a generic `QuestSuccess`, which skips
-   the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
-   `QuestSuccess` for your descriptor.
+   the branch method where vanilla pays. The framework rejects generic `QuestSuccess` for proof quests, so each
+   descriptor still needs a finalization proof strategy and branch implementation.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot, moved to the new owner on
    `NetworkIssueOwnerChanged` and emptied on `NetworkIssueFinalized`. A client sets or moves its mirror when it
@@ -73,7 +73,10 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
-   listener names as strings because `Framework/` cannot name quest types.
+   listener names as strings because `Framework/` cannot name quest types. `OnPlayerDesertedBattle` is about one
+   player: the server dispatches it inside the retreating player's `MainHeroSubstitutionScope`
+   (`EncounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence`), and the relay runs vanilla's `OnPlayerDeserted`
+   only on that player's quests, through `IOutcomeDispatcher.RunAsOwner`.
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.

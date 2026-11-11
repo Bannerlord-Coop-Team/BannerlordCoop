@@ -7,6 +7,7 @@
 Build armies, manage kingdoms, fight battles, trade, raid settlements, and conquer Calradia together in a shared multiplayer campaign.
 
 [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3770450698) &nbsp;•&nbsp;
+[Rent a Server](https://bannerlordcoop.com/hosting) &nbsp;•&nbsp;
 [Discord](https://discord.gg/VXqGyT8) &nbsp;•&nbsp;
 [Reddit](https://www.reddit.com/r/BannerlordCoop/) &nbsp;•&nbsp;
 [Support the project](#support-bannerlord-coop)
@@ -27,7 +28,9 @@ Join our [Discord](https://discord.gg/VXqGyT8) for installation help, announceme
 
 ## Hosting
 
-For the best performance and stability, we strongly recommend hosting campaigns through the included **dedicated server**. [The hosting instructions can be found in our Discord through this link.](https://discord.gg/2MRuH9fVVV)
+**Don't want to run a server yourself?** [Rent an official Bannerlord Co-op server](https://bannerlordcoop.com/hosting) from the mod team. It stays on the latest co-op build, takes daily off-host backups, and runs in 12 regions across North America, Europe and Asia-Pacific. You manage it from bannerlordcoop.com.
+
+If you'd rather host it yourself, we strongly recommend running campaigns on the included **dedicated server** for the best performance and stability. [The hosting instructions can be found in our Discord through this link.](https://discord.gg/2MRuH9fVVV)
 
 Steam hosting does not require traditional port forwarding in most cases. Manual network hosting options are also available.
 
@@ -89,6 +92,8 @@ Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/
 We do not accept tests or implementations that no human contributor takes ownership of, because they add too much technical debt. AI tools may write code and tests, but a human contributor must own every change: direct its design, review and test it, answer review feedback, and be able to explain and maintain it. PRs that nobody owns this way may be closed.
 
 Debug builds of the in-game server always try to load a campaign save named `MP` when the server starts: a plain `/server` launch loads nothing else, and a `/coopsave <name>` launch attempts `MP` before the named save. A missing `MP` save is skipped with `Failed to load save with name MP` in the server log, so create a game and save it as `MP` before hosting from a Debug build; the [Environment Setup Guide](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Environment-Setup-Guide) wiki page covers this under Windows Setup (create a new game and save it as MP). Release builds skip `MP` and load only the save picked in the host screen or passed with `/coopsave`.
+
+The Visual Studio launch profiles for `Coop`, `ClientDebug`, `ClientDebug2` and `Coop.Core` append the `CoopDebugModules` user environment variable to the `_MODULES_` list right after `StoryMode`, so extra modules can be loaded without editing the launch settings. Start each module with `*`: `setx CoopDebugModules "*NavalDLC"` loads War Sails, and `"*NavalDLC*OtherModule"` loads more than one. Left unset, the default module list is used. Restart Visual Studio after changing it, because it only reads environment variables when it starts.
 
 By submitting a contribution to BannerlordCoop, you agree that your contribution
 may be used, modified, distributed, sublicensed, and relicensed by the

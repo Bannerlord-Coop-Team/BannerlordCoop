@@ -49,12 +49,21 @@ public class AgentRoutReporter : IAgentRoutReporter
         this.lifecycle = lifecycle;
 
         messageBroker.Subscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
+        messageBroker.Subscribe<BattleAgentRetreatChanged>(Handle_BattleAgentRetreatChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
+        messageBroker.Unsubscribe<BattleAgentRetreatChanged>(Handle_BattleAgentRetreatChanged);
     }
+
+    /// <summary>
+    /// Whether a routed removal is a battlefield rout. A leaving client's teardown also removes agents as routed (the
+    /// naval ships logic removes every hull with its crew in <c>OnEndMission</c>); peers must not despawn those, because
+    /// the departure path decides which of them withdraw and which the successor adopts.
+    /// </summary>
+    internal static bool IsBattlefieldRout(Mission.State missionState) => missionState == Mission.State.Continuing;
 
     public void OnAgentFleeing(Agent agent)
     {
@@ -63,11 +72,26 @@ public class AgentRoutReporter : IAgentRoutReporter
         if (info.CurrentAuthority != session.OwnControllerId) return;
 
         Logger.Information("[BattleSync] Broadcasting fleeing state of agent {AgentId} to the battle mesh", info.AgentId);
-        network.SendAll(new NetworkBattleAgentFleeing(info.AgentId));
+        network.SendAll(new NetworkBattleAgentFleeing(info.AgentId, info.AuthorityRevision));
     }
 
+    // Tells peers an owned troop's retreat flag changed. Authority is read here on the game thread, so a new owner reports its rallies.
+    private void Handle_BattleAgentRetreatChanged(MessagePayload<BattleAgentRetreatChanged> payload)
+    {
+        var change = payload.What;
+        if (!change.Agent.IsHuman) return;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(change.Agent, out var info)) return;
+        if (info.CurrentAuthority != session.OwnControllerId) return;
+
+        network.SendAll(new NetworkBattleAgentRetreatState(info.AgentId, change.IsRunningAway, info.AuthorityRevision));
+    }
+
+    // Published synchronously from Mission.OnAgentRemoved, so the mission state is the one the removal happened in.
     private void Handle_BattleAgentRouted(MessagePayload<BattleAgentRouted> payload)
     {
+        var mission = payload.What.Agent?.Mission;
+        if (mission == null || !IsBattlefieldRout(mission.CurrentState)) return;
+
         var registry = coopMissionComponent.AgentRegistry;
 
         GameThread.RunSafe(() =>

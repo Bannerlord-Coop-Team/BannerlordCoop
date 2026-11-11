@@ -1,7 +1,5 @@
 ﻿using ProtoBuf;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -20,8 +18,8 @@ namespace Missions.Agents.Packets
                 mainHandUsageIndex = 0;
             }
 
-            MainHandIndex = (int)mainHandIndex;
-            OffHandIndex = (int)offHandIndex;
+            MainHandIndexWire = (int)mainHandIndex + 1;
+            OffHandIndexWire = (int)offHandIndex + 1;
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = GetItemId(agent?.Equipment, mainHandIndex);
             OffHandItemId = GetItemId(agent?.Equipment, offHandIndex);
@@ -30,6 +28,7 @@ namespace Missions.Agents.Packets
 
         internal static bool TryCapture(Agent agent, out AgentEquipmentData data)
         {
+            // MatchesLive reads the same fields without allocating, so a field added here needs a matching check there.
             data = default;
             if (!TryRead(agent, out EquipmentIndex mainHandIndex,
                     out EquipmentIndex offHandIndex, out int mainHandUsageIndex))
@@ -70,8 +69,8 @@ namespace Missions.Agents.Packets
             string offHandItemId = null,
             AgentArrowAmmoData[] arrowAmmo = null)
         {
-            MainHandIndex = (int)mainHandIndex;
-            OffHandIndex = (int)offHandIndex;
+            MainHandIndexWire = (int)mainHandIndex + 1;
+            OffHandIndexWire = (int)offHandIndex + 1;
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = mainHandItemId;
             OffHandItemId = offHandItemId;
@@ -112,21 +111,74 @@ namespace Missions.Agents.Packets
                 && MainHandUsageIndex == current.MainHandUsageIndex
                 && (MainHandItemId == null || MainHandItemId == current.MainHandItemId)
                 && (OffHandItemId == null || OffHandItemId == current.OffHandItemId)
-                && (ArrowAmmo == null || ArrowAmmo.SequenceEqual(current.ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>()));
+                && (ArrowAmmo == null || ArrowAmmoEquals(ArrowAmmo, current.ArrowAmmo));
+        }
+
+        /// <summary>
+        /// True when this stored capture equals what <see cref="TryCapture"/> would read from the agent right now,
+        /// without allocating. Reads exactly the fields <see cref="TryCapture"/> sends.
+        /// </summary>
+        internal bool MatchesLive(Agent agent)
+        {
+            if (!TryRead(agent, out EquipmentIndex mainHandIndex,
+                    out EquipmentIndex offHandIndex, out int mainHandUsageIndex))
+            {
+                return false;
+            }
+
+            MissionEquipment equipment = agent.Equipment;
+            return MainHandIndex == (int)mainHandIndex
+                && OffHandIndex == (int)offHandIndex
+                && MainHandUsageIndex == mainHandUsageIndex
+                && MainHandItemId == GetItemId(equipment, mainHandIndex)
+                && OffHandItemId == GetItemId(equipment, offHandIndex)
+                && ArrowAmmoMatchesLive(equipment);
+        }
+
+        private bool ArrowAmmoMatchesLive(MissionEquipment equipment)
+        {
+            int storedCount = ArrowAmmo?.Length ?? 0;
+            if (!HasSafeWeaponSlots(equipment)) return storedCount == 0;
+
+            int next = 0;
+            for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.ExtraWeaponSlot; slot++)
+            {
+                MissionWeapon weapon = equipment[slot];
+                if (!IsArrowAmmo(weapon)) continue;
+                if (next >= storedCount || !ArrowAmmo[next].MatchesWeapon((int)slot, weapon)) return false;
+                next++;
+            }
+            return next == storedCount;
+        }
+
+        // Null and empty are the same loadout.
+        internal static bool ArrowAmmoEquals(AgentArrowAmmoData[] left, AgentArrowAmmoData[] right)
+        {
+            int leftCount = left?.Length ?? 0;
+            if (leftCount != (right?.Length ?? 0)) return false;
+            for (int i = 0; i < leftCount; i++)
+                if (!left[i].Equals(right[i])) return false;
+            return true;
         }
 
         private static AgentArrowAmmoData[] CaptureArrowAmmo(MissionEquipment equipment)
         {
             if (!HasSafeWeaponSlots(equipment)) return null;
-            List<AgentArrowAmmoData> amounts = null;
+            int count = 0;
+            for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.ExtraWeaponSlot; slot++)
+                if (IsArrowAmmo(equipment[slot])) count++;
+            if (count == 0) return null;
+
+            var amounts = new AgentArrowAmmoData[count];
+            int next = 0;
             for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.ExtraWeaponSlot; slot++)
             {
-                var weapon = equipment[slot];
+                MissionWeapon weapon = equipment[slot];
                 if (!IsArrowAmmo(weapon)) continue;
-                (amounts ??= new List<AgentArrowAmmoData>()).Add(new AgentArrowAmmoData(
-                    (int)slot, weapon.Item.StringId, weapon.ItemModifier?.StringId, weapon.Amount));
+                amounts[next++] = new AgentArrowAmmoData(
+                    (int)slot, weapon.Item.StringId, weapon.ItemModifier?.StringId, weapon.Amount);
             }
-            return amounts?.ToArray();
+            return amounts;
         }
 
         private static bool IsArrowAmmo(MissionWeapon weapon)
@@ -280,8 +332,7 @@ namespace Missions.Agents.Packets
                    MainHandUsageIndex == other.MainHandUsageIndex
                    && MainHandItemId == other.MainHandItemId
                    && OffHandItemId == other.OffHandItemId
-                   && (ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>()).SequenceEqual(
-                       other.ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>());
+                   && ArrowAmmoEquals(ArrowAmmo, other.ArrowAmmo);
         }
 
         public override bool Equals(object obj)
@@ -304,10 +355,13 @@ namespace Missions.Agents.Packets
             }
         }
 
+        // Shifted by one so protobuf omits an empty hand (EquipmentIndex.None, -1) instead of writing a 10-byte varint.
         [ProtoMember(1)]
-        public int MainHandIndex { get; }
+        private int MainHandIndexWire { get; }
+        public int MainHandIndex => MainHandIndexWire - 1;
         [ProtoMember(2)]
-        public int OffHandIndex { get; }
+        private int OffHandIndexWire { get; }
+        public int OffHandIndex => OffHandIndexWire - 1;
         [ProtoMember(3)]
         public int MainHandUsageIndex { get; }
         [ProtoMember(4)]
@@ -318,8 +372,12 @@ namespace Missions.Agents.Packets
         public AgentArrowAmmoData[] ArrowAmmo { get; }
     }
 
+    /// <summary>
+    /// One arrow or bolt stack in a weapon slot. Implements <see cref="IEquatable{T}"/> because the per-frame action
+    /// poll compares these, and the default struct equality goes through reflection and boxing.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct AgentArrowAmmoData
+    public readonly struct AgentArrowAmmoData : IEquatable<AgentArrowAmmoData>
     {
         public AgentArrowAmmoData(int slot, string itemId, string itemModifierId, short amount)
         {
@@ -327,6 +385,40 @@ namespace Missions.Agents.Packets
             ItemId = itemId;
             ItemModifierId = itemModifierId;
             Amount = amount;
+        }
+
+        public bool Equals(AgentArrowAmmoData other)
+        {
+            return Slot == other.Slot
+                && Amount == other.Amount
+                && string.Equals(ItemId, other.ItemId, StringComparison.Ordinal)
+                && string.Equals(ItemModifierId, other.ItemModifierId, StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is AgentArrowAmmoData other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hashCode = Slot;
+                hashCode = (hashCode * 397) ^ Amount;
+                hashCode = (hashCode * 397) ^ (ItemId?.GetHashCode() ?? 0);
+                hashCode = (hashCode * 397) ^ (ItemModifierId?.GetHashCode() ?? 0);
+                return hashCode;
+            }
+        }
+
+        // Same fields CaptureArrowAmmo reads from a live weapon, compared without building a new struct.
+        internal bool MatchesWeapon(int slot, MissionWeapon weapon)
+        {
+            return Slot == slot
+                && Amount == weapon.Amount
+                && string.Equals(ItemId, weapon.Item.StringId, StringComparison.Ordinal)
+                && string.Equals(ItemModifierId, weapon.ItemModifier?.StringId, StringComparison.Ordinal);
         }
 
         [ProtoMember(1)]

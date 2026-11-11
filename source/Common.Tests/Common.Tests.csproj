@@ -37,6 +37,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <!-- The benchmark comparison lives in the tool; PrivateAssets keeps it out of the projects that reference these tests. -->
+    <ProjectReference Include="..\..\tools\BattleBenchmark\BattleBenchmark.csproj" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

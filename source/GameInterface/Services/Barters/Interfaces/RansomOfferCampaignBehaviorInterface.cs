@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Barters.Data;
 using GameInterface.Services.Barters.Messages;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
@@ -44,6 +45,7 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
 
     private Dictionary<string, RansomOfferData> PlayerRansomOfferData => coopSessionProvider.CoopSession.TradePlayerData.PlayerRansomOfferData;
 
@@ -53,12 +55,14 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         ICoopSessionProvider coopSessionProvider,
         IObjectManager objectManager,
         INetwork network,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IStatisticsCampaignBehaviorInterface statisticsInterface)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.statisticsInterface = statisticsInterface;
     }
 
     public void ConsiderRansomPrisoner(Hero hero)
@@ -131,7 +135,7 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
     public void AcceptRansomOffer(string playerHeroId, string ransomHeroId)
     {
         if (!TryGetRansomOfferBehavior(out var ransomOfferBehavior)) return;
-        if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out _)) return;
+        if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out var playerHero)) return;
 
         // The offer the player answered expired or was replaced before the response arrived
         if (playerData.CurrentRansomHeroId != ransomHeroId) return;
@@ -165,13 +169,8 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         }
         GiveGoldAction.ApplyBetweenCharacters(currentRansomPayer, ransomOfferBehavior.GetCaptorClanOfPrisoner(currentRansomHero).Leader, ransomPrice, false);
         EndCaptivityAction.ApplyByRansom(currentRansomHero, currentRansomHero.Clan.Leader);
-        
-        // TODO: Statistics (#3470)
-        //IStatisticsCampaignBehavior behavior = Campaign.Current.CampaignBehaviorManager.GetBehavior<IStatisticsCampaignBehavior>();
-        //if (behavior != null)
-        //{
-        //    behavior.OnPlayerAcceptedRansomOffer(ransomPrice);
-        //}
+
+        statisticsInterface.OnPlayerAcceptedRansomOffer(playerHero, ransomPrice);
     }
 
     public void DeclineRansomOffer(string playerHeroId, string playerRespondedRansomHeroId = null)

@@ -86,16 +86,25 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
                peer.GetPacketsCountInReliableQueue(0, false);
     }
 
-    private List<NetPeer> GetLivePeersAboveThreshold(int threshold)
+    private List<NetPeer> GetPeersAboveThreshold(int threshold)
     {
-        // Loading peers are excluded: their bulk save and held world stream are expected join traffic.
-        // Once the held stream is released the connection enters CampaignState and normal overload
-        // backpressure applies if its reliable world channel cannot keep up.
-        return connectionCollection
+        // Loading peers aren't measured here: their bulk save fragments are expected join traffic and count
+        // toward the pre-entry backlog below instead. Once the held stream is released the connection enters
+        // CampaignState and normal overload backpressure applies if its reliable world channel cannot keep up.
+        var livePeers = connectionCollection
             .Where(logic => logic.IsLoading == false)
             .Select(logic => logic.Peer)
-            .Where(peer => GetQueueDepth(peer) > threshold)
-            .ToList();
+            .Where(peer => GetQueueDepth(peer) > threshold);
+
+        // Until it enters the campaign a peer counts by the same join backlog the pre-entry watchdog checks,
+        // so time stops before its held stream overflows. The watchdog deadline ends the join and the pause.
+        var preEntryPeers = connectionCollection
+            .Where(logic => logic.State is LoadingState { IsPreEntryPending: true })
+            .Select(logic => logic.Peer)
+            .Where(peer => connectionMessageQueue.TryGetCatchUpPacketsRemaining(peer, out int backlog) &&
+                           backlog > threshold);
+
+        return livePeers.Concat(preEntryPeers).ToList();
     }
 
     private void AbortStalledJoiners(DateTime utcNow)
@@ -141,7 +150,9 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             bool queueExceeded = queueDepth > NetworkJoinLimits.MaxReplayPackets ||
                                  connectionMessageQueue.HasCatchUpOverflowed(entry.Peer);
             bool bytesExceeded = pendingBytes > NetworkJoinLimits.MaxReplayPendingBytes;
-            if (!timedOut && !queueExceeded && !bytesExceeded) continue;
+            // The capped join ignores further baseline requests, so nothing can make it progress again
+            bool baselinesExhausted = entry.State.HasExhaustedBaselines;
+            if (!timedOut && !queueExceeded && !bytesExceeded && !baselinesExhausted) continue;
 
             // Make the join terminal before disconnecting. Network receive is polled after this
             // check, so an acknowledgement already in flight cannot restart synchronization.
@@ -149,9 +160,11 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
             string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
             int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
-            string disconnectCode = timedOut
-                ? "JoinReplayAppliedTimeout"
-                : "JoinReplayQueueLimit";
+            string disconnectCode = baselinesExhausted
+                ? "JoinBaselineLimit"
+                : timedOut
+                    ? "JoinReplayAppliedTimeout"
+                    : "JoinReplayQueueLimit";
 
             joinCatchUpProgress.Remove(entry.Peer);
 
@@ -223,7 +236,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
                 if (!preEntryBackpressureStartedUtc.TryGetValue(entry.Peer, out var startedUtc))
                 {
-                    if (queueDepth <= config.MaxPacketsInQueue) continue;
+                    // While paused, a peer above the resume threshold holds the pause, so it needs the deadline too
+                    if (queueDepth <= config.MaxPacketsInQueue && automaticPauseLease == null) continue;
 
                     startedUtc = utcNow;
                     preEntryBackpressureStartedUtc.Add(entry.Peer, startedUtc);
@@ -294,7 +308,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         // hysteresis: it stops a chronically slow peer from flapping pause/resume around one limit.
         if (automaticPauseLease != null)
         {
-            var stillDraining = GetLivePeersAboveThreshold(config.ResumePacketsInQueue)
+            var stillDraining = GetPeersAboveThreshold(config.ResumePacketsInQueue)
                 .Distinct()
                 .ToArray();
             cachedOverloadedPeers = stillDraining;
@@ -315,7 +329,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             return;
         }
 
-        var overloadedPeers = GetLivePeersAboveThreshold(config.MaxPacketsInQueue);
+        var overloadedPeers = GetPeersAboveThreshold(config.MaxPacketsInQueue);
         if (overloadedPeers.Count == 0) return;
 
         PauseTime(

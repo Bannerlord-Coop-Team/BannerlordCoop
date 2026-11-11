@@ -132,7 +132,7 @@ internal static class RaidAiInterventionSuppression
         return settlement?.Party?.MapEvent?.IsRaidAiInterventionSuppressed() == true;
     }
 
-    private static void HoldParty(MobileParty party)
+    internal static void HoldParty(MobileParty party)
     {
         if (ModInformation.IsClient)
             return;

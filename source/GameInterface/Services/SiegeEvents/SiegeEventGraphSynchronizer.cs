@@ -39,6 +39,7 @@ internal readonly struct SiegeEventGraphSnapshot
     public uint[] BesiegerPartyHandles { get; }
     public SiegeEngineGraphSnapshot[] AttackerEngines { get; }
     public SiegeEngineGraphSnapshot[] DefenderEngines { get; }
+    public bool IsBlockadeActive { get; }
 
     public bool IsComplete =>
         !string.IsNullOrEmpty(SiegeEventId) &&
@@ -70,7 +71,8 @@ internal readonly struct SiegeEventGraphSnapshot
         int besiegerTroopsKilled = 0,
         uint[] besiegerPartyHandles = null,
         SiegeEngineGraphSnapshot[] attackerEngines = null,
-        SiegeEngineGraphSnapshot[] defenderEngines = null)
+        SiegeEngineGraphSnapshot[] defenderEngines = null,
+        bool isBlockadeActive = false)
     {
         SiegeEventId = siegeEventId;
         SiegeEventHandle = siegeEventHandle;
@@ -88,6 +90,7 @@ internal readonly struct SiegeEventGraphSnapshot
         BesiegerPartyHandles = besiegerPartyHandles;
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
+        IsBlockadeActive = isBlockadeActive;
     }
 }
 
@@ -218,7 +221,8 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
             camp.NumberOfTroopsKilledOnSide,
             besiegerPartyHandles,
             attackerEngineStates,
-            defenderEngineStates);
+            defenderEngineStates,
+            siegeEvent.IsBlockadeActive);
         return true;
     }
 
@@ -338,6 +342,13 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
 
                 ApplyEngineState(attackerEngines, attackerSnapshots, attackerEngineTypes);
                 ApplyEngineState(defenderEngines, defenderSnapshots, defenderEngineTypes);
+
+                // Run instead of set, so the blockading fleets are redrawn and the blockade events are raised
+                if (siegeEvent.IsBlockadeActive != snapshot.IsBlockadeActive)
+                {
+                    if (snapshot.IsBlockadeActive) siegeEvent.ActivateBlockade();
+                    else siegeEvent.DeactivateBlockade();
+                }
             }
 
             var siegeEvents = Campaign.Current?.SiegeEventManager?._siegeEvents;
