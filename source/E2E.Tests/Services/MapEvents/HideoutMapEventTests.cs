@@ -18,6 +18,7 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using GameInterface.Services.Villages.Interfaces;
 using Moq;
@@ -881,6 +882,35 @@ public class HideoutMapEventTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
                 Assert.Equal(expectedAttackTime, settlement.Hideout.NextPossibleAttackTime);
             });
+    }
+
+    [Fact]
+    public void SendTroopsSuccess_ClearsHideoutAndLeaveTakesThePartyToTheGate()
+    {
+        var raid = CreateSharedHideout(joinerJoinsBattle: false, isSendTroops: true);
+        var client = Clients.First();
+        EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_success_on_init(null),
+            MapEventDisabledMethods);
+        Server.PumpGameThread();
+        client.PumpGameThread();
+        client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_success_consequence(null),
+            MapEventDisabledMethods);
+        Server.PumpGameThread();
+        client.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCommitMapEventResults>());
+        AssertHideoutClearedEverywhere(raid.SettlementId, raid.LeaderPartyId, raid.JoinerPartyId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkNotifyCleanHideoutRelations>());
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Equal(settlement.GatePosition, MobileParty.MainParty.Position);
+            Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior);
+        }, MapEventDisabledMethods);
     }
 
     [Fact]
