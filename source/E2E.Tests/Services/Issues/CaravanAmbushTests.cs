@@ -413,6 +413,23 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
+    public void RewardConversationMessageIsDeliveredOnlyToTheOwner()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            Server.Resolve<ICaravanAmbushEvents>().OpenOwnerConversation(QuestOf(Server));
+        });
+
+        var received = Assert.Single(Owner.InternalMessages.GetMessages<NetworkCaravanAmbushConversation>());
+        Assert.Equal(QuestScenario.ControllerA, received.ControllerId);
+        Assert.Equal(scenario.NotableId, received.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, received.IssueId);
+        Assert.Equal(caravanId, received.CaravanId);
+        Assert.Empty(Other.InternalMessages.GetMessages<NetworkCaravanAmbushConversation>());
+    }
+
+    [Fact]
     public void SavedCaravanConversationWaitsForPausedCampaignAndOpensOnce()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
