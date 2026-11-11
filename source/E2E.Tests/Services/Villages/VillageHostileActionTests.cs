@@ -137,6 +137,7 @@ public class VillageHostileActionTests : MapEventTestBase
         RegisterPeer(client, "PlayerOne");
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
+        using var resists = new VillageResistsScope();
 
         Server.NetworkSentMessages.Clear();
 
@@ -151,6 +152,80 @@ public class VillageHostileActionTests : MapEventTestBase
         var result = ConsumeApprovedMapEventStart(mobilePartyId, target.SettlementPartyId, HostileActionFlags(action));
         Assert.True(result.Approved);
         Assert.Equal(VillageHostileActionDeniedReason.Invalid, result.Reason);
+    }
+
+    // v1.5: a village with no defenders gives in. Vanilla applies a coercion (crime and relations, no war)
+    // and the outcome a won battle gives, so the server does the same without a map event (#4587).
+    [Theory]
+    [InlineData(VillageHostileAction.ForceVolunteers)]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    public void ClientRequestForceAction_VillageWithoutDefenders_GivesInWithoutWarOrBattle(VillageHostileAction action)
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            mobileParty.LeaderHero.Gold = 0;
+            settlement.SettlementHitPoints = 1f;
+        });
+
+        var expectedCoercion = action == VillageHostileAction.ForceSupplies
+            ? nameof(BeHostileAction.ApplyMinorCoercionHostileAction)
+            : nameof(BeHostileAction.ApplyMajorCoercionHostileAction);
+        using var coercion = new MethodCallRecorder(AccessTools.Method(typeof(BeHostileAction), expectedCoercion));
+        using var encounter = new MethodCallRecorder(
+            AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction)));
+        using var skills = new MethodCallRecorder(
+            AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnForceSupplies)),
+            AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnForceVolunteers)));
+
+        Server.NetworkSentMessages.Clear();
+
+        RequestHostileAction(client, action, mobilePartyId, target.SettlementId);
+
+        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        Assert.Equal(action, started.Action);
+        Assert.True(started.Unresisted);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
+        Assert.Equal(1, coercion.CountFor(Server));
+        Assert.Equal(0, encounter.CountFor(Server));
+        Assert.Equal(1, skills.CountFor(Server));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+        AssertCooldownBroadcast(target.SettlementId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.Equal(0.2f, settlement.SettlementHitPoints, 3);
+        });
+        if (action == VillageHostileAction.ForceSupplies)
+            AssertForceSuppliesGoldAndHitPointsOutcome(Server, mobilePartyId, target.SettlementId);
+
+        Assert.False(ConsumeApprovedMapEventStart(mobilePartyId, target.SettlementPartyId, HostileActionFlags(action)).Approved);
+    }
+
+    // The test village has no militia, which vanilla's check reads as no resistance.
+    private sealed class VillageResistsScope : IDisposable
+    {
+        private readonly Harmony harmony = new($"e2e.village-resists.{Guid.NewGuid():N}");
+
+        public VillageResistsScope()
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(VillageHostileActionCampaignBehavior), "WillVillageResistHostileAction"),
+                prefix: new HarmonyMethod(typeof(VillageResistsScope), nameof(Resists)));
+        }
+
+        public void Dispose() => harmony.UnpatchAll(harmony.Id);
+
+        private static bool Resists(ref bool __result)
+        {
+            __result = true;
+            return false;
+        }
     }
 
     [Fact]

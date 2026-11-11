@@ -10,7 +10,8 @@ namespace GameInterface.Services.Villages.Patches;
 
 /// <summary>
 /// v1.5 split the old StartHostileAction(HostileActionType) into one "continue" consequence per
-/// action. Each of them starts the encounter, so each sends the request to the server instead.
+/// action and per answer of the village. Each of them changes the world, so each sends the request
+/// to the server instead. The server decides again whether the village resists (#4587).
 /// </summary>
 [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior))]
 internal class VillageHostileActionStartPatch
@@ -27,6 +28,14 @@ internal class VillageHostileActionStartPatch
     [HarmonyPrefix]
     private static bool ForceSuppliesPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceSupplies);
 
+    [HarmonyPatch("game_menu_force_volunteers_no_resist_continue_on_consequence")]
+    [HarmonyPrefix]
+    private static bool ForceVolunteersNoResistPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceVolunteers);
+
+    [HarmonyPatch("game_menu_force_supplies_no_resist_continue_on_consequence")]
+    [HarmonyPrefix]
+    private static bool ForceSuppliesNoResistPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceSupplies);
+
     private static bool RequestOnServer(VillageHostileAction action)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -36,22 +45,6 @@ internal class VillageHostileActionStartPatch
             return false;
 
         hostileActionInterface.RequestHostileAction(action);
-        return false;
-    }
-}
-
-/// <summary>
-/// v1.5 lets a village with no defenders give up supplies or recruits without a battle, applied
-/// locally by the menu. Co-op authorizes force actions through the server-side encounter, so every
-/// village resists and the request goes through <see cref="VillageHostileActionStartPatch"/>.
-/// </summary>
-[HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), "WillVillageResistHostileAction")]
-internal class VillageAlwaysResistsHostileActionPatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(ref bool __result)
-    {
-        __result = true;
         return false;
     }
 }
