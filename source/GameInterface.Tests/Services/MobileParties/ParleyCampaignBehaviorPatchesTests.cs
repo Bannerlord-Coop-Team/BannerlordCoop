@@ -67,8 +67,8 @@ public class ParleyCampaignBehaviorPatchesTests : IDisposable
         {
             var patched = harmony.CreateClassProcessor(typeof(ParleyCampaignBehaviorPatches)).Patch();
 
-            Assert.Contains(patched, method => method.DeclaringType == typeof(ParleyCampaignBehavior) &&
-                method.Name == nameof(ParleyCampaignBehavior.StartParley));
+            // Harmony returns the replacement method, named after the target with a _PatchN suffix.
+            Assert.Contains(patched, method => method.Name.Contains(nameof(ParleyCampaignBehavior.StartParley)));
         }
         finally
         {
