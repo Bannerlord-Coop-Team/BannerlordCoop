@@ -192,6 +192,11 @@ public sealed class RevenueFarmingTests : IDisposable
     [Fact]
     public void LosingAcceptKeepsItsOwnStateUntilTheRejectionCancelsIt()
     {
+        Observer.Call(() =>
+        {
+            Assert.True(Observer.Resolve<IPlayerManager>().AddPlayer(owner));
+            Assert.True(Observer.Resolve<IPlayerManager>().AddPlayer(other));
+        });
         var router = Server.Resolve<TestNetworkRouter>();
         router.PauseLink(Server.NetPeer, Observer.NetPeer);
         Accept();
@@ -201,8 +206,10 @@ public sealed class RevenueFarmingTests : IDisposable
         var requested = stray._totalRequestedDenars;
         var journal = stray.JournalEntries.ToArray();
         router.ResumeLink(Server.NetPeer, Observer.NetPeer);
+        router.DrainReady();
         environment.FlushCoalescer();
 
+        Assert.Single(Observer.InternalMessages.GetMessages<NetworkQuestSolutionAccepted>());
         Assert.Equal(QuestScenario.ControllerA,
             Assert.Single(Observer.InternalMessages.GetMessages<QuestSolutionAcceptedOnClient>()).ControllerId);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
