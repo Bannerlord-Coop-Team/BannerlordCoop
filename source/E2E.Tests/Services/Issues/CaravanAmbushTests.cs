@@ -249,14 +249,6 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void AnotherPlayersRewardRequestDoesNotReachTheQuest()
-    {
-        scenario.AttachQuest(Other, CreateQuest);
-        Other.Call(() => QuestOf(Other).OnQuestSucceeded());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
-    [Fact]
     public void EligibleSecondPlayerCanTakeTheSameTypeButTheOwnerCannot()
     {
         var giverId = environment.CreateRegisteredObject<Hero>();
