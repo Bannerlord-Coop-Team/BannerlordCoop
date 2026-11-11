@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Handlers;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -94,5 +95,5 @@ public class ExtortionByDesertersHandlerTests
             Mock.Of<IMessageBroker>(), Mock.Of<INetwork>(), Mock.Of<IObjectManager>(),
             Mock.Of<IIssueResolver>(), Mock.Of<IIssueOwnerResolver>(), Mock.Of<IControllerIdProvider>(),
             Mock.Of<IPlayerManager>(), collector, new TestQuestFeatureFlag(questsOn),
-            Mock.Of<IIssueConversationGuard>());
+            new IssueConversationGuard(Mock.Of<IObjectManager>()));
 }
