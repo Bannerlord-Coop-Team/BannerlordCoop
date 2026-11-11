@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Logging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
@@ -10,6 +11,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Messages;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +28,7 @@ using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
 
 internal sealed class RevenueFarmingStateHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RevenueFarmingStateHandler>();
     private readonly IMessageBroker broker;
     private readonly INetwork network;
     private readonly IObjectManager objects;
@@ -178,7 +181,11 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             var session = sessions.Get(giver, state.QuestId);
             if (session == null || state.Revision < session.Revision) return;
             var quest = session.Quest;
-            Validate(state, quest);
+            if (!Validate(state, quest))
+            {
+                Logger.Warning("Revenue Farming state does not match the accepted quest {quest}", state.QuestId);
+                return;
+            }
             Settlement collection = null;
             if (state.CollectionSettlementId != null &&
                 !objects.TryGetObjectWithLogging(state.CollectionSettlementId, out collection)) return;
@@ -229,7 +236,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         }, state.GiverId), context: nameof(RevenueFarmingStateHandler));
     }
 
-    private static void Validate(NetworkRevenueFarmingState state, Quest quest)
+    private static bool Validate(NetworkRevenueFarmingState state, Quest quest)
     {
         if (state.Villages == null || state.Villages.Length != quest.RevenueVillages.Count ||
             state.Villages.Any(village => village == null || village.CollectedAmount < 0 || village.HourlyGain < 0 ||
@@ -239,7 +246,8 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             state.Journal.Any(log => log.Text == null) || state.UsedIncidents == null ||
             state.UsedIncidents.Any(id => !quest._currentVillageEvents.ContainsKey(id)) ||
             (state.Incident != null && !quest._currentVillageEvents.ContainsKey(state.Incident)))
-            throw new ArgumentException("Revenue Farming state does not match the accepted quest.");
+            return false;
+        return true;
     }
 
     private void Present(RevenueFarmingSession session, NetworkRevenueFarmingState state, bool newPrompt, Settlement menuSettlement)
