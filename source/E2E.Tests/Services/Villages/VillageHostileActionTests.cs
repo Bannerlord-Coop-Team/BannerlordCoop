@@ -2568,9 +2568,10 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(0.5f, Village.VillageStates.Normal)]
-    [InlineData(0f, Village.VillageStates.Looted)]
-    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState)
+    [InlineData(0.5f, Village.VillageStates.Normal, false)]
+    [InlineData(0f, Village.VillageStates.Looted, false)]
+    [InlineData(0.5f, Village.VillageStates.Normal, true)]
+    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState, bool savedOnV148)
     {
         // a save where an AI raid already left the map event manager but still links its parties
         var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -2585,6 +2586,13 @@ public class VillageHostileActionTests : MapEventTestBase
             var mapEvent = CreateHostileActionMapEvent(aiRaiderParty.Party, settlement.Party, VillageHostileAction.Raid);
             Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
             Assert.Equal(Village.VillageStates.BeingRaided, settlement.Village.VillageState);
+
+            if (savedOnV148)
+            {
+                // v1.4.8 saved the settlement on the map event, and only AfterLoad refills the component's, for listed events
+                mapEvent.Component.MapEvent = null!;
+                mapEvent.SetMapEventSettlement(null!);
+            }
 
             Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
 

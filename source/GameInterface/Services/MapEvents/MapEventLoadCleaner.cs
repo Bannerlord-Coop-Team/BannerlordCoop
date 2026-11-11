@@ -197,6 +197,8 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                         "Map event {MapEventId} is linked to {PartyCount} parties but is neither listed by the map event manager nor finalized, ending it",
                         mapEvent.StringId,
                         orphaned.LinkedParties(mapEvent).Count);
+                    // Before WaitingRemoval, since AfterLoad only refills a v1.4.8 save's settlement for a live event.
+                    RestoreUnsavedStateIfUnlisted(mapEvent);
                     ResetVillageState(mapEvent);
                     mapEvent.State = MapEventState.WaitingRemoval;
                 }
@@ -329,9 +331,23 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
-    private static void RestoreUnsavedState(MapEvent mapEvent)
+    // Gives an unlisted event the unsaved state the load restores only for listed ones: the component's back-reference
+    // (read on every field battle party add and remove), position lists, tracker and a v1.4.8 save's settlement.
+    private void RestoreUnsavedStateIfUnlisted(MapEvent mapEvent)
     {
-        mapEvent.Component?.AfterLoad(mapEvent);
+        if (Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+            return;
+
+        // A broken event can fail to derive its settlement, which must not stop its parties being released.
+        try
+        {
+            mapEvent.Component?.AfterLoad(mapEvent);
+        }
+        catch (Exception e)
+        {
+            logger.Warning(e, "Could not restore the unsaved state of unlisted map event {MapEventId}", mapEvent.StringId);
+        }
+
         if (TrackerField(mapEvent) == null)
             TrackerField(mapEvent) = new TroopUpgradeTracker();
     }
@@ -439,6 +455,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
                 mapEvent.StringId,
                 mapEvent.InvolvedParties.Count());
+            RestoreUnsavedStateIfUnlisted(mapEvent);
             LoadRepairMapEventFinalizer.FinalizeEvent(mapEvent, messageBroker, objectManager);
             return;
         }
@@ -454,11 +471,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // without running FinalizeEvent (and its battle results) again.
     private void DetachFromFinalizedEvent(MapEvent mapEvent)
     {
-        // The load restores unsaved state only for events the manager lists. Without it the component's
-        // MapEvent back-reference is null, which FieldBattleEventComponent reads on every party add and
-        // remove, so even a one-party side fails; the position lists and tracker are null as well.
-        if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
-            RestoreUnsavedState(mapEvent);
+        RestoreUnsavedStateIfUnlisted(mapEvent);
 
         mapEvent.AttackerSide?.HandleMapEventEnd();
         mapEvent.DefenderSide?.HandleMapEventEnd();

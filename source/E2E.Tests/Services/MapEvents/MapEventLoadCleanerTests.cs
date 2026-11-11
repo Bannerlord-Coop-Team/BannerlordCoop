@@ -45,6 +45,12 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     private static void ModelOrphanedAfterLoad(MapEvent mapEvent)
     {
         mapEvent.State = MapEventState.WaitingRemoval;
+        ModelUnlistedAfterLoad(mapEvent);
+    }
+
+    // Clears the state the load restores only for listed events, as a save leaves it for an event the manager dropped.
+    private static void ModelUnlistedAfterLoad(MapEvent mapEvent)
+    {
         TrackerField(mapEvent) = null;
         var component = Assert.IsType<FieldBattleEventComponent>(mapEvent.Component);
         component.MapEvent = null!;
@@ -89,6 +95,29 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Null(aiParty.MoveTargetParty);
             Assert.True(aiParty.Ai.RethinkAtNextHourlyTick);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void CleanUpLoadedMapEvents_UnlistedLivePlayerEvent_RestoresUnsavedStateAndFinalizesFully()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-unlisted-player", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var aiParty));
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            ModelUnlistedAfterLoad(mapEvent);
+
+            RunRepair(originalsAllowed: true);
+
+            // Without the back-reference the field battle party removal throws before the component finalizes
+            Assert.True(mapEvent.Component._isFinished);
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Null(aiParty.Party.MapEventSide);
         }, MapEventDisabledMethods);
     }
 
