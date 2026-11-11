@@ -13,7 +13,7 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.CampaignService.Patches;
 
 /// <summary>
-/// Campaign behaviors added in v1.5 that change synchronized campaign state. Like the other disabled
+/// Campaign behaviors that change synchronized campaign state. Like the other disabled
 /// behaviors, they run on the server only; their results reach clients through the usual sync.
 /// <list type="bullet">
 /// <item>HeroDailyXpCampaignBehavior: daily skill xp for every eligible hero, players excluded

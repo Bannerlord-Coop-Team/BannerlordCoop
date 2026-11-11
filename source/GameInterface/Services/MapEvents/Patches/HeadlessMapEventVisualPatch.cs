@@ -5,9 +5,9 @@ using TaleWorlds.CampaignSystem.MapEvents;
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// v1.5 creates the map event visual inside <see cref="MapEvent.Initialize"/> and initializes it without a
+/// <see cref="MapEvent.Initialize"/> creates the map event visual and initializes it without a
 /// null check. A host with no map event visual creator (a headless server or test campaign) gets a no-op
-/// visual instead of null, which <see cref="MapEventBattleFactory"/> used to pre-assign before Initialize.
+/// visual instead of null.
 /// </summary>
 [HarmonyPatch(typeof(VisualCreator), nameof(VisualCreator.CreateMapEventVisual))]
 internal class HeadlessMapEventVisualPatch

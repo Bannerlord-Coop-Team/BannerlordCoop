@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Serialization.External
 {
     /// <summary>
-    /// Binary package for <see cref="PartyConfiguration"/>, the per-leader party commands v1.5 added to
+    /// Binary package for <see cref="PartyConfiguration"/>, the per-leader party commands in
     /// <c>Hero._partyConfiguration</c>. Hero packages pack every field, so heroes carrying one need this.
     /// </summary>
     [Serializable]

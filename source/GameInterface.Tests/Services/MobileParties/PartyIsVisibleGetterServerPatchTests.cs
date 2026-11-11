@@ -10,7 +10,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Tests for the forced-spotted override (on the IsVisible getter since v1.5 removed IsSpotted). On the server (and when debug visibility is on) live
+/// Tests for the forced-spotted override (on the IsVisible getter). On the server (and when debug visibility is on) live
 /// parties are always spotted, but a destroyed party must read as unspotted, or the map nameplate
 /// machinery keeps re-creating its banner after the destruction replicates. Release clients keep
 /// whatever the native spotting logic computed.

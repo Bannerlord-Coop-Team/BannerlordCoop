@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Actions;
 
 /// <summary>
-/// v1.5 moved the execution trait penalty into ExecutionCampaignBehavior, keyed on Hero.MainHero.
+/// ExecutionCampaignBehavior charges the execution trait penalty only to Hero.MainHero.
 /// The server's KillCharacterAction replacement applies it to the executing player instead.
 /// </summary>
 public class KillCharacterActionExecutionTests : MapEventTestBase

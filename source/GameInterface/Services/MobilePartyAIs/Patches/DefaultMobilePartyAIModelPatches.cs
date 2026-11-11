@@ -138,7 +138,7 @@ internal class DefaultMobilePartyAIModelPatches
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
 
-    // v1.5 stops an AI party from starting any attack while a main party stronger than itself is near it. The
+    // Vanilla stops an AI party from starting any attack while a main party stronger than itself is near it. The
     // co-op server has no main party on the map, so that check reads any active player party instead; an offline
     // player's party is parked (inactive) and cannot step in. The method's later IsMainParty read is older and stays.
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]

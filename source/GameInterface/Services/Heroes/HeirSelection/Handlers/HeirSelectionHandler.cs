@@ -7,7 +7,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
-using GameInterface.Services.Clans.Data;
+using GameInterface.Services.Clans;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -50,6 +50,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
     private readonly ISendCoalescer sendCoalescer;
+    private readonly IPartyConfigurationService partyConfiguration;
     private readonly Dictionary<string, IMessage> sentSelections = new();
     private double lastCheckDays = -1;
     private int presentationVersion;
@@ -69,6 +70,7 @@ internal class HeirSelectionHandler : IHandler
         ITraitLevelingHelperInterface traitLevelingHelperInterface,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
+        IPartyConfigurationService partyConfiguration,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -83,6 +85,7 @@ internal class HeirSelectionHandler : IHandler
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
         this.sendCoalescer = sendCoalescer;
+        this.partyConfiguration = partyConfiguration;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
@@ -440,8 +443,8 @@ internal class HeirSelectionHandler : IHandler
         sentSelections.Remove(originalHeroId);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
-        // The server never raises OnBeforePlayerCharacterChanged, where v1.5 resets the new player character's party commands.
-        PartyConfigurationFlags.Reset(data.Heir);
+
+        partyConfiguration.Reset(data.Heir);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 

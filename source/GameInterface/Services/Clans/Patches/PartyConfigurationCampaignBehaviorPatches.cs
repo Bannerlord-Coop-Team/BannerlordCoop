@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Clans.Data;
-using GameInterface.Services.Clans.Extensions;
+﻿using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -7,10 +6,8 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 namespace GameInterface.Services.Clans.Patches;
 
 /// <summary>
-/// v1.5 resets a hero's party commands when they leave a companion role, become the player character or
-/// leave the player clan. The behavior runs on the server only, and its reset nulls a field that is not
-/// synced, so each reset goes through <see cref="PartyConfigurationFlags.Reset"/> instead. Every co-op
-/// player's clan counts as the player clan.
+/// The behavior runs on the server only, and its reset nulls a field that is not
+/// synced, so each reset goes through <see cref="IPartyConfigurationService.Reset"/> instead.
 /// </summary>
 [HarmonyPatch(typeof(PartyConfigurationCampaignBehavior))]
 internal class PartyConfigurationCampaignBehaviorPatches
@@ -19,7 +16,9 @@ internal class PartyConfigurationCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnCompanionRemovedPrefix(Hero hero)
     {
-        if (hero != null) PartyConfigurationFlags.Reset(hero);
+        if (!ContainerProvider.TryResolve<IPartyConfigurationService>(out var partyConfiguration)) return true;
+
+        if (hero != null) partyConfiguration.Reset(hero);
         return false;
     }
 
@@ -27,7 +26,9 @@ internal class PartyConfigurationCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnBeforePlayerCharacterChangedPrefix(Hero hero)
     {
-        if (hero != null) PartyConfigurationFlags.Reset(hero);
+        if (!ContainerProvider.TryResolve<IPartyConfigurationService>(out var partyConfiguration)) return true;
+
+        if (hero != null) partyConfiguration.Reset(hero);
         return false;
     }
 
@@ -36,8 +37,10 @@ internal class PartyConfigurationCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnHeroChangedClanPrefix(Hero hero, Clan clan)
     {
+        if (!ContainerProvider.TryResolve<IPartyConfigurationService>(out var partyConfiguration)) return true;
+
         if (clan.IsPlayerClan())
-            PartyConfigurationFlags.Reset(hero);
+            partyConfiguration.Reset(hero);
         return false;
     }
 }

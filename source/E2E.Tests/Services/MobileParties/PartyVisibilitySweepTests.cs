@@ -194,7 +194,7 @@ public class PartyVisibilitySweepTests : IDisposable
 
         public override float GetHideoutSpottingDistance() => 30f;
 
-        // v1.5 moved the per-party visibility rule into the model. Same rule with the fixed ranges:
+        // The per-party visibility rule lives in the model. Same rule with the fixed ranges:
         // attached army followers copy their leader, everyone else is visible within seeing range.
         public override void GetMobilePartyVisibilityAndInspectedState(MobileParty mobileParty, Vec2[] points, float seeingRange, out bool isVisible, out bool isInspected)
         {

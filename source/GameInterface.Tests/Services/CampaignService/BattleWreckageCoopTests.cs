@@ -13,7 +13,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.CampaignService;
 
 /// <summary>
-/// v1.5 battle wreckages are off on every role: the co-op StringId gate leaves a server-made wreckage
+/// Battle wreckages are off on every role: the co-op StringId gate leaves a server-made wreckage
 /// without an id, which throws in AddWreckage after it is already in the saved list. Saves that already
 /// hold such wreckages are repaired before the object lists are built.
 /// </summary>

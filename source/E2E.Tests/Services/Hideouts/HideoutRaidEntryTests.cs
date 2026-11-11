@@ -93,7 +93,7 @@ public class HideoutRaidEntryTests : MapEventTestBase
         var visualPatch = new Harmony($"HideoutRaidEntryTests.{Guid.NewGuid()}");
         visualPatch.Patch(AccessTools.PropertyGetter(typeof(CampaignTime), nameof(CampaignTime.Now)),
             postfix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ProvideCampaignTime)));
-        // v1.5 Initialize creates the visual itself, and a headless host gets a no-op visual.
+        // Initialize creates the visual itself, and a headless host gets a no-op visual.
         var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
             new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent) });
         try

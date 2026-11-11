@@ -40,7 +40,7 @@ public class PartiesSellPrisonerCampaignBehaviorInterface : IPartiesSellPrisoner
                 TroopRoster troopRoster = TroopRoster.CreateDummyTroopRoster();
                 foreach (TroopRosterElement troopRosterElement in mobileParty.PrisonRoster.GetTroopRoster())
                 {
-                    // Replace IsPlayerCharacter check. v1.5 keeps blood-feud heroes out of other factions' prisons.
+                    // Replace IsPlayerCharacter check. Blood-feud heroes stay out of other factions' prisons.
                     var prisonerHero = troopRosterElement.Character.HeroObject;
                     if (!troopRosterElement.Character.IsHero || (!prisonerHero.IsPlayerHero() && prisonerHero.MapFaction.IsAtWarWith(settlement.MapFaction) &&
                         (prisonerHero.Clan?.HasBloodFeudWithPlayer != true || mobileParty.MapFaction == settlement.MapFaction)))

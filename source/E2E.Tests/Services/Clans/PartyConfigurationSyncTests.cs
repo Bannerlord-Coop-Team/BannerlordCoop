@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Players;
@@ -13,7 +14,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Clans;
 
 /// <summary>
-/// The v1.5 party commands (join armies, raid, donate troops, fleet) are hero flags the server owns.
+/// The party commands (join armies, raid, donate troops, fleet) are hero flags the server owns.
 /// A client toggle is a request, and every server change, the vanilla resets included, reaches clients.
 /// </summary>
 public class PartyConfigurationSyncTests : SyncTestBase
@@ -89,7 +90,7 @@ public class PartyConfigurationSyncTests : SyncTestBase
         {
             var hero = Server.GetRegisteredObject<Hero>(heroId);
             foreach (PartyConfigurationFlag flag in Enum.GetValues(typeof(PartyConfigurationFlag)))
-                PartyConfigurationFlags.Set(hero, flag, value);
+                Server.Resolve<IPartyConfigurationService>().Set(hero, flag, value);
         });
     }
 
@@ -101,7 +102,7 @@ public class PartyConfigurationSyncTests : SyncTestBase
             {
                 var hero = instance.GetRegisteredObject<Hero>(heroId);
                 foreach (PartyConfigurationFlag flag in Enum.GetValues(typeof(PartyConfigurationFlag)))
-                    Assert.Equal(expected, PartyConfigurationFlags.Get(hero, flag));
+                    Assert.Equal(expected, instance.Resolve<IPartyConfigurationService>().Get(hero, flag));
             });
         }
     }

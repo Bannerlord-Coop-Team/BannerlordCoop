@@ -152,7 +152,6 @@ internal class CompanionRolesHandler : IHandler
                     mobileParty.ActualClan = clan;
                     mobileParty.Party.SetVisualAsDirty();
                 }
-                // v1.5 tops the new clan's party, created or kept, up to 33 men, half basic and half elite.
                 if (mobileParty.MemberRoster.TotalManCount < 33)
                 {
                     int missing = 33 - mobileParty.MemberRoster.TotalManCount;

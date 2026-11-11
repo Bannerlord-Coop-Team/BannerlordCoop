@@ -1,4 +1,4 @@
-using GameInterface.Services.Clans.Extensions;
+﻿using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;

@@ -10,7 +10,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.Clans;
 
 /// <summary>
-/// The v1.5 governor trait effects apply only while the governor is in town. Each transpiler must swap the
+/// The governor trait effects apply only while the governor is in town. Each transpiler must swap the
 /// method's single governor CurrentSettlement read, so a player governor counts as present in their town.
 /// </summary>
 public class CoopClanGovernorPatchesTests
