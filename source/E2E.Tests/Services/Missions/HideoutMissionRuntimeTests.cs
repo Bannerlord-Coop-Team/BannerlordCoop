@@ -129,6 +129,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             AccessTools.Method(typeof(Agent), nameof(Agent.SetAgentFlags)),
             AccessTools.Method(typeof(Agent), nameof(Agent.SetWatchState)),
             AccessTools.Method(typeof(Agent), nameof(Agent.WieldInitialWeapons)),
+            AccessTools.Method(typeof(Agent), nameof(Agent.UpdateSpawnEquipmentAndRefreshVisuals)),
         });
     }
 

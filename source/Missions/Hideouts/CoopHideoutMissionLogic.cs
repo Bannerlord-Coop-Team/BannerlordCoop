@@ -194,13 +194,6 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         if (ledger.Latest?.ActiveHeroSeeds?.Contains(origin.UniqueSeed) == true) return;
         SpawnOrigins(new[] { origin }, returningHero: true);
         heroEntered = true;
-        if (!direct && Mission.MainAgent != null)
-        {
-            Mission.MainAgent.SetClothingColor1(4279111698u);
-            Mission.MainAgent.SetClothingColor2(4279111698u);
-            using (new TransientEquipmentSyncScope())
-                Mission.MainAgent.UpdateSpawnEquipmentAndRefreshVisuals(Hero.MainHero.StealthEquipment);
-        }
     }
 
     public void SpawnOrigins(IEnumerable<IAgentOriginBase> origins, bool returningHero = false)
@@ -213,9 +206,23 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             // Native requires a direction whenever an explicit spawn position is supplied.
             Vec2? direction = ally?.GetMovementDirection();
             var agent = Mission.SpawnTroop(origin, true, true, false, false, 0, 0, true, true, position, direction);
-            if (!direct && Native.Phase is HideoutPhase.Camp or HideoutPhase.BossBattle)
+            if (direct) continue;
+            DressInStealthEquipment(agent);
+            if (Native.Phase is HideoutPhase.Camp or HideoutPhase.BossBattle)
                 agent.Formation?.SetMovementOrder(MovementOrder.MovementOrderCharge);
         }
+    }
+
+    // Puts an ambush hero in its stealth equipment, as native AfterStart and SpawnAllyAgent do.
+    private static void DressInStealthEquipment(Agent agent)
+    {
+        var equipment = (agent.Character as CharacterObject)?.HeroObject?.StealthEquipment;
+        if (equipment == null || equipment.IsEmpty()) return;
+
+        agent.SetClothingColor1(4279111698u);
+        agent.SetClothingColor2(4279111698u);
+        using (new TransientEquipmentSyncScope())
+            agent.UpdateSpawnEquipmentAndRefreshVisuals(equipment);
     }
 
     public bool WasSpawned(IAgentOriginBase origin) => origin != null && ledger.WasSpawned(origin.UniqueSeed);
