@@ -17,6 +17,7 @@ using SandBox.GauntletUI.Map;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -625,6 +626,44 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         Assert.False(CompanyDialogOpens(conversationPartyId: companyPartyId));
+    }
+
+    [Fact]
+    public void TheHostileCompany_DoesNotSurrenderToTheOwner()
+    {
+        Assert.False(BanditsSurrender(troopStringId: "company_of_trouble_character"));
+    }
+
+    [Fact]
+    public void OtherBandits_StillSurrenderToTheOwner()
+    {
+        Assert.True(BanditsSurrender(troopStringId: "looter"));
+    }
+
+    private bool BanditsSurrender(string troopStringId)
+    {
+        var banditPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var surrenders = false;
+
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(banditPartyId, out var bandits));
+            Assert.True(Owner.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                troop.StringId = troopStringId;
+                bandits.MemberRoster.AddToCounts(troop, 4);
+                bandits._isInRaftState = true;
+                Campaign.Current.MainParty = ownerParty;
+                Campaign.Current.ConversationManager._conversationParty = bandits;
+            }
+
+            surrenders = Campaign.Current.GetCampaignBehavior<BanditInteractionsCampaignBehavior>().conversation_bandits_surrender_on_condition();
+        });
+
+        return surrenders;
     }
 
     private bool CompanyDialogOpens(string conversationPartyId)

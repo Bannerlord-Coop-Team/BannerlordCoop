@@ -21,4 +21,7 @@ internal interface ILandLordCompanyOfTroubleService
 
     // Server: fails an owner's quest when someone other than the owner destroys the hostile company
     void OnMobilePartyDestroyed(MobileParty mobileParty, PartyBase destroyerParty);
+
+    // Owner's client: whether a party is a hostile company, which only the server knows as the quest's party
+    bool IsHostileCompany(MobileParty party);
 }

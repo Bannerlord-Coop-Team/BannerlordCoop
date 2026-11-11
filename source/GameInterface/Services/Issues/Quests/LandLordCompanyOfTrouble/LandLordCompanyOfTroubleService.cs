@@ -14,6 +14,8 @@ namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble;
 
 internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleService
 {
+    private const string TroubleCharacterId = "company_of_trouble_character";
+
     private readonly IOutcomeDispatcher dispatcher;
     private readonly IIssueOwnerResolver ownerResolver;
 
@@ -46,7 +48,7 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         // The field isn't saved and the server never starts the quest, so a loaded save leaves it null
         if (quest._troubleCharacterObject == null)
         {
-            quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>("company_of_trouble_character");
+            quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>(TroubleCharacterId);
         }
 
         if (!ownerResolver.TryResolveOwnerHero(issue, out _))
@@ -77,6 +79,24 @@ internal class LandLordCompanyOfTroubleService : ILandLordCompanyOfTroubleServic
         }
 
         dispatcher.RunAsOwners<Quest>(quest => OnPartyDestroyed(quest, mobileParty, destroyerParty));
+    }
+
+    public bool IsHostileCompany(MobileParty party)
+    {
+        if (party == null || party == MobileParty.MainParty)
+        {
+            return false;
+        }
+
+        foreach (var element in party.MemberRoster.GetTroopRoster())
+        {
+            if (element.Character.StringId == TroubleCharacterId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
