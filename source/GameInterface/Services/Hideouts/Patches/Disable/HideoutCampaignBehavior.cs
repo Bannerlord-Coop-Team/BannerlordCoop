@@ -183,13 +183,6 @@ internal class HideoutCampaignBehaviorPatch
         return true;
     }
 
-    [HarmonyPatch("hideout_send_troops_result_success_consequence")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultSuccessConsequence()
-    {
-        PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
-    }
-
     // Use coop re-implementation in handler that doesn't use Hero.MainHero
     [HarmonyPatch(nameof(HideoutCampaignBehavior.SetCleanHideoutRelations))]
     [HarmonyPrefix]

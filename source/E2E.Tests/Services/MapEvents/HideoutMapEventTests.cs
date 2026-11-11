@@ -818,6 +818,29 @@ public class HideoutMapEventTests : MapEventTestBase
     }
 
     [Fact]
+    public void SendTroopsFailureLeave_ServerEndsRaidAndTakesPartyOutOfHideout()
+    {
+        var raid = CreateSharedHideout(joinerJoinsBattle: false, isSendTroops: true);
+        var client = Clients.First();
+        EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
+
+        client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_failure_consequence(null),
+            MapEventDisabledMethods);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+            Assert.Null(leader.CurrentSettlement);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out _));
+        });
+        client.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void VictoriousSendTroops_ClearsHideoutWithoutCommittingResults()
     {
         var raid = CreateSharedHideout(isSendTroops: true);
