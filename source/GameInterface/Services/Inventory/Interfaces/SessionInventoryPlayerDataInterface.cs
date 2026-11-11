@@ -36,8 +36,10 @@ public class SessionInventoryPlayerDataInterface : ISessionInventoryPlayerDataIn
 
     public IReadOnlyCollection<string> GetInventoryLocks(string playerHeroId)
     {
+        // An empty lock list comes back from the session data as null.
         if (InventoryPlayerData?.PlayerInventoryLocks == null ||
-            !InventoryPlayerData.PlayerInventoryLocks.TryGetValue(playerHeroId, out var locks))
+            !InventoryPlayerData.PlayerInventoryLocks.TryGetValue(playerHeroId, out var locks) ||
+            locks == null)
             return Array.Empty<string>();
 
         return locks;

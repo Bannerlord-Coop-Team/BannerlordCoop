@@ -95,14 +95,24 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         {
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(command.CharacterId, out var character)) continue;
 
-            string rejection = command.Code switch
+            string rejection;
+            try
             {
-                PartyScreenLogic.PartyCommandCode.TransferTroop or
-                PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot => Transfer(commit, command, character),
-                PartyScreenLogic.PartyCommandCode.UpgradeTroop => commit.IsForceTransfer ? NotOnThisScreen : Upgrade(commit, command, character),
-                PartyScreenLogic.PartyCommandCode.RecruitTroop => commit.IsForceTransfer ? NotOnThisScreen : Recruit(commit, command, character),
-                _ => "not supported",
-            };
+                rejection = command.Code switch
+                {
+                    PartyScreenLogic.PartyCommandCode.TransferTroop or
+                    PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot => Transfer(commit, command, character),
+                    PartyScreenLogic.PartyCommandCode.UpgradeTroop => commit.IsForceTransfer ? NotOnThisScreen : Upgrade(commit, command, character),
+                    PartyScreenLogic.PartyCommandCode.RecruitTroop => commit.IsForceTransfer ? NotOnThisScreen : Recruit(commit, command, character),
+                    _ => "not supported",
+                };
+            }
+            catch (Exception e)
+            {
+                // One broken command shouldn't drop the rest of the screen, or leave the player without a reason.
+                Logger.Error(e, "Party command {Code} {Character} failed for {Hero}", command.Code, character.StringId, mainHero.StringId);
+                rejection = "failed on the server";
+            }
 
             if (rejection == null) continue;
 
@@ -286,10 +296,10 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         }
         if (number <= 0) return $"not enough {shortOf}";
 
-        roster.SetElementXp(index, element.Xp - (xpCost * number));
-        commit.GoldChange -= goldCost * number;
         if (itemCategory != null)
             RemoveItems(party.ItemRoster, itemCategory, number, sessionInventoryPlayerData.GetInventoryLocks(commit.MainHeroId));
+        roster.SetElementXp(index, element.Xp - (xpCost * number));
+        commit.GoldChange -= goldCost * number;
 
         int healthy = element.Number - element.WoundedNumber;
         int wounded = number > healthy ? number - healthy : 0;
