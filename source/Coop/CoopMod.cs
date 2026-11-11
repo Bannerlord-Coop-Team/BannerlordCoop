@@ -236,17 +236,18 @@ namespace Coop
                 Directory.GetCurrentDirectory(),
                 isServer ? "server" : "client",
                 System.Diagnostics.Process.GetCurrentProcess().Id);
-            activeLogFilePath = logFileOpener.Open(path => configuration.WriteTo.Sink(new SizeLimitedFileSink(
+            var logFile = logFileOpener.Open(path => configuration.WriteTo.Sink(new SizeLimitedFileSink(
                 path,
                 outputTemplate,
                 maxLogFileSizeBytes,
                 preservedLogBeginningBytes,
                 compactedLogFileSizeBytes)));
+            activeLogFilePath = logFile.Path;
 
             Logger = LogManager.GetLogger<CoopMod>();
             SessionSummary = new SessionSummarySink(Logger);
             configuration.WriteTo.Sink(SessionSummary);
-            logFileOpener.LogFailures(Logger);
+            logFile.LogFailures(Logger);
         }
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
