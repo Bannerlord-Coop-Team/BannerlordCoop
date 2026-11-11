@@ -26,6 +26,8 @@ internal static class StagedBattleResultUpdatePatch
             Campaign.Current.MapEventManager.MapEvents.Contains(encounter._mapEvent)) return;
         // A captured lord conversation is open; updating now would reopen it every tick.
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
+        // Send troops has nothing staged, its result menu's Leave finishes the encounter like vanilla.
+        if (encounter._mapEvent.Component is HideoutEventComponent { IsSendTroops: true }) return;
 
         // Custom hideout menus, the siege defeated menu and an empty map have no native menu init callback
         // to resume the loot flow.

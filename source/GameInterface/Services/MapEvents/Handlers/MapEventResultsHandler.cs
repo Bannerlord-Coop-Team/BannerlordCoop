@@ -85,6 +85,8 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
+            // v1.5 send troops goes straight to PlayerEncounterState.End and never applies results, so no loot or xp.
+            if (mapEvent.Component is HideoutEventComponent { IsSendTroops: true }) return;
 
             contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
