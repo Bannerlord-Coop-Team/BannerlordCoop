@@ -350,7 +350,10 @@ Changed targets of postfixes, finalizers and transpilers:
   `HandleClickTimeChange` gained a second `!MapState.AtMenu` guard, while the transpilers still
   replace every `Campaign.TimeControlMode` setter call.
 - `MapScreen.HandleMouse` (`MapSiegeHoverCursorPatch`, `DisableGameMenuPausePatches`): no break; a
-  new parley branch before the map click calls `HandleParleyClick`, which no Coop patch targets.
+  new parley branch before the map click calls `HandleParleyClick`. It ends in
+  `ParleyCampaignBehavior.StartParley`, where `ParleyCampaignBehaviorPatches` refuses a party parley
+  on clients, since it would open a local conversation with a party the server owns (#4585, until
+  #4601 sends it to the server). A settlement parley runs as before.
 - `MapScreen.CloseCampaignOptions` (`UpdateCampaignOptionsPatch`): no break; only the
   `Debug.FailedAssert` line numbers changed.
 - `SPOrderOfBattleVM.GetAgentTooltip` (`CaptainTooltipPatches`): no break; the transpiler's single
