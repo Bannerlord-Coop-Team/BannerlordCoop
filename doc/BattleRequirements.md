@@ -96,11 +96,22 @@ Armies shall be able to join the battle with the same join restrictions as mobil
 The first player to become **mission-ready** — to finish loading the battle mission, as observed
 by the campaign server — shall become the mission host.
 
+When the server's `preferredBattleHosts` mod-config list is set, the server shall hold the
+election for up to 5 seconds while a listed participant ranked higher than every mission-ready
+player is still loading. A listed participant counts as loading while it is connected, in the
+battle, and has not become mission-ready, withdrawn or dropped out. When no such participant is
+left, or the 5 seconds run out, the best-ranked mission-ready listed player shall become the
+mission host, otherwise the first mission-ready player. A player who leaves or disconnects during
+the hold shall not be elected. With the list unset the election is unchanged.
+
 A hideout battle is the exception, because its boss duel runs on the host's own hero. While the
 player whose party leads the attacker side is connected and has not left the battle, players who
 become ready before it wait and the leader becomes the host when it is ready. If the leader leaves,
 withdraws or disconnects before hosting, or is not ready within 90 seconds of the first waiting
-player, the earliest waiting player becomes the host instead.
+player, the earliest waiting player becomes the host instead. With `preferredBattleHosts` set the
+leader still hosts. The hold only orders the players it releases together, best ranked first; a
+player who becomes ready later queues behind those already waiting, so if the leader is gone the
+earliest waiting player still becomes the host.
 
 The campaign server shall arbitrate the election (BR-101) and shall issue the unowned (NPC) troop
 reserves to the elected host together with the election, so that the host fields the NPC troops
@@ -128,10 +139,14 @@ have not been assigned to another player.
 The campaign server shall maintain, for each battle instance, an ordered list of players based on
 the sequence in which they became mission-ready in the mission instance, as observed by the
 server. A player still on the loading screen has not yet joined for the purposes of this
-ordering, so the first entry in the list is the initially elected host (BR-010). In a hideout a
+ordering. The initially elected host (BR-010) heads the list. In a hideout a
 player joins the successor line only once the host's hideout state reaches it, so players who
 waited for the assault leader join in the order their hideout state ready requests arrive, not
 the order they became mission-ready.
+
+When `preferredBattleHosts` is set, listed players are ordered ahead of unlisted ones by their
+rank in the list, and players of equal standing keep their mission-ready order. This only orders
+the successor line, so migration (BR-014, BR-015) promotes the next player in it.
 
 ### BR-014 — Host Migration
 
