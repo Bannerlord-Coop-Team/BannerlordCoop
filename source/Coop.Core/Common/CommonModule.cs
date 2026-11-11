@@ -11,6 +11,9 @@ using Coop.Core.Common.Configuration;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace Coop.Core.Common;
@@ -33,29 +36,29 @@ public abstract class CommonModule : Module
         builder.RegisterInstance(new CoopLogFile(null)).As<ICoopLogFile>().SingleInstance();
 
         #region Serialization
-        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
-        builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().SingleInstance();
         #endregion
 
         #region Network
-        builder.RegisterType<NetworkConfig>().As<INetworkConfig>().InstancePerLifetimeScope();
+        builder.RegisterType<NetworkConfig>().As<INetworkConfig>().SingleInstance();
         builder.RegisterGeneric(typeof(ReliableMessageBatcher<>))
             .As(typeof(IReliableMessageBatcher<>))
             .InstancePerDependency();
         #endregion
 
         #region Communication
-        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-        builder.RegisterType<MessagePacketHandler>().AsSelf().As<IMessagePacketHandler>().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<AggregateMessagePacketHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
+        builder.RegisterType<MessagePacketHandler>().AsSelf().As<IMessagePacketHandler>().SingleInstance().AutoActivate();
+        builder.RegisterType<AggregateMessagePacketHandler>().AsSelf().SingleInstance().AutoActivate();
         builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance().ExternallyOwned();
         #endregion
 
-        builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.Register(_ => new CancellationTokenSource()).InstancePerLifetimeScope();
+        builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
+        builder.Register(_ => new CancellationTokenSource()).SingleInstance();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
-        builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().SingleInstance();
         builder.RegisterType<PatchFailureReport>().As<IPatchFailureReport>().InstancePerDependency();
 
         base.Load(builder);
@@ -68,12 +71,18 @@ public abstract class CommonModule : Module
     /// <typeparam name="TInterface">Type to collect if inherited from</typeparam>
     /// <param name="builder"><see cref="ContainerBuilder"/> for registering types</param>
     /// <param name="autoInstantiate">Flag to auto instantiate type when container is built</param>
-    protected void RegisterAllTypesWithInterface<TModule, TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
+    /// <param name="excludedTypes">Types to leave unregistered, such as naval handlers while NavalDLC co-op is off</param>
+    protected void RegisterAllTypesWithInterface<TModule, TInterface>(
+        ContainerBuilder builder, bool autoInstantiate = false, IEnumerable<Type> excludedTypes = null)
     {
+        var excluded = new HashSet<Type>(excludedTypes ?? Enumerable.Empty<Type>());
+
         // Namespace is needed to separate client and server handlers being registered with DI
         foreach (var handlerType in InterfaceCollector.GetInterfaces<TInterface>(typeof(TModule).Namespace))
         {
-            var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
+            if (excluded.Contains(handlerType)) continue;
+
+            var handlerBuilder = builder.RegisterType(handlerType).AsSelf().SingleInstance();
 
             if (autoInstantiate)
             {

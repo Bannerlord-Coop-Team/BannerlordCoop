@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 
 namespace GameInterface.Services.Inventory.Handlers;
@@ -16,17 +17,20 @@ internal class InventoryStatesHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionInventoryPlayerDataInterface sessionInventoryPlayerDataInterface;
 
     public InventoryStatesHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionInventoryPlayerDataInterface sessionInventoryPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.sessionInventoryPlayerDataInterface = sessionInventoryPlayerDataInterface;
 
         messageBroker.Subscribe<SaveItemLockStates>(Handle_SaveItemLockStates);
@@ -59,6 +63,8 @@ internal class InventoryStatesHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+
             sessionInventoryPlayerDataInterface.SetInventoryLocks(obj.What.MainHeroId, obj.What.ItemLockIds);
         });
     }
@@ -77,6 +83,8 @@ internal class InventoryStatesHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
+
             sessionInventoryPlayerDataInterface.SetSortPreference(obj.What.MainHeroId, obj.What.UsageType, obj.What.SortPreference);
         });
     }

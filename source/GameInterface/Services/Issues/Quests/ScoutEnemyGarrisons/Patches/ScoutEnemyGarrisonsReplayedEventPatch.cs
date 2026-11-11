@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 /// dispatcher would let the quest cancel locally without telling the server. The owner's quest reacts on the next
 /// frame instead, so its cancel is handed to the server. Army dispersal is relayed by the framework on the server.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ScoutEnemyGarrisonsReplayedEventPatch
 {

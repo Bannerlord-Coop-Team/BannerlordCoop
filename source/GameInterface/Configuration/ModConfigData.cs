@@ -88,6 +88,8 @@ public sealed class ModOptionsData
 
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
+    public int? PostBattleAiAmnestySeconds { get; set; }
+
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
     public bool? EnsureUnaffiliatedWanderers { get; set; }
@@ -122,6 +124,15 @@ public sealed class ModOptionsData
 
     public bool? ShowPlayerNameplates { get; set; }
 
+    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
+
+    public ClansAfterKingdomDestructionMode? ClansAfterKingdomDestruction { get; set; }
+
+    public List<string> PreferredBattleHosts { get; set; }
+
+    /// <summary>Whether a dedicated server runs War Sails (NavalDLC) co-op. It parses the file itself; declared so the key isn't reported as unknown.</summary>
+    public bool? WarSails { get; set; }
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
@@ -144,6 +155,15 @@ public enum LordDefectionRetryMode
 
     /// <summary>A refusal never blocks; the lord can be asked again straight away.</summary>
     AlwaysRetry
+}
+
+/// <summary>
+/// What happens to clans left without a kingdom after their kingdom is destroyed.
+/// </summary>
+public enum ClansAfterKingdomDestructionMode
+{
+    Vanilla,
+    KeepClans
 }
 
 public enum GoldFoodChangeMode

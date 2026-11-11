@@ -4,7 +4,9 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Smithing.Patches;
@@ -29,20 +31,26 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
     private readonly ISendCoalescer sendCoalescer;
 
     public CraftingCampaignBehaviorCraftingHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
+        this.statisticsInterface = statisticsInterface;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<DoSmelting>(Handle_DoSmelting);
@@ -238,6 +246,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
+
             if (!TryCreateCraftedWeapon(data))
             {
                 network.Send(peer, new NetworkCreateCraftedWeaponInternalClients(data, null, false));
@@ -310,6 +320,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<ItemObject>(craftedItemId, out var craftedItem)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
+
+        statisticsInterface.OnNewItemCrafted(playerHero, craftedItem, !data.IsFreeMode);
 
         float gainedXp;
         if (data.IsFreeMode)

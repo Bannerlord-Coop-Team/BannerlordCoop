@@ -70,6 +70,9 @@ public readonly struct NetworkMapEventInitialized : ICommand
     [ProtoMember(21)]
     public readonly SiegeEngineGraphSnapshot[] DefenderEngines;
 
+    [ProtoMember(22)]
+    public readonly bool IsBlockadeActive;
+
     public NetworkMapEventInitialized(
         uint mapEventHandle,
         bool isTerminal,
@@ -98,6 +101,7 @@ public readonly struct NetworkMapEventInitialized : ICommand
         BesiegerPartyHandles = null;
         AttackerEngines = null;
         DefenderEngines = null;
+        IsBlockadeActive = false;
     }
 
     internal NetworkMapEventInitialized(
@@ -125,6 +129,7 @@ public readonly struct NetworkMapEventInitialized : ICommand
         BesiegerPartyHandles = siegeGraph.BesiegerPartyHandles;
         AttackerEngines = siegeGraph.AttackerEngines;
         DefenderEngines = siegeGraph.DefenderEngines;
+        IsBlockadeActive = siegeGraph.IsBlockadeActive;
     }
 
     internal SiegeEventGraphSnapshot SiegeGraph => new SiegeEventGraphSnapshot(
@@ -143,5 +148,6 @@ public readonly struct NetworkMapEventInitialized : ICommand
         BesiegerTroopsKilled,
         BesiegerPartyHandles,
         AttackerEngines,
-        DefenderEngines);
+        DefenderEngines,
+        IsBlockadeActive);
 }

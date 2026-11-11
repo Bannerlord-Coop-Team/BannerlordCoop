@@ -92,7 +92,7 @@
     "fastForwardEnabled": true,
 
     // Toggle auto pausing
-    // (Default) true: Pause when all players are occupied (in a battle or a settlement).
+    // (Default) true: Pause when all players are occupied (in a battle, a settlement or the screens after a battle).
     // false: Auto pause is disabled. The game will still automatically pause for clients catching up and when there are no players online.
     "autoPauseEnabled": true,
 
@@ -127,6 +127,13 @@
     // Default is 6, meaning AI parties can only join a player battle within 6 hours of it starting.
     // If set to 0, AI parties will not join in player battles.
     "playerBattleAiJoinWindowHours": 6,
+
+    // Set how many real seconds AI parties leave a player alone after a battle.
+    // (Default) 0: Off. AI parties can attack a player as soon as their battle ends.
+    // Above 0: AI parties can't attack a player who is still in the loot, prisoner or other after battle screens,
+    // or for this many seconds after the player leaves them. The seconds count while paused too, and game speed
+    // doesn't change them. Other players can still attack.
+    "postBattleAiAmnestySeconds": 0,
 
     // Toggle speed limit when players are in a battle.
     // Default is true, meaning the game will be locked at 1x speed when any player is in a battle.
@@ -171,10 +178,10 @@
     "smithingStaminaRecoveryOutsideSettlements": true,
 
     // Set a multiplier for increasing/decreasing smithing stamina recovery speed.
-    // The vanilla rate is 1. The default for this mod is 0.1 as stamina regenerates in the smithing screen.
-    // Setting any lower than this won't decrease speed more.
+    // The vanilla rate is 1. The default for this mod is 0.6 as stamina regenerates in the smithing screen.
+    // Setting it lower than 0.1 won't decrease speed more.
     // Stamina is stored as an integer and ticks are rounded up to ensure heroes always recover some stamina.
-    "smithingStaminaRecoveryMultiplier": 0.1,
+    "smithingStaminaRecoveryMultiplier": 0.6,
 
     // Set a multiplier for increasing/decreasing the number of looter/bandit parties.
     // The higher the multiplier, the more looter parties can exist on the map at a time.
@@ -221,6 +228,28 @@
 
     // Toggle players being allowed to join battles when wounded
     // Default is true
-    "playerWoundedBattleEntry": true
+    "playerWoundedBattleEntry": true,
+
+    // Set the time in seconds players have to vote on kingdom decisions.
+    // Default is 60. Values of 0 or lower will default back to 60.
+    "kingdomDecisionVoteTimeoutSeconds": 60,
+
+    // Set what happens to clans when their kingdom is destroyed.
+    // "KeepClans": Clans leave the destroyed kingdom and stay alive as independent clans.
+    // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
+    "clansAfterKingdomDestruction": "Vanilla",
+
+    // Players who should host battles, in order of preference, listed by Steam ID.
+    // The battle host runs the battle for everyone else, so list players with a fast and stable upload.
+    // If a higher-priority player is still loading, the server waits up to 5 seconds for them before picking someone else.
+    // (Default) []: The first player to finish loading hosts the battle.
+    // e.g. ["76561198000000001", "76561198000000002"]
+    "preferredBattleHosts": [],
+
+    // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
+    // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
+    // (Default) false: the dedicated server runs without NavalDLC.
+    // true: the dedicated server runs with NavalDLC. Needs a save made with it and a tester build.
+    "warSails": false
   }
 }

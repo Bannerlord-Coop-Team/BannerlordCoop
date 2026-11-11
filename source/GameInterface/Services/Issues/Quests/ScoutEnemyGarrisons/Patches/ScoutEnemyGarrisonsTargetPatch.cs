@@ -10,6 +10,7 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 /// Vanilla skips a target besieged by the player's faction. The dedicated server's main hero is not a player,
 /// and only a player of the issue owner's faction can take the quest, so the server compares to that faction.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(ScoutEnemyGarrisonsIssueBehavior), nameof(ScoutEnemyGarrisonsIssueBehavior.SuitableSettlementCondition))]
 internal class ScoutEnemyGarrisonsTargetPatch
 {

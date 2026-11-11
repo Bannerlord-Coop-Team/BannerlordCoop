@@ -32,16 +32,16 @@ public class SettlementTestEnvironmentTests : SettlementTestEnvironment
         Assert.Same(fixture.PlayerAgent, fixture.Mission.MainAgent);
         client.Call(() =>
         {
-            var gate = client.Resolve<ILocationNpcGate>();
-            Assert.True(gate.IsCoopLocationMissionActive);
-            Assert.Equal(instanceId, gate.ActiveInstanceId);
+            var state = client.Resolve<ILocationNpcAuthorityState>();
+            Assert.True(state.IsCoopLocationMissionActive);
+            Assert.Equal(instanceId, state.ActiveInstanceId);
         });
 
         LeaveLocation(client);
 
         Assert.False(fixture.Mesh.IsStarted);
         Assert.Null(fixture.Mesh.ActiveInstanceId);
-        client.Call(() => Assert.False(client.Resolve<ILocationNpcGate>().IsCoopLocationMissionActive));
+        client.Call(() => Assert.False(client.Resolve<ILocationNpcAuthorityState>().IsCoopLocationMissionActive));
     }
 
     [Fact]
@@ -95,13 +95,13 @@ public class SettlementTestEnvironmentTests : SettlementTestEnvironment
 
         clients[0].Call(() =>
         {
-            Assert.Equal(instanceId, clients[0].Resolve<ILocationNpcGate>().ActiveInstanceId);
-            Assert.Equal(instanceId, clients[1].Resolve<ILocationNpcGate>().ActiveInstanceId);
+            Assert.Equal(instanceId, clients[0].Resolve<ILocationNpcAuthorityState>().ActiveInstanceId);
+            Assert.Equal(instanceId, clients[1].Resolve<ILocationNpcAuthorityState>().ActiveInstanceId);
         });
     }
 
     [Fact]
-    public void LeavingOneClient_DoesNotClearOtherClientNpcGate()
+    public void LeavingOneClient_DoesNotClearOtherClientLocationAuthority()
     {
         var clients = Clients.ToArray();
         var (instanceId, _) = CreateSettlement("A", "B");
@@ -110,23 +110,30 @@ public class SettlementTestEnvironmentTests : SettlementTestEnvironment
 
         clients[0].Call(() =>
         {
-            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
-            Assert.Equal(first.InstanceId, LocationNpcGate.ActiveInstanceId);
+            Assert.True(ResolveActiveAuthorityState().IsCoopLocationMissionActive);
+            Assert.Equal(first.InstanceId, ResolveActiveAuthorityState().ActiveInstanceId);
         });
         clients[1].Call(() =>
         {
-            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
-            Assert.Equal(second.InstanceId, LocationNpcGate.ActiveInstanceId);
+            Assert.True(ResolveActiveAuthorityState().IsCoopLocationMissionActive);
+            Assert.Equal(second.InstanceId, ResolveActiveAuthorityState().ActiveInstanceId);
         });
 
         LeaveLocation(clients[0]);
 
-        clients[0].Call(() => Assert.False(LocationNpcGate.IsCoopLocationMissionActive));
+        clients[0].Call(() => Assert.False(ResolveActiveAuthorityState().IsCoopLocationMissionActive));
         clients[1].Call(() =>
         {
-            Assert.True(LocationNpcGate.IsCoopLocationMissionActive);
-            Assert.Equal(second.InstanceId, LocationNpcGate.ActiveInstanceId);
+            Assert.True(ResolveActiveAuthorityState().IsCoopLocationMissionActive);
+            Assert.Equal(second.InstanceId, ResolveActiveAuthorityState().ActiveInstanceId);
         });
+    }
+
+    // Resolves the state the way the location Harmony patches do, from the active client's container.
+    private static ILocationNpcAuthorityState ResolveActiveAuthorityState()
+    {
+        Assert.True(GameInterface.ContainerProvider.TryResolve<ILocationNpcAuthorityState>(out var state));
+        return state;
     }
 
     [Fact]

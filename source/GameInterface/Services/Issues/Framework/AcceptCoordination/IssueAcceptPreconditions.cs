@@ -77,7 +77,7 @@ internal class IssueAcceptPreconditions : IIssueAcceptPreconditions
         {
             if (other != issue &&
                 other.GetType() == issue.GetType() &&
-                (other.IsSolvingWithQuest || other.IsSolvingWithAlternative) &&
+                (other.IsSolvingWithQuest || other.IsSolvingWithAlternative || other.IsSolvingWithLordSolution) &&
                 ownerResolver.TryGetOwnerControllerId(other, out var ownerControllerId) &&
                 ownerControllerId == controllerId)
             {

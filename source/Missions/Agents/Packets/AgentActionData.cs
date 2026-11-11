@@ -5,6 +5,7 @@ using Missions.Diagnostics;
 #endif
 using System;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
@@ -25,7 +26,25 @@ namespace Missions.Agents.Packets
             typeof(MBAPI).GetField("IMBAnimation", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
         private static MethodInfo getActionNameWithCode;
 
-        internal static string GetActionNameWithCode(int actionCode)
+        // Static because every caller, including the Harmony-patched lookup, is static, and action codes are fixed per process.
+        private static readonly ActionNameCache NameCache = new ActionNameCache(
+            ReadNativeActionName,
+            actionName => ActionIndexCache.Create(actionName).Index);
+
+        // Kept un-inlined so a Harmony patch on it still wins in callers that were JITted first.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static string GetActionNameWithCode(int actionCode) =>
+            NameCache.GetName(actionCode);
+
+        internal static bool IsRangedSiegeUsageAction(int actionCode) =>
+            actionCode >= 0
+            && NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsRangedSiegeUsage == true;
+
+        internal static bool IsOrderGestureAction(int actionCode) =>
+            actionCode >= 0
+            && NameCache.Describe(actionCode, GetActionNameWithCode(actionCode))?.IsOrderGesture == true;
+
+        private static string ReadNativeActionName(int actionCode)
         {
             var animation = AnimationField?.GetValue(null);
             if (animation == null) return null;
@@ -45,7 +64,7 @@ namespace Missions.Agents.Packets
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {
-                action = ActionIndexCache.Create(actionName);
+                action = new ActionIndexCache(NameCache.ResolveIndex(actionIndex, actionName));
                 return action.Index >= 0;
             }
 
@@ -394,9 +413,28 @@ namespace Missions.Agents.Packets
             int guardReactionChannel,
             float? action0Speed,
             float? action1Speed)
+            : this(
+                agent,
+                defendFlags,
+                guardMode,
+                guardReactionChannel,
+                action0Speed,
+                action1Speed,
+                AgentEquipmentData.TryCapture(agent, out var equipment) ? equipment : (AgentEquipmentData?)null)
         {
-            Equipment = AgentEquipmentData.TryCapture(agent, out var equipment)
-                ? equipment : (AgentEquipmentData?)null;
+        }
+
+        // The equipment is passed in by the caller that already captured it this frame, so it isn't read twice.
+        internal AgentActionData(
+            Agent agent,
+            Agent.MovementControlFlag defendFlags,
+            Agent.GuardMode guardMode,
+            int guardReactionChannel,
+            float? action0Speed,
+            float? action1Speed,
+            AgentEquipmentData? capturedEquipment)
+        {
+            Equipment = capturedEquipment;
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
             bool isPlayerControlled =
@@ -427,7 +465,7 @@ namespace Missions.Agents.Packets
             Action0Progress = agent.GetCurrentActionProgress(0);
             Action0Flag = (ulong)agent.GetCurrentAnimationFlag(0);
             Action0Speed = action0Speed;
-            Action1Index = cache1.Index;
+            Action1IndexWire = cache1.Index + 1;
             Action1Progress = agent.GetCurrentActionProgress(1);
             Action1Flag = (ulong)agent.GetCurrentAnimationFlag(1);
             Action1Speed = action1Speed;
@@ -436,16 +474,17 @@ namespace Missions.Agents.Packets
                 && guardReactionChannel <= 1
                     ? guardReactionChannel
                     : -1;
-            GuardPresentationChannel =
+            int guardPresentationChannel =
                 agent.HasMount && validGuardReactionChannel >= 0
                     ? validGuardReactionChannel
                     : GetGuardPresentationChannel(agent);
-            GuardActionChannel =
-                validGuardReactionChannel >= 0
+            GuardPresentationChannelWire = guardPresentationChannel + 1;
+            GuardActionChannelWire =
+                (validGuardReactionChannel >= 0
                     ? validGuardReactionChannel
                     : GetGuardActionChannel(
                         agent,
-                        GuardPresentationChannel);
+                        guardPresentationChannel)) + 1;
             GuardActionIsDefending =
                 GuardActionChannel >= 0
                 && IsDefendingAction(
@@ -635,7 +674,7 @@ namespace Missions.Agents.Packets
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {
-                action = ActionIndexCache.Create(actionName);
+                action = new ActionIndexCache(NameCache.ResolveIndex(actionIndex, actionName));
                 return true;
             }
 
@@ -748,8 +787,10 @@ namespace Missions.Agents.Packets
         public float Action1Progress { get; }
         [ProtoMember(5)]
         public ulong Action1Flag { get; }
+        // Shifted by one so protobuf omits act_none (-1) instead of writing a 10-byte varint.
         [ProtoMember(6)]
-        public int Action1Index { get; }
+        private int Action1IndexWire { get; set; }
+        public int Action1Index => Action1IndexWire - 1;
         [ProtoMember(7)]
         public uint MovementFlag { get; }
         [ProtoMember(8)]
@@ -758,10 +799,13 @@ namespace Missions.Agents.Packets
         public byte StateFlags { get; private set; }
         [ProtoMember(10)]
         public int GuardState { get; }
+        // Shifted by one so protobuf omits the usual no-channel (-1) value.
         [ProtoMember(11)]
-        public int GuardPresentationChannel { get; }
+        private int GuardPresentationChannelWire { get; set; }
+        public int GuardPresentationChannel => GuardPresentationChannelWire - 1;
         [ProtoMember(12)]
-        public int GuardActionChannel { get; }
+        private int GuardActionChannelWire { get; set; }
+        public int GuardActionChannel => GuardActionChannelWire - 1;
         // Nullable keeps packets from older peers (where these fields are absent) at the native 1x default.
         [ProtoMember(13)]
         public float? Action0Speed { get; }

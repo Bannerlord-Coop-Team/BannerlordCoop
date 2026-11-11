@@ -9,6 +9,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
+using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
 
 namespace GameInterface.Tests.Registry;
 
@@ -28,6 +29,16 @@ public class MBObjectBasePatchesTests
     public void AClientDoesNotNameAnIssueOnItsOwn()
     {
         Assert.False(RunPrefix(isServer: false, ObjectHelper.SkipConstructor<Issue>()));
+    }
+
+    // Intentionally generic: every quest type keeps vanilla's id on every machine, because journal entries
+    // find a quest by its StringId once its issue has detached it
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EveryMachineKeepsVanillasQuestId(bool isServer)
+    {
+        Assert.True(RunPrefix(isServer, ObjectHelper.SkipConstructor<Quest>()));
     }
 
     [Fact]

@@ -152,7 +152,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             ReliableOrderedChannel,
-            () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy,
+                markGameThread: true)));
         scheduler.DrainReady();
     }
 
@@ -166,7 +167,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             $"packet:{packet.DeliveryMethod}",
-            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy,
+                markGameThread: true)));
         scheduler.DrainReady();
     }
 
@@ -181,7 +183,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             $"packet:{packet.DeliveryMethod}",
-            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy,
+                markGameThread: true)));
         scheduler.DrainReady();
     }
 

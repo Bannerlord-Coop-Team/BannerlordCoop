@@ -17,6 +17,16 @@ public readonly struct CraftingVMCreated : IEvent
     }
 }
 
+public readonly struct CraftingVMFinalized : IEvent
+{
+    public readonly CraftingVM CraftingVM;
+
+    public CraftingVMFinalized(CraftingVM craftingVM)
+    {
+        CraftingVM = craftingVM;
+    }
+}
+
 public readonly struct RefreshWeaponDesignVM : IEvent
 {
     public readonly Town Town;

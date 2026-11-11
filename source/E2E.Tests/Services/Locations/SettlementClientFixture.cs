@@ -75,7 +75,7 @@ public sealed class SettlementClientFixture : IDisposable
 
         Instance.Call(() =>
         {
-            LocationNpcGate.EndMission();
+            Instance.Resolve<ILocationNpcAuthorityState>().EndMission();
             Controller.Dispose();
             Mesh.Stop();
         });

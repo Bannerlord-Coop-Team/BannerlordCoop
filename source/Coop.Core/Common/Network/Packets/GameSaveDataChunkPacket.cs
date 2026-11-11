@@ -8,8 +8,11 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.OrderOfBattle;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.ViewData;
 using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
@@ -85,6 +88,16 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(19)]
     public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
 
+    [ProtoMember(20)]
+    public readonly OrderOfBattlePlayerData OrderOfBattlePlayerData;
+    [ProtoMember(21)]
+    public readonly NavalPlayerData NavalPlayerData;
+    [ProtoMember(22)]
+    public readonly string[] HeldLootShipIds;
+
+    [ProtoMember(23)]
+    public readonly ViewDataPlayerData ViewDataPlayerData;
+
     public GameSaveDataChunkPacket(
         int transferId,
         int chunkIndex,
@@ -102,9 +115,13 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
-        Dictionary<string, ClanFinanceSettings> clanFinance = null)
+        Dictionary<string, ClanFinanceSettings> clanFinance = null,
+        OrderOfBattlePlayerData orderOfBattlePlayerData = null,
+        string[] heldLootShipIds = null,
+        ViewDataPlayerData viewDataPlayerData = null)
     {
         TransferId = transferId;
         ChunkIndex = chunkIndex;
@@ -122,8 +139,12 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;
+        OrderOfBattlePlayerData = orderOfBattlePlayerData;
+        HeldLootShipIds = heldLootShipIds;
+        ViewDataPlayerData = viewDataPlayerData;
     }
 }

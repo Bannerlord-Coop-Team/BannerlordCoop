@@ -6,6 +6,7 @@ using GameInterface.Services.Inventory.TradeSkills.Data;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -19,17 +20,20 @@ internal class TradeRumorsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
 
     public TradeRumorsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
 
         messageBroker.Subscribe<UpdateTradeRumors>(Handle_UpdateTradeRumors);
@@ -76,6 +80,8 @@ internal class TradeRumorsHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
+
             sessionTradePlayerDataInterface.UpdatePlayerTradeRumors(data.PlayerHeroId, data.TradeRumors, data.EnteredSettlements);
         });
     }

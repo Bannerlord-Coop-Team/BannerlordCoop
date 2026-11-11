@@ -1,4 +1,6 @@
-﻿using Common.Logging;
+﻿using Autofac;
+using Common.BattleBenchmark;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -9,7 +11,8 @@ using Missions.Diagnostics;
 #endif
 using Missions.Messages;
 using Serilog;
-using System; 
+using System;
+using System.Runtime.ExceptionServices;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -20,7 +23,7 @@ namespace Missions;
 /// the join-info handshake wiring — announce ourselves when a peer connects, and process a peer's
 /// <see cref="NetworkMissionJoinInfo"/> when it arrives. Subclasses supply the mission-specific behaviour:
 /// how to build their own join info, how to spawn a peer's agents, plus any extra subscriptions
-/// (overriding <see cref="Dispose"/>) and leave logic (overriding <see cref="OnLeaving"/>).
+/// (overriding <see cref="DisposeMission"/>) and leave logic (overriding <see cref="OnLeaving"/>).
 /// </summary>
 public abstract class CoopMissionController : MissionBehavior, IDisposable
 {
@@ -35,6 +38,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     internal IAgentMovementHandler AgentMovementHandler =>
         coopMissionComponent.AgentMovementHandler;
+
+    /// <summary>This mission's registries and sync handlers, shared with services composed outside the controller.</summary>
+    public ICoopMissionComponent MissionComponent => coopMissionComponent;
 
     protected CoopMissionController(
         IBattleNetwork network,
@@ -71,13 +77,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Capture continuous movement on the game thread so each snapshot reads one coherent engine state. A
         // background poll can race native movement/input updates and send a moved position with stale input,
         // leaving peers to interpolate a sliding puppet with no locomotion animation.
-        coopMissionComponent.AgentMovementHandler.PollMovement(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.MovementSend))
+            coopMissionComponent.AgentMovementHandler.PollMovement(dt);
 
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
         // per-packet correction was bound to the bursty movement-poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
-        coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.MovementApply))
+            coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
         // Continuous movement setters can replace defend input after the mission boundary. Restore the held
         // flags without restarting the guard command so native animation keeps its own timeline.
@@ -104,7 +112,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // Native Agent processing realizes authoritative AI and player actions after the input boundary.
         // Diff them here so peers receive the displayed action instead of retaining an earlier pose.
         // A headless mission participant would need an equivalent non-display boundary for AI action sync.
-        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
+        using (coopMissionComponent.BattleBenchmark.Measure(BattleBenchmarkSection.ActionPoll))
+            coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
 
         coopMissionComponent.AgentMovementHandler
             .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
@@ -117,7 +126,26 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 #endif
     }
 
-    public virtual void Dispose()
+    private MissionLifetime lifetime;
+    private bool ended;
+    private bool disposed;
+
+    internal void SetLifetime(MissionLifetime value) => lifetime = value;
+
+    public void Dispose()
+    {
+        if (lifetime != null) lifetime.Dispose();
+        else DisposeController();
+    }
+
+    private void DisposeController()
+    {
+        if (disposed) return;
+        disposed = true;
+        DisposeMission();
+    }
+
+    protected virtual void DisposeMission()
     {
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -149,41 +177,48 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     /// </summary>
     protected virtual void OnLeaving() { }
 
+    public override void OnRemoveBehavior() => OnEndMissionInternal();
+
+    public override void OnAgentDeleted(Agent affectedAgent)
+    {
+        coopMissionComponent.AgentRegistry.ForgetCosmeticAgent(affectedAgent);
+        base.OnAgentDeleted(affectedAgent);
+    }
+
     public override void OnEndMissionInternal()
     {
-        try
+        if (ended) return;
+        ended = true;
+        Cleanup(
+            coopMissionComponent.AgentMovementHandler.Dispose,
+            coopMissionComponent.AgentActionHandler.Dispose,
+            coopMissionComponent.AgentVoiceHandler.Dispose,
+            coopMissionComponent.MissileHandler.Dispose,
+            coopMissionComponent.WeaponDropHandler.Dispose,
+            coopMissionComponent.WeaponPickupHandler.Dispose,
+            coopMissionComponent.ShieldDamageHandler.Dispose,
+            coopMissionComponent.CombatHitPresentationHandler.Dispose,
+            coopMissionComponent.AgentDeathHandler.Dispose,
+            OnLeaving,
+            base.OnEndMission,
+            DisposeController,
+            coopMissionComponent.AgentRegistry.Clear,
+            () => lifetime?.Dispose());
+    }
+
+    // Attempt every cleanup step before propagating the first failure to the caller.
+    protected void Cleanup(params Action[] actions)
+    {
+        Exception first = null;
+        foreach (var action in actions)
         {
-            // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
-            // detach deterministically here instead of leaking their packet-handler registration until the GC
-            // finalizer runs.
-            coopMissionComponent.AgentMovementHandler.Dispose();
-            coopMissionComponent.AgentActionHandler.Dispose();
-            coopMissionComponent.AgentVoiceHandler.Dispose();
-
-            coopMissionComponent.MissileHandler.Dispose();
-            coopMissionComponent.WeaponDropHandler.Dispose();
-            coopMissionComponent.WeaponPickupHandler.Dispose();
-            coopMissionComponent.ShieldDamageHandler.Dispose();
-            coopMissionComponent.CombatHitPresentationHandler.Dispose();
-            coopMissionComponent.AgentDeathHandler.Dispose();
-
-            OnLeaving();
-
-            base.OnEndMission();
-        }
-        finally
-        {
-            // Detach and clear on every exit path, because the registry outlives the mission and a throw in a
-            // step above would otherwise keep wrappers around destroyed native agents reachable from the
-            // campaign map. Detach first: the services that register agents are torn down in Dispose.
-            try
+            try { action(); }
+            catch (Exception error)
             {
-                Dispose();
-            }
-            finally
-            {
-                coopMissionComponent.AgentRegistry.Clear();
+                if (first == null) first = error;
+                Logger.Error(error, "Mission cleanup failed");
             }
         }
+        if (first != null) ExceptionDispatchInfo.Capture(first).Throw();
     }
 }

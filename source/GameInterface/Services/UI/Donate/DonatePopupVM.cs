@@ -19,11 +19,15 @@ public class DonatePopupVM : ViewModel
         "Bannerlord Coop is free and developed by volunteers.\n\n" +
         "Donations help cover servers, development tools, and other project costs so we can keep improving the mod.\n\n" +
         "If you enjoy the project and would like to support its development, consider donating.";
+    public string PatreonButtonText => "Patreon";
     public string PayPalButtonText => "PayPal";
     public string BuyMeACoffeeButtonText => "Buy a Coffee";
     public string AfdianButtonText => "Afdian";
     public string BoostyButtonText => "Boosty";
     public string CloseButtonText => "Close";
+
+    // Opens the general Patreon join page.
+    public void ActionPatreon() => CommunityLinks.OpenPatreon();
 
     public void ActionPayPal()
     {

@@ -3,10 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.Settlements;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -136,6 +138,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                     payload.PartyId,
                     payload.SettlementId,
                     rejectionReason);
+                settlementInterface.CorrectPartyPosition(mobileParty);
                 RejectSettlementEncounter(peer, payload, rejectionReason);
                 return;
             }
@@ -214,8 +217,20 @@ public class ServerSettlementExitEnterHandler : IHandler
             }
 
             var leftSettlement = mobileParty.CurrentSettlement;
-            LeaveHideoutMapEvent(mobileParty);
+            LeaveSettlementMapEvent(mobileParty);
+
+            // Vanilla disembarks before leaving, otherwise leaving at sea resets the anchor
+            if (payload.LeaveType == SettlementLeaveType.Disembark && leftSettlement != null)
+            {
+                settlementInterface.PartyDisembark(mobileParty, leftSettlement);
+            }
+
             settlementInterface.PartyLeaveSettlement(mobileParty);
+
+            if (payload.LeaveType == SettlementLeaveType.SetSail && leftSettlement != null)
+            {
+                settlementInterface.PartySetSail(mobileParty, leftSettlement);
+            }
 
             network.Send(
                 peer,
@@ -231,10 +246,17 @@ public class ServerSettlementExitEnterHandler : IHandler
         }, context: nameof(NetworkRequestEndSettlementEncounter));
     }
 
-    private void LeaveHideoutMapEvent(MobileParty mobileParty)
+    private void LeaveSettlementMapEvent(MobileParty mobileParty)
     {
         var party = mobileParty?.Party;
         var mapEvent = party?.MapEvent;
+        // Detach a leaving village defender before the settlement reply closes its menus.
+        if (mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized && party.MapEventSide == mapEvent.DefenderSide)
+        {
+            messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party, finishLocalMenus: false));
+            return;
+        }
+
         if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
         foreach (var player in playerManager.Players)

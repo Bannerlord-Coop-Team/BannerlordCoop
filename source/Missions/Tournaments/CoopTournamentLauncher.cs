@@ -51,22 +51,16 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
     private readonly IObjectManager objectManager;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
-    private readonly Func<MissionMapTimeView> mapTimeViewFactory;
-    private readonly Func<PlayerNameplateMissionView> playerNameplateViewFactory;
 
     public CoopTournamentLauncher(
         Harmony harmony,
         IObjectManager objectManager,
         ITournamentGameInterface tournamentGameInterface,
-        Func<CoopTournamentController> controllerFactory,
-        Func<MissionMapTimeView> mapTimeViewFactory,
-        Func<PlayerNameplateMissionView> playerNameplateViewFactory)
+        Func<CoopTournamentController> controllerFactory)
     {
         this.objectManager = objectManager;
         this.tournamentGameInterface = tournamentGameInterface;
         this.controllerFactory = controllerFactory;
-        this.mapTimeViewFactory = mapTimeViewFactory;
-        this.playerNameplateViewFactory = playerNameplateViewFactory;
         TournamentCombatPatchInstaller.Install(harmony);
     }
 
@@ -90,8 +84,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         CoopTournamentController coopController = null;
         CoopTournamentBehavior tournamentBehavior = null;
         CoopTournamentFightMissionController fightController = null;
-
-        Mission mission = MissionState.OpenNew(
+        var mission = MissionState.OpenNew(
             "TournamentFight",
             initializer,
             _ => CreateBehaviors(
@@ -105,12 +98,6 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
                 out fightController),
             true,
             true);
-
-        if (mission == null)
-        {
-            uiContext.Clear(snapshot.SessionId);
-            return null;
-        }
 
         coopController.Initialize(snapshot, tournamentBehavior, fightController, mission);
         return mission;
@@ -155,8 +142,8 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new MissionOptionsComponent(),
             new HighlightsController(),
             new SandboxHighlightsController(),
-            mapTimeViewFactory(),
-            playerNameplateViewFactory(),
+            coopController.MapTimeView,
+            coopController.PlayerNameplateView,
             coopController
         };
         if (!behaviors.Select(behavior => behavior.GetType()).SequenceEqual(BehaviorOrder))

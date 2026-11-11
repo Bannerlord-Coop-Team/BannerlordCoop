@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -111,6 +112,56 @@ public class BattleSurrenderTests : MapEventTestBase
 
         // No other client surrendered on the participating player's behalf.
         Assert.Empty(Clients.First().NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+    }
+
+    /// <summary>
+    /// A surrender clicked before the server's battle has reached the client cannot be sent, so it must not
+    /// latch the local pending state either. Once the server's real battle party attach lands, the next click
+    /// sends exactly one request for that battle, even though the encounter never adopted it.
+    /// </summary>
+    [Fact]
+    public void RealSurrenderAction_BeforeServerBattleArrives_DoesNotLatch_ThenSendsOnceItArrives()
+    {
+        var ctx = CreateServerMapEvent();
+        var partyId = CreateServerParty();
+        var client = Clients.Last();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Campaign.Current.MainParty = party;
+        }, MapEventDisabledMethods);
+        SetMockPlayerEncounter(client);
+
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.Null(MobileParty.MainParty.MapEvent);
+
+            InvokePatchedSurrender(encounter);
+            Assert.False(encounter._playerSurrender, "a surrender that could not be sent must not latch");
+        }, WithoutNetworkDelivery());
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+
+        JoinServerPartyToSide(ctx.MapEventId, partyId, BattleSideEnum.Defender);
+
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(MobileParty.MainParty.MapEvent);
+            Assert.Null(encounter._mapEvent);
+
+            InvokePatchedSurrender(encounter);
+            Assert.True(encounter._playerSurrender);
+
+            // A second click while the reply is in flight still sends nothing more.
+            InvokePatchedSurrender(encounter);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+        Assert.Equal(partyId, request.PlayerParty);
+        Assert.Equal(ctx.MapEventId, request.MapEventId);
     }
 
     /// <summary>
@@ -359,7 +410,10 @@ public class BattleSurrenderTests : MapEventTestBase
     {
         var setup = SetupTwoOpposingPlayersInBattle();
 
-        // A healthy ally party fights on the recipient's (defender) side.
+        // A healthy ally party fights on the recipient's (defender) side. The players registered after Initialize, so
+        // open the AI join window a live player battle would have, otherwise the server blocks the ally's join.
+        Server.Call(() => InteractionPatches.OpenAiJoinWindowAndPublish(
+            Server.GetRegisteredObject<MapEvent>(setup.ctx.MapEventId), () => { }));
         var allyPartyId = JoinNewServerPartyToSide(setup.ctx.MapEventId, BattleSideEnum.Defender);
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         SeedPartyTroopOnAll(allyPartyId, troopId, 3);

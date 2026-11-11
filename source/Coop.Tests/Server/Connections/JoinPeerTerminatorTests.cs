@@ -28,6 +28,10 @@ public class JoinPeerTerminatorTests
         "Joining the campaign timed out while synchronizing.\n" +
         "The server stopped this join to keep the campaign responsive. Please try again.")]
     [InlineData(
+        "JoinBaselineLimit",
+        "Joining the campaign failed because it could not be synchronized after repeated attempts.\n" +
+        "Make sure your mods and save match the server's, then try again.")]
+    [InlineData(
         "JoinReplayQueueLimit",
         "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\n" +
         "Please try again.")]
@@ -61,6 +65,7 @@ public class JoinPeerTerminatorTests
             "UnknownReason", "You have been Disconnected");
     }
 
+    /// <summary>Connects a real client over loopback, runs <paramref name="disconnect"/> on the server peer and checks what the client reports.</summary>
     private static void RunDisconnect(Action<NetPeer> disconnect, string? expectedReason, string expectedMessage)
     {
         using var broker = new TestMessageBroker();
@@ -89,8 +94,8 @@ public class JoinPeerTerminatorTests
 
         try
         {
-            Assert.True(serverTransport.StartInManualMode(0));
-            Assert.True(clientTransport.StartInManualMode(0));
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, "join-disconnect-test");
             PumpUntil(serverTransport, clientTransport, () =>
                 serverPeer != null && broker.GetMessagesFromType<NetworkConnected>().Any());

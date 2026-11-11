@@ -254,23 +254,6 @@ internal static class HideoutMenuUpdatePatch
     private static void Postfix(MenuContext __instance) => HideoutCampaignBehaviorPatch.RefreshCoopMenu(__instance);
 }
 
-[HarmonyPatch(typeof(MapState), "OnMapModeTick")]
-internal static class HideoutResultUpdatePatch
-{
-    private static void Postfix(MapState __instance)
-    {
-        if (ModInformation.IsServer || Mission.Current != null || MissionState.Current != null ||
-            Game.Current?.GameStateManager?.ActiveState != __instance) return;
-        var encounter = PlayerEncounter.Current;
-        if (encounter?._mapEvent?.IsHideoutBattle != true ||
-            !MapEventInitializationBarrier.IsBattleResultEncounter(encounter) ||
-            Campaign.Current.MapEventManager.MapEvents.Contains(encounter._mapEvent)) return;
-
-        // Custom hideout menus and an empty map have no native menu-init callback to resume the loot flow.
-        PlayerEncounter.Update();
-    }
-}
-
 [HarmonyPatch]
 internal static class HideoutStartOptionsPatch
 {

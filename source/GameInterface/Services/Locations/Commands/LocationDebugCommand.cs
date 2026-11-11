@@ -4,12 +4,15 @@ using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Utils.Commands;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -28,6 +31,13 @@ public class LocationDebugCommand
 
     public sealed class EnterLocationCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public EnterLocationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "enter";
@@ -38,7 +48,7 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -47,7 +57,7 @@ public class LocationDebugCommand
                 return Failed("Run this command on a client.");
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false)
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false)
                 return Failed(error);
 
             var settlement = Campaign.Current.Settlements.FirstOrDefault(
@@ -159,6 +169,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class InfoCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public InfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "info";
@@ -169,13 +186,13 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
 
             var stringBuilder = new StringBuilder();
             stringBuilder.AppendLine($"StringId: '{location.StringId}'");
@@ -193,6 +210,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class ListCharactersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public ListCharactersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "list_characters";
@@ -203,17 +227,17 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
 
             var stringBuilder = new StringBuilder();
 
-            foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
+            foreach (var locationCharacter in location.GetCharacterList())
             {
                 stringBuilder.AppendLine($"'{locationCharacter.Character?.StringId}' Hero: {locationCharacter.Character?.IsHero} Tag: '{locationCharacter.SpecialTargetTag}'");
             }
@@ -229,6 +253,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class ListSpecialItemsCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public ListSpecialItemsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "list_special_items";
@@ -239,13 +270,13 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
 
             var stringBuilder = new StringBuilder();
 
@@ -265,6 +296,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class AddCharacterCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AddCharacterCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "add_character";
@@ -275,8 +313,8 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
-            new ExpectedArgs("characterObjectId", "The character object id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
+            new ExpectedArgs("characterObjectId", "Character name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -287,8 +325,8 @@ public class LocationDebugCommand
             }
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
-            if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
+            if (resolver.TryResolveCharacterObject(args[1], out var character, out error) == false) return Failed(error);
 
             var locationCharacter = LocationCharacterFactory.Create(
                 character,
@@ -304,7 +342,7 @@ public class LocationDebugCommand
             // The real mutator runs so the patched chokepoint broadcasts the change.
             GameThread.Run(() => location.AddCharacter(locationCharacter));
 
-            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+            return Succeeded($"Added '{resolver.DisplayId(character)}' to '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -315,6 +353,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class RemoveCharacterCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RemoveCharacterCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "remove_character";
@@ -325,8 +370,8 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
-            new ExpectedArgs("characterObjectId", "The character object id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
+            new ExpectedArgs("characterObjectId", "Character name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -337,18 +382,20 @@ public class LocationDebugCommand
             }
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
-            if (TryResolveObject<CharacterObject>(args[1], out var character, out error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
+            var presentCharacters = location.GetCharacterList()
+                .Select(locationCharacter => locationCharacter.Character);
+            if (resolver.TryResolve(args[1], presentCharacters, candidate => candidate.Name?.ToString(), out var character, out error) == false)
+            {
+                if (resolver.IsAmbiguous(error)) return Failed(error);
+                return Failed($"'{args[1]}' is not a character in {resolver.DisplayId(location)}.");
+            }
 
             var entry = SyncedLocationCharacters.Find(location, character);
-            if (entry == null)
-            {
-                return Failed($"No character '{args[1]}' in '{args[0]}'");
-            }
 
             GameThread.Run(() => location.RemoveLocationCharacter(entry));
 
-            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+            return Succeeded($"Removed '{resolver.DisplayId(character)}' from '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -359,6 +406,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class RemoveAllCharactersCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RemoveAllCharactersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "remove_all_characters";
@@ -369,7 +423,7 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -380,11 +434,11 @@ public class LocationDebugCommand
             }
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
 
             GameThread.Run(() => location.RemoveAllCharacters());
 
-            return Succeeded($"Cleared '{args[0]}'");
+            return Succeeded($"Cleared '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -395,6 +449,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class AddSpecialItemCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AddSpecialItemCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "add_special_item";
@@ -405,8 +466,8 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
-            new ExpectedArgs("itemObjectId", "The item object id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
+            new ExpectedArgs("itemObjectId", "Item name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -417,12 +478,12 @@ public class LocationDebugCommand
             }
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
-            if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return Failed(error);
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
+            if (resolver.TryResolveItemObject(args[1], out var item, out error) == false) return Failed(error);
 
             GameThread.Run(() => location.AddSpecialItem(item));
 
-            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+            return Succeeded($"Added '{resolver.DisplayId(item)}' to '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -434,6 +495,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class RemoveSpecialItemCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RemoveSpecialItemCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "remove_special_item";
@@ -444,8 +512,8 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("locationId", "The location id."),
-            new ExpectedArgs("itemObjectId", "The item object id."),
+            new ExpectedArgs("locationId", "Location name or id; quote names with spaces."),
+            new ExpectedArgs("itemObjectId", "Item name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -456,12 +524,12 @@ public class LocationDebugCommand
             }
 
 
-            if (TryResolveLocation(args[0], out var location, out var error) == false) return Failed(error);
-            if (TryResolveObject<ItemObject>(args[1], out var item, out error) == false) return Failed(error);
-
-            if (location.SpecialItems?.Contains(item) != true)
+            if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
+            var presentItems = location.SpecialItems ?? new List<ItemObject>();
+            if (resolver.TryResolve(args[1], presentItems, candidate => candidate.Name?.ToString(), out var item, out error) == false)
             {
-                return Failed($"No item '{args[1]}' in '{args[0]}'");
+                if (resolver.IsAmbiguous(error)) return Failed(error);
+                return Failed($"'{args[1]}' is not a special item in {resolver.DisplayId(location)}.");
             }
 
             GameThread.Run(() =>
@@ -470,7 +538,7 @@ public class LocationDebugCommand
                 MessageBroker.Instance.Publish(location, new LocationSpecialItemRemoved(location, item));
             });
 
-            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+            return Succeeded($"Removed '{resolver.DisplayId(item)}' from '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -482,6 +550,13 @@ public class LocationDebugCommand
     /// </summary>
     public sealed class PopulateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PopulateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.location";
 
         public string Name => "populate";
@@ -492,7 +567,7 @@ public class LocationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementStringId", "The settlement string id."),
+            new ExpectedArgs("settlementStringId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -508,11 +583,7 @@ public class LocationDebugCommand
                 return Failed($"Unable to resolve {nameof(SettlementPopulationTracker)}");
             }
 
-            var settlement = Campaign.Current.Settlements.FirstOrDefault(x => x.StringId == args[0]);
-            if (settlement == null)
-            {
-                return Failed($"Unable to find settlement '{args[0]}'");
-            }
+            if (resolver.TryResolveSettlement(args[0], out var settlement, out var error) == false) return Failed(error);
 
             tracker.DebugPopulate(settlement);
 
@@ -521,43 +592,13 @@ public class LocationDebugCommand
         }
     }
 
-    private static bool TryResolveLocation(string locationId, out Location location, out string error)
+    // Resolves a location by registry id or name over every settlement's location complex.
+    private static bool TryResolveLocation(ICommandObjectResolver resolver, string query, out Location location, out string error)
     {
-        location = null;
-        error = null;
+        var locations = (Campaign.Current?.Settlements ?? Enumerable.Empty<Settlement>())
+            .Where(settlement => settlement.LocationComplex != null)
+            .SelectMany(settlement => settlement.LocationComplex.GetListOfLocations());
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            error = $"Unable to resolve {nameof(IObjectManager)}";
-            return false;
-        }
-
-        if (objectManager.TryGetObject(locationId, out location) == false)
-        {
-            error = $"Unable to find location '{locationId}'";
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryResolveObject<T>(string id, out T obj, out string error) where T : class
-    {
-        obj = null;
-        error = null;
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            error = $"Unable to resolve {nameof(IObjectManager)}";
-            return false;
-        }
-
-        if (objectManager.TryGetObject(id, out obj) == false)
-        {
-            error = $"Unable to find object '{id}'";
-            return false;
-        }
-
-        return true;
+        return resolver.TryResolve(query, locations, candidate => candidate.Name?.ToString(), out location, out error);
     }
 }

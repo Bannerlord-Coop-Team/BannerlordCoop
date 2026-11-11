@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventParties.Messages;
 
@@ -23,8 +24,10 @@ public readonly struct NetworkTroopScoreHit : ICommand
     public readonly bool IsFatal;
     [ProtoMember(6)]
     public readonly bool IsSimulatedHit;
+    [ProtoMember(7)]
+    public readonly WeaponComponentData AttackerWeapon;
 
-    public NetworkTroopScoreHit(string mapEventPartyId, string attackingTroopId, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit)
+    public NetworkTroopScoreHit(string mapEventPartyId, string attackingTroopId, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit, WeaponComponentData attackerWeapon)
     {
         MapEventPartyId = mapEventPartyId;
         AttackingTroopId = attackingTroopId;
@@ -32,5 +35,6 @@ public readonly struct NetworkTroopScoreHit : ICommand
         Damage = damage;
         IsFatal = isFatal;
         IsSimulatedHit = isSimulatedHit;
+        AttackerWeapon = attackerWeapon;
     }
 }

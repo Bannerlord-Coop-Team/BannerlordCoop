@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Participation;
@@ -42,12 +42,12 @@ internal sealed class ServerRetreatedMapEventPartyHandler : IHandler
 
     private void Handle_NetworkBattleRetreated(MessagePayload<NetworkBattleRetreated> payload)
     {
-        if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player) || !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) || !ReferenceEquals(currentPeer, peer))
+        if (payload.Who is not NetPeer peer || !playerManager.TryGetCurrentController(peer, out var controllerId))
         {
             return;
         }
 
-        messageBroker.Publish(this, new BattlePartyRetreated(player.ControllerId, payload.What.InstanceId));
+        messageBroker.Publish(this, new BattlePartyRetreated(controllerId, payload.What.InstanceId));
     }
 
     private void Handle_BattlePartyRetreated(MessagePayload<BattlePartyRetreated> payload)

@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -23,7 +24,7 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 /// Runs the owner's prisoner dialog consequences on the server as that player, after checking the prisoner
 /// and the receiver against what the server sees.
 /// </summary>
-internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationProofStrategy
+internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationProofStrategy, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LordWantsRivalCapturedFinalizationProofStrategy>();
 
@@ -35,6 +36,7 @@ internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationPr
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly ConversationPartyTracker conversationPartyTracker;
+    private readonly IMessageBroker messageBroker;
     private readonly Dictionary<Quest, CaptureEntitlement> pendingCaptures = new();
 
     public LordWantsRivalCapturedFinalizationProofStrategy(
@@ -48,7 +50,13 @@ internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationPr
         this.playerManager = playerManager;
         this.ownership = ownership;
         this.conversationPartyTracker = conversationPartyTracker;
+        this.messageBroker = messageBroker;
         messageBroker.Subscribe<PlayerPrisonersLooted>(Handle_PlayerPrisonersLooted);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<PlayerPrisonersLooted>(Handle_PlayerPrisonersLooted);
     }
 
     private void Handle_PlayerPrisonersLooted(MessagePayload<PlayerPrisonersLooted> payload)

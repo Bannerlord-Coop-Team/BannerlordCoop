@@ -1,4 +1,6 @@
 ﻿using GameInterface.Configuration;
+using Common;
+using GameInterface.Services.Modules;
 using System;
 using System.IO;
 using Xunit;
@@ -24,8 +26,11 @@ public class ModConfigTests : IDisposable
         Directory.CreateDirectory(tempDir);
     }
 
+    private readonly bool originalIsServer = ModInformation.IsServer;
+
     public void Dispose()
     {
+        ModInformation.IsServer = originalIsServer;
         try { Directory.Delete(tempDir, recursive: true); } catch { }
     }
 
@@ -294,6 +299,8 @@ public class ModConfigTests : IDisposable
         Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
         Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(0, options.PostBattleAiAmnestySeconds);
+        Assert.Equal(60, options.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
         Assert.True(options.EnsureUnaffiliatedWanderers);
         Assert.Equal(32, options.WandererLimit);
@@ -301,13 +308,15 @@ public class ModConfigTests : IDisposable
         Assert.False(options.WandererLimitScalesWithPlayers);
         Assert.Equal(4, options.PlayerKingdomClanTierRequired);
         Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
-        Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
+        Assert.Equal(0.6f, options.SmithingStaminaRecoveryMultiplier);
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
         Assert.True(options.CoopClansEnabled);
         Assert.False(options.EnableHeroExecutions);
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
+        Assert.Equal(ClansAfterKingdomDestructionMode.Vanilla, options.ClansAfterKingdomDestruction);
+        Assert.Empty(options.PreferredBattleHosts);
     }
 
     /// <summary>
@@ -330,8 +339,9 @@ public class ModConfigTests : IDisposable
         // Read back a value rather than only the overflow: an unparsed block would leave every
         // property null, which the defaults comparison below would accept as a vacuous pass.
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.Equal(60, config.ModOptions.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(config.ModOptions.CoopClansEnabled);
-        Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
+        Assert.Equivalent(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions), strict: true);
     }
 
     [Fact]
@@ -344,6 +354,10 @@ public class ModConfigTests : IDisposable
     ""playerTroopsReceivedDamage"": ""Easy"",
     ""birthAndDeath"": false,
   },
+  ""modOptions"": {
+    ""KINGDOMDECISIONVOTETIMEOUTSECONDS"": 600,
+    ""PreferredBattleHosts"": [""76561198000000002"", null, ""76561198000000001"",],
+  },
 }");
 
         var config = NewModConfig().Data;
@@ -351,6 +365,8 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerTroopsReceivedDamage);
         Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.Equal(600, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
+        Assert.Equal(new[] { "76561198000000002", "76561198000000001" }, new ModOptions(config.ModOptions).PreferredBattleHosts);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
     }
 
@@ -361,12 +377,20 @@ public class ModConfigTests : IDisposable
   ""difficulty"": {
     ""playerReceivedDamage"": ""Medium"",
     ""battleDeath"": ""Easy""
+  },
+  ""modOptions"": {
+    ""kingdomDecisionVoteTimeoutSeconds"": ""invalid"",
+    ""wandererLimit"": 40,
+    ""preferredBattleHosts"": null,
   }
 }");
 
         var config = NewModConfig().Data;
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
+        Assert.Empty(new ModOptions(config.ModOptions).PreferredBattleHosts);
+        Assert.Equal(40, config.ModOptions.WandererLimit);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
     }
 
@@ -399,6 +423,7 @@ public class ModConfigTests : IDisposable
 
         Assert.NotNull(config);
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
     }
 
     [Fact]
@@ -497,5 +522,64 @@ public class ModConfigTests : IDisposable
             Environment.SetEnvironmentVariable("COOP_DATA_DIR", savedData);
             Environment.SetEnvironmentVariable("BANNERLORD_USER_DIR", savedEnv);
         }
+    }
+
+    // War Sails isn't officially supported, so the shipped template and an absent key both leave it off.
+    [Fact]
+    public void ShippedTemplate_ShipsWarSailsOff()
+    {
+        File.Copy(ShippedTemplatePath, ConfigPath);
+
+        var config = NewModConfig().Data;
+
+        Assert.False(config.ModOptions.WarSails);
+        Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
+    }
+
+    // On a server, a config made before the key existed gets warSails seeded off, keeping every operator value and comment.
+    [Fact]
+    public void ExistingModOptions_WithoutWarSails_IsSeededOffAndIsIdempotent()
+    {
+        ModInformation.IsServer = true;
+        File.WriteAllText(ConfigPath, @"{
+  ""modOptions"": {
+    // operator note
+    ""clientsCanUseCheats"": true
+  }
+}");
+
+        var config = NewModConfig().Data;
+        string firstMigration = File.ReadAllText(ConfigPath);
+        _ = NewModConfig().Data;
+
+        Assert.False(config.ModOptions.WarSails);
+        Assert.True(config.ModOptions.ClientsCanUseCheats);
+        Assert.Contains("\"warSails\": false", firstMigration);
+        Assert.Contains("// operator note", firstMigration);
+        Assert.Equal(firstMigration, File.ReadAllText(ConfigPath));
+    }
+
+    // An operator's warSails value wins over the seeded default.
+    [Fact]
+    public void ExistingWarSails_IsKept()
+    {
+        File.WriteAllText(ConfigPath, "{ \"modOptions\": { \"WarSails\": true } }");
+
+        var config = NewModConfig().Data;
+
+        Assert.True(config.ModOptions.WarSails);
+        Assert.DoesNotContain("\"warSails\": false", File.ReadAllText(ConfigPath));
+    }
+
+    // A config with no modOptions block is left without one, and warSails still reads as off.
+    [Fact]
+    public void MissingModOptionsBlock_IsNotAdded_AndWarSailsReadsOff()
+    {
+        File.WriteAllText(ConfigPath, "{ \"voice\": { \"mapMaximumDistance\": 20 } }");
+
+        var config = NewModConfig().Data;
+
+        Assert.False(config.ModOptions?.WarSails ?? false);
+        Assert.DoesNotContain("modOptions", File.ReadAllText(ConfigPath));
     }
 }

@@ -15,6 +15,18 @@ internal static class SiegeWeaponFireContext
 {
     [System.ThreadStatic]
     public static RangedSiegeWeapon Capturing;
+
+    /// <summary>Starts capturing a launch; only the machine's simulating client captures.</summary>
+    public static void Begin(RangedSiegeWeapon weapon)
+    {
+        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(weapon.Id.Id)) return;
+
+        Capturing = weapon;
+    }
+
+    // Cleared even if the launch throws before AddCustomMissile, so a stale weapon can't taint a later shot.
+    public static void End() => Capturing = null;
 }
 
 /// <summary>
@@ -24,19 +36,11 @@ internal static class SiegeWeaponFireContext
 [HarmonyPatch(typeof(RangedSiegeWeapon), "ShootProjectileAux")]
 internal static class RangedSiegeWeaponShootPatch
 {
-    private static void Prefix(RangedSiegeWeapon __instance)
-    {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
-        if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id)) return;
+    // Opens the shot's capture context for this weapon.
+    private static void Prefix(RangedSiegeWeapon __instance) => SiegeWeaponFireContext.Begin(__instance);
 
-        SiegeWeaponFireContext.Capturing = __instance;
-    }
-
-    // Clear even if the launch throws before AddCustomMissile, so a stale weapon can't taint a later shot.
-    private static void Finalizer()
-    {
-        SiegeWeaponFireContext.Capturing = null;
-    }
+    // Closes the capture context, also when the shot throws.
+    private static void Finalizer() => SiegeWeaponFireContext.End();
 }
 
 /// <summary>

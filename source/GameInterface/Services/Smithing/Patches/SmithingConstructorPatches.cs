@@ -25,4 +25,12 @@ internal class CraftingVMConstructorPatch
 
         MessageBroker.Instance.Publish(__instance, new CraftingVMCreated(__instance));
     }
+
+    // A later order refresh would otherwise run on this finalized VM and its finalized children
+    [HarmonyPatch(nameof(CraftingVM.OnFinalize))]
+    [HarmonyPostfix]
+    public static void OnFinalizePostfix(CraftingVM __instance)
+    {
+        MessageBroker.Instance.Publish(__instance, new CraftingVMFinalized(__instance));
+    }
 }

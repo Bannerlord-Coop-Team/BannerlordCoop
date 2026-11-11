@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network.Messages;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -11,9 +12,10 @@ using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dismissal;
 
@@ -22,28 +24,35 @@ namespace GameInterface.Services.Issues.Framework.Dismissal;
 /// player is gone is ended silently, so its notable does not stay stuck on it. For this first
 /// iteration of quests, this will be the behavior, but this will change in the future.
 /// </summary>
-internal class ActiveIssueDismisser : IHandler
+internal class ActiveIssueDismisser : IHandler, IActiveIssueDismisser
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ActiveIssueDismisser>();
+    private const string ReturnedTroopsText = "{=V5Za6d4h}Your troops have returned from their mission.";
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
+    private readonly IIssueDismisser issueDismisser;
+    private readonly IIssueOwnerResolver ownerResolver;
 
     public ActiveIssueDismisser(
         IMessageBroker messageBroker,
         IQuestTypeRegistry registry,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IIssueDismisser issueDismisser,
+        IIssueOwnerResolver ownerResolver)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
+        this.issueDismisser = issueDismisser;
+        this.ownerResolver = ownerResolver;
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
@@ -97,7 +106,7 @@ internal class ActiveIssueDismisser : IHandler
         {
             try
             {
-                if (issue.IsSolvingWithQuest && !OwnerIsConnected(issue))
+                if ((issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution) && !OwnerIsConnected(issue))
                 {
                     DismissQuest(issue, announce);
                     dismissed++;
@@ -143,45 +152,52 @@ internal class ActiveIssueDismisser : IHandler
     private void DismissQuest(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the quest of {issue} offered by {owner}, its player is gone", issue.StringId, issue.IssueOwner?.StringId);
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
 
-        issue.IssueFinalized();
+        var quest = issue.IssueQuest;
+        var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
+        if (journals != null && ownerResolver.TryResolveOwnerHero(issue, out var owner))
+        {
+            // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                if (quest != null && quest.IsOngoing)
+                    journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
+                // The issue's accepted status takes precedence over the quest detail in IsEnded.
+                journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
+            }
+        }
+
+        issueDismisser.Dismiss(issue);
 
         if (announce)
         {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel));
+            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.QuestCancel, issueOwnerId));
         }
+    }
+
+    public void Dismiss(IssueBase issue, IssueOutcome outcome)
+    {
+        objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId);
+        if (issue.IsSolvingWithAlternative) DismissTroops(issue, announce: false);
+        else DismissQuest(issue, announce: false);
+
+        messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome, issueOwnerId));
     }
 
     private void DismissTroops(IssueBase issue, bool announce)
     {
         Logger.Information("Dismissing the troops sent for {issue} offered by {owner}, nobody owns them", issue.StringId, issue.IssueOwner?.StringId);
 
-        var settlement = issue.IssueOwner?.CurrentSettlement ?? issue.IssueOwner?.HomeSettlement;
-
-        foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
-        {
-            if (element.Character.IsHero && element.Character.HeroObject.HeroState == Hero.CharacterStates.Disabled)
-            {
-                FreeCompanion(element.Character.HeroObject, settlement);
-            }
-        }
-
-        issue.IssueFinalized();
+        if (!issue.JournalEntries.Any(log => log.LogText?.Value == ReturnedTroopsText))
+            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(ReturnedTroopsText)));
+        messageBroker.Publish(issue, new AlternativeSolutionEndingObserved(
+            issue, IssueBase.IssueUpdateDetails.IssueCancel));
+        issueDismisser.Dismiss(issue);
 
         if (announce)
         {
             messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
         }
-    }
-
-    private static void FreeCompanion(Hero companion, Settlement settlement)
-    {
-        if (settlement == null)
-        {
-            companion.ChangeState(Hero.CharacterStates.Active);
-            return;
-        }
-
-        TeleportHeroAction.ApplyImmediateTeleportToSettlement(companion, settlement);
     }
 }

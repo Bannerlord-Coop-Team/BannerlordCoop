@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
@@ -45,7 +46,7 @@ public readonly struct ModOptions
     [ProtoMember(12)]
     public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
     [ProtoMember(13)]
-    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.6f;
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
@@ -74,6 +75,14 @@ public readonly struct ModOptions
     public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
     [ProtoMember(26)]
     public readonly int SpawnRateWanderers { get; } = 1;
+    [ProtoMember(27)]
+    public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
+    [ProtoMember(28)]
+    public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
+    [ProtoMember(29)]
+    public readonly int PostBattleAiAmnestySeconds { get; } = 0;
+    [ProtoMember(30)]
+    public readonly List<string> PreferredBattleHosts { get; } = new();
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -92,6 +101,7 @@ public readonly struct ModOptions
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
         BlockAiWarDeclarationsOnOfflinePlayers = modOptionsData.BlockAiWarDeclarationsOnOfflinePlayers ?? BlockAiWarDeclarationsOnOfflinePlayers;
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
+        PostBattleAiAmnestySeconds = modOptionsData.PostBattleAiAmnestySeconds ?? PostBattleAiAmnestySeconds;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
@@ -109,5 +119,8 @@ public readonly struct ModOptions
         EnablePlayerExecutions = modOptionsData.EnablePlayerExecutions ?? EnablePlayerExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
+        KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
+        ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
+        PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
     }
 }

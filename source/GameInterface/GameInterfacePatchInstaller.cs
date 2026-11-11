@@ -1,4 +1,5 @@
-﻿using GameInterface.Utils;
+﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Utils;
 using HarmonyLib;
 
 namespace GameInterface;
@@ -9,7 +10,8 @@ namespace GameInterface;
 public interface IGameInterfacePatchInstaller
 {
     /// <summary>
-    /// Installs the detour guard, the static fixes and every uncategorized patch onto <paramref name="harmony"/>.
+    /// Installs the detour guard, the static fixes, every uncategorized patch and the enabled quest category
+    /// onto <paramref name="harmony"/>.
     /// </summary>
     void Install(Harmony harmony);
 }
@@ -17,6 +19,13 @@ public interface IGameInterfacePatchInstaller
 /// <inheritdoc cref="IGameInterfacePatchInstaller"/>
 internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
 {
+    private readonly IQuestFeatureFlag questFeatureFlag;
+
+    public GameInterfacePatchInstaller(IQuestFeatureFlag questFeatureFlag)
+    {
+        this.questFeatureFlag = questFeatureFlag;
+    }
+
     /// <inheritdoc/>
     public void Install(Harmony harmony)
     {
@@ -28,5 +37,10 @@ internal class GameInterfacePatchInstaller : IGameInterfacePatchInstaller
 
         harmony.PatchCategory(assembly, GameInterface.HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        if (questFeatureFlag.IsEnabled)
+        {
+            harmony.PatchCategory(assembly, GameInterface.HARMONY_QUESTS_CATEGORY);
+        }
     }
 }

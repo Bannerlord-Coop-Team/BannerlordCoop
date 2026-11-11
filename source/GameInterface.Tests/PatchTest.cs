@@ -34,6 +34,23 @@ namespace GameInterface.Tests
         }
 
         [Fact]
+        public void QuestCategoryPatches_ApplyToCurrentGameAssemblies()
+        {
+            var harmony = new Harmony(nameof(QuestCategoryPatches_ApplyToCurrentGameAssemblies));
+
+            try
+            {
+                harmony.PatchCategory(typeof(GameInterface).Assembly, GameInterface.HARMONY_QUESTS_CATEGORY);
+
+                Assert.NotEmpty(harmony.GetPatchedMethods());
+            }
+            finally
+            {
+                harmony.UnpatchAll(harmony.Id);
+            }
+        }
+
+        [Fact]
         public void PlayerLeaveSiegeEncounterPatch_HooksDontGetInvolved()
         {
             var harmony = new Harmony(nameof(PlayerLeaveSiegeEncounterPatch_HooksDontGetInvolved));

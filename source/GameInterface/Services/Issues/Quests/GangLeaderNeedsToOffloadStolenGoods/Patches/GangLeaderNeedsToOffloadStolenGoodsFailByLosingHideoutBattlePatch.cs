@@ -4,6 +4,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoo
 
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.FailQuestByLosingHideoutBattle))]
 internal class GangLeaderNeedsToOffloadStolenGoodsFailByLosingHideoutBattlePatch
 {
