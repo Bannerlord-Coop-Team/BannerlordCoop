@@ -301,6 +301,9 @@ public class ExtortionByDesertersTests : IDisposable
             raid._sides[(int)BattleSideEnum.Defender] = new MapEventSide(raid, BattleSideEnum.Defender, quest.QuestSettlement.Party);
             raider.MapEventSide = raid.AttackerSide;
             quest.QuestSettlement.Party.MapEventSide = raid.DefenderSide;
+            defenders.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
+            defenders.MapEventSide = raid.DefenderSide;
+            Assert.Same(raid, defenders.MapEvent);
             log = (attacker == 0 ? quest.OnQuestFailed2LogText :
                 attacker == 1 ? quest.OnQuestFailed3LogText : quest.OnQuestCancel2LogText).Value;
 
@@ -313,6 +316,8 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Same(deserters, quest._deserterMobileParty);
             Assert.False(defenders.IsActive);
             Assert.Null(quest._defenderMobileParty);
+            Assert.Single(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
+                message => message.DefeatedParty == defenders);
             Assert.True(ownerParty.IsActive);
             Assert.True(otherParty.IsActive);
         }, TextLinks.Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize))));
@@ -1196,7 +1201,7 @@ public class ExtortionByDesertersTests : IDisposable
     }
 
     [Fact]
-    public void Timeout_AppliesThePenaltyAndJournalOnTheOwningQuest()
+    public void Timeout_WithNullCharacterProperties_PreservesTheBindingInBothJournalPaths()
     {
         var quest = Accept();
         var mirror = (Quest)scenario.QuestOf(Server);
@@ -1222,7 +1227,9 @@ public class ExtortionByDesertersTests : IDisposable
         var snapshotWire = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(snapshot));
         Assert.Equal(stateWire.Log.Value, entry.Value);
         Assert.Equal(Assert.Single(snapshotWire.Logs).Text.ToString(), entry.ToString());
-        Assert.DoesNotContain("ERROR:", entry.ToString());
+        Assert.Null(stateWire.Log.Attributes["QUEST_GIVER"]);
+        Assert.Null(Assert.Single(snapshotWire.Logs).Text.Attributes["QUEST_GIVER"]);
+        Assert.Equal(stateWire.Log.ToString(), entry.ToString());
         output.WriteLine($"Owner single timeout after both serialized paths: {entry}");
     }
 

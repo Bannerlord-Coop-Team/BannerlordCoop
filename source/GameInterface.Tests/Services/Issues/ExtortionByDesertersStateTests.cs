@@ -82,8 +82,8 @@ public class ExtortionByDesertersStateTests
 
         Assert.Equal(text.Value, state.Log.Value);
         Assert.Equal(ending.Value, state.Log.Value);
-        Assert.False(state.Log.Attributes?.ContainsKey("QUEST_GIVER") ?? false);
-        Assert.False(ending.Attributes?.ContainsKey("QUEST_GIVER") ?? false);
+        Assert.Null(state.Log.Attributes["QUEST_GIVER"]);
+        Assert.Null(ending.Attributes["QUEST_GIVER"]);
     }
 
     [Fact]
