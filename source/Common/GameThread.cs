@@ -398,7 +398,6 @@ public class GameThread : IUpdateable
         if (maximumDrainTime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDrainTime));
         TimeSpan timeout = blockingTimeout ?? BlockingTimeout;
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
-        QueueContext queue = CurrentQueue;
         return AddDrainBudget(Math.Max(1L, (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout);
     }
 

@@ -49,6 +49,7 @@ internal class GameStateInterface : IGameStateInterface
     private readonly Action<SaveGameFileInfo> forceLoadSave;
     private readonly INavalSaveCompatibility navalSaveCompatibility;
     private readonly ILoadingInterface loadingInterface;
+    private readonly Action<byte[]> loadTransferredSave;
 
     public GameStateInterface(IMessageBroker messageBroker, INavalSaveCompatibility navalSaveCompatibility,
         ILoadingInterface loadingInterface)
@@ -57,10 +58,12 @@ internal class GameStateInterface : IGameStateInterface
     {
     }
 
-    // Lets tests replace the engine's end-game, save listing and forced load.
+    // Lets tests replace the engine's end-game, save listing, forced load and transferred save load.
     internal GameStateInterface(IMessageBroker messageBroker, Action endGame, Func<SaveGameFileInfo[]> getSaveFiles,
-        Action<SaveGameFileInfo> forceLoadSave, INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface)
+        Action<SaveGameFileInfo> forceLoadSave, INavalSaveCompatibility navalSaveCompatibility, ILoadingInterface loadingInterface,
+        Action<byte[]> loadTransferredSave = null)
     {
+        this.loadTransferredSave = loadTransferredSave ?? InteralLoadSaveGame;
         this.messageBroker = messageBroker;
         this.endGame = endGame;
         this.getSaveFiles = getSaveFiles;
@@ -86,12 +89,13 @@ internal class GameStateInterface : IGameStateInterface
             GameThread.Run(() =>
             {
                 Interlocked.Exchange(ref started, 1);
-                InteralLoadSaveGame(saveData);
+                loadTransferredSave(saveData);
             }, blocking: true);
         }
         catch (TimeoutException e) when (Volatile.Read(ref started) == 1)
         {
-            // A big save can take longer than the wait to read, and it still finishes on the game thread
+            // A big save can take longer than the wait to read, and it still finishes on the game thread.
+            // If that load then fails, the server's campaign entry timeout ends the join, as before.
             Logger.Warning(e, "The transferred save is still loading on the game thread after the blocking wait");
         }
     }
