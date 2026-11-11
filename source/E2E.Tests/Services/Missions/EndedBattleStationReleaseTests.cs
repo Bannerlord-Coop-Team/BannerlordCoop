@@ -17,6 +17,7 @@ namespace E2E.Tests.Services.Missions;
 /// </summary>
 public class EndedBattleStationReleaseTests : MissionTestEnvironment
 {
+    // Sets up the mission test environment with the test's output.
     public EndedBattleStationReleaseTests(ITestOutputHelper output) : base(output) { }
 
     // Runs vanilla's own removal, the one deaths, fades and withdrawals all reach, on an agent seated after the battle ended.
@@ -25,7 +26,8 @@ public class EndedBattleStationReleaseTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
-        // Patched here, after the fixture's agent shims, as other classes reapply and remove the shared harmony's patches.
+        // Installs the patch under this test's own Harmony owner, removed in finally, so another test unpatching the shared
+        // category can't strip it.
         var harmony = new Harmony("e2e.ended-battle-station-release." + Guid.NewGuid());
         harmony.CreateClassProcessor(typeof(EndedBattleStationReleasePatch)).Patch();
         BattleSpawnGate.BeginBattle("ended-battle-station-release");
