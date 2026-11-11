@@ -12,9 +12,5 @@ internal class HideoutEventComponentPatches
     // A client reaches this from its own encounter end, the server clears through HideoutCampaignConsequencesHandler.
     [HarmonyPatch(nameof(HideoutEventComponent.OnHideoutCleared))]
     [HarmonyPrefix]
-    private static bool OnHideoutClearedPrefix()
-    {
-        if (ModInformation.IsServer) return true;
-        return CallOriginalPolicy.IsOriginalAllowed();
-    }
+    private static bool OnHideoutClearedPrefix() => ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
 }
