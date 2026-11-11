@@ -1,0 +1,106 @@
+[
+  {
+    "action": "WaitFor",
+    "target": "testclient",
+    "name": "coop.debug.issues.grain.party_screen",
+    "arguments": [
+      "status"
+    ],
+    "match": "left=1 .*done=False",
+    "timeoutMs": 30000,
+    "intervalMs": 1000
+  },
+  {
+    "action": "Screenshot",
+    "target": "testclient",
+    "label": "companion-troops-done-disabled"
+  },
+  {
+    "action": "Command",
+    "target": "testclient",
+    "name": "coop.debug.issues.grain.party_screen",
+    "arguments": [
+      "move",
+      "3"
+    ],
+    "expect": "left=4 .*done=False"
+  },
+  {
+    "action": "Command",
+    "target": "testclient",
+    "name": "coop.debug.issues.grain.party_screen",
+    "arguments": [
+      "move",
+      "1"
+    ],
+    "expect": "left=5 .*done=True"
+  },
+  {
+    "action": "Screenshot",
+    "target": "testclient",
+    "label": "companion-troops-done-enabled"
+  },
+  {
+    "action": "Command",
+    "target": "testclient",
+    "name": "coop.debug.issues.grain.party_screen",
+    "arguments": [
+      "done"
+    ],
+    "expect": "Pressed the native Party screen Done button"
+  },
+  {
+    "action": "WaitFor",
+    "target": "testclient",
+    "name": "coop.debug.ittest.run",
+    "arguments": [
+      "cont"
+    ],
+    "match": "inProgress=False",
+    "timeoutMs": 60000,
+    "intervalMs": 3000
+  },
+  {
+    "action": "WaitFor",
+    "target": "server",
+    "name": "coop.debug.ittest.run",
+    "arguments": [
+      "issue",
+      "@D"
+    ],
+    "match": "owner=testclient .*alternative=True",
+    "timeoutMs": 30000,
+    "intervalMs": 1000
+  },
+  {
+    "action": "Command",
+    "target": "server",
+    "name": "coop.debug.ittest.run",
+    "arguments": [
+      "state",
+      "@D"
+    ]
+  },
+  {
+    "action": "Command",
+    "target": "testclient",
+    "name": "coop.debug.ittest.run",
+    "arguments": [
+      "state",
+      "@D"
+    ]
+  },
+  {
+    "action": "Command",
+    "target": "testclient2",
+    "name": "coop.debug.ittest.run",
+    "arguments": [
+      "state",
+      "@D"
+    ]
+  },
+  {
+    "action": "Screenshot",
+    "label": "companion-sent-after-native-party-screen"
+  }
+]
