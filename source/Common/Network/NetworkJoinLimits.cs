@@ -46,7 +46,8 @@ public static class NetworkJoinLimits
     /// <summary>
     /// How long a joining client waits for its game thread to leave the character creation campaign, and then again
     /// to start loading the transferred save. On a big map the first map frame after character creation can take more
-    /// than a minute. Both waits together stay under <see cref="CampaignEntryTimeout"/>, so the client gives up first.
+    /// than a minute. That is up to 5 minutes per step, 10 together, which usually ends well inside
+    /// <see cref="CampaignEntryTimeout"/>. The server's clock for that can start earlier, during the save transfer.
     /// </summary>
     public static readonly TimeSpan SaveHandoffTimeout = TimeSpan.FromMinutes(5);
 }

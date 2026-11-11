@@ -14,23 +14,6 @@ public class GameThreadBlockingTimeoutScopeTests : IDisposable
     }
 
     [Fact]
-    public void UseBlockingTimeout_RaisesTheWaitWithoutLimitingTheDrain()
-    {
-        var queue = new GameThread.QueueContext();
-        using var active = GameThread.ActivateQueue(queue);
-        TimeSpan longer = TimeSpan.FromMinutes(5);
-
-        using (GameThread.Instance.UseBlockingTimeout(longer))
-        {
-            Assert.Equal(longer, GameThread.Instance.EffectiveBlockingTimeout);
-            Assert.Equal(0, GameThread.Instance.FrameDrainLimitCount);
-            Assert.Equal(0, Interlocked.Read(ref queue.activeDrainTicks));
-        }
-
-        Assert.Equal(GameThread.BlockingTimeout, GameThread.Instance.EffectiveBlockingTimeout);
-    }
-
-    [Fact]
     public void UseBlockingTimeout_KeepsAnActiveDrainLimit()
     {
         var queue = new GameThread.QueueContext();

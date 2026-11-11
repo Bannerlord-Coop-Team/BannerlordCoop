@@ -404,6 +404,7 @@ public class GameThread : IUpdateable
     /// <summary>
     /// Applies <paramref name="blockingTimeout"/> to blocking work queued in this runtime until the scope is disposed,
     /// without limiting the frame drain. The longest active timeout wins, as with <see cref="LimitFrameDrain"/>.
+    /// Like a drain limit it covers the whole queue, so blocking runs from other callers wait as long while it is active.
     /// </summary>
     public IDisposable UseBlockingTimeout(TimeSpan blockingTimeout)
     {
