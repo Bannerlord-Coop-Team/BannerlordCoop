@@ -9,6 +9,8 @@ using GameInterface.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.Kingdoms;
+using Coop.Core.Server.Services.Kingdoms.Messages;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -1621,6 +1623,82 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     notice => notice is KingdomDecisionMapNotification decisionNotice && decisionNotice.KingdomOfDecision == kingdom);
             });
         }
+    }
+
+    [Fact]
+    public void JoinKingdomBaseline_CancellablePeaceDoesNotShiftLoadedDecisionIndexes()
+    {
+        var client = Clients.First();
+        var joiningClient = Clients.Skip(1).First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        joiningClient.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var joiningPlayer = CreateSyncedPlayerContext(SecondControllerId, joiningClient);
+        var targetPlayer = CreateSyncedPlayerContext("JoinBaselinePeaceTarget", _ => false);
+        LeadPlayerPartiesEverywhere(player, joiningPlayer, targetPlayer);
+        string kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        string targetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(joiningPlayer.ClanId, kingdomId);
+        ConfigureClanInKingdom(targetPlayer.ClanId, targetId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetId);
+
+        KingdomDecision[] savedDecisions = Array.Empty<KingdomDecision>();
+        foreach (var endpoint in Clients)
+        {
+            endpoint.Call(() =>
+            {
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+                Assert.True(endpoint.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposer));
+                using (new AllowedThread())
+                {
+                    kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                    kingdom._unresolvedDecisions.Add(new MakePeaceKingdomDecision(proposer, target));
+                    kingdom._unresolvedDecisions.Add(new DeclareWarDecision(proposer, target));
+                }
+                if (ReferenceEquals(endpoint, joiningClient)) savedDecisions = kingdom.UnresolvedDecisions.ToArray();
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var proposer));
+            using (new AllowedThread())
+            {
+                kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                kingdom._unresolvedDecisions.Add(new MakePeaceKingdomDecision(proposer, target));
+                kingdom._unresolvedDecisions.Add(new DeclareWarDecision(proposer, target));
+            }
+            Assert.True(kingdom.UnresolvedDecisions[0].ShouldBeCancelled());
+            var manager = GetVoteManager(Server);
+            Assert.True(manager.HandleVoteRequest(ControllerId, new KingdomDecisionVoteData(
+                kingdomId, 1, 0, (int)Supporter.SupportWeights.FullyPush, false, false)));
+
+            // The joiner loaded this order from the save before receiving the immediate baseline.
+            Server.Resolve<IJoinCampaignKingdomBaseLineSender>().Send(joiningClient.NetPeer);
+            var baseline = Assert.Single(Server.NetworkSentImmediateMessages.GetMessages<NetworkJoinCampaignKingdomBaseline>());
+            var vote = Assert.Single(baseline.ActiveDecisionVotes);
+            Assert.Equal(player.ClanId, vote.ClanId);
+            Assert.IsType<DeclareWarDecision>(savedDecisions[vote.VoteData.DecisionIndex]);
+            Assert.Equal(1, vote.VoteData.DecisionIndex);
+            var round = Assert.Single(baseline.ActiveDecisionRounds,
+                status => status.KingdomId == kingdomId && status.DecisionIndex == vote.VoteData.DecisionIndex);
+            Assert.IsType<DeclareWarDecision>(savedDecisions[round.DecisionIndex]);
+            Assert.Equal(2, kingdom.UnresolvedDecisions.Count);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>());
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow);
+            Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message =>
+                message.KingdomId == kingdomId && message.Index == 0);
+            var shiftedVote = Assert.Single(manager.CaptureActiveRoundVotes());
+            Assert.Equal(0, shiftedVote.VoteData.DecisionIndex);
+            Assert.Equal(player.ClanId, shiftedVote.ClanId);
+        });
     }
 
     [Fact]
