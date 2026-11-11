@@ -68,8 +68,8 @@ internal class EmptyClanPartyLeadersClientPatch
 }
 
 /// <summary>
-/// Battle wreckages are off on every role: co-op drops the StringId of a server-made one, which then
-/// throws in AddWreckage and saves an id-less wreckage.
+/// Battle wreckages, the land battle sites and sea wreckages left after a battle, are off on every role:
+/// they have no registry or sync yet, and co-op drops the StringId of a server-made one.
 /// </summary>
 [HarmonyPatch(typeof(BattleWreckageCampaignBehavior), nameof(BattleWreckageCampaignBehavior.RegisterEvents))]
 internal class DisableBattleWreckageCampaignBehavior
@@ -79,21 +79,30 @@ internal class DisableBattleWreckageCampaignBehavior
 }
 
 /// <summary>
-/// Saves written before the fix hold wreckages without an id, and vanilla's object lists throw on them
-/// during load. OnGameLoaded is too late, so they are dropped before the lists are built.
+/// Drops every saved wreckage before the object lists are built, since with the behavior off they never
+/// expire and clicking one opens a menu that was never registered. Id-less ones also throw while loading.
 /// </summary>
 [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
-internal class IdlessWreckageLoadRepairPatch
+internal class SavedWreckageRemovalPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<IdlessWreckageLoadRepairPatch>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SavedWreckageRemovalPatch>();
 
+    // Removes the saved wreckages and logs how many were dropped.
     [HarmonyPrefix]
     private static void Prefix(CampaignObjectManager __instance)
     {
-        var removed = RemoveIdlessWreckages(__instance);
-        if (removed > 0) Logger.Warning("Dropped {Count} battle wreckages saved without an id", removed);
+        var removed = RemoveSavedWreckages(__instance);
+        if (removed > 0) Logger.Information("Dropped {Count} saved battle wreckages", removed);
     }
 
-    internal static int RemoveIdlessWreckages(CampaignObjectManager manager) =>
-        manager._wreckages?.RemoveAll(wreckage => wreckage == null || wreckage.StringId == null) ?? 0;
+    // Clears the saved wreckage list and returns how many entries it held.
+    internal static int RemoveSavedWreckages(CampaignObjectManager manager)
+    {
+        var wreckages = manager._wreckages;
+        if (wreckages == null) return 0;
+
+        var count = wreckages.Count;
+        wreckages.Clear();
+        return count;
+    }
 }

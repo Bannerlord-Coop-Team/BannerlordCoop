@@ -13,9 +13,8 @@ using Xunit;
 namespace GameInterface.Tests.Services.CampaignService;
 
 /// <summary>
-/// v1.5 battle wreckages are off on every role: the co-op StringId gate leaves a server-made wreckage
-/// without an id, which throws in AddWreckage after it is already in the saved list. Saves that already
-/// hold such wreckages are repaired before the object lists are built.
+/// v1.5 battle wreckages are off on every role, and every wreckage a save already holds is dropped
+/// before the object lists are built, since id-less ones throw there and none of them would expire.
 /// </summary>
 [Collection(ModInformationRoleCollection.Name)]
 public class BattleWreckageCoopTests : IDisposable
@@ -57,7 +56,7 @@ public class BattleWreckageCoopTests : IDisposable
     }
 
     [Fact]
-    public void IdlessWreckage_IsDroppedSoTheObjectListsInitialize()
+    public void SavedWreckages_AreAllDroppedSoTheObjectListsInitialize()
     {
         var manager = new CampaignObjectManager();
         var idless = ObjectHelper.SkipConstructor<BattleWreckage>();
@@ -65,38 +64,14 @@ public class BattleWreckageCoopTests : IDisposable
         using (new AllowedThread()) named.StringId = "wreckage_1";
         manager._wreckages.Add(idless);
         manager._wreckages.Add(named);
+        manager._wreckages.Add(null);
 
-        // Baseline: without the repair the vanilla load path throws like the client dump.
+        // Baseline: without the removal the vanilla load path throws like the client dump.
         Assert.Throws<NullReferenceException>(() => manager.InitializeManagerObjectLists());
 
-        Assert.Equal(1, IdlessWreckageLoadRepairPatch.RemoveIdlessWreckages(manager));
+        Assert.Equal(3, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
         manager.InitializeManagerObjectLists();
-        Assert.Same(named, Assert.Single(manager.Wreckages));
-    }
-
-    [Fact]
-    public void Repair_WithOnlyNamedWreckages_RemovesNothing()
-    {
-        var manager = new CampaignObjectManager();
-        var named = ObjectHelper.SkipConstructor<BattleWreckage>();
-        using (new AllowedThread()) named.StringId = "wreckage_1";
-        manager._wreckages.Add(named);
-
-        Assert.Equal(0, IdlessWreckageLoadRepairPatch.RemoveIdlessWreckages(manager));
-        Assert.Same(named, Assert.Single(manager.Wreckages));
-    }
-
-    [Fact]
-    public void Repair_DropsNullEntries()
-    {
-        var manager = new CampaignObjectManager();
-        var named = ObjectHelper.SkipConstructor<BattleWreckage>();
-        using (new AllowedThread()) named.StringId = "wreckage_1";
-        manager._wreckages.Add(null);
-        manager._wreckages.Add(named);
-
-        Assert.Equal(1, IdlessWreckageLoadRepairPatch.RemoveIdlessWreckages(manager));
-        Assert.Same(named, Assert.Single(manager.Wreckages));
+        Assert.Empty(manager.Wreckages);
     }
 
     [Fact]
@@ -105,7 +80,7 @@ public class BattleWreckageCoopTests : IDisposable
         var manager = new CampaignObjectManager();
         manager._wreckages = null;
 
-        Assert.Equal(0, IdlessWreckageLoadRepairPatch.RemoveIdlessWreckages(manager));
+        Assert.Equal(0, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
     }
 
     [Fact]
@@ -115,10 +90,10 @@ public class BattleWreckageCoopTests : IDisposable
         try
         {
             var disabled = harmony.CreateClassProcessor(typeof(DisableBattleWreckageCampaignBehavior)).Patch();
-            var repaired = harmony.CreateClassProcessor(typeof(IdlessWreckageLoadRepairPatch)).Patch();
+            var removal = harmony.CreateClassProcessor(typeof(SavedWreckageRemovalPatch)).Patch();
 
             Assert.Contains(disabled, method => method.Name.Contains(nameof(BattleWreckageCampaignBehavior.RegisterEvents)));
-            Assert.Contains(repaired, method => method.Name.Contains(nameof(CampaignObjectManager.InitializeOnLoad)));
+            Assert.Contains(removal, method => method.Name.Contains(nameof(CampaignObjectManager.InitializeOnLoad)));
         }
         finally
         {

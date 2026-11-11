@@ -581,12 +581,16 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     in co-op anyway, since nothing syncs them (#3837, #3838). Re-enabling needs the wreckage to get an
     id (a sync registry, or `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after
     proving `CreateWreckage`'s log entry and map interactable work under co-op).
-  - Save repair: `IdlessWreckageLoadRepairPatch` is a prefix on `CampaignObjectManager.InitializeOnLoad`
-    (`OnGameLoaded` fires too late) and removes wreckages with a null `StringId` before the object
-    lists are built, on the server and on clients, logging how many it dropped. Saves already
-    written by an affected server load again once the fix is deployed on both sides. Checked live on
-    2026-10-22: a server save hit by 7 throws logged "Dropped 7 battle wreckages saved without an id",
-    loaded, and a client that had crashed on it rejoined.
+  - Save repair: `SavedWreckageRemovalPatch` is a prefix on `CampaignObjectManager.InitializeOnLoad`
+    (`OnGameLoaded` fires too late) and removes every saved wreckage before the object lists are
+    built, on the server and on clients, logging "Dropped {Count} saved battle wreckages". Id-less
+    wreckages throw there, and a valid one would never expire and opens an unregistered menu (below).
+    The map visuals are built later from `Campaign.Wreckages`, so none are drawn. A dropped wreckage
+    stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry) and in the
+    disabled behavior's `_encounteredBattleWreckage`. Saves already written by an affected server
+    load again once the fix is deployed on both sides. Checked live on 2026-10-22, when the patch
+    only dropped id-less wreckages: a server save hit by 7 throws dropped all 7, loaded, and a client
+    that had crashed on it rejoined.
   - The wreckage repair does not undo the rest of the damage. A throw skipped the end of
     `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
     AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`
@@ -618,9 +622,9 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     `WaitingRemoval` (the merge below). The missing `MapEventFinalized` and
     `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed too; see
     the merge's review fixes.
-  - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
-    expires, because the server no longer registers the hourly tick. Clients still draw it and can
-    click it, which opens a menu clients never registered (existing client path; in-game check owed).
+  - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) would never
+    expire, because the server no longer registers the hourly tick, and clicking it opens a menu
+    clients never registered. `SavedWreckageRemovalPatch` drops it on load (#4582).
 - v1.5 spawns deserter looter parties with a null `PartyTemplate` (co-op's own
   `DesertersCampaignBehaviorPatches` calls `CreateLooterParty(..., null, ...)`). The bandit init
   args handler now accepts a null template on the send and receive paths, as the caravan handler does
