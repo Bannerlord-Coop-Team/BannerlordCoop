@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -443,11 +444,11 @@ public class HeadmanNeedsGrainTests : IDisposable
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
+    // v1.5.7 fails the quest for a crime war only during a raid on the giver's faction; any other war cancels it.
     [Theory]
-    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
-    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange, IssueOutcome.QuestFail)]
-    public void ServerWar_UsesTheOwnersFactionAndDoesNotRequireAnActiveMapEvent(
-        DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion)]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange)]
+    public void ServerWarWithoutARaid_CancelsTheOwnersQuestWithoutAnActiveMapEvent(DeclareWarAction.DeclareWarDetail detail)
     {
         Accept();
         var ownerQuest = (Quest)scenario.QuestOf(ClientA);
@@ -457,18 +458,50 @@ public class HeadmanNeedsGrainTests : IDisposable
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
                 DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Clan>(Server, playerClanId), detail);
         }, Texts);
-        Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
-        if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange)
+        ClientA.Call(() =>
         {
-            ClientA.Call(() =>
+            Assert.Empty(ownerQuest.JournalEntries.Where(log => log.LogText.Value.Contains("accused of a crime")));
+            Assert.Equal(0, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor));
+        });
+    }
+
+    [Fact]
+    public void ServerCrimeWar_DuringARaidOnTheGiversFaction_FailsTheOwnersQuest()
+    {
+        Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
+        Server.Call(() =>
+        {
+            var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            var settlement = Get<Settlement>(Server, villageSettlementId);
+            var raid = ObjectHelper.SkipConstructor<MapEvent>();
+            raid.RestoreComponent(ObjectHelper.SkipConstructor<RaidEventComponent>());
+            var side = ObjectHelper.SkipConstructor<MapEventSide>();
+            AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, raid);
+            using (new AllowedThread())
             {
-                Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value.Contains("accused of a crime")));
-                Assert.Equal(-50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor));
-            });
-            foreach (var instance in Instances)
-                instance.Call(() => Assert.Equal(90f, Get<Hero>(instance, scenario.NotableId).Power));
-        }
+                raid.SetMapEventSettlement(settlement);
+                hero.PartyBelongedTo.Party._mapEventSide = side;
+            }
+            Assert.True(hero.PartyBelongedTo.MapEvent.IsRaid);
+            Assert.Same(Get<Kingdom>(Server, kingdomId), settlement.MapFaction);
+
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Clan>(Server, playerClanId),
+                    DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange);
+            using (new AllowedThread())
+                hero.PartyBelongedTo.Party._mapEventSide = null;
+        }, Texts);
+        Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        ClientA.Call(() =>
+        {
+            Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value.Contains("accused of a crime")));
+            Assert.Equal(-50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor));
+        });
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(90f, Get<Hero>(instance, scenario.NotableId).Power));
     }
 
     [Theory]
@@ -565,9 +598,10 @@ public class HeadmanNeedsGrainTests : IDisposable
         }, Texts);
 
         var outcomes = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().ToDictionary(m => m.IssueId, m => m.Outcome);
-        Assert.Equal(IssueOutcome.QuestFail, outcomes[QuestScenario.IssueId]);
+        // No raid, so v1.5.7 cancels the responsible owner's quest too.
+        Assert.Equal(IssueOutcome.QuestCancel, outcomes[QuestScenario.IssueId]);
         Assert.Equal(IssueOutcome.QuestCancel, outcomes[secondIssueId]);
-        ClientA.Call(() => Assert.Equal(-50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor)));
+        ClientA.Call(() => Assert.Equal(0, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor)));
         ClientB.Call(() =>
         {
             Assert.False(secondQuest.IsOngoing);
