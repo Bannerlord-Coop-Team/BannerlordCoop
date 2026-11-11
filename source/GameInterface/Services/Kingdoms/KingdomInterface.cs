@@ -129,7 +129,7 @@ internal class KingdomInterface : IKingdomInterface
         if (!hasEligiblePlayerClan)
         {
             CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
-            // Offline human rulers still count as native player supporters, but cannot vote here.
+            // Human rulers still count as native player supporters when no co-op vote can be taken.
             election.StartElectionWithoutPlayerCoop();
             return election.RandomFloat;
         }

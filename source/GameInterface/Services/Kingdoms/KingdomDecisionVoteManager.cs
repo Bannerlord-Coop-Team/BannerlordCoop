@@ -1064,7 +1064,9 @@ namespace GameInterface.Services.Kingdoms
                     messageBroker?.Publish(state.Decision, new AllianceOfferPendingStatusChanged(
                         allianceDecision.Kingdom,
                         allianceDecision.KingdomToStartAllianceWith,
-                        isPending: true));
+                        isPending: playerkingdom2.UnresolvedDecisions.OfType<StartAllianceDecision>()
+                            .Any(offer => CoopKingdomElection._opponentProposedAllianceDecisions.Contains(offer)
+                                          && offer.KingdomToStartAllianceWith == playerKingdom)));
                 }
                 if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
                 {
@@ -1093,7 +1095,8 @@ namespace GameInterface.Services.Kingdoms
                     messageBroker?.Publish(state.Decision, new PeaceOfferPendingStatusChanged(
                         peaceDecision.Kingdom,
                         (Kingdom)peaceDecision.FactionToMakePeaceWith,
-                        isPending: true));
+                        isPending: playerkingdom2.UnresolvedDecisions.OfType<MakePeaceKingdomDecision>()
+                            .Any(offer => offer._isProposedByOpponent && offer.FactionToMakePeaceWith == playerKingdom)));
                 }
 
                 if (state.Decision.Kingdom._unresolvedDecisions.Contains(state.Decision))
