@@ -25,16 +25,18 @@ internal class CaravanAmbushStateHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly ICaravanAmbushEvents events;
+    private readonly IIssueConversationGuard conversationGuard;
     private NetworkCaravanAmbushConversation? pendingConversation;
 
     public CaravanAmbushStateHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
-        IControllerIdProvider controller, ICaravanAmbushEvents events)
+        IControllerIdProvider controller, ICaravanAmbushEvents events, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.objects = objects;
         this.issues = issues;
         this.controller = controller;
         this.events = events;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkCaravanAmbushState>(Handle);
         broker.Subscribe<NetworkCaravanAmbushConversation>(Conversation);
         broker.Subscribe<BanditPartyRecruitedByPlayer>(Recruited);
@@ -53,11 +55,12 @@ internal class CaravanAmbushStateHandler : IHandler
     private void Conversation(MessagePayload<NetworkCaravanAmbushConversation> payload)
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
-        GameThread.RunSafe(() =>
+        var data = payload.What;
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
-            pendingConversation = payload.What;
+            pendingConversation = data;
             TryOpenConversation();
-        }, context: nameof(CaravanAmbushStateHandler));
+        }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
     }
 
     private void Tick(MessagePayload<CampaignTick> payload)
@@ -118,7 +121,7 @@ internal class CaravanAmbushStateHandler : IHandler
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
         var data = payload.What;
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue.IssueQuest is Quest quest)) return;
@@ -143,7 +146,7 @@ internal class CaravanAmbushStateHandler : IHandler
             {
                 quest.AddLog(new TextObject("{=!}" + journal[i]));
             }
-        }, context: nameof(CaravanAmbushStateHandler));
+        }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
     }
 
     private bool TryResolveParty(string id, out MobileParty party)
