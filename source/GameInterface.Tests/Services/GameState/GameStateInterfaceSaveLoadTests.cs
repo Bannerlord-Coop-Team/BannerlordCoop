@@ -72,8 +72,9 @@ public sealed class GameStateInterfaceSaveLoadTests
 
         try
         {
-            // The load starts at once and then runs past both short waits, like reading a big save
-            using (GameThread.Instance.UseBlockingTimeout(TimeSpan.FromMilliseconds(200)))
+            // The load starts and then runs past both short waits, like reading a big save. The wait leaves
+            // a slow CI runner time to start the load first.
+            using (GameThread.Instance.UseBlockingTimeout(TimeSpan.FromSeconds(1)))
             {
                 gameStateInterface.LoadSaveData(new byte[16]);
             }

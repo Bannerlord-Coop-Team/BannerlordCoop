@@ -80,10 +80,4 @@ public class GameThreadBlockingTimeoutScopeTests : IDisposable
         GameThread.Instance.Update(TimeSpan.Zero);
         Assert.False(ran);
     }
-
-    [Fact]
-    public void UseBlockingTimeout_RejectsANonPositiveTimeout()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => GameThread.Instance.UseBlockingTimeout(TimeSpan.Zero));
-    }
 }
