@@ -212,55 +212,11 @@ namespace Coop
             GameThread.Instance.MarkGameThread();
         }
 
-        // Held open for the whole process lifetime (never disposed) so the claim can't race with a second
-        // instance's own attempt: a check-then-release probe would leave a window, between our own close and
-        // Serilog's later open of the real log file, where a second process's identical probe could also
-        // succeed. A sidecar lock file kept open under FileShare.None the entire time closes that window, and
-        // is independent of whatever sharing mode Serilog itself uses to open the actual log file.
-        private static FileStream logLockHandle;
+        // Never disposed, because it holds the claim on the canonical log for the whole process.
+        private static ILogFileOpener logFileOpener;
 
         // Created in SetupLogging, not here, because CoopMod's type initializer runs before the check for a foreign Common.dll.
         private static ISessionSummarySink SessionSummary;
-
-        // True if filePath was free (no other live process holds its lock).
-        private static bool TryClaimExclusive(string filePath)
-        {
-            try
-            {
-                logLockHandle = new FileStream(filePath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
-                return true;
-            }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
-            {
-                return false;
-            }
-        }
-
-        // Keep only the newest few process-id-suffixed logs. Each dual-client run mints one under a fresh
-        // pid, so unlike the canonical Coop_{postfix}.log (recreated every startup) they would
-        // otherwise pile up unbounded. The canonical file has no pid and isn't matched, so it's never touched.
-        private static void PruneProcessSuffixedLogs(string filePostfix)
-        {
-            const int keep = 5;
-            try
-            {
-                // The extension filter guards the .NET quirk where a 3-char pattern extension (.log) also
-                // matches files whose extension merely starts with it, e.g. our own .log.lock sidecar files.
-                var stale = Directory.GetFiles(Directory.GetCurrentDirectory(), $"Coop_{filePostfix}_*.log")
-                    .Where(f => System.IO.Path.GetExtension(f).Equals(".log", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .Skip(keep);
-                foreach (var file in stale)
-                {
-                    try { File.Delete(file); }
-                    catch (Exception) { /* still open by a live instance, or already gone — skip */ }
-                }
-            }
-            catch (Exception)
-            {
-                // Best effort — log housekeeping must never break startup.
-            }
-        }
 
         // Opens this session's log file and configures the root logger, before anything logs.
         private void SetupLogging()
@@ -270,40 +226,26 @@ namespace Coop
             const long compactedLogFileSizeBytes = 28L * 1024 * 1024;
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-            var filePostfix = isServer ? "server" : "client";
-            var canonicalLogPath = $"Coop_{filePostfix}.log";
-            var processLogPath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
-
-            // File.Delete alone can't detect another live instance: it succeeds even on a file another
-            // process still has open, as long as that handle allows shared delete (Serilog's file sink
-            // does), so two same-install clients would silently keep fighting over one file. An exclusive
-            // open is the only check that actually fails when someone else already has the file open.
-            var canonicalLogClaimed = TryClaimExclusive(canonicalLogPath);
-
-            PruneProcessSuffixedLogs(filePostfix);
-
-            var logFileOpener = new LogFileOpener(canonicalLogPath, processLogPath, canonicalLogClaimed);
-            var fileSink = logFileOpener.Open(path => new SizeLimitedFileSink(
-                path,
-                outputTemplate,
-                maxLogFileSizeBytes,
-                preservedLogBeginningBytes,
-                compactedLogFileSizeBytes));
-
-            activeLogFilePath = logFileOpener.OpenedPath == null ? null : System.IO.Path.GetFullPath(logFileOpener.OpenedPath);
-
-            SessionSummary = new SessionSummarySink();
-            var configuration = LogManager.Configuration
-                .Enrich.WithProcessId()
-                .WriteTo.Sink(SessionSummary);
-            if (fileSink != null)
-                configuration.WriteTo.Sink(fileSink);
+            var configuration = LogManager.Configuration.Enrich.WithProcessId();
 #if DEBUG
             configuration.MinimumLevel.Debug();
 #else
             configuration.MinimumLevel.Information();
 #endif
+            logFileOpener = new LogFileOpener(
+                Directory.GetCurrentDirectory(),
+                isServer ? "server" : "client",
+                System.Diagnostics.Process.GetCurrentProcess().Id);
+            activeLogFilePath = logFileOpener.Open(path => configuration.WriteTo.Sink(new SizeLimitedFileSink(
+                path,
+                outputTemplate,
+                maxLogFileSizeBytes,
+                preservedLogBeginningBytes,
+                compactedLogFileSizeBytes)));
+
             Logger = LogManager.GetLogger<CoopMod>();
+            SessionSummary = new SessionSummarySink();
+            configuration.WriteTo.Sink(SessionSummary);
             logFileOpener.LogFailures(Logger);
         }
 
