@@ -668,7 +668,6 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
-            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -851,9 +850,6 @@ namespace Coop
             Exception ex = (Exception)e.ExceptionObject;
             Logger?.Fatal(ex, "Unhandled exception");
             Logger?.Fatal(ex.StackTrace);
-            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "crash");
-            // The file sink flushes every event; this sends Seq's buffered events, if a Seq server is listening.
-            LogManager.CloseAndFlush(TimeSpan.FromSeconds(1));
             Serilog.Log.CloseAndFlush();
         }
 
