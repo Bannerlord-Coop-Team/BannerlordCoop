@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Rafts.Messages;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
@@ -30,8 +31,8 @@ internal interface IServerPlayerUnstuck
     /// <summary>
     /// Force-applies every applicable exit for the player's registered party and hero, releases every
     /// party (not only the player's) still linked to a battle that already ended, ends battles left with no
-    /// healthy troops on one side, then moves a free party off a map spot it cannot move from, each step
-    /// guarded independently, and sends the result to the player's connection when it has one. Runs on
+    /// healthy troops on one side, ends the raft state of a party stranded on land, then moves a free party
+    /// off a map spot it cannot move from, each step guarded independently, and sends the result to the player's connection when it has one. Runs on
     /// the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
@@ -198,6 +199,21 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 ? null
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
+
+        // Only a party already on land, so a raft still at sea can't use unstuck to skip washing ashore
+        if ((hero == null || !hero.IsPrisoner) && party.Position.IsOnLand &&
+            (party.IsInRaftState || party.IsCurrentlyAtSea))
+        {
+            TryStep(actions, "raft landing", () =>
+            {
+                // Handled by the War Sails raft handler, which nothing registers while War Sails is off
+                messageBroker.Publish(party, new PlayerRaftLandingAttempted(party));
+                if (party.IsInRaftState || party.IsCurrentlyAtSea)
+                    throw new InvalidOperationException("The raft landing did not put the party ashore.");
+
+                return $"Ended the raft state of the party stranded on land at {Format(party.Position)}.";
+            });
+        }
 
         // Last, so a party the exits above just freed is checked at its final spot.
         TryStep(actions, "map position repair", () =>

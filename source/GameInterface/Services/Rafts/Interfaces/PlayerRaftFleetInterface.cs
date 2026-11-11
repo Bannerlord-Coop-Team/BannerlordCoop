@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.CoopSessionData;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -36,6 +37,11 @@ public interface IPlayerRaftFleetInterface : IGameAbstraction
     /// Ends a player party's raft state where it is at sea and gives back its fleet unanchored, as the naval scenario staging does.
     /// </summary>
     void LeaveRaftAtSea(MobileParty party);
+
+    /// <summary>
+    /// Lands a party stranded on land as a raft or marked at sea where it stands, ends its raft state and gives back its fleet.
+    /// </summary>
+    void PutAshore(MobileParty party);
 
     /// <summary>
     /// Puts a player's new party on a raft or gives it the fleet cached for that player, like
@@ -123,6 +129,25 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         ReturnFleet(party);
         // ReturnFleet restores the coast anchor cached at the stranding, but a party at sea sails with its fleet, unanchored.
         party.Anchor.ResetPosition();
+    }
+
+    public void PutAshore(MobileParty party)
+    {
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
+        party.DisembarkToPosition(party.Position);
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+
+        // Same end of raft state as LeaveRaftAtSea, but the fleet keeps the coast anchor ReturnFleet restores, like a landing
+        if (party.IsInRaftState)
+        {
+            party.IsInRaftState = false;
+            party.Ai.EnableAi();
+            CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
+        }
+        ReturnFleet(party);
     }
 
     public void OnPlayerCharacterChanged(Hero newPlayerHero, MobileParty newMainParty)

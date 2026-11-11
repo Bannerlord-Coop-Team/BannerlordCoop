@@ -598,6 +598,10 @@ internal class PlayerCaptivityServerHandler : IHandler
             playerParty.TeleportPartyToOutSideOfEncounterRadius();
         }
 
+        // A parked party doesn't tick, so a landing it started before capture would finish after release and flip it back to sea
+        if (playerParty.IsTransitionInProgress)
+            playerParty.CancelNavigationTransition();
+
         if (captorParty != null && captorParty.IsSettlement)
         {
             playerParty.DisembarkToPosition(captorParty.Settlement.GatePosition);
