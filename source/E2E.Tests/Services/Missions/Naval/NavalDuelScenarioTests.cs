@@ -235,6 +235,44 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
             $"B put its copy at {placement.Position}");
     }
 
+    // B's copy of A's crew member is in the water when A seats it, or falls in while seated, and vanilla keeps it seated there.
+    // B puts it back on the station while A holds the seat: a hook at its station, an oar at its rower's spawn placement.
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public void Duel_ACopyOffItsHullWhileItsOwnerKeepsItSeated_IsPutBackOnTheStation(bool atHook, bool offBeforeTheSeat)
+    {
+        using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender) });
+        var a = battle["A"];
+        var b = battle["B"];
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        battle.FieldPlayerHull(b, new Vec3(0f, 300f, 0f));
+        var crewId = Guid.NewGuid();
+        var crewOnA = a.RegisterAgent(crewId, "A");
+        var crewOnB = b.RegisterAgent(crewId, "A");
+        battle.CommitAll();
+        battle.TickAll();
+        var copyOfA = b.Hull(hullA);
+        string key = atHook ? HookKey : "oar";
+        if (atHook) copyOfA.Hook(key);
+        var stationOnA = atHook ? a.Hull(hullA).Hook(key) : a.Hull(hullA).Station(key);
+
+        if (offBeforeTheSeat) b.Engine.Overboard(crewOnB);
+        a.UseStation(crewOnA, stationOnA, inUse: true);
+        if (!offBeforeTheSeat) b.Engine.Overboard(crewOnB);
+        b.Ticks(3);
+
+        Assert.Same(crewOnB, copyOfA.SeatedAt(key));
+        var placement = Assert.Single(b.Engine.SeatPlacements);
+        var station = copyOfA.Frame.origin + FakeNavalShipEngine.StationOffset;
+        var spot = atHook ? station : station + FakeNavalShipEngine.SitDownDisplacement;
+        Assert.Same(crewOnB, placement.Agent);
+        Assert.True(placement.Position.DistanceSquared(spot) < 1e-8f, $"B put its copy at {placement.Position}, the spot is {spot}");
+        Assert.Same(copyOfA.Hull, b.Engine.GetSupportHull(crewOnB));
+    }
+
 #if COOP_NAVAL
     private static readonly Vec3 HookOffset = new(-3f, 6f, 2f);
 

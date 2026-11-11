@@ -242,7 +242,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         alive && registered && !ownedHere && !hullSinking && !hullRemoved;
 
     // [Game thread] Runs after this frame's hull frame writes and the owners' uses. A puppet the owner keeps seated is re-pinned
-    // to its station's user frame on the moved hull; if vanilla released it locally it is re-seated once per retry interval.
+    // to its station's user frame on the moved hull, re-seated if vanilla released it and put back on the hull if it is off it.
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;
@@ -280,6 +280,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 if (!Reseat(entry.Key, seat)) continue;
             }
 
+            ReturnIfStranded(entry.Key, seat);
             engine.PinToStation(seat.Agent, seat.Point);
             pinned++;
         }
@@ -306,22 +307,22 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 agentId, DescribeStation(seat.Point));
         }
 
-        bool stranded = !ReferenceEquals(engine.GetSupportHull(seat.Agent), seat.Hull);
         Apply(seat.Agent, seat.Point, inUse: true);
         settler.Restart(agentId);
-        if (!engine.IsSeated(seat.Agent, seat.Point)) return false;
-
-        if (stranded) ReturnToStation(agentId, seat);
-        return true;
+        return engine.IsSeated(seat.Agent, seat.Point);
     }
 
-    // Vanilla's spawn seating places a helm's or an oar's pilot on its hull, but nothing places a hook's, so a puppet re-seated
-    // from the water would stay there; it is put on its station as the helm's spawn seating puts its pilot.
-    private void ReturnToStation(Guid agentId, AppliedSeat seat)
+    // Seating binds a puppet where it stands and vanilla can keep it seated in the water, so one off its station's hull is put
+    // back at most once per retry interval: a pilot where its spawn seating sits it, any other user on the station.
+    private void ReturnIfStranded(Guid agentId, AppliedSeat seat)
     {
-        if (engine.ReadSeatPose(seat.Agent, seat.Point).Kind != StationSeatKind.None) return;
+        if (ReferenceEquals(engine.GetSupportHull(seat.Agent), seat.Hull) || elapsed < seat.NextReturnAt) return;
 
-        engine.PlaceSeatedAgent(seat.Agent, engine.GetStationPosition(seat.Point));
+        seat.NextReturnAt = elapsed + ReseatRetrySeconds;
+        var pose = engine.ReadSeatPose(seat.Agent, seat.Point);
+        engine.PlaceSeatedAgent(seat.Agent, pose.Kind == StationSeatKind.None
+            ? engine.GetStationPosition(seat.Point)
+            : StationSeatSettler.SpawnPlacement(pose));
         strandedReturns++;
         Logger.Debug("[NavalSync] Put puppet {AgentId} back on its station {Station}, off its hull", agentId,
             DescribeStation(seat.Point));
@@ -595,7 +596,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     };
 
     // A remote owner's seat applied to its puppet here: the puppet, the hull, the point it sits at and when a lost seat may next
-    // be re-seated.
+    // be re-seated or a stranded puppet put back.
     private sealed class AppliedSeat
     {
         public AppliedSeat(Agent agent, MissionObject hull, UsableMissionObject point)
@@ -609,6 +610,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         public MissionObject Hull { get; }
         public UsableMissionObject Point { get; }
         public float NextReseatAt { get; set; }
+        public float NextReturnAt { get; set; }
     }
 
     // A seat this client announced for an agent it drives: the use peers get, and the agent, point and hull it holds here.

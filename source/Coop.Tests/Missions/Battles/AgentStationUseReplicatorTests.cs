@@ -1109,7 +1109,7 @@ public class AgentStationUseReplicatorTests
         crew.Engine.Verify(e => e.PlaceSeatedAgent(crew.Agent, It.Is<Vec3>(spot => spot.DistanceSquared(spawnSpot) < 1e-8f)), Times.Once);
     }
 
-    // A puppet of a remote owner, crewing a registered hull whose oar station resolves.
+    // A puppet of a remote owner, standing on a registered hull whose oar station resolves.
     private sealed class RemoteCrew
     {
         public RemoteCrew()
@@ -1120,6 +1120,7 @@ public class AgentStationUseReplicatorTests
             Registry.Setup(r => r.TryGetAgentInfo(Agent, out info)).Returns(() => Registered);
             Ships.TryRegister(new NetworkShipInfo(ShipId, "owner", "party", isNpcParty: false, Hull, null!));
             Engine.Setup(e => e.ResolveStation(Hull, "oar", 0)).Returns(Point);
+            Engine.Setup(e => e.GetSupportHull(Agent)).Returns(Hull);
         }
 
         public Guid AgentId { get; } = Guid.NewGuid();
