@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(129, commandTypes.Length);
+        Assert.Equal(126, commandTypes.Length);
 #else
-        Assert.Equal(110, commandTypes.Length);
+        Assert.Equal(107, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -92,14 +92,11 @@ public class DirectMigratedCommandTests
         Assert.Equal(
             new[]
             {
-                "add_upgrade_items",
                 "battle_reward_fixture_start",
                 "engage_nearest_bandit",
                 "kms",
                 "move_to_settlement",
                 "open_party_screen_as",
-                "recruit_party_screen_prisoner",
-                "remove_horses",
                 "route_enemies",
                 "set_troop_state",
                 "stage_party_screen_transfer",

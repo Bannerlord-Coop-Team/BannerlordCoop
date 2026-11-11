@@ -816,60 +816,6 @@ internal class PartyCommands
     }
 
     /// <summary>
-    /// Stages a prisoner recruit on the open Party screen, like the row's recruit button.
-    /// </summary>
-    public sealed class RecruitPartyScreenPrisonerCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.mobile_party";
-
-        public string Name => "recruit_party_screen_prisoner";
-
-        public string Description => "Stages a prisoner recruit on the open party screen.";
-
-        public CoopCommandSide Side => CoopCommandSide.Client;
-
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("character_id", "Prisoner character name or id; quote names with spaces.", true),
-            new ExpectedArgs("count", "How many to recruit, 1 by default.", false),
-        };
-
-        private readonly ICommandObjectResolver resolver;
-
-        public RecruitPartyScreenPrisonerCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
-            if (!resolver.TryResolveCharacterObject(args[0], out var character, out var error)) return Failed(error);
-            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
-                return Failed("No active party screen.");
-
-            int count = 1;
-            if (args.Count > 1 && (!int.TryParse(args[1], out count) || count <= 0))
-                return Failed("Count must be a positive integer.");
-
-            var logic = partyState.PartyScreenLogic;
-            var command = new PartyScreenLogic.PartyCommand();
-            command.FillForRecruitTroop(
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Prisoner,
-                character,
-                count,
-                -1);
-            if (!logic.ValidateCommand(command))
-                return Failed($"PARTY_SCREEN_RECRUIT_REJECTED character={resolver.DisplayId(character)}");
-
-            logic.AddCommand(command);
-            (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource?.ExecuteRemoveZeroCounts();
-            return Succeeded($"PARTY_SCREEN_RECRUIT_STAGED character={resolver.DisplayId(character)} count={count}");
-        }
-    }
-
-    /// <summary>
     /// Reports every roster of the open Party screen, its Done baseline, and the commands recorded for Done.
     /// </summary>
     public sealed class PartyScreenStateCoopCommand : ICoopCommand
@@ -939,11 +885,8 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("kind", "normal, loot, donate_garrison, donate_prisoners, manage_prisoners, manage_garrison, donate_troops, clan_party, create_clan_party or quest.", true),
-            new ExpectedArgs("target", "Party id for manage_garrison, donate_troops and clan_party, issue giver hero id for quest, companion hero id for create_clan_party, member troop id for loot.", false),
-            new ExpectedArgs("member_count", "Loot only: how many of the member troop the loot offers.", false),
-            new ExpectedArgs("prisoner_id", "Loot only: the prisoner troop the loot offers.", false),
-            new ExpectedArgs("prisoner_count", "Loot only: how many of that prisoner the loot offers.", false),
+            new ExpectedArgs("kind", "normal, donate_garrison, donate_prisoners, manage_prisoners, manage_garrison, clan_party, create_clan_party or quest.", true),
+            new ExpectedArgs("target", "Party id for manage_garrison and clan_party, issue giver hero id for quest, companion hero id for create_clan_party.", false),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -962,7 +905,7 @@ internal class PartyCommands
             string target = args.Count > 1 ? args[1] : null;
             MobileParty party = null;
             string error = null;
-            if ((kind == "manage_garrison" || kind == "donate_troops" || kind == "clan_party") &&
+            if ((kind == "manage_garrison" || kind == "clan_party") &&
                 (target == null || !resolver.TryResolveMobileParty(target, out party, out error)))
                 return Failed(error ?? "This kind needs a party id.");
 
@@ -970,19 +913,6 @@ internal class PartyCommands
             {
                 case "normal":
                     PartyScreenHelper.OpenScreenAsNormal();
-                    break;
-                case "loot":
-                    if (args.Count < 5 ||
-                        !resolver.TryResolveCharacterObject(args[1], out var memberTroop, out error) ||
-                        !int.TryParse(args[2], out var memberCount) ||
-                        !resolver.TryResolveCharacterObject(args[3], out var prisonerTroop, out error) ||
-                        !int.TryParse(args[4], out var prisonerCount))
-                        return Failed(error ?? "Loot needs member_id member_count prisoner_id prisoner_count.");
-                    var lootMembers = TroopRoster.CreateDummyTroopRoster();
-                    var lootPrisoners = TroopRoster.CreateDummyTroopRoster();
-                    lootMembers.AddToCounts(memberTroop, memberCount);
-                    lootPrisoners.AddToCounts(prisonerTroop, prisonerCount);
-                    PartyScreenHelper.OpenScreenAsLoot(lootMembers, lootPrisoners, new TaleWorlds.Localization.TextObject("{=!}Loot"), memberCount);
                     break;
                 case "donate_garrison":
                 case "donate_prisoners":
@@ -994,9 +924,6 @@ internal class PartyCommands
                     break;
                 case "manage_garrison":
                     PartyScreenHelper.OpenScreenAsManageTroops(party);
-                    break;
-                case "donate_troops":
-                    PartyScreenHelper.OpenScreenAsDonateTroops(party);
                     break;
                 case "clan_party":
                     PartyScreenHelper.OpenScreenAsManageTroopsAndPrisoners(party);
@@ -1027,104 +954,6 @@ internal class PartyCommands
             return Game.Current?.GameStateManager?.ActiveState is PartyState state
                 ? Succeeded($"PARTY_SCREEN_OPENED kind={kind} mode={state.PartyScreenMode} donating={state.IsDonating}")
                 : Failed($"PARTY_SCREEN_NOT_OPENED kind={kind}");
-        }
-    }
-
-    /// <summary>
-    /// Gives a party items of the category a troop's upgrade uses up, like horses for cavalry.
-    /// </summary>
-    public sealed class AddUpgradeItemsCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.mobile_party";
-
-        public string Name => "add_upgrade_items";
-
-        public string Description => "Gives a party items of the category a troop's upgrade needs.";
-
-        public CoopCommandSide Side => CoopCommandSide.Server;
-
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
-            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
-            new ExpectedArgs("upgrade_target_index", "The upgrade target index, 0 by default.", false),
-            new ExpectedArgs("count", "How many items to add, 5 by default.", false),
-        };
-
-        private readonly ICommandObjectResolver resolver;
-
-        public AddUpgradeItemsCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
-            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
-
-            int targetIndex = 0;
-            if (args.Count > 2 && (!int.TryParse(args[2], out targetIndex) || targetIndex < 0 || targetIndex >= character.UpgradeTargets.Length))
-                return Failed($"Upgrade target index must be between 0 and {character.UpgradeTargets.Length - 1}.");
-            int count = 5;
-            if (args.Count > 3 && (!int.TryParse(args[3], out count) || count <= 0))
-                return Failed("Count must be a positive integer.");
-
-            var category = character.UpgradeTargets[targetIndex].UpgradeRequiresItemFromCategory;
-            if (category == null) return Succeeded("UPGRADE_ITEMS_NOT_NEEDED");
-
-            var item = MBObjectManager.Instance.GetObjectTypeList<ItemObject>().FirstOrDefault(candidate => candidate.ItemCategory == category);
-            if (item == null) return Failed($"No item has category {category.StringId}.");
-
-            party.ItemRoster.AddToCounts(item, count);
-            return Succeeded($"UPGRADE_ITEMS_ADDED party={resolver.DisplayId(party)} item={item.StringId} category={category.StringId} count={count}");
-        }
-    }
-
-    /// <summary>
-    /// Removes every horse from a party's inventory, the items troop upgrades to cavalry use up.
-    /// </summary>
-    public sealed class RemoveHorsesCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.mobile_party";
-
-        public string Name => "remove_horses";
-
-        public string Description => "Removes every horse from a party's inventory.";
-
-        public CoopCommandSide Side => CoopCommandSide.Server;
-
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
-            new ExpectedArgs("replicate", "false keeps the change on the server only, like a change still on its way to the client.", false),
-        };
-
-        private readonly ICommandObjectResolver resolver;
-
-        public RemoveHorsesCoopCommand(ICommandObjectResolver resolver)
-        {
-            this.resolver = resolver;
-        }
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
-            bool replicate = args.Count < 2 || args[1] != "false";
-
-            int removed = 0;
-            using (replicate ? null : new AllowedThread())
-            {
-                foreach (var item in party.ItemRoster.Where(item => item.EquipmentElement.Item?.HasHorseComponent == true).ToList())
-                {
-                    party.ItemRoster.AddToCounts(item.EquipmentElement, -item.Amount);
-                    removed += item.Amount;
-                }
-            }
-
-            return Succeeded($"HORSES_REMOVED party={resolver.DisplayId(party)} removed={removed} replicated={replicate}");
         }
     }
 
