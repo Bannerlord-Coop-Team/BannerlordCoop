@@ -1,5 +1,5 @@
-﻿using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+﻿using GameInterface.Services.MobileParties.Extensions;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -20,36 +20,41 @@ public interface IAiPartyThinkBehaviorInterface : IGameAbstraction
 /// <inheritdoc cref="IAiPartyThinkBehaviorInterface"/>
 public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
 {
-    private readonly IPlayerManager playerManager;
-    private readonly IObjectManager objectManager;
-
-    // Takes the player registry and the object registry used to find each player's party.
-    public AiPartyThinkBehaviorInterface(IPlayerManager playerManager, IObjectManager objectManager)
-    {
-        this.playerManager = playerManager;
-        this.objectManager = objectManager;
-    }
-
     // Runs the hold around every player party in the clan, since players can share a clan.
     public void HoldPartiesChasingPlayerParties(Clan clan)
     {
-        foreach (var player in playerManager.Players)
+        foreach (var warPartyComponent in clan.WarPartyComponents)
         {
-            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty)) continue;
-            if (playerParty.ActualClan != clan) continue;
+            var playerParty = warPartyComponent.MobileParty;
+            if (!playerParty.IsPlayerParty()) continue;
 
-            HoldPartiesChasing(playerParty, clan.MapFaction);
+            HoldPartiesChasing(playerParty, FindNearbyParties(playerParty));
         }
     }
 
-    // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom loop with the main party swapped for a player party.
-    private static void HoldPartiesChasing(MobileParty playerParty, IFaction playerFaction)
+    // Collects the parties in the radius vanilla searches around the main party.
+    private static List<MobileParty> FindNearbyParties(MobileParty playerParty)
     {
-        float radius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 4f;
+        var radius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius * 4f;
         var searchData = MobileParty.StartFindingLocatablesAroundPosition(playerParty.Position.ToVec2(), radius);
-        for (var party = MobileParty.FindNextLocatable(ref searchData); party != null; party = MobileParty.FindNextLocatable(ref searchData))
+        var nearbyParties = new List<MobileParty>();
+
+        for (var party = MobileParty.FindNextLocatable(ref searchData);
+             party != null;
+             party = MobileParty.FindNextLocatable(ref searchData))
         {
-            if (party.MapFaction.IsAtWarWith(playerFaction)) continue;
+            nearbyParties.Add(party);
+        }
+
+        return nearbyParties;
+    }
+
+    // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
+    internal void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
+    {
+        foreach (var party in nearbyParties)
+        {
+            if (party.MapFaction.IsAtWarWith(playerParty.MapFaction)) continue;
             if (party.ShortTermTargetParty != playerParty) continue;
             if (party.IsCurrentlyUsedByAQuest) continue;
             if (!party.MapFaction.IsKingdomFaction && !party.IsLordParty) continue;

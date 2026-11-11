@@ -12,8 +12,8 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(AiMilitaryBehavior))]
 internal class AiMilitaryBehaviorPatches
 {
-    // Vanilla skips a settlement last attacked by the main party while DoNotAttackMainPartyUntil runs. Co-op keeps
-    // that timer per player party in DefaultMobilePartyAIModelPatches, so skip the settlement while it runs.
+    // Vanilla skips a settlement last attacked by the main party while DoNotAttackMainPartyUntil runs. Co-op skips it
+    // while any attack protection in DefaultMobilePartyAIModelPatches runs against the last attacker, per party or faction.
     [HarmonyPatch(nameof(AiMilitaryBehavior.CheckIfSettlementIsSuitableForMilitaryAction))]
     [HarmonyPostfix]
     private static void CheckIfSettlementIsSuitableForMilitaryActionPostfix(Settlement settlement, MobileParty mobileParty, ref bool __result)

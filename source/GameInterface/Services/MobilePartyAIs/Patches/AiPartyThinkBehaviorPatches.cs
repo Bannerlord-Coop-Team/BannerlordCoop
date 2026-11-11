@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Clans.Extensions;
-using GameInterface.Services.MobilePartyAIs.Interfaces;
+﻿using GameInterface.Services.MobilePartyAIs.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
@@ -18,7 +17,6 @@ internal class AiPartyThinkBehaviorPatches
     [HarmonyPostfix]
     private static void OnClanChangedKingdomPostfix(Clan clan)
     {
-        if (!clan.IsPlayerClan()) return;
         if (!ContainerProvider.TryResolve<IAiPartyThinkBehaviorInterface>(out var aiPartyThinkBehaviorInterface)) return;
 
         aiPartyThinkBehaviorInterface.HoldPartiesChasingPlayerParties(clan);

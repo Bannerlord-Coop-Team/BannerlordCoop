@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Commands;
+﻿using Common.Commands;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -55,7 +54,6 @@ internal static class MobilePartyAiDebugCommands
         // Sets the engage order and its short term behavior so the party targets the other party at once.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
             if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
             if (!resolver.TryResolveMobileParty(args[1], out var target, out error)) return Failed(error);
             if (party.IsPlayerParty()) return Failed($"{resolver.DisplayId(party)} is a player party, its client drives it.");
@@ -103,7 +101,6 @@ internal static class MobilePartyAiDebugCommands
         // Runs the live AiMilitaryBehavior settlement check, patches included, and prints what it read.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
             if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
             if (!resolver.TryResolveSettlement(args[1], out var settlement, out error)) return Failed(error);
             if (!Enum.TryParse(args[2], true, out Army.ArmyTypes missionType)) return Failed($"Unknown mission type {args[2]}.");
@@ -112,10 +109,11 @@ internal static class MobilePartyAiDebugCommands
             if (behavior == null) return Failed("AiMilitaryBehavior is not registered on this campaign.");
 
             var lastAttacker = settlement.LastAttackerParty;
+            bool attackPrevented = DefaultMobilePartyAIModelPatches.IsAttackPrevented(party, lastAttacker);
             bool suitable = behavior.CheckIfSettlementIsSuitableForMilitaryAction(settlement, party, missionType, false);
             return Succeeded($"MILITARY_TARGET party={resolver.DisplayId(party)} settlement={settlement.StringId} " +
                 $"missionType={missionType} lastAttacker={lastAttacker?.StringId ?? "none"} " +
-                $"attackPrevented={DefaultMobilePartyAIModelPatches.IsAttackPrevented(party, lastAttacker)} suitable={suitable}");
+                $"attackPrevented={attackPrevented} suitable={suitable}");
         }
     }
 }
