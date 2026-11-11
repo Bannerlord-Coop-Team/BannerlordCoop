@@ -14,12 +14,9 @@ internal static class MissionTestObjects
 
     internal static RangedSiegeWeapon CreateShipWeapon() => Uninitialized<Ballista>();
 
-    private static T Uninitialized<T>() => (T)Uninitialized(typeof(T));
-
-    // A constructor-skipped instance of a script type, also one only known at runtime such as a NavalDLC machine.
     // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills; run
     // first without it, the initializer fails for every later test in the process.
-    internal static object Uninitialized(Type type)
+    private static T Uninitialized<T>()
     {
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
         var field = AccessTools.Field(managed, "_moduleTypes");
@@ -27,7 +24,7 @@ internal static class MissionTestObjects
         try
         {
             if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return RuntimeHelpers.GetUninitializedObject(type);
+            return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
         }
         finally
         {

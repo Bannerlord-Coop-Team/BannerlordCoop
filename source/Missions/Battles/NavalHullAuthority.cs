@@ -37,7 +37,7 @@ public interface INavalHullAuthority : IDisposable
     /// Queues taking hulls out through vanilla's removal: the next <see cref="Tick"/> parks everyone still aboard and the one
     /// after withdraws the <paramref name="crew"/> from the battle, then removes the hulls, as vanilla's removal fades a
     /// removed hull's crew. Parked agents that are not withdrawn then go back where they stood. The hulls' own stations must
-    /// already be free; withdrawn crew leaves a station elsewhere as it fades.
+    /// already be free; withdrawn crew leaves a station elsewhere as it is removed.
     /// </summary>
     void Remove(IReadOnlyList<NetworkShipInfo> ships, DepartingCrew crew);
 

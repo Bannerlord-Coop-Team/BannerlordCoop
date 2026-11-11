@@ -115,7 +115,6 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_ClothingColor1", nameof(Agent_get_ClothingColor1));
         Prefix(typeof(Agent), "get_ClothingColor2", nameof(Agent_get_ClothingColor2));
         Prefix(typeof(Agent), "get_CurrentlyUsedGameObject", nameof(Agent_get_CurrentlyUsedGameObject));
-        Prefix(typeof(Agent), "set_CurrentlyUsedGameObject", nameof(Agent_set_CurrentlyUsedGameObject));
         Prefix(typeof(Agent), nameof(Agent.UseGameObject), nameof(Agent_UseGameObject));
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObjectMT), nameof(Agent_StopUsingGameObject));
@@ -158,8 +157,6 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
         Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
         Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
-        // The naval withdrawal lets a parked agent's physics back on before fading it.
-        Prefix(typeof(Agent), nameof(Agent.SetIsPhysicsForceClosed), nameof(Agent_SetIsPhysicsForceClosed));
         // Retreat/adoption paths: own-party classification reads the origin, the adoption clears a mount's
         // interpolation target, and the retreat despawn fades the withdrawing troops out.
         Prefix(typeof(Agent), "get_Origin", nameof(Agent_get_Origin));
@@ -645,14 +642,6 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    // A direct release of the managed link (the naval removed station user guard) clears the mirror too.
-    private static bool Agent_set_CurrentlyUsedGameObject(Agent __instance, UsableMissionObject value)
-    {
-        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
-        mirror.CurrentlyUsedGameObject = value;
-        return false;
-    }
-
     private static bool Agent_UseGameObject(Agent __instance, UsableMissionObject usedObject)
     {
         if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
@@ -942,9 +931,6 @@ public sealed class MissionEngineFixture : IDisposable
         // No visual loop headless — accept the call so freshly spawned (reinforcement) agents don't deref natives.
         return !AgentMirror.TryGet(__instance, out _);
     }
-
-    // Mock agents have no physics to close, so the call is accepted without reaching native code.
-    private static bool Agent_SetIsPhysicsForceClosed(Agent __instance) => !AgentMirror.TryGet(__instance, out _);
 
     private static bool Agent_get_Origin(Agent __instance, ref IAgentOriginBase __result)
     {

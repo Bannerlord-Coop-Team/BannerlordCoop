@@ -676,7 +676,7 @@ public partial class MissileOutcomeTests : MissionTestEnvironment
     [InlineData(true)]
     public void RuntimeShipChildOutcome_ResolvesTheNavalPathAndFollowsTheChild(bool bounce)
     {
-        var shipEngine = new global::Missions.Naval.NavalShipEngine(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        var shipEngine = new global::Missions.Naval.NavalShipEngine(null!, null!, null!, null!, null!, null!, null!, null!, null!);
         RunClients((shooter, peer, native) =>
         {
             MissionObject sourceHull = null!, targetHull = null!, sourceChild = null!, targetChild = null!;
