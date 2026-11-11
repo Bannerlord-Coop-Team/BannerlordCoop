@@ -1,0 +1,23 @@
+Original save on previous build 31192d438. Screenshot taken after joining, before voting.
+
+Client log:
+[(41036) 21:16:10 INF GameInterface.Services.GameDebug.Patches.CharacterCreationIntroPatch] Game State is changing to GameLoadingState
+[(41036) 21:16:33 INF GameInterface.Services.GameDebug.Patches.CharacterCreationIntroPatch] Game State is changing to MapState
+[(41036) 21:16:34 INF GameInterface.Services.GameDebug.Patches.CharacterCreationIntroPatch] Game State is changing to KingdomState
+[(41036) 21:16:35 INF GameInterface.Services.Kingdoms.KingdomDecisionVoteManager] Kingdom decision voting round opened for Kingdom_Created_9 decision 0 (MakePeaceKingdomDecision proposed by Clan_clan_empire_north_3); 1 eligible clans, deadline null
+
+Dedicated server log:
+21:17:06.732  [Coop] Kingdom decision voting deadline reached for "Kingdom_Created_9" decision 0 ("MakePeaceKingdomDecision" proposed by "Clan_clan_empire_north_3"); resolving with 0/1 final clan votes
+21:17:06.793  [Coop] Failed to run action on the game thread: "KingdomDecisionVoteManager"
+21:17:06.793  System.NullReferenceException: Object reference not set to an instance of an object.
+21:17:06.793     at GameInterface.Services.Kingdoms.Extentions.CoopKingdomElection.StartElectionCoop()
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomInterface.AddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, Boolean ignoreInfluenceCost, Nullable`1 randomFloat, Boolean applyInfluenceCost)
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomInterface.AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, Boolean ignoreInfluenceCost)
+21:17:06.793     at GameInterface.Services.Kingdoms.Patches.KingdomPatches.AddDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision, Boolean ignoreInfluenceCost)
+21:17:06.793     at TaleWorlds.CampaignSystem.Kingdom.AddDecision_Patch2(Kingdom this, KingdomDecision kingdomDecision, Boolean ignoreInfluenceCost)
+21:17:06.793     at GameInterface.Services.Kingdoms.Extentions.CoopKingdomElection.TryRedirectPlayerPeaceOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomDecisionVoteManager.ResolveDecision(KingdomDecisionVoteState state)
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomDecisionVoteManager.TryResolveExpiredRound(KingdomDecisionVoteState state, DateTime utcNow)
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomDecisionVoteManager.ProcessVotingRounds(DateTime utcNow)
+21:17:06.793     at GameInterface.Services.Kingdoms.KingdomDecisionVoteManager.<QueueVotingRoundTick>b__111_0()
+21:17:06.793     at Common.GameThread.<>c__DisplayClass55_0.<WrapSafe>b__0()
