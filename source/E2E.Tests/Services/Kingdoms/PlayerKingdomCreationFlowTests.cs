@@ -1624,6 +1624,49 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
+    public void PeaceDecision_AcceptedWithTargetRulerOffline_FinishesBothElections()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var friend = CreateSyncedPlayerContext("OfflinePeaceRuler", _ => false);
+        LeadPlayerPartiesEverywhere(player, friend);
+        string npcClanId = CreateSyncedNpcClan();
+        string kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        string targetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(npcClanId, kingdomId);
+        ConfigureClanInKingdom(friend.ClanId, targetId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(targetId);
+        ConfigureWarEverywhere(kingdomId, targetId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(npcClanId, out var proposer));
+            Assert.True(target.RulingClan.Leader.IsHumanPlayerCharacter);
+            kingdom.AddDecision(new MakePeaceKingdomDecision(proposer, target), true);
+            Assert.Single(kingdom.UnresolvedDecisions);
+        });
+
+        client.SimulateMessage(this,
+            new KingdomDecisionVoteRequested(CreateMakePeaceVote(kingdomId, shouldMakePeace: true)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+            Assert.Empty(kingdom.UnresolvedDecisions);
+            Assert.Empty(target.UnresolvedDecisions);
+            Assert.Empty(GetVoteManager(Server).CaptureActiveRoundStatuses());
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message => message.KingdomId == kingdomId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(), message => message.KingdomId == kingdomId);
+    }
+
+    [Fact]
     public void KingdomDecisionVotes_RestoredDecisionGetsNewFixedRound()
     {
         var client = Clients.First();
