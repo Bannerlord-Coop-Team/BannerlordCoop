@@ -851,24 +851,44 @@ public class HideoutMapEventTests : MapEventTestBase
             });
     }
 
-    [Fact]
-    public void VictoriousHideout_FinalizesNativeComponentWithAttackerContextAndRestoresDedicatedServer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void VictoriousHideout_FinalizesNativeComponentWithAttackerContextAndRestoresDedicatedServer(bool joinerInLeadersArmy)
     {
         var raid = CreateSharedHideout();
         var completedState = HideoutEventComponent.HideoutBattleEndState.None;
         var winnerSide = BattleSideEnum.None;
+        var joinerPosition = new CampaignVec2(new Vec2(7f, 7f), true);
+        if (joinerInLeadersArmy)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var joiner));
+                joiner.Army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
+                joiner.AttachedTo = leader;
+                joiner.Position = joinerPosition;
+            }, MapEventDisabledMethods);
         Server.Call(() =>
         {
             Campaign.Current.MainParty = null;
             CampaignEvents.OnHideoutBattleCompletedEvent.AddNonSerializedListener(this,
                 (side, _, state) => { winnerSide = side; completedState = state; });
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var joiner));
             mapEvent._battleState = BattleState.AttackerVictory;
             mapEvent._mapEventResultsApplied = true;
             Server.Resolve<IMessageBroker>().Publish(this, new CommitMapEventResults(mapEvent));
             Server.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
             Assert.Null(Campaign.Current.MainParty);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out _));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            Assert.Equal(settlement.GatePosition, leader.Position);
+            Assert.Equal(AiBehavior.Hold, leader.DefaultBehavior);
+            // An attached joiner leaves with its army leader instead of walking to the gate on its own.
+            if (joinerInLeadersArmy)
+                Assert.Equal(joinerPosition, joiner.Position);
         });
         Assert.Equal(BattleSideEnum.Attacker, winnerSide);
         Assert.Equal(HideoutEventComponent.HideoutBattleEndState.Victory, completedState);
