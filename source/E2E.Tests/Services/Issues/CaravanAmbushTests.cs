@@ -9,6 +9,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Players;
@@ -113,6 +114,93 @@ public class CaravanAmbushTests : IDisposable
             Assert.Null(QuestOf(Other)._caravanParty);
             Assert.Empty(QuestOf(Other).JournalEntries);
         });
+    }
+
+    [Fact]
+    public void ProgressWaitsForTheGiverChangeHeldByAConversation()
+    {
+        var quest = QuestOf(Owner);
+        var newGiverId = ChangeGiverWhileOwnerIsTalking();
+
+        Server.Call(() =>
+        {
+            var serverQuest = Server.GetRegisteredObject<Hero>(newGiverId).Issue.IssueQuest as Quest;
+            Assert.NotNull(serverQuest);
+            serverQuest._isCaravanSaved = true;
+            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(serverQuest);
+        });
+        Owner.Call(() =>
+        {
+            Assert.False(quest._isCaravanSaved);
+            Assert.Null(Owner.GetRegisteredObject<Hero>(newGiverId).Issue);
+            Campaign.Current.ConversationManager.EndConversation();
+            Assert.Same(quest, Owner.GetRegisteredObject<Hero>(newGiverId).Issue.IssueQuest);
+            Assert.True(quest._isCaravanSaved);
+        });
+    }
+
+    [Fact]
+    public void RewardConversationWaitsForTheGiverChangeHeldByAConversation()
+    {
+        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        SendState(QuestScenario.ControllerA, true, 0);
+        var newGiverId = ChangeGiverWhileOwnerIsTalking();
+        Owner.Call(() =>
+        {
+            GameStateManager._current = Game.Current.GameStateManager;
+            GameStateManager.Current._gameStates.Add(GameStateManager.Current.CreateState<MapState>());
+        });
+
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
+            newGiverId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
+        Assert.Equal(0, conversations.CountFor(Owner));
+        Owner.Call(() =>
+        {
+            Campaign.Current.ConversationManager.EndConversation();
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
+        });
+        Assert.Equal(1, conversations.CountFor(Owner));
+        Assert.Equal(0, conversations.CountFor(Other));
+    }
+
+    [Fact]
+    public void PublishedJournalKeepsTextKeysVariablesTimeAndProgress()
+    {
+        Server.Call(() =>
+        {
+            var text = new TextObject("{=caravan_progress_test}Follow {CARAVAN}");
+            text.SetTextVariable("CARAVAN", "Atilon's caravan");
+            QuestOf(Server)._journalEntries.Add(new JournalLog(new CampaignTime(123456L), text,
+                new TextObject("{=caravan_task_test}Caravans saved"), 2, 5, LogType.Discreate));
+            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(QuestOf(Server));
+        });
+        Owner.Call(() =>
+        {
+            var log = Assert.Single(QuestOf(Owner).JournalEntries);
+            Assert.Equal("caravan_progress_test", log.LogText.GetID());
+            Assert.Equal("Follow Atilon's caravan", log.LogText.ToString());
+            Assert.Equal(123456L, log.LogTime.NumTicks);
+            Assert.Equal("caravan_task_test", log.TaskName.GetID());
+            Assert.Equal(2, log.CurrentProgress);
+            Assert.Equal(5, log.Range);
+            Assert.Equal(LogType.Discreate, log.Type);
+        });
+    }
+
+    [Fact]
+    public void ReceivedJournalDoesNotSendARequestBackToTheServer()
+    {
+        Owner.Call(() => Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA)));
+        var before = Owner.NetworkSentMessages.GetMessageCount<RequestQuestJournal>();
+        Server.Call(() =>
+        {
+            QuestOf(Server)._journalEntries.Add(new JournalLog(new CampaignTime(123456L), new TextObject("Follow the caravan")));
+            Server.Resolve<ICaravanAmbushStatePublisher>().Publish(QuestOf(Server));
+        });
+        Owner.Call(() => Assert.Single(QuestOf(Owner).JournalEntries));
+        Assert.Equal(before, Owner.NetworkSentMessages.GetMessageCount<RequestQuestJournal>());
     }
 
     [Fact]
@@ -452,6 +540,27 @@ public class CaravanAmbushTests : IDisposable
     }
 
     private static Quest CreateQuest(Hero giver) => new("caravan_test_quest", giver, null, CampaignTime.Never, 1000, 0.5f);
+
+    private string ChangeGiverWhileOwnerIsTalking()
+    {
+        var newGiverId = environment.CreateRegisteredObject<Hero>();
+        Owner.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            var character = ObjectHelper.SkipConstructor<CharacterObject>();
+            character.HeroObject = Owner.GetRegisteredObject<Hero>(scenario.NotableId);
+            Campaign.Current.ConversationManager.SetupAndStartMapConversation(null,
+                new MapConversationAgent(character), new MapConversationAgent(CharacterObject.PlayerCharacter));
+            Assert.True(Campaign.Current.ConversationManager.IsConversationInProgress);
+            // A held removal keeps later messages for the giver, including its move, in order.
+            Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(() => { }, scenario.NotableId);
+        }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
+        Server.Call(() => Campaign.Current.IssueManager.ChangeIssueOwner(
+            IssueOf(Server), Server.GetRegisteredObject<Hero>(newGiverId)));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueOwnerChanged>());
+        return newGiverId;
+    }
 
     private Hero PlayerHero(string controller)
     {
