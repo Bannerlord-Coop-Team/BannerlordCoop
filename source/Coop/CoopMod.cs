@@ -259,6 +259,7 @@ namespace Coop
             }
         }
 
+        // Opens this session's log file and configures the root logger, before anything logs.
         private void SetupLogging()
         {
             const long maxLogFileSizeBytes = 30L * 1024 * 1024;
@@ -267,59 +268,28 @@ namespace Coop
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
             var filePostfix = isServer ? "server" : "client";
-            var filePath = $"Coop_{filePostfix}.log";
+            var canonicalLogPath = $"Coop_{filePostfix}.log";
+            var processLogPath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
 
             // File.Delete alone can't detect another live instance: it succeeds even on a file another
             // process still has open, as long as that handle allows shared delete (Serilog's file sink
             // does), so two same-install clients would silently keep fighting over one file. An exclusive
             // open is the only check that actually fails when someone else already has the file open.
-            var processLogPath = $"Coop_{filePostfix}_{System.Diagnostics.Process.GetCurrentProcess().Id}.log";
-            if (!TryClaimExclusive(filePath))
-                filePath = processLogPath;
+            var canonicalLogClaimed = TryClaimExclusive(canonicalLogPath);
 
             PruneProcessSuffixedLogs(filePostfix);
 
-            // Keep the last session's log one more launch, otherwise a crashed session's log is gone on relaunch.
-            var previousLogFile = new PreviousLogFile();
-            var previousLogKept = previousLogFile.TryKeep(filePath, out var previousLogFailure);
+            var logFileOpener = new LogFileOpener(canonicalLogPath, processLogPath, canonicalLogClaimed);
+            var fileSink = logFileOpener.Open(path => new SizeLimitedFileSink(
+                path,
+                outputTemplate,
+                maxLogFileSizeBytes,
+                preservedLogBeginningBytes,
+                compactedLogFileSizeBytes));
 
-            try
-            {
-                File.Delete(filePath);
-            }
-            catch (Exception)
-            {
-                // Best effort delete
-            }
-
-            // A log file that another program holds open (an editor, a backup tool) makes the sink throw, which
-            // stopped start-up. The log moves to the process-id name instead, and with no file logging still starts.
-            var candidateLogPaths = filePath == processLogPath ? new[] { filePath } : new[] { filePath, processLogPath };
-            var fileSink = new LogFileOpener().OpenFirst(
-                candidateLogPaths,
-                path =>
-                {
-                    // An earlier process with the same id can have left this file; the sink would append to it.
-                    if (path != filePath)
-                    {
-                        try { File.Delete(path); }
-                        catch (Exception) { /* best effort, as for the canonical log */ }
-                    }
-
-                    return new SizeLimitedFileSink(
-                        path,
-                        outputTemplate,
-                        maxLogFileSizeBytes,
-                        preservedLogBeginningBytes,
-                        compactedLogFileSizeBytes);
-                },
-                out var openedLogPath,
-                out var logFileFailure);
-
-            activeLogFilePath = openedLogPath == null ? null : System.IO.Path.GetFullPath(openedLogPath);
+            activeLogFilePath = logFileOpener.OpenedPath == null ? null : System.IO.Path.GetFullPath(logFileOpener.OpenedPath);
 
             var configuration = LogManager.Configuration.Enrich.WithProcessId();
-            //configuration.WriteTo.Debug(outputTemplate: outputTemplate); // Disabled: floods VS Output window causing frame hitching when debugger is attached
             if (fileSink != null)
                 configuration.WriteTo.Sink(fileSink);
 #if DEBUG
@@ -328,14 +298,7 @@ namespace Coop
             configuration.MinimumLevel.Information();
 #endif
             Logger = LogManager.GetLogger<CoopMod>();
-
-            if (!previousLogKept)
-                Logger.Warning(previousLogFailure, "Previous log {Path} could not be kept", previousLogFile.GetPath(filePath));
-
-            if (fileSink == null)
-                Logger.Warning(logFileFailure, "No log file could be opened ({Paths}); this session writes no log file", string.Join(", ", candidateLogPaths));
-            else if (openedLogPath != filePath)
-                Logger.Warning(logFileFailure, "Log {Path} could not be opened; this session logs to {OpenedPath}", filePath, openedLogPath);
+            logFileOpener.LogFailures(Logger);
         }
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
