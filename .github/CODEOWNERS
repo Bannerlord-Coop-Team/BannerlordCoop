@@ -5,6 +5,8 @@
 /source/Common/ @garrettluskey
 /source/Coop.Core/ @garrettluskey
 /source/Missions @garrettluskey
+/source/Coop.Naval/ @garrettluskey @jordanbrymora
+/source/Missions.Naval/ @garrettluskey @jordanbrymora
 
 ‎.agents/ @ShoT-UPfps @garrettluskey
 
@@ -62,11 +64,13 @@
 /source/GameInterface/Services/MapEventParties/ @garrettluskey
 /source/GameInterface/Services/MapEventSides/ @garrettluskey
 /source/GameInterface/Services/MapEvents/ @garrettluskey
+/source/GameInterface/Services/MapEvents/NavalScenarios/ @garrettluskey @jordanbrymora
 /source/GameInterface/Services/MapTracks/ @jordanbrymora
 /source/GameInterface/Services/Missions/ @garrettluskey @ShoT-UPfps
 /source/GameInterface/Services/MobileParties/ @garrettluskey
 /source/GameInterface/Services/MobilePartyAIs/ @garrettluskey
 /source/GameInterface/Services/Modules/ @garrettluskey
+/source/GameInterface/Services/NavalDLC/ @garrettluskey @jordanbrymora
 /source/GameInterface/Services/Monsters/ @garrettluskey
 /source/GameInterface/Services/ObjectManager/ @garrettluskey
 /source/GameInterface/Services/Party/ @garrettluskey

@@ -87,6 +87,23 @@ public class SimilarCommitmentsTests : IDisposable
     }
 
     [Fact]
+    public void LordSolution_CountsOnlyAgainstItsOwnerOnTheClientAndServer()
+    {
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<Hero>(firstNotableId).Issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
+            });
+        Assert.False(CheckPreconditions(ClientA, secondNotableId));
+        Assert.True(CheckPreconditions(ClientB, secondNotableId));
+        Accept(ClientA, secondNotableId);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Null(OwnerOnServer(secondNotableId, SecondIssueId));
+        ClientA.Call(() => Assert.True(ClientA.GetRegisteredObject<Hero>(firstNotableId).Issue.IsSolvingWithLordSolution));
+    }
+
+    [Fact]
     public void ThePlayersOwnUnconfirmedAccept_StillCountsAgainstAnotherGiver()
     {
         ClientA.Call(() => ClientA.Resolve<IIssueOwnershipRegistry>().Remove(firstNotableId));

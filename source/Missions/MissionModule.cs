@@ -1,8 +1,10 @@
 ﻿using Autofac;
 using Common;
+using Common.BattleBenchmark;
 using Common.Commands;
 using Common.Logging;
 using Common.Network.Session;
+using Common.Serialization;
 using GameInterface;
 using GameInterface.Services.Locations;
 using GameInterface.Services.Hideouts;
@@ -16,6 +18,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
+using Missions.Battles.Benchmark;
 using Missions.Data;
 #if DEBUG
 using Missions.Diagnostics;
@@ -81,6 +84,10 @@ public class MissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 
+        builder.RegisterType<BattleBenchmarkRecorder>().As<IBattleBenchmarkRecorder>().SingleInstance();
+        builder.RegisterType<BattleBenchmarkProcessSampler>().As<IBattleBenchmarkProcessSampler>().InstancePerDependency();
+        builder.RegisterType<BattleBenchmarkMissionProbe>().As<IBattleBenchmarkMissionProbe>().InstancePerDependency();
+        builder.RegisterType<JsonFileIO>().As<IJsonFileIO>().InstancePerDependency();
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
@@ -217,6 +224,14 @@ public class MissionModule : Module
         // Stateless, so a single session instance is fine.
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
+            .SingleInstance();
+        builder.RegisterType<PreferredBattleHosts>()
+            .As<IPreferredBattleHosts>()
+            .InstancePerDependency();
+        // Holds the elections BattleHostHandler has not run yet, so it lives as long as that handler: one per
+        // session container, which keeps each E2E game instance's holds apart.
+        builder.RegisterType<PreferredBattleHostHold>()
+            .As<IPreferredBattleHostHold>()
             .SingleInstance();
         builder.RegisterType<BattleSizeProvider>()
             .As<IBattleSizeProvider>()

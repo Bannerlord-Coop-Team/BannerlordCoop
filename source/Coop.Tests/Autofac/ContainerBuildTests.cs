@@ -79,7 +79,7 @@ namespace Coop.Tests.Autofac
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(52, missionCommands.Length);
+            Assert.Equal(56, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
@@ -92,7 +92,7 @@ namespace Coop.Tests.Autofac
                     .Select(command => command.Name)
                     .OrderBy(name => name));
 #else
-            Assert.Equal(15, missionCommands.Length);
+            Assert.Equal(19, missionCommands.Length);
 #endif
         }
 

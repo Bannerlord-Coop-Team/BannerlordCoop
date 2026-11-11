@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Configuration;
 
@@ -80,6 +81,8 @@ public readonly struct ModOptions
     public readonly ClansAfterKingdomDestructionMode ClansAfterKingdomDestruction { get; } = ClansAfterKingdomDestructionMode.Vanilla;
     [ProtoMember(29)]
     public readonly int PostBattleAiAmnestySeconds { get; } = 0;
+    [ProtoMember(30)]
+    public readonly List<string> PreferredBattleHosts { get; } = new();
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -118,5 +121,6 @@ public readonly struct ModOptions
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
         KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         ClansAfterKingdomDestruction = modOptionsData.ClansAfterKingdomDestruction ?? ClansAfterKingdomDestruction;
+        PreferredBattleHosts = modOptionsData.PreferredBattleHosts?.FindAll(id => id != null) ?? PreferredBattleHosts;
     }
 }

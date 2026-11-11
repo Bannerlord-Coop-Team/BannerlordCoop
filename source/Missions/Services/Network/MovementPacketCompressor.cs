@@ -24,6 +24,9 @@ public interface IMovementPacketCompressor
     byte[] SerializeSnapshots(IPacket packet, Guid[] snapshotIds);
 
     bool TryRestore(IPacket packet, out IPacket restored);
+
+    /// <summary>The bytes <see cref="Serialize"/> writes for <paramref name="packet"/>, worked out without serializing it.</summary>
+    int GetSerializedLength(CompressedMovementPacket packet);
 }
 
 /// <summary>
@@ -254,16 +257,26 @@ public class MovementPacketCompressor : IMovementPacketCompressor
         }
     }
 
-    // Writes the bytes Serialize(new CompressedMovementPacket(...)) would, or null when they are not smaller.
-    private byte[] WriteEnvelope(int uncompressedLength, byte[] payload, int payloadLength)
+    public int GetSerializedLength(CompressedMovementPacket packet) =>
+        EnvelopeLength(packet.UncompressedLength, packet.Payload?.Length ?? 0, out _);
+
+    // The length of the bytes Serialize(new CompressedMovementPacket(...)) writes, and of their body.
+    private int EnvelopeLength(int uncompressedLength, int payloadLength, out int bodyLength)
     {
         byte[] typeField = compressedTypeField ??= ReadTypeField(
             serializer.Serialize(new CompressedMovementPacket(1, new byte[1])));
-        int bodyLength = 1 + ProtoBufSerializer.GetVarintLength((uint)uncompressedLength) +
+        bodyLength = 1 + ProtoBufSerializer.GetVarintLength((uint)uncompressedLength) +
             1 + ProtoBufSerializer.GetVarintLength((uint)payloadLength) + payloadLength;
-        int length = typeField.Length + 1 + ProtoBufSerializer.GetVarintLength((uint)bodyLength) + bodyLength;
+        return typeField.Length + 1 + ProtoBufSerializer.GetVarintLength((uint)bodyLength) + bodyLength;
+    }
+
+    // Writes the bytes Serialize(new CompressedMovementPacket(...)) would, or null when they are not smaller.
+    private byte[] WriteEnvelope(int uncompressedLength, byte[] payload, int payloadLength)
+    {
+        int length = EnvelopeLength(uncompressedLength, payloadLength, out int bodyLength);
         if (length >= uncompressedLength) return null;
 
+        byte[] typeField = compressedTypeField;
         var envelope = new byte[length];
         Buffer.BlockCopy(typeField, 0, envelope, 0, typeField.Length);
         int offset = typeField.Length;

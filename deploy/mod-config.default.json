@@ -239,6 +239,13 @@
     // (Default) "Vanilla": Clans still in a kingdom are destroyed with it, and clans left independent are destroyed after 28 days like vanilla.
     "clansAfterKingdomDestruction": "Vanilla",
 
+    // Players who should host battles, in order of preference, listed by Steam ID.
+    // The battle host runs the battle for everyone else, so list players with a fast and stable upload.
+    // If a higher-priority player is still loading, the server waits up to 5 seconds for them before picking someone else.
+    // (Default) []: The first player to finish loading hosts the battle.
+    // e.g. ["76561198000000001", "76561198000000002"]
+    "preferredBattleHosts": [],
+
     // Toggle War Sails (NavalDLC) co-op on a dedicated server. War Sails is not officially supported yet.
     // Only the dedicated server reads this. Hosting in game and joining follow the launcher's NavalDLC setting.
     // (Default) false: the dedicated server runs without NavalDLC.
