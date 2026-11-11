@@ -1,10 +1,11 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.CampaignService.Patches;
+using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Tests;
 using HarmonyLib;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -31,29 +32,21 @@ public class BattleWreckageCoopTests : IDisposable
     {
         ModInformation.IsServer = isServer;
 
-        Assert.False(DisableBattleWreckageCampaignBehavior.Prefix());
+        Assert.False(BattleWreckageCampaignBehaviorPatches.RegisterEventsPrefix());
     }
 
     [Fact]
-    public void OtherV15Behaviors_StayServerOnly()
+    public void OtherBehaviors_StayServerOnly()
     {
         ModInformation.IsServer = true;
-        Assert.True(DisableV15CampaignBehaviors.Prefix());
+        Assert.True(HeroDailyXpCampaignBehaviorPatches.RegisterEventsPrefix());
+        Assert.True(EmptyClanPartiesCampaignBehaviorPatches.RegisterEventsPrefix());
+        Assert.True(PartyConfigurationCampaignBehaviorPatches.RegisterEventsPrefix());
 
         ModInformation.IsServer = false;
-        Assert.False(DisableV15CampaignBehaviors.Prefix());
-    }
-
-    [Fact]
-    public void ServerOnlyList_HoldsTheOtherThreeBehaviorsAndNotTheWreckageOne()
-    {
-        var targets = DisableV15CampaignBehaviors.TargetMethods().ToList();
-
-        Assert.Equal(3, targets.Count);
-        Assert.Contains(targets, m => m.DeclaringType == typeof(HeroDailyXpCampaignBehavior));
-        Assert.Contains(targets, m => m.DeclaringType == typeof(EmptyClanPartiesCampaignBehavior));
-        Assert.Contains(targets, m => m.DeclaringType == typeof(PartyConfigurationCampaignBehavior));
-        Assert.DoesNotContain(targets, m => m.DeclaringType == typeof(BattleWreckageCampaignBehavior));
+        Assert.False(HeroDailyXpCampaignBehaviorPatches.RegisterEventsPrefix());
+        Assert.False(EmptyClanPartiesCampaignBehaviorPatches.RegisterEventsPrefix());
+        Assert.False(PartyConfigurationCampaignBehaviorPatches.RegisterEventsPrefix());
     }
 
     [Fact]
@@ -114,7 +107,7 @@ public class BattleWreckageCoopTests : IDisposable
         var harmony = new Harmony(nameof(BothPatches_ResolveTheirTargetsAndPatch));
         try
         {
-            var disabled = harmony.CreateClassProcessor(typeof(DisableBattleWreckageCampaignBehavior)).Patch();
+            var disabled = harmony.CreateClassProcessor(typeof(BattleWreckageCampaignBehaviorPatches)).Patch();
             var repaired = harmony.CreateClassProcessor(typeof(IdlessWreckageLoadRepairPatch)).Patch();
 
             Assert.Contains(disabled, method => method.Name.Contains(nameof(BattleWreckageCampaignBehavior.RegisterEvents)));

@@ -1,17 +1,19 @@
-﻿using GameInterface.Services.Clans.Extensions;
+﻿using Common;
+using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Clans.Patches;
 
-/// <summary>
-/// The behavior runs on the server only, and its reset nulls a field that is not
-/// synced, so each reset goes through <see cref="IPartyConfigurationService.Reset"/> instead.
-/// </summary>
+// The vanilla reset nulls a field that is not synced, so each reset goes through IPartyConfigurationService instead.
 [HarmonyPatch(typeof(PartyConfigurationCampaignBehavior))]
 internal class PartyConfigurationCampaignBehaviorPatches
 {
+    [HarmonyPatch(nameof(PartyConfigurationCampaignBehavior.RegisterEvents))]
+    [HarmonyPrefix]
+    internal static bool RegisterEventsPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(PartyConfigurationCampaignBehavior.OnCompanionRemoved))]
     [HarmonyPrefix]
     private static bool OnCompanionRemovedPrefix(Hero hero)
