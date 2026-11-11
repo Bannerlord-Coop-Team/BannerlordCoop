@@ -122,6 +122,32 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     }
 
     [Fact]
+    public void CleanUpLoadedMapEvents_UnlistedLiveEventWithLeaderlessSide_StillReleasesParties()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        // a second defender, because the field battle reads its position lists only to place a non-leader party
+        var extraDefenderId = JoinNewServerPartyToSide(mapEventContext.MapEventId, BattleSideEnum.Defender);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(extraDefenderId, out var extraDefender));
+            ModelUnlistedAfterLoad(mapEvent);
+
+            // the field battle cannot derive its settlement without both leader parties
+            mapEvent.DefenderSide.LeaderParty = null!;
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+            Assert.Null(extraDefender.Party.MapEventSide);
+        }, JoinDisabledMethods);
+    }
+
+    [Fact]
     public void CleanUpLoadedMapEvents_StaleParticipantSideLink_RepairsAndCompletes()
     {
         var mapEventContext = CreateServerMapEvent(commit: false);

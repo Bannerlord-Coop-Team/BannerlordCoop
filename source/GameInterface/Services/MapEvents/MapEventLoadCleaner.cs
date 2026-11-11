@@ -124,6 +124,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         try
         {
+            RestoreUnsavedStateIfUnlisted(mapEvent);
             FinalizeOrRepairEvent(mapEvent);
         }
         catch (Exception e)
@@ -190,7 +191,8 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             try
             {
                 // First, because the settlement a v1.4.8 save kept on MapEvent must be refilled before ResetVillageState
-                // reads it, and vanilla only derives it while the event isn't finalized.
+                // reads it. It also has to come before the WaitingRemoval below, since vanilla only derives the settlement
+                // while the event isn't finalized.
                 RestoreUnsavedStateIfUnlisted(mapEvent);
 
                 // The battle already ended, so mark it finalized before detaching. Removing the last
@@ -347,22 +349,17 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (component == null)
             return;
 
-        // The steps of MapEventComponent.AfterLoad, with a settlement that fails to derive (a side without a leader party)
-        // not skipping OnAfterLoad, whose position lists the detach reads.
-        component.MapEvent = mapEvent;
-        if (!mapEvent.IsFinalized)
+        // A settlement that fails to derive, as for a side without a leader party, is only logged.
+        // OnAfterLoad still runs, because the detach reads the position lists it builds.
+        try
         {
-            try
-            {
-                component.UpdateMapEventSettlement();
-            }
-            catch (Exception e)
-            {
-                logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
-            }
+            component.AfterLoad(mapEvent);
         }
-
-        component.OnAfterLoad();
+        catch (Exception e)
+        {
+            logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
+            component.OnAfterLoad();
+        }
     }
 
     private (int RepairedLinks, int RemovedEntries) RepairPartySideLinks(MapEvent mapEvent)
@@ -463,8 +460,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // Finalizes a loaded player battle, or only detaches its parties when it is already finalized.
     private void FinalizeOrRepairEvent(MapEvent mapEvent)
     {
-        RestoreUnsavedStateIfUnlisted(mapEvent);
-
         if (!mapEvent.IsFinalized)
         {
             logger.Information(
