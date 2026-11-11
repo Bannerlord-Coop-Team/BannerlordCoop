@@ -597,7 +597,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Go away"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
@@ -627,7 +627,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="Hurry up and get on with it."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_sturgia" />
     </face>
@@ -773,7 +773,7 @@
     coop_location="center"
     coop_spawn_tag="npc_common"
     coop_dialogue="Have you seen the rest of the boys? We got a war to win."
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_vlandia" />
     </face>
@@ -900,6 +900,174 @@
     <skills />
     <Equipments>
       <EquipmentRoster civilian="true">
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_bfb11aa3"
+    name="{=!}Giovanni Leas"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A4"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Mind your step! The keep&apos;s drains are choked with siege-sludge. I&apos;m Giovanni Leas. If the Lord&apos;s privy is backed up or the aqueduct needs a patch, they call for me. Speak quickly a burst pipe waits for no man."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_civil_f_cape" />
+        <equipment slot="Cape" id="Item.assassin_shoulder" />
+        <equipment slot="Body" id="Item.aserai_tunic_waistcoat" />
+        <equipment slot="Gloves" id="Item.leather_gloves" />
+        <equipment slot="Leg" id="Item.fine_town_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_cb3fe1da"
+    name="{=!}Tabetha"
+    default_group="Infantry"
+    level="1"
+    is_female="true"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You came here dressed like that?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.leopard_pelt" />
+        <equipment slot="Body" id="Item.fine_southern_dress" />
+        <equipment slot="Gloves" id="Item.highland_gloves" />
+        <equipment slot="Leg" id="Item.decorated_imperial_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_c457ee01"
+    name="{=!}Samuel Dezarme"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="rien"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_d942a7ec"
+    name="{=!}Ayzanok"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.sturgia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S2"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Ayzanok"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_131d4f02"
+    name="{=!}Isak Söderberg"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.sturgia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S3"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You look familiar—do I know who you are?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.bearhead" />
+        <equipment slot="Cape" id="Item.wolf_shoulder" />
+        <equipment slot="Body" id="Item.fur_armor_with_strap" />
+        <equipment slot="Gloves" id="Item.woven_leather_bracers" />
+        <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_c00838e5"
+    name="{=!}FatalBeans"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Would you like some BEANS?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.pauldron_cape_a" />
+        <equipment slot="Body" id="Item.aserai_full_scale_armor_on_chain" />
+        <equipment slot="Gloves" id="Item.lamellar_plate_gauntlets" />
+        <equipment slot="Leg" id="Item.lamellar_plate_boots" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>

@@ -241,6 +241,13 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
     public bool PreserveStealthPosture => Native.Phase is HideoutPhase.Stealth ||
         (direct && Native.Phase == HideoutPhase.Camp);
 
+    // A won duel leaves the leftover bandits surrendered (vanilla makes them teamless), so nothing may wake or charge them
+    public bool HoldsSurrenderedDefenders => Native?.Phase == HideoutPhase.Resolved && winner == BattleSideEnum.Attacker;
+
+    // A duel spectator stays teamless until RestoreSpectators runs, so its real side is the team it was taken from
+    public bool IsSurrenderedDefender(Agent agent) => HoldsSurrenderedDefenders &&
+        (spectatorTeams.TryGetValue(agent, out var team) ? team : agent.Team)?.Side == BattleSideEnum.Defender;
+
     public bool RestoreAdoptedAgent(Agent agent)
     {
         if (!PreserveStealthPosture) return false;

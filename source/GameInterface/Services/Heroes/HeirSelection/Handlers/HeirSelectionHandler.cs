@@ -8,10 +8,13 @@ using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Clans.Data;
+using GameInterface.Services.CampaignService.Statistics.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -47,6 +50,8 @@ internal class HeirSelectionHandler : IHandler
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
+    private readonly IIssueCancellationCoordinator issueCancellationCoordinator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
     private readonly ISendCoalescer sendCoalescer;
@@ -67,6 +72,8 @@ internal class HeirSelectionHandler : IHandler
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
         ICoopSessionMigrator coopSessionMigrator,
         ITraitLevelingHelperInterface traitLevelingHelperInterface,
+        IStatisticsCampaignBehaviorInterface statisticsInterface,
+        IIssueCancellationCoordinator issueCancellationCoordinator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
         ISendCoalescer sendCoalescer = null)
@@ -80,6 +87,8 @@ internal class HeirSelectionHandler : IHandler
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
         this.traitLevelingHelperInterface = traitLevelingHelperInterface;
+        this.statisticsInterface = statisticsInterface;
+        this.issueCancellationCoordinator = issueCancellationCoordinator;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
         this.sendCoalescer = sendCoalescer;
@@ -256,7 +265,7 @@ internal class HeirSelectionHandler : IHandler
         if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
         bool clanSurvives = hero.Clan != null && (hero.Clan.Heroes.Any(member => member.IsAlive && playerManager.Contains(member)) ||
             hero.Clan.GetHeirApparents().Count > 0);
-        var message = new NetworkClientGameOver(player.HeroId, state.AppointedLeaderId, clanSurvives);
+        var message = new NetworkClientGameOver(player.HeroId, state.AppointedLeaderId, clanSurvives, statisticsInterface.GetStatistics(hero));
         sentSelections[player.HeroId] = message;
         sendCoalescer?.Flush(network);
         network.Send(peer, message);
@@ -280,8 +289,7 @@ internal class HeirSelectionHandler : IHandler
                     showingWaitInquiry = true;
                     InformationManager.ShowInquiry(new InquiryData(
                         GameTexts.FindText("str_coop_succession_wait_title").ToString(),
-                        GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
-                        GameTexts.FindText("str_coop_succession_wait_description"), true, false,
+                        GameTexts.FindText("str_coop_succession_wait_description").ToString(), true, false,
                         GameTexts.FindText("str_coop_succession_disconnect").ToString(), string.Empty,
                         () => messageBroker.Publish(this, new PlayerDisconnectRequested()), null));
                     return;
@@ -439,9 +447,24 @@ internal class HeirSelectionHandler : IHandler
 
         sentSelections.Remove(originalHeroId);
 
+        // Finish personal quests before their inventory consequences are copied into the inheritance cache.
+        issueCancellationCoordinator.CancelForPlayerDeath(registeredPlayer.ControllerId, data.OriginalHero, originalParty);
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
         // The server never raises OnBeforePlayerCharacterChanged, where v1.5 resets the new player character's party commands.
         PartyConfigurationFlags.Reset(data.Heir);
+
+        // Same as ChangePlayerCharacterAction.Apply, the player's fleet is transferred to their heir
+        if (objectManager.TryGetObjectWithLogging<MobileParty>(replacementPlayer.MobilePartyId, out var heirParty))
+        {
+            applyHeirSelectionActionInterface.TransferFleetToHeir(originalParty, heirParty);
+        }
+
+        // Same as ChangePlayerCharacterAction.Apply, which only runs on the owning client, so the other clients get the cancel too
+        if (originalParty != null && originalParty.IsTransitionInProgress)
+        {
+            originalParty.CancelNavigationTransition();
+            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(originalParty, forcePosition: true, isCurrentlyAtSea: originalParty.IsCurrentlyAtSea));
+        }
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
@@ -544,6 +567,8 @@ internal class HeirSelectionHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.NewMainPartyId, out var newMainParty)) return;
 
             heirSelectionCampaignBehaviorInterface.OnPlayerCharacterChanged(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged);
+
+            messageBroker.Publish(this, new PlayerCharacterChangedOnServer(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged));
         });
     }
 }

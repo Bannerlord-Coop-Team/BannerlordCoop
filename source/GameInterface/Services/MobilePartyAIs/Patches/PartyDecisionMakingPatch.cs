@@ -1,11 +1,14 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -35,4 +38,41 @@ internal class SkipPlayerPartyAiThinkPatch
 {
     static bool Prefix(MobileParty mobileParty) =>
         mobileParty == null || (!mobileParty.IsPlayerParty() && !mobileParty.MapEvent.ContainsPlayerParty());
+}
+
+/// <summary>
+/// Drops hourly engage targets inside a player battle closed to AI joins.
+/// Vanilla scores as GoAroundParty and only switches to EngageParty near the target.
+/// </summary>
+[HarmonyPatch(typeof(AiEngagePartyBehavior))]
+internal class SkipClosedPlayerBattleEngagePatch
+{
+    [HarmonyPatch(nameof(AiEngagePartyBehavior.AiHourlyTick))]
+    [HarmonyPostfix]
+    public static void AiHourlyTickPostfix(PartyThinkParams p)
+    {
+        p._aiBehaviorScores.RemoveAll(score =>
+            score.Item1.AiBehavior == AiBehavior.GoAroundParty &&
+            score.Item1.Party is MobileParty target &&
+            InteractionPatches.IsClosedToAiJoins(target.MapEvent));
+    }
+}
+
+/// <summary>
+/// Drops hourly besiege and defend targets whose siege battle is closed to AI joins, otherwise the party walks up
+/// and gets held beside it. Parties already in that siege's camp keep their score so they aren't ejected.
+/// </summary>
+[HarmonyPatch(typeof(AiMilitaryBehavior))]
+internal class SkipClosedSiegeBattleMilitaryPatch
+{
+    [HarmonyPatch(nameof(AiMilitaryBehavior.AiHourlyTick))]
+    [HarmonyPostfix]
+    public static void AiHourlyTickPostfix(MobileParty mobileParty, PartyThinkParams p)
+    {
+        p._aiBehaviorScores.RemoveAll(score =>
+            (score.Item1.AiBehavior == AiBehavior.BesiegeSettlement || score.Item1.AiBehavior == AiBehavior.DefendSettlement) &&
+            score.Item1.Party is Settlement target &&
+            mobileParty.BesiegedSettlement != target &&
+            InteractionPatches.IsSiegeClosedToAiJoins(target));
+    }
 }

@@ -249,7 +249,8 @@ internal class MapEventPartyHandler : IHandler
             obj.Damage,
             obj.IsFatal,
             obj.IsSimulatedHit,
-            obj.AttackerWeapon,
+            // vanilla only reads the weapon for a hero attacker (OnHeroCombatHit)
+            obj.AttackingTroop.IsHero ? obj.AttackerWeapon : null,
             captainId));
     }
 

@@ -322,7 +322,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     {
         var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
 
-        EnsureServerCampaignModels();
+        EnsureServerCampaignModels(ScoreHitXp);
 
         string? partyId = null;
         string? victimId = null;

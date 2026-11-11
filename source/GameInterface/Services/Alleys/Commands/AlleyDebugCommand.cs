@@ -155,7 +155,11 @@ public class AlleyDebugCommand
                 ? new[] { new TroopRosterElementData(heroCharId, 1, 0, 0) }
                 : new TroopRosterElementData[0];
 
-            MessageBroker.Instance.Publish(alley, new RequestAcquireAlley(alleyId, heroId, heroId, garrison));
+            // The command may take any alley, so it names whoever holds it now as the previous owner.
+            string previousOwnerId = null;
+            if (alley.Owner != null && !objectManager.TryGetId(alley.Owner, out previousOwnerId)) return Failed("Alley owner is not registered");
+
+            MessageBroker.Instance.Publish(alley, new RequestAcquireAlley(alleyId, heroId, heroId, garrison, previousOwnerId));
 
             return Succeeded($"Set alley [{args[1]}] in {alley.Settlement.Name} to {hero.Name}");
         }

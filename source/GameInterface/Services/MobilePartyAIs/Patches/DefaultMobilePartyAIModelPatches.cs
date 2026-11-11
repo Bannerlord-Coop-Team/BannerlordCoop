@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -181,6 +182,10 @@ internal class DefaultMobilePartyAIModelPatches
         // Don't consider attacking a party that is held in a conversation with a player; the interaction guard
         // would block the attack anyway, and this keeps the AI from chasing an unattackable target.
         if (ConversationPartyHold.IsInPlayerConversation(targetParty))
+            __result = false;
+
+        // A player battle closed to AI joins is ignored, otherwise the attacker walks up and gets held beside it.
+        if (InteractionPatches.IsClosedToAiJoins(targetParty.MapEvent))
             __result = false;
     }
     [HarmonyPatch(typeof(DefaultMobilePartyAIModel))]

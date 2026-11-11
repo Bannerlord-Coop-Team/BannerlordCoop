@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.CommentBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.UI.LogEntries.Handlers;
 
@@ -37,6 +39,15 @@ internal class LogEntriesHandler : IHandler
 
         messageBroker.Subscribe<CommentGivenBirth>(Handle_CommentGivenBirth);
         messageBroker.Subscribe<NetworkCommentGivenBirth>(Handle_NetworkCommentGivenBirth);
+
+        messageBroker.Subscribe<CommentVillageStateChanged>(Handle_CommentVillageStateChanged);
+        messageBroker.Subscribe<NetworkCommentVillageStateChanged>(Handle_NetworkCommentVillageStateChanged);
+
+        messageBroker.Subscribe<CommentClanLeaderChanged>(Handle_CommentClanLeaderChanged);
+        messageBroker.Subscribe<NetworkCommentClanLeaderChanged>(Handle_NetworkCommentClanLeaderChanged);
+
+        messageBroker.Subscribe<CommentCharacterBorn>(Handle_CommentCharacterBorn);
+        messageBroker.Subscribe<NetworkCommentCharacterBorn>(Handle_NetworkCommentCharacterBorn);
     }
 
     public void Dispose()
@@ -49,6 +60,15 @@ internal class LogEntriesHandler : IHandler
 
         messageBroker.Unsubscribe<CommentGivenBirth>(Handle_CommentGivenBirth);
         messageBroker.Unsubscribe<NetworkCommentGivenBirth>(Handle_NetworkCommentGivenBirth);
+
+        messageBroker.Unsubscribe<CommentVillageStateChanged>(Handle_CommentVillageStateChanged);
+        messageBroker.Unsubscribe<NetworkCommentVillageStateChanged>(Handle_NetworkCommentVillageStateChanged);
+
+        messageBroker.Unsubscribe<CommentClanLeaderChanged>(Handle_CommentClanLeaderChanged);
+        messageBroker.Unsubscribe<NetworkCommentClanLeaderChanged>(Handle_NetworkCommentClanLeaderChanged);
+
+        messageBroker.Unsubscribe<CommentCharacterBorn>(Handle_CommentCharacterBorn);
+        messageBroker.Unsubscribe<NetworkCommentCharacterBorn>(Handle_NetworkCommentCharacterBorn);
     }
 
     private void Handle_LogPlayerRetired(MessagePayload<LogPlayerRetired> obj)
@@ -137,6 +157,77 @@ internal class LogEntriesHandler : IHandler
 
             var commentChildbirthBehavior = Campaign.Current?.GetCampaignBehavior<CommentChildbirthBehavior>();
             commentChildbirthBehavior?.OnGivenBirthEvent(mother, aliveChildren, obj.What.StillbornCount);
+        });
+    }
+
+    private void Handle_CommentVillageStateChanged(MessagePayload<CommentVillageStateChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Village, out var villageId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.RaiderParty, out var raiderPartyId)) return;
+
+            var message = new NetworkCommentVillageStateChanged(villageId, obj.What.OldState, obj.What.NewState, raiderPartyId);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkCommentVillageStateChanged(MessagePayload<NetworkCommentVillageStateChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Village>(obj.What.VillageId, out var village)) return;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.RaiderPartyId, out var raiderParty)) return;
+
+            var commentOnChangeVillageStateBehavior = Campaign.Current?.GetCampaignBehavior<CommentOnChangeVillageStateBehavior>();
+            commentOnChangeVillageStateBehavior?.OnVillageStateChanged(village, obj.What.OldState, obj.What.NewState, raiderParty);
+        });
+    }
+
+    private void Handle_CommentClanLeaderChanged(MessagePayload<CommentClanLeaderChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.OldLeader, out var oldLeaderId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.NewLeader, out var newLeaderId)) return;
+
+            var message = new NetworkCommentClanLeaderChanged(oldLeaderId, newLeaderId);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkCommentClanLeaderChanged(MessagePayload<NetworkCommentClanLeaderChanged> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OldLeaderId, out var oldLeader)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderId, out var newLeader)) return;
+
+            if (Campaign.Current?.GetCampaignBehavior<CommentOnClanLeaderChangedBehavior>() == null) return;
+
+            CommentOnClanLeaderChangedBehavior.OnClanLeaderChanged(oldLeader, newLeader);
+        });
+    }
+
+    private void Handle_CommentCharacterBorn(MessagePayload<CommentCharacterBorn> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
+
+            var message = new NetworkCommentCharacterBorn(heroId);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkCommentCharacterBorn(MessagePayload<NetworkCommentCharacterBorn> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
+
+            var commentCharacterBornBehavior = Campaign.Current?.GetCampaignBehavior<CommentCharacterBornBehavior>();
+            commentCharacterBornBehavior?.HeroCreated(hero, true);
         });
     }
 }

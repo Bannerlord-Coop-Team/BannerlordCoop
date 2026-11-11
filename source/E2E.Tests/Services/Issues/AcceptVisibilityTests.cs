@@ -341,15 +341,19 @@ public class AcceptVisibilityTests : IDisposable
     }
 
     [Theory]
-    [InlineData(IssueOutcome.QuestSuccess)]
-    [InlineData(IssueOutcome.QuestCancel)]
-    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome)
+    [InlineData(IssueOutcome.QuestSuccess, false)]
+    [InlineData(IssueOutcome.QuestCancel, false)]
+    [InlineData(IssueOutcome.QuestSuccess, true)]
+    [InlineData(IssueOutcome.QuestCancel, true)]
+    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome, bool knowsOwner)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         var otherIssue = AddIssue(Other, notableId);
         ListenForIssueUpdatesOnTheOtherClient();
         ListenForQuestCompletionsOnTheOtherClient();
         LoadQuestSolutionFromSave(otherIssue, notableId);
+        if (knowsOwner)
+            Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId)));
 
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 
@@ -455,8 +459,8 @@ public class AcceptVisibilityTests : IDisposable
         Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
 
         Owner.Call(() => Owner.SimulateMessage(this, new NetworkIssueJournal(notableId, IssueId, false,
-            new[] { outcome == IssueOutcome.LordAcceptedCounterOffer
-                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog })));
+            new[] { new IssueJournalEntry(new JournalLog(CampaignTime.Now, outcome == IssueOutcome.LordAcceptedCounterOffer
+                ? ownerIssue.LordSolutionCounterOfferAcceptLog : ownerIssue.LordSolutionCounterOfferRefuseLog)) })));
         Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 

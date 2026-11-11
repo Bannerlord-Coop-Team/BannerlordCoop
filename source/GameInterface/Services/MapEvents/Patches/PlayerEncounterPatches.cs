@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
@@ -367,8 +368,11 @@ internal class PlayerEncounterPatches
 
     [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPrefix]
-    private static bool FinishPrefix()
+    private static bool FinishPrefix(out string __state)
     {
+        // Finish clears the battle, so the postfix's notice reads which one ended from here.
+        __state = PlayerEncounter.Battle?.StringId;
+
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
             return true;
 
@@ -393,12 +397,12 @@ internal class PlayerEncounterPatches
     // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
     [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPostfix]
-    private static void FinishPostfix(bool __runOriginal)
+    private static void FinishPostfix(bool __runOriginal, string __state)
     {
         if (!__runOriginal || ModInformation.IsServer) return;
 
         // The server holds the AI party this player was conversing with; tell it the encounter is over.
-        MessageBroker.Instance.Publish(null, new ConversationEnded());
+        MessageBroker.Instance.Publish(null, new ConversationEnded(__state));
 
         // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
         // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
@@ -550,6 +554,15 @@ internal class PlayerEncounterPatches
     {
         party.SetMoveModeHold();
         MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+    }
+
+    // After a victory vanilla thanks every side leader the player helped in a conversation; another player's hero is no
+    // lord to thank, and that conversation mission held the encounter open past the server's close.
+    [HarmonyPatch(nameof(PlayerEncounter.DoPlayerVictory))]
+    [HarmonyPostfix]
+    internal static void SkipHelpedPlayerHeroes(PlayerEncounter __instance)
+    {
+        __instance._helpedHeroes?.RemoveAll(hero => hero.IsPlayerHero());
     }
 
     [HarmonyPatch(nameof(PlayerEncounter.DoApplyMapEventResults))]

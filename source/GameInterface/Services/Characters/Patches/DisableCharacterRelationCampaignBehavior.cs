@@ -29,7 +29,7 @@ internal class CharacterRelationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnPrisonerDonatedToSettlementPrefix(MobileParty donatingParty, FlattenedTroopRoster donatedPrisoners, Settlement donatedSettlement)
     {
-        ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface);
+        if (!ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface)) return true;
 
         characterRelationBehaviorInterface.OnPrisonerDonatedToSettlement(donatingParty, donatedPrisoners, donatedSettlement);
 
@@ -40,7 +40,7 @@ internal class CharacterRelationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickPrefix()
     {
-        ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface);
+        if (!ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface)) return true;
 
         characterRelationBehaviorInterface.DailyTick();
 
@@ -51,7 +51,7 @@ internal class CharacterRelationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnSettlementOwnerChangedPrefix(Settlement settlement, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturerHero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
     {
-        ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface);
+        if (!ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface)) return true;
 
         characterRelationBehaviorInterface.OnSettlementOwnerChanged(settlement, openToClaim, newOwner, oldOwner, capturerHero, detail);
 
@@ -62,7 +62,7 @@ internal class CharacterRelationCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnRaidCompletedPrefix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
-        ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface);
+        if (!ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface)) return true;
 
         characterRelationBehaviorInterface.OnRaidCompleted(winnerSide, raidEvent);
 

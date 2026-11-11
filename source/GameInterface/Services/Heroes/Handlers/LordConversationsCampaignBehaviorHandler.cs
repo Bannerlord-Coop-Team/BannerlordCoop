@@ -117,6 +117,14 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
             // may have died. A prisoner the player just looted is held by no party and can still be taken.
             if (!conversationHero.IsAlive || conversationHero.PartyBelongedToAsPrisoner != null) return;
 
+            // A captured or freed lord has no party. A stale dialog must not take one out of another party.
+            if (conversationHero.PartyBelongedTo != null && conversationHero.PartyBelongedTo != mainParty.MobileParty)
+            {
+                Logger.Warning("Ignored taking {HeroId} prisoner because it is in {PartyId}",
+                    data.ConversationHeroId, conversationHero.PartyBelongedTo.StringId);
+                return;
+            }
+
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },
         context: nameof(Handle_NetworkTakeLordPrisoner));

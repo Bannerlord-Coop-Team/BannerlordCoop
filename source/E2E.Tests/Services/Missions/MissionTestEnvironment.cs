@@ -8,6 +8,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -16,8 +17,12 @@ using Missions.Messages;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -27,10 +32,9 @@ namespace E2E.Tests.Services.Missions;
 /// helpers to stand up a coop battle (a <see cref="MapEvent"/> whose sides hold one player party per
 /// controller id) and to drive + inspect server-authoritative host election.
 /// <para>
-/// Scope: host election and (future) migration travel the campaign <c>INetwork</c>, which the E2E mock
-/// router replicates, so they are testable here. Troop spawning and control transfer travel the P2P mesh
-/// (<c>IBattleNetwork</c>) and also need a live <see cref="TaleWorlds.MountAndBlade.Mission"/> — neither
-/// exists in this headless harness — so those mechanisms are exercised by targeted unit tests instead.
+/// Host election and migration travel the campaign router. Connected mock missions also route serialized
+/// spawning, control and movement traffic through the mission mesh. <see cref="MissionEngineFixture"/>
+/// replaces the native mission/agent boundaries, not co-op handlers or authority decisions.
 /// </para>
 /// </summary>
 public class MissionTestEnvironment : E2ETestEnvironment
@@ -38,7 +42,8 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// <summary>Methods to suppress when constructing a <see cref="MapEvent"/> headlessly.</summary>
     protected IReadOnlyList<MethodBase> MapEventDisabledMethods { get; }
 
-    public MissionTestEnvironment(ITestOutputHelper output, int numClients = 2) : base(output, numClients)
+    public MissionTestEnvironment(ITestOutputHelper output, int numClients = 2,
+        Action<Autofac.ContainerBuilder>? configureDependencies = null) : base(output, numClients, configureDependencies)
     {
         MapEventDisabledMethods = new List<MethodBase>
         {
@@ -46,6 +51,25 @@ public class MissionTestEnvironment : E2ETestEnvironment
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
     }
+
+    /// <summary>
+    /// <see cref="MapEventDisabledMethods"/> plus the reward, loot and menu steps a victory finalization runs, which need
+    /// campaign state the headless server does not have.
+    /// </summary>
+    protected IReadOnlyList<MethodBase> VictoryConclusionDisabledMethods()
+        => MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CaptureDefeatedPartyMembers"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
+            .ToList();
 
     /// <summary>Sets a client's network identity — the value host election ranks by.</summary>
     protected void SetControllerId(EnvironmentInstance instance, string controllerId)
@@ -140,8 +164,17 @@ public class MissionTestEnvironment : E2ETestEnvironment
             RegisterAsPlayerParty(controllerIds[i], heroIds[i], partyIds[i]);
         }
 
+        OpenAiJoinWindow(mapEventId!);
+
         return (mapEventId!, partyIds, heroIds);
     }
+
+    /// <summary>
+    /// Opens the AI join window a live player battle opens when it starts. Fixtures that register their players after
+    /// <see cref="MapEvent.Initialize"/> never get one, so the server would block their later AI joins.
+    /// </summary>
+    protected void OpenAiJoinWindow(string mapEventId) =>
+        Server.Call(() => InteractionPatches.OpenAiJoinWindowAndPublish(Server.GetRegisteredObject<MapEvent>(mapEventId), () => { }));
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
     protected void RegisterAsPlayerParty(
@@ -212,7 +245,10 @@ public class MissionTestEnvironment : E2ETestEnvironment
                 Server.Resolve<IMessageBroker>().Publish(this, new BattlePartyRetreated(controllerId, mapEventId));
             }
 
-            Server.Resolve<IMessageBroker>().Publish(this, new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
+            // The server's membership handler withdraws a disconnect at sea too (D4).
+            bool withdraws = wasRetreat || Server.Resolve<IBattleHostRetentionPolicy>().DisconnectWithdraws(mapEventId);
+            Server.Resolve<IMessageBroker>().Publish(this,
+                new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty, withdraws));
         });
     }
 
@@ -248,5 +284,48 @@ public class MissionTestEnvironment : E2ETestEnvironment
             var registry = instance.Resolve<IBattleHostRegistry>();
             Assert.Equal(expected, registry.IsHost(mapEventId));
         });
+    }
+
+    /// <summary>
+    /// The harness boots a <see cref="Campaign"/> without the campaign-start flow that would populate
+    /// <c>Campaign.Models</c>, so give the server the models the native scorer runs through
+    /// (xp-from-hit, troop power and max hitpoints), with every hit worth <paramref name="xpPerHit"/>. Clients never run the scorer.
+    /// </summary>
+    protected void EnsureServerCampaignModels(int xpPerHit)
+    {
+        Server.Call(() =>
+        {
+            var gameModels = new GameModels(new List<GameModel>
+            {
+                new FixedCombatXpModel(xpPerHit),
+                new DefaultMilitaryPowerModel(),
+                new DefaultCharacterStatsModel(),
+            });
+            Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+            Campaign.Current._gameModels = gameModels;
+        });
+    }
+
+    private sealed class FixedCombatXpModel : CombatXpModel
+    {
+        private readonly int xpPerHit;
+
+        public FixedCombatXpModel(int xpPerHit) => this.xpPerHit = xpPerHit;
+
+        public override float CaptainRadius => 0f;
+
+        public override SkillObject GetSkillForWeapon(WeaponComponentData weapon, bool isSiegeEngineHit) => null;
+
+        public override ExplainedNumber GetXpFromHit(
+            CharacterObject attackerTroop,
+            CharacterObject captain,
+            CharacterObject attackedTroop,
+            PartyBase attackerParty,
+            int damage,
+            bool isFatal,
+            MissionTypeEnum missionType) =>
+            new ExplainedNumber(xpPerHit);
+
+        public override float GetXpMultiplierFromShotDifficulty(float shotDifficulty) => 1f;
     }
 }

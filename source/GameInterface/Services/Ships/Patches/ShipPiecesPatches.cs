@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Naval;
 namespace GameInterface.Services.Ships.Patches;
 
 [HarmonyPatch(typeof(Ship))]
+[HarmonyPatchCategory(GameInterface.HARMONY_NAVAL_CATEGORY)]
 internal class ShipPiecesPatches
 {
     [HarmonyPatch(nameof(Ship.InitializeFromTemplate))]

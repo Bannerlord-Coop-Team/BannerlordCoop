@@ -99,6 +99,14 @@ internal class PartyScreenHelperPatches
     {
         Settlement currentSettlement = Hero.MainHero.CurrentSettlement;
 
+        // The party already left the town, so no garrison takes the troops and a Done would lose them
+        if (currentSettlement == null && leftMemberRoster.Count > 0)
+        {
+            Logger.Warning("Ignoring a garrison donation Done because the main party is no longer in a settlement");
+            __result = false;
+            return false;
+        }
+
         var message = new GarrisonDonated(currentSettlement, leftMemberRoster);
         MessageBroker.Instance.Publish(null, message);
 
