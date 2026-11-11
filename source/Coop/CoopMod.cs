@@ -226,7 +226,10 @@ namespace Coop
             const long compactedLogFileSizeBytes = 28L * 1024 * 1024;
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-            var configuration = LogManager.Configuration.Enrich.WithProcessId();
+            SessionSummary = new SessionSummarySink(LogManager.GetLogger<SessionSummarySink>());
+            var configuration = LogManager.Configuration
+                .Enrich.WithProcessId()
+                .WriteTo.Sink(SessionSummary);
 #if DEBUG
             configuration.MinimumLevel.Debug();
 #else
@@ -244,9 +247,8 @@ namespace Coop
                 compactedLogFileSizeBytes)));
             activeLogFilePath = logFile.Path;
 
+            // The first event freezes the configuration, so this stays last.
             Logger = LogManager.GetLogger<CoopMod>();
-            SessionSummary = new SessionSummarySink(Logger);
-            configuration.WriteTo.Sink(SessionSummary);
             logFile.LogFailures(Logger);
         }
 
