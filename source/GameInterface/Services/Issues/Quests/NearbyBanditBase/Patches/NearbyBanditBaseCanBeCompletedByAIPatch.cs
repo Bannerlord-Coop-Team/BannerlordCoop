@@ -6,6 +6,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.NearbyBanditBaseIssueBehavior.Nea
 
 namespace GameInterface.Services.Issues.Quests.NearbyBanditBase.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Issue), nameof(Issue.CanBeCompletedByAI))]
 internal class NearbyBanditBaseCanBeCompletedByAIPatch
 {
