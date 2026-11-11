@@ -1745,6 +1745,27 @@ namespace GameInterface.Services.Kingdoms
 
         internal void ProcessVotingRounds(DateTime utcNow)
         {
+            if (ModInformation.IsServer && Campaign.Current?.KingdomManager != null)
+            {
+                foreach (Kingdom kingdom in Kingdom.All)
+                {
+                    if (kingdom?._unresolvedDecisions == null) continue;
+
+                    foreach (MakePeaceKingdomDecision decision in kingdom.UnresolvedDecisions.OfType<MakePeaceKingdomDecision>().ToList())
+                    {
+                        if (!decision.ShouldBeCancelledInternal()) continue;
+
+                        // The campaign can be paused in the kingdom screen after console-forced peace.
+                        kingdom.RemoveDecision(decision);
+                        if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision)
+                            && decision.FactionToMakePeaceWith is Kingdom proposingKingdom)
+                        {
+                            messageBroker.Publish(this, new PeaceOfferPendingStatusChanged(proposingKingdom, kingdom, false));
+                        }
+                        CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, kingdom.IsPlayerKingdom());
+                    }
+                }
+            }
             RegisterLoadedDecisions();
             foreach (KingdomDecisionVoteState state in DecisionStates.Values.ToList())
             {
@@ -1775,20 +1796,7 @@ namespace GameInterface.Services.Kingdoms
 
                 foreach (KingdomDecision decision in kingdom.UnresolvedDecisions.ToList())
                 {
-                    if (decision == null) continue;
-                    // The campaign can be paused in the kingdom screen after console-forced peace.
-                    if (decision is MakePeaceKingdomDecision peaceDecision && peaceDecision.ShouldBeCancelledInternal())
-                    {
-                        kingdom.RemoveDecision(decision);
-                        if (CoopKingdomElection.IsPendingPlayerPeaceOffer(decision)
-                            && peaceDecision.FactionToMakePeaceWith is Kingdom proposingKingdom)
-                        {
-                            messageBroker.Publish(this, new PeaceOfferPendingStatusChanged(proposingKingdom, kingdom, false));
-                        }
-                        CampaignEventDispatcher.Instance.OnKingdomDecisionCancelled(decision, kingdom.IsPlayerKingdom());
-                        continue;
-                    }
-                    if (DecisionStates.ContainsKey(decision)) continue;
+                    if (decision == null || DecisionStates.ContainsKey(decision)) continue;
                     if (!HasEligiblePlayerClan(decision)) continue;
 
                     RegisterDecision(decision);
