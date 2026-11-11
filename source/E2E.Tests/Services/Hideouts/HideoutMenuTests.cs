@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Services.MapEvents;
+﻿using Common.Util;
+using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts;
@@ -6,6 +7,7 @@ using GameInterface.Services.Hideouts.Patches.Disable;
 using GameInterface.Services.Villages.Interfaces;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -23,6 +25,28 @@ namespace E2E.Tests.Services.Hideouts;
 public class HideoutMenuTests : MapEventTestBase
 {
     public HideoutMenuTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void JoinOption_IsHiddenWithoutAnEncounteredParty()
+    {
+        var client = Clients.Last();
+        client.Call(() =>
+        {
+            var previousEncounter = Campaign.Current.PlayerEncounter;
+            try
+            {
+                Campaign.Current.PlayerEncounter = null;
+                Assert.False(HideoutCampaignBehaviorPatch.CanJoinHideout(new MenuCallbackArgs((MenuContext)null, null)));
+
+                Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                Assert.False(HideoutCampaignBehaviorPatch.CanJoinHideout(new MenuCallbackArgs((MenuContext)null, null)));
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = previousEncounter;
+            }
+        });
+    }
 
     [Theory]
     [InlineData(false)]

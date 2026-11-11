@@ -143,9 +143,11 @@ internal class HideoutCampaignBehaviorPatch
         return false;
     }
 
-    private static bool CanJoinHideout(MenuCallbackArgs args)
+    internal static bool CanJoinHideout(MenuCallbackArgs args)
     {
-        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? PlayerEncounter.EncounteredBattle;
+        // EncounteredBattle throws once a failed send-troops Leave has cleared the encounter
+        var encounteredBattle = PlayerEncounter.EncounteredParty != null ? PlayerEncounter.EncounteredBattle : null;
+        var battle = Settlement.CurrentSettlement?.Party.MapEvent ?? encounteredBattle;
         args.optionLeaveType = GameMenuOption.LeaveType.Mission;
         args.IsEnabled = Hero.MainHero?.IsWounded == false;
         return battle?.EventType == MapEvent.BattleTypes.Hideout && !battle.IsFinalized &&
