@@ -1,9 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -22,34 +20,9 @@ internal static class IssueManagerClientLifecyclePatches
     }
 
     [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
     private static class HeroKilledPatch
     {
-        [HarmonyPrefix]
-        private static bool Prefix(Hero victim, out IDisposable __state)
-        {
-            __state = null;
-            if (ModInformation.IsClient)
-            {
-                return false;
-            }
-
-            if (victim?.Issue == null)
-            {
-                return false;
-            }
-
-            if (!ContainerProvider.TryResolve<IIssueManagerLifecycleService>(out var lifecycle) ||
-                !lifecycle.TryOpenOwnerScope(victim.Issue, out var scope))
-            {
-                return true;
-            }
-
-            __state = scope;
-            return true;
-        }
-
-        [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
         [HarmonyPrefix]
         private static void DispatcherPrefix(
             Hero victim,
@@ -61,13 +34,6 @@ internal static class IssueManagerClientLifecyclePatches
             {
                 Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);
             }
-        }
-
-        [HarmonyFinalizer]
-        private static Exception Finalizer(Exception __exception, IDisposable __state)
-        {
-            __state?.Dispose();
-            return __exception;
         }
     }
 
