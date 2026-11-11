@@ -2589,7 +2589,8 @@ public class VillageHostileActionTests : MapEventTestBase
 
             if (savedOnV148)
             {
-                // v1.4.8 saved the settlement on the map event, and only AfterLoad refills the component's, for listed events
+                // A v1.4.8 save has no component settlement, and an unlisted event also gets no back-reference,
+                // because AfterLoad only refills them for listed events
                 mapEvent.Component.MapEvent = null!;
                 mapEvent.SetMapEventSettlement(null!);
             }
