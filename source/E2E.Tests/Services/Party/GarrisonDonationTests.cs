@@ -4,7 +4,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.Party.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
@@ -12,7 +11,6 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
@@ -32,25 +30,31 @@ public class GarrisonDonationTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
 
-    // A donate screen Done after the party left the town is refused, so the party keeps the troops.
+    // A donation Done that lands after the party left the town keeps the troops in the party.
     [Fact]
-    public void DonationDone_AfterLeavingTheTown_IsRefused()
+    public void DonationAfterLeavingTheTown_KeepsTheTroops()
     {
-        string characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        bool result = true;
-        bool runOriginal = true;
+        var fixture = CreateFixture(troopCount: 3);
+        Server.Call(() => Resolve(fixture).Party.CurrentSettlement = null);
 
-        Client.Call(() =>
+        Send(fixture, new[]
         {
-            Assert.Null(Hero.MainHero.CurrentSettlement);
-            TroopRoster roster = TroopRoster.CreateDummyTroopRoster();
-            roster.AddToCounts(Client.GetRegisteredObject<CharacterObject>(characterId), 3);
-
-            runOriginal = PartyScreenHelperPatches.DonateGarrisonDoneHandlerPrefix(ref result, roster);
+            new PartyScreenCommandData(
+                PartyScreenLogic.PartyCommandCode.TransferTroop,
+                PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member,
+                Server.GetHandle<CharacterObject>(fixture.TroopId),
+                number: 3,
+                woundedNumber: 0,
+                upgradeTarget: 0),
         });
 
-        Assert.False(runOriginal);
-        Assert.False(result);
+        Server.Call(() =>
+        {
+            var state = Resolve(fixture);
+            Assert.Null(state.Settlement.Town.GarrisonParty);
+            Assert.Equal(3, state.Party.MemberRoster.GetTroopCount(state.Troop));
+        });
     }
 
     // A Done with nothing moved arrives with null commands and must not create a garrison.

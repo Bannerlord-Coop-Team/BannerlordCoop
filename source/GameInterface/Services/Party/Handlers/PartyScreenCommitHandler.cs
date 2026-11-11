@@ -149,10 +149,12 @@ internal class PartyScreenCommitHandler : IHandler
             if (!playerManager.IsSenderControllingHero(obj.Who, message.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
             // The party can be gone by now, for example after a capture that landed before this commit.
-            if (mainHero.PartyBelongedTo == null) return;
-
-            var rejections = commandProcessor.Apply(mainHero, message, requester);
-            messageBroker.Publish(this, new ApplyTroopRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData));
+            IReadOnlyList<string> rejections = new[] { "you no longer have a party" };
+            if (mainHero.PartyBelongedTo != null)
+            {
+                rejections = commandProcessor.Apply(mainHero, message, requester);
+                messageBroker.Publish(this, new ApplyTroopRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData));
+            }
 
             if (rejections.Count > 0 && requester != null)
             {

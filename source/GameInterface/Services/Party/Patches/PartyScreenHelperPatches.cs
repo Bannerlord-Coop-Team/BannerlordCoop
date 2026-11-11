@@ -2,7 +2,6 @@
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Helpers;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -33,10 +32,9 @@ internal class PartyScreenHelperPatches
 
     [HarmonyPatch(nameof(PartyScreenHelper.DonateGarrisonDoneHandler))]
     [HarmonyPrefix]
-    public static bool DonateGarrisonDoneHandlerPrefix(ref bool __result, TroopRoster leftMemberRoster)
+    public static bool DonateGarrisonDoneHandlerPrefix(ref bool __result)
     {
-        // The party already left the town, so no garrison takes the troops and a Done would lose them
-        __result = Hero.MainHero.CurrentSettlement != null || leftMemberRoster.Count == 0;
+        __result = true;
         return false;
     }
 

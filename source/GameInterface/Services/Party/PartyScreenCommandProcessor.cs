@@ -71,8 +71,6 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         INetwork network,
         ISendCoalescer sendCoalescer = null)
     {
-        this.network = network;
-        this.sendCoalescer = sendCoalescer;
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.troopRosterInterface = troopRosterInterface;
@@ -81,6 +79,8 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.commitments = commitments;
         this.sessionInventoryPlayerData = sessionInventoryPlayerData;
+        this.network = network;
+        this.sendCoalescer = sendCoalescer;
     }
 
     public IReadOnlyList<string> Apply(Hero mainHero, NetworkCommitPartyScreen message, NetPeer requester)
@@ -174,7 +174,7 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
                 !villageHostileActionInterface.TryConsumeForceTransfer(message.ForceTransferId, partyId, out var pool) ||
                 !objectManager.TryGetObjectWithLogging<CharacterObject>(pool.TroopId, out var poolTroop))
             {
-                failure = "The village has no recruits left to give.";
+                failure = "the village has no recruits left to give";
                 return false;
             }
 
@@ -343,8 +343,9 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         foreach (var entry in commit.PendingRightPrisoners)
         {
             if (entry.Value <= 0 || !entry.Key.HeroObject.IsPlayerHero()) continue;
+            var releasePosition = party.CurrentSettlement != null ? party.CurrentSettlement.GatePosition : party.Position;
             messageBroker.Publish(this, new PlayerCaptivityEndedByServer(
-                entry.Key.HeroObject, EndCaptivityDetail.ReleasedByChoice, null, GetReleasePosition(party)));
+                entry.Key.HeroObject, EndCaptivityDetail.ReleasedByChoice, null, releasePosition));
         }
 
         var movedLeft = new FlattenedTroopRoster(4);
@@ -539,9 +540,6 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
     // Same id the inventory screen saves its locks under, see PartyScreenLogic.GetItemLockStringID.
     private static string GetItemLockId(EquipmentElement element)
         => element.Item.StringId + (element.ItemModifier?.StringId ?? string.Empty);
-
-    private static CampaignVec2 GetReleasePosition(MobileParty party)
-        => party.CurrentSettlement != null ? party.CurrentSettlement.GatePosition : party.Position;
 
     /// <summary>
     /// One side of the screen: a real roster the server edits, or a roster only the client has, kept as counts.
