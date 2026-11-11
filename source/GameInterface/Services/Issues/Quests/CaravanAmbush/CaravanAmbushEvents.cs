@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Common.Network;
 using System;
 using System.Linq;
@@ -28,15 +29,17 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
     private readonly INetwork network;
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
+    private readonly IPlayerManager players;
 
     public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
-        INetwork network, IObjectManager objects, IIssueOwnerResolver owners)
+        INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players)
     {
         this.dispatcher = dispatcher;
         this.publisher = publisher;
         this.network = network;
         this.objects = objects;
         this.owners = owners;
+        this.players = players;
     }
 
     public void Run(Action<Quest> action)
@@ -86,8 +89,9 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         if (issue == null || quest._caravanParty == null ||
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        network.SendAll(new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
+            !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
+            !players.TryGetPeer(controllerId, out var peer)) return;
+        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
     }
 
     public void Release(Quest quest, bool completing = false)
