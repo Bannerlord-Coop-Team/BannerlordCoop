@@ -5,7 +5,7 @@ using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Surrogates;
 using System.Collections.Generic;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using Xunit;
 
