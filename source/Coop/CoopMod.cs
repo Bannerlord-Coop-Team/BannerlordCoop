@@ -245,7 +245,7 @@ namespace Coop
                 maxLogFileSizeBytes,
                 preservedLogBeginningBytes,
                 compactedLogFileSizeBytes)));
-            activeLogFilePath = logFile.Path;
+            activeLogFilePath = logFile.OpenedPath;
 
             // The first event freezes the configuration, so this stays last.
             Logger = LogManager.GetLogger<CoopMod>();

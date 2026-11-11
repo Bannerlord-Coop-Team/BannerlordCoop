@@ -31,14 +31,14 @@ public class LogFileOpenerTests : IDisposable
             if (path == LogPath) throw new IOException("held by another program");
         });
 
-        Assert.Equal(ProcessLogPath, logFile.Path);
+        Assert.Equal(ProcessLogPath, logFile.OpenedPath);
         Assert.False(File.Exists(ProcessLogPath));
     }
 
     [Fact]
-    public void Open_NoPathOpens_ReturnsNull()
+    public void Open_NoPathOpens_OpensNoPath()
     {
-        Assert.Null(opener.Open(_ => throw new IOException("held by another program")).Path);
+        Assert.Null(opener.Open(_ => throw new IOException("held by another program")).OpenedPath);
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public class LogFileOpenerTests : IDisposable
 
         var logFile = secondInstance.Open(_ => { });
 
-        Assert.Equal(Path.Combine(tempRoot, "Coop_client_5678.log"), logFile.Path);
+        Assert.Equal(Path.Combine(tempRoot, "Coop_client_5678.log"), logFile.OpenedPath);
         Assert.Equal("live session", File.ReadAllText(LogPath));
         Assert.False(File.Exists(Path.Combine(tempRoot, "Coop_client.prev.log")));
     }
@@ -65,7 +65,7 @@ public class LogFileOpenerTests : IDisposable
         // A reader like tail -f or the crash reporter's copy, which allows delete.
         using (new FileStream(LogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
         {
-            Assert.Equal(LogPath, opener.Open(_ => { }).Path);
+            Assert.Equal(LogPath, opener.Open(_ => { }).OpenedPath);
         }
 
         Assert.Equal("last session", File.ReadAllText(previousLogPath));

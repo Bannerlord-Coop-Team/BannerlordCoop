@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Serilog;
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -10,8 +12,8 @@ namespace Common.Logging;
 /// </summary>
 public interface ILogFileOpener : IDisposable
 {
-    /// <summary>Runs <paramref name="openSink"/> on the log path and returns the path it opened and what failed.</summary>
-    OpenedLogFile Open(Action<string> openSink);
+    /// <summary>Runs <paramref name="openSink"/> on the log path and returns the path it opened and the warnings to log.</summary>
+    LogFileOpenResult Open(Action<string> openSink);
 }
 
 /// <inheritdoc />
@@ -35,22 +37,30 @@ public class LogFileOpener : ILogFileOpener
     }
 
     /// <inheritdoc />
-    public OpenedLogFile Open(Action<string> openSink)
+    public LogFileOpenResult Open(Action<string> openSink)
     {
+        var warnings = new List<Action<ILogger>>();
         var canonicalLogClaimed = TryClaimCanonicalLog();
         PruneProcessLogs();
 
         // Another live process owns the canonical log, so this one logs under its process id.
         var logPath = canonicalLogClaimed ? canonicalLogPath : processLogPath;
         var keepFailure = KeepPreviousLog(logPath);
+        if (keepFailure != null)
+            warnings.Add(logger => logger.Warning(keepFailure, "Log {Path} could not be kept as the previous log", logPath));
 
         var openFailure = TryOpen(logPath, openSink);
-        if (openFailure == null) return new OpenedLogFile(logPath, logPath, keepFailure, null);
-        if (!canonicalLogClaimed) return new OpenedLogFile(null, logPath, keepFailure, openFailure);
+        if (openFailure == null) return new LogFileOpenResult(logPath, warnings);
+
+        // Without the canonical claim the log is already the process-id log, so there is nothing to fall back to.
+        if (!canonicalLogClaimed) return NoLogFile(openFailure, warnings);
 
         // A program holding the log open (an editor, a backup tool) makes the sink throw, so the process-id log takes over.
-        var openedPath = TryOpen(processLogPath, openSink) == null ? processLogPath : null;
-        return new OpenedLogFile(openedPath, logPath, keepFailure, openFailure);
+        warnings.Add(logger => logger.Warning(openFailure, "Log {Path} could not be opened; trying {FallbackPath}", logPath, processLogPath));
+        var fallbackFailure = TryOpen(processLogPath, openSink);
+        if (fallbackFailure != null) return NoLogFile(fallbackFailure, warnings);
+
+        return new LogFileOpenResult(processLogPath, warnings);
     }
 
     /// <summary>Releases the claim on the canonical log.</summary>
@@ -138,6 +148,13 @@ public class LogFileOpener : ILogFileOpener
         {
             return exception;
         }
+    }
+
+    // Records the failure that left the session with no log file, and returns a result with no opened path.
+    private static LogFileOpenResult NoLogFile(Exception failure, List<Action<ILogger>> warnings)
+    {
+        warnings.Add(logger => logger.Warning(failure, "No log file could be opened; this session writes no log file"));
+        return new LogFileOpenResult(null, warnings);
     }
 
     // A file another program holds, or one this process may not touch, rather than a bug in the caller.
