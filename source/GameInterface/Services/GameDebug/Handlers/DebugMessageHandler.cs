@@ -74,6 +74,7 @@ internal class DebugMessageHandler : IHandler
     private void Handle(MessagePayload<SendInformationMessage> payload)
     {
         var text = payload.What.Text;
+        Logger.Information("Information message: {Text}", text);
         // DisplayMessage touches UI, so run it on the main thread. No campaign guard: these
         // messages also fire outside a loaded campaign (connecting, disconnected, etc.).
         GameThread.Run(() =>

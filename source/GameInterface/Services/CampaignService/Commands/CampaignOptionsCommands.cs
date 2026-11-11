@@ -58,6 +58,33 @@ internal class CampaignOptionsCommands
         }
     }
 
+    /// <summary>
+    /// Runs the engine's config.cheat_mode console command, which live testing can't call directly.
+    /// </summary>
+    public sealed class CampaignOptionsCheatModeCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.campaign_options";
+
+        public string Name => "cheat_mode";
+
+        public string Description => "Runs vanilla config.cheat_mode with the given value.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("value", "1 to turn cheat mode on, 0 to turn it off.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            // config.cheat_mode lives in the native console, not in CommandLineFunctionality.
+            string output = TaleWorlds.Engine.Utilities.ExecuteCommandLineCommand("config.cheat_mode " + strings[0]);
+            TaleWorlds.Engine.NativeConfig.OnConfigChanged();
+            return Succeeded($"{output} CheatMode={TaleWorlds.Core.Game.Current?.CheatMode}");
+        }
+    }
+
     public sealed class CampaignOptionsAutoAllocateClanMemberPerksCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.campaign_options";
