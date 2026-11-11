@@ -216,7 +216,7 @@ namespace Coop
         private static ILogFileOpener logFileOpener;
 
         // Created in SetupLogging, not here, because CoopMod's type initializer runs before the check for a foreign Common.dll.
-        private static ISessionSummarySink SessionSummary;
+        private static ISessionSummarySink sessionSummary;
 
         // Opens this session's log file and configures the root logger, before anything logs.
         private void SetupLogging()
@@ -226,10 +226,10 @@ namespace Coop
             const long compactedLogFileSizeBytes = 28L * 1024 * 1024;
             var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-            SessionSummary = new SessionSummarySink(LogManager.GetLogger<SessionSummarySink>());
+            sessionSummary = new SessionSummarySink(LogManager.GetLogger<SessionSummarySink>());
             var configuration = LogManager.Configuration
                 .Enrich.WithProcessId()
-                .WriteTo.Sink(SessionSummary);
+                .WriteTo.Sink(sessionSummary);
 #if DEBUG
             configuration.MinimumLevel.Debug();
 #else
@@ -249,7 +249,7 @@ namespace Coop
 
             // The first event freezes the configuration, so this stays last.
             Logger = LogManager.GetLogger<CoopMod>();
-            logFile.LogFailures(Logger);
+            logFile.LogWarnings(Logger);
         }
 
         private void CoopLogHeader(IModuleInfoProvider moduleInfoProvider)
@@ -479,22 +479,7 @@ namespace Coop
 
 #if DEBUG
             if (isAutoConnect && LiveTestControlServer.IsEnabled(Environment.GetCommandLineArgs()))
-            {
-                // The live-test control server reads this session's log and refuses to start without one.
-                if (activeLogFilePath == null)
-                {
-                    Logger.Warning("Live-test control was not started: this session has no log file");
-                }
-                else
-                {
-                    liveTestControlServer = new LiveTestControlServer(
-                        isServer,
-                        activeLogFilePath,
-                        isDeferredClientJoin,
-                        () => autoConnectArgumentsValid && Coop.StartAsClient(autoConnectConfiguration));
-                    liveTestControlServer.Start();
-                }
-            }
+                TryStartLiveTestControl();
 #endif
 
             // Skip startup splash screen
@@ -558,6 +543,25 @@ namespace Coop
             #endregion
         }
 
+#if DEBUG
+        // Starts the live-test control server, which reads this session's log and can't start without one.
+        private void TryStartLiveTestControl()
+        {
+            if (activeLogFilePath == null)
+            {
+                Logger.Warning("Live-test control was not started: this session has no log file");
+                return;
+            }
+
+            liveTestControlServer = new LiveTestControlServer(
+                isServer,
+                activeLogFilePath,
+                isDeferredClientJoin,
+                () => autoConnectArgumentsValid && Coop.StartAsClient(autoConnectConfiguration));
+            liveTestControlServer.Start();
+        }
+#endif
+
         protected override void OnGameStart(Game game, IGameStarter gameStarterObject)
         {
             base.OnGameStart(game, gameStarterObject);
@@ -613,7 +617,7 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
-            SessionSummary?.WriteSummary("exit");
+            sessionSummary?.WriteSummary("exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -803,7 +807,7 @@ namespace Coop
 
             Logger.Fatal(ex, "Unhandled exception");
             Logger.Fatal(ex.StackTrace);
-            SessionSummary?.WriteSummary("crash");
+            sessionSummary?.WriteSummary("crash");
             // The file sink flushes every event; this sends Seq's buffered events, if a Seq server is listening.
             LogManager.CloseAndFlush(TimeSpan.FromSeconds(1));
         }

@@ -22,7 +22,7 @@ public sealed class LogFileOpenResult
     public string OpenedPath { get; }
 
     /// <summary>Writes the recorded warnings to <paramref name="logger"/>.</summary>
-    public void LogFailures(ILogger logger)
+    public void LogWarnings(ILogger logger)
     {
         foreach (var warning in warnings)
             warning(logger);
