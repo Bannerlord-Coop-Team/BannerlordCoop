@@ -326,9 +326,11 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         var playersInside = rewards.Settlement.Parties.Where(playerManager.Contains).ToArray();
         // Native PlayerEncounter.DoEnd clears the hideout through its component; the dedicated server has no player encounter.
         rewards.Component.OnHideoutCleared(rewards.Settlement);
-        // Army members follow their leader out, so only parties that left on their own wait at the gate.
-        foreach (var party in playersInside.Where(party => party.CurrentSettlement == null && party.AttachedTo == null))
+        foreach (var party in playersInside)
         {
+            // Army members follow their leader out, so only parties that left on their own wait at the gate.
+            if (party.CurrentSettlement != null || party.AttachedTo != null) continue;
+
             party.Position = rewards.Settlement.GatePosition;
             party.SetMoveModeHold();
         }
