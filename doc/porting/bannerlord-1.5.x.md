@@ -581,12 +581,14 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     in co-op anyway, since nothing syncs them (#3837, #3838). Re-enabling needs the wreckage to get an
     id (a sync registry, or `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after
     proving `CreateWreckage`'s log entry and map interactable work under co-op).
+    `SavedWreckageRemovalPatch` has to be removed at the same time, or narrowed back to id-less
+    entries.
   - Saved wreckage removal: `SavedWreckageRemovalPatch` is a prefix on
     `CampaignObjectManager.InitializeOnLoad` (`OnGameLoaded` fires too late) and removes every saved
     wreckage before the object lists are built, on the server and on clients, logging "Dropped
-    {Count} saved battle wreckages" (#4582). Id-less wreckages throw there, and a valid one (for
-    example from a single-player v1.5 campaign) would never expire, because the server no longer
-    registers the hourly tick, and clicking it opens a menu clients never registered.
+    {Count} saved battle wreckages" (#4582). Id-less wreckages throw there. A valid one (for example
+    from a single-player v1.5 campaign) would never expire, because the server no longer registers
+    the hourly tick. Clicking one opens a menu clients never registered.
     The map visuals are built later from `Campaign.Wreckages`, so none are drawn. A dropped wreckage
     stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry) and in the
     disabled behavior's `_encounteredBattleWreckage`. Saves already written by an affected server

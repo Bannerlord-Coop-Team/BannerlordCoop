@@ -79,8 +79,8 @@ internal class DisableBattleWreckageCampaignBehavior
 }
 
 /// <summary>
-/// Drops every saved wreckage before the object lists are built, since with the behavior off they never
-/// expire and clicking one opens a menu that was never registered. Id-less ones also throw while loading.
+/// Goes with <see cref="DisableBattleWreckageCampaignBehavior"/>: drops every saved wreckage before the object
+/// lists are built, since with RegisterEvents skipped they never expire and their menu is never registered.
 /// </summary>
 [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
 internal class SavedWreckageRemovalPatch
@@ -98,11 +98,8 @@ internal class SavedWreckageRemovalPatch
     // Clears the saved wreckage list and returns how many entries it held.
     internal static int RemoveSavedWreckages(CampaignObjectManager manager)
     {
-        var wreckages = manager._wreckages;
-        if (wreckages == null) return 0;
-
-        var count = wreckages.Count;
-        wreckages.Clear();
+        var count = manager._wreckages.Count;
+        manager._wreckages.Clear();
         return count;
     }
 }
