@@ -99,7 +99,7 @@ internal sealed class LandLordCompanyOfTroubleSetupCoopCommand : ICoopCommand
         // The company's daily theft only takes food
         if (playerParty.ItemRoster.TotalFood == 0)
         {
-            playerParty.ItemRoster.AddToCounts(DefaultItems.Grain, 5);
+            playerParty.ItemRoster.AddToCounts(DefaultItems.Grain, 30);
         }
 
         return new CoopCommandResult(true, Report(playerHero, playerParty, lord, (Issue)lord.Issue));
