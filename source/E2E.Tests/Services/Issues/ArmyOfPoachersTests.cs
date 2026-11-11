@@ -500,7 +500,8 @@ public class ArmyOfPoachersTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void OnlyARaidAtTheSelectedVillageFailsTheQuest(bool selectedVillage)
+    // v1.5.7 cancels the quest when its village is raided (QuestCanceledTargetVillageRaided); v1.4.8 failed it.
+    public void OnlyARaidAtTheSelectedVillageCancelsTheQuest(bool selectedVillage)
     {
         Accept();
         Server.Call(() =>
@@ -512,7 +513,7 @@ public class ArmyOfPoachersTests : IDisposable
         });
 
         if (selectedVillage)
-            Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+            Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         else
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }

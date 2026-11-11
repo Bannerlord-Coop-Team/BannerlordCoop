@@ -45,6 +45,12 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     private static void ModelOrphanedAfterLoad(MapEvent mapEvent)
     {
         mapEvent.State = MapEventState.WaitingRemoval;
+        ModelUnlistedAfterLoad(mapEvent);
+    }
+
+    // Clears the state the load restores only for listed events, as a save leaves it for an event the manager dropped.
+    private static void ModelUnlistedAfterLoad(MapEvent mapEvent)
+    {
         TrackerField(mapEvent) = null;
         var component = Assert.IsType<FieldBattleEventComponent>(mapEvent.Component);
         component.MapEvent = null!;
@@ -90,6 +96,55 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.True(aiParty.Ai.RethinkAtNextHourlyTick);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void CleanUpLoadedMapEvents_UnlistedLivePlayerEvent_RestoresUnsavedStateAndFinalizesFully()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("offline-unlisted-player", heroId, mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var aiParty));
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            ModelUnlistedAfterLoad(mapEvent);
+
+            RunRepair(originalsAllowed: true);
+
+            // Without the back-reference the field battle party removal throws before the component finalizes
+            Assert.True(mapEvent.Component._isFinished);
+            Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
+            Assert.Null(aiParty.Party.MapEventSide);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void CleanUpLoadedMapEvents_UnlistedLiveEventWithLeaderlessSide_StillReleasesParties()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        // a second defender, because the field battle reads its position lists only to place a non-leader party
+        var extraDefenderId = JoinNewServerPartyToSide(mapEventContext.MapEventId, BattleSideEnum.Defender);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(extraDefenderId, out var extraDefender));
+            ModelUnlistedAfterLoad(mapEvent);
+
+            // the field battle cannot derive its settlement without both leader parties
+            mapEvent.DefenderSide.LeaderParty = null!;
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+            Assert.Null(extraDefender.Party.MapEventSide);
+        }, JoinDisabledMethods);
     }
 
     [Fact]
