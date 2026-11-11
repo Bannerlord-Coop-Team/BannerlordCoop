@@ -18,9 +18,9 @@ public class AiMilitaryBehaviorPatchesTests : MapEventTestBase
     public AiMilitaryBehaviorPatchesTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(true, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, true)]
+    [InlineData(true, true, false)] // protected, player attacked last: skipped
+    [InlineData(false, true, true)] // not protected, player attacked last: suitable
+    [InlineData(true, false, true)] // protected, another party attacked last: suitable
     public void Settlement_IsSkippedOnlyWhileProtectedFromItsLastAttacker(bool isProtected, bool playerAttackedLast, bool expectedSuitable)
     {
         var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
@@ -43,7 +43,8 @@ public class AiMilitaryBehaviorPatchesTests : MapEventTestBase
                 if (isProtected)
                     DefaultMobilePartyAIModelPatches.PreventAttacksUntil(aiParty, playerParty, Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(12));
 
-                suitable = new AiMilitaryBehavior().CheckIfSettlementIsSuitableForMilitaryAction(settlement, aiParty, Army.ArmyTypes.Besieger, false);
+                suitable = new AiMilitaryBehavior().CheckIfSettlementIsSuitableForMilitaryAction(
+                    settlement, aiParty, Army.ArmyTypes.Besieger, isCalculatingForNewArmyCreation: false);
             }
             finally
             {

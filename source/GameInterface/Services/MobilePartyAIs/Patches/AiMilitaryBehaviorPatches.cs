@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 /// <summary>
-/// Makes the main party checks of <see cref="AiMilitaryBehavior"/> read co-op player parties. Its listeners
+/// Makes the last attacker check of <see cref="AiMilitaryBehavior"/> read co-op player parties. Its listeners
 /// are only registered on the server (<see cref="AiEngagePartyBehaviorPatches"/>).
 /// </summary>
 [HarmonyPatch(typeof(AiMilitaryBehavior))]

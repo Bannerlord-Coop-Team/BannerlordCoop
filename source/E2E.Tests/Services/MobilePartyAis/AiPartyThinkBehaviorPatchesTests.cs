@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MobilePartyAis;
 
 /// <summary>
-/// Verifies a player clan changing kingdom holds the nearby lords that chased its player party, like vanilla
+/// Verifies a player clan changing kingdom holds the nearby lords that chased its player parties, like vanilla
 /// does around the main party.
 /// </summary>
 public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
@@ -20,39 +20,56 @@ public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
     public AiPartyThinkBehaviorPatchesTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void ClanChangedKingdom_HoldsOnlyLordsNoLongerAtWarThatChaseItsPlayerParty()
+    public void ClanChangedKingdom_HoldsOnlyLordsNoLongerAtWarThatChaseItsPlayerParties()
     {
         var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
-        var (_, otherPlayerPartyId) = CreatePlayerHeroParty("PlayerTwo");
+        var (_, clanmatePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        var aiPartyId = CreateServerParty();
         var peacefulLordId = CreateServerParty();
+        var clanmateChaserId = CreateServerParty();
         var warLordId = CreateServerParty();
-        var otherChaserId = CreateServerParty();
+        var aiPartyChaserId = CreateServerParty();
 
         Server.Call(() =>
         {
             AddEncounterModel();
             var playerParty = Server.GetRegisteredObject<MobileParty>(playerPartyId);
-            var otherPlayerParty = Server.GetRegisteredObject<MobileParty>(otherPlayerPartyId);
+            var clanmateParty = Server.GetRegisteredObject<MobileParty>(clanmatePartyId);
+            var aiParty = Server.GetRegisteredObject<MobileParty>(aiPartyId);
             var peacefulLord = Server.GetRegisteredObject<MobileParty>(peacefulLordId);
+            var clanmateChaser = Server.GetRegisteredObject<MobileParty>(clanmateChaserId);
             var warLord = Server.GetRegisteredObject<MobileParty>(warLordId);
-            var otherChaser = Server.GetRegisteredObject<MobileParty>(otherChaserId);
-            Assert.Contains(playerParty.WarPartyComponent, playerParty.ActualClan.WarPartyComponents);
+            var aiPartyChaser = Server.GetRegisteredObject<MobileParty>(aiPartyChaserId);
+            var playerClan = playerParty.ActualClan;
 
-            PlaceNear(playerParty, otherPlayerParty, 1f);
+            // The harness gives every party its own clan, so move the second player into the first one's.
+            clanmateParty.ActualClan = playerClan;
+            Assert.Contains(playerParty.WarPartyComponent, playerClan.WarPartyComponents);
+            Assert.Contains(clanmateParty.WarPartyComponent, playerClan.WarPartyComponents);
+
+            PlaceNear(playerParty, clanmateParty, 1f);
+            PlaceNear(playerParty, aiParty, 1.5f);
             PlaceNear(playerParty, peacefulLord, 2f);
+            PlaceNear(playerParty, clanmateChaser, 2.5f);
             PlaceNear(playerParty, warLord, 3f);
-            PlaceNear(playerParty, otherChaser, 4f);
+            PlaceNear(playerParty, aiPartyChaser, 3.5f);
             Chase(peacefulLord, playerParty);
+            Chase(clanmateChaser, clanmateParty);
             Chase(warLord, playerParty);
-            Chase(otherChaser, otherPlayerParty);
-            FactionManager.DeclareWar(warLord.MapFaction, playerParty.MapFaction);
+            Chase(aiPartyChaser, aiParty);
+            FactionManager.DeclareWar(warLord.MapFaction, playerClan.MapFaction);
 
             new AiPartyThinkBehavior().OnClanChangedKingdom(
-                playerParty.ActualClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+                playerClan,
+                oldKingdom: null,
+                newKingdom: null,
+                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom,
+                showNotification: false);
 
             Assert.Equal(AiBehavior.Hold, peacefulLord.DefaultBehavior);
+            Assert.Equal(AiBehavior.Hold, clanmateChaser.DefaultBehavior);
             Assert.Equal(AiBehavior.EngageParty, warLord.DefaultBehavior);
-            Assert.Equal(AiBehavior.EngageParty, otherChaser.DefaultBehavior);
+            Assert.Equal(AiBehavior.EngageParty, aiPartyChaser.DefaultBehavior);
         }, MapEventDisabledMethods);
     }
 

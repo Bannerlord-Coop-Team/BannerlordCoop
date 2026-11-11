@@ -50,7 +50,7 @@ public class AiPartyThinkBehaviorInterface : IAiPartyThinkBehaviorInterface
     }
 
     // Vanilla's AiPartyThinkBehavior.OnClanChangedKingdom filter with the main party swapped for a player party.
-    internal void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
+    private static void HoldPartiesChasing(MobileParty playerParty, IEnumerable<MobileParty> nearbyParties)
     {
         foreach (var party in nearbyParties)
         {
