@@ -44,7 +44,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IObjectManager objectManager;
     private readonly IArmyDisbander armyDisbander;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
-    private readonly IOrphanedMapEventFinder orphanedMapEventFinder;
     private readonly ILoadRepairRegistryReconciler registryReconciler;
 
     public MapEventLoadCleaner(
@@ -54,7 +53,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         IObjectManager objectManager,
         IArmyDisbander armyDisbander,
         IStalledMapEventResolver stalledMapEventResolver,
-        IOrphanedMapEventFinder orphanedMapEventFinder,
         ILoadRepairRegistryReconciler registryReconciler)
     {
         this.logger = logger;
@@ -63,7 +61,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.objectManager = objectManager;
         this.armyDisbander = armyDisbander;
         this.stalledMapEventResolver = stalledMapEventResolver;
-        this.orphanedMapEventFinder = orphanedMapEventFinder;
         this.registryReconciler = registryReconciler;
     }
 
@@ -184,10 +181,15 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     {
         var releasedParties = new List<PartyBase>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
-        var orphaned = orphanedMapEventFinder.Find(GetLinkedParties(), liveMapEvents);
+        var endedMapEvents = GetLinkedParties()
+            .GroupBy(party => party.MapEventSide.MapEvent)
+            .Where(group => group.Key.IsFinalized || !liveMapEvents.Contains(group.Key))
+            .ToArray();
 
-        foreach (var mapEvent in orphaned.Finalized.Concat(orphaned.UnlistedLive))
+        foreach (var group in endedMapEvents)
         {
+            var mapEvent = group.Key;
+            var linkedParties = group.ToArray();
             try
             {
                 // First, because the settlement a v1.4.8 save kept on MapEvent must be refilled before ResetVillageState
@@ -202,12 +204,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     logger.Warning(
                         "Map event {MapEventId} is linked to {PartyCount} parties but is neither listed by the map event manager nor finalized, ending it",
                         mapEvent.StringId,
-                        orphaned.LinkedParties(mapEvent).Count);
+                        linkedParties.Length);
                     ResetVillageState(mapEvent);
                     mapEvent.State = MapEventState.WaitingRemoval;
                 }
 
-                releasedParties.AddRange(ReleaseLinkedParties(mapEvent, orphaned.LinkedParties(mapEvent), onReleased));
+                releasedParties.AddRange(ReleaseLinkedParties(mapEvent, linkedParties, onReleased));
             }
             catch (Exception e)
             {

@@ -988,7 +988,6 @@ public class MapEventLoadCleanerTests : MapEventTestBase
                 Server.ObjectManager,
                 Server.Resolve<IArmyDisbander>(),
                 Server.Resolve<IStalledMapEventResolver>(),
-                new OrphanedMapEventFinder(),
                 Server.Resolve<ILoadRepairRegistryReconciler>());
             var reportedParties = new List<PartyBase>();
 
