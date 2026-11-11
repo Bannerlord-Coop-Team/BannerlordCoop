@@ -260,9 +260,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MenuOptionsRefresher>().As<IMenuOptionsRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenLockPreserver>().As<IPartyScreenLockPreserver>().InstancePerDependency();
-        // Shared so the recording patches and the Done patch read the same command list.
-        builder.RegisterType<PartyScreenCommandTracker>().As<IPartyScreenCommandTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<PartyScreenCommandProcessor>().As<IPartyScreenCommandProcessor>().InstancePerDependency();
         builder.RegisterType<PlayerTroopXpRelevance>().As<IPlayerTroopXpRelevance>().InstancePerDependency();
         builder.RegisterType<PrisonerSaleValidator>().As<IPrisonerSaleValidator>().InstancePerDependency();
         builder.RegisterType<PlayerRansomReleaseSettlementProvider>().As<IPlayerRansomReleaseSettlementProvider>().InstancePerDependency();

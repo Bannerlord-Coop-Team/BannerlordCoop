@@ -35,7 +35,7 @@ namespace GameInterface.Services.Party;
 /// Replays a player's party screen commands on the server, applying or rejecting each one on its own,
 /// then runs the effects of the screen's vanilla done handler.
 /// </summary>
-internal interface IPartyScreenCommandProcessor
+internal interface IPartyScreenCommandProcessor : IGameAbstraction
 {
     /// <returns>A short description of every command that could not be applied in full.</returns>
     IReadOnlyList<string> Apply(Hero mainHero, NetworkCommitPartyScreen message, NetPeer requester);

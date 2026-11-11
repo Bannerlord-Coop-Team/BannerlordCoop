@@ -7,7 +7,7 @@ namespace GameInterface.Services.Party;
 /// <summary>
 /// Records the party screen commands that actually changed the open screen, in the order they ran.
 /// </summary>
-internal interface IPartyScreenCommandTracker
+internal interface IPartyScreenCommandTracker : IGameAbstraction
 {
     IReadOnlyList<PartyScreenLogic.PartyCommand> GetCommands(PartyScreenLogic logic);
     /// <summary>How many commands ran before the last <see cref="Save"/>.</summary>
