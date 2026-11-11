@@ -1630,7 +1630,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var friend = CreateSyncedPlayerContext("OfflinePeaceRuler", _ => false);
-        LeadPlayerPartiesEverywhere(player, friend);
+        var bystanderClient = Clients.Skip(1).First();
+        bystanderClient.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+        var bystander = CreateSyncedPlayerContext(SecondControllerId, bystanderClient);
+        LeadPlayerPartiesEverywhere(player, friend, bystander);
         string npcClanId = CreateSyncedNpcClan();
         string kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         string targetId = TestEnvironment.CreateRegisteredObject<Kingdom>();
