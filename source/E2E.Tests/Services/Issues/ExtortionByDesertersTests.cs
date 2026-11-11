@@ -1221,7 +1221,7 @@ public class ExtortionByDesertersTests : IDisposable
         var snapshot = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         var snapshotWire = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(snapshot));
         Assert.Equal(stateWire.Log.Value, entry.Value);
-        Assert.Equal(Assert.Single(snapshotWire.Logs).ToString(), entry.ToString());
+        Assert.Equal(Assert.Single(snapshotWire.Logs).Text.ToString(), entry.ToString());
         Assert.DoesNotContain("ERROR:", entry.ToString());
         output.WriteLine($"Owner single timeout after both serialized paths: {entry}");
     }
@@ -1253,10 +1253,10 @@ public class ExtortionByDesertersTests : IDisposable
     private string AssertTimeoutTextRoundTrip(Quest mirror)
     {
         var text = mirror.OnQuestTimedOutLogText;
-        var envelope = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { text });
+        var envelope = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { new IssueJournalEntry(new JournalLog(default, text)) });
         var roundTrip = Owner.DeserializeFromWire<NetworkIssueJournal>(Server.SerializeForWire(envelope));
         var rendered = AssertValidTimeoutText(text);
-        Assert.Equal(rendered, AssertValidTimeoutText(Assert.Single(roundTrip.Logs)));
+        Assert.Equal(rendered, AssertValidTimeoutText(Assert.Single(roundTrip.Logs).Text));
         return rendered;
     }
 

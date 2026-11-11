@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Surrogates;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -54,9 +55,9 @@ public class ExtortionByDesertersStateTests
         text.SetTextVariable("QUEST_GIVER", properties);
         var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
             "", "", 0, text, false));
-        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { text }));
+        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { new IssueJournalEntry(new JournalLog(default, text)) }));
 
-        foreach (var log in new[] { state.Log, Assert.Single(snapshot.Logs) })
+        foreach (var log in new[] { state.Log, Assert.Single(snapshot.Logs).Text })
         {
             Assert.Equal(text.Value, log.Value);
             var giver = Assert.IsType<TextObject>(log.Attributes["QUEST_GIVER"]);
@@ -76,8 +77,8 @@ public class ExtortionByDesertersStateTests
             new Dictionary<string, object> { ["QUEST_GIVER"] = null });
         var state = RoundTrip(new NetworkExtortionByDesertersState("headman", "issue-generation", "player-B",
             "", "", 0, text, false));
-        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { text }));
-        var ending = Assert.Single(snapshot.Logs);
+        var snapshot = RoundTrip(new NetworkIssueJournal("headman", "issue-generation", true, new[] { new IssueJournalEntry(new JournalLog(default, text)) }));
+        var ending = Assert.Single(snapshot.Logs).Text;
 
         Assert.Equal(text.Value, state.Log.Value);
         Assert.Equal(ending.Value, state.Log.Value);
