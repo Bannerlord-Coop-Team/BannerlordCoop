@@ -824,6 +824,7 @@ public class HideoutMapEventTests : MapEventTestBase
         var client = Clients.First();
         EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
 
+        // Starts from the native menu, so the client-side routing is covered too.
         client.Call(() => new HideoutCampaignBehavior().hideout_send_troops_result_failure_consequence(null),
             MapEventDisabledMethods);
 
@@ -838,6 +839,48 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Null(PlayerEncounter.Current);
             Assert.Null(MobileParty.MainParty.CurrentSettlement);
         }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void SendTroopsStart_ServerSetsTheHideoutCooldownForEveryone()
+    {
+        var raid = CreateSharedHideout(joinerJoinsBattle: false, isSendTroops: true);
+        var expectedAttackTime = CampaignTime.Zero;
+        Server.Call(() =>
+        {
+            // The server applies hideout consequences through the native behavior.
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[]
+            {
+                new HideoutCampaignBehavior(),
+            }));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            var banditClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            banditClan.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            for (var index = 0; index < Campaign.Current.Models.BanditDensityModel.NumberOfMinimumBanditPartiesInAHideoutToInfestIt; index++)
+            {
+                var bandits = BanditPartyComponent.CreateBanditParty($"SendTroopsCooldownBandits{index}", banditClan,
+                    settlement.Hideout, false, null, settlement.Position);
+                EnterSettlementAction.ApplyForParty(bandits, settlement);
+            }
+            settlement.Hideout._nextPossibleAttackTime = new CampaignTime(-1);
+            expectedAttackTime = CampaignTime.Now + Campaign.Current.Models.HideoutModel.HideoutHiddenDuration;
+            Assert.True(settlement.Hideout.IsInfested);
+        }, MapEventDisabledMethods);
+        var client = Clients.First();
+        EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
+
+        // Native sets the cooldown from the no-winner branch while the send troops raid waits.
+        client.Call(() => PlayerEncounter.Current._mapEvent.Component.UpdatePlayerEncounterState(null, out _, out _),
+            MapEventDisabledMethods);
+        Server.PumpGameThread();
+        client.PumpGameThread();
+
+        foreach (var instance in Clients.Prepend(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+                Assert.Equal(expectedAttackTime, settlement.Hideout.NextPossibleAttackTime);
+            });
     }
 
     [Fact]

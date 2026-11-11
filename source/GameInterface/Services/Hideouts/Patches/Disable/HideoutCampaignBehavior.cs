@@ -158,13 +158,6 @@ internal class HideoutCampaignBehaviorPatch
             coordinator.OpenTroopSelection(args, isDirectAssault: true);
     }
 
-    [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultFailureOnInit()
-    {
-        PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown);
-    }
-
     [HarmonyPatch("game_menu_hideout_place_on_init")]
     [HarmonyPrefix]
     private static bool GameMenuHideoutPlaceOnInit()
