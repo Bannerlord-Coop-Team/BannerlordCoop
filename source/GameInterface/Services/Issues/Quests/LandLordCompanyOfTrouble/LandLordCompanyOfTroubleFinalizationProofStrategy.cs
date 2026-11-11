@@ -84,6 +84,12 @@ internal class LandLordCompanyOfTroubleFinalizationProofStrategy : IFinalization
     // Vanilla's TryToStealItemFromPlayer without its pop-ups, which the owner's client already showed
     private static void StealFood(Quest quest)
     {
+        if (!MobileParty.MainParty.MemberRoster.Contains(quest._troubleCharacterObject))
+        {
+            Logger.Warning("The owner of {quest} has no mercenaries left to steal food", quest.StringId);
+            return;
+        }
+
         var roster = MobileParty.MainParty.ItemRoster;
 
         for (int i = 0; i < roster.Count; i++)

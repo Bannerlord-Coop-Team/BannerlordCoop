@@ -243,6 +243,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     public void FoodTheft_TheServerRemovesOneOfTheItemFromTheOwnersParty()
     {
         SetOwner();
+        GiveMercenaries(4);
 
         Server.Call(() =>
         {
@@ -593,6 +594,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     [Fact]
     public void FoodTheftOnTheOwnersClient_OnlyAsksTheServer()
     {
+        GiveMercenaries(3);
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));

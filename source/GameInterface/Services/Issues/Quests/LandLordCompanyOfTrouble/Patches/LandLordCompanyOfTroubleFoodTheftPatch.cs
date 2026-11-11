@@ -22,7 +22,8 @@ internal class LandLordCompanyOfTroubleFoodTheftPatch
             return true;
         }
 
-        if (!HasFood())
+        // The mercenaries left the party when they turned hostile, so nobody is left to steal
+        if (!HasFood() || !MobileParty.MainParty.MemberRoster.Contains(__instance._troubleCharacterObject))
         {
             return false;
         }
