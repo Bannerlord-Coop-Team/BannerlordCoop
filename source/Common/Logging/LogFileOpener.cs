@@ -72,7 +72,13 @@ public class LogFileOpener : ILogFileOpener
     {
         try
         {
-            canonicalLogClaim = new FileStream(canonicalLogPath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            canonicalLogClaim = new FileStream(
+                canonicalLogPath + ".lock",
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                bufferSize: 1,
+                FileOptions.DeleteOnClose);
             return true;
         }
         catch (Exception exception) when (IsFileUnavailable(exception))
