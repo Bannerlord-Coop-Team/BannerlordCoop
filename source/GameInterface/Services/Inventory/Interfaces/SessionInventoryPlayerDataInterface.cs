@@ -10,6 +10,7 @@ namespace GameInterface.Services.Inventory.Interfaces;
 public interface ISessionInventoryPlayerDataInterface : IGameAbstraction
 {
     void SetInventoryLocks(string playerHeroId, IEnumerable<string> lockedItemIds);
+    IReadOnlyCollection<string> GetInventoryLocks(string playerHeroId);
     void SetSortPreference(string playerHeroId, int usageType, Tuple<int, int> preference);
     void AddPlayerKeys(string playerHeroId);
 }
@@ -31,6 +32,15 @@ public class SessionInventoryPlayerDataInterface : ISessionInventoryPlayerDataIn
         if (!InventoryPlayerData.PlayerInventoryLocks.ContainsKey(playerHeroId)) return;
 
         InventoryPlayerData.PlayerInventoryLocks[playerHeroId] = (List<string>)lockedItemIds;
+    }
+
+    public IReadOnlyCollection<string> GetInventoryLocks(string playerHeroId)
+    {
+        if (InventoryPlayerData?.PlayerInventoryLocks == null ||
+            !InventoryPlayerData.PlayerInventoryLocks.TryGetValue(playerHeroId, out var locks))
+            return Array.Empty<string>();
+
+        return locks;
     }
 
     public void SetSortPreference(string playerHeroId, int usageType, Tuple<int, int> preference)
