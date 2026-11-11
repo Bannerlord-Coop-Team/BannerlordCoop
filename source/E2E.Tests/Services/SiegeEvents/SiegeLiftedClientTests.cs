@@ -62,6 +62,8 @@ public class SiegeLiftedClientTests : SiegeTestBase
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         mapEvent._state = MapEventState.WaitingRemoval;
+        // v1.5 reads the battle type, which the party's disorganized time checks, from the component
+        mapEvent.Component = ObjectHelper.SkipConstructor<FieldBattleEventComponent>();
         var side = ObjectHelper.SkipConstructor<MapEventSide>();
         AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, mapEvent);
         return side;
