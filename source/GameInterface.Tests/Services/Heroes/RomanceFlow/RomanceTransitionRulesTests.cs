@@ -24,4 +24,31 @@ public class RomanceTransitionRulesTests
     {
         Assert.Equal(expected, RomanceTransitionRules.IsAllowed(currentLevel, requestedLevel));
     }
+
+    // v1.5.4 lets a failed courtship start again once its one season cooldown has passed.
+    [Theory]
+    [InlineData(Romance.RomanceLevelEnum.FailedInCompatibility, true, true)]
+    [InlineData(Romance.RomanceLevelEnum.FailedInPracticalities, true, true)]
+    [InlineData(Romance.RomanceLevelEnum.FailedInCompatibility, false, false)]
+    [InlineData(Romance.RomanceLevelEnum.FailedInPracticalities, false, false)]
+    [InlineData(Romance.RomanceLevelEnum.Rejection, true, false)]
+    [InlineData(Romance.RomanceLevelEnum.Ended, true, false)]
+    public void IsAllowed_RestartsAFailedCourtshipOnlyAfterItsCooldown(
+        Romance.RomanceLevelEnum currentLevel,
+        bool retryCooldownExpired,
+        bool expected)
+    {
+        Assert.Equal(expected, RomanceTransitionRules.IsAllowed(
+            currentLevel, Romance.RomanceLevelEnum.CourtshipStarted, retryCooldownExpired));
+    }
+
+    [Theory]
+    [InlineData(Romance.RomanceLevelEnum.FailedInCompatibility, true)]
+    [InlineData(Romance.RomanceLevelEnum.FailedInPracticalities, true)]
+    [InlineData(Romance.RomanceLevelEnum.Rejection, false)]
+    [InlineData(Romance.RomanceLevelEnum.CourtshipStarted, false)]
+    public void IsFailedCourtship_MatchesTheLevelsVanillaRetries(Romance.RomanceLevelEnum level, bool expected)
+    {
+        Assert.Equal(expected, RomanceRetryCooldown.IsFailedCourtship(level));
+    }
 }

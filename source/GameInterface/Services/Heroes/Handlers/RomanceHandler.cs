@@ -125,11 +125,19 @@ internal class RomanceHandler : IHandler
                 return;
             }
 
+            var currentLevel = Romance.GetRomanticLevel(playerHero, targetHero);
             if (!TryApplyClientStateFields(playerHero, targetHero, request, out reason))
             {
                 Reject(peer, reason);
                 return;
             }
+
+            // Before the change, so the snapshot that the change sends carries the cooldown.
+            if (RomanceRetryCooldown.IsFailedCourtship(currentLevel) &&
+                requestedLevel == Romance.RomanceLevelEnum.CourtshipStarted)
+                RomanceRetryCooldown.Clear(targetHero);
+            else if (RomanceRetryCooldown.IsFailedCourtship(requestedLevel))
+                RomanceRetryCooldown.RecordFailure(targetHero);
 
             ChangeRomanticStateAction.Apply(playerHero, targetHero, requestedLevel);
         }, context: nameof(Handle_NetworkRequestRomanceStateChange));
@@ -248,11 +256,17 @@ internal class RomanceHandler : IHandler
                 state.Level,
                 state.ProgressToNextLevel,
                 state.LastVisit,
-                state.ScoreFromPersuasion));
+                state.ScoreFromPersuasion,
+                RomanceRetryCooldown.IsFailedCourtship(state.Level)
+                    ? RomanceRetryCooldown.LatestFailureTicks(CourtedHero(state.Person1, state.Person2))
+                    : 0));
         }
 
         return result.ToArray();
     }
+
+    // Vanilla keys the failed attempts by the courted hero, the person who is not a player.
+    private static Hero CourtedHero(Hero person1, Hero person2) => person1.IsPlayerHero() ? person2 : person1;
 
     private void ApplySnapshot(RomanceStateData[] snapshot)
     {
@@ -296,6 +310,9 @@ internal class RomanceHandler : IHandler
                 romanticState.ProgressToNextLevel = state.Data.ProgressToNextLevel;
                 romanticState.LastVisit = state.Data.LastVisit;
                 romanticState.ScoreFromPersuasion = state.Data.ScoreFromPersuasion;
+
+                if (state.Data.FailedAtTicks > 0)
+                    RomanceRetryCooldown.ReplaceWithFailure(CourtedHero(state.Person1, state.Person2), state.Data.FailedAtTicks);
             }
         }
     }

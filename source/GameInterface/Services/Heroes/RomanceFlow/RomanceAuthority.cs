@@ -27,7 +27,9 @@ internal class RomanceAuthority : IRomanceAuthority
         if (!TryValidatePair(playerHero, targetHero, out reason)) return false;
 
         var currentLevel = Romance.GetRomanticLevel(playerHero, targetHero);
-        if (!RomanceTransitionRules.IsAllowed(currentLevel, requestedLevel))
+        var retryCooldownExpired = RomanceRetryCooldown.IsFailedCourtship(currentLevel) &&
+            RomanceRetryCooldown.HasRetryCooldownExpired(targetHero);
+        if (!RomanceTransitionRules.IsAllowed(currentLevel, requestedLevel, retryCooldownExpired))
         {
             reason = $"Cannot change romance from {currentLevel} to {requestedLevel}.";
             return false;
@@ -128,16 +130,19 @@ internal static class RomanceTransitionRules
 {
     public static bool IsAllowed(
         Romance.RomanceLevelEnum currentLevel,
-        Romance.RomanceLevelEnum requestedLevel)
+        Romance.RomanceLevelEnum requestedLevel,
+        bool retryCooldownExpired = false)
         => requestedLevel switch
         {
             Romance.RomanceLevelEnum.MatchMadeByFamily =>
                 currentLevel == Romance.RomanceLevelEnum.Untested,
-            // Vanilla's clan leader dialogue re-applies CourtshipStarted to a pair already at it.
+            // Vanilla's clan leader dialogue re-applies CourtshipStarted to a pair already at it, and the
+            // retry dialogue starts a failed courtship again after its cooldown.
             Romance.RomanceLevelEnum.CourtshipStarted =>
                 currentLevel == Romance.RomanceLevelEnum.Untested ||
                 currentLevel == Romance.RomanceLevelEnum.MatchMadeByFamily ||
-                currentLevel == Romance.RomanceLevelEnum.CourtshipStarted,
+                currentLevel == Romance.RomanceLevelEnum.CourtshipStarted ||
+                (retryCooldownExpired && RomanceRetryCooldown.IsFailedCourtship(currentLevel)),
             Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible =>
                 currentLevel == Romance.RomanceLevelEnum.CourtshipStarted,
             Romance.RomanceLevelEnum.CoupleAgreedOnMarriage =>
