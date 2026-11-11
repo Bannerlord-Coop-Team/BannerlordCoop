@@ -4,7 +4,6 @@ using Serilog.Events;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 
 namespace Common.Logging;
 
@@ -22,48 +21,48 @@ public sealed class SessionSummarySink : ISessionSummarySink
 {
     private const string UnknownSource = "unknown";
 
-    // Emit runs on whatever thread logged; warnings are interlocked, and errors and fatal take the
-    // lock so their totals always agree with the per-source counts.
     private readonly object gate = new object();
     private readonly Dictionary<string, int> errorsBySource = new Dictionary<string, int>(StringComparer.Ordinal);
     private int warnings;
-    private int errors;
     private int fatal;
-    private int written;
+    private bool written;
 
     /// <summary>Counts the event when it is a Warning, Error or Fatal.</summary>
     public void Emit(LogEvent logEvent)
     {
-        switch (logEvent.Level)
+        if (logEvent.Level < LogEventLevel.Warning) return;
+
+        lock (gate)
         {
-            case LogEventLevel.Warning:
-                Interlocked.Increment(ref warnings);
-                break;
-            case LogEventLevel.Error:
-                CountError(logEvent);
-                break;
-            case LogEventLevel.Fatal:
-                lock (gate)
-                {
+            switch (logEvent.Level)
+            {
+                case LogEventLevel.Warning:
+                    warnings++;
+                    break;
+                case LogEventLevel.Error:
+                    var source = GetSource(logEvent);
+                    errorsBySource.TryGetValue(source, out var count);
+                    errorsBySource[source] = count + 1;
+                    break;
+                case LogEventLevel.Fatal:
                     fatal++;
-                }
-                break;
+                    break;
+            }
         }
     }
 
     /// <inheritdoc />
     public bool WriteSummary(ILogger logger, string reason)
     {
-        if (Interlocked.Exchange(ref written, 1) == 1) return false;
-
-        // Snapshot before writing so the summary lines can never count themselves.
-        int warningCount = Volatile.Read(ref warnings);
-        int errorCount;
+        int warningCount;
         int fatalCount;
         KeyValuePair<string, int>[] sources;
         lock (gate)
         {
-            errorCount = errors;
+            if (written) return false;
+
+            written = true;
+            warningCount = warnings;
             fatalCount = fatal;
             sources = errorsBySource
                 .OrderByDescending(entry => entry.Value)
@@ -72,30 +71,23 @@ public sealed class SessionSummarySink : ISessionSummarySink
         }
 
         logger.Information("[Session] summary reason={Reason:l} warnings={Warnings} errors={Errors} fatal={Fatal}",
-            reason, warningCount, errorCount, fatalCount);
+            reason, warningCount, sources.Sum(source => source.Value), fatalCount);
 
         foreach (var source in sources)
         {
-            // A closed generic type's name holds spaces, and summary values carry none.
+            // Closed generic type names hold spaces, so they're replaced to keep each key=value pair space-free.
             logger.Information("[Session] errors source={Source:l} n={Count}", source.Key.Replace(' ', '_'), source.Value);
         }
 
         return true;
     }
 
-    // Counts an Error in the total and under its SourceContext.
-    private void CountError(LogEvent logEvent)
+    // Returns the event's SourceContext, or "unknown" when it has none.
+    private static string GetSource(LogEvent logEvent)
     {
-        var source = logEvent.Properties.TryGetValue(Constants.SourceContextPropertyName, out var value)
-            && value is ScalarValue { Value: string context }
-            ? context
-            : UnknownSource;
+        if (!logEvent.Properties.TryGetValue(Constants.SourceContextPropertyName, out var value)) return UnknownSource;
+        if (value is not ScalarValue { Value: string source }) return UnknownSource;
 
-        lock (gate)
-        {
-            errors++;
-            errorsBySource.TryGetValue(source, out var count);
-            errorsBySource[source] = count + 1;
-        }
+        return source;
     }
 }

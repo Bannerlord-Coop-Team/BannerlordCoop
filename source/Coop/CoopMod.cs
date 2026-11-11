@@ -219,6 +219,9 @@ namespace Coop
         // is independent of whatever sharing mode Serilog itself uses to open the actual log file.
         private static FileStream logLockHandle;
 
+        // Created in SetupLogging, not here, because CoopMod's type initializer runs before the check for a foreign Common.dll.
+        private static ISessionSummarySink SessionSummary;
+
         // True if filePath was free (no other live process holds its lock).
         private static bool TryClaimExclusive(string filePath)
         {
@@ -289,7 +292,10 @@ namespace Coop
 
             activeLogFilePath = logFileOpener.OpenedPath == null ? null : System.IO.Path.GetFullPath(logFileOpener.OpenedPath);
 
-            var configuration = LogManager.Configuration.Enrich.WithProcessId();
+            SessionSummary = new SessionSummarySink();
+            var configuration = LogManager.Configuration
+                .Enrich.WithProcessId()
+                .WriteTo.Sink(SessionSummary);
             if (fileSink != null)
                 configuration.WriteTo.Sink(fileSink);
 #if DEBUG
@@ -662,7 +668,7 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
-            if (Logger != null) LogManager.SessionSummary.WriteSummary(Logger, "exit");
+            if (Logger != null) SessionSummary.WriteSummary(Logger, "exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -852,7 +858,7 @@ namespace Coop
 
             Logger.Fatal(ex, "Unhandled exception");
             Logger.Fatal(ex.StackTrace);
-            LogManager.SessionSummary.WriteSummary(Logger, "crash");
+            SessionSummary.WriteSummary(Logger, "crash");
             // The file sink flushes every event; this sends Seq's buffered events, if a Seq server is listening.
             LogManager.CloseAndFlush(TimeSpan.FromSeconds(1));
         }

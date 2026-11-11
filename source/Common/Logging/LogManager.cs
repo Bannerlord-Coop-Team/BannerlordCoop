@@ -11,8 +11,6 @@ namespace Common.Logging;
 public static class LogManager
 {
 	public static LoggerConfiguration Configuration { get; set; } = new LoggerConfiguration();
-
-	public static ISessionSummarySink SessionSummary { get; } = new SessionSummarySink();
 	
 	// Built from Configuration on the first event, not the first GetLogger, because a static Logger field can be
 	// initialized before the mod adds its file sink (parsing /autoconnect host:port touches CoopConnectMenuVM first).
@@ -22,8 +20,7 @@ public static class LogManager
         var configuration = Configuration
             .Enrich.With(new NetworkEnricher())
             .Enrich.With(new StackTraceEnricher())
-            .WriteTo.Sink(new OutputSinkManager())
-            .WriteTo.Sink(SessionSummary);
+            .WriteTo.Sink(new OutputSinkManager());
 
         // CI keeps its test output without buffering events for an absent Seq server.
         if (Environment.GetEnvironmentVariable("COOP_DISABLE_SEQ") != "1")
@@ -41,20 +38,20 @@ public static class LogManager
 	public static ILogger GetLogger(Type type) => SourceLoggers.GetOrAdd(type.FullName, CreateSourceLogger);
 
 	// Disposes the configured logger every source logger forwards to, flushing Seq's buffer within the limit; only call it
-	// when the process ends, because later events are dropped. Returns false when a sink didn't close in time or threw.
-	public static bool CloseAndFlush(TimeSpan limit)
+	// when the process ends, because later events are dropped.
+	public static void CloseAndFlush(TimeSpan limit)
 	{
 		// Never build the logger only to dispose it.
-		if (!_logger.IsValueCreated || _logger.Value is not IDisposable disposable) return true;
+		if (!_logger.IsValueCreated || _logger.Value is not IDisposable disposable) return;
 
 		// With no Seq server listening, the Seq sink takes about 8 s to give up its last send, so the wait has a limit.
 		try
 		{
-			return Task.Run(disposable.Dispose).Wait(limit);
+			Task.Run(disposable.Dispose).Wait(limit);
 		}
 		catch (AggregateException)
 		{
-			return false;
+			// The process is ending and a sink that threw while closing has nowhere left to log.
 		}
 	}
 

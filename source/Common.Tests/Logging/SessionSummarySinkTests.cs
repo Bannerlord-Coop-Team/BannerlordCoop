@@ -17,24 +17,24 @@ public class SessionSummarySinkTests
         sink.Emit(CreateEvent(LogEventLevel.Information, "Coop.A"));
         sink.Emit(CreateEvent(LogEventLevel.Warning, "Coop.A"));
         sink.Emit(CreateEvent(LogEventLevel.Error, "Coop.A"));
-        sink.Emit(CreateEvent(LogEventLevel.Error, "Coop.A"));
         sink.Emit(CreateEvent(LogEventLevel.Error, "Coop.B"));
+        sink.Emit(CreateEvent(LogEventLevel.Error, "Coop.B"));
+        sink.Emit(CreateEvent(LogEventLevel.Error, null));
         sink.Emit(CreateEvent(LogEventLevel.Fatal, "Coop.B"));
         sink.Emit(CreateEvent(LogEventLevel.Warning, "Coop.C"));
 
         var capture = new CaptureSink();
-        // The summary goes through a pipeline that also holds the counting sink, so a summary
-        // that counted itself would show up in its own totals.
-        using var logger = new LoggerConfiguration().WriteTo.Sink(sink).WriteTo.Sink(capture).CreateLogger();
+        using var logger = new LoggerConfiguration().WriteTo.Sink(capture).CreateLogger();
 
-        Assert.True(sink.WriteSummary(logger.ForContext("SourceContext", "Coop.CoopMod"), "exit"));
+        Assert.True(sink.WriteSummary(logger, "exit"));
 
         var lines = capture.Events.Select(e => e.RenderMessage()).ToArray();
         Assert.Equal(new[]
         {
-            "[Session] summary reason=exit warnings=2 errors=3 fatal=1",
-            "[Session] errors source=Coop.A n=2",
-            "[Session] errors source=Coop.B n=1",
+            "[Session] summary reason=exit warnings=2 errors=4 fatal=1",
+            "[Session] errors source=Coop.B n=2",
+            "[Session] errors source=Coop.A n=1",
+            "[Session] errors source=unknown n=1",
         }, lines);
     }
 
