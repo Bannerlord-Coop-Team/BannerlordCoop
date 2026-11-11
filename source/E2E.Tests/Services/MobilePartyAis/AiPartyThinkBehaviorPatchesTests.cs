@@ -42,10 +42,13 @@ public class AiPartyThinkBehaviorPatchesTests : MapEventTestBase
             var aiPartyChaser = Server.GetRegisteredObject<MobileParty>(aiPartyChaserId);
             var playerClan = playerParty.ActualClan;
 
-            // The harness gives every party its own clan, so move the second player into the first one's.
+            // The harness gives every party its own clan, so move the second player and an AI party into the
+            // first player's clan, which then holds player and non-player war parties.
             clanmateParty.ActualClan = playerClan;
+            aiParty.ActualClan = playerClan;
             Assert.Contains(playerParty.WarPartyComponent, playerClan.WarPartyComponents);
             Assert.Contains(clanmateParty.WarPartyComponent, playerClan.WarPartyComponents);
+            Assert.Contains(aiParty.WarPartyComponent, playerClan.WarPartyComponents);
 
             PlaceNear(playerParty, clanmateParty, 1f);
             PlaceNear(playerParty, aiParty, 1.5f);
