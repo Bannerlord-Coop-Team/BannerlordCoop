@@ -10,6 +10,7 @@ Review the change for debt from not fitting the codebase. Follow the Rules in `.
 
 **No complexity beyond what the change needs.**
 - Pass-through layers or forwarding wrappers that make simple behavior hard to trace.
+- A private method that only wraps one or two existing calls, or a private copy of a check that belongs on a shared service.
 - A second source of truth for state that already has an owner.
 - A wider public surface or more configuration than callers use.
 - An ordinary change that had to touch many layers.

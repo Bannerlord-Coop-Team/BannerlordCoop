@@ -53,6 +53,14 @@ internal class ExecuteTroopActionHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            // Vanilla only takes a hero with no party. Another player may have taken it while this menu was open.
+            if (hero.PartyBelongedTo != null)
+            {
+                Logger.Warning("Ignored taking {HeroId} to a party because it is already in {PartyId}",
+                    obj.What.HeroId, hero.PartyBelongedTo.StringId);
+                return;
+            }
+
             if (hero.CurrentSettlement != null && hero.CurrentSettlement.Notables?.Contains(hero) == true)
             {
                 LeaveSettlementAction.ApplyForCharacterOnly(hero);

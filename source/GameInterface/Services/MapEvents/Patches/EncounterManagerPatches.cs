@@ -50,14 +50,17 @@ internal class EncounterManagerPatches
         if (TryRequestActiveSlowRaidConversation(attackerParty, settlement))
             return false;
 
+        // Vanilla puts a late besieger in the camp, or a port defender in the town, before the blocked MapEventSide join
+        if (ModInformation.IsServer && !attackerParty.IsPlayerParty() && attackerParty.BesiegedSettlement != settlement &&
+            InteractionPatches.IsSiegeClosedToAiJoins(settlement))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty);
+            return false;
+        }
+
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
-            return false;
-
-        // Client time keeps running under the encounter menu, so the map tick re-fires this for a besieged
-        // town the party stays outside of. The approval would be a no-op, so don't ask again.
-        if (attackerParty == MobileParty.MainParty && PlayerEncounter.EncounterSettlement == settlement)
             return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
@@ -84,7 +87,15 @@ internal class EncounterManagerPatches
         if (RaidAiInterventionSuppression.ShouldSuppressEncounter(attackerParty, defenderParty))
             return false;
 
-        if (ModInformation.IsServer && TryRequestServerPlayerConversation(attackerParty, defenderParty))
+        if (ModInformation.IsClient) return true;
+
+        if (attackerParty?.MobileParty?.IsPlayerParty() == false && InteractionPatches.IsClosedToAiJoins(defenderParty?.MapEvent))
+        {
+            RaidAiInterventionSuppression.HoldParty(attackerParty.MobileParty);
+            return false;
+        }
+
+        if (TryRequestServerPlayerConversation(attackerParty, defenderParty))
             return false;
 
         return true;
@@ -134,6 +145,11 @@ internal class EncounterManagerPatches
                 return false;
 
             if (mobileParty.ShortTermBehavior == AiBehavior.EngageParty && mobileParty.ShortTermTargetParty == null)
+                return false;
+
+            // Vanilla stops time under the encounter menu, co-op keeps the client map running, so the main party
+            // would otherwise re-interact every tick with the target it is already in an encounter with.
+            if (mobileParty.IsMainParty && PlayerEncounter.Current != null)
                 return false;
         }
 

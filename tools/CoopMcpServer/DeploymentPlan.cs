@@ -18,6 +18,8 @@ public sealed class DeploymentPlan : IDeploymentPlan
     public DeploymentPlan(IDeploymentPaths paths, IDeploymentFiles files) { this.paths = paths; this.files = files; }
 
     private static readonly string[] Projects = { "Coop", "Common", "Coop.Core", "GameInterface", "Missions", "Coop.Steam", "Coop.CrashReporter" };
+    // Optional War Sails assemblies, built after Coop and shipped together since startup requires both.
+    internal static readonly string[] NavalProjects = { "Missions.Naval", "Coop.Naval" };
     // Only runtime dependencies of the mod, never game assemblies or recursive publicizer output.
     private static readonly string[] Dependencies = ("0Harmony Autofac Concentus DiscordRPC Fmod5Sharp K4os.Compression.LZ4 LiteNetLib " +
         "Microsoft.Bcl.AsyncInterfaces Microsoft.CodeAnalysis Microsoft.CodeAnalysis.CSharp Microsoft.Extensions.DependencyInjection.Abstractions " +
@@ -49,7 +51,7 @@ public sealed class DeploymentPlan : IDeploymentPlan
         if (!text.TrimStart().StartsWith("Microsoft Visual Studio Solution File, Format Version 12.00", StringComparison.Ordinal))
             throw new ArgumentException("Expected a Visual Studio Coop.sln solution, not an arbitrary project file.");
         bool naval = Directory.Exists(Path.Combine(source, "Missions.Naval"));
-        foreach (string project in Projects.Concat(naval ? new[] { "Missions.Naval" } : Array.Empty<string>()))
+        foreach (string project in Projects.Concat(naval ? NavalProjects : Array.Empty<string>()))
         {
             string path = Path.Combine(source, project, project + ".csproj");
             paths.NoLinks(path);
@@ -89,14 +91,14 @@ public sealed class DeploymentPlan : IDeploymentPlan
         var inputs = new List<DeploymentInput>();
         string output = Path.Combine(layout.Repository, "source", "Coop", "bin", layout.Configuration);
         string bin = Path.Combine(layout.Module, "bin", "Win64_Shipping_Client");
-        foreach (string project in Projects.Concat(layout.Naval ? new[] { "Missions.Naval" } : Array.Empty<string>()))
+        foreach (string project in Projects.Concat(layout.Naval ? NavalProjects : Array.Empty<string>()))
         {
             string extension = project == "Coop.CrashReporter" ? ".exe" : ".dll";
             string projectOutput = project is "Coop" or "Coop.CrashReporter" ? Path.Combine(layout.Repository, "source", project, "bin", layout.Configuration) :
                 Path.Combine(layout.Repository, "source", project, "bin", layout.Configuration, "netstandard2.0");
             string file = Path.Combine(projectOutput, project + extension);
             if (!File.Exists(file)) throw new FileNotFoundException($"Required {layout.Configuration} build output missing.", file);
-            if (project != "Missions.Naval")
+            if (!NavalProjects.Contains(project))
             {
                 string referenced = Path.Combine(output, project + extension);
                 if (!File.Exists(referenced) || files.Inspect(referenced) != files.Inspect(file))
@@ -107,7 +109,7 @@ public sealed class DeploymentPlan : IDeploymentPlan
         foreach (string file in Directory.EnumerateFiles(output, "*.dll"))
         {
             string name = Path.GetFileNameWithoutExtension(file);
-            if (Projects.Contains(name) || name == "Missions.Naval" || Dependencies.Contains(name) ||
+            if (Projects.Contains(name) || NavalProjects.Contains(name) || Dependencies.Contains(name) ||
                 name.StartsWith("TaleWorlds.", StringComparison.Ordinal) || name.StartsWith("SandBox", StringComparison.Ordinal) ||
                 name.StartsWith("StoryMode", StringComparison.Ordinal) || name == "Steamworks.NET" || name == "netstandard") continue;
             throw new InvalidDataException("Unrecognized top-level build DLL; update the runtime allowlist deliberately: " + file);

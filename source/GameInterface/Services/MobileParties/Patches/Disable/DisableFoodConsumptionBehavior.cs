@@ -28,7 +28,7 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool OnPartyAttachedPartyPrefix(FoodConsumptionBehavior __instance, MobileParty mobileParty)
     {
-        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return true;
 
         // Custom implementation to to work for all armies with player parties
         foodConsumptionBehaviorInterface.OnPartyAttachedParty(__instance, mobileParty);
@@ -42,11 +42,11 @@ internal class FoodConsumptionBehaviorPatches
     {
         if (party == null || !party.IsPlayerParty()) return true;
 
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
 
         if (!ShouldTickFoodChange(playerManager, party)) return false;
 
-        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return true;
 
         foodConsumptionBehaviorInterface.DailyTickParty(__instance, party);
 
@@ -59,8 +59,8 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool OnTickPrefix(FoodConsumptionBehavior __instance, float dt)
     {
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return true;
 
         var playerPartyLastItemVersions = campaignPlayerPartyLastItemVersions.GetOrCreateValue(__instance);
 
@@ -96,7 +96,7 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool PartyConsumeFoodPrefix(FoodConsumptionBehavior __instance, MobileParty mobileParty, bool starvingCheck = false)
     {
-        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return true;
 
         // Custom implementation to handle IsMainParty -> IsPlayerParty replacements and client notifications
         foodConsumptionBehaviorInterface.PartyConsumeFood(__instance, mobileParty, starvingCheck);
@@ -108,7 +108,7 @@ internal class FoodConsumptionBehaviorPatches
     [HarmonyPrefix]
     public static bool CheckAnimalBreedingPrefix(FoodConsumptionBehavior __instance, MobileParty party)
     {
-        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return false;
+        if (!ContainerProvider.TryResolve<IFoodConsumptionBehaviorInterface>(out var foodConsumptionBehaviorInterface)) return true;
 
         // Custom implementation to handle IsMainParty -> IsPlayerParty replacement and client notification
         foodConsumptionBehaviorInterface.CheckAnimalBreeding(__instance, party);

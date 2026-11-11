@@ -46,6 +46,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly object ownerPeersLock = new();
     private readonly IIssueConversationGuard conversationGuard;
     private readonly IQuestSolutionAcceptCoordinator acceptCoordinator;
+    private readonly ITextObjectComparer textComparer;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -57,7 +58,8 @@ internal class FinalizationCoordinator : IHandler
         IControllerIdProvider controller,
         IAlternativeSolutionCommitments commitments,
         IIssueConversationGuard conversationGuard,
-        IQuestSolutionAcceptCoordinator acceptCoordinator)
+        IQuestSolutionAcceptCoordinator acceptCoordinator,
+        ITextObjectComparer textComparer)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -69,6 +71,7 @@ internal class FinalizationCoordinator : IHandler
         this.commitments = commitments;
         this.conversationGuard = conversationGuard;
         this.acceptCoordinator = acceptCoordinator;
+        this.textComparer = textComparer;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -277,11 +280,11 @@ internal class FinalizationCoordinator : IHandler
                         {
                             var matches = remaining.Where(existing =>
                                 existing.Type == log.Type && existing.Range == log.Range &&
-                                SameText(existing.LogText, log.Text) && SameText(existing.TaskName, log.TaskName)).ToArray();
+                                textComparer.SameText(existing.LogText, log.Text) && textComparer.SameText(existing.TaskName, log.TaskName)).ToArray();
                             if (matches.Length == 0)
                                 matches = remaining.Where(existing =>
                                     existing.Type == log.Type && existing.Range == log.Range &&
-                                    SameKey(existing.LogText, log.Text) && SameKey(existing.TaskName, log.TaskName)).ToArray();
+                                    textComparer.SameKey(existing.LogText, log.Text) && textComparer.SameKey(existing.TaskName, log.TaskName)).ToArray();
                             var existing = matches.FirstOrDefault(entry => entry.LogTime.NumTicks == log.Time.NumTicks);
                             if (existing == null && matches.Length == 1) existing = matches[0];
                             if (existing == null && matches.Length > 0)
@@ -323,28 +326,6 @@ internal class FinalizationCoordinator : IHandler
             }
         }, context: nameof(FinalizationCoordinator));
     }
-
-    private static bool SameText(TextObject first, TextObject second)
-    {
-        if (ReferenceEquals(first, second)) return true;
-        if (first == null || second == null || first.Value != second.Value ||
-            (first.Attributes == null) != (second.Attributes == null) ||
-            (first.Attributes?.Count ?? 0) != (second.Attributes?.Count ?? 0)) return false;
-        if (first.Attributes == null) return true;
-        foreach (var pair in first.Attributes)
-        {
-            if (second.Attributes == null || !second.Attributes.TryGetValue(pair.Key, out var value)) return false;
-            if (pair.Value is TextObject text)
-            {
-                if (!(value is TextObject other) || !SameText(text, other)) return false;
-            }
-            else if (!Equals(pair.Value, value)) return false;
-        }
-        return true;
-    }
-
-    private static bool SameKey(TextObject first, TextObject second) =>
-        ReferenceEquals(first, second) || (first != null && second != null && first.Value == second.Value);
 
     // Server only.
     private void Handle_IssueOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)

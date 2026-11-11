@@ -27,7 +27,6 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 internal class SiegePreparationPromptPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegePreparationPromptPatches>();
-    private static readonly HashSet<SiegeEvent> FinalizingSieges = new();
 
     private sealed class SiegeTerminationState
     {
@@ -70,16 +69,34 @@ internal class SiegePreparationPromptPatches
         MessageBroker.Instance.Publish(null, new SiegePreparationStarted(besiegerParty, settlement));
     }
 
+    // Lifting a siege and ending its battles empty the camp before the siege finalizes, so the finalize snapshot
+    // would miss every party that was camped there
+    [HarmonyPatch(typeof(BesiegerCamp), nameof(BesiegerCamp.RemoveAllSiegeParties))]
+    [HarmonyPrefix]
+    private static void RemoveAllSiegePartiesPrefix(BesiegerCamp __instance)
+    {
+        if (ModInformation.IsClient || __instance.SiegeEvent == null) return;
+        if (!ContainerProvider.TryResolve<ISiegeFinalizeTracker>(out var finalizeTracker)) return;
+        if (finalizeTracker.IsFinalizing(__instance.SiegeEvent)) return;
+
+        finalizeTracker.RecordCampParties(__instance.SiegeEvent, __instance._besiegerParties.ToArray());
+    }
+
     [HarmonyPatch(typeof(SiegeEvent), nameof(SiegeEvent.FinalizeSiegeEvent))]
     [HarmonyPrefix]
     private static void FinalizeSiegeEventPrefix(SiegeEvent __instance, out SiegeTerminationState __state)
     {
         __state = null;
         if (ModInformation.IsClient) return;
-        if (!FinalizingSieges.Add(__instance)) return;
+        if (!ContainerProvider.TryResolve<ISiegeFinalizeTracker>(out var finalizeTracker)) return;
+        bool isOuterFinalize = finalizeTracker.TryBeginFinalize(__instance);
+        if (!isOuterFinalize) return;
 
         try
         {
+            // Taken before the early return below so a skipped finalize does not leave the entry behind
+            var emptiedParties = finalizeTracker.TakeCampParties(__instance);
+
             var settlement = __instance.BesiegedSettlement;
             var mapEvent = settlement?.Party?.MapEvent;
             bool interruptedActiveAssault = IsInterruptedActiveAssault(mapEvent);
@@ -92,6 +109,10 @@ internal class SiegePreparationPromptPatches
             var camp = __instance.BesiegerCamp;
             var leaderParty = camp?.LeaderParty;
             var attackerParties = GetMobileParties(camp?.GetInvolvedPartiesForEventType());
+            if (emptiedParties != null)
+            {
+                attackerParties = attackerParties.Concat(emptiedParties).Distinct().ToArray();
+            }
             var defenderParties = interruptedActiveAssault
                 ? GetMapEventParties(mapEvent.DefenderSide)
                 : GetDefenderParties(settlement);
@@ -188,7 +209,11 @@ internal class SiegePreparationPromptPatches
     {
         if (__state == null) return __exception;
 
-        FinalizingSieges.Remove(__instance);
+        if (ContainerProvider.TryResolve<ISiegeFinalizeTracker>(out var finalizeTracker))
+        {
+            finalizeTracker.EndFinalize(__instance);
+        }
+
         if (__exception == null && __state.ShouldPublish)
         {
             MessageBroker.Instance.Publish(null, new SiegeEndedWithoutBattle(

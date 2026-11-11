@@ -17,26 +17,15 @@ namespace Coop.Tests.Stubs
 
         public override void Publish<T>(object? source, T message)
         {
-            if (!subscribers.ContainsKey(typeof(T)))
-            {
-                return;
-            }
-            var delegates = subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return;
+            if (!subscribers.TryGetValue(typeof(T), out var list)) return;
+            if (list.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
-            for (int i = 0; i < delegates.Count; i++)
+            foreach (var subscription in list.Items)
             {
-                var weakDelegate = delegates[i];
-                if (weakDelegate.IsAlive == false)
-                {
-                    delegates.RemoveAt(i--);
-                    continue;
-                }
+                if (subscription.Handler.IsAlive == false) continue;
 
-                weakDelegate.Invoke(new object[] { payload });
+                subscription.Handler.Invoke(new object[] { payload });
             }
-
-            return;
         }
     }
 }

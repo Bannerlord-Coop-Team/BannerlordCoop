@@ -3,9 +3,10 @@ using Autofac;
 using Common;
 using Common.Messaging;
 using Common.Logging;
+using Common.Network;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Companions.Messages;
-using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -476,7 +477,10 @@ internal class CompanionsCommands
             if (party.GetRoleHolder(PartyRole.Scout) != fixture.OriginalScout)
             {
                 party.SetPartyScout(fixture.OriginalScout);
-                MessageBroker.Instance.Publish(party, new SetPartyScout(fixture.OriginalScout, party));
+                // The scout syncs by itself; clients still need the cache reset and the role screen refresh.
+                party.ResetCached();
+                if (ContainerProvider.TryResolve<INetwork>(out var network) && objectManager.TryGetId(party, out string partyId))
+                    network.SendAll(new NetworkRefreshAfterRoleAssignment(partyId));
             }
 
             int roleCompanionCount = party.MemberRoster.GetTroopCount(fixture.RoleCompanion.CharacterObject);

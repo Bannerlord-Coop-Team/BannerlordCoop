@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using Common;
+using Autofac;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -105,7 +106,19 @@ public class TestEnvironment
     {
         // TaleWorlds ViewModel metadata initialization is not thread-safe.
         lock (ContainerBuildLock)
-            return builder.Build();
+        {
+            // Naval sync is tested here too, so the modules register it; the flag goes back for the run itself.
+            bool previous = ModInformation.IsNavalEnabled;
+            ModInformation.IsNavalEnabled = true;
+            try
+            {
+                return builder.Build();
+            }
+            finally
+            {
+                ModInformation.IsNavalEnabled = previous;
+            }
+        }
     }
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
