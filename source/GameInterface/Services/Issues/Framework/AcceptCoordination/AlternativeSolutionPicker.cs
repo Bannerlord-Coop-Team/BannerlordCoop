@@ -42,14 +42,14 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
         this.controller = controller;
         this.commitments = commitments;
         this.troops = troops;
-        broker.Subscribe<PartyDoneLogicAttempted>(Handle_Done);
+        broker.Subscribe<PartyScreenCommitAttempted>(Handle_Done);
         broker.Subscribe<RequestAlternativeSolutionCancellation>(Handle_Cancel);
         broker.Subscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<PartyDoneLogicAttempted>(Handle_Done);
+        broker.Unsubscribe<PartyScreenCommitAttempted>(Handle_Done);
         broker.Unsubscribe<RequestAlternativeSolutionCancellation>(Handle_Cancel);
         broker.Unsubscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
         pickers.Clear();
@@ -95,11 +95,11 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
             network.SendAll(new RequestAlternativeSolutionCancellation(giverId, issue.StringId));
     }
 
-    private void Handle_Done(MessagePayload<PartyDoneLogicAttempted> payload)
+    private void Handle_Done(MessagePayload<PartyScreenCommitAttempted> payload)
     {
-        if (ModInformation.IsClient && payload.What.LeftMemberRoster != null &&
-            pickers.TryGetValue(payload.What.LeftMemberRoster, out var picker))
-            pickers[payload.What.LeftMemberRoster] = (picker.Issue, null);
+        var leftMemberRoster = payload.What.Logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        if (ModInformation.IsClient && leftMemberRoster != null && pickers.TryGetValue(leftMemberRoster, out var picker))
+            pickers[leftMemberRoster] = (picker.Issue, null);
     }
 
     private void Handle_Accepted(MessagePayload<NetworkAlternativeSolutionAccepted> payload)

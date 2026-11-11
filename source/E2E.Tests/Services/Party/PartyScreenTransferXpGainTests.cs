@@ -15,8 +15,8 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Party;
 
 /// <summary>
-/// A server xp gain on a troop the player moved out of an open party screen, through the client refresher,
-/// the Done delta and the server apply. The screen binds the real party rosters like vanilla manage troops.
+/// A server xp gain on a troop the player moved out of an open party screen, through the client refresher's replay,
+/// the Done commit and the server replay. The screen binds the real party rosters like vanilla manage troops.
 /// </summary>
 public class PartyScreenTransferXpGainTests : IDisposable
 {
@@ -39,7 +39,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
     }
 
     [Fact]
-    public void TransferThenServerXpGain_ResetsScreenAndKeepsServerXp()
+    public void TransferThenServerXpGain_KeepsTheTransferWithServerXp()
     {
         var fixture = CreateFixture();
         var logic = OpenPartyScreen(fixture);
@@ -48,40 +48,22 @@ public class PartyScreenTransferXpGainTests : IDisposable
         Assert.Equal(new RosterState((-1, -1), (1, TroopXp)), ReadClient(fixture));
 
         SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
-
-        Done(fixture, logic);
-        AssertServerKeepsTotalXp(fixture, new RosterState((1, ServerXp), (-1, -1)));
-    }
-
-    [Fact]
-    public void TransferAgainAfterReset_CommitsServerXp()
-    {
-        var fixture = CreateFixture();
-        var logic = OpenPartyScreen(fixture);
-
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
-        SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
-
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
-        Assert.Equal(new RosterState((-1, -1), (1, ServerXp)), ReadClient(fixture));
+        AssertScreenReplayed(fixture, logic, new RosterState((-1, -1), (1, ServerXp)));
 
         Done(fixture, logic);
         AssertServerKeepsTotalXp(fixture, new RosterState((-1, -1), (1, ServerXp)));
     }
 
     [Fact]
-    public void TransferBackBeforeDone_KeepsServerXp()
+    public void TransferBackAfterServerXpGain_KeepsServerXp()
     {
         var fixture = CreateFixture();
         var logic = OpenPartyScreen(fixture);
 
         Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
         SetServerXp(fixture, ServerXp);
-        AssertScreenReset(fixture, logic);
+        AssertScreenReplayed(fixture, logic, new RosterState((-1, -1), (1, ServerXp)));
 
-        Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Right);
         Transfer(fixture, logic, PartyScreenLogic.PartyRosterSide.Left);
         Assert.Equal(new RosterState((1, ServerXp), (-1, -1)), ReadClient(fixture));
 
@@ -89,11 +71,10 @@ public class PartyScreenTransferXpGainTests : IDisposable
         AssertServerKeepsTotalXp(fixture, new RosterState((1, ServerXp), (-1, -1)));
     }
 
-    // The refresher cannot rebase the moved troop onto the gain, so it drops the pending transfer and the
-    // screen shows the server stack again, with the new xp as the baseline for the next Done.
-    private void AssertScreenReset(TransferFixture fixture, PartyScreenLogic logic)
+    // The gain lands in the baseline and the pending transfer is replayed on top of it, so the screen
+    // keeps the player's move and the moved troop carries the server's xp.
+    private void AssertScreenReplayed(TransferFixture fixture, PartyScreenLogic logic, RosterState expected)
     {
-        var expected = new RosterState((1, ServerXp), (-1, -1));
         Assert.Equal(expected, ReadClient(fixture));
 
         RosterState baseline = default;
@@ -104,7 +85,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
                 Read(logic._initialData.RightMemberRoster, troop),
                 Read(logic._initialData.LeftMemberRoster, troop));
         });
-        Assert.Equal(expected, baseline);
+        Assert.Equal(new RosterState((1, ServerXp), (-1, -1)), baseline);
     }
 
     private void AssertServerKeepsTotalXp(TransferFixture fixture, RosterState expected)
@@ -237,29 +218,12 @@ public class PartyScreenTransferXpGainTests : IDisposable
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var hero));
-            var message = new PartyDoneLogicAttempted(
+            Client.SimulateMessage(this, new PartyScreenCommitAttempted(
+                logic,
                 hero,
-                new FlattenedTroopRoster(4),
-                new FlattenedTroopRoster(4),
-                new FlattenedTroopRoster(4),
-                logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
-                logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
-                logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right],
-                logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right],
-                logic._initialData.LeftMemberRoster,
-                logic._initialData.LeftPrisonerRoster,
-                logic._initialData.RightMemberRoster,
-                logic._initialData.RightPrisonerRoster,
-                logic.RightOwnerParty.ItemRoster,
-                logic.CurrentData.UpgradedTroopsHistory,
-                logic.CurrentData.LeftParty,
-                partyGoldChangeAmount: 0,
-                partyInfluenceChangeAmount: 0,
-                partyMoraleChangeAmount: 0,
-                doNotApplyGoldTransactions: true,
-                Helpers.PartyScreenHelper.PartyScreenMode.Normal);
-
-            Client.SimulateMessage(this, message);
+                Helpers.PartyScreenHelper.PartyScreenMode.Normal,
+                isDonating: false,
+                forceTransferId: null));
         });
         TestEnvironment.FlushCoalescer();
     }

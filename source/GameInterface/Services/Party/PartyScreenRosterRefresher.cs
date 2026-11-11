@@ -8,7 +8,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
@@ -49,23 +51,28 @@ internal readonly struct PartyScreenSelectionIdentity
 }
 
 /// <summary>
-/// Applies received roster changes to an open party screen and its comparison baseline.
+/// Applies received roster changes to an open party screen. The change goes into the screen's baseline, the
+/// state the server has, and the player's recorded commands are replayed on top of it, so their edits survive
+/// unless a change makes one of them impossible.
 /// </summary>
 internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 {
-    private const string PendingChangesResetMessage =
-        "Party updated. Pending changes reset.";
+    private const string CommandsDroppedMessage =
+        "Party updated, some pending changes no longer apply:";
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenRosterRefresher>();
     private readonly IPartyScreenRosterBaselineProvider baselineProvider;
     private readonly IPartyScreenLockPreserver lockPreserver;
+    private readonly IPartyScreenCommandTracker commandTracker;
 
     public PartyScreenRosterRefresher(
         IPartyScreenRosterBaselineProvider baselineProvider,
-        IPartyScreenLockPreserver lockPreserver)
+        IPartyScreenLockPreserver lockPreserver,
+        IPartyScreenCommandTracker commandTracker)
     {
         this.baselineProvider = baselineProvider;
         this.lockPreserver = lockPreserver;
+        this.commandTracker = commandTracker;
     }
 
     public bool TryApply(
@@ -78,12 +85,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (applyAuthoritative == null) throw new ArgumentNullException(nameof(applyAuthoritative));
 
         var logic = GetOpenLogic(Game.Current?.GameStateManager);
-        return TryApply(
-            logic,
-            authoritativeRoster,
-            character,
-            applyAuthoritative,
-            NotifyPendingChangesReset);
+        return TryApply(logic, authoritativeRoster, character, applyAuthoritative, NotifyCommandsDropped);
     }
 
     internal bool TryApply(
@@ -91,57 +93,24 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         TroopRoster authoritativeRoster,
         CharacterObject character,
         Action<TroopRoster, CharacterObject> applyAuthoritative,
-        Action notifyPendingChangesReset)
+        Action<IReadOnlyList<string>> notifyCommandsDropped)
     {
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
-        var visible = GetVisibleRoster(logic, baseline);
-        var saved = GetSavedRoster(logic, baseline);
-        var previousBaseline = RosterElementState.Read(baseline, character);
-        var previousVisible = RosterElementState.Read(visible, character);
-        var previousSaved = saved == null
-            ? default
-            : RosterElementState.Read(saved, character);
-
-        if (ReferenceEquals(authoritativeRoster, visible))
+        // A roster the screen edits holds the player's edits, so the change goes into the baseline and the replay
+        // rebuilds the screen roster. A roster the screen only shows a copy of takes the change directly.
+        if (ReferenceEquals(authoritativeRoster, GetVisibleRoster(logic, baseline)))
         {
-            previousBaseline.Write(authoritativeRoster, character);
+            applyAuthoritative(baseline, character);
+        }
+        else
+        {
+            applyAuthoritative(authoritativeRoster, character);
+            RosterElementState.Read(authoritativeRoster, character).Write(baseline, character);
         }
 
-        applyAuthoritative(authoritativeRoster, character);
-        var authoritative = RosterElementState.Read(authoritativeRoster, character);
-
-        RosterElementState rebasedSaved = default;
-        bool canRebase =
-            RosterElementState.TryRebase(authoritative, previousBaseline, previousVisible, out var rebasedVisible) &&
-            (saved == null ||
-                RosterElementState.TryRebase(
-                    authoritative,
-                    previousBaseline,
-                    previousSaved,
-                    out rebasedSaved));
-
-        authoritative.Write(baseline, character);
-        if (!canRebase)
-        {
-            logic.CurrentData.ResetUsing(logic._initialData);
-            RefreshRecruitablePrisoners(logic);
-            if (logic._savedData != null) logic.SavePartyScreenData();
-            RefreshScreen(logic);
-            notifyPendingChangesReset();
-            return true;
-        }
-
-        rebasedVisible.Write(visible, character);
-        if (saved != null) rebasedSaved.Write(saved, character);
-        RefreshRecruitablePrisoners(logic);
-        RefreshTroop(
-            logic,
-            baseline,
-            character,
-            previousVisible.Number != rebasedVisible.Number,
-            previousVisible.Wounded != rebasedVisible.Wounded);
+        Replay(logic, notifyCommandsDropped);
         return true;
     }
 
@@ -153,25 +122,10 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
-        var visible = GetVisibleRoster(logic, baseline);
-        var saved = GetSavedRoster(logic, baseline);
-        RemoveZeroCounts(authoritativeRoster);
-        if (!ReferenceEquals(authoritativeRoster, baseline)) RemoveZeroCounts(baseline);
-        if (!ReferenceEquals(authoritativeRoster, visible) &&
-            !ReferenceEquals(baseline, visible))
-        {
-            RemoveZeroCounts(visible);
-        }
-        if (saved != null &&
-            !ReferenceEquals(authoritativeRoster, saved) &&
-            !ReferenceEquals(baseline, saved) &&
-            !ReferenceEquals(visible, saved))
-        {
-            RemoveZeroCounts(saved);
-        }
-
-        RefreshRecruitablePrisoners(logic);
-        RefreshScreen(logic);
+        // Removing empty stacks changes no counts, so the player's edits and the rows stay as they are.
+        RemoveZeroCounts(baseline);
+        if (!ReferenceEquals(authoritativeRoster, GetVisibleRoster(logic, baseline)))
+            RemoveZeroCounts(authoritativeRoster);
         return true;
     }
 
@@ -181,37 +135,163 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (applyAuthoritative == null) throw new ArgumentNullException(nameof(applyAuthoritative));
 
         var logic = GetOpenLogic(Game.Current?.GameStateManager);
-        return TryApply(logic, authoritativeRoster, applyAuthoritative);
+        return TryApply(logic, authoritativeRoster, applyAuthoritative, NotifyCommandsDropped);
     }
 
     internal bool TryApply(
         PartyScreenLogic logic,
         ItemRoster authoritativeRoster,
-        Action<ItemRoster> applyAuthoritative)
+        Action<ItemRoster> applyAuthoritative,
+        Action<IReadOnlyList<string>> notifyCommandsDropped)
     {
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
-        var visible = logic.CurrentData.RightItemRoster;
-        var saved = logic._savedData?.RightItemRoster;
-        applyAuthoritative(authoritativeRoster);
-        if (!ReferenceEquals(authoritativeRoster, baseline)) applyAuthoritative(baseline);
-        if (visible != null &&
-            !ReferenceEquals(authoritativeRoster, visible) &&
-            !ReferenceEquals(baseline, visible))
+        applyAuthoritative(baseline);
+        if (!ReferenceEquals(authoritativeRoster, baseline) &&
+            !ReferenceEquals(authoritativeRoster, logic.CurrentData.RightItemRoster))
+            applyAuthoritative(authoritativeRoster);
+
+        Replay(logic, notifyCommandsDropped);
+        return true;
+    }
+
+    private void Replay(PartyScreenLogic logic, Action<IReadOnlyList<string>> notifyCommandsDropped)
+    {
+        var commands = commandTracker.GetCommands(logic).ToList();
+        int savedCount = commandTracker.GetSavedCount(logic);
+        var rosters = GetScreenRosters(logic);
+        var previousOrder = rosters.Select(GetOrder).ToArray();
+        var failed = new List<string>();
+        List<string> reduced;
+
+        // The rows are refreshed once afterwards, so the per command UI updates are skipped.
+        var updateDelegate = logic.UpdateDelegate;
+        logic.UpdateDelegate = null;
+        try
         {
-            applyAuthoritative(visible);
+            // A command that throws can leave a roster half changed, so start over from the baseline without it.
+            int failedIndex;
+            while ((failedIndex = ReplayCommands(logic, commands, savedCount, out reduced)) >= 0)
+            {
+                failed.Add($"{commands[failedIndex].Character.Name} x{commands[failedIndex].TotalNumber}: no longer possible");
+                commands.RemoveAt(failedIndex);
+                if (failedIndex < savedCount) savedCount--;
+            }
+
+            logic.RemoveZeroCounts();
+            for (int i = 0; i < rosters.Length; i++)
+                RestoreOrder(rosters[i], previousOrder[i]);
         }
-        if (saved != null &&
-            !ReferenceEquals(authoritativeRoster, saved) &&
-            !ReferenceEquals(baseline, saved) &&
-            !ReferenceEquals(visible, saved))
+        finally
         {
-            applyAuthoritative(saved);
+            logic.UpdateDelegate = updateDelegate;
         }
 
-        RefreshUpgrades(logic);
-        return true;
+        var dropped = failed.Concat(reduced).ToList();
+        if (dropped.Count > 0) notifyCommandsDropped(dropped);
+
+        RefreshRows(logic);
+    }
+
+    /// <returns>The index of a command that threw, or -1 when every command replayed.</returns>
+    private int ReplayCommands(PartyScreenLogic logic, List<PartyScreenLogic.PartyCommand> commands, int savedCount, out List<string> reduced)
+    {
+        reduced = new List<string>();
+        logic.CurrentData.ResetUsing(logic._initialData);
+        // After the reset, because the recruit model reads the screen's bound prisoner roster, not the baseline.
+        RefreshRecruitablePrisoners(logic);
+        commandTracker.Clear(logic);
+        for (int i = 0; i < commands.Count; i++)
+        {
+            if (logic._savedData != null && i == savedCount) logic.SavePartyScreenData();
+
+            int recordedBefore = commandTracker.GetCommands(logic).Count;
+            try
+            {
+                logic.AddCommand(ClampToAvailable(logic, commands[i]));
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Failed to replay party screen command {Code} {Character}", commands[i].Code, commands[i].Character?.StringId);
+                return i;
+            }
+
+            var recorded = commandTracker.GetCommands(logic);
+            int replayed = recorded.Count > recordedBefore ? recorded[recorded.Count - 1].TotalNumber : 0;
+            if (replayed < commands[i].TotalNumber)
+            {
+                reduced.Add($"{commands[i].Character.Name} x{commands[i].TotalNumber}: " +
+                    (replayed == 0 ? "no longer possible" : $"only {replayed} still possible"));
+            }
+        }
+
+        if (logic._savedData != null && savedCount >= commands.Count) logic.SavePartyScreenData();
+        return -1;
+    }
+
+    // Moves what is still there when a change took away part of a stack, instead of dropping the whole command.
+    // The wounded split is refit too, because healing or injuries change it without changing the count.
+    private static PartyScreenLogic.PartyCommand ClampToAvailable(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
+    {
+        bool isTransfer = command.Code == PartyScreenLogic.PartyCommandCode.TransferTroop ||
+            command.Code == PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot;
+        if (!isTransfer && command.Code != PartyScreenLogic.PartyCommandCode.UpgradeTroop) return command;
+
+        var roster = command.Type == PartyScreenLogic.TroopType.Member
+            ? logic.MemberRosters[(int)command.RosterSide]
+            : logic.PrisonerRosters[(int)command.RosterSide];
+        int index = roster.FindIndexOfTroop(command.Character);
+        if (index < 0) return command;
+
+        var element = roster.GetElementCopyAtIndex(index);
+        int number = Math.Min(command.TotalNumber, element.Number);
+        if (number <= 0) return command;
+
+        var clamped = new PartyScreenLogic.PartyCommand();
+        if (isTransfer)
+        {
+            int wounded = Math.Max(
+                number - (element.Number - element.WoundedNumber),
+                Math.Min(command.WoundedNumber, Math.Min(number, element.WoundedNumber)));
+            if (number == command.TotalNumber && wounded == command.WoundedNumber) return command;
+            clamped.FillForTransferTroop(command.RosterSide, command.Type, command.Character, number, wounded, -1);
+        }
+        else
+        {
+            if (number == command.TotalNumber) return command;
+            clamped.FillForUpgradeTroop(command.RosterSide, command.Type, command.Character, number, command.UpgradeTarget, -1);
+        }
+
+        return clamped;
+    }
+
+    private static TroopRoster[] GetScreenRosters(PartyScreenLogic logic) => new[]
+    {
+        logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right],
+        logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right],
+        logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
+        logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
+    };
+
+    private static List<CharacterObject> GetOrder(TroopRoster roster)
+    {
+        var order = new List<CharacterObject>(roster.Count);
+        for (int i = 0; i < roster.Count; i++) order.Add(roster.GetCharacterAtIndex(i));
+        return order;
+    }
+
+    // Replayed transfers land at the end of a roster, so put the stacks back where the player had them.
+    private static void RestoreOrder(TroopRoster roster, List<CharacterObject> order)
+    {
+        int target = 0;
+        foreach (var character in order)
+        {
+            int index = roster.FindIndexOfTroop(character);
+            if (index < 0) continue;
+            if (index != target) roster.ShiftTroopToIndex(index, target);
+            target++;
+        }
     }
 
     private static TroopRoster GetVisibleRoster(PartyScreenLogic logic, TroopRoster baseline)
@@ -225,18 +305,6 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         return logic.CurrentData.LeftPrisonerRoster;
     }
 
-    private static TroopRoster GetSavedRoster(PartyScreenLogic logic, TroopRoster baseline)
-    {
-        if (logic._savedData == null) return null;
-        if (ReferenceEquals(baseline, logic._initialData.RightMemberRoster))
-            return logic._savedData.RightMemberRoster;
-        if (ReferenceEquals(baseline, logic._initialData.LeftMemberRoster))
-            return logic._savedData.LeftMemberRoster;
-        if (ReferenceEquals(baseline, logic._initialData.RightPrisonerRoster))
-            return logic._savedData.RightPrisonerRoster;
-        return logic._savedData.LeftPrisonerRoster;
-    }
-
     private static void RemoveZeroCounts(TroopRoster roster)
     {
         roster.RemoveZeroCounts();
@@ -247,27 +315,69 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
         if (logic.RightOwnerParty?.MobileParty?.IsMainParty != true) return;
 
-        RefreshRecruitablePrisoners(
-            logic._initialData.RightPrisonerRoster,
-            logic._initialData.RightRecruitableData);
-        if (logic._savedData != null)
-        {
-            RefreshRecruitablePrisoners(
-                logic._savedData.RightPrisonerRoster,
-                logic._savedData.RightRecruitableData);
-        }
-    }
-
-    private static void RefreshRecruitablePrisoners(
-        TroopRoster prisonerRoster,
-        System.Collections.Generic.Dictionary<CharacterObject, int> recruitable)
-    {
+        var recruitable = logic._initialData.RightRecruitableData;
         recruitable.Clear();
-        foreach (TroopRosterElement element in prisonerRoster.GetTroopRoster())
+        foreach (TroopRosterElement element in logic._initialData.RightPrisonerRoster.GetTroopRoster())
         {
             recruitable[element.Character] = Campaign.Current.Models.PrisonerRecruitmentCalculationModel
                 .CalculateRecruitableNumber(PartyBase.MainParty, element.Character);
         }
+        logic.CurrentData.RightRecruitableData = new Dictionary<CharacterObject, int>(recruitable);
+    }
+
+    // Updates the rows in place when the screen still has the same stacks, so scrolling and selection stay put.
+    private void RefreshRows(PartyScreenLogic logic)
+    {
+        var partyVm = GetPartyVm(logic);
+        if (partyVm == null) return;
+
+        var rows = new[] { partyVm.MainPartyTroops, partyVm.MainPartyPrisoners, partyVm.OtherPartyTroops, partyVm.OtherPartyPrisoners };
+        var rosters = GetScreenRosters(logic);
+        for (int i = 0; i < rows.Length; i++)
+        {
+            if (!RowsMatch(rows[i], rosters[i]))
+            {
+                RefreshScreen(logic);
+                return;
+            }
+        }
+
+        for (int i = 0; i < rows.Length; i++)
+        {
+            for (int j = 0; j < rows[i].Count; j++)
+            {
+                var row = rows[i][j];
+                row.Troop = rosters[i].GetElementCopyAtIndex(j);
+                row.InitializeUpgrades();
+                row.UpdateRecruitable();
+                row.UpdateTradeData();
+                row.ThrowOnPropertyChanged();
+            }
+        }
+
+        partyVm.RefreshPartyInformation();
+        partyVm.OnPartyGoldChanged();
+        partyVm.OnPartyMoraleChanged();
+        partyVm.OnPartyHorseChanged();
+        partyVm.OnPartyInfluenceChanged();
+        partyVm.UpdateTroopManagerPopUpCounts();
+        partyVm.MainPartyComposition.RefreshCounts(partyVm.MainPartyTroops);
+        partyVm.OtherPartyComposition.RefreshCounts(partyVm.OtherPartyTroops);
+        partyVm.RefreshTopInformation();
+        partyVm.RefreshCurrentCharacterInformation();
+        partyVm.IsDoneDisabled = !logic.IsDoneActive();
+        partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
+        partyVm.IsCancelDisabled = !logic.IsCancelActive();
+    }
+
+    private static bool RowsMatch(MBBindingList<PartyCharacterVM> rows, TroopRoster roster)
+    {
+        if (rows.Count != roster.Count) return false;
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (!ReferenceEquals(rows[i].Character, roster.GetCharacterAtIndex(i))) return false;
+        }
+        return true;
     }
 
     private void RefreshScreen(PartyScreenLogic logic)
@@ -299,106 +409,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         replacement.UpdateRecruitable();
     }
 
-    private void RefreshTroop(
-        PartyScreenLogic logic,
-        TroopRoster baseline,
-        CharacterObject character,
-        bool numberChanged,
-        bool woundedChanged)
-    {
-        var partyVm = GetPartyVm(logic);
-        if (partyVm == null) return;
-
-        var identity = GetIdentity(logic, baseline, character);
-        var row = FindSelectionReplacement(
-            partyVm.MainPartyTroops,
-            partyVm.MainPartyPrisoners,
-            partyVm.OtherPartyTroops,
-            partyVm.OtherPartyPrisoners,
-            identity,
-            GetIdentity);
-        var visible = GetVisibleRoster(logic, baseline);
-        int index = visible.FindIndexOfTroop(character);
-        if (row == null || index < 0)
-        {
-            RefreshScreen(logic);
-            return;
-        }
-
-        row.Troop = visible.GetElementCopyAtIndex(index);
-        row.InitializeUpgrades();
-        row.UpdateRecruitable();
-        row.UpdateTradeData();
-        row.ThrowOnPropertyChanged();
-        partyVm.UpdateTroopManagerPopUpCounts();
-        if (numberChanged)
-        {
-            partyVm.RefreshPartyInformation();
-            partyVm.IsDoneDisabled = !logic.IsDoneActive();
-            partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
-            partyVm.IsCancelDisabled = !logic.IsCancelActive();
-            RefreshSort(logic, partyVm, identity);
-
-            if (identity.Side == PartyScreenLogic.PartyRosterSide.Right)
-                partyVm.MainPartyComposition.RefreshCounts(partyVm.MainPartyTroops);
-            else
-                partyVm.OtherPartyComposition.RefreshCounts(partyVm.OtherPartyTroops);
-        }
-
-        if ((numberChanged || woundedChanged) &&
-            identity.Side == PartyScreenLogic.PartyRosterSide.Right)
-            partyVm.RefreshTopInformation();
-    }
-
-    private static void RefreshSort(
-        PartyScreenLogic logic,
-        TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyVM partyVm,
-        PartyScreenSelectionIdentity identity)
-    {
-        var sortType = logic.GetActiveSortTypeForSide(identity.Side);
-        if (sortType != PartyScreenLogic.TroopSortType.Count) return;
-
-        var troopComparer = logic.GetComparer(sortType);
-        troopComparer.SetIsAscending(logic.GetIsAscendingSortForSide(identity.Side));
-        var comparer = new TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyVM.TroopVMComparer(
-            troopComparer);
-        if (identity.Side == PartyScreenLogic.PartyRosterSide.Right)
-        {
-            if (identity.Type == PartyScreenLogic.TroopType.Member)
-                partyVm.MainPartyTroops.Sort(comparer);
-            else
-                partyVm.MainPartyPrisoners.Sort(comparer);
-        }
-        else if (identity.Type == PartyScreenLogic.TroopType.Member)
-        {
-            partyVm.OtherPartyTroops.Sort(comparer);
-        }
-        else
-        {
-            partyVm.OtherPartyPrisoners.Sort(comparer);
-        }
-    }
-
-    private static void RefreshUpgrades(PartyScreenLogic logic)
-    {
-        var partyVm = GetPartyVm(logic);
-        if (partyVm == null) return;
-
-        foreach (var row in partyVm.MainPartyTroops)
-        {
-            row.InitializeUpgrades();
-        }
-        partyVm.UpdateTroopManagerPopUpCounts();
-    }
-
     /// <summary>
     /// The open party screen, also while a conversation started from it is the active state.
     /// </summary>
     internal static PartyScreenLogic GetOpenLogic(GameStateManager gameStateManager)
         => gameStateManager?.LastOrDefault<PartyState>()?.PartyScreenLogic;
 
-    private static TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyVM GetPartyVm(
-        PartyScreenLogic logic)
+    private static PartyVM GetPartyVm(PartyScreenLogic logic)
     {
         var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
         return partyVm != null && ReferenceEquals(partyVm.PartyScreenLogic, logic)
@@ -406,34 +423,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             : null;
     }
 
-    private static PartyScreenSelectionIdentity GetIdentity(
-        PartyScreenLogic logic,
-        TroopRoster baseline,
-        CharacterObject character)
-    {
-        if (ReferenceEquals(baseline, logic._initialData.RightMemberRoster))
-            return new PartyScreenSelectionIdentity(
-                character,
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Member);
-        if (ReferenceEquals(baseline, logic._initialData.LeftMemberRoster))
-            return new PartyScreenSelectionIdentity(
-                character,
-                PartyScreenLogic.PartyRosterSide.Left,
-                PartyScreenLogic.TroopType.Member);
-        if (ReferenceEquals(baseline, logic._initialData.RightPrisonerRoster))
-            return new PartyScreenSelectionIdentity(
-                character,
-                PartyScreenLogic.PartyRosterSide.Right,
-                PartyScreenLogic.TroopType.Prisoner);
-        return new PartyScreenSelectionIdentity(
-            character,
-            PartyScreenLogic.PartyRosterSide.Left,
-            PartyScreenLogic.TroopType.Prisoner);
-    }
-
-    private static PartyScreenSelectionIdentity GetIdentity(
-        TaleWorlds.CampaignSystem.ViewModelCollection.Party.PartyCharacterVM row)
+    private static PartyScreenSelectionIdentity GetIdentity(PartyCharacterVM row)
         => new PartyScreenSelectionIdentity(row.Character, row.Side, row.Type);
 
     internal static T FindSelectionReplacement<T>(
@@ -452,10 +442,11 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             .FirstOrDefault(row => getIdentity(row).Matches(selection));
     }
 
-    private static void NotifyPendingChangesReset()
+    private static void NotifyCommandsDropped(IReadOnlyList<string> dropped)
     {
-        Logger.Information(PendingChangesResetMessage);
-        MBInformationManager.AddQuickInformation(new TextObject(PendingChangesResetMessage));
+        var message = CommandsDroppedMessage + " " + string.Join("; ", dropped);
+        Logger.Information(message);
+        InformationManager.DisplayMessage(new InformationMessage(message));
     }
 
     private readonly struct RosterElementState
@@ -479,48 +470,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             if (index < 0) return default;
 
             var element = roster.GetElementCopyAtIndex(index);
-            return new RosterElementState(
-                true,
-                element.Number,
-                element.WoundedNumber,
-                element.Xp);
-        }
-
-        public static bool TryRebase(
-            RosterElementState authoritative,
-            RosterElementState previousBaseline,
-            RosterElementState previousVisible,
-            out RosterElementState rebased)
-        {
-            long number = authoritative.Number +
-                ((long)previousVisible.Number - previousBaseline.Number);
-            long wounded = authoritative.Wounded +
-                ((long)previousVisible.Wounded - previousBaseline.Wounded);
-            long xp = authoritative.Xp +
-                ((long)previousVisible.Xp - previousBaseline.Xp);
-            if (number < 0 ||
-                number > int.MaxValue ||
-                wounded < 0 ||
-                wounded > number ||
-                xp < 0 ||
-                xp > int.MaxValue ||
-                (number == 0 && xp != 0))
-            {
-                rebased = default;
-                return false;
-            }
-
-            bool localExistenceChanged = previousVisible.Exists != previousBaseline.Exists;
-            bool exists = number != 0 ||
-                wounded != 0 ||
-                xp != 0 ||
-                (localExistenceChanged ? previousVisible.Exists : authoritative.Exists);
-            rebased = new RosterElementState(
-                exists,
-                (int)number,
-                (int)wounded,
-                (int)xp);
-            return true;
+            return new RosterElementState(true, element.Number, element.WoundedNumber, element.Xp);
         }
 
         public void Write(TroopRoster roster, CharacterObject character)

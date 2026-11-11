@@ -167,54 +167,35 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
         return fixture;
     }
 
-    private NetworkCompleteDoneLogic CreateDonationMessage(DonationFixture fixture)
+    private NetworkCommitPartyScreen CreateDonationMessage(DonationFixture fixture)
     {
         uint prisonerHandle = Server.GetHandle<CharacterObject>(fixture.PrisonerId);
-        var settlementDelta = new TroopRosterData(new[]
-        {
-            new TroopRosterElementData(prisonerHandle, 1, 0, 0),
-        });
-        var playerDelta = new TroopRosterData(new[]
-        {
-            new TroopRosterElementData(prisonerHandle, -1, 0, 0),
-        });
-        var donatedPrisoners = new[]
-        {
-            new FlattenedTroop(
-                fixture.PrisonerId,
-                isHero: false,
-                uniqueSeed: 1,
-                RosterTroopState.Active,
-                xp: 0,
-                xpGained: 0),
-        };
+        var donate = new PartyScreenCommandData(
+            PartyScreenLogic.PartyCommandCode.TransferTroop,
+            PartyScreenLogic.PartyRosterSide.Right,
+            PartyScreenLogic.TroopType.Prisoner,
+            prisonerHandle,
+            number: 1,
+            woundedNumber: 0,
+            upgradeTarget: 0);
 
-        return new NetworkCompleteDoneLogic(
+        return new NetworkCommitPartyScreen(
             fixture.MainHeroId,
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            Array.Empty<FlattenedTroop>(),
-            EmptyRosterData(),
-            settlementDelta,
-            EmptyRosterData(),
-            playerDelta,
-            Array.Empty<ItemRosterElement>(),
-            new UpgradedTroopHistoryData(new List<UpgradedTroopHistoryElementData>()),
-            leftPartyId: null,
-            leftPrisonerRosterId: null,
-            partyGoldChangeAmount: 0,
-            partyInfluenceChangeAmount: 0,
-            partyMoraleChangeAmount: 0,
-            doNotApplyGoldTransactions: true,
-            default,
-            Helpers.PartyScreenHelper.PartyScreenMode.Normal,
+            Helpers.PartyScreenHelper.PartyScreenMode.PrisonerManage,
+            PartyScreenDoneKind.DonatePrisoners,
+            new[] { donate },
             new TroopRosterOrderData(new()),
-            applyReleasedAndTakenPrisonerActions: false,
-            donationSettlementId: fixture.SettlementId,
-            donatedPrisonersRoster: donatedPrisoners);
+            leftPartyId: null,
+            leftMemberSeed: default,
+            leftPrisonerSeed: default,
+            isDonating: true,
+            doNotApplyGoldTransactions: true,
+            forceTransferId: null,
+            issueOwnerId: null,
+            issueId: null);
     }
 
-    private void Send(NetworkCompleteDoneLogic message)
+    private void Send(NetworkCommitPartyScreen message)
     {
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();
@@ -227,9 +208,6 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
         Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(fixture.PrisonerId, out var prisoner));
         return new ResolvedDonationFixture(mainHero.PartyBelongedTo.Party, settlement, prisoner);
     }
-
-    private static TroopRosterData EmptyRosterData() =>
-        new(Array.Empty<TroopRosterElementData>());
 
     public void Dispose() => TestEnvironment.Dispose();
 

@@ -53,12 +53,10 @@ public class AlternativeSolutionCommitmentsTests : IDisposable
             var delta = new TroopRosterData(new[] { new TroopRosterElementData(troopHandle, 4, 1, 20) });
             for (var i = 0; i < 200; i++)
             {
-                broker.Publish(this, new PartyDoneLogicApplied(client.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage,
-                    delta, heroId, "giver", "issue"));
+                broker.Publish(this, new PartyScreenCommitApplied(client.NetPeer, heroId, "giver", "issue", delta));
                 var consumed = Assert.Single(commitments.Consume(heroId, "giver", "issue", Array.Empty<TroopRosterElementData>()));
                 Assert.Equal((4, 1, 20), (consumed.Number, consumed.WoundedNumber, consumed.Xp));
-                broker.Publish(this, new PartyDoneLogicApplied(client.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage,
-                    delta, heroId, "giver", "issue"));
+                broker.Publish(this, new PartyScreenCommitApplied(client.NetPeer, heroId, "giver", "issue", delta));
                 commitments.ReturnForIssue("giver", "issue");
             }
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));

@@ -697,33 +697,28 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerHeroId, out var prisonerHero));
             Assert.True(Server.ObjectManager.TryGetHandle(prisonerHero.CharacterObject, out var prisonerCharacterId));
 
-            var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
-            var message = new NetworkCompleteDoneLogic(
+            var release = new PartyScreenCommandData(
+                PartyScreenLogic.PartyCommandCode.TransferTroop,
+                PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Prisoner,
+                prisonerCharacterId,
+                number: 1,
+                woundedNumber: 0,
+                upgradeTarget: 0);
+            var message = new NetworkCommitPartyScreen(
                 captorHeroId,
-                Array.Empty<FlattenedTroop>(),
-                Array.Empty<FlattenedTroop>(),
-                Array.Empty<FlattenedTroop>(),
-                emptyRosterDelta,
-                new TroopRosterData(new[]
-                {
-                    new TroopRosterElementData(prisonerCharacterId, 1, 0, 0),
-                }),
-                emptyRosterDelta,
-                new TroopRosterData(new[]
-                {
-                    new TroopRosterElementData(prisonerCharacterId, -1, 0, 0),
-                }),
-                captorParty.ItemRoster.ToArray(),
-                new UpgradedTroopHistoryData(new()),
-                null,
-                null,
-                0,
-                0,
-                0,
-                true,
-                captorParty.Position,
                 PartyScreenHelper.PartyScreenMode.Normal,
-                Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
+                PartyScreenDoneKind.Default,
+                new[] { release },
+                Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster),
+                leftPartyId: null,
+                leftMemberSeed: default,
+                leftPrisonerSeed: default,
+                isDonating: false,
+                doNotApplyGoldTransactions: true,
+                forceTransferId: null,
+                issueOwnerId: null,
+                issueId: null);
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.TryGetPlayer(captorHero, out var captor));

@@ -1,7 +1,11 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using Common.Network;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.TroopRosters.Data;
+using TaleWorlds.CampaignSystem.Settlements;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using System;
@@ -36,19 +40,22 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
     [Fact]
     public void ClientPartyDoneLogic_WithInfluenceGain_CreditsRequestingClan_OnAllClients()
     {
-        const int influenceGain = 50;
-
         string heroId = null;
         string clanId = null;
         string partyId = null;
         float baselineInfluence = 0;
 
-        // Arrange: a requesting player's party whose leader's clan sits in a kingdom (influence only applies to
-        // a clan that has a kingdom). The party + clan + kingdom are created on the server and replicate.
+        string troopId = null;
+
+        // Arrange: a requesting player's party, inside a town, whose leader's clan sits in a kingdom (influence
+        // only applies to a clan that has a kingdom). Everything is created on the server and replicates.
         Server.Call(() =>
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var town = GameObjectCreator.CreateInitializedObject<Town>();
+            var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
 
             var hero = party.LeaderHero;
             hero.Clan.Kingdom = kingdom;
@@ -56,49 +63,57 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
             // The server apply reads mainHero.PartyBelongedTo, so make sure the requesting hero belongs to its party.
             if (hero.PartyBelongedTo == null) hero.PartyBelongedTo = party;
 
+            settlement.Town = town;
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = hero.Clan;
+            town.IsOwnerUnassigned = false;
+            party.CurrentSettlement = settlement;
+            troop.Level = 26;
+            party.MemberRoster.AddToCounts(troop, 100);
+
             baselineInfluence = hero.Clan.Influence;
 
             Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
             Assert.True(Server.ObjectManager.TryGetId(hero, out heroId));
             Assert.True(Server.ObjectManager.TryGetId(hero.Clan, out clanId));
+            Assert.True(Server.ObjectManager.TryGetId(troop, out troopId));
 
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", heroId, string.Empty, string.Empty, string.Empty)));
             playerManager.SetPeer("RequestingControllerId", Clients.First().NetPeer);
         });
+        TestEnvironment.FlushCoalescer();
 
-        // Act: a client finishes the party screen with a pending influence gain and nothing else changed. This
-        // mirrors how PartyScreenLogicPatches builds the event; empty rosters keep the test focused on influence.
+        // Act: a client donates the troops to the town's garrison, which pays troop donation influence.
+        uint troopHandle = Server.GetHandle<CharacterObject>(troopId);
         var requestingClient = Clients.First();
         requestingClient.Call(() =>
         {
-            Assert.True(requestingClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
-            Assert.True(requestingClient.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
+            var donate = new PartyScreenCommandData(
+                PartyScreenLogic.PartyCommandCode.TransferTroop,
+                PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member,
+                troopHandle,
+                number: 100,
+                woundedNumber: 0,
+                upgradeTarget: 0);
 
-            var message = new PartyDoneLogicAttempted(
-                clientHero,
-                new FlattenedTroopRoster(4),
-                new FlattenedTroopRoster(4),
-                new FlattenedTroopRoster(4),
-                leftMemberRoster: null,
-                leftPrisonerRoster: null,
-                rightMemberRoster: null,
-                rightPrisonerRoster: null,
-                initialLeftMemberRoster: null,
-                initialLeftPrisonerRoster: null,
-                initialRightMemberRoster: null,
-                initialRightPrisonerRoster: null,
-                clientParty.ItemRoster,
-                new List<Tuple<CharacterObject, CharacterObject, int>>(),
-                leftParty: null,
-                partyGoldChangeAmount: 0,
-                partyInfluenceChangeAmount: influenceGain,
-                partyMoraleChangeAmount: 0,
+            requestingClient.Resolve<INetwork>().SendAll(new NetworkCommitPartyScreen(
+                heroId,
+                Helpers.PartyScreenHelper.PartyScreenMode.TroopsManage,
+                PartyScreenDoneKind.DonateGarrison,
+                new[] { donate },
+                new TroopRosterOrderData(new()),
+                leftPartyId: null,
+                leftMemberSeed: default,
+                leftPrisonerSeed: default,
+                isDonating: true,
                 doNotApplyGoldTransactions: true,
-                Helpers.PartyScreenHelper.PartyScreenMode.Normal);
-
-            requestingClient.SimulateMessage(this, message);
+                forceTransferId: null,
+                issueOwnerId: null,
+                issueId: null));
         });
+        TestEnvironment.FlushCoalescer();
 
         // Assert: the requesting clan - not the host's Hero.MainHero - was credited, and every client
         // converged on the server's value. We assert the increase and the server<->client match rather than an

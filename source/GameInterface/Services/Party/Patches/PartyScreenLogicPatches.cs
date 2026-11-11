@@ -34,13 +34,9 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
     {
-        // Force-transfer loot screens only honor member takes and dismissals: the
-        // commit validation rejects any prisoner, upgrade, gold, influence, or
-        // morale movement, which would fail after the screen already reset.
-        // Block those operations up front so the buttons simply stay disabled.
-        // ValidateCommand is also queried per-frame by the UI, so no message.
-        // Member transfers stay allowed (takes and dismissals); shifts and sorts
-        // only reorder and never affect the commit deltas.
+        // Force-transfer loot screens only honor member takes and dismissals, the server
+        // rejects prisoner, upgrade and recruit commands there. Block them up front so the
+        // buttons stay disabled. ValidateCommand is also queried per-frame by the UI, so no message.
         if (ForceTransferScreenTracker.HasOpenForceTransferScreen() &&
             IsBlockedOnForceTransferScreen(command.Code, command.Type))
         {
@@ -95,57 +91,26 @@ internal class PartyScreenLogicPatches
             }
         }
 
-        PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
-        PartyScreenHelperPatches.ResetPrisonerDonationRequest();
         var partyScreenMode = __instance._partyScreenMode;
+        bool isDonating = false;
         if (Game.Current.GameStateManager.ActiveState is PartyState activePartyState)
         {
             partyScreenMode = activePartyState.PartyScreenMode;
+            isDonating = activePartyState.IsDonating;
         }
+        // The PartyScreenHelper done handlers are patched to do nothing here, the server runs their effects.
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
-        bool applyReleasedAndTakenPrisonerActions =
-            PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
-        PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
-            out var donationSettlement,
-            out var donatedPrisonersRoster);
         if (flag)
         {
-            FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
-            foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
-            {
-                recruitedPrisonersRoster.Add(tuple.Item1, tuple.Item2, 0);
-            }
-
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
-            var message = new PartyDoneLogicAttempted(
+            MessageBroker.Instance.Publish(__instance, new PartyScreenCommitAttempted(
+                __instance,
                 Hero.MainHero,
-                releasedPrisonersRoster,
-                takenPrisonersRoster,
-                recruitedPrisonersRoster,
-                __instance.MemberRosters[0],
-                __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
-                __instance.PrisonerRosters[1],
-                __instance._initialData.LeftMemberRoster,
-                __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
-                __instance._initialData.RightPrisonerRoster,
-                __instance.RightOwnerParty.ItemRoster,
-                __instance.CurrentData.UpgradedTroopsHistory,
-                __instance.CurrentData.LeftParty,
-                __instance.CurrentData.PartyGoldChangeAmount,
-                __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
-                __instance.CurrentData.PartyMoraleChangeAmount,
-                __instance.DoNotApplyGoldTransactions,
                 partyScreenMode,
-                applyReleasedAndTakenPrisonerActions,
-                donationSettlement,
-                donatedPrisonersRoster,
-                forceTransferId
-            );
+                isDonating,
+                forceTransferId));
 
-            MessageBroker.Instance.Publish(__instance, message);
-            // Manage changing rosters on the server
+            // The server replays the commands and sends the results back, so undo them here.
             using (new AllowedThread())
             {
                 TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
@@ -214,6 +179,31 @@ internal class PartyScreenLogicPatches
     {
         sentTroops.Clear();
         sentTroops.Add(transferredTroops);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
+    [HarmonyPostfix]
+    public static void ResetPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.Clear(__instance);
+    }
+
+    // The troop manager popup saves on open and restores on cancel, so its commands roll back with it.
+    [HarmonyPatch(nameof(PartyScreenLogic.SavePartyScreenData))]
+    [HarmonyPostfix]
+    public static void SavePartyScreenDataPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.Save(__instance);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.ResetToLastSavedPartyScreenData))]
+    [HarmonyPostfix]
+    public static void ResetToLastSavedPartyScreenDataPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.RestoreSaved(__instance);
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]

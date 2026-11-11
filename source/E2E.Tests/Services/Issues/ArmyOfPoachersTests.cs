@@ -602,9 +602,8 @@ public class ArmyOfPoachersTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetHandle(Get<CharacterObject>(Server, troopId), out var handle));
                 var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 40, 0, 0) });
-                Server.Resolve<IMessageBroker>().Publish(this, new PartyDoneLogicApplied(Owner.NetPeer,
-                    PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
-                    playerA.HeroId, scenario.NotableId, QuestScenario.IssueId));
+                Server.Resolve<IMessageBroker>().Publish(this, new PartyScreenCommitApplied(Owner.NetPeer,
+                    playerA.HeroId, scenario.NotableId, QuestScenario.IssueId, delta));
             });
             IssueOf(Owner).StartIssueWithAlternativeSolution();
         });

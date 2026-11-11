@@ -2,7 +2,6 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
@@ -10,17 +9,18 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Party;
 
 /// <summary>
-/// Normal party-screen commits that release or take prisoners and recruit the same type in one Done.
+/// Normal party screen commits that release or take prisoners and recruit in one Done.
 /// </summary>
 public class PartyDoneLogicPrisonerRecruitTests : IDisposable
 {
+    // Enough conformity for every prisoner, the roster caps it at what the stack can use.
+    private const int FullConformity = 1_000_000;
+
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance Client => TestEnvironment.Clients.Single();
@@ -35,7 +35,7 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
     {
         var fixture = CreateFixture(prisonerCount: 3);
 
-        Send(CreateMessage(fixture, released: 1, recruited: 1, prisonerDelta: -2));
+        Send(fixture, seed: default, Release(fixture, 1), Recruit(fixture, 1));
 
         AssertCounts(fixture, prisoners: 1, members: 1);
     }
@@ -46,8 +46,12 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
     public void TakeAndRecruitOfSameType_AppliesBoth(int taken, int recruited)
     {
         var fixture = CreateFixture(prisonerCount: 1);
+        var seed = new TroopRosterData(new[]
+        {
+            new TroopRosterElementData(Handle(fixture), taken, 0, FullConformity),
+        });
 
-        Send(CreateMessage(fixture, released: 0, recruited: recruited, prisonerDelta: taken - recruited, taken: taken));
+        Send(fixture, seed, Take(fixture, taken), Recruit(fixture, recruited));
 
         AssertCounts(fixture, prisoners: 1 + taken - recruited, members: recruited);
     }
@@ -58,40 +62,23 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
         var fixture = CreateFixture(prisonerCount: 2);
         var other = CreateFixture(prisonerCount: 1, fixture.MainHeroId);
 
-        Send(CreateMessage(
-            fixture,
-            released: 1,
-            recruited: 0,
-            prisonerDelta: -1,
-            recruitedFixture: other));
+        Send(fixture, seed: default, Release(fixture, 1), Recruit(other, 1));
 
         AssertCounts(fixture, prisoners: 1, members: 0);
         AssertCounts(other, prisoners: 0, members: 1);
     }
 
     [Fact]
-    public void ReleaseNotMatchingPrisonerDelta_IsRejected()
+    public void StaleRecruit_IsRejectedAlone_AndTheReleaseStillApplies()
     {
-        var fixture = CreateFixture(prisonerCount: 3);
+        var fixture = CreateFixture(prisonerCount: 3, conformity: 0);
 
-        // One release and no recruit cannot remove two prisoners.
-        Send(CreateMessage(fixture, released: 1, recruited: 0, prisonerDelta: -2));
+        Send(fixture, seed: default, Recruit(fixture, 1), Release(fixture, 1));
 
-        AssertCounts(fixture, prisoners: 3, members: 0);
+        AssertCounts(fixture, prisoners: 2, members: 0);
     }
 
-    [Fact]
-    public void RecruitCountedAsRelease_IsRejected()
-    {
-        var fixture = CreateFixture(prisonerCount: 3);
-
-        // Recruits leave the prison roster, so a recruit plus a release of two only covers three.
-        Send(CreateMessage(fixture, released: 2, recruited: 1, prisonerDelta: -2));
-
-        AssertCounts(fixture, prisoners: 3, members: 0);
-    }
-
-    private PrisonerFixture CreateFixture(int prisonerCount, string mainHeroId = null)
+    private PrisonerFixture CreateFixture(int prisonerCount, string mainHeroId = null, int conformity = FullConformity)
     {
         PrisonerFixture fixture = default;
         Server.Call(() =>
@@ -109,6 +96,7 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
 
             var prisoner = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             party.PrisonRoster.AddToCounts(prisoner, prisonerCount);
+            if (conformity != 0) party.PrisonRoster.AddXpToTroop(prisoner, conformity);
 
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
             Assert.True(Server.ObjectManager.TryGetId(prisoner, out var prisonerId));
@@ -125,66 +113,41 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
         return fixture;
     }
 
-    private NetworkCompleteDoneLogic CreateMessage(
+    private uint Handle(PrisonerFixture fixture) => Server.GetHandle<CharacterObject>(fixture.PrisonerId);
+
+    private PartyScreenCommandData Release(PrisonerFixture fixture, int number)
+        => Command(PartyScreenLogic.PartyCommandCode.TransferTroop, PartyScreenLogic.PartyRosterSide.Right, fixture, number);
+
+    private PartyScreenCommandData Take(PrisonerFixture fixture, int number)
+        => Command(PartyScreenLogic.PartyCommandCode.TransferTroop, PartyScreenLogic.PartyRosterSide.Left, fixture, number);
+
+    private PartyScreenCommandData Recruit(PrisonerFixture fixture, int number)
+        => Command(PartyScreenLogic.PartyCommandCode.RecruitTroop, PartyScreenLogic.PartyRosterSide.Right, fixture, number);
+
+    private PartyScreenCommandData Command(
+        PartyScreenLogic.PartyCommandCode code,
+        PartyScreenLogic.PartyRosterSide side,
         PrisonerFixture fixture,
-        int released,
-        int recruited,
-        int prisonerDelta,
-        PrisonerFixture? recruitedFixture = null,
-        int taken = 0)
+        int number)
+        => new(code, side, PartyScreenLogic.TroopType.Prisoner, Handle(fixture), number, 0, 0);
+
+    private void Send(PrisonerFixture fixture, TroopRosterData seed, params PartyScreenCommandData[] commands)
     {
-        uint prisonerHandle = Server.GetHandle<CharacterObject>(fixture.PrisonerId);
-        var prisonerDeltas = new List<TroopRosterElementData>();
-        // PackTroopRosterDelta leaves out an unchanged stack.
-        if (prisonerDelta != 0)
-            prisonerDeltas.Add(new TroopRosterElementData(prisonerHandle, prisonerDelta, 0, 0));
-        var memberDeltas = new List<TroopRosterElementData>();
-        if (recruited != 0)
-            memberDeltas.Add(new TroopRosterElementData(prisonerHandle, recruited, 0, 0));
-
-        var recruitedPrisoners = Troops(fixture.PrisonerId, recruited, firstSeed: 100).ToList();
-        if (recruitedFixture.HasValue)
-        {
-            uint otherHandle = Server.GetHandle<CharacterObject>(recruitedFixture.Value.PrisonerId);
-            prisonerDeltas.Add(new TroopRosterElementData(otherHandle, -1, 0, 0));
-            memberDeltas.Add(new TroopRosterElementData(otherHandle, 1, 0, 0));
-            recruitedPrisoners.AddRange(Troops(recruitedFixture.Value.PrisonerId, 1, firstSeed: 200));
-        }
-
-        return new NetworkCompleteDoneLogic(
+        var message = new NetworkCommitPartyScreen(
             fixture.MainHeroId,
-            Troops(fixture.PrisonerId, released, firstSeed: 1).ToArray(),
-            Troops(fixture.PrisonerId, taken, firstSeed: 300).ToArray(),
-            recruitedPrisoners.ToArray(),
-            EmptyRosterData(),
-            EmptyRosterData(),
-            new TroopRosterData(memberDeltas.ToArray()),
-            new TroopRosterData(prisonerDeltas.ToArray()),
-            Array.Empty<ItemRosterElement>(),
-            new UpgradedTroopHistoryData(new List<UpgradedTroopHistoryElementData>()),
-            leftPartyId: null,
-            leftPrisonerRosterId: null,
-            partyGoldChangeAmount: 0,
-            partyInfluenceChangeAmount: 0,
-            partyMoraleChangeAmount: 0,
-            doNotApplyGoldTransactions: true,
-            default,
             Helpers.PartyScreenHelper.PartyScreenMode.Normal,
+            PartyScreenDoneKind.Default,
+            commands,
             new TroopRosterOrderData(new()),
-            applyReleasedAndTakenPrisonerActions: true);
-    }
+            leftPartyId: null,
+            leftMemberSeed: default,
+            leftPrisonerSeed: seed,
+            isDonating: false,
+            doNotApplyGoldTransactions: true,
+            forceTransferId: null,
+            issueOwnerId: null,
+            issueId: null);
 
-    private static IEnumerable<FlattenedTroop> Troops(string characterId, int count, int firstSeed)
-        => Enumerable.Range(firstSeed, count).Select(seed => new FlattenedTroop(
-            characterId,
-            isHero: false,
-            uniqueSeed: seed,
-            RosterTroopState.Active,
-            xp: 0,
-            xpGained: 0));
-
-    private void Send(NetworkCompleteDoneLogic message)
-    {
         Client.Call(() => Client.Resolve<INetwork>().SendAll(message));
         TestEnvironment.FlushCoalescer();
     }
@@ -200,9 +163,6 @@ public class PartyDoneLogicPrisonerRecruitTests : IDisposable
             Assert.Equal(members, party.MemberRoster.GetTroopCount(prisoner));
         });
     }
-
-    private static TroopRosterData EmptyRosterData() =>
-        new(Array.Empty<TroopRosterElementData>());
 
     public void Dispose() => TestEnvironment.Dispose();
 
