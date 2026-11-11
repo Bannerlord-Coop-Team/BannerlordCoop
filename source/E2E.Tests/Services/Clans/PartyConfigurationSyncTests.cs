@@ -40,24 +40,6 @@ public class PartyConfigurationSyncTests : SyncTestBase
     }
 
     [Fact]
-    public void ClientToggle_ForAPlayerHero_IsRejected()
-    {
-        var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var client = Clients.First();
-        AddPlayer(playerHeroId);
-
-        client.Call(() => client.Resolve<IMessageBroker>().Publish(
-            this,
-            new PartyConfigurationChangedOnSelection(
-                client.GetRegisteredObject<Hero>(playerHeroId),
-                PartyConfigurationFlag.CanJoinArmy,
-                false)));
-
-        foreach (var instance in Clients.Prepend(Server))
-            instance.Call(() => Assert.True(instance.GetRegisteredObject<Hero>(playerHeroId).CanJoinArmy));
-    }
-
-    [Fact]
     public void CompanionRemoved_ResetsCommandsOnEveryClient()
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();

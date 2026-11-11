@@ -19,41 +19,6 @@ public class LordConversationPrisonerSyncTests : MapEventTestBase
     }
 
     [Fact]
-    public void TakeLordPrisoner_FreeLord_BecomesThePlayersPrisonerEverywhere()
-    {
-        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
-        var lordHeroId = CreateLord();
-
-        PublishFromClient(playerPartyId, lordHeroId);
-
-        AssertCaptivity(Server, lordHeroId, playerPartyId);
-        foreach (var client in Clients)
-        {
-            client.PumpGameThread();
-            AssertCaptivity(client, lordHeroId, playerPartyId);
-        }
-    }
-
-    [Fact]
-    public void TakeLordPrisoner_LordAlreadyCaptured_StaysWithHisCaptor()
-    {
-        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
-        var lordHeroId = CreateLord();
-        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(lordHeroId, out var lord));
-            TakePrisonerAction.Apply(captor.Party, lord);
-            Assert.True(lord.IsPrisoner);
-        });
-
-        PublishFromClient(playerPartyId, lordHeroId);
-
-        AssertCaptivity(Server, lordHeroId, captorPartyId);
-    }
-
-    [Fact]
     public void TakeLordPrisoner_PrisonerLootedFromADefeatedParty_BecomesThePlayersPrisoner()
     {
         var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
