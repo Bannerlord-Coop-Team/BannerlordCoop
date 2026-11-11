@@ -1937,6 +1937,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     continue;
                 }
 
+                // A seated agent's owner sends no movement, so a sample reaching its seated puppet was sent before the seat.
+                if (stationSeats?.IsAppliedSeat(agentInfo.AgentId) == true)
+                {
+                    RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+                    seatedIgnored++;
+                    continue;
+                }
+
                 // The interpolator owns a deck pose and its rebased directions every tick.
                 if (data.DeckShipIndex != 0)
                 {

@@ -765,6 +765,8 @@ public class NavalShipEngine : INavalShipEngine
     // Vanilla's spawn seating teleports the same way; the seat lock keeps steering the agent's XY and facing afterwards.
     public void PlaceSeatedAgent(Agent agent, Vec3 position) => agent.TeleportToPosition(position);
 
+    public Vec3 GetStationPosition(UsableMissionObject point) => point.GameEntity.GetGlobalFrame().origin;
+
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
         ropeRegistry.Capture((MissionShip)hull, shipIdOf);
 

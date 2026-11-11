@@ -180,7 +180,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     // The ship controller type names the live engine reports: none on a copy, AI on a hull this client simulates.
     public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "None" : "AI";
 
-    public MissionObject GetSupportHull(Agent agent) => null!;
+    // The hull whose deck the agent stands on, as the live engine reads its stepped ship.
+    public MissionObject GetSupportHull(Agent agent) => DeckOf(agent)?.Hull!;
 
     // Fake hulls have no physics box, so no deck pose is refused for its distance.
     public bool TryGetFootprint(MissionObject hull, out Vec2 min, out Vec2 max)
@@ -221,6 +222,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         if (inUse)
         {
             fake.Seats[point] = agent;
+            if (fake.Hooks.Contains(point)) return;
+
             var spawn = SpawnSeatPose(fake, point);
             SeatPoses[agent] = WalksIn.Contains(agent) ? WithPose(spawn, isSitting: false, spawn.Position + WalkInRaise) : spawn;
         }
@@ -283,9 +286,15 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public bool IsStruck(Agent agent) => SeatPoses.TryGetValue(agent, out var pose) && pose.IsStruck;
 
+    // A station's origin on its hull, as its spawn pose frames it.
+    public Vec3 GetStationPosition(UsableMissionObject point) => HullOfStation(point).Frame.origin + StationOffset;
+
+    // Records the placement, which stands the agent on the hull of the station it holds.
     public void PlaceSeatedAgent(Agent agent, Vec3 position)
     {
         SeatPlacements.Add((agent, position));
+        var seatHull = hulls.FirstOrDefault(fake => fake.Seats.Values.Any(seated => ReferenceEquals(seated, agent)));
+        if (seatHull != null) decks[agent] = seatHull;
         if (SeatPoses.TryGetValue(agent, out var pose)) SeatPoses[agent] = WithPose(pose, pose.IsSitting, position);
     }
 
@@ -481,6 +490,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         decks[agent] = Of(deck);
         if (crewHull != null) crews[agent] = Of(crewHull);
     }
+
+    /// <summary>Takes <paramref name="agent"/> off every deck, as one that fell into the water.</summary>
+    public void Overboard(Agent agent) => decks.Remove(agent);
 
     /// <summary>Makes <paramref name="agent"/> crew of <paramref name="crewHull"/> without standing it on a deck, as a swimmer.</summary>
     public void AssignCrew(Agent agent, MissionObject crewHull) => crews[agent] = Of(crewHull);
@@ -818,6 +830,8 @@ public sealed class FakeHull
     public List<MissionObject?> AppliedHitters { get; } = new();
     public Dictionary<(string Key, int Index), UsableMissionObject> Stations { get; } = new();
     public Dictionary<UsableMissionObject, Agent> Seats { get; } = new(ReferenceEqualityComparer.Instance);
+    /// <summary>The grappling hook stations, whose pilots have no pilot seat pose, unlike the oars every other station stands for.</summary>
+    public HashSet<UsableMissionObject> Hooks { get; } = new(ReferenceEqualityComparer.Instance);
     /// <summary>The hull's ship siege weapon, a constructor-skipped ballista, once <see cref="ArmWeapon"/> mounted it.</summary>
     public RangedSiegeWeapon? Weapon { get; private set; }
     public string WeaponKey { get; private set; } = null!;
@@ -844,6 +858,14 @@ public sealed class FakeHull
             Stations.Add((key, index), point);
         }
 
+        return point;
+    }
+
+    /// <summary>The grappling hook station at a content path, created on first use.</summary>
+    public UsableMissionObject Hook(string key, int index = 0)
+    {
+        var point = Station(key, index);
+        Hooks.Add(point);
         return point;
     }
 

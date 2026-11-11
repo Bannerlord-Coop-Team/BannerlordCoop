@@ -96,6 +96,9 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Moves a seated agent to <paramref name="position"/>, leaving its seat and actions as they are.</summary>
     void PlaceSeatedAgent(Agent agent, Vec3 position);
 
+    /// <summary>[Game thread] Where the point stands on its hull now, where vanilla's helm spawn seating puts its pilot.</summary>
+    Vec3 GetStationPosition(UsableMissionObject point);
+
     /// <summary>[Game thread] Hands a hull's simulation away from this client: it becomes a copy steered toward its owner's samples.</summary>
     void ReleaseHull(MissionObject hull);
 

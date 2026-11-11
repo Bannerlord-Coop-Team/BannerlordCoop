@@ -11,11 +11,14 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
-/// <summary>The agents this client seated at a ship station, whose movement and actions the handlers leave to the station.</summary>
+/// <summary>The agents seated at a ship station here, whose movement and actions the handlers leave to the station.</summary>
 public interface IShipStationSeats
 {
     /// <summary>[Game thread] Whether this client seated the agent.</summary>
     bool IsOwnSeat(Guid agentId);
+
+    /// <summary>[Game thread] Whether the agent is a puppet its remote owner keeps seated here, also while it is being re-seated.</summary>
+    bool IsAppliedSeat(Guid agentId);
 }
 
 /// <summary>
@@ -81,7 +84,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // those the owner's late release showed were its own; staleUses and obsoleteReleases (nothing left to release) are expected.
     private long sent, applied, dropped, staleUses, obsoleteReleases, unownedPuppetReleases, pinned, ownerReleases,
         sinkingUseReleases, sinkingSafetyNetReleases, withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats,
-        adoptedSeats, reseatAttempts;
+        adoptedSeats, reseatAttempts, strandedReturns;
 
     // Subscribes to this client's use and release patches, the owners' uses and mission entries, and gives the movement and
     // action handlers its seats.
@@ -170,6 +173,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     }
 
     public bool IsOwnSeat(Guid agentId) => ownSeated.ContainsKey(agentId);
+
+    public bool IsAppliedSeat(Guid agentId) => appliedSeats.ContainsKey(agentId);
 
     // [Poller thread] Hands an owner's use to the game thread, which keeps it pending.
     private void Handle_NetworkAgentStationUse(MessagePayload<NetworkAgentStationUse> payload)
@@ -301,9 +306,25 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
                 agentId, DescribeStation(seat.Point));
         }
 
+        bool stranded = !ReferenceEquals(engine.GetSupportHull(seat.Agent), seat.Hull);
         Apply(seat.Agent, seat.Point, inUse: true);
         settler.Restart(agentId);
-        return engine.IsSeated(seat.Agent, seat.Point);
+        if (!engine.IsSeated(seat.Agent, seat.Point)) return false;
+
+        if (stranded) ReturnToStation(agentId, seat);
+        return true;
+    }
+
+    // Vanilla's spawn seating places a helm's or an oar's pilot on its hull, but nothing places a hook's, so a puppet re-seated
+    // from the water would stay there; it is put on its station as the helm's spawn seating puts its pilot.
+    private void ReturnToStation(Guid agentId, AppliedSeat seat)
+    {
+        if (engine.ReadSeatPose(seat.Agent, seat.Point).Kind != StationSeatKind.None) return;
+
+        engine.PlaceSeatedAgent(seat.Agent, engine.GetStationPosition(seat.Point));
+        strandedReturns++;
+        Logger.Debug("[NavalSync] Put puppet {AgentId} back on its station {Station}, off its hull", agentId,
+            DescribeStation(seat.Point));
     }
 
     public int ReleaseSeatsOn(MissionObject hull)
@@ -566,6 +587,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         detachedSeats,
         adoptedSeats,
         reseatAttempts,
+        strandedReturns,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
