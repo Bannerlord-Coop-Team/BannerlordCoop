@@ -117,7 +117,7 @@ public class BattleWaterTimeEstimatorTests
     }
 
     [Fact]
-    public void BehindTheLoadingScreen_APersistentForwardGap_JumpsForward()
+    public void BeforeTheLocalClockMoves_APersistentForwardGap_JumpsForward()
     {
         estimator.Begin(1000f, 0f);
         estimator.AddHostSample(5000f, 1000f);

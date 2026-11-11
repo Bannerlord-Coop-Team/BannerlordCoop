@@ -59,6 +59,7 @@ public class NavalWaterClockScenarioTests : NavalBattleTestEnvironment
         AssertNeverBackwards(waterC);
     }
 
+    // Host samples keep coming while only the follower's clock stalls mid-battle; on resume it catches up without a jump.
     [Fact]
     public void FollowerClockStall_CatchesUpWithoutAMidBattleWaterJump()
     {

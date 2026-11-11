@@ -7,8 +7,8 @@ using System.Linq;
 namespace Missions.Battles;
 
 /// <summary>
-/// Turns the battle host's water time samples into this client's water time: once begun it never runs backwards, and once
-/// the battle shows only a host change jumps it forward, so the sea phase doesn't snap under the hulls.
+/// Turns the battle host's water time samples into this client's water time: it never runs backwards, and once the local
+/// clock moves a forward gap is slewed, jumping only on the first adoption or after a host change.
 /// </summary>
 public interface IBattleWaterTimeEstimator
 {
@@ -61,8 +61,8 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     private bool jumpPending;
     // A persistent forward gap slews at the catch-up rate until the applied offset reaches the target.
     private bool catchingUp;
-    // Whether the local clock has moved since Begin; until then the battle is still behind the loading screen.
-    private bool shown;
+    // Whether the local clock has moved since Begin; until it does no water has run, so a forward gap can still jump.
+    private bool hasLocalProgress;
 
     public bool HasHostTime { get; private set; }
 
@@ -121,7 +121,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     {
         double step = lastLocal.HasValue ? Math.Max(0.0, localTime - lastLocal.Value) : 0.0;
         lastLocal = localTime;
-        shown |= step > 0.0;
+        hasLocalProgress |= step > 0.0;
         if (isHost) return Hold(localTime);
 
         if (jumpPending && TargetOffset > AppliedOffset)
@@ -141,16 +141,16 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     // Sets a forward target the next advance jumps to.
     private void JumpTo(double offset)
     {
-        if (shown)
+        if (hasLocalProgress)
             Logger.Information("[NavalSync] Water time jumped forward {Gap} to the battle host's", offset - AppliedOffset);
         TargetOffset = offset;
         jumpPending = true;
     }
 
-    // Sets a forward target the advances catch up to at the faster rate; behind the loading screen it jumps instead.
+    // Sets a forward target the advances catch up to at the faster rate; before the local clock has moved it jumps instead.
     private void CatchUpTo(double offset)
     {
-        if (!shown)
+        if (!hasLocalProgress)
         {
             JumpTo(offset);
             return;
