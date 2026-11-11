@@ -12,8 +12,8 @@ namespace Common.Logging;
 /// </summary>
 public interface ISessionSummarySink : ILogEventSink
 {
-    /// <summary>Writes the summary once and returns true; later calls (an unload after a crash) write nothing.</summary>
-    bool WriteSummary(ILogger logger, string reason);
+    /// <summary>Writes the summary once; later calls (an unload after a crash) write nothing.</summary>
+    void WriteSummary(string reason);
 }
 
 /// <inheritdoc />
@@ -21,11 +21,18 @@ public sealed class SessionSummarySink : ISessionSummarySink
 {
     private const string UnknownSource = "unknown";
 
+    private readonly ILogger logger;
     private readonly object gate = new object();
     private readonly Dictionary<string, int> errorsBySource = new Dictionary<string, int>(StringComparer.Ordinal);
     private int warnings;
     private int fatal;
     private bool written;
+
+    /// <summary>Writes the summary to <paramref name="logger"/>.</summary>
+    public SessionSummarySink(ILogger logger)
+    {
+        this.logger = logger;
+    }
 
     /// <summary>Counts the event when it is a Warning, Error or Fatal.</summary>
     public void Emit(LogEvent logEvent)
@@ -52,14 +59,14 @@ public sealed class SessionSummarySink : ISessionSummarySink
     }
 
     /// <inheritdoc />
-    public bool WriteSummary(ILogger logger, string reason)
+    public void WriteSummary(string reason)
     {
         int warningCount;
         int fatalCount;
         KeyValuePair<string, int>[] sources;
         lock (gate)
         {
-            if (written) return false;
+            if (written) return;
 
             written = true;
             warningCount = warnings;
@@ -78,8 +85,6 @@ public sealed class SessionSummarySink : ISessionSummarySink
             // Closed generic type names hold spaces, so they're replaced to keep each key=value pair space-free.
             logger.Information("[Session] errors source={Source:l} n={Count}", source.Key.Replace(' ', '_'), source.Value);
         }
-
-        return true;
     }
 
     // Returns the event's SourceContext, or "unknown" when it has none.

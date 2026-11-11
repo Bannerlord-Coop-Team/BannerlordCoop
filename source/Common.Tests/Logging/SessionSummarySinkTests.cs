@@ -12,7 +12,9 @@ public class SessionSummarySinkTests
     [Fact]
     public void WriteSummary_CountsLevelsAndErrorsPerSource()
     {
-        var sink = new SessionSummarySink();
+        var capture = new CaptureSink();
+        using var logger = new LoggerConfiguration().WriteTo.Sink(capture).CreateLogger();
+        var sink = new SessionSummarySink(logger);
         sink.Emit(CreateEvent(LogEventLevel.Debug, "Coop.A"));
         sink.Emit(CreateEvent(LogEventLevel.Information, "Coop.A"));
         sink.Emit(CreateEvent(LogEventLevel.Warning, "Coop.A"));
@@ -23,10 +25,7 @@ public class SessionSummarySinkTests
         sink.Emit(CreateEvent(LogEventLevel.Fatal, "Coop.B"));
         sink.Emit(CreateEvent(LogEventLevel.Warning, "Coop.C"));
 
-        var capture = new CaptureSink();
-        using var logger = new LoggerConfiguration().WriteTo.Sink(capture).CreateLogger();
-
-        Assert.True(sink.WriteSummary(logger, "exit"));
+        sink.WriteSummary("exit");
 
         var lines = capture.Events.Select(e => e.RenderMessage()).ToArray();
         Assert.Equal(new[]

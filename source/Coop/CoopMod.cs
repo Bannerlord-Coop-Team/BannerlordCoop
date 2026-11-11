@@ -244,7 +244,7 @@ namespace Coop
                 compactedLogFileSizeBytes)));
 
             Logger = LogManager.GetLogger<CoopMod>();
-            SessionSummary = new SessionSummarySink();
+            SessionSummary = new SessionSummarySink(Logger);
             configuration.WriteTo.Sink(SessionSummary);
             logFileOpener.LogFailures(Logger);
         }
@@ -610,7 +610,7 @@ namespace Coop
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
 #endif
-            if (Logger != null) SessionSummary.WriteSummary(Logger, "exit");
+            SessionSummary?.WriteSummary("exit");
             base.OnSubModuleUnloaded();
         }
 
@@ -800,7 +800,7 @@ namespace Coop
 
             Logger.Fatal(ex, "Unhandled exception");
             Logger.Fatal(ex.StackTrace);
-            SessionSummary.WriteSummary(Logger, "crash");
+            SessionSummary?.WriteSummary("crash");
             // The file sink flushes every event; this sends Seq's buffered events, if a Seq server is listening.
             LogManager.CloseAndFlush(TimeSpan.FromSeconds(1));
         }
