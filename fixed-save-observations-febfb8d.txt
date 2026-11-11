@@ -1,0 +1,18 @@
+Original save, dedicated server and one client
+The saved peace decision was present on the server and client before voting.
+Yes and Done were selected through the kingdom decision dialog. The player returned to the map.
+
+Client log excerpts:
+Kingdom decision final selection for Kingdom_Created_9 decision 0: sent to the server; the player clan votes in this round
+Kingdom decision panel closed after the vote was submitted for Kingdom_Created_9 decision 0; the round continues
+
+The server sent NetworkMakePeace and NetworkRemoveDecision. Its captured log has no NullReferenceException.
+After disconnecting and rejoining, the kingdom tab could be opened and closed normally.
+The decision lists on the server and client were empty after the voting deadline.
+
+Staff-repaired save, dedicated server and one client
+There was no pending decision before or after the client rejoined.
+The kingdom tab opened and closed normally after rejoining.
+
+With both saves, Done returned to the map after leaving the kingdom tab open for 65 seconds.
+The client stayed responsive and had no memory growth warning in either case.
