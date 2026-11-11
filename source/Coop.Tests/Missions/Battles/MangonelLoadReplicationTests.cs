@@ -47,7 +47,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         Stub(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(MainHand));
         Stub(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(OffHand));
         Stub(typeof(Agent), nameof(Agent.UseGameObject), nameof(Use));
-        // Stub the body, not the one-line StopUsingGameObject wrapper, which an optimized caller can run past the prefix.
+        // StopUsingGameObject only forwards here, so stubbing the body covers every caller.
         Stub(typeof(Agent), "StopUsingGameObjectAux", nameof(Stop));
         Stub(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Action));
         Stub(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(CurrentAction));
