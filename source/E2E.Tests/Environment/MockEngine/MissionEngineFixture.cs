@@ -115,6 +115,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_ClothingColor1", nameof(Agent_get_ClothingColor1));
         Prefix(typeof(Agent), "get_ClothingColor2", nameof(Agent_get_ClothingColor2));
         Prefix(typeof(Agent), "get_CurrentlyUsedGameObject", nameof(Agent_get_CurrentlyUsedGameObject));
+        Prefix(typeof(Agent), "set_CurrentlyUsedGameObject", nameof(Agent_set_CurrentlyUsedGameObject));
         Prefix(typeof(Agent), nameof(Agent.UseGameObject), nameof(Agent_UseGameObject));
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), nameof(Agent.StopUsingGameObjectMT), nameof(Agent_StopUsingGameObject));
@@ -641,6 +642,14 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
         __result = mirror.CurrentlyUsedGameObject;
+        return false;
+    }
+
+    // A direct release of the managed link (the naval removed station user guard) clears the mirror too.
+    private static bool Agent_set_CurrentlyUsedGameObject(Agent __instance, UsableMissionObject value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.CurrentlyUsedGameObject = value;
         return false;
     }
 
