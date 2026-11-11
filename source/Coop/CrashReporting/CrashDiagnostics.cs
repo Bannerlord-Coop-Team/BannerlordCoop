@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -9,6 +10,7 @@ namespace Coop.CrashReporting
 {
     internal static class CrashDiagnostics
     {
+        private static readonly ILogger Logger = LogManager.GetLogger(typeof(CrashDiagnostics));
         private const int MaximumPhaseCount = 8;
         private static readonly object SyncRoot = new object();
         private static readonly Queue<string> Phases = new Queue<string>(MaximumPhaseCount);
@@ -19,17 +21,12 @@ namespace Coop.CrashReporting
         private static string role = "unknown";
         private static string phase = "boot";
 
-        // Created in Initialize, after CoopMod configures logging, because LogManager freezes its configuration
-        // at the first event and a phase logged before that would leave out the file sink and minimum level.
-        private static IPhaseChangeLog phaseLog;
-
         internal static void Initialize(string buildValue, string roleValue)
         {
             lock (SyncRoot)
             {
                 build = buildValue;
                 role = roleValue;
-                phaseLog = new PhaseChangeLog(LogManager.GetLogger(typeof(CrashDiagnostics)));
                 Rebuild();
             }
         }
@@ -38,6 +35,9 @@ namespace Coop.CrashReporting
         {
             lock (SyncRoot)
             {
+                if (value != phase)
+                    Logger.Information("Phase changed to {Phase}", value);
+
                 phase = value;
                 if (Phases.Count == MaximumPhaseCount)
                     Phases.Dequeue();
@@ -48,7 +48,6 @@ namespace Coop.CrashReporting
                     DateTime.UtcNow,
                     value));
                 Rebuild();
-                phaseLog?.Report(value);
             }
         }
 
