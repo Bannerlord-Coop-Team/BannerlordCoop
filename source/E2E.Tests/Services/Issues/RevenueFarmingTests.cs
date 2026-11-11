@@ -190,6 +190,42 @@ public sealed class RevenueFarmingTests : IDisposable
     }
 
     [Fact]
+    public void LosingAcceptKeepsItsOwnStateUntilTheRejectionCancelsIt()
+    {
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(Server.NetPeer, Observer.NetPeer);
+        Accept();
+        scenario.Accept(Observer);
+        var stray = Quest(Observer);
+        var villages = stray.RevenueVillages.ToArray();
+        var requested = stray._totalRequestedDenars;
+        var journal = stray.JournalEntries.ToArray();
+        var accepted = new List<string>();
+        Observer.Call(() => Observer.Resolve<IMessageBroker>().Subscribe<QuestSolutionAcceptedOnClient>(
+            payload => accepted.Add(payload.What.ControllerId)));
+
+        router.ResumeLink(Server.NetPeer, Observer.NetPeer);
+        environment.FlushCoalescer();
+
+        Assert.Equal(QuestScenario.ControllerA, Assert.Single(accepted));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Observer.Call(() =>
+        {
+            Assert.True(stray.IsFinalized);
+            Assert.Null(Object<Hero>(Observer, scenario.NotableId).Issue.IssueQuest);
+            Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
+            Assert.Equal(requested, stray._totalRequestedDenars);
+            Assert.Equal(journal, stray.JournalEntries);
+            for (var i = 0; i < villages.Length; i++) Assert.Same(villages[i], stray.RevenueVillages[i]);
+            Assert.Equal(QuestScenario.ControllerB, Observer.Resolve<IRevenueFarmingSessionStore>().Get(stray).ControllerId);
+        });
+        Client.Call(() => Assert.True(Quest(Client).IsOngoing));
+    }
+
+    [Fact]
     public void HourlyCollectionReplicatesProgressAndGoldOnlyForTheOwner()
     {
         Accept();
