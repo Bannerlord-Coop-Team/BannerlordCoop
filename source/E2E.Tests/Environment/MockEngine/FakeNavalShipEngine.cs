@@ -36,8 +36,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     private readonly Dictionary<Agent, FakeHull> parkedFrom = new(ReferenceEqualityComparer.Instance);
     // Every agent any parking lifted, kept after it is put back, so a park then unpark still shows.
     private readonly HashSet<Agent> everParked = new(ReferenceEqualityComparer.Instance);
-    // Agents that fell into the water, on no hull until a placement puts them back.
-    private readonly HashSet<Agent> overboard = new(ReferenceEqualityComparer.Instance);
     // The free ship assignment slots lent to hulls holding none, as NavalShipEngine.RemoveThroughLentAssignment lends them.
     private readonly List<FakeHull> lentSlots = new();
     private readonly List<string> removalViolations = new();
@@ -182,13 +180,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     // The ship controller type names the live engine reports: none on a copy, AI on a hull this client simulates.
     public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "None" : "AI";
 
-    // The hull whose deck the agent stands on, as the live engine reads its stepped ship; crew put on no deck stand at their station.
-    public MissionObject GetSupportHull(Agent agent) =>
-        overboard.Contains(agent) ? null! : (DeckOf(agent) ?? HullSeating(agent))?.Hull!;
-
-    // The hull of the station the agent holds, or null.
-    private FakeHull? HullSeating(Agent agent) =>
-        hulls.FirstOrDefault(fake => fake.Seats.Values.Any(seated => ReferenceEquals(seated, agent)));
+    // The hull whose deck the test or a placement stood the agent on, as the live engine reads its stepped ship.
+    public MissionObject GetSupportHull(Agent agent) => DeckOf(agent)?.Hull!;
 
     // Fake hulls have no physics box, so no deck pose is refused for its distance.
     public bool TryGetFootprint(MissionObject hull, out Vec2 min, out Vec2 max)
@@ -300,9 +293,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     public void PlaceSeatedAgent(Agent agent, Vec3 position)
     {
         SeatPlacements.Add((agent, position));
-        var seatHull = HullSeating(agent);
+        var seatHull = hulls.FirstOrDefault(fake => fake.Seats.Values.Any(seated => ReferenceEquals(seated, agent)));
         if (seatHull != null) decks[agent] = seatHull;
-        overboard.Remove(agent);
         if (SeatPoses.TryGetValue(agent, out var pose)) SeatPoses[agent] = WithPose(pose, pose.IsSitting, position);
     }
 
@@ -496,16 +488,11 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     public void PlaceAgent(Agent agent, MissionObject deck, MissionObject? crewHull = null)
     {
         decks[agent] = Of(deck);
-        overboard.Remove(agent);
         if (crewHull != null) crews[agent] = Of(crewHull);
     }
 
     /// <summary>Takes <paramref name="agent"/> off every deck, as one that fell into the water.</summary>
-    public void Overboard(Agent agent)
-    {
-        decks.Remove(agent);
-        overboard.Add(agent);
-    }
+    public void Overboard(Agent agent) => decks.Remove(agent);
 
     /// <summary>Makes <paramref name="agent"/> crew of <paramref name="crewHull"/> without standing it on a deck, as a swimmer.</summary>
     public void AssignCrew(Agent agent, MissionObject crewHull) => crews[agent] = Of(crewHull);

@@ -22,6 +22,12 @@ public interface IStationSeatSettler
     /// <summary>[Mission tick] Forgets the seats no <see cref="Settle"/> call visited since the last pass.</summary>
     void EndPass();
 
+    /// <summary>
+    /// Where vanilla's spawn seats the pilot (<c>ShipOarMachine</c>/<c>ShipControllerMachine.OnPilotAssignedDuringSpawn</c>): an
+    /// oar's rower at the end of its sit-down from the raw station frame, the helm's pilot at the raw station origin.
+    /// </summary>
+    Vec3 SpawnPlacement(in StationSeatPose pose);
+
     /// <summary>[Game thread] The settle counters (diagnostics).</summary>
     object Inspect();
 }
@@ -49,11 +55,8 @@ public class StationSeatSettler : IStationSeatSettler
     /// <summary>A seat has settled once its pilot finished sitting down and plays no stagger.</summary>
     internal static bool IsSettled(in StationSeatPose pose) => pose.Kind != StationSeatKind.None && pose.IsSitting && !pose.IsStruck;
 
-    /// <summary>
-    /// Where vanilla's spawn seats the pilot (<c>ShipOarMachine</c>/<c>ShipControllerMachine.OnPilotAssignedDuringSpawn</c>): an
-    /// oar's rower at the end of its sit-down from the raw station frame, the helm's pilot at the raw station origin.
-    /// </summary>
-    internal static Vec3 SpawnPlacement(in StationSeatPose pose)
+    // Takes the oar's sit-down from the orthonormal station frame; any other pilot sits at the frame's origin.
+    public Vec3 SpawnPlacement(in StationSeatPose pose)
     {
         if (pose.Kind != StationSeatKind.Oar) return pose.StationFrame.origin;
 

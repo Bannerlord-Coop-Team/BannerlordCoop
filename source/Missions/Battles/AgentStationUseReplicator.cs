@@ -174,6 +174,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     public bool IsOwnSeat(Guid agentId) => ownSeated.ContainsKey(agentId);
 
+    // A seat stays applied from the owner's use until its release applies, also while the refresh re-seats the puppet.
     public bool IsAppliedSeat(Guid agentId) => appliedSeats.ContainsKey(agentId);
 
     // [Poller thread] Hands an owner's use to the game thread, which keeps it pending.
@@ -322,7 +323,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         var pose = engine.ReadSeatPose(seat.Agent, seat.Point);
         engine.PlaceSeatedAgent(seat.Agent, pose.Kind == StationSeatKind.None
             ? engine.GetStationPosition(seat.Point)
-            : StationSeatSettler.SpawnPlacement(pose));
+            : settler.SpawnPlacement(pose));
         strandedReturns++;
         Logger.Debug("[NavalSync] Put puppet {AgentId} back on its station {Station}, off its hull", agentId,
             DescribeStation(seat.Point));

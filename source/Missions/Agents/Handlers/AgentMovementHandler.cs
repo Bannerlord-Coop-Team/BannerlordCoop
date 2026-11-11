@@ -1937,7 +1937,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     continue;
                 }
 
-                // A seated agent's owner sends no movement, so a sample reaching its seated puppet was sent before the seat.
+                // The owner's applied seat owns the puppet's pose until its release applies here, so a sample in between, sent
+                // before the seat or racing the release on this unordered channel, is dropped.
                 if (stationSeats?.IsAppliedSeat(agentInfo.AgentId) == true)
                 {
                     RecordMovementSequence(agentInfo, snapshot.SampleSequence);

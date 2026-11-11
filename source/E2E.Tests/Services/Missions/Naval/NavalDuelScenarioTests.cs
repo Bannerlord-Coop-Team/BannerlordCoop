@@ -83,6 +83,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         var oarOnA = a.Hull(hullA).Station("oar");
         a.UseStation(crewOnA, oarOnA, inUse: true);
         Assert.Same(crewOnB, b.Hull(hullA).SeatedAt("oar"));
@@ -127,6 +128,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         a.Engine.WalksIn.Add(crewOnA);
         var oarOnA = a.Hull(hullA).Station("oar");
         a.UseStation(crewOnA, oarOnA, inUse: true);
@@ -171,6 +173,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         var crewOnB = b.RegisterAgent(crewId, "A");
         battle.CommitAll();
         battle.TickAll();
+        b.Engine.PlaceAgent(crewOnB, b.Ship(hullA).Hull);
         a.Engine.WalksIn.Add(crewOnA);
 
         // Each of B's ticks is one frame, so the use's frame is the only settle pass before the engine moves the copy.
@@ -258,10 +261,16 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         string key = atHook ? HookKey : "oar";
         if (atHook) copyOfA.Hook(key);
         var stationOnA = atHook ? a.Hull(hullA).Hook(key) : a.Hull(hullA).Station(key);
+        if (!offBeforeTheSeat) b.Engine.PlaceAgent(crewOnB, copyOfA.Hull);
 
-        if (offBeforeTheSeat) b.Engine.Overboard(crewOnB);
         a.UseStation(crewOnA, stationOnA, inUse: true);
-        if (!offBeforeTheSeat) b.Engine.Overboard(crewOnB);
+        b.Tick();
+        if (!offBeforeTheSeat)
+        {
+            Assert.Empty(b.Engine.SeatPlacements);
+            b.Engine.Overboard(crewOnB);
+        }
+
         b.Ticks(3);
 
         Assert.Same(crewOnB, copyOfA.SeatedAt(key));
@@ -299,6 +308,7 @@ public class NavalDuelScenarioTests : NavalBattleTestEnvironment
         hookOnB.LockUserPositions = true;
         copyOfA.Stations[(HookKey, 0)] = hookOnB;
         copyOfA.Hooks.Add(hookOnB);
+        b.Engine.PlaceAgent(crewOnB, copyOfA.Hull);
         b.Engine.Pin = ((global::Missions.Naval.NavalShipEngine)RuntimeHelpers.GetUninitializedObject(
             typeof(global::Missions.Naval.NavalShipEngine))).PinToStation;
 
