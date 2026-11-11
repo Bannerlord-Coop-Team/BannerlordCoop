@@ -124,6 +124,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         try
         {
+            RestoreUnsavedStateIfUnlisted(mapEvent);
             FinalizeOrRepairEvent(mapEvent);
         }
         catch (Exception e)
@@ -189,6 +190,11 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         {
             try
             {
+                // First, because the settlement a v1.4.8 save kept on MapEvent must be refilled before ResetVillageState
+                // reads it. It also has to come before the WaitingRemoval below, since vanilla only derives the settlement
+                // while the event isn't finalized.
+                RestoreUnsavedStateIfUnlisted(mapEvent);
+
                 // The battle already ended, so mark it finalized before detaching. Removing the last
                 // party then cannot run FinalizeEvent again and replay its results.
                 if (!mapEvent.IsFinalized)
@@ -329,11 +335,31 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
-    private static void RestoreUnsavedState(MapEvent mapEvent)
+    // Gives an unlisted event the unsaved state the load restores only for listed ones: the component's back-reference
+    // (read on every field battle party add and remove), position lists, tracker and a v1.4.8 save's settlement.
+    private void RestoreUnsavedStateIfUnlisted(MapEvent mapEvent)
     {
-        mapEvent.Component?.AfterLoad(mapEvent);
+        if (Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+            return;
+
         if (TrackerField(mapEvent) == null)
             TrackerField(mapEvent) = new TroopUpgradeTracker();
+
+        var component = mapEvent.Component;
+        if (component == null)
+            return;
+
+        // A settlement that fails to derive, as for a side without a leader party, is only logged.
+        // OnAfterLoad still runs, because the detach reads the position lists it builds.
+        try
+        {
+            component.AfterLoad(mapEvent);
+        }
+        catch (Exception e)
+        {
+            logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
+            component.OnAfterLoad();
+        }
     }
 
     private (int RepairedLinks, int RemovedEntries) RepairPartySideLinks(MapEvent mapEvent)
@@ -431,6 +457,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         return (repairedLinks, removedEntries);
     }
 
+    // Finalizes a loaded player battle, or only detaches its parties when it is already finalized.
     private void FinalizeOrRepairEvent(MapEvent mapEvent)
     {
         if (!mapEvent.IsFinalized)
@@ -454,12 +481,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // without running FinalizeEvent (and its battle results) again.
     private void DetachFromFinalizedEvent(MapEvent mapEvent)
     {
-        // The load restores unsaved state only for events the manager lists. Without it the component's
-        // MapEvent back-reference is null, which FieldBattleEventComponent reads on every party add and
-        // remove, so even a one-party side fails; the position lists and tracker are null as well.
-        if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
-            RestoreUnsavedState(mapEvent);
-
         mapEvent.AttackerSide?.HandleMapEventEnd();
         mapEvent.DefenderSide?.HandleMapEventEnd();
         messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));

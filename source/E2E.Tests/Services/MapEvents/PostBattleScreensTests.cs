@@ -247,7 +247,8 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
     }
 
     // The encounter holds the client's own copy of the battle, kept from before the server destroyed it, so its id
-    // comes the real way. An unknown id gets a stand in. FinalizeBattle is off so Finish doesn't try to end it.
+    // comes the real way. An unknown id gets a stand in. The battle component's finalize is off so Finish doesn't
+    // try to end it.
     private void LeavePostBattleScreens(EnvironmentInstance client, string partyId, string finishedMapEventId)
     {
         client.Call(() =>
@@ -264,15 +265,21 @@ public class PostBattleScreensTests : MapEventTestBase, IDisposable
                 return;
             }
 
+            // v1.5's FinalizeBattle calls into the battle's component, so the stand in needs one.
             encounter._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
             using (new AllowedThread())
+            {
                 encounter._mapEvent.StringId = finishedMapEventId;
+                encounter._mapEvent.Component = ObjectHelper.SkipConstructor<FieldBattleEventComponent>();
+            }
         });
         EnableHeadlessEncounterFinish(client);
 
         client.Call(() => PlayerEncounter.Finish(), MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
-            .Append(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.FinalizeBattle)))
+            // v1.5's FinalizeBattle is a one-line call to the component, which the JIT can inline into the patched
+            // Finish, so disabling it has no effect. A field battle's override does what v1.4's FinalizeBattle did.
+            .Append(AccessTools.Method(typeof(FieldBattleEventComponent), nameof(FieldBattleEventComponent.OnPlayerEncounterFinalizeBattle)))
             .ToList());
 
         AssertHasPlayerEncounter(client, expected: false);

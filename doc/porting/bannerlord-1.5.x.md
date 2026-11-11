@@ -527,6 +527,41 @@ Open:
 - The TaleWorlds dedicated server moved to v1.5.7 on Steam on 2026-11-10 (app 1863440, buildid
   26569029).
 
+## Loading a v1.4.8 save (#4615)
+
+Vanilla v1.5.7 migrates a save written before v1.5.0 while it loads. The server loads the save; a
+client loads the server's transfer save, which carries v1.5.7 in its metadata
+(`SaveInterface.EnsureUsableGameVersion`), so the version-gated migrations run on the server only.
+They all run inside `Campaign.DoLoadingForGameType` (`OnGameLoaded`, then `OnSessionStart`), before
+the server enters `ServerRunningState`, so `ServerSyncPolicy.AllowOriginal` is true and the AutoSync
+setters and the `MapEventSide.RemovePartyInternal` prefix run vanilla and publish nothing. Players
+are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
+`RegisterAllGameObjects` and `SaveGameHandler.Handle_AllGameObjectsRegistered`.
+
+- `MapEvent.OnAfterLoad` removes every party that fails `CanPartyJoinBattle`, behind
+  `MBSaveLoad.IsUpdatingGameVersion && LastLoadedGameVersion.IsOlderThan("v1.5.0")`. No change
+  needed: `Postfix_CanPartyJoinBattle` (`MapEventPatches.cs`) reads player parties through
+  `PlayerManager.TryGetControlledObjectInfo`, which is empty until the players are registered, so
+  `ContainsPlayerParty` is false and the postfix returns vanilla's result for every party. The
+  missing AI join window doesn't strip AI parties. A player battle, siege or raid still in progress
+  is then finalized at `CampaignReady` by `MapEventLoadCleaner`, as for any loaded save.
+- `VillageHostileActionCampaignBehavior.OnGameEarlyLoaded` rewrites the removed village menu ids
+  in `MapStateData.GameMenuId` and finishes the encounter. Not version-gated. No change needed: it
+  reads the save's own menu, which is the server's, and `SavedMenuLoadPatch` drops any menu the
+  server has. A rejoining client's menu comes from its party state (`HeroInterface.SwitchToPlayer`,
+  `SiegeEventInterface.RestoreReloadedPlayer`), not from the save's menu id.
+- `MapEventComponent.AfterLoad` runs `UpdateMapEventSettlement` for every unfinished event the map
+  event manager lists, on every load. v1.4.8 saved the settlement on `MapEvent` (save id 103) and
+  v1.5 saves it on the component (id 100), so a v1.4.8 save has none until this runs. For listed
+  events it derives the same settlement v1.4.8's `MapEvent.Initialize` set, and the AutoSync setter
+  publishes nothing during the load. An event the manager doesn't list never gets it, so the
+  orphan pass found no village to reset after an orphaned raid or force action; `MapEventLoadCleaner`
+  now restores an unlisted event's unsaved state before it resets the village.
+- `MapEvent.OnLateLoad` creates the siege, sally out and siege outside components the v1.4.8 save
+  lacks, behind `LastLoadedGameVersion < "v1.5.0"`, for listed and unlisted events alike.
+- Not checked live: a v1.4.8 dedicated server save with a player battle, a siege and a village raid
+  in progress loading on the v1.5.7 server.
+
 ## Known gaps
 
 - Village force actions always take the encounter path; v1.5's no-resist path is not supported yet.
@@ -580,11 +615,12 @@ Open:
     reads `timeMode=Stop players=0`, so that check waits for a client. On 2026-10-23 a modded server
     with one client ran 11 in-game days on a new campaign without that exception; time running on a
     repaired damaged save is still unchecked.
-  - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
-    unsaved state, so that finalize can throw; the orphan pass then releases the event only if
-    vanilla had already set `WaitingRemoval`. (The missing `MapEventFinalized` and
-    `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed; see the
-    merge's review fixes.)
+  - Follow-ups, done: the player pass restores an unlisted live event's unsaved state before it
+    finalizes it, so the field battle party removal no longer throws before the component finalizes
+    (#4615), and the orphan pass ends an unlisted live event whether or not vanilla set
+    `WaitingRemoval` (the merge below). The missing `MapEventFinalized` and
+    `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed too; see
+    the merge's review fixes.
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).
@@ -712,8 +748,8 @@ Git reported 10 conflicting files. Each keeps both sides:
   the component, battle state and party ids. One behavior differed: 1.5.x left a live event the
   manager no longer lists in place, and `development` ends it. The merge follows `development`.
   That settles half of the open follow-up in "Known gaps" (the orphan pass released an event
-  only once vanilla had set `WaitingRemoval`); the player pass still finalizes an unlisted live
-  event without restoring its unsaved state first.
+  only once vanilla had set `WaitingRemoval`); the other half, the player pass finalizing an
+  unlisted live event without restoring its unsaved state first, is fixed by #4615.
 - `MapEventLoadCleanerTests.cs`. The 11 tests both sides share keep `development`'s names. The
   other 1.5.x tests take the `CleanUpLoadedMapEvents_` prefix and call `CleanUpLoadedMapEvents`
   where they called `FinalizePlayerMapEvents` or `RepairOrphanedMapEvents`. Two 1.5.x tests were removed:
