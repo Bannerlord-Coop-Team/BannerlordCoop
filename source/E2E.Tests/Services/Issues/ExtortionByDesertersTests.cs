@@ -26,6 +26,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Actions;
@@ -151,6 +152,55 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
             Assert.Null(notable.Issue.IssueQuest);
             Assert.Empty(notable.Issue.JournalEntries);
+        });
+    }
+
+    [Fact]
+    public void StateWaitsForEarlierGiverWorkBeforeBindingAndLogging()
+    {
+        var quest = Accept();
+        var earlierWorkApplied = false;
+        Owner.Call(() =>
+        {
+            var conversation = Campaign.Current.ConversationManager;
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+            var character = ObjectHelper.SkipConstructor<CharacterObject>();
+            character.HeroObject = Owner.GetRegisteredObject<Hero>(scenario.NotableId);
+            conversation.SetupAndStartMapConversation(null, new MapConversationAgent(character),
+                new MapConversationAgent(CharacterObject.PlayerCharacter));
+            Assert.True(conversation.IsConversationInProgress);
+            Assert.Same(quest.QuestGiver, conversation.OneToOneConversationHero);
+            Owner.Resolve<IIssueConversationGuard>().RunWhenNotTalkingTo(
+                () => earlierWorkApplied = true, scenario.NotableId);
+        }, new[] { AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.StartNew)) });
+
+        string partyId = null!;
+        var log = new TextObject("{=!}Ordered deserter progress.");
+        Server.Call(() =>
+        {
+            var mirror = (Quest)scenario.QuestOf(Server);
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            mirror._deserterMobileParty = party;
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+            Server.Resolve<ExtortionByDesertersHandler>().Send(mirror, log);
+        });
+
+        Owner.Call(() =>
+        {
+            Assert.False(earlierWorkApplied);
+            Assert.Null(quest._deserterMobileParty);
+            Assert.Empty(quest.JournalEntries);
+            Campaign.Current.ConversationManager.EndConversation();
+            Assert.True(earlierWorkApplied);
+            Assert.Same(Owner.GetRegisteredObject<MobileParty>(partyId), quest._deserterMobileParty);
+            Assert.Equal(log.Value, Assert.Single(quest.JournalEntries).LogText.Value);
+        }, TextLinks);
+        Other.Call(() =>
+        {
+            var issue = Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.Null(issue.IssueQuest);
+            Assert.Empty(issue.JournalEntries);
         });
     }
 
