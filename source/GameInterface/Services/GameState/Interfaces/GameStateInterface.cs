@@ -10,6 +10,7 @@ using SandBox;
 using Serilog;
 using System;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
@@ -24,6 +25,10 @@ public interface IGameStateInterface : IGameAbstraction
 {
     void GoToMainMenu();
     void StartNewGame();
+    /// <summary>
+    /// Loads a transferred save on the game thread. Throws <see cref="TimeoutException"/> only when the load never
+    /// started; a load that started finishes on the game thread even after the wait ends.
+    /// </summary>
     void LoadSaveData(byte[] saveData);
     void LoadGame(string saveName);
 
@@ -75,7 +80,20 @@ internal class GameStateInterface : IGameStateInterface
     public void LoadSaveData(byte[] saveData)
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() => InteralLoadSaveGame(saveData), blocking: true);
+        int started = 0;
+        try
+        {
+            GameThread.Run(() =>
+            {
+                Interlocked.Exchange(ref started, 1);
+                InteralLoadSaveGame(saveData);
+            }, blocking: true);
+        }
+        catch (TimeoutException e) when (Volatile.Read(ref started) == 1)
+        {
+            // A big save can take longer than the wait to read, and it still finishes on the game thread
+            Logger.Warning(e, "The transferred save is still loading on the game thread after the blocking wait");
+        }
     }
 
     private void InteralLoadSaveGame(byte[] saveData)

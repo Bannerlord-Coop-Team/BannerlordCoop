@@ -399,12 +399,28 @@ public class GameThread : IUpdateable
         TimeSpan timeout = blockingTimeout ?? BlockingTimeout;
         if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
         QueueContext queue = CurrentQueue;
+        return AddDrainBudget(Math.Max(1L, (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="blockingTimeout"/> to blocking work queued in this runtime until the scope is disposed,
+    /// without limiting the frame drain. The longest active timeout wins, as with <see cref="LimitFrameDrain"/>.
+    /// </summary>
+    public IDisposable UseBlockingTimeout(TimeSpan blockingTimeout)
+    {
+        if (blockingTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
+        // A drain budget of 0 carries only the timeout
+        return AddDrainBudget(0, blockingTimeout);
+    }
+
+    private IDisposable AddDrainBudget(long drainTicks, TimeSpan timeout)
+    {
+        QueueContext queue = CurrentQueue;
         lock (queue.gate)
         {
             if (queue.isClosed) throw new OperationCanceledException("The game-thread queue is closed.");
             long id = ++queue.nextDrainBudgetId;
-            queue.drainBudgets.Add(id, (Math.Max(1L,
-                (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout.Ticks));
+            queue.drainBudgets.Add(id, (drainTicks, timeout.Ticks));
             RefreshDrainLimits(queue);
             return new FrameDrainBudgetScope(queue, id);
         }
@@ -416,7 +432,7 @@ public class GameThread : IUpdateable
         get
         {
             QueueContext queue = CurrentQueue;
-            lock (queue.gate) return queue.drainBudgets.Count;
+            lock (queue.gate) return queue.drainBudgets.Values.Count(value => value.DrainTicks > 0);
         }
     }
 
@@ -498,8 +514,9 @@ public class GameThread : IUpdateable
 
     private static void RefreshDrainLimits(QueueContext queue)
     {
-        Interlocked.Exchange(ref queue.activeDrainTicks,
-            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Min(value => value.DrainTicks));
+        long[] drainLimits = queue.drainBudgets.Values.Where(value => value.DrainTicks > 0)
+            .Select(value => value.DrainTicks).ToArray();
+        Interlocked.Exchange(ref queue.activeDrainTicks, drainLimits.Length == 0 ? 0 : drainLimits.Min());
         Interlocked.Exchange(ref queue.activeBlockingTimeoutTicks,
             queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Max(value => value.TimeoutTicks));
     }

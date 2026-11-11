@@ -42,4 +42,11 @@ public static class NetworkJoinLimits
     /// frame-budgeted on the client, so slow machines need time to apply it without freezing a frame.
     /// </summary>
     public static readonly TimeSpan ReplayAppliedTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// How long a joining client waits for its game thread to leave the character creation campaign and start
+    /// loading the transferred save. On a big map the first map frame after character creation can take more than a
+    /// minute, and the client gives up on the join after this. Well under <see cref="CampaignEntryTimeout"/>.
+    /// </summary>
+    public static readonly TimeSpan SaveHandoffTimeout = TimeSpan.FromMinutes(5);
 }

@@ -1,5 +1,8 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
+using Common.Network;
+using Coop.Core.Common;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
@@ -90,6 +93,47 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkGameSaveDataReceived_WaitsTheSaveHandoffTimeout()
+        {
+            // Arrange
+            TimeSpan? timeoutDuringLoad = null;
+            gameStateMock.Setup(x => x.LoadSaveData(It.IsAny<byte[]>()))
+                .Callback(() => timeoutDuringLoad = GameThread.Instance.EffectiveBlockingTimeout);
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(new byte[16], "12345")));
+
+            // Assert — a busy first map frame after character creation can take over a minute
+            Assert.True(timeoutDuringLoad >= NetworkJoinLimits.SaveHandoffTimeout);
+        }
+
+        [Fact]
+        public void NetworkGameSaveDataReceived_SaveLoadNeverStarted_EndsTheJoinWithAMessage()
+        {
+            // Arrange
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var currentState = new ReceivingSavedDataState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                loadingInterfaceMock.Object,
+                gameStateMock.Object,
+                coopFinalizer.Object);
+            ((ClientLogic)clientLogic).State = currentState;
+            var gameSaveData = new byte[16];
+            gameStateMock.Setup(x => x.LoadSaveData(gameSaveData)).Throws(new TimeoutException("It did not start and will not run."));
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataReceived(
+                new MessagePayload<NetworkGameSaveDataReceived>(this, SaveData(gameSaveData, "12345")));
+
+            // Assert — back to the main menu with a message instead of an endless loading screen
+            coopFinalizer.Verify(x => x.Finalize(ReceivingSavedDataState.SaveHandoffTimedOutText), Times.Once);
+            Assert.Same(currentState, clientLogic.State);
         }
 
         [Fact]
