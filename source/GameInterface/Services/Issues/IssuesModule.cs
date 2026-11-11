@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Services.Issues.Framework.Dismissal;

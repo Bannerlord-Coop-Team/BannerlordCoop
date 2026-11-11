@@ -14,7 +14,7 @@ internal enum ExtortionByDesertersNotice : byte
 
 /// <summary>Owner-only quest progress, sent after the referenced world objects.</summary>
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkExtortionByDesertersState : IServerToClientCommand
+public readonly struct NetworkExtortionByDesertersState : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

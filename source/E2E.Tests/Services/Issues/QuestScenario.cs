@@ -102,6 +102,7 @@ internal sealed class QuestScenario
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
         }, disabledMethods);
+
     public string AddIssue()
     {
         var notableId = testEnvironment.CreateRegisteredObject<Hero>();
