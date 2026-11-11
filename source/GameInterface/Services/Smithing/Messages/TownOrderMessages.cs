@@ -9,11 +9,13 @@ namespace GameInterface.Services.Smithing.Messages;
 
 public readonly struct TownOrderCreated : IEvent
 {
+    public readonly Town Town;
     public readonly Hero OrderOwner;
     public readonly int OrderSlot;
 
-    public TownOrderCreated(Hero orderOwner, int orderSlot)
+    public TownOrderCreated(Town town, Hero orderOwner, int orderSlot)
     {
+        Town = town;
         OrderOwner = orderOwner;
         OrderSlot = orderSlot;
     }
@@ -72,13 +74,17 @@ internal readonly struct NetworkCreateTownOrder : ICommand
     [ProtoMember(5)]
     public readonly string NextTownOrderId;
 
-    public NetworkCreateTownOrder(string orderOwnerId, string craftingOrderId, string randomElementId, int pieceTier, string nextTownOrderId)
+    [ProtoMember(6)]
+    public readonly string TownId;
+
+    public NetworkCreateTownOrder(string orderOwnerId, string craftingOrderId, string randomElementId, int pieceTier, string nextTownOrderId, string townId)
     {
         OrderOwnerId = orderOwnerId;
         CraftingOrderId = craftingOrderId;
         RandomElementId = randomElementId;
         PieceTier = pieceTier;
         NextTownOrderId = nextTownOrderId;
+        TownId = townId;
     }
 }
 

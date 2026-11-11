@@ -1,7 +1,8 @@
 # Porting co-op to Bannerlord v1.5.x
 
-This page records what changed between Bannerlord v1.4.8 and v1.5.6 (the branch was ported to v1.5.3,
-then v1.5.4, built unchanged on v1.5.5, and now builds against v1.5.6) and how co-op follows it on the
+This page records what changed between Bannerlord v1.4.8 and v1.5.7 (the branch was ported to v1.5.3,
+then v1.5.4, built unchanged on v1.5.5, was ported to v1.5.6, and now builds against v1.5.7) and how
+co-op follows it on the
 `bannerlord-1.5.x` branch. `development` stays on v1.4.8. Use it to review the port, and as a
 checklist when porting other code that runs against the game, such as the dedicated server. The
 epic #3836 tracks the v1.5 work that remains.
@@ -376,6 +377,153 @@ Open: the TaleWorlds v1.5.6 dedicated server moves to .NET 8 and has not shipped
 (`scripts/prepare-dotnet-runtime.ps1` accepts only a `6.0.x` runtime), so its host will need a .NET 8
 runtime once that server ships.
 
+## v1.5.7
+
+v1.5.7 (changeset 125802, on the Steam beta since 2026-11-10) changed engine signatures, and two of
+them broke the Release build at 5 call sites in GameInterface, where co-op calls them. The port
+follows both, and two engine body changes that co-op copies (2026-11-10, with `mb2` pointing at that
+install, on top of `ea72fd8fa`). `CraftingCampaignBehavior.CreateCustomOrderForHero` also gained the
+`Town`, as its first parameter; co-op neither calls nor patches it.
+
+- `CraftingCampaignBehavior.CreateTownOrder` takes the town:
+  `CreateTownOrder(Town town, Hero orderOwner, int orderSlot)`. v1.5.6 had
+  `CreateTownOrder(Hero orderOwner, int orderSlot)` and read `orderOwner.CurrentSettlement.Town`,
+  behind a `Debug.Print` for an owner outside a town. The three vanilla callers now pass the town they
+  iterate. Co-op read the owner's current settlement at four places, two on the server and two on the
+  client. The server's reads ran inline at the vanilla call, because `GameThread.Run` runs the action
+  at once on the game thread. Only the two client reads ran later, when the network message arrived,
+  by which time the owner could have left the town. The town now travels with the order:
+  `TownOrderCreated` carries it, the server files the order under it, `NetworkCreateTownOrder` sends
+  its id, and the client resolves it on the game thread for the order slot and for the weapon design
+  refresh.
+- `MapEventParty.OnTroopScoreHit` ends with `CharacterObject captain`, `MapEventSide` gained the
+  same parameter, and `PartyGroupTroopSupplier` gained a `BasicCharacterObject captain`.
+  `PartyGroupAgentOrigin.OnScoreHit` now passes its `captain` argument down, and `MapEventParty`
+  hands it to `CombatXpModel.GetXpFromHit`, where v1.5.6 passed none. It feeds the formation
+  captain's perk bonus on hit xp. Co-op replaces the native origin, so the captain now travels with
+  the hit: `CoopAgentOrigin` puts it into `OnTroopScoreHitAttempted`, the reporting client sends its
+  id in `NetworkTroopScoreHit` (`CaptainId`, null when the formation has no captain), and the server
+  passes it to the native call. A captain the server cannot resolve is logged, and the hit still
+  counts.
+- `SiegeAftermathCampaignBehavior` now saves `_settlementProsperityCache`, and `OnMapEventEnded`
+  resets it to -1 when the main party is on the winning side. Co-op replaces `OnMapEventEnded`, and
+  clients never run `OnSiegeAftermathApplied`, the only writer. Without the reset a client keeps the
+  value from the server's save, which is the prosperity of the last town the server applied an
+  aftermath to, and its Devastate, Pillage and Mercy tooltips and the capture narration show a wrong
+  prosperity loss. The client branch of the co-op prefix and `SwitchLocalPartyToSettlementTaken` now
+  reset the cache as vanilla does. The penalty the server applies was never affected.
+- `DefaultPartySizeLimitModel.CalculateMobilePartyMemberSizeLimit` takes `bool isCurrentlyAtSea` and
+  reads it where it read `party.IsCurrentlyAtSea`. `GetPartyMemberSizeLimit` gained the same parameter
+  and forwards it. The co-op prefix that replaces the body for player caravans declares the new
+  parameter and reads it too. No caller passes a value that differs for a player caravan today, so no
+  number changes. Co-op has no call and no override of `GetPartyMemberSizeLimit`.
+
+Ported files:
+
+- Smithing: `TownOrdersPatches.cs`, `CraftingCampaignBehaviorTownOrderHandler.cs`,
+  `CraftingCampaignBehaviorInterface.cs`, `TownOrderMessages.cs` and `SmithingCommands.cs` (the
+  `coop.debug.crafting.add_town_order` command now refuses a hero who is not in a town).
+- Score hits: `MapEventPartyPatches.cs`, `MapEventPartyHandler.cs`, `NetworkTroopScoreHit.cs`,
+  `OnTroopScoreHitAttempted.cs` and `CoopAgentOrigin.cs`.
+- `SiegeAftermathPatches.cs`, `SiegeEventInterface.cs` and `DefaultPartySizeLimitModelPatches.cs`.
+- Version pins: `source/Coop/Coop.csproj` `GameVersion`, `README.md` and
+  `TestApplicationVersionPatch.FallbackVersion` moved from v1.5.6 to v1.5.7.
+- Tests: `TroopScoreHitVerticalTests` follows the new shapes and gains
+  `LiveBattleScoreHit_WithFormationCaptain_PassesTheCaptainToTheServerXpModel`, which fails when the
+  origin drops the captain. `TownOrdersPatchesTests` (new) pins that the prefix announces the town it
+  was given, for an owner with no settlement. `CraftingCampaignBehaviorTownOrderHandlerTests` (new,
+  E2E) pins that a client files a received order under the town the message names, for an owner who
+  stands in another town; it turns off the three engine methods that build the pre-crafted item. The
+  killed-attacker score hit test now carries a captain, so it fails when the fallback descriptor
+  drops it. The server town order handler has no test: it reads `CraftingTemplate.All`, and the
+  `CraftingOrder` constructor needs the campaign models. The cache reset and the caravan prefix have
+  no test of their own.
+
+Proof, run on the port branch on 2026-11-10 against v1.5.7 (`Version.xml` says
+`Singleplayer Value="v1.5.7"`), with `-p:BannerlordDir` pointing at the `mb2` junction and `ModsRoot`
+at a missing folder, so nothing was deployed:
+
+- Release build (`dotnet build Coop.sln -c Release`): `1972 Warning(s)`, `0 Error(s)`. Before the
+  port the same build gave 5 errors, all CS7036, at the two signatures above.
+- Engine member audit (TAOM's `tools/check_engine_member_refs.ps1`, exit code 0): Coop.dll
+  `checked 94 distinct engine refs`, Coop.Core.dll `checked 227`, GameInterface.dll `checked 6769`,
+  Missions.dll `checked 1496`, each `0 unresolved (0 new)`. The v1.5.6 build of GameInterface.dll has
+  2 unresolved members on v1.5.7: `CraftingCampaignBehavior.CreateTownOrder(Hero, Int32)` and the
+  seven-argument `MapEventParty.OnTroopScoreHit`.
+- Unit tests (`dotnet test CoopUnitTests.slnf -c Release --no-build`, exit code 0):
+  Coop.CrashReporter.Tests 10 passed, Common.Tests 421 passed, Coop.Tests 1,434 passed,
+  Coop.IntegrationTests 160 passed and 2 skipped, GameInterface.Tests 2,275 passed; 4,300 passed,
+  2 skipped, 0 failed. VerificationHarness.Tests: 86 passed, 0 failed, on an idle machine (CPU at
+  6%). In the run before it, on a machine loaded by other test runs, two deadline tests of
+  `ProcessPeerLabTests` failed (exit code 5 where 0 and 6 were expected); the same build passed all
+  86 forty minutes later.
+- E2E tests in 16 shards (`run-e2e-shard.sh n 16`, n = 0 to 15): 3,323 tests, 3,322 passed, 1 skipped
+  (`ItemRosterSyncTests.Server_ItemRoster__count`, as on v1.5.6), 0 failed.
+- Review, before these runs: two readers and one checker read the port against the v1.5.7
+  decompile. They found no case in which the server and a client disagree about a town order or
+  about battle xp where they agreed before. Four low findings were corrected: the debug command let
+  a hero in a castle through, two sentences of this section were wrong, and the client town order
+  handler and the killed-attacker score hit had no test. Each of the two new assertions fails when
+  its production line is put back.
+- Not covered: no in-game or live co-op session, and no body diff by tool of every patch target (the
+  v1.5.6 snapshot generator was not kept; the search described below stands in for it).
+
+Other engine changes (2026-11-10): the decompiles of v1.5.6.125270 and v1.5.7.125802 differ in 6 of
+56 shipping assemblies and 11 of 32 vanilla module assemblies. Every changed member was searched in
+the co-op source by name, by owning type, in the `*Interface.cs` copies and in the AutoSync
+registrations, by two readers and then one checker. Co-op touches these and needs no change:
+
+- `DisbandPartyCampaignBehavior.OnMobilePartyDestroyed` now sets `IsDisbanding` on a party from the
+  waiting list before it removes it. The method runs on the server only, and `IsDisbanding` is
+  AutoSynced, so the server sends one more property change. The server announces the destroy first
+  (`PartyLifetimePatches`; `DestroyPartyActionPatches` defers the event), so a client can receive the
+  change for a party it already removed and log one `Failed to get` line. Read from the code, not
+  seen in a run.
+- `EmptyClanPartiesCampaignBehavior.OnMobilePartyDestroyed` returns when the destroyer party is null.
+  Server only, and no co-op patch binds the renamed parameter.
+- `IssuesCampaignBehavior.OnGameLoaded` gained a save migration for saves older than v1.5.6.125291.
+  It cancels an issue whose alternative solution hero is dead, and it removes dead heroes, and
+  disabled heroes outside `Clan.PlayerClan`, from party and prison rosters. Co-op runs `OnGameLoaded`
+  on the server only. The migration needs `MBSaveLoad.IsUpdatingGameVersion`, so it runs once on a
+  host that has a game version. A host with no `Parameters/Version.xml` has an empty
+  `MBSaveLoad.CurrentVersion` (see `SaveInterface.EnsureUsableGameVersion`), and there it does not
+  run. Co-op player clans are not `Clan.PlayerClan`, so the exemption does not cover them; co-op
+  disables a hero only for deletion, heir selection and creation rollback.
+- `KillCharacterAction.ApplyInternal` gained an assert. The co-op replacement carries none of
+  vanilla's asserts.
+- `PartyScreenLogic.TransferTroop` removes upgrade xp from the source roster in both directions. Co-op
+  does not copy it, and the server applies the roster deltas of the client's Done.
+- `SiegeAssaultEventComponent.OnPlayerEncounterContinueBattle` keeps the siege event only with a
+  player siege event. No co-op copy, and no AutoSynced field is stored there.
+- The `MobileParty.IsCurrentlyAtSea` setter and `FinishNavigationTransitionInternal` call
+  `MemberRoster.UpdateVersion()`. Clients set the flag through the setter, so they follow.
+- `IssueManager.MakeAlternativeTroopsReturn` removes dead heroes. The server runs vanilla inside
+  `MainHeroSubstitutionScope`.
+- `CampaignIncidentEffects.RemovePrisonerTroopsRandomlyWithPredicate`: co-op disables incidents.
+- `LordDefectionCampaignBehavior`, `ExecutionCampaignBehavior`, `TooltipRefresherCollection` and
+  `DefaultPersonalityTraitEffects` changed text keys only.
+
+Open:
+
+- `MenuHelper.EncounterAttackConsequence` and `EncounterOrderAttack` now skip
+  `BeHostileAction.ApplyEncounterHostileAction` when the opposing leader party is a villager or
+  caravan party. The conversation with such a party still applies it. The co-op copy of that war
+  block, `MapEventHostileActionConsequences.Apply`, has no such check: an attack on an encounter led
+  by a caravan or villager party of a faction the attacker is not at war with still declares the war
+  and costs 10 relation on the server. After a hostile conversation the copy already returns at
+  `HasWarStance`. It was left as it is. In co-op a second player can join such a fight without the
+  conversation, and whether that attack starts a war is a maintainer's decision. The Modding Kit
+  build of v1.5.7 asserts in both methods that the player's faction is already at war with the
+  faction of such a leader party ("EncounterAttackConsequence being at war mismatch!"), so vanilla
+  expects the war to exist before Attack. No test covers the copy.
+- `AnimationPoint.Tick` no longer sets the loop start action channel while a pair state is active.
+  Co-op migrates paired points between clients (`LocationAuthorityMigrator`,
+  `LocationPointUseLifecycle`) and patches none of that method. It needs a two-client tavern check.
+- `CoopTroopSupplier.OnTroopScoreHit` is an empty method that nothing calls. It still has the v1.5.6
+  parameters.
+- The TaleWorlds dedicated server moved to v1.5.7 on Steam on 2026-11-10 (app 1863440, buildid
+  26569029).
+
 ## Known gaps
 
 - Village force actions always take the encounter path; v1.5's no-resist path is not supported yet.
@@ -504,20 +652,23 @@ clients.
 
 ## Verification
 
-- The whole solution builds against v1.5.4, against v1.5.5 with no code change (see "v1.5.5"), and
-  against v1.5.6 after the perk call port (see "v1.5.6"). Every Harmony patch class binds, except
+- The whole solution builds against v1.5.4, against v1.5.5 with no code change (see "v1.5.5"),
+  against v1.5.6 after the perk call port (see "v1.5.6"), and against v1.5.7 after the port in
+  "v1.5.7". Every Harmony patch class binds, except
   `MobilePartyAIRobustnessPatches`, whose class-level `[HarmonyPatch]` is commented out on
   `development` too.
 - The bodies of all 2,336 game methods GameInterface patched at the port (`0d8dd2280`) were diffed
   from v1.4.8 to v1.5.3 and from v1.5.3 to v1.5.4, and the changes reviewed. The patch targets added
   since were written against v1.5.4. From v1.5.5 to v1.5.6 the bodies of all 4,529 engine members
   Coop patches today were diffed: 43 changed, none breaks a patch (see "Patched method bodies" in
-  "v1.5.6").
-- Unit tests and E2E tests (5 E2E tests skipped, as on `development`) pass in Release; the current
-  counts are in the v1.5.6 section above. On Windows, run E2E in 16 shards
+  "v1.5.6"). From v1.5.6 to v1.5.7 the changed engine members were searched in the co-op source by
+  hand, with no tool diff of every target (see "v1.5.7").
+- Unit tests and E2E tests (1 E2E test skipped) pass in Release; the current counts are in the
+  v1.5.7 section above. On Windows, run E2E in 16 shards
   (`sh ../.github/scripts/run-e2e-shard.sh <n> 16` from `source`): with 8, a shard's test filter can
   exceed the command-line length limit.
-- v1.5.6: see the v1.5.6 section above for the current counts (v1.5.5's are in the v1.5.5 section).
+- v1.5.7: see the v1.5.7 section above for the current counts (v1.5.6's are in the v1.5.6 section
+  and in "Merge of development").
 - Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
   still carries v1.4.8 game assemblies. The dedicated server has booted and served clients on v1.5.5
   (see "Porting the dedicated server").

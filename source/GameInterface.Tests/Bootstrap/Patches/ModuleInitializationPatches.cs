@@ -9,7 +9,7 @@ namespace GameInterface.Tests.Bootstrap.Patches;
 internal static class TestApplicationVersionPatch
 {
     // The game version the referenced assemblies come from.
-    private const string FallbackVersion = "v1.5.6";
+    private const string FallbackVersion = "v1.5.7";
 
     [HarmonyPrefix]
     private static bool Prefix(ref ApplicationVersion __result)

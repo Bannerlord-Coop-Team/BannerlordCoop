@@ -19,7 +19,7 @@ internal class DefaultPartySizeLimitModelPatches
     /// </summary>
     [HarmonyPatch(nameof(DefaultPartySizeLimitModel.CalculateMobilePartyMemberSizeLimit))]
     [HarmonyPrefix]
-    public static bool CalculateMobilePartyMemberSizeLimitPrefix(DefaultPartySizeLimitModel __instance, ref ExplainedNumber __result, MobileParty party, bool includeDescriptions = false)
+    public static bool CalculateMobilePartyMemberSizeLimitPrefix(DefaultPartySizeLimitModel __instance, ref ExplainedNumber __result, MobileParty party, bool isCurrentlyAtSea, bool includeDescriptions = false)
     {
         // Override result if party is a player caravan
         if (party.IsCaravan && party.Party.Owner != null && party.Party.Owner.IsPlayerHero())
@@ -33,7 +33,7 @@ internal class DefaultPartySizeLimitModelPatches
             }
             result.Add((float)partySizeLimit, __instance._randomSizeBonusTemporary, null);
 
-            if (party.IsCurrentlyAtSea)
+            if (isCurrentlyAtSea)
             {
                 foreach (Ship ship in party.Ships)
                 {

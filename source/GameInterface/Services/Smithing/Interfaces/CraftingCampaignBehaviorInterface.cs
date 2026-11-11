@@ -256,7 +256,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
                     {
                         break;
                     }
-                    craftingBehavior.CreateTownOrder(hero, availableSlot);
+                    craftingBehavior.CreateTownOrder(settlement.Town, hero, availableSlot);
                 }
             }
         }
