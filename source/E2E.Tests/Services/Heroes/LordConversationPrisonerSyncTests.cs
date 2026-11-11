@@ -75,6 +75,33 @@ public class LordConversationPrisonerSyncTests : MapEventTestBase
         AssertCaptivity(Server, lordHeroId, playerPartyId);
     }
 
+    [Fact]
+    public void TakeLordPrisoner_LordInAnotherParty_StaysInThatParty()
+    {
+        var (_, playerPartyId) = CreatePlayerHeroParty("PlayerOne");
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var memberHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(memberHeroId, out var member));
+            // A stale dialog: another party took the hero in before the answer arrived.
+            other.MemberRoster.AddToCounts(member.CharacterObject, 1);
+            Assert.Same(other, member.PartyBelongedTo);
+            Assert.NotSame(member, other.LeaderHero);
+        });
+
+        PublishFromClient(playerPartyId, memberHeroId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(memberHeroId, out var member));
+            Assert.False(member.IsPrisoner);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
+            Assert.Same(other, member.PartyBelongedTo);
+        });
+    }
+
     private string CreateLord()
     {
         var lordPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
