@@ -43,11 +43,13 @@ internal class HeroCreatorHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Hero.CharacterObject, out var characterObjectId)) return;
         if (!objectManager.TryGetIdWithLogging(data.Hero.BattleEquipment, out var battleEquipmentId)) return;
         if (!objectManager.TryGetIdWithLogging(data.Hero.CivilianEquipment, out var civilianEquipmentId)) return;
 
         var message = new NetworkInitializeNewHero(
             heroId,
+            characterObjectId,
             data.Hero.FirstName,
             data.Hero.Name,
             civilianEquipmentId,
@@ -64,6 +66,18 @@ internal class HeroCreatorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+
+            // The field sync sends the CharacterObject earlier on this ordered stream, so a hero without one here lost it
+            if (hero.CharacterObject == null)
+            {
+                Logger.Error(
+                    "Hero {HeroId} ({HeroName}) reached initialization without CharacterObject {CharacterObjectId}",
+                    data.HeroId,
+                    data.Name?.Value,
+                    data.CharacterObjectId);
+                messageBroker.Publish(this, new ChangeCharacterObject(data.CharacterObjectId, data.HeroId));
+            }
+
             if (!objectManager.TryGetObjectWithLogging<Equipment>(data.BattleEquipmentId, out var battleEquipment)) return;
             if (!objectManager.TryGetObjectWithLogging<Equipment>(data.CivilianEquipmentId, out var civilianEquipment)) return;
 

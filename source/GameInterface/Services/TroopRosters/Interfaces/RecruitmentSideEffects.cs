@@ -1,4 +1,5 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using GameInterface.Services.CampaignService.Statistics.Interfaces;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -11,6 +12,13 @@ public interface IRecruitmentSideEffects : IGameAbstraction
 
 public class RecruitmentSideEffects : IRecruitmentSideEffects
 {
+    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
+
+    public RecruitmentSideEffects(IStatisticsCampaignBehaviorInterface statisticsInterface)
+    {
+        this.statisticsInterface = statisticsInterface;
+    }
+
     public void Apply(MobileParty party, CharacterObject troop, int count)
     {
         var leaderHero = party.LeaderHero;
@@ -23,5 +31,6 @@ public class RecruitmentSideEffects : IRecruitmentSideEffects
         {
             SkillLevelingManager.OnBanditsRecruited(party, troop, count);
         }
+        statisticsInterface.OnUnitRecruited(leaderHero, count);
     }
 }

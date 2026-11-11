@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Ships;
 using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
@@ -25,6 +26,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -86,7 +88,7 @@ internal class MapEventPatches
             __instance._sides.SelectMany(side => side.Parties).ToList());
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (isPlayerJoin && !InteractionPatches.IsInitializingPlayerBattle(__instance))
+        if (isPlayerJoin && !InteractionPatches.IsInitializingBattle(__instance))
         {
             InteractionPatches.OpenAiJoinWindowAndPublish(
                 __instance,
@@ -205,6 +207,8 @@ internal class MapEventPatches
         return null;
     }
 
+    // A client skips an unchanged winner, and writes a coop mission victory straight to the field so the managed
+    // setter never reports it; the server and allowed writes run vanilla.
     [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
     [HarmonyPrefix]
     private static bool Prefix_SetOverrideWinner(MapEvent __instance, BattleSideEnum winner)
@@ -220,8 +224,23 @@ internal class MapEventPatches
         };
 
         // Skip unchanged client writes before the managed setter reports them.
-        return state != __instance.BattleState;
+        if (state == __instance.BattleState) return false;
+
+        // A coop mission's victory winds the local mission down (PlayerEncounter.SetPlayerVictoriousInternal); the server
+        // applies it after every member reports, so the client writes only the field (its OnBattleWon is skipped anyway).
+        if (IsCoopMissionVictory(state))
+        {
+            __instance._battleState = state;
+            return false;
+        }
+
+        return true;
     }
+
+    // A victory set inside a coop battle mission, which the server applies only after every member reports.
+    private static bool IsCoopMissionVictory(BattleState state) =>
+        (state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
+        && BattleConclusionGate.IsInCoopBattleMission;
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
@@ -263,8 +282,7 @@ internal class MapEventPatches
         // Coop mission victories use NetworkBattleResultReady so the server can wait for every member and
         // accepted joiner. The local set still runs so this mission winds down; the server applies the result
         // only after the completion barrier publishes the authoritative state change.
-        if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission)
+        if (IsCoopMissionVictory(value))
         {
             return true;
         }
@@ -304,6 +322,12 @@ internal class MapEventPatches
         // Skip on client
         if (ModInformation.IsClient)
             return false;
+
+        // Vanilla writes naval damage into the campaign ships live; coop holds the reported fates until now, so sunk ships are
+        // destroyed and survivors carry their battle HP before the results and the ship loot read them. NB §3 lists every
+        // apply point.
+        if (ModInformation.IsNavalEnabled && ContainerProvider.TryResolve<IBattleShipFateApplier>(out var fateApplier))
+            fateApplier.ApplyAll(__instance);
 
         // Vanilla calculates plunder from each defeated participant's Party reference.
         RemovePartiesWithoutParty(__instance);
@@ -737,7 +761,7 @@ internal class InteractionPatches
     }
 
     private static readonly ConditionalWeakTable<MapEvent, PlayerBattleWindows> playerBattleWindows = new();
-    private static readonly ConditionalWeakTable<MapEvent, object> initializingPlayerBattles = new();
+    private static readonly ConditionalWeakTable<MapEvent, object> initializingBattles = new();
 
     /// <summary>True while a player's battle is still within its post-start window for AI parties to join as
     /// reinforcements (<see cref="ModConfigProvider.ModOptions.PlayerBattleAiJoinWindowHours"/>). The window is opened after
@@ -745,8 +769,8 @@ internal class InteractionPatches
     public static bool IsWithinAiJoinWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.AiJoinWindowExpired;
 
-    internal static bool IsInitializingPlayerBattle(MapEvent mapEvent)
-        => initializingPlayerBattles.TryGetValue(mapEvent, out _);
+    internal static bool IsInitializingBattle(MapEvent mapEvent)
+        => initializingBattles.TryGetValue(mapEvent, out _);
 
     public static bool IsWithinGoldFoodConsumptionWindow(MapEvent mapEvent)
         => playerBattleWindows.TryGetValue(mapEvent, out var window) && !window.GoldFoodConsumptionExpired;
@@ -817,46 +841,45 @@ internal class InteractionPatches
             return;
         }
 
-        if (__instance.IsRaidHostileAction() && MapEventConfig.AllowRaidAiIntervention)
-            return;
-
-        // Allow AI to join if no players are involved
-        if (!__instance.ContainsPlayerParty())
-            return;
-
-        // A player's battle stays open to AI reinforcements for a campaign day after it begins. While the
-        // window is open, AI may keep joining; once it expires —
-        // or if no window was opened for this event — no more AI may join a player's battle.
-        if (IsInitializingPlayerBattle(__instance) || IsWithinAiJoinWindow(__instance))
-            return;
-
-        __result = false;
+        if (IsClosedToAiJoins(__instance))
+            __result = false;
     }
 
+    internal static bool IsClosedToAiJoins(MapEvent mapEvent)
+    {
+        if (mapEvent.IsRaidHostileAction() && MapEventConfig.AllowRaidAiIntervention)
+            return false;
+
+        return mapEvent.ContainsPlayerParty() && !IsInitializingBattle(mapEvent) && !IsWithinAiJoinWindow(mapEvent);
+    }
+
+    // A party arriving at a siege joins the camp leader's battle, or the settlement's own when defending its port.
+    internal static bool IsSiegeClosedToAiJoins(Settlement settlement) =>
+        settlement?.SiegeEvent != null &&
+        (IsClosedToAiJoins(settlement.SiegeEvent.BesiegerCamp?.LeaderParty?.MapEvent) || IsClosedToAiJoins(settlement.Party?.MapEvent));
+
+    // Every server battle is marked, because a player can be added partway through, e.g. attached to an AI army leader.
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
     [HarmonyPrefix]
-    private static void Prefix_Initialize(
-        MapEvent __instance,
-        PartyBase attackerParty,
-        PartyBase defenderParty)
+    private static void Prefix_Initialize(MapEvent __instance)
     {
-        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
+        if (ModInformation.IsClient)
             return;
 
-        initializingPlayerBattles.GetValue(__instance, _ => new object());
+        initializingBattles.GetValue(__instance, _ => new object());
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.Initialize))]
     [HarmonyPostfix]
-    private static void Postfix_Initialize(
-        MapEvent __instance,
-        PartyBase attackerParty,
-        PartyBase defenderParty)
+    private static void Postfix_Initialize(MapEvent __instance)
     {
-        if (ModInformation.IsClient || !StartsWithPlayerParty(attackerParty, defenderParty))
+        if (ModInformation.IsClient)
             return;
 
-        initializingPlayerBattles.Remove(__instance);
+        initializingBattles.Remove(__instance);
+        if (!__instance.ContainsPlayerParty())
+            return;
+
         OpenAiJoinWindowAndPublish(
             __instance,
             () => MessageBroker.Instance.Publish(__instance, new PlayerJoinedBattle()));
@@ -874,10 +897,6 @@ internal class InteractionPatches
     [HarmonyFinalizer]
     private static void Finalizer_Initialize(MapEvent __instance)
     {
-        initializingPlayerBattles.Remove(__instance);
+        initializingBattles.Remove(__instance);
     }
-
-    private static bool StartsWithPlayerParty(PartyBase attackerParty, PartyBase defenderParty)
-        => attackerParty.MobileParty?.IsPlayerParty() == true ||
-           defenderParty.MobileParty?.IsPlayerParty() == true;
 }

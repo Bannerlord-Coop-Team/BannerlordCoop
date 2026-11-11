@@ -90,6 +90,48 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         }
 
         [Fact]
+        public void Kingdom_WarAndAllyLists_PackedAsIds()
+        {
+            var objectManager = container.Resolve<IObjectManager>();
+
+            // Overhauls run 40+ kingdoms all at war, by value these lists nested each kingdom inside the last one
+            var kingdoms = Enumerable.Range(0, 64).Select(i => CreateKingdom($"war_kingdom_{i}")).ToList();
+            foreach (var kingdom in kingdoms)
+            {
+                objectManager.AddExisting(kingdom.StringId, kingdom);
+                kingdom._factionsAtWarWith.AddRange(kingdoms.Where(other => other != kingdom));
+            }
+
+            Kingdom testKingdom = CreateKingdom("unregistered_kingdom");
+            testKingdom._factionsAtWarWith.AddRange(kingdoms.Skip(1));
+            testKingdom._alliedKingdoms.Add(kingdoms[0]);
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            KingdomBinaryPackage package = new KingdomBinaryPackage(testKingdom, factory);
+
+            package.Pack();
+
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
+
+            KingdomBinaryPackage returnedPackage = BinaryPackageSerializer.Deserialize<KingdomBinaryPackage>(bytes);
+
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Kingdom newKingdom = returnedPackage.Unpack<Kingdom>(deserializeFactory);
+
+            Assert.NotSame(testKingdom, newKingdom);
+            Assert.Equal(testKingdom._factionsAtWarWith, newKingdom._factionsAtWarWith);
+            Assert.Same(kingdoms[0], Assert.Single(newKingdom._alliedKingdoms));
+        }
+
+        private static Kingdom CreateKingdom(string stringId)
+        {
+            Kingdom kingdom = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
+            kingdom.StringId = stringId;
+            kingdom.InitializeCachedLists();
+            return kingdom;
+        }
+
+        [Fact]
         public void Kingdom_StringId_Serialization()
         {
             var objectManager = container.Resolve<IObjectManager>();

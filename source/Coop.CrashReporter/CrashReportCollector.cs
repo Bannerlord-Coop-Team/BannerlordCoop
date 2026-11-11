@@ -13,12 +13,16 @@ namespace Coop.CrashReporter
     internal sealed class CrashReportCollector
     {
         private const string RuntimeArgumentsMarker = "#TW#Runtime#TW#Arguments#TW#";
+        private const int EngineShutdownExitCode = -1;
+        private const string EngineShutdownLogLine = "Managed Interface deleted.";
+        private const int EngineLogTailBytes = 4096;
         private static readonly TimeSpan CrashDumpDiscoveryTimeout = TimeSpan.FromSeconds(30);
         private static readonly TimeSpan DumpCompletionTimeout = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(250);
         private readonly CrashReporterOptions options;
         private readonly TimeSpan dumpCompletionTimeout;
         private readonly TimeSpan retryInterval;
+        private readonly TimeSpan dumpDiscoveryTimeout;
         private readonly Func<string, string, bool> tryCopyDumpAttempt;
 
         public CrashReportCollector(CrashReporterOptions options)
@@ -38,7 +42,8 @@ namespace Coop.CrashReporter
             CrashReporterOptions options,
             TimeSpan dumpCompletionTimeout,
             TimeSpan retryInterval,
-            Func<string, string, bool> tryCopyDumpAttempt)
+            Func<string, string, bool> tryCopyDumpAttempt,
+            TimeSpan? dumpDiscoveryTimeout = null)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
 #pragma warning disable CA1512 // ThrowIfLessThanOrEqual is unavailable on .NET Framework 4.7.2.
@@ -52,6 +57,7 @@ namespace Coop.CrashReporter
             this.dumpCompletionTimeout = dumpCompletionTimeout;
             this.retryInterval = retryInterval;
             this.tryCopyDumpAttempt = tryCopyDumpAttempt ?? TryCopyDumpOnce;
+            this.dumpDiscoveryTimeout = dumpDiscoveryTimeout ?? CrashDumpDiscoveryTimeout;
         }
 
         public int Run(Process process)
@@ -59,7 +65,7 @@ namespace Coop.CrashReporter
             process.WaitForExit();
             int exitCode = process.ExitCode;
 
-            // Walked before anything waits on a dump: the zero exit-code path spends up to
+            // Walked before anything waits on a dump: the clean exit path spends up to
             // 30 seconds looking for one, and a launcher update inside that window would rewrite
             // the very files being listed. A clean exit pays for a walk whose result is then
             // thrown away, but the game's own binaries are still in the file cache it just used
@@ -67,10 +73,11 @@ namespace Coop.CrashReporter
             GameBinariesManifest binaries = GameBinariesManifest.Capture(
                 options.GameBinariesDirectory);
 
-            string dumpPath = exitCode == 0
-                ? WaitForMatchingDump(CrashDumpDiscoveryTimeout)
+            bool cleanExit = IsCleanExit(exitCode);
+            string dumpPath = cleanExit
+                ? WaitForMatchingDump(dumpDiscoveryTimeout)
                 : null;
-            if (exitCode == 0 && dumpPath == null)
+            if (cleanExit && dumpPath == null)
                 return 0;
 
             string reportDirectory = CreateReportDirectory();
@@ -83,7 +90,7 @@ namespace Coop.CrashReporter
             string binariesSummary = binaries.Write(manifestPath, out manifestWritten);
 
             if (dumpPath == null)
-                dumpPath = WaitForMatchingDump(CrashDumpDiscoveryTimeout);
+                dumpPath = WaitForMatchingDump(dumpDiscoveryTimeout);
 
             string copiedDumpPath = Path.Combine(reportDirectory, "dump.dmp");
             bool dumpCopied = dumpPath != null &&
@@ -111,6 +118,51 @@ namespace Coop.CrashReporter
             return 0;
         }
 
+        // Bannerlord's own Exit Game ends the process with -1 after the engine finishes shutting down,
+        // so -1 is only a crash when the engine log stops before that shutdown line. The line is the
+        // engine's own rgl log text (seen on 1.4.8); if a game update changes it, a clean exit is
+        // reported as a crash again rather than a crash being missed.
+        internal bool IsCleanExit(int exitCode)
+        {
+            if (exitCode == 0)
+                return true;
+
+            return exitCode == EngineShutdownExitCode && EngineLogShowsShutdown();
+        }
+
+        private bool EngineLogShowsShutdown()
+        {
+            string logPath = Path.Combine(
+                options.BannerlordDataRoot,
+                "logs",
+                "rgl_log_" + options.ProcessId.ToString(CultureInfo.InvariantCulture) + ".txt");
+            try
+            {
+                // A reused pid can leave an earlier game's clean log behind.
+                if (File.GetLastWriteTimeUtc(logPath) < GetProcessStartUtc())
+                    return false;
+
+                using (var stream = new FileStream(
+                    logPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete))
+                {
+                    stream.Seek(Math.Max(0L, stream.Length - EngineLogTailBytes), SeekOrigin.Begin);
+                    using (var reader = new StreamReader(stream))
+                        return reader.ReadToEnd().Contains(EngineShutdownLogLine);
+                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
         private HashSet<string> FindDumps()
         {
             string crashesRoot = Path.Combine(options.BannerlordDataRoot, "crashes");
@@ -135,9 +187,7 @@ namespace Coop.CrashReporter
 
         internal string WaitForMatchingDump(TimeSpan initialTimeout)
         {
-            DateTime processStartUtc =
-                new DateTime(options.ProcessStartUtcTicks, DateTimeKind.Utc)
-                    .AddSeconds(-1);
+            DateTime processStartUtc = GetProcessStartUtc();
             var stopwatch = Stopwatch.StartNew();
             do
             {
@@ -161,6 +211,12 @@ namespace Coop.CrashReporter
             while (stopwatch.Elapsed < initialTimeout);
 
             return null;
+        }
+
+        private DateTime GetProcessStartUtc()
+        {
+            return new DateTime(options.ProcessStartUtcTicks, DateTimeKind.Utc)
+                .AddSeconds(-1);
         }
 
         private string CreateReportDirectory()

@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Environment.MockEngine;
@@ -15,9 +17,13 @@ namespace E2E.Tests.Environment.MockEngine;
 public sealed class MockTeam
 {
     private static readonly ConditionalWeakTable<Team, MockTeam> ByShell = new();
+    private static readonly ConditionalWeakTable<TeamQuerySystem, MockTeam> ByQuerySystem = new();
 
     public Team Shell { get; }
     public BattleSideEnum Side { get; }
+    /// <summary>How many times <c>Team.ResetTactic</c> ran, the NPC release resets the enemy team's tactic.</summary>
+    public int ResetTacticCalls { get; set; }
+    public TeamQuerySystem QuerySystem { get; } = ObjectHelper.SkipConstructor<TeamQuerySystem>();
 
     private readonly Dictionary<FormationClass, MockFormation> formations = new();
 
@@ -26,9 +32,14 @@ public sealed class MockTeam
         Side = side;
         Shell = ObjectHelper.SkipConstructor<Team>();
         ByShell.AddOrUpdate(Shell, this);
+        ByQuerySystem.AddOrUpdate(QuerySystem, this);
     }
 
     public static bool ForShell(Team shell, out MockTeam team) => ByShell.TryGetValue(shell, out team);
+
+    public static bool OwnsQuerySystem(TeamQuerySystem querySystem) => ByQuerySystem.TryGetValue(querySystem, out _);
+
+    public MBList<Formation> Formations => new(formations.Values.Select(f => f.Shell));
 
     public MockFormation GetFormation(FormationClass formationClass)
     {
@@ -71,4 +82,5 @@ public sealed class MockFormation
     public static bool ForShell(Formation shell, out MockFormation formation) => ByShell.TryGetValue(shell, out formation);
 
     public void AddUnit(Agent agent) => units.Add(agent);
+    public IReadOnlyList<Agent> Units => units;
 }

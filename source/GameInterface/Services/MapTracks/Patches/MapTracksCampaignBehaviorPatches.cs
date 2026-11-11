@@ -22,7 +22,7 @@ internal class MapTracksCampaignBehaviorPatches
         if (ModInformation.IsClient) return false;
 
         // Replace with interface method to run for all players
-        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return true;
 
         mapTracksCampaignBehaviorInterface.OnHourlyTick(__instance);
 
@@ -44,7 +44,7 @@ internal class MapTracksCampaignBehaviorPatches
         if (ModInformation.IsClient) return false;
 
         // Replace with interface method to run for all players
-        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return true;
 
         mapTracksCampaignBehaviorInterface.QuarterHourlyTick(__instance);
 
@@ -57,7 +57,7 @@ internal class MapTracksCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
-        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return true;
 
         __result = mapTracksCampaignBehaviorInterface.IsTrackDropped(__instance, mobileParty);
 
@@ -70,7 +70,7 @@ internal class MapTracksCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return false;
 
-        ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IMapTracksCampaignBehaviorInterface>(out var mapTracksCampaignBehaviorInterface)) return true;
 
         mapTracksCampaignBehaviorInterface.AddTrack(__instance, party, trackPosition, trackDirection);
 

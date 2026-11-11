@@ -2,6 +2,8 @@
 using System.Reflection;
 using Common.PacketHandlers;
 using Common.Serialization;
+using E2E.Tests.Environment.Mock;
+using E2E.Tests.Environment.MockEngine;
 #if DEBUG
 using Common.Messaging;
 using Common.Util;
@@ -19,6 +21,45 @@ namespace E2E.Tests.Services.Missions;
 
 public partial class ActionEquipmentSyncTests
 {
+    [Fact]
+    public void ArcherAmmoBurst_SplitsActionPacketsToFitOneDatagram()
+    {
+        RunScenario(context =>
+        {
+            const int maxPacketBytes = 400;
+            var ids = new List<Guid>();
+            var mirrors = new List<MirrorAgent>();
+            for (int i = 0; i < 16; i++)
+            {
+                context.Spawn("peer", out var mirror, out var id);
+                mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("bow");
+                mirror.Equipment[EquipmentIndex.Weapon1] = ArrowWeapon(29);
+                mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+                ids.Add(id);
+                mirrors.Add(mirror);
+            }
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Network.SerializedPacketSends.Clear();
+
+            // Every archer's ammo changes in one frame, so each entry carries an equipment snapshot.
+            foreach (MirrorAgent mirror in mirrors)
+            {
+                var arrows = mirror.Equipment[EquipmentIndex.Weapon1];
+                arrows.Amount = 28;
+                mirror.Equipment[EquipmentIndex.Weapon1] = arrows;
+            }
+            context.Network.MaxUnreliablePayloadBytes = maxPacketBytes;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            List<SerializedPacketSend> sends = context.Network.SerializedPacketSends;
+            Assert.True(sends.Count > 2);
+            Assert.All(sends, send => Assert.InRange(send.Payload.Length, 1, maxPacketBytes));
+            Guid[] sentIds = sends.SelectMany(send => ((AgentActionPacket)send.Packet).AgentIds).ToArray();
+            Assert.Equal(ids.OrderBy(id => id), sentIds.OrderBy(id => id));
+        });
+    }
+
     [Fact]
     public void ArrowRefillWithoutActionOrWieldChange_PublishesEquipmentRevision()
     {

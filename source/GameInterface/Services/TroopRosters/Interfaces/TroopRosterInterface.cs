@@ -7,6 +7,7 @@ using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -53,8 +54,9 @@ public interface ITroopRosterInterface : IGameAbstraction
 
     /// <summary>
     /// Runs troop recruitment logic for client requests.
+    /// Returns how many cart entries were not recruited because the volunteers or the gold changed.
     /// </summary>
-    void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
+    int HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart);
 
     /// <summary>
     /// Players are able to change the order of their party roster.
@@ -320,23 +322,40 @@ internal class TroopRosterInterface : ITroopRosterInterface
         return counts;
     }
 
-    public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart)
+    public int HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart)
     {
-        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return;
+        troopsInCart ??= Array.Empty<TroopInfo>();
+
+        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return 0;
 
         List<(Hero, CharacterObject, int)> herosValidated = new();
+        HashSet<(Hero, int)> claimedSlots = new();
 
-        // Validate troops before committing to recruiting
+        // Validate troops before committing to recruiting. The cart can be stale when an AI lord
+        // or the daily volunteer update changed a slot after the client opened the recruit screen.
         foreach (var troop in troopsInCart)
         {
             if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
             if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
 
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
+            var volunteerTypes = hero.VolunteerTypes;
+            if (volunteerTypes == null || troop.TroopIndex < 0 || troop.TroopIndex >= volunteerTypes.Length) continue;
 
-            if (volunteerTroopAtIndex is null) continue;
+            var volunteerTroopAtIndex = volunteerTypes[troop.TroopIndex];
 
-            herosValidated.Add((hero, characterObject, troop.TroopIndex));
+            // An emptied slot is null, so this also skips a troop another party recruited first
+            if (volunteerTroopAtIndex != characterObject) continue;
+
+            // Slots are only emptied at commit, so the same slot twice in one cart would recruit two troops
+            if (!claimedSlots.Add((hero, troop.TroopIndex))) continue;
+
+            herosValidated.Add((hero, volunteerTroopAtIndex, troop.TroopIndex));
+        }
+
+        int skipped = troopsInCart.Length - herosValidated.Count;
+        if (skipped > 0)
+        {
+            Logger.Warning("Skipped {Skipped} of {Total} recruitment cart entries that did not match a free volunteer slot", skipped, troopsInCart.Length);
         }
 
         // Calculate cost before changing any data
@@ -350,7 +369,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
         if (cost > mobileParty.LeaderHero.Gold)
         {
             Logger.Warning("Attempted to recruit troops that cost more than the player had");
-            return;
+            return troopsInCart.Length;
         }
 
         // Commit recruitment
@@ -364,6 +383,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
         }
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
+
+        return skipped;
     }
 
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)

@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Framework.Conversation;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkIssueConversationAllowed : IServerToClientCommand
+public readonly struct NetworkIssueConversationAllowed : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

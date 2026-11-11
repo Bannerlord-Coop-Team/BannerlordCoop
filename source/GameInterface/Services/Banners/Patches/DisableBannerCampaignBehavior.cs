@@ -50,7 +50,7 @@ internal class BannerCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnCollectLootItemsPrefix(BannerCampaignBehavior __instance, PartyBase winnerParty, ItemRoster gainedLoots)
     {
-        ContainerProvider.TryResolve<IBannerCampaignBehaviorInterface>(out var bannerCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IBannerCampaignBehaviorInterface>(out var bannerCampaignBehaviorInterface)) return true;
 
         bannerCampaignBehaviorInterface.OnCollectLootItems(__instance, winnerParty, gainedLoots);
 

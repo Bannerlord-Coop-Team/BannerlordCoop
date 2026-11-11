@@ -1,13 +1,17 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.GameDebug.Messages;
 using Missions.Messages;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
-/// <summary>Forwards the native result-ready callback to the coop battle result reporter.</summary>
+/// <summary>
+/// Forwards the native result-ready callback to the coop battle result reporter, and leaves the mission when the server
+/// ends this battle before it has a result.
+/// </summary>
 public class BattleResultReadyLogic : MissionLogic
 {
     private readonly IBattleResultCommitter resultCommitter;
@@ -17,6 +21,7 @@ public class BattleResultReadyLogic : MissionLogic
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly INetwork relayNetwork;
     private bool hasResolvedMissionResult;
+    private bool endRequestedWhileLoading;
 
     public BattleResultReadyLogic(
         IBattleResultCommitter resultCommitter,
@@ -34,6 +39,7 @@ public class BattleResultReadyLogic : MissionLogic
         this.relayNetwork = relayNetwork;
 
         messageBroker.Subscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
+        messageBroker.Subscribe<NetworkEndBattleMission>(Handle_NetworkEndBattleMission);
     }
 
     public override void OnMissionResultReady(MissionResult missionResult)
@@ -50,6 +56,7 @@ public class BattleResultReadyLogic : MissionLogic
     public override void OnEndMissionInternal()
     {
         messageBroker.Unsubscribe<BattleHostAuthorityAcquired>(Handle_BattleHostAuthorityAcquired);
+        messageBroker.Unsubscribe<NetworkEndBattleMission>(Handle_NetworkEndBattleMission);
         base.OnEndMission();
     }
 
@@ -70,9 +77,52 @@ public class BattleResultReadyLogic : MissionLogic
         }, context: nameof(Handle_BattleHostAuthorityAcquired));
     }
 
+    // The server finalized this battle mid mission (a peace decision, say), so no result can be applied to it any more.
+    // MissionEnded is already true while the scoreboard waits on other results, so skip only a mission tearing down.
+    private void Handle_NetworkEndBattleMission(MessagePayload<NetworkEndBattleMission> payload)
+    {
+        if (payload.What.MapEventId != session.InstanceId)
+            return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (payload.What.MapEventId != session.InstanceId ||
+                Mission.CurrentState == Mission.State.EndingNextFrame ||
+                Mission.CurrentState == Mission.State.Over)
+                return;
+
+            // Ending a loading mission makes MissionState skip TickLoading, so wait for its first tick after loading.
+            if (Mission.CurrentState != Mission.State.Continuing)
+            {
+                endRequestedWhileLoading = true;
+                return;
+            }
+
+            EndBattleMission();
+        }, context: nameof(Handle_NetworkEndBattleMission));
+    }
+
+    public override void OnMissionTick(float dt)
+    {
+        if (!endRequestedWhileLoading)
+            return;
+
+        endRequestedWhileLoading = false;
+        EndBattleMission();
+    }
+
+    private void EndBattleMission()
+    {
+        messageBroker.Publish(this, new SendInformationMessage("This battle has ended. Returning to the map."));
+        Mission.EndMission();
+    }
+
     // Only report retreats triggered by the retreat action
     public override void OnRetreatMission()
     {
+#if DEBUG
+        if (session.DebugWithholdCompletion) return;
+#endif
         if (!hasResolvedMissionResult && session.HasInstance) relayNetwork.SendAll(new NetworkBattleRetreated(session.InstanceId));
     }
 }
