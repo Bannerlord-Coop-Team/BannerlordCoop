@@ -860,8 +860,10 @@ public class ExtortionByDesertersTests : IDisposable
         }, TextLinks);
     }
 
-    [Fact]
-    public void CapturedOwnerLoss_FinalizesProgressAndCleansDefendersOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CapturedOwnerLoss_FinalizesProgressAndCleansDefendersOnce(bool throughSimulation)
     {
         var ownerQuest = Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -908,7 +910,20 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
             output.WriteLine("Native capture cleared owner membership; canonical registered owner party remains in the losing side.");
 
-            battle.FinalizeEventAux();
+            if (throughSimulation)
+            {
+                // Exercise the actual simulation teardown, not a direct finalization substitute.
+                var handlerType = typeof(GameInterface.Services.MapEvents.Handlers.BattleSimulationRunHandler);
+                var sessionType = handlerType.GetNestedType("ActiveSimulation", BindingFlags.NonPublic)!;
+                var session = Activator.CreateInstance(sessionType, nonPublic: true)!;
+                sessionType.GetField("MapEvent")!.SetValue(session, battle);
+                handlerType.GetMethod("EndSimulationSession", BindingFlags.Static | BindingFlags.NonPublic)!
+                    .Invoke(null, new[] { session });
+            }
+            else
+            {
+                battle.FinalizeEventAux();
+            }
 
             Assert.True(battle.IsFinalized);
             Assert.Equal(1, ended.CountFor(Server));
