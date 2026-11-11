@@ -22,20 +22,23 @@ internal static class StagedBattleResultUpdatePatch
         if (ModInformation.IsServer || Mission.Current != null || MissionState.Current != null ||
             Game.Current?.GameStateManager?.ActiveState != __instance) return;
         var encounter = PlayerEncounter.Current;
-        if (!HasStagedResults(encounter) ||
+        if (!HasLootToResume(encounter) ||
             Campaign.Current.MapEventManager.MapEvents.Contains(encounter._mapEvent)) return;
         // A captured lord conversation is open; updating now would reopen it every tick.
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
-        // Send troops has nothing staged, its result menu's Leave finishes the encounter like vanilla.
-        if (encounter._mapEvent.Component is HideoutEventComponent { IsSendTroops: true }) return;
 
         // Custom hideout menus, the siege defeated menu and an empty map have no native menu init callback
         // to resume the loot flow.
         PlayerEncounter.Update();
     }
 
+    // Whether a hideout or siege assault defender encounter must stay open after its map event is destroyed.
     internal static bool HasStagedResults(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         (mapEvent.IsHideoutBattle || (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
+
+    // Whether a held encounter still has a loot flow to play, a won send troops raid ends on its own result menu.
+    internal static bool HasLootToResume(PlayerEncounter encounter) =>
+        HasStagedResults(encounter) && encounter._mapEvent.Component is not HideoutEventComponent { IsSendTroops: true };
 }

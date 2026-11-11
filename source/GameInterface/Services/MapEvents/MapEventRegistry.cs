@@ -92,8 +92,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        // A hideout or siege assault defender who already left the mission still needs to collect the
-        // server's staged loot, which StagedBattleResultUpdatePatch resumes on the next map tick.
+        // A hideout or siege assault defender who already left the mission keeps its encounter for the server's
+        // staged loot, which StagedBattleResultUpdatePatch resumes, or for the send troops result menu.
         if (!hasStagedResults)
             CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
