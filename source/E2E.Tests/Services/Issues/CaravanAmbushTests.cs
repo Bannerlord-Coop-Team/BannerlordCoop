@@ -607,6 +607,7 @@ public class CaravanAmbushTests : IDisposable
     private void SendState(string controller, bool saved, int warnings, params string[] journal)
     {
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushState(
-            scenario.NotableId, QuestScenario.IssueId, controller, caravanId, banditId, saved, warnings, journal)));
+            scenario.NotableId, QuestScenario.IssueId, controller, caravanId, banditId, saved, warnings,
+            journal.Select(text => new IssueJournalEntry(new JournalLog(CampaignTime.Now, new TextObject(text)))).ToArray())));
     }
 }

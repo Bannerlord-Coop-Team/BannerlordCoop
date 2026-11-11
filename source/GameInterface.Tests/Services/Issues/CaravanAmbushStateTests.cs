@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using ProtoBuf;
+using GameInterface.Services.Issues.Framework.Finalization;
 using System.IO;
 using Xunit;
 
@@ -14,7 +15,7 @@ public class CaravanAmbushStateTests
     public void WireRoundTripKeepsPartyIdentityProgressAndPersonalJournal(bool saved, int warnings)
     {
         var sent = new NetworkCaravanAmbushState("giver", "issue", "owner", "caravan", "raiders",
-            saved, warnings, new[] { "Follow the caravan", "The caravan survived" });
+            saved, warnings, new[] { default(IssueJournalEntry), default(IssueJournalEntry) });
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, sent);
         stream.Position = 0;

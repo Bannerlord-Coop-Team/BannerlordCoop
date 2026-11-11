@@ -3,6 +3,8 @@ using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using System;
@@ -141,10 +143,13 @@ internal class CaravanAmbushStateHandler : IHandler
             {
                 if (party != null && !quest.IsTracked(party)) quest.AddTrackedObject(party);
             }
-            var journal = data.Journal ?? Array.Empty<string>();
-            for (var i = quest.JournalEntries.Count; i < journal.Length; i++)
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
-                quest.AddLog(new TextObject("{=!}" + journal[i]));
+                quest._journalEntries.Clear();
+                foreach (var entry in data.Journal ?? Array.Empty<IssueJournalEntry>())
+                    quest._journalEntries.Add(entry.ToJournalLog());
+                CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
             }
         }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
     }

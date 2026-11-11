@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using GameInterface.Services.Issues.Framework.Finalization;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
@@ -13,10 +14,10 @@ public readonly struct NetworkCaravanAmbushState : IMessage
     [ProtoMember(5)] public readonly string BanditId;
     [ProtoMember(6)] public readonly bool Saved;
     [ProtoMember(7)] public readonly int Warnings;
-    [ProtoMember(8)] public readonly string[] Journal;
+    [ProtoMember(8)] public readonly IssueJournalEntry[] Journal;
 
     public NetworkCaravanAmbushState(string ownerId, string issueId, string controllerId,
-        string caravanId, string banditId, bool saved, int warnings, string[] journal)
+        string caravanId, string banditId, bool saved, int warnings, IssueJournalEntry[] journal)
     {
         IssueOwnerId = ownerId;
         IssueId = issueId;

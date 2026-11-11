@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         var journalCount = quest.JournalEntries.Count;
         if (published.TryGetValue(quest, out var previous) && previous.Matches(ownerId, issue.StringId,
             controllerId, caravanId, banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount)) return;
-        var journal = quest.JournalEntries.Select(entry => entry.LogText.ToString()).ToArray();
+        var journal = quest.JournalEntries.Select(entry => new IssueJournalEntry(entry)).ToArray();
         var state = new State(ownerId, issue.StringId, controllerId, caravanId, banditId,
             quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount);
         published[quest] = state;
