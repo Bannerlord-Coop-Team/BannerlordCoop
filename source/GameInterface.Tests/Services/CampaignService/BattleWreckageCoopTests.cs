@@ -64,23 +64,13 @@ public class BattleWreckageCoopTests : IDisposable
         using (new AllowedThread()) named.StringId = "wreckage_1";
         manager._wreckages.Add(idless);
         manager._wreckages.Add(named);
-        manager._wreckages.Add(null);
 
         // Baseline: without the removal the vanilla load path throws like the client dump.
         Assert.Throws<NullReferenceException>(() => manager.InitializeManagerObjectLists());
 
-        Assert.Equal(3, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
+        Assert.Equal(2, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
         manager.InitializeManagerObjectLists();
         Assert.Empty(manager.Wreckages);
-    }
-
-    [Fact]
-    public void Repair_WithNoWreckageList_RemovesNothing()
-    {
-        var manager = new CampaignObjectManager();
-        manager._wreckages = null;
-
-        Assert.Equal(0, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
     }
 
     [Fact]

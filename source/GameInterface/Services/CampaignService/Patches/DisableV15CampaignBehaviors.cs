@@ -68,7 +68,7 @@ internal class EmptyClanPartyLeadersClientPatch
 }
 
 /// <summary>
-/// Battle wreckages, the land battle sites and sea wreckages left after a battle, are off on every role:
+/// Battle wreckages (the land battle sites and sea wreckages left after a battle) are off on every role:
 /// they have no registry or sync yet, and co-op drops the StringId of a server-made one.
 /// </summary>
 [HarmonyPatch(typeof(BattleWreckageCampaignBehavior), nameof(BattleWreckageCampaignBehavior.RegisterEvents))]
