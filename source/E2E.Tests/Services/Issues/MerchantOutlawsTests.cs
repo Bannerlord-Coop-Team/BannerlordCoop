@@ -1038,6 +1038,9 @@ public class MerchantOutlawsTests : IDisposable
             // The Done moves only the sent - 1 troops still there, so the selection falls short of what the issue needs.
             Server.Call(() => Assert.Equal(0,
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            // The picker drops the troop the server couldn't move.
+            ClientA.Call(() => Assert.Equal(sent - 1,
+                Get<Hero>(ClientA, scenario.NotableId).Issue.AlternativeSolutionSentTroops.GetTroopCount(Get<CharacterObject>(ClientA, troopId))));
         }
         var expectedRegulars = rejectDone ? sent - 1 : sent + (upgradePicker ? 6 : 5);
         if (disconnectSelecting)

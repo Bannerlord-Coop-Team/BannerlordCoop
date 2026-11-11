@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -21,15 +22,17 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
     private readonly IObjectManager objects;
     private readonly ITroopRosterInterface rosters;
     private readonly IPlayerManager players;
+    private readonly INetwork network;
     private readonly Dictionary<(string Hero, string Giver, string Issue), (NetPeer Peer, Dictionary<CharacterObject, TroopRosterElement> Troops)> selections = new();
 
     public AlternativeSolutionCommitments(IMessageBroker broker, IObjectManager objects,
-        ITroopRosterInterface rosters, IPlayerManager players)
+        ITroopRosterInterface rosters, IPlayerManager players, INetwork network)
     {
         this.broker = broker;
         this.objects = objects;
         this.rosters = rosters;
         this.players = players;
+        this.network = network;
         broker.Subscribe<PartyScreenCommitApplied>(Handle_Applied);
         broker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
     }
@@ -88,6 +91,7 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
             Add(selection.Troops, element);
         }
         selections[key] = (data.Requester, selection.Troops);
+        network.Send(data.Requester, new NetworkAlternativeSolutionSelection(data.IssueOwnerId, data.IssueId, ToData(selection.Troops.Values)));
     }
 
     private void Handle_Disconnected(MessagePayload<PlayerDisconnected> payload)
