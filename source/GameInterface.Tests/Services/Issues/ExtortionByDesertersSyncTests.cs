@@ -93,5 +93,6 @@ public class ExtortionByDesertersHandlerTests
         new ExtortionByDesertersHandler(
             Mock.Of<IMessageBroker>(), Mock.Of<INetwork>(), Mock.Of<IObjectManager>(),
             Mock.Of<IIssueResolver>(), Mock.Of<IIssueOwnerResolver>(), Mock.Of<IControllerIdProvider>(),
-            Mock.Of<IPlayerManager>(), collector, new TestQuestFeatureFlag(questsOn));
+            Mock.Of<IPlayerManager>(), collector, new TestQuestFeatureFlag(questsOn),
+            Mock.Of<IIssueConversationGuard>());
 }

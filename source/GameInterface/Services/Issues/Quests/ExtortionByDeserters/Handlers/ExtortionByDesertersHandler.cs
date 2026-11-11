@@ -29,10 +29,12 @@ internal class ExtortionByDesertersHandler : IHandler
     private readonly IIssueOwnerResolver owners;
     private readonly IControllerIdProvider controller;
     private readonly IPlayerManager players;
+    private readonly IIssueConversationGuard conversationGuard;
 
     public ExtortionByDesertersHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
-        IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag)
+        IAutoSyncPatchCollector patchCollector, IQuestFeatureFlag questFeatureFlag,
+        IIssueConversationGuard conversationGuard)
     {
         if (questFeatureFlag.IsEnabled)
         {
@@ -52,6 +54,7 @@ internal class ExtortionByDesertersHandler : IHandler
         this.owners = owners;
         this.controller = controller;
         this.players = players;
+        this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkExtortionByDesertersState>(Handle);
     }
 
@@ -90,7 +93,7 @@ internal class ExtortionByDesertersHandler : IHandler
             return;
         }
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => conversationGuard.RunInOrder(() =>
         {
             if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue.IssueQuest is Quest quest)) return;
@@ -133,6 +136,6 @@ internal class ExtortionByDesertersHandler : IHandler
             {
                 quest.StartAmbushEncounter();
             }
-        }, context: nameof(ExtortionByDesertersHandler));
+        }, data.IssueOwnerId), context: nameof(ExtortionByDesertersHandler));
     }
 }
