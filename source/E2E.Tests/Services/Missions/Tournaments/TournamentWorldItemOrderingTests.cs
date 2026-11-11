@@ -11,6 +11,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Agents.Patches;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Missions.Tournaments;
@@ -950,6 +951,29 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void StuckMissilePickup_RetiresThePeerCopyWhenOnlyTheShooterHasTheBanner()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            // The shooter's own copy keeps the clan banner; replayed shots arrive without one.
+            var shooterCopy = new MissionWeapon(itemObject, null, new Banner(MissileShotReplayTests.ClanBannerCode));
+            SpawnedItemEntity pickerCopy = clients.Picker.LandMissile(shooter, weapon, missileIndex: 7, sceneId: 108);
+            SpawnedItemEntity peerCopy = clients.Peer.LandMissile(shooter, shooterCopy, missileIndex: 11, sceneId: 109);
+            Assert.True(clients.Peer.Items.TryGetId(peerCopy, out Guid peerCopyId));
+
+            clients.Picker.Broker.Publish(this, CreateMissilePickup(picker, pickerCopy, itemObject, weapon));
+            NetworkWeaponPickedup sent = Assert.Single(
+                clients.Network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>());
+            clients.Peer.Broker.Publish(this, sent);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            Assert.False(clients.Peer.Spawner.IsPresent(peerCopy));
+            Assert.False(clients.Peer.Items.TryGet(peerCopyId, out _));
+            Assert.Empty(clients.Network.NetworkSentMessages.GetMessages<NetworkWeaponDropResyncRequest>());
+        });
+    }
+
+    [Fact]
     public void StuckMissileCopy_LandingAfterThePickup_IsRemoved()
     {
         RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
@@ -1414,7 +1438,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         {
             this.agentRegistry = agentRegistry;
             this.shotMap = shotMap;
-            missiles = new MissileHandler(network, Broker, agentRegistry);
+            missiles = new MissileHandler(network, Broker, agentRegistry, new MissileOrientationCodec(), Spawner, Items,
+                new MissionObjectPath());
             drops = CreateHandler(observer, agentRegistry, Items, objectManager, Spawner, Broker);
             pickups = new WeaponPickupHandler(agentRegistry, Items, network, Broker, objectManager);
         }
@@ -6030,7 +6055,9 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             bool hasLifeTime,
             float remainingLifeTime,
             MatrixFrame frame,
-            out SpawnedItemEntity item)
+            out SpawnedItemEntity item,
+            MissionObject parent = null,
+            GameEntity attachmentParent = null)
         {
             SpawnCount++;
             item = AddPresent(weapon);

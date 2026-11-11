@@ -10,7 +10,8 @@ namespace GameInterface;
 public interface IGameInterfacePatchInstaller
 {
     /// <summary>
-    /// Installs the detour guard, the static fixes and every uncategorized patch onto <paramref name="harmony"/>.
+    /// Installs the detour guard, the static fixes, every uncategorized patch and the enabled quest category
+    /// onto <paramref name="harmony"/>.
     /// </summary>
     void Install(Harmony harmony);
 }

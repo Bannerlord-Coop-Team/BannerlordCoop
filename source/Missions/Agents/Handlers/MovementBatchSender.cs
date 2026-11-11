@@ -15,6 +15,12 @@ public interface IMovementBatchSender
 
     void BeginFrame(float elapsedSeconds);
 
+    /// <summary>
+    /// Sets how many recipients the current capture goes to. With two or more, each snapshot is encoded once and shared;
+    /// with one, encoding the whole packet is cheaper because nothing reuses the snapshot encodings.
+    /// </summary>
+    void SetCaptureRecipients(int recipientCount);
+
     void ConfigureRecipient(
         string controllerId,
         double bytesPerSecond,
@@ -44,6 +50,9 @@ public interface IMovementBatchSender
         string controllerId,
         int deferredSnapshots,
         float maximumDeferredAgeSeconds);
+
+    /// <summary>Lists each recipient's effective ceiling, the lowest of its configured and health limits.</summary>
+    IReadOnlyDictionary<string, double> GetRouteBytesPerSecond();
 
     void RemoveRecipient(string controllerId);
 
@@ -169,9 +178,11 @@ public sealed class MovementBatchSender : IMovementBatchSender
     private readonly IMovementTrafficBudgetFactory trafficBudgetFactory;
     private readonly IMovementPriorityScheduler priorityScheduler;
     private readonly IMovementNetworkSettings networkSettings;
+    private readonly IMovementRouteBackoff routeBackoff;
     private readonly IMovementTrafficBudget outgoingTrafficBudget;
     private readonly Dictionary<string, RecipientState> recipients =
         new Dictionary<string, RecipientState>(StringComparer.Ordinal);
+    private bool encodeSnapshotsOnce;
 
     private sealed class RecipientState
     {
@@ -239,7 +250,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
         IMovementPacketCompressor packetCompressor,
         IMovementTrafficBudgetFactory trafficBudgetFactory,
         IMovementPriorityScheduler priorityScheduler,
-        IMovementNetworkSettings networkSettings)
+        IMovementNetworkSettings networkSettings,
+        IMovementRouteBackoff routeBackoff = null)
     {
         if (client == null) throw new ArgumentNullException(nameof(client));
         if (packetCompressor == null) throw new ArgumentNullException(nameof(packetCompressor));
@@ -252,6 +264,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         this.trafficBudgetFactory = trafficBudgetFactory;
         this.priorityScheduler = priorityScheduler;
         this.networkSettings = networkSettings;
+        this.routeBackoff = routeBackoff ?? new MovementRouteBackoff(client);
         outgoingTrafficBudget = trafficBudgetFactory.Create(
             networkSettings.OutgoingBytesPerSecond,
             CalculateBurstBytes(networkSettings.OutgoingBytesPerSecond, 1000));
@@ -281,14 +294,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
         outgoingTrafficBudget.Advance(elapsedSeconds);
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Advance(elapsedSeconds);
+        routeBackoff.Advance(elapsedSeconds);
     }
+
+    public void SetCaptureRecipients(int recipientCount) => encodeSnapshotsOnce = recipientCount >= 2;
 
     public void ConfigureRecipient(
         string controllerId,
         double bytesPerSecond,
         int maxPayloadBytes)
     {
-        double normalizedBytesPerSecond = NormalizeByteRate(bytesPerSecond);
+        double normalizedBytesPerSecond = Math.Min(
+            NormalizeByteRate(bytesPerSecond),
+            routeBackoff.GetBytesPerSecond(controllerId));
         RecipientState recipient = GetOrCreateRecipient(controllerId);
         recipient.TrafficBudget.Configure(
             normalizedBytesPerSecond,
@@ -573,10 +591,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
             : new MovementTrafficFrame();
     }
 
+    public IReadOnlyDictionary<string, double> GetRouteBytesPerSecond()
+    {
+        var rates = new Dictionary<string, double>(recipients.Count, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, RecipientState> recipient in recipients)
+            rates.Add(recipient.Key, recipient.Value.TrafficBudget.BytesPerSecond);
+        return rates;
+    }
+
     public void RemoveRecipient(string controllerId)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         recipients.Remove(controllerId);
+        routeBackoff.RemoveRoute(controllerId);
     }
 
     public void Clear()
@@ -585,6 +612,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
         foreach (RecipientState recipient in recipients.Values)
             recipient.TrafficBudget.Clear();
         recipients.Clear();
+        routeBackoff.Clear();
     }
 
     private RecipientState GetOrCreateRecipient(string controllerId)
@@ -758,6 +786,7 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (!outgoingTrafficBudget.TrySpend(candidate.Payload.Length))
                 throw new InvalidOperationException("The shared movement budget changed during a game-thread send.");
             client.Send(controllerId, candidate.Packet, candidate.Payload);
+            routeBackoff.ReportSent(controllerId, candidate.Payload.Length);
             for (int i = 0; i < candidate.Count; i++)
                 onSent?.Invoke(
                     GetCircular(
@@ -1062,13 +1091,18 @@ public sealed class MovementBatchSender : IMovementBatchSender
     {
         var data = new T[count];
         CopyCircular(batch.Data, offset, start, data);
+        // Encode-once looks snapshots up by canonical id, so compact packets only need the ids on that path.
+        Guid[] canonicalIds = null;
+        if (idFormat == MovementIdFormat.Canonical || encodeSnapshotsOnce)
+        {
+            canonicalIds = new Guid[count];
+            CopyCircular(batch.CanonicalIds, offset, start, canonicalIds);
+        }
 
         IPacket packet;
         if (idFormat == MovementIdFormat.Canonical)
         {
-            var ids = new Guid[count];
-            CopyCircular(batch.CanonicalIds, offset, start, ids);
-            packet = createPacket(null, null, ids, data);
+            packet = createPacket(null, null, canonicalIds, data);
         }
         else
         {
@@ -1093,7 +1127,9 @@ public sealed class MovementBatchSender : IMovementBatchSender
         return new SerializedMovementBatch(
             count,
             packet,
-            packetCompressor.Serialize(packet));
+            encodeSnapshotsOnce
+                ? packetCompressor.SerializeSnapshots(packet, canonicalIds)
+                : packetCompressor.Serialize(packet));
     }
 
     private static T GetCircular<T>(

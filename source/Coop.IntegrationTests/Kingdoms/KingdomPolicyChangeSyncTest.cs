@@ -1,5 +1,4 @@
-﻿using Coop.Core.Server.Services.Kingdoms.Messages;
-using Coop.IntegrationTests.Environment;
+﻿using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;

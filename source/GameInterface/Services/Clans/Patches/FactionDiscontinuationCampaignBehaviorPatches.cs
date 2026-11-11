@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Kingdoms.Extentions;
 using HarmonyLib;
@@ -33,11 +34,12 @@ internal class FactionDiscontinuationCampaignBehaviorPatches
     }
     [HarmonyPatch(nameof(FactionDiscontinuationCampaignBehavior.OnClanChangedKingdom))]
     [HarmonyPrefix]
-    private static bool OnClanChangedKingdomPrefix(FactionDiscontinuationCampaignBehavior __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
+    internal static bool OnClanChangedKingdomPrefix(FactionDiscontinuationCampaignBehavior __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification = true)
     {
         if (newKingdom == null)
         {
-            if (__instance.CanClanBeDiscontinued(clan))
+            bool keepClan = detail == ChangeKingdomAction.ChangeKingdomActionDetail.LeaveByKingdomDestruction && ModConfigProvider.ModOptions.ClansAfterKingdomDestruction == ClansAfterKingdomDestructionMode.KeepClans;
+            if (!keepClan && __instance.CanClanBeDiscontinued(clan))
             {
                 __instance.AddIndependentClan(clan);
             }

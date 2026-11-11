@@ -59,7 +59,7 @@ public class SiegeMachineSimulationTests : IDisposable
         session.Setup(value => value.IsHostController(It.IsAny<string>()))
             .Returns((string controller) => controller == "host");
         using var replicator = new SiegeMachineStateReplicator(Mock.Of<IBattleNetwork>(), broker,
-            session.Object, Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+            session.Object, Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), new RangedSiegeWeaponPresentation());
 #pragma warning disable SYSLIB0050
         var machine = (UsableMachine)FormatterServices.GetUninitializedObject(
             ranged ? typeof(Ballista) : typeof(ManagedStonePile));
@@ -344,7 +344,7 @@ public class SiegeMachineSimulationTests : IDisposable
             session.SetupGet(value => value.HostEpoch).Returns(5);
             session.Setup(value => value.IsHostController("host")).Returns(true);
             using var replicator = new SiegeMachineStateReplicator(network.Object, broker, session.Object,
-                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
             GameThread.Run(() => AccessTools.Method(typeof(SiegeMachineStateReplicator), "RefreshMachineCache")
                 .Invoke(replicator, Array.Empty<object>()), blocking: true);
             ReadField<Dictionary<int, UsableMachine>>(replicator, "machinesById")[ram.Id.Id] = ram;
@@ -608,7 +608,7 @@ public class SiegeMachineSimulationTests : IDisposable
             var network = new Mock<IBattleNetwork>();
             network.Setup(value => value.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(messages.Add);
             return new SiegeMachineStateReplicator(network.Object, broker, session.Object,
-                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy());
+                Mock.Of<INetworkAgentRegistry>(), new HostEpochPolicy(), Mock.Of<IRangedSiegeWeaponPresentation>());
         }
 
         ManagedStonePile RegisterPile(SiegeMachineStateReplicator replicator)

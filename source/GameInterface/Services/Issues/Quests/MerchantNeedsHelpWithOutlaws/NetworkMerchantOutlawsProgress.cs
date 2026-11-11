@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkMerchantOutlawsProgress : IServerToClientCommand
+public readonly struct NetworkMerchantOutlawsProgress : ICommand
 {
     [ProtoMember(1)] public string GiverId { get; }
     [ProtoMember(2)] public string IssueId { get; }

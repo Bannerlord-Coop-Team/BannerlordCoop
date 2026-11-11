@@ -91,6 +91,41 @@ internal static class Program
         }
 
         Console.WriteLine();
+        Console.WriteLine("## movement frame for 3 recipients (#4487): per-candidate encode versus each agent encoded once per frame");
+        Console.WriteLine("workload | path | ns/frame | serialize ns | lz4 ns | other ns | B/frame | gen0/1k | gen1/1k | candidates | envelopes | packets | wire bytes | wire hash");
+        foreach ((string name, int agents, bool compactIds, bool compressible) in new[]
+        {
+            ("125 incompressible compact", 125, true, false),
+            ("125 compressible compact", 125, true, true),
+            ("400 incompressible guid", 400, false, false),
+        })
+        {
+            string? baseline = null;
+            foreach ((string pathName, bool encodeOnce) in new[] { ("per candidate", false), ("encode once", true) })
+            {
+                var workload = new MovementWorkload(
+                    current,
+                    BenchmarkPayloads.Agents(agents, compressible, seed: 7),
+                    compactIds,
+                    MovementWorkload.RelayPayloadBudget(current),
+                    recipients: 3,
+                    encodeOnce);
+                Result r = Measure(() => { workload.SendFrame(); return 0; }, perOps: 1000);
+                MovementFrameStats timed = workload.Stats;
+                double ticksToNs = 1e9 / Stopwatch.Frequency / timed.Frames;
+                double serializeNs = timed.SerializeTicks * ticksToNs;
+                double lz4Ns = timed.Lz4Ticks * ticksToNs;
+                workload.ResetStats();
+                workload.SendFrame();
+                MovementFrameStats s = workload.Stats;
+                string counts = $"{s.Candidates} | {s.Envelopes} | {s.Packets} | {s.WireBytes} | {s.WireHash:X16}";
+                Console.WriteLine($"{name} | {pathName} | {r.Ns:F0} | {serializeNs:F0} | {lz4Ns:F0} | {r.Ns - serializeNs - lz4Ns:F0} | {r.BytesPerOp:F0} | {r.Gen0Per100k:F1} | {r.Gen1Per100k:F1} | {counts}");
+                if (baseline == null) baseline = counts;
+                else if (baseline != counts) throw new InvalidOperationException($"{name}: encode-once wire differs from per-candidate");
+            }
+        }
+
+        Console.WriteLine();
         Console.WriteLine("## parallel throughput: 8 threads for 2 s on movement 60 compact, total ops");
         object movement = payloads.Single(p => p.Name == "movement 60 compact").Value;
         foreach ((string serializerName, ICommonSerializer serializer) in serializers)

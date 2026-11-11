@@ -38,6 +38,10 @@ public interface INetworkAgentRegistry : IDisposable
     bool RemoveAgent(Agent agent);
     bool TryGetAgentInfo(Agent agent, out CoopAgentInfo agentInfo);
     bool TryGetAgentInfo(Guid agentId, out CoopAgentInfo agentInfo);
+    // Cosmetic identities survive deregistration, but never native deletion or a mission reset.
+    bool TryGetCosmeticAgent(Guid agentId, out Agent agent);
+    bool TryGetCosmeticAgentId(Agent agent, out Guid agentId);
+    void ForgetCosmeticAgent(Agent agent);
     bool TryGetAgentInfo(string movementScopeId, ushort movementId, out CoopAgentInfo agentInfo);
     bool TryGetHeroAgentInfo(Hero hero, out CoopAgentInfo agentInfo);
     bool IsLocallyControlled(Guid agentId);
@@ -48,6 +52,12 @@ public interface INetworkAgentRegistry : IDisposable
         Guid agentId, long previousRevision, Guid mountAgentId, long previousMountRevision);
 
     IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId);
+
+    /// <summary>
+    /// Replaces the contents of <paramref name="destination"/> with the snapshot <see cref="GetAgents(string)"/>
+    /// returns, so a per-tick caller can reuse one list instead of allocating an array each call.
+    /// </summary>
+    void GetAgents(string controllerId, List<CoopAgentInfo> destination);
 
     /// <summary>
     /// Every controller id that currently holds at least one registered agent (by CURRENT authority, the
@@ -66,6 +76,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     private readonly object gate = new();
     private readonly Dictionary<Agent, CoopAgentInfo> AgentToInfo = new();
     private readonly Dictionary<Guid, CoopAgentInfo> IdToInfo = new();
+    private readonly Dictionary<Agent, Guid> cosmeticAgentIds = new();
+    private readonly Dictionary<Guid, Agent> cosmeticAgents = new();
     private readonly Dictionary<(string Scope, ushort MovementId), CoopAgentInfo> MovementIdToInfo = new();
     private readonly Dictionary<string, List<CoopAgentInfo>> ControllerAgentMap = new();
     private readonly IControllerIdProvider controllerIdProvider;
@@ -84,6 +96,8 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         {
             AgentToInfo.Clear();
             IdToInfo.Clear();
+            cosmeticAgentIds.Clear();
+            cosmeticAgents.Clear();
             MovementIdToInfo.Clear();
             ControllerAgentMap.Clear();
         }
@@ -223,6 +237,12 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
             AgentToInfo[agent] = agentInfo;
             IdToInfo[agentId] = agentInfo;
+            if (cosmeticAgents.TryGetValue(agentId, out var previousAgent))
+                cosmeticAgentIds.Remove(previousAgent);
+            if (cosmeticAgentIds.TryGetValue(agent, out Guid previousId))
+                cosmeticAgents.Remove(previousId);
+            cosmeticAgentIds[agent] = agentId;
+            cosmeticAgents[agentId] = agent;
             if (movementId != 0)
                 MovementIdToInfo[(movementScopeId, movementId)] = agentInfo;
 
@@ -301,6 +321,28 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         lock (gate)
         {
             return IdToInfo.TryGetValue(agentId, out agentInfo);
+        }
+    }
+
+    public bool TryGetCosmeticAgent(Guid agentId, out Agent agent)
+    {
+        lock (gate)
+            return cosmeticAgents.TryGetValue(agentId, out agent);
+    }
+
+    public bool TryGetCosmeticAgentId(Agent agent, out Guid agentId)
+    {
+        lock (gate)
+            return cosmeticAgentIds.TryGetValue(agent, out agentId);
+    }
+
+    public void ForgetCosmeticAgent(Agent agent)
+    {
+        lock (gate)
+        {
+            if (!cosmeticAgentIds.TryGetValue(agent, out Guid agentId)) return;
+            cosmeticAgentIds.Remove(agent);
+            cosmeticAgents.Remove(agentId);
         }
     }
 
@@ -408,6 +450,23 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
 
             // Snapshot under the lock — the underlying list can be mutated by register/remove.
             return agents.ToArray();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void GetAgents(string controllerId, List<CoopAgentInfo> destination)
+    {
+        destination.Clear();
+        if (string.IsNullOrEmpty(controllerId))
+        {
+            Logger.Error($"{nameof(controllerId)} is null or empty.");
+            return;
+        }
+
+        lock (gate)
+        {
+            if (ControllerAgentMap.TryGetValue(controllerId, out var agents))
+                destination.AddRange(agents);
         }
     }
 
@@ -571,6 +630,9 @@ public class CoopAgentInfo
     public string MovementScopeId { get; }
     public string CurrentAuthority { get; internal set; }
     public long AuthorityRevision { get; internal set; }
+
+    // Whether this client already ran the fleeing side effects of the owner's current panic.
+    internal bool PanicNotified { get; set; }
 
     internal void RecordAuthoritativeEquipment(AgentEquipmentData equipment)
     {

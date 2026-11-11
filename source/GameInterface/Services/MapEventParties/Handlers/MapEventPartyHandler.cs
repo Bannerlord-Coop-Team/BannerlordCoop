@@ -244,7 +244,9 @@ internal class MapEventPartyHandler : IHandler
             attackedTroopId,
             obj.Damage,
             obj.IsFatal,
-            obj.IsSimulatedHit));
+            obj.IsSimulatedHit,
+            // vanilla only reads the weapon for a hero attacker (OnHeroCombatHit)
+            obj.AttackingTroop.IsHero ? obj.AttackerWeapon : null));
     }
 
     private void Handle_NetworkTroopScoreHit(MessagePayload<NetworkTroopScoreHit> payload)
@@ -272,7 +274,8 @@ internal class MapEventPartyHandler : IHandler
                 attackedTroop,
                 obj.Damage,
                 obj.IsFatal,
-                obj.IsSimulatedHit);
+                obj.IsSimulatedHit,
+                obj.AttackerWeapon);
         }, context: nameof(Handle_NetworkTroopScoreHit));
     }
 
@@ -282,7 +285,8 @@ internal class MapEventPartyHandler : IHandler
         CharacterObject attackedTroop,
         int damage,
         bool isFatal,
-        bool isSimulatedHit)
+        bool isSimulatedHit,
+        WeaponComponentData attackerWeapon)
     {
         var roster = mapEventParty.Troops;
         UniqueTroopDescriptor? fallbackDescriptor = null;
@@ -294,14 +298,13 @@ internal class MapEventPartyHandler : IHandler
                 fallbackDescriptor ??= element.Descriptor;
                 if (element.IsKilled || element.IsWounded || element.IsRouted) continue;
 
-                // The attacker's weapon is not carried over the wire; native simulation also passes null.
                 mapEventParty.OnTroopScoreHit(
                     element.Descriptor,
                     attackedTroop,
                     damage,
                     isFatal,
                     isTeamKill: false,
-                    null,
+                    attackerWeapon,
                     isSimulatedHit);
                 return;
             }
@@ -316,7 +319,7 @@ internal class MapEventPartyHandler : IHandler
                 damage,
                 isFatal,
                 isTeamKill: false,
-                null,
+                attackerWeapon,
                 isSimulatedHit);
             return;
         }
