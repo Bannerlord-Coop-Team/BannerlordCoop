@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Registry.Auto;
-using GameInterface.Registry;
 using GameInterface.Services.Armies;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -44,7 +43,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IObjectManager objectManager;
     private readonly IArmyDisbander armyDisbander;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
-    private readonly ILoadRepairRegistryReconciler registryReconciler;
 
     public MapEventLoadCleaner(
         ILogger logger,
@@ -52,8 +50,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         IPlayerManager playerManager,
         IObjectManager objectManager,
         IArmyDisbander armyDisbander,
-        IStalledMapEventResolver stalledMapEventResolver,
-        ILoadRepairRegistryReconciler registryReconciler)
+        IStalledMapEventResolver stalledMapEventResolver)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
@@ -61,7 +58,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.objectManager = objectManager;
         this.armyDisbander = armyDisbander;
         this.stalledMapEventResolver = stalledMapEventResolver;
-        this.registryReconciler = registryReconciler;
     }
 
     public void CleanUpLoadedMapEvents()
@@ -69,22 +65,14 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var before = registryReconciler.Capture();
-        try
+        foreach (var mapEvent in GetLoadedPlayerMapEvents())
         {
-            foreach (var mapEvent in GetLoadedPlayerMapEvents())
-            {
-                CleanUpLoadedPlayerMapEvent(mapEvent);
-            }
+            CleanUpLoadedPlayerMapEvent(mapEvent);
+        }
 
-            // A save can hold an AI battle left with no healthy troops on one side, which nothing ends on its own.
-            stalledMapEventResolver.ResolveStalledMapEvents();
-            ReleaseEndedMapEventLinks(_ => { });
-        }
-        finally
-        {
-            registryReconciler.UnregisterRemoved(before);
-        }
+        // A save can hold an AI battle left with no healthy troops on one side, which nothing ends on its own.
+        stalledMapEventResolver.ResolveStalledMapEvents();
+        ReleaseEndedMapEventLinks(_ => { });
     }
 
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
@@ -468,7 +456,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
                 mapEvent.StringId,
                 mapEvent.InvolvedParties.Count());
-            LoadRepairMapEventFinalizer.FinalizeEvent(mapEvent, messageBroker, objectManager);
+            mapEvent.FinalizeEvent();
             return;
         }
 

@@ -53,23 +53,23 @@ namespace Coop.Tests.Server.States
         }
 
         [Fact]
-        public void CampaignReady_PatchesLifetimesBeforeRunningLoadRepairs()
+        public void CampaignReady_RunsLoadRepairsOnceTheServerIsRunning()
         {
             var calls = new List<string>();
+            var serverLogic = serverComponent.Container.Resolve<IServerLogic>();
             var registryManager = serverComponent.Container.Resolve<Mock<IRegistryManager>>();
             var loadRepairRunner = serverComponent.Container.Resolve<Mock<ILoadRepairRunner>>();
             registryManager.Setup(manager => manager.RegisterAllGameObjects())
                 .Callback(() => calls.Add("register"));
             loadRepairRunner.Setup(runner => runner.RunLoadRepairs())
-                .Callback(() => calls.Add("repair"));
+                .Callback(() => calls.Add(serverLogic.State is ServerRunningState ? "repair while running" : "repair"));
             registryManager.Setup(manager => manager.PatchLifetimes())
                 .Callback(() => calls.Add("patch"));
 
-            var initialState = Assert.IsType<InitialServerState>(
-                serverComponent.Container.Resolve<IServerLogic>().State);
+            var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
             initialState.Handle_CampaignReady(new MessagePayload<CampaignReady>(null, new CampaignReady()));
 
-            Assert.Equal(new[] { "register", "patch", "repair" }, calls);
+            Assert.Equal(new[] { "register", "patch", "repair while running" }, calls);
         }
     }
 }

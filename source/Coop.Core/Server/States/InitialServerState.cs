@@ -71,9 +71,11 @@ public class InitialServerState : ServerStateBase
 
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
-        loadRepairRunner.RunLoadRepairs();
 
         Logic.SetState<ServerRunningState>();
+
+        // After the state change, so the lifetime patches register and announce what the repairs create and destroy.
+        loadRepairRunner.RunLoadRepairs();
     }
 
     public override void Start()

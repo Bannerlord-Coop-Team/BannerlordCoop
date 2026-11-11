@@ -8,41 +8,25 @@ namespace GameInterface.Registry;
 
 public interface ILoadRepairRunner
 {
-    /// <summary>
-    /// Runs the repairs a loaded save needs before the server becomes joinable, then brings the server
-    /// registry in line with the objects they created, destroyed or ended. Each step is caught on
-    /// its own, so one failing repair cannot stop the server from starting.
-    /// </summary>
+    // Runs the repairs a loaded save needs, each caught on its own so one failing repair cannot stop the server from starting.
     void RunLoadRepairs();
 }
 
-/// <summary>
-/// The repairs run after the first registration and before ServerRunningState, while the sync policy
-/// still allows originals, so lifetime patches publish no InstanceCreated or InstanceDestroyed for what
-/// they do. A clan repair can create a lord party and the empty party reset destroys parties and
-/// disbands armies; without this pass the party stays unregistered (the join baseline then fails for
-/// it) or the destroyed object keeps its id.
-/// </summary>
+// Runs the load repairs once the server is running, so the lifetime patches register and announce what they change.
 internal sealed class LoadRepairRunner : ILoadRepairRunner
 {
     private readonly ILogger logger;
-    private readonly IRegistryManager registryManager;
-    private readonly ILoadRepairRegistryReconciler registryReconciler;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
     private readonly ILeaderlessClanResolver leaderlessClanResolver;
     private readonly IEmptyLordPartyResetter emptyLordPartyResetter;
 
     public LoadRepairRunner(
         ILogger logger,
-        IRegistryManager registryManager,
-        ILoadRepairRegistryReconciler registryReconciler,
         IMapEventLoadCleaner mapEventLoadCleaner,
         ILeaderlessClanResolver leaderlessClanResolver,
         IEmptyLordPartyResetter emptyLordPartyResetter)
     {
         this.logger = logger;
-        this.registryManager = registryManager;
-        this.registryReconciler = registryReconciler;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
         this.leaderlessClanResolver = leaderlessClanResolver;
         this.emptyLordPartyResetter = emptyLordPartyResetter;
@@ -50,19 +34,9 @@ internal sealed class LoadRepairRunner : ILoadRepairRunner
 
     public void RunLoadRepairs()
     {
-        LoadRepairSnapshot before = null;
-        RunStep("capture campaign objects", () => before = registryReconciler.Capture());
-
         RunStep("clean up loaded map events", mapEventLoadCleaner.CleanUpLoadedMapEvents);
         RunStep("repair leaderless clans", () => leaderlessClanResolver.RepairLoadedClans());
         RunStep("reset empty lord parties", () => emptyLordPartyResetter.ResetEmptyLordParties());
-
-        // Unregister first: a replacement can take the owner-derived id of what it replaced (a fired wanderer
-        // companion's reset equipment), and registration skips an id that is still held.
-        if (before != null)
-            RunStep("unregister removed objects", () => registryReconciler.UnregisterRemoved(before));
-
-        RunStep("register created objects", registryManager.RegisterNewGameObjects);
     }
 
     // Runs one repair step, logging a throw so the remaining steps still run.
