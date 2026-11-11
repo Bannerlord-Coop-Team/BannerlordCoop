@@ -26,8 +26,8 @@ public class EndedBattleStationReleaseTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
-        // Installs the patch under this test's own Harmony owner, removed in finally, so another test unpatching the shared
-        // category can't strip it.
+        // Installs the patch itself, right before running and after the mock-engine setup, so a copy another test removed
+        // earlier doesn't matter; it's removed again in finally.
         var harmony = new Harmony("e2e.ended-battle-station-release." + Guid.NewGuid());
         harmony.CreateClassProcessor(typeof(EndedBattleStationReleasePatch)).Patch();
         BattleSpawnGate.BeginBattle("ended-battle-station-release");
