@@ -1663,7 +1663,20 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Empty(GetVoteManager(Server).CaptureActiveRoundStatuses());
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemoveDecision>(), message => message.KingdomId == kingdomId);
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(), message => message.KingdomId == kingdomId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+        var pending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceOfferPendingStatusChanged>(),
+            message => message.RequestingKingdomId == kingdomId && message.TargetKingdomId == targetId);
+        Assert.False(pending.IsPending);
+        foreach (var endpoint in Clients)
+        {
+            endpoint.Call(() =>
+            {
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(endpoint.ObjectManager.TryGetObject<Kingdom>(targetId, out var target));
+                Assert.Empty(kingdom.UnresolvedDecisions);
+                Assert.Empty(target.UnresolvedDecisions);
+            });
+        }
     }
 
     [Fact]
