@@ -631,8 +631,11 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   with or without a template. Unchecked whether a live client corrects it through later movement
   sync. Also unguarded: a bandit component created with no init args at all (vanilla's party
   conversion actions) makes the send handler throw; the broker logs it. No caller in co-op found.
-- A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
-  client loses its courtship attempt history when it reconnects.
+- A failed courtship can be retried after a season in v1.5 (#4588). The server records the failure in
+  vanilla's saved `RomanceCampaignBehavior._previousRomancePersuasionAttempts` when it applies a failed
+  level, allows the retry only when vanilla's own cooldown test passes, and sends the failure time to
+  clients in each romance state (`RomanceStateData.FailedAtTicks`). Vanilla keys the attempts by the
+  courted hero, so one player's failure blocks every player from courting that hero for one season.
 - Two v1.5 AI reactions check the server's main party and player clan, so they never fire for co-op
   players: when a player's clan changes kingdom, lords no longer at war with it keep chasing the
   player until their next AI decision, and an AI party that agreed not to attack a player can still
