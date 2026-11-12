@@ -10,6 +10,6 @@ COPY DockerAssembliesTemp /home/mb2
 
 # Run ".\DockerPrepare.ps1" first (needs BANNERLORD_DIR set by runmefirst.cmd)
 # Run "docker login ghcr.io" with a classic token that has write:packages
-# Run "docker build -t ghcr.io/bannerlord-coop-team/bannerlordcoop:latest -t ghcr.io/bannerlord-coop-team/bannerlordcoop:v<game version> ."
+# Run "docker build -t ghcr.io/bannerlord-coop-team/bannerlordcoop:v<game version> ."
 # "docker push ghcr.io/bannerlord-coop-team/bannerlordcoop:v<game version>"
-# "docker push ghcr.io/bannerlord-coop-team/bannerlordcoop:latest"
+# The workflows under .github pin the game version tag, so update them when the game version changes.
