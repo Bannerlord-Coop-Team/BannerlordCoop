@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -43,6 +44,8 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
+using Serilog.Events;
+using System.Collections.Concurrent;
 using Moq;
 using System.Reflection;
 using System.Xml;
@@ -3350,6 +3353,52 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(secondAiPartyId, allowed.AttackerId);
         Assert.Equal(playerPartyId, allowed.DefenderId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+    }
+
+    // The deferral line is Verbose, which the default test logger drops; this must run before the first log event.
+    [System.Runtime.CompilerServices.ModuleInitializer]
+    internal static void LogDeferralLines() =>
+        LogManager.Configuration.MinimumLevel.Override(typeof(ConversationRequestHandler).FullName, LogEventLevel.Verbose);
+
+    [Fact]
+    public void ServerAiPartyEncounter_RetriedWhilePlayerTalksToAnotherParty_LogsDeferralOnce()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+        var logs = new ConcurrentQueue<string>();
+        Action<string> capture = logs.Enqueue;
+        int Deferrals(string aiPartyId) => logs.Count(line =>
+            line.StartsWith("Deferring server-detected conversation") && line.Contains($"AttackerId=\"{aiPartyId}\""));
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            for (var tick = 0; tick < 5; tick++)
+                StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+            Assert.Equal(1, Deferrals(secondAiPartyId));
+
+            // Once the conversation ends the attacker is approved, so a later deferral logs again.
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            Server.PumpGameThread();
+            StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.AttackerId == secondAiPartyId);
+            StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+            StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+            Assert.Equal(1, Deferrals(firstAiPartyId));
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
         Server.PumpGameThread();
