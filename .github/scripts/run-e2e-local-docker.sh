@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-docker_image=${E2E_IMAGE:-ghcr.io/bannerlord-coop-team/bannerlordcoop:latest}
+docker_image=${E2E_IMAGE:-ghcr.io/bannerlord-coop-team/bannerlordcoop:v1.5.7}
 shard_count=${E2E_SHARDS:-4}
 # Where the test image holds the game assemblies; builds and tests resolve them through BANNERLORD_DIR.
 image_bannerlord_dir=/home/mb2

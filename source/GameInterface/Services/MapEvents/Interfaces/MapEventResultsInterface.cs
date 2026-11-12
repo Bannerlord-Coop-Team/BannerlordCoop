@@ -263,7 +263,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     playerLootData.LootedShips[winnerPlayerParty] = new();
                 }
 
-                // v1.5 lets the map event component decide what the winners loot, as vanilla's
+                // The map event component decides what the winners loot, as vanilla's
                 // CalculateAndCommitMapEventResults does. A partial ship loot (the player disengaged from a naval
                 // battle) reads PlayerEncounter.CapturedShipsInEncounter, which the server has no copy of, so it loots none.
                 var component = mapEvent.Component;

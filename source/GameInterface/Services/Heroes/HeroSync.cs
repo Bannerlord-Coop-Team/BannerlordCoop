@@ -39,7 +39,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.PreferredUpgradeFormation)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HeroState)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsMinorFactionHero)));
-            // v1.5 party commands, set from the clan screen through UpdatePartyConfigurationOnSelection.
+            // Party commands, set from the clan screen through UpdatePartyConfigurationOnSelection.
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.CanJoinArmy)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.CanRaid)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.CanDonateTroopsToGarrison)));
