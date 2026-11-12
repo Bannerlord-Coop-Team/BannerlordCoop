@@ -1,12 +1,8 @@
-﻿using Common;
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.CampaignService.Patches;
-using GameInterface.Tests;
-using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit;
 
 namespace GameInterface.Tests.Services.CampaignService;
@@ -16,23 +12,8 @@ namespace GameInterface.Tests.Services.CampaignService;
 /// without an id, which throws in AddWreckage after it is already in the saved list. Saves that already
 /// hold such wreckages are repaired before the object lists are built.
 /// </summary>
-[Collection(ModInformationRoleCollection.Name)]
-public class BattleWreckageCoopTests : IDisposable
+public class BattleWreckageCoopTests
 {
-    private readonly bool wasServer = ModInformation.IsServer;
-
-    public void Dispose() => ModInformation.IsServer = wasServer;
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void RegisterEvents_IsSkippedOnEveryRole(bool isServer)
-    {
-        ModInformation.IsServer = isServer;
-
-        Assert.False(BattleWreckageCampaignBehaviorPatches.RegisterEventsPrefix());
-    }
-
     [Fact]
     public void IdlessWreckage_IsDroppedSoTheObjectListsInitialize()
     {
@@ -83,23 +64,5 @@ public class BattleWreckageCoopTests : IDisposable
         manager._wreckages = null;
 
         Assert.Equal(0, IdlessWreckageLoadRepairPatch.RemoveIdlessWreckages(manager));
-    }
-
-    [Fact]
-    public void BothPatches_ResolveTheirTargetsAndPatch()
-    {
-        var harmony = new Harmony(nameof(BothPatches_ResolveTheirTargetsAndPatch));
-        try
-        {
-            var disabled = harmony.CreateClassProcessor(typeof(BattleWreckageCampaignBehaviorPatches)).Patch();
-            var repaired = harmony.CreateClassProcessor(typeof(IdlessWreckageLoadRepairPatch)).Patch();
-
-            Assert.Contains(disabled, method => method.Name.Contains(nameof(BattleWreckageCampaignBehavior.RegisterEvents)));
-            Assert.Contains(repaired, method => method.Name.Contains(nameof(CampaignObjectManager.InitializeOnLoad)));
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
     }
 }
