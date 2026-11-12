@@ -1,10 +1,8 @@
 ﻿using GameInterface.Services.MapEvents;
 using Common.Messaging;
 using Coop.Core.Server.Services.Save.Messages;
-using GameInterface.Services.Armies;
 using GameInterface.Services.Players;
 using Serilog;
-using Serilog.Events;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
