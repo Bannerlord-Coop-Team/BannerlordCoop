@@ -104,9 +104,9 @@ internal class ClanPartyItemVMPatches
 
     private static bool RequestPartyConfiguration(ClanPartyItemVM instance, PartyConfigurationFlag flag, bool value)
     {
-        Hero leader = instance.Leader;
         if (!ContainerProvider.TryResolve<IPartyConfigurationService>(out var partyConfiguration)) return true;
 
+        Hero leader = instance.Leader;
         if (leader == null) return false;
         if (!CoopClanPermissions.CanManageParty(instance.Party?.MobileParty)) return false;
         if (partyConfiguration.Get(leader, flag) == value) return false;

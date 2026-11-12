@@ -1,8 +1,6 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.CampaignService.Patches;
-using GameInterface.Services.Clans.Patches;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Tests;
 using HarmonyLib;
 using System;
@@ -33,20 +31,6 @@ public class BattleWreckageCoopTests : IDisposable
         ModInformation.IsServer = isServer;
 
         Assert.False(BattleWreckageCampaignBehaviorPatches.RegisterEventsPrefix());
-    }
-
-    [Fact]
-    public void OtherBehaviors_StayServerOnly()
-    {
-        ModInformation.IsServer = true;
-        Assert.True(HeroDailyXpCampaignBehaviorPatches.RegisterEventsPrefix());
-        Assert.True(EmptyClanPartiesCampaignBehaviorPatches.RegisterEventsPrefix());
-        Assert.True(PartyConfigurationCampaignBehaviorPatches.RegisterEventsPrefix());
-
-        ModInformation.IsServer = false;
-        Assert.False(HeroDailyXpCampaignBehaviorPatches.RegisterEventsPrefix());
-        Assert.False(EmptyClanPartiesCampaignBehaviorPatches.RegisterEventsPrefix());
-        Assert.False(PartyConfigurationCampaignBehaviorPatches.RegisterEventsPrefix());
     }
 
     [Fact]

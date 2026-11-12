@@ -11,7 +11,7 @@ internal class HeroDailyXpCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(HeroDailyXpCampaignBehavior.RegisterEvents))]
     [HarmonyPrefix]
-    internal static bool RegisterEventsPrefix() => ModInformation.IsServer;
+    private static bool RegisterEventsPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(nameof(HeroDailyXpCampaignBehavior.DailyTickHero))]
     [HarmonyPrefix]

@@ -443,7 +443,7 @@ internal class HeirSelectionHandler : IHandler
         sentSelections.Remove(originalHeroId);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
-
+        // The server never raises OnBeforePlayerCharacterChanged for an heir transfer, so the heir's party commands are reset here.
         partyConfiguration.Reset(data.Heir);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");

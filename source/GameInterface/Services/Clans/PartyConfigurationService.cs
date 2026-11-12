@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans;
 
-public interface IPartyConfigurationService
+internal interface IPartyConfigurationService
 {
     bool Get(Hero hero, PartyConfigurationFlag flag);
     void Set(Hero hero, PartyConfigurationFlag flag, bool value);
@@ -17,7 +17,7 @@ public interface IPartyConfigurationService
     void Reset(Hero hero);
 }
 
-public class PartyConfigurationService : IPartyConfigurationService
+internal class PartyConfigurationService : IPartyConfigurationService
 {
     public bool Get(Hero hero, PartyConfigurationFlag flag) => flag switch
     {

@@ -12,7 +12,7 @@ internal class PartyConfigurationCampaignBehaviorPatches
 {
     [HarmonyPatch(nameof(PartyConfigurationCampaignBehavior.RegisterEvents))]
     [HarmonyPrefix]
-    internal static bool RegisterEventsPrefix() => ModInformation.IsServer;
+    private static bool RegisterEventsPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(nameof(PartyConfigurationCampaignBehavior.OnCompanionRemoved))]
     [HarmonyPrefix]
