@@ -12,7 +12,6 @@ namespace GameInterface.Services.Clans.Patches;
 [HarmonyPatch(typeof(EmptyClanPartiesCampaignBehavior))]
 internal class EmptyClanPartiesCampaignBehaviorPatches
 {
-    // Clients hold the server's whole list, so only the local player's clan is listed.
     [HarmonyPatch(nameof(EmptyClanPartiesCampaignBehavior.GetEmptyClanPartyLeaders))]
     [HarmonyPrefix]
     public static bool GetEmptyClanPartyLeadersPrefix(EmptyClanPartiesCampaignBehavior __instance, ref MBReadOnlyList<Hero> __result)
