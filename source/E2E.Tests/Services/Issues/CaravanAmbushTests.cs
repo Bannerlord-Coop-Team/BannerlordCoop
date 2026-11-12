@@ -486,6 +486,23 @@ public class CaravanAmbushTests : IDisposable
         Assert.Equal(ownerRecruits ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
     }
 
+    [Fact]
+    public void RecruitmentByAnotherPlayerCancelsTheQuestOfAnOwnerWithoutAParty()
+    {
+        using var hiring = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnPlayerHiredBandits)));
+        Server.Call(() =>
+        {
+            BindParties();
+            PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
+            var hero = PlayerHero(QuestScenario.ControllerB);
+            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(bandits);
+        });
+        Assert.Equal(0, hiring.CountFor(Server));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

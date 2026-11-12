@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Issue = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
@@ -47,11 +48,12 @@ internal class CaravanAmbushEventPatches
     [HarmonyPostfix]
     private static void Recruited(MobileParty banditParty)
     {
-        var recruitingParty = MobileParty.MainParty;
+        // Compare the player troop, because an owner without a party leaves the recruiter's MainParty in place.
+        var recruiter = Game.Current?.PlayerTroop;
         Run(quest =>
         {
             if (quest._banditParty != banditParty) return;
-            if (MobileParty.MainParty == recruitingParty) quest.OnPlayerHiredBandits();
+            if (Game.Current?.PlayerTroop == recruiter) quest.OnPlayerHiredBandits();
             else quest.CompleteQuestWithCancel();
         });
     }
