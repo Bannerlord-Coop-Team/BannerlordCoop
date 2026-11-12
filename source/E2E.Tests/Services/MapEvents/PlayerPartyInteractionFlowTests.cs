@@ -3395,6 +3395,15 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
             StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
             Assert.Equal(2, Deferrals(thirdAiPartyId));
+
+            // A conversation the player asks for clears it too.
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            Server.PumpGameThread();
+            RequestInteraction(client, playerPartyId, firstAiPartyId);
+            Server.PumpGameThread();
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.AttackerId == playerPartyId);
+            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
+            Assert.Equal(3, Deferrals(thirdAiPartyId));
         }
         finally
         {

@@ -67,7 +67,8 @@ internal class ConversationRequestHandler : IHandler
     private readonly ConcurrentDictionary<NetPeer, PvpInteraction> pvpDefenderByAttacker =
         new ConcurrentDictionary<NetPeer, PvpInteraction>();
     // [Server] AI parties whose server-detected encounter with a player party was deferred, so each one's per-tick
-    // retries log once. Game thread only; cleared when one of that player's server-detected conversations starts.
+    // retries log once. Game thread only; cleared when the server accepts any conversation for that player, and a
+    // player that leaves keeps its small last set.
     private readonly Dictionary<string, HashSet<string>> deferredAiPartiesByPlayerParty =
         new Dictionary<string, HashSet<string>>();
     private readonly Queue<IMessage> pvpInteractionNotifications = new Queue<IMessage>();
@@ -210,7 +211,7 @@ internal class ConversationRequestHandler : IHandler
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
         if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
         {
-            // The attacker retries every tick, so log it once until one of this player's conversations starts.
+            // The attacker retries every tick, so log it once until the server accepts a conversation for this player.
             if (!deferredAiPartiesByPlayerParty.TryGetValue(playerPartyId, out var deferredAiParties))
             {
                 deferredAiParties = new HashSet<string>();
@@ -226,8 +227,6 @@ internal class ConversationRequestHandler : IHandler
             }
             return;
         }
-
-        deferredAiPartiesByPlayerParty.Remove(playerPartyId);
 
         Logger.Debug(
             "Starting server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
@@ -274,6 +273,9 @@ internal class ConversationRequestHandler : IHandler
 
         if (!TryAcceptConversationRequest(requestingPeer, request, attacker, defender, out var aiParty, out var aiPartyId, out var playerPartyId, out var isPlayerVsPlayer))
             return;
+
+        if (playerPartyId != null)
+            deferredAiPartiesByPlayerParty.Remove(playerPartyId);
 
         if (aiParty == null)
         {
