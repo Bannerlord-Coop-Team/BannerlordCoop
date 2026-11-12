@@ -44,9 +44,8 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
-using Serilog.Events;
-using System.Collections.Concurrent;
 using Moq;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
@@ -3358,11 +3357,6 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         Server.PumpGameThread();
     }
 
-    // The deferral line is Verbose, which the default test logger drops; this must run before the first log event.
-    [System.Runtime.CompilerServices.ModuleInitializer]
-    internal static void LogDeferralLines() =>
-        LogManager.Configuration.MinimumLevel.Override(typeof(ConversationRequestHandler).FullName, LogEventLevel.Verbose);
-
     [Fact]
     public void ServerAiPartyEncounter_RetriedWhilePlayerTalksToAnotherParty_LogsDeferralOnce()
     {
@@ -3372,6 +3366,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
         var firstAiPartyId = CreateMobilePartyBase();
         var secondAiPartyId = CreateMobilePartyBase();
+        var thirdAiPartyId = CreateMobilePartyBase();
         var logs = new ConcurrentQueue<string>();
         Action<string> capture = logs.Enqueue;
         int Deferrals(string aiPartyId) => logs.Count(line =>
@@ -3382,26 +3377,31 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
         OutputSinkManager.AddLogCallback(capture);
         try
         {
+            // Two parties retry in turn every tick while the player talks to the first one.
             for (var tick = 0; tick < 5; tick++)
+            {
                 StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
-            Assert.Equal(1, Deferrals(secondAiPartyId));
+                StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
+            }
 
-            // Once the conversation ends the attacker is approved, so a later deferral logs again.
+            Assert.Equal(1, Deferrals(secondAiPartyId));
+            Assert.Equal(1, Deferrals(thirdAiPartyId));
+
+            // Once the conversation ends the second party is approved, so the third one's next deferral logs again.
             client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
             Server.PumpGameThread();
             StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.AttackerId == secondAiPartyId);
-            StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
-            StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
-            Assert.Equal(1, Deferrals(firstAiPartyId));
+            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
+            StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
+            Assert.Equal(2, Deferrals(thirdAiPartyId));
         }
         finally
         {
             OutputSinkManager.RemoveLogCallback(capture);
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            Server.PumpGameThread();
         }
-
-        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
-        Server.PumpGameThread();
     }
 
     [Fact]

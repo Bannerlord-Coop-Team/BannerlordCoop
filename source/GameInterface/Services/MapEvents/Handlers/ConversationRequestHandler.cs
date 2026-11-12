@@ -66,10 +66,10 @@ internal class ConversationRequestHandler : IHandler
     // so this is the only record of a PvP engagement). The defender's "hold on" popup is driven from these broadcasts.
     private readonly ConcurrentDictionary<NetPeer, PvpInteraction> pvpDefenderByAttacker =
         new ConcurrentDictionary<NetPeer, PvpInteraction>();
-    // [Server] Player party id -> the AI party its server-detected encounter was last deferred with, so the retries
-    // are logged once. Game-thread-only: the encounter patch publishes ConversationRequested on the game thread.
-    // Bounded by the number of player parties, so a disconnect leaves at most one entry behind.
-    private readonly Dictionary<string, string> deferredAiPartyByPlayerParty = new Dictionary<string, string>();
+    // [Server] AI parties whose server-detected encounter with a player party was deferred, so each one's per-tick
+    // retries log once. Game thread only; cleared when one of that player's server-detected conversations starts.
+    private readonly Dictionary<string, HashSet<string>> deferredAiPartiesByPlayerParty =
+        new Dictionary<string, HashSet<string>>();
     private readonly Queue<IMessage> pvpInteractionNotifications = new Queue<IMessage>();
     private bool isDrainingPvpInteractionNotifications;
 
@@ -210,10 +210,15 @@ internal class ConversationRequestHandler : IHandler
         // otherwise the attacker retries every tick and each retry denies a request nobody made.
         if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
         {
-            // The attacker retries every tick, so only the first deferral against a party is logged.
-            if (!deferredAiPartyByPlayerParty.TryGetValue(playerPartyId, out var deferredAiPartyId) || deferredAiPartyId != aiPartyId)
+            // The attacker retries every tick, so log it once until one of this player's conversations starts.
+            if (!deferredAiPartiesByPlayerParty.TryGetValue(playerPartyId, out var deferredAiParties))
             {
-                deferredAiPartyByPlayerParty[playerPartyId] = aiPartyId;
+                deferredAiParties = new HashSet<string>();
+                deferredAiPartiesByPlayerParty[playerPartyId] = deferredAiParties;
+            }
+
+            if (deferredAiParties.Add(aiPartyId))
+            {
                 Logger.Verbose(
                     "Deferring server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
                     attackerId,
@@ -222,7 +227,7 @@ internal class ConversationRequestHandler : IHandler
             return;
         }
 
-        deferredAiPartyByPlayerParty.Remove(playerPartyId);
+        deferredAiPartiesByPlayerParty.Remove(playerPartyId);
 
         Logger.Debug(
             "Starting server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
