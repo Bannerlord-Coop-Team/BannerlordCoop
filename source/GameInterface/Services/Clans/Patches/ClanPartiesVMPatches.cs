@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -46,6 +47,8 @@ internal class ClanPartiesVMPatches
     [HarmonyPrefix]
     public static bool GetCanDisbandPartyPrefix(ClanPartiesVM __instance, ref bool __result, ref TextObject cannotDisbandReason)
     {
+        if (__instance.CurrentSelectedParty is ClanPartyItemWithHeroVM && CoopClanPermissions.CanManageClan(__instance._faction)) return true;
+
         var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
         if (CoopClanPermissions.CanManageParty(party)) return true;
         cannotDisbandReason = GameTexts.FindText(party?.IsPlayerParty() == true
@@ -94,11 +97,23 @@ internal class ClanPartiesVMPatches
     /// </summary>
     private static MobileParty popupParty;
 
+    // The leader of the cached empty party the popup was opened for, which has no MobileParty.
+    private static Hero popupCachedLeader;
+
     [HarmonyPatch(nameof(ClanPartiesVM.OnShowChangeLeaderPopup))]
     [HarmonyPrefix]
     public static bool OnShowChangeLeaderPopupPrefix(ClanPartiesVM __instance)
     {
         popupParty = null;
+        popupCachedLeader = null;
+        if (__instance.CurrentSelectedParty is ClanPartyItemWithHeroVM cachedParty)
+        {
+            if (!CoopClanPermissions.CanManageClan(__instance._faction)) return false;
+
+            popupCachedLeader = cachedParty.Leader;
+            return true;
+        }
+
         var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
         if (!CoopClanPermissions.CanManageParty(party)) return false;
 
@@ -112,7 +127,19 @@ internal class ClanPartiesVMPatches
     {
         // Use popupParty instead of the CurrentSelectedParty that can change from any incoming refresh messages
         var selectedParty = popupParty ?? __instance.CurrentSelectedParty?.Party?.MobileParty;
+        var cachedLeader = popupCachedLeader;
         popupParty = null;
+        popupCachedLeader = null;
+
+        if (cachedLeader != null)
+        {
+            if (newLeader != null && (newLeader.IsPlayerHero() || !CoopClanPermissions.CanManageHero(newLeader))) return false;
+
+            if (newLeader != null && newLeader.PartyBelongedTo == MobileParty.MainParty) __instance._openPartyAsManage(newLeader);
+
+            MessageBroker.Instance.Publish(__instance, new EmptyClanPartyLeaderChanged(Hero.MainHero, cachedLeader, newLeader));
+            return false;
+        }
 
         if (selectedParty == null) return false;
         if (!CoopClanPermissions.CanManageParty(selectedParty)) return false;
@@ -159,6 +186,7 @@ internal class ClanPartiesVMPatches
     public static void OnFinalizePostfix()
     {
         popupParty = null;
+        popupCachedLeader = null;
     }
 
     [HarmonyPatch(nameof(ClanPartiesVM.GetNewPartyLeaderCandidates))]

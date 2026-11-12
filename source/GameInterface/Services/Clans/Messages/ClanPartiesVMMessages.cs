@@ -43,3 +43,16 @@ public readonly struct ClanPartyLeaderChanged : IEvent
         MainParty = mainParty;
     }
 }
+public readonly struct EmptyClanPartyLeaderChanged : IEvent
+{
+    public readonly Hero MainHero;
+    public readonly Hero CachedLeader;
+    public readonly Hero NewLeader;
+
+    public EmptyClanPartyLeaderChanged(Hero mainHero, Hero cachedLeader, Hero newLeader)
+    {
+        MainHero = mainHero;
+        CachedLeader = cachedLeader;
+        NewLeader = newLeader;
+    }
+}
