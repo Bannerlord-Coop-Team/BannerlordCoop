@@ -44,33 +44,30 @@ internal class MobilePartyTrainingBehaviorPatches
     public static bool CheckMovementSkillsPrefix(MobileParty mobileParty)
     {
         // Only need to patch first block as mobileParty == MobileParty.MainParty won't be true on the server
-        if (mobileParty.IsPlayerParty())
+        if (!mobileParty.IsPlayerParty()) return true;
+
+        if (mobileParty.IsCurrentlyAtSea)
         {
-            if (mobileParty.IsCurrentlyAtSea)
+            if (!mobileParty.IsInNavalAutoTravel)
             {
-                if (!mobileParty.IsInNavalAutoTravel)
-                {
-                    SkillLevelingManager.OnTravelOnWater(mobileParty);
-                }
-                return false;
-            }
-            foreach (TroopRosterElement troopRosterElement in mobileParty.MemberRoster.GetTroopRoster())
-            {
-                if (troopRosterElement.Character.IsHero)
-                {
-                    if (troopRosterElement.Character.Equipment.Horse.IsEmpty)
-                    {
-                        SkillLevelingManager.OnTravelOnFoot(troopRosterElement.Character.HeroObject);
-                    }
-                    else
-                    {
-                        SkillLevelingManager.OnTravelOnHorse(troopRosterElement.Character.HeroObject);
-                    }
-                }
+                SkillLevelingManager.OnTravelOnWater(mobileParty);
             }
             return false;
         }
 
-        return true;
+        foreach (TroopRosterElement troopRosterElement in mobileParty.MemberRoster.GetTroopRoster())
+        {
+            if (!troopRosterElement.Character.IsHero) continue;
+
+            if (troopRosterElement.Character.Equipment.Horse.IsEmpty)
+            {
+                SkillLevelingManager.OnTravelOnFoot(troopRosterElement.Character.HeroObject);
+            }
+            else
+            {
+                SkillLevelingManager.OnTravelOnHorse(troopRosterElement.Character.HeroObject);
+            }
+        }
+        return false;
     }
 }
