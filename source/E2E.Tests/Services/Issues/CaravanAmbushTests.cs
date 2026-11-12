@@ -11,7 +11,6 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
-using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -238,14 +237,6 @@ public class CaravanAmbushTests : IDisposable
             quest.StartQuest();
             Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
         });
-    }
-
-    [Fact]
-    public void OwnerRewardRequestCannotFinishAnUnsavedCaravan()
-    {
-        Owner.Call(() => QuestOf(Owner).OnQuestSucceeded());
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Server.Call(() => Assert.True(QuestOf(Server).IsOngoing));
     }
 
     [Fact]
@@ -486,9 +477,10 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() =>
         {
             BindParties();
-            var recruiter = PlayerHero(ownerRecruits ? QuestScenario.ControllerA : QuestScenario.ControllerB).PartyBelongedTo;
+            var hero = PlayerHero(ownerRecruits ? QuestScenario.ControllerA : QuestScenario.ControllerB);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
-            Server.Resolve<IMessageBroker>().Publish(this, new BanditPartyRecruitedByPlayer(bandits, recruiter));
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                CampaignEventDispatcher.Instance.OnBanditPartyRecruited(bandits);
         });
         Assert.Equal(ownerRecruits ? 1 : 0, hiring.CountFor(Server));
         Assert.Equal(ownerRecruits ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());

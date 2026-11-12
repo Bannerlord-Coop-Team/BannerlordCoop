@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Util;
@@ -26,22 +25,19 @@ internal class CaravanAmbushStateHandler : IHandler
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
-    private readonly ICaravanAmbushEvents events;
     private readonly IIssueConversationGuard conversationGuard;
     private NetworkCaravanAmbushConversation? pendingConversation;
 
     public CaravanAmbushStateHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
-        IControllerIdProvider controller, ICaravanAmbushEvents events, IIssueConversationGuard conversationGuard)
+        IControllerIdProvider controller, IIssueConversationGuard conversationGuard)
     {
         this.broker = broker;
         this.objects = objects;
         this.issues = issues;
         this.controller = controller;
-        this.events = events;
         this.conversationGuard = conversationGuard;
         broker.Subscribe<NetworkCaravanAmbushState>(Handle);
         broker.Subscribe<NetworkCaravanAmbushConversation>(Conversation);
-        broker.Subscribe<BanditPartyRecruitedByPlayer>(Recruited);
         broker.Subscribe<CampaignTick>(Tick);
     }
 
@@ -49,7 +45,6 @@ internal class CaravanAmbushStateHandler : IHandler
     {
         broker.Unsubscribe<NetworkCaravanAmbushState>(Handle);
         broker.Unsubscribe<NetworkCaravanAmbushConversation>(Conversation);
-        broker.Unsubscribe<BanditPartyRecruitedByPlayer>(Recruited);
         broker.Unsubscribe<CampaignTick>(Tick);
         ClearPendingConversation();
     }
@@ -105,18 +100,6 @@ internal class CaravanAmbushStateHandler : IHandler
     private void ClearPendingConversation()
     {
         pendingConversation = null;
-    }
-
-    private void Recruited(MessagePayload<BanditPartyRecruitedByPlayer> payload)
-    {
-        if (ModInformation.IsClient) return;
-        var data = payload.What;
-        events.Run(quest =>
-        {
-            if (quest._banditParty != data.Bandits) return;
-            if (MobileParty.MainParty == data.Recruiter) quest.OnPlayerHiredBandits();
-            else quest.CompleteQuestWithCancel();
-        });
     }
 
     private void Handle(MessagePayload<NetworkCaravanAmbushState> payload)
