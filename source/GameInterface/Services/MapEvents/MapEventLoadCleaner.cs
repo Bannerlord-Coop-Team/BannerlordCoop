@@ -34,6 +34,8 @@ public interface IMapEventLoadCleaner
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 {
+    // Not the property, because on the server its getter postfix logs an error and builds a tracker when it reads null,
+    // and the setter's AutoSync prefix reads that getter.
     private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker> TrackerField =
         AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker>("<TroopUpgradeTracker>k__BackingField");
 
