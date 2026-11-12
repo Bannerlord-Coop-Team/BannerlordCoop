@@ -84,7 +84,7 @@ internal class PartyScreenHelperPatches
     {
         __result = true;
 
-        // v1.5.4 sells nothing when no prisoners were left on the sale side.
+        // Nothing is sold when no prisoners were left on the sale side.
         if (leftPrisonRoster == null || leftPrisonRoster.TotalManCount <= 0)
             return false;
 

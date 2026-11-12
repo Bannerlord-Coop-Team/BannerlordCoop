@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Registry.Auto;
-using GameInterface.Registry;
 using GameInterface.Services.Armies;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -25,9 +24,9 @@ public interface IMapEventLoadCleaner
     // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
     void CleanUpLoadedMapEvents();
 
-    // Releases every party still linked to a battle that already ended, calling onReleased for each one
-    // as it is released. A throw from onReleased is logged and the rest are still released. Also run live by coop.unstuck.
-    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
+    // Releases every party still linked to a battle that already ended, calling onReleased (a throw is only logged) for each,
+    // and returns them with the ids of the battles that failed to release. Also run live by coop.unstuck.
+    (PartyBase[] ReleasedParties, string[] FailedMapEventIds) ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
 
     // Releases the parties of a battle whose finalize threw after it already ended, and publishes its end for the clients.
     void ReleaseFailedFinalization(MapEvent mapEvent);
@@ -44,8 +43,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     private readonly IObjectManager objectManager;
     private readonly IArmyDisbander armyDisbander;
     private readonly IStalledMapEventResolver stalledMapEventResolver;
-    private readonly IOrphanedMapEventFinder orphanedMapEventFinder;
-    private readonly ILoadRepairRegistryReconciler registryReconciler;
 
     public MapEventLoadCleaner(
         ILogger logger,
@@ -53,9 +50,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         IPlayerManager playerManager,
         IObjectManager objectManager,
         IArmyDisbander armyDisbander,
-        IStalledMapEventResolver stalledMapEventResolver,
-        IOrphanedMapEventFinder orphanedMapEventFinder,
-        ILoadRepairRegistryReconciler registryReconciler)
+        IStalledMapEventResolver stalledMapEventResolver)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
@@ -63,8 +58,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.objectManager = objectManager;
         this.armyDisbander = armyDisbander;
         this.stalledMapEventResolver = stalledMapEventResolver;
-        this.orphanedMapEventFinder = orphanedMapEventFinder;
-        this.registryReconciler = registryReconciler;
     }
 
     public void CleanUpLoadedMapEvents()
@@ -72,49 +65,25 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var before = registryReconciler.Capture();
-        try
+        foreach (var mapEvent in GetLoadedPlayerMapEvents())
         {
-            foreach (var mapEvent in GetLoadedPlayerMapEvents())
-            {
-                CleanUpLoadedPlayerMapEvent(mapEvent);
-            }
+            CleanUpLoadedPlayerMapEvent(mapEvent);
+        }
 
-            // A save can hold an AI battle left with no healthy troops on one side, which nothing ends on its own.
-            stalledMapEventResolver.ResolveStalledMapEvents();
-            ReleaseEndedMapEventLinks(_ => { });
-        }
-        finally
-        {
-            registryReconciler.UnregisterRemoved(before);
-        }
+        // A save can hold an AI battle left with no healthy troops on one side, which nothing ends on its own.
+        stalledMapEventResolver.ResolveStalledMapEvents();
+        ReleaseEndedMapEventLinks(_ => { });
     }
 
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
     private void CleanUpLoadedPlayerMapEvent(MapEvent mapEvent)
     {
-        MobileParty[] involvedMobileParties;
-        Army[] playerLedArmies;
-        MobileParty[] releasedArmyParties;
+        (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) parties;
 
         try
         {
             RepairPartySideLinks(mapEvent);
-
-            involvedMobileParties = mapEvent.InvolvedParties
-                .Where(party => party.IsMobile && party.MobileParty.IsActive)
-                .Select(party => party.MobileParty)
-                .ToArray();
-            playerLedArmies = involvedMobileParties
-                .Select(mobileParty => mobileParty.Army)
-                .Where(army => army != null && army.LeaderParty.IsPlayerParty())
-                .Distinct()
-                .ToArray();
-            releasedArmyParties = playerLedArmies
-                .SelectMany(army => army.Parties)
-                .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
-                .Distinct()
-                .ToArray();
+            parties = CollectPlayerMapEventParties(mapEvent);
         }
         catch (Exception e)
         {
@@ -134,12 +103,33 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         try
         {
-            ReleasePlayerMapEventParties(mapEvent, involvedMobileParties, playerLedArmies, releasedArmyParties);
+            ReleasePlayerMapEventParties(mapEvent, parties.InvolvedMobileParties, parties.PlayerLedArmies, parties.ReleasedArmyParties);
         }
         catch (Exception e)
         {
             logger.Error(e, "Failed to release parties of loaded player map event {MapEventId}", mapEvent.StringId);
         }
+    }
+
+    // Collected before the finalize detaches the parties, so the release still knows which ones fought.
+    private static (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) CollectPlayerMapEventParties(MapEvent mapEvent)
+    {
+        var involvedMobileParties = mapEvent.InvolvedParties
+            .Where(party => party.IsMobile && party.MobileParty.IsActive)
+            .Select(party => party.MobileParty)
+            .ToArray();
+        var playerLedArmies = involvedMobileParties
+            .Select(mobileParty => mobileParty.Army)
+            .Where(army => army != null && army.LeaderParty.IsPlayerParty())
+            .Distinct()
+            .ToArray();
+        var releasedArmyParties = playerLedArmies
+            .SelectMany(army => army.Parties)
+            .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
+            .Distinct()
+            .ToArray();
+
+        return (involvedMobileParties, playerLedArmies, releasedArmyParties);
     }
 
     private void ReleasePlayerMapEventParties(
@@ -180,14 +170,20 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
+    public (PartyBase[] ReleasedParties, string[] FailedMapEventIds) ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
     {
         var releasedParties = new List<PartyBase>();
+        var failedMapEventIds = new List<string>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
-        var orphaned = orphanedMapEventFinder.Find(GetLinkedParties(), liveMapEvents);
+        var endedMapEvents = GetLinkedParties()
+            .GroupBy(party => party.MapEventSide.MapEvent)
+            .Where(group => group.Key.IsFinalized || !liveMapEvents.Contains(group.Key))
+            .ToArray();
 
-        foreach (var mapEvent in orphaned.Finalized.Concat(orphaned.UnlistedLive))
+        foreach (var group in endedMapEvents)
         {
+            var mapEvent = group.Key;
+            var linkedParties = group.ToArray();
             try
             {
                 // First, because the settlement a v1.4.8 save kept on MapEvent must be refilled before ResetVillageState
@@ -202,20 +198,21 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     logger.Warning(
                         "Map event {MapEventId} is linked to {PartyCount} parties but is neither listed by the map event manager nor finalized, ending it",
                         mapEvent.StringId,
-                        orphaned.LinkedParties(mapEvent).Count);
+                        linkedParties.Length);
                     ResetVillageState(mapEvent);
                     mapEvent.State = MapEventState.WaitingRemoval;
                 }
 
-                releasedParties.AddRange(ReleaseLinkedParties(mapEvent, orphaned.LinkedParties(mapEvent), onReleased));
+                releasedParties.AddRange(ReleaseLinkedParties(mapEvent, linkedParties, onReleased));
             }
             catch (Exception e)
             {
                 logger.Error(e, "Failed to release the parties of ended map event {MapEventId}", mapEvent.StringId);
+                failedMapEventIds.Add(mapEvent.StringId);
             }
         }
 
-        return releasedParties.ToArray();
+        return (releasedParties.ToArray(), failedMapEventIds.ToArray());
     }
 
     // FinalizeEventAux sets WaitingRemoval before its listeners, the component's OnFinalize and the party
@@ -349,17 +346,24 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (component == null)
             return;
 
+        // The steps of the component's AfterLoad, split so only the settlement step is caught.
+        component.MapEvent = mapEvent;
+
         // A settlement that fails to derive, as for a side without a leader party, is only logged.
         // OnAfterLoad still runs, because the detach reads the position lists it builds.
-        try
+        if (!mapEvent.IsFinalized)
         {
-            component.AfterLoad(mapEvent);
+            try
+            {
+                component.UpdateMapEventSettlement();
+            }
+            catch (Exception e)
+            {
+                logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
+            }
         }
-        catch (Exception e)
-        {
-            logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
-            component.OnAfterLoad();
-        }
+
+        component.OnAfterLoad();
     }
 
     private (int RepairedLinks, int RemovedEntries) RepairPartySideLinks(MapEvent mapEvent)
@@ -466,7 +470,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
                 mapEvent.StringId,
                 mapEvent.InvolvedParties.Count());
-            LoadRepairMapEventFinalizer.FinalizeEvent(mapEvent, messageBroker, objectManager);
+            mapEvent.FinalizeEvent();
             return;
         }
 

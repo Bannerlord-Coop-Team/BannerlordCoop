@@ -542,8 +542,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         {
             settlement.SettlementHitPoints *= 0.2f;
         }
-        // The outcome only runs after the party beat the village in a map event; v1.5 passes
-        // attacked: true for that case (v1.4.8 had the flag inverted).
+        // The outcome only runs after the party beat the village in a map event.
         SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, attacked: true);
 
         AuthorizeAndAnnounceTransfer(

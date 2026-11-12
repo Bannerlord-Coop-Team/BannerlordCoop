@@ -7,9 +7,8 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Tests.Utils;
 
 /// <summary>
-/// v1.5 derives <see cref="MapEvent.EventType"/> from <see cref="MapEvent.Component"/> and keeps
-/// <see cref="MapEvent.MapEventSettlement"/> on the component, so a test map event needs a component
-/// of the matching type instead of the removed <c>_mapEventType</c> field.
+/// <see cref="MapEvent.EventType"/> comes from <see cref="MapEvent.Component"/>, which also keeps
+/// <see cref="MapEvent.MapEventSettlement"/>, so a test map event needs a component of the matching type.
 /// </summary>
 internal static class MapEventTestExtensions
 {
