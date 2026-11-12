@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;

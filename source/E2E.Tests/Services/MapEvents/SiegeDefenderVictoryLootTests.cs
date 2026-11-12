@@ -3,7 +3,7 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;

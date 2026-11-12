@@ -15,6 +15,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Enum;
