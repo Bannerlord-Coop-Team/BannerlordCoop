@@ -294,12 +294,12 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     {
         var mapEvent = payload.What.MapEvent;
         var settlement = mapEvent.MapEventSettlement;
-        if (ModInformation.IsClient || mapEvent.EventType != MapEvent.BattleTypes.Hideout ||
+        if (ModInformation.IsClient || mapEvent.Component is not HideoutEventComponent component ||
             settlement?.IsHideout != true ||
             (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent))
             return;
 
-        var rewards = new ClearRewardSnapshot(settlement) { MapEvent = mapEvent };
+        var rewards = new ClearRewardSnapshot(settlement) { Component = component };
         foreach (var player in playerManager.Players)
         {
             if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
@@ -322,18 +322,18 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         if (rewards.MapEvent.BattleState != BattleState.AttackerVictory)
             return;
 
-        // Native PlayerEncounter.DoEnd clears the hideout; the dedicated server has no player encounter.
-        foreach (var party in rewards.Settlement.Parties.ToArray())
+        // Snapshot before the clear, because OnHideoutCleared takes the parties out of Settlement.Parties.
+        var playersInside = rewards.Settlement.Parties.Where(playerManager.Contains).ToArray();
+        // Native PlayerEncounter.DoEnd clears the hideout through its component; the dedicated server has no player encounter.
+        rewards.Component.OnHideoutCleared(rewards.Settlement);
+        foreach (var party in playersInside)
         {
-            LeaveSettlementAction.ApplyForParty(party);
-            party.Ai.SetDoNotAttackMainParty(3);
-            if (playerManager.Contains(party))
-            {
-                party.Position = rewards.Settlement.GatePosition;
-                party.SetMoveModeHold();
-            }
+            // Army members follow their leader out, so only parties that left on their own wait at the gate.
+            if (party.CurrentSettlement != null || party.AttachedTo != null) continue;
+
+            party.Position = rewards.Settlement.GatePosition;
+            party.SetMoveModeHold();
         }
-        rewards.Settlement.IsVisible = false;
 
         foreach (var participant in rewards.Participants)
         {
@@ -492,7 +492,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     private sealed class ClearRewardSnapshot
     {
         public Settlement Settlement { get; }
-        public MapEvent MapEvent { get; set; }
+        public HideoutEventComponent Component { get; set; }
+        public MapEvent MapEvent => Component?.MapEvent;
         public List<(Hero Hero, MobileParty Party)> Participants { get; } = new();
         public HashSet<Hero> ClaimedHeroes { get; } = new();
 

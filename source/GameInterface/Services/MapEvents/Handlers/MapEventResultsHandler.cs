@@ -85,6 +85,8 @@ internal class MapEventResultsHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
             if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
+            // Send troops only gets a winner when it succeeds, and native ends that at End without applying results.
+            if (mapEvent.Component is HideoutEventComponent { IsSendTroops: true }) return;
 
             contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);

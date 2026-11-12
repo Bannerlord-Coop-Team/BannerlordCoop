@@ -22,7 +22,7 @@ internal static class StagedBattleResultUpdatePatch
         if (ModInformation.IsServer || Mission.Current != null || MissionState.Current != null ||
             Game.Current?.GameStateManager?.ActiveState != __instance) return;
         var encounter = PlayerEncounter.Current;
-        if (!HasStagedResults(encounter) ||
+        if (!HasLootToResume(encounter) ||
             Campaign.Current.MapEventManager.MapEvents.Contains(encounter._mapEvent)) return;
         // A captured lord conversation is open; updating now would reopen it every tick.
         if (Campaign.Current.ConversationManager?.IsConversationInProgress == true) return;
@@ -32,8 +32,13 @@ internal static class StagedBattleResultUpdatePatch
         PlayerEncounter.Update();
     }
 
-    internal static bool HasStagedResults(PlayerEncounter encounter) =>
+    // Whether a hideout or siege assault defender encounter must stay open after its map event is destroyed.
+    internal static bool HoldsBattleResultEncounter(PlayerEncounter encounter) =>
         encounter?._mapEvent is MapEvent mapEvent &&
         (mapEvent.IsHideoutBattle || (mapEvent.IsSiegeAssault && encounter.PlayerSide == BattleSideEnum.Defender)) &&
         MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
+
+    // Whether a held encounter has loot to resume; send troops only gets a winner on success, ending on its result menu.
+    internal static bool HasLootToResume(PlayerEncounter encounter) =>
+        HoldsBattleResultEncounter(encounter) && encounter._mapEvent.Component is not HideoutEventComponent { IsSendTroops: true };
 }

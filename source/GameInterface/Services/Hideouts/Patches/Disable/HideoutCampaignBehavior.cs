@@ -158,13 +158,6 @@ internal class HideoutCampaignBehaviorPatch
             coordinator.OpenTroopSelection(args, isDirectAssault: true);
     }
 
-    [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultFailureOnInit()
-    {
-        PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown);
-    }
-
     [HarmonyPatch("game_menu_hideout_place_on_init")]
     [HarmonyPrefix]
     private static bool GameMenuHideoutPlaceOnInit()
@@ -181,13 +174,6 @@ internal class HideoutCampaignBehaviorPatch
         if (battle != null && battle.WinningSide == encounter.PlayerSide)
             PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
         return true;
-    }
-
-    [HarmonyPatch("hideout_send_troops_result_success_consequence")]
-    [HarmonyPrefix]
-    private static void HideoutSendTroopsResultSuccessConsequence()
-    {
-        PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
     }
 
     // Use coop re-implementation in handler that doesn't use Hero.MainHero

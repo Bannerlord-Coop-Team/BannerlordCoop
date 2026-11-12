@@ -60,7 +60,7 @@ internal class SiegeDefenderVictoryHandler : IHandler
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
         // StagedBattleResultUpdatePatch plays out the loot flow; prompt once it has finished the encounter.
-        if (StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current)) return;
+        if (StagedBattleResultUpdatePatch.HoldsBattleResultEncounter(PlayerEncounter.Current)) return;
 
         pendingSettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
