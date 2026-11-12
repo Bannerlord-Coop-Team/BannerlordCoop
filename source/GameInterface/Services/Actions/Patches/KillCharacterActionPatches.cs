@@ -166,17 +166,8 @@ internal class KillCharacterActionPatches
         return false;
     }
 
-    /// <summary>
-    /// v1.5 moved the execution trait penalty out of this action into ExecutionCampaignBehavior, which
-    /// applies <see cref="TraitLevelingHelper.OnBloodFeudStarted"/> only when the killer is Hero.MainHero.
-    /// On the server a client's execution arrives with that client's hero as the killer, so the penalty
-    /// is applied to that player here. Blood feuds are not multiplayer-aware (#3819): no feud is started,
-    /// and vanilla's "no feud with the player yet" gate is not copied, because Clan.HasBloodFeudWithPlayer
-    /// would describe the server's player clan, not the executing player's.
-    /// Known gap: N executions from one clan cost N penalties, where v1.5.6 vanilla charges once per feud.
-    /// Only Executed is checked: ExecutionAfterMapEvent comes only from ApplyByExecutionAfterMapEvent, whose one
-    /// v1.5.6 caller (HeroExecutionSceneNotificationData) HeroExecutionScenePatch skips on the server.
-    /// </summary>
+    // ExecutionCampaignBehavior only charges this when the killer is Hero.MainHero, so a player's execution is charged here.
+    // Blood feuds are not multiplayer-aware yet (#3819), so no feud is started and every execution is charged.
     internal static void ApplyExecutionTraitPenalty(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail)
     {
         if (actionDetail != KillCharacterAction.KillCharacterActionDetail.Executed) return;

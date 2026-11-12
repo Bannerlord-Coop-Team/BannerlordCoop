@@ -7,12 +7,11 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace E2E.Tests.Util;
 
 /// <summary>
-/// v1.5 derives <see cref="MapEvent.EventType"/> from <see cref="MapEvent.Component"/> and keeps
-/// <see cref="MapEvent.MapEventSettlement"/> on the component, so tests that used to write the removed
-/// <c>_mapEventType</c> field give the map event a component of the matching type instead.
+/// <see cref="MapEvent.EventType"/> comes from <see cref="MapEvent.Component"/>, which also keeps
+/// <see cref="MapEvent.MapEventSettlement"/>, so tests give the map event a component of the matching type.
 /// <list type="bullet">
 /// <item>A map event without a component yet (built by hand on the server, before it is committed) gets a
-/// real component from its constructor, assigned through the synchronized property, the way the v1.5
+/// real component from its constructor, assigned through the synchronized property, the way the
 /// factories create them, so it registers and replicates with the event.</item>
 /// <item>A map event that already has one is re-stamped locally: the new component is written to the
 /// property's backing field, so like the old field write the change stays on that instance.</item>
@@ -50,7 +49,7 @@ internal static class MapEventTestExtensions
     public static void RestoreComponent(this MapEvent mapEvent, MapEventComponent component)
         => ComponentField(mapEvent) = component;
 
-    /// <summary>Sets the battle settlement through the component, as v1.4 set it on the map event.</summary>
+    /// <summary>Sets the battle settlement through the component.</summary>
     public static void SetMapEventSettlement(this MapEvent mapEvent, Settlement settlement)
     {
         if (mapEvent.Component == null)
@@ -66,7 +65,7 @@ internal static class MapEventTestExtensions
             case MapEvent.BattleTypes.FieldBattle:
             {
                 var component = Make<FieldBattleEventComponent>(mapEvent, construct);
-                // Without its constructor the component lacks its v1.5 party position caches; OnAfterLoad
+                // Without its constructor the component lacks its party position caches; OnAfterLoad
                 // creates them, as for a component loaded from a save or replicated to a client.
                 if (!construct) component.OnAfterLoad();
                 return component;

@@ -538,7 +538,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 var heir = Get<Hero>(instance, heirId);
                 Assert.Same(heir, Get<MobileParty>(instance, player.MobilePartyId).LeaderHero);
                 Assert.Equal(leaderDies, heir.Clan.Leader == heir);
-                // v1.5 resets the new player character's party commands.
+                // The new player character's party commands are reset.
                 Assert.True(heir.CanRaid);
             });
         }

@@ -17,7 +17,6 @@ internal class HeroExecutionScenePatch
     {
         if (ModInformation.IsServer) return false;
 
-        // v1.5 also shows display-only execution scenes (blood feuds) that must not act on close.
         if (__instance._runAffirmativeActionAtClose && !__instance._isVisualOnly)
         {
             if (__instance._onAffirmativeAction != null)
