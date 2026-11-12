@@ -132,6 +132,18 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         return (involvedMobileParties, playerLedArmies, releasedArmyParties);
     }
 
+    // The event's sides can list a party that holds no link to it; detaching releases that party as well.
+    private static PartyBase[] CollectReleaseCandidates(MapEvent mapEvent, IEnumerable<PartyBase> linkedParties)
+    {
+        var sideParties = (mapEvent._sides ?? Array.Empty<MapEventSide>())
+            .Where(side => side != null)
+            .SelectMany(side => side.Parties)
+            .Select(mapEventParty => mapEventParty?.Party)
+            .Where(party => party != null);
+
+        return linkedParties.Concat(sideParties).Distinct().ToArray();
+    }
+
     private void ReleasePlayerMapEventParties(
         MapEvent mapEvent,
         MobileParty[] involvedMobileParties,
@@ -239,15 +251,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
     private PartyBase[] ReleaseLinkedParties(MapEvent mapEvent, IReadOnlyList<PartyBase> linkedParties)
     {
-        // The event's sides can list a party that holds no link to it; detaching releases that party as well.
-        var candidates = linkedParties
-            .Concat((mapEvent._sides ?? Array.Empty<MapEventSide>())
-                .Where(side => side != null)
-                .SelectMany(side => side.Parties)
-                .Select(mapEventParty => mapEventParty?.Party)
-                .Where(party => party != null))
-            .Distinct()
-            .ToArray();
+        var candidates = CollectReleaseCandidates(mapEvent, linkedParties);
         var componentName = mapEvent.Component?.GetType().Name;
         var battleState = mapEvent.BattleState;
 
