@@ -958,3 +958,94 @@ deployed:
   replacements still ran v1.4.8 logic (the ransom and mercenary offers above), fixed after the
   merge.
 - Not done: a live co-op session, and CI.
+
+## Second merge of development (2026-11-11, #4593)
+
+`task/4593-merge-development` (PR #4630) merges `development` at `74d9a8ac0` into `bannerlord-1.5.x`
+at
+`83c46b153` (`bd2d6847d`), fixes the E2E tests that failed after it (`d9504a791`), and then merges
+the
+current heads: `bannerlord-1.5.x` at `5a4dc68a1` (#4616) and `development` at `0a375595f` (#4553,
+#4619).
+The two later merges had no conflicts.
+
+### API changes needed to build
+
+- `AnchorPoint` lost `SetPosition`, `ResetMoveTarget`, `HourlyTick` and `TargetPosition`. Its state
+  is now the `_position` and `_settlement` fields, so `AnchorPointSync` syncs those fields (and
+  `_lastUsedDisembarkPosition`) instead of the `Position` and `TargetPosition` properties. Clients
+  block the `Position` and `Settlement` setters and `ResetPosition`, as they blocked `SetPosition`.
+- `Campaign.Tick` calls `AnchorPoint.TryUpdatePlayerAnchorInfo` for `MobileParty.MainParty` only, so
+  the client now shows "Your fleet has arrived" itself and keeps the fleet tracker. The server's
+  `FleetArrived` and `NetworkNotifyFleetArrived` message pair is removed.
+- The heir no longer cancels a called fleet: v1.5.7 `ChangePlayerCharacterAction.Apply` does not
+  either.
+- `BlockadeBattleMapEvent` is `BlockadeBattleEventComponent`.
+- The village set sail and disembark consequences are now shared with castles
+  (`game_menu_set_sail_leave_on_consequence`, `game_menu_disembark_on_consequence`).
+- Map event results ask the event component what the winners loot, as vanilla does. A partial ship
+  loot reads the player encounter, which the server lacks, so it loots no ships.
+- Incidents only build against v1.5.7: triggers are string sets, `LeavingSettlement` is gone
+  (leaving a castle now counts), the seed and cooldown live in `IncidentManager`, and
+  `IncidentManager.IncidentResolved` replaces `OnIncidentResolved`. `IncidentDisable` still blocks
+  `IncidentManager.InvokeIncident`; #4590 moves the service onto the v1.5 API (status comment
+  there).
+- The Escort Merchant Caravan visibility check uses
+  `MapVisibilityModel.GetMobilePartyVisibilityAndInspectedState`.
+- Smaller renames: `AnchorVisualManager.CanPlayerHaveAnchor`,
+  `RangedSiegeWeaponAi.ResetThreatSeeker`, the ship upgrade perk call.
+- E2E tests use the v1.5 map event helpers (`SetBattleType`, `SetMapEventSettlement`, `Initialize`
+  with a component) and the new troop score hit captain argument.
+
+### Conflict choices
+
+- Development's server side fleet transfer to the heir replaces the port's
+  `ChangePlayerCharacterAction` copy.
+- The take prisoner answer keeps both stale dialog checks.
+- The crash handler keeps development's early boot log and the port's session summary and flush.
+- `IncidentDisable.cs` is kept (development had deleted it).
+- `PlayerTrackCompanionBehavior` and prison breaks take development's side: the port's
+  `DisablePlayerTrackCompanionBehavior.cs` and `DisablePrisonBreakCampaignBehavior.cs` are removed,
+  so development's per player companion tracking and the prison break sync are active. See #4613 for
+  prison breaks.
+- `CoopHideoutMissionLogic` keeps the port's `Mission.OnInitialSpawnCompleted` call (#4591 explains
+  why the field, siege and naval paths need no such call).
+
+### Fixes on top of the merge
+
+The merge commit alone failed 9 E2E tests. One more commit fixes them.
+
+- **Taking a lord prisoner:** the port's stale dialog check refused a defeated lord who still leads
+  his own party, so taking a beaten lord did nothing. The check now allows the lord's own party and
+  still refuses a lord in another party (new test
+  `TakeLordPrisoner_LordInAnotherParty_StaysInThatParty`).
+- **Sally out:** `SallyOutFinishEncounterPatch` read the battle type of a client map event with no
+  component, which throws on v1.5 (`MapEvent.EventType` reads the component). It now returns when
+  the component is missing.
+- **Ship ownership:** a destroyed ship stayed on its owner's ship list on clients.
+  `DestroyShipAction.ApplyInternal` is patched before the AutoSync patch on `Ship.Owner`, so its
+  owner change never reached the clients (we think v1.5's smaller setter is now inlined into it).
+  `ShipRegistry.OnClientDestroyed` now clears the owner on the client. The same patch order may hide
+  other small synced setters; that needs its own issue.
+- **Tests that encoded v1.4.8:** the ArmyOfPoachers raid test now expects the v1.5.7 cancel
+  (`QuestCanceledTargetVillageRaided` calls `CompleteQuestWithCancel`). The troop score hit test
+  uses the shared XP model with the new captain argument. The post battle screen and siege lifted
+  tests give their constructor-skipped map events a `FieldBattleEventComponent`, and the post battle
+  test turns off the component's `OnPlayerEncounterFinalizeBattle`, because v1.5's one-line
+  `PlayerEncounter.FinalizeBattle` only calls into it.
+
+### Checks
+
+Release build, run locally against the v1.5.7 assemblies, with nothing deployed:
+
+- Engine member audit over Coop, Coop.Core, GameInterface and Missions: 1,545 distinct engine
+  references, 0 unresolved.
+- Unit tests (`CoopUnitTests.slnf`): 5,851 passed, 0 failed, 2 skipped.
+- `VerificationHarness.Tests`: 86 passed.
+- E2E, 16 shards: 4,145 tests, 4,144 passed, 1 skipped, every shard exit 0.
+
+All of these ran on the final head, da7a109d0.
+
+Not covered: no game ran. The two client live test from #4593 is still owed. CI uses
+`ghcr.io/bannerlord-coop-team/bannerlordcoop:latest`; I did not check which game version that image
+holds, so CI can fail here until the image has v1.5.7.
