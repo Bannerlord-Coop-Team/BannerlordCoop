@@ -80,36 +80,37 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
     private void CleanUpLoadedPlayerMapEvent(MapEvent mapEvent)
     {
-        (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) parties;
+        (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) parties = default;
 
-        try
+        var repaired = TryStage(mapEvent, "party link repair, so its finalize and party release are skipped", () =>
         {
             RepairPartySideLinks(mapEvent);
             parties = CollectPlayerMapEventParties(mapEvent);
-        }
-        catch (Exception e)
-        {
-            logger.Error(e, "Failed to repair party links of loaded player map event {MapEventId}; skipping its finalize and party release", mapEvent.StringId);
-            return;
-        }
+        });
+        if (!repaired) return;
 
-        try
+        TryStage(mapEvent, "finalize", () =>
         {
             RestoreUnsavedStateIfUnlisted(mapEvent);
             FinalizeOrRepairEvent(mapEvent);
-        }
-        catch (Exception e)
-        {
-            logger.Error(e, "Failed to finalize loaded player map event {MapEventId}", mapEvent.StringId);
-        }
+        });
 
+        TryStage(mapEvent, "party release", () =>
+            ReleasePlayerMapEventParties(mapEvent, parties.InvolvedMobileParties, parties.PlayerLedArmies, parties.ReleasedArmyParties));
+    }
+
+    // Runs one cleanup stage of a loaded player battle and logs its failure instead of throwing.
+    private bool TryStage(MapEvent mapEvent, string stage, Action action)
+    {
         try
         {
-            ReleasePlayerMapEventParties(mapEvent, parties.InvolvedMobileParties, parties.PlayerLedArmies, parties.ReleasedArmyParties);
+            action();
+            return true;
         }
         catch (Exception e)
         {
-            logger.Error(e, "Failed to release parties of loaded player map event {MapEventId}", mapEvent.StringId);
+            logger.Error(e, "Loaded player map event {MapEventId} failed its {Stage}", mapEvent.StringId, stage);
+            return false;
         }
     }
 
