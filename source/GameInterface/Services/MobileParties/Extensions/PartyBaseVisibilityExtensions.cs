@@ -8,8 +8,8 @@ namespace GameInterface.Services.MobileParties.Extensions;
 public static class PartyBaseVisibilityExtensions
 {
     /// <summary>
-    /// Recomputes one party's fog of war visibility and inspected state from <paramref name="fromPosition"/>.
-    /// A party inside a settlement stays hidden unless its leader shows a clan banner or it is assaulting the walls.
+    /// Recomputes one party's fog of war visibility and inspected state from <paramref name="fromPosition"/> with the map visibility model.
+    /// Inactive parties, and parties in a settlement whose leader has no clan banner, are hidden before the model runs, so garrisons and militia the model would leave as saved don't keep the server save's all-visible state.
     /// </summary>
     /// <param name="mainPartySeeingRange">The seeing range to use; 0 uses the main party's current range.</param>
     public static void UpdateVisibilityAndInspected(this PartyBase party, CampaignVec2 fromPosition, float mainPartySeeingRange = 0f)

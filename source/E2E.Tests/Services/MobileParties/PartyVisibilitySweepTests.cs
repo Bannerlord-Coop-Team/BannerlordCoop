@@ -191,7 +191,7 @@ public class PartyVisibilitySweepTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(insidePartyId, out var insideParty));
             Assert.True(Client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            // The harness clan has no banner, so only an assault on the walls would show this party.
+            // The harness leader has no clan banner, so the settlement filter hides this party before the model, which here would show it.
             Assert.Null(insideParty.LeaderHero?.ClanBanner);
 
             mainParty._position = LandPosition(100f, 100f);
