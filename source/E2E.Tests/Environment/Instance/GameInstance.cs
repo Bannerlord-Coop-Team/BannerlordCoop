@@ -47,7 +47,6 @@ public class GameInstance
 
                 Campaign.SiegeEventManager = new SiegeEventManager();
                 Campaign.MapEventManager = new MapEventManager();
-                // v1.5 moved map markers into the MapTrackerManager.
                 Campaign.MapTrackerManager = new MapTrackerManager();
 
                 RegisterType<ItemObject>(MBObjectManager);

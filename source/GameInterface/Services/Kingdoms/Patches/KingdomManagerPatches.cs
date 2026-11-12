@@ -22,7 +22,7 @@ internal class KingdomManagerPatches
         {
             kingdom.Banner = new Banner(Clan.PlayerClan.Banner);
         }
-        // v1.5.4 hands the throne to the most influential clan that may rule, if any.
+        // The throne goes to the most influential clan that may rule, if any.
         float num = float.MinValue;
         Clan clan = null;
         foreach (Clan clan2 in kingdom.Clans)
