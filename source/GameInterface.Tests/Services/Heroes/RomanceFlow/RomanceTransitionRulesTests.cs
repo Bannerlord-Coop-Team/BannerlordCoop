@@ -49,6 +49,6 @@ public class RomanceTransitionRulesTests
     [InlineData(Romance.RomanceLevelEnum.CourtshipStarted, false)]
     public void IsFailedCourtship_MatchesTheLevelsVanillaRetries(Romance.RomanceLevelEnum level, bool expected)
     {
-        Assert.Equal(expected, RomanceRetryCooldown.IsFailedCourtship(level));
+        Assert.Equal(expected, RomanceTransitionRules.IsFailedCourtship(level));
     }
 }

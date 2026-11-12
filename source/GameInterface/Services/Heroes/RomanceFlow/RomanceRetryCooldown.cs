@@ -6,72 +6,64 @@ using Romance = TaleWorlds.CampaignSystem.Romance;
 namespace GameInterface.Services.Heroes.RomanceFlow;
 
 /// <summary>
-/// v1.5.4 lets a failed courtship start again after one season. Vanilla keeps the failed persuasion
-/// attempts in <see cref="RomanceCampaignBehavior"/>, keyed by the courted hero, and saves them. The
-/// persuasion runs on the client, so the server records the failure itself when it applies a failed
-/// level, and sends the failure time to the clients with the romance states.
+/// v1.5.4 lets a failed courtship start again after one season (#4588). Vanilla keeps the failed persuasion
+/// attempts in <see cref="RomanceCampaignBehavior"/>, keyed by the courted hero only. The persuasion runs on
+/// the client, so the server keeps each player's failure in <see cref="IRomanceRetryHistory"/>, and a client
+/// puts its own failures into vanilla's list, where the retry dialogue reads them.
 /// </summary>
-internal static class RomanceRetryCooldown
+internal interface IRomanceRetryCooldown
 {
-    public static bool IsFailedCourtship(Romance.RomanceLevelEnum level) =>
-        level == Romance.RomanceLevelEnum.FailedInCompatibility ||
-        level == Romance.RomanceLevelEnum.FailedInPracticalities;
+    void RecordFailure(Hero playerHero, Hero courtedHero);
 
-    private static RomanceCampaignBehavior Behavior =>
-        Campaign.Current?.GetCampaignBehavior<RomanceCampaignBehavior>();
-
-    public static void RecordFailure(Hero courtedHero) => AddFailure(courtedHero, CampaignTime.Now);
+    /// <summary>Forgets the failure when the courtship starts again, as vanilla does.</summary>
+    void Clear(Hero playerHero, Hero courtedHero);
 
     /// <summary>
-    /// The same test as vanilla EvaluateCourtshipProgress: an attempt exists and no attempt failed
-    /// within one season.
+    /// True when no failure of this player with this hero is less than one season old. A failed courtship
+    /// with no record, from a save written before the history existed, can be retried.
     /// </summary>
-    public static bool HasRetryCooldownExpired(Hero courtedHero)
+    bool HasRetryCooldownExpired(Hero playerHero, Hero courtedHero);
+
+    /// <summary>
+    /// The ticks of this player's failure with this hero, for a couple at a failed level. Without a record it
+    /// is the first tick of the campaign, so the client's retry dialogue allows what the server allows.
+    /// </summary>
+    long FailureTicks(Hero playerHero, Hero courtedHero);
+
+    /// <summary>On a client, replaces vanilla's attempts for the courted hero with the server's failure.</summary>
+    void RestoreLocalFailure(Hero courtedHero, long failureTicks);
+}
+
+internal class RomanceRetryCooldown : IRomanceRetryCooldown
+{
+    private readonly IRomanceRetryHistory history;
+
+    public RomanceRetryCooldown(IRomanceRetryHistory history)
     {
-        var behavior = Behavior;
-        if (behavior?._previousRomancePersuasionAttempts == null) return false;
-
-        var hasAttempt = false;
-        foreach (var attempt in behavior._previousRomancePersuasionAttempts)
-        {
-            if (attempt.PersuadedHero != courtedHero) continue;
-            hasAttempt = true;
-            if (!attempt.IsSuccesful() &&
-                behavior.IsPersuiasionAttemptInCooldown(attempt.GameTime)) return false;
-        }
-
-        return hasAttempt;
+        this.history = history;
     }
 
-    /// <summary>Vanilla clears the attempts for the courted hero when the courtship starts again.</summary>
-    public static void Clear(Hero courtedHero) => Behavior?.ClearRomancePersuasionAttemptsFor(courtedHero);
+    public void RecordFailure(Hero playerHero, Hero courtedHero) =>
+        history.RecordFailure(playerHero, courtedHero, CampaignTime.Now);
 
-    /// <summary>The ticks of the latest failed attempt for the courted hero, or 0 if there is none.</summary>
-    public static long LatestFailureTicks(Hero courtedHero)
+    public void Clear(Hero playerHero, Hero courtedHero) => history.Clear(playerHero, courtedHero);
+
+    // The same test as vanilla's IsPersuiasionAttemptInCooldown: less than one season since the failure.
+    public bool HasRetryCooldownExpired(Hero playerHero, Hero courtedHero) =>
+        !history.TryGetFailure(playerHero, courtedHero, out var failedAt) || failedAt.ElapsedSeasonsUntilNow >= 1f;
+
+    public long FailureTicks(Hero playerHero, Hero courtedHero) =>
+        history.TryGetFailure(playerHero, courtedHero, out var failedAt) ? failedAt.NumTicks : 1;
+
+    public void RestoreLocalFailure(Hero courtedHero, long failureTicks)
     {
-        var attempts = Behavior?._previousRomancePersuasionAttempts;
-        if (attempts == null) return 0;
+        var behavior = Campaign.Current?.GetCampaignBehavior<RomanceCampaignBehavior>();
+        if (behavior?._previousRomancePersuasionAttempts == null) return;
 
-        long latest = 0;
-        foreach (var attempt in attempts)
-        {
-            if (attempt.PersuadedHero == courtedHero && !attempt.IsSuccesful() &&
-                attempt.GameTime.NumTicks > latest)
-                latest = attempt.GameTime.NumTicks;
-        }
-
-        return latest;
+        behavior.ClearRomancePersuasionAttemptsFor(courtedHero);
+        // Vanilla reads the option arguments only for a successful attempt, so a failure needs none.
+        if (failureTicks > 0)
+            behavior._previousRomancePersuasionAttempts.Add(new PersuasionAttempt(
+                courtedHero, new CampaignTime(failureTicks), null, PersuasionOptionResult.Failure, 0));
     }
-
-    /// <summary>Replaces the attempts for the courted hero with the server's latest failure.</summary>
-    public static void ReplaceWithFailure(Hero courtedHero, long failureTicks)
-    {
-        Clear(courtedHero);
-        if (failureTicks > 0) AddFailure(courtedHero, new CampaignTime(failureTicks));
-    }
-
-    // Vanilla reads the option arguments only for a successful attempt, so a failure needs none.
-    private static void AddFailure(Hero courtedHero, CampaignTime time) =>
-        Behavior?._previousRomancePersuasionAttempts?.Add(
-            new PersuasionAttempt(courtedHero, time, null, PersuasionOptionResult.Failure, 0));
 }

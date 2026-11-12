@@ -96,7 +96,7 @@ internal readonly struct RomanceStateData
     public readonly float LastVisit;
     [ProtoMember(6)]
     public readonly float ScoreFromPersuasion;
-    /// <summary>The courted hero's latest failed courtship in campaign ticks, or 0 if there is none.</summary>
+    /// <summary>This couple's failed courtship in campaign ticks, or 0 if there is none.</summary>
     [ProtoMember(7)]
     public readonly long FailedAtTicks;
 

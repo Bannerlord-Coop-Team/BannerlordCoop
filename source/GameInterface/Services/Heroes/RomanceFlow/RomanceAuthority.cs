@@ -18,6 +18,13 @@ internal interface IRomanceAuthority : IGameAbstraction
 
 internal class RomanceAuthority : IRomanceAuthority
 {
+    private readonly IRomanceRetryCooldown retryCooldown;
+
+    public RomanceAuthority(IRomanceRetryCooldown retryCooldown)
+    {
+        this.retryCooldown = retryCooldown;
+    }
+
     public bool TryValidateStateChange(
         Hero playerHero,
         Hero targetHero,
@@ -27,8 +34,8 @@ internal class RomanceAuthority : IRomanceAuthority
         if (!TryValidatePair(playerHero, targetHero, out reason)) return false;
 
         var currentLevel = Romance.GetRomanticLevel(playerHero, targetHero);
-        var retryCooldownExpired = RomanceRetryCooldown.IsFailedCourtship(currentLevel) &&
-            RomanceRetryCooldown.HasRetryCooldownExpired(targetHero);
+        var retryCooldownExpired = RomanceTransitionRules.IsFailedCourtship(currentLevel) &&
+            retryCooldown.HasRetryCooldownExpired(playerHero, targetHero);
         if (!RomanceTransitionRules.IsAllowed(currentLevel, requestedLevel, retryCooldownExpired))
         {
             reason = $"Cannot change romance from {currentLevel} to {requestedLevel}.";
@@ -128,6 +135,10 @@ internal class RomanceAuthority : IRomanceAuthority
 
 internal static class RomanceTransitionRules
 {
+    public static bool IsFailedCourtship(Romance.RomanceLevelEnum level) =>
+        level == Romance.RomanceLevelEnum.FailedInCompatibility ||
+        level == Romance.RomanceLevelEnum.FailedInPracticalities;
+
     public static bool IsAllowed(
         Romance.RomanceLevelEnum currentLevel,
         Romance.RomanceLevelEnum requestedLevel,
@@ -142,7 +153,7 @@ internal static class RomanceTransitionRules
                 currentLevel == Romance.RomanceLevelEnum.Untested ||
                 currentLevel == Romance.RomanceLevelEnum.MatchMadeByFamily ||
                 currentLevel == Romance.RomanceLevelEnum.CourtshipStarted ||
-                (retryCooldownExpired && RomanceRetryCooldown.IsFailedCourtship(currentLevel)),
+                (retryCooldownExpired && IsFailedCourtship(currentLevel)),
             Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible =>
                 currentLevel == Romance.RomanceLevelEnum.CourtshipStarted,
             Romance.RomanceLevelEnum.CoupleAgreedOnMarriage =>
