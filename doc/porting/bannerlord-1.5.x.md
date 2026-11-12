@@ -185,7 +185,9 @@ every role (below).
   `HeadmanNeedsGrainWorldEventPatches` follows that (#4589). The other synced quests need no change:
   Escort Merchant Caravan runs vanilla on the server, and Herd and Garrison have no logic change co-op
   copies. An ArmyOfPoachers raid at the target village now cancels the quest
-  (`QuestCanceledTargetVillageRaided` calls `CompleteQuestWithCancel`).
+  (`QuestCanceledTargetVillageRaided` calls `CompleteQuestWithCancel`), and its `StartQuestBattle`
+  opens the village center with the scene level `land_raid`, which `PoachersBattleMissionInitializer`
+  now passes too.
 
 ## Loading a v1.4.8 save (#4615)
 
