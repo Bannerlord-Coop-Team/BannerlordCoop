@@ -370,6 +370,56 @@ internal class PartyCommands
     }
 
     /// <summary>
+    /// Orders an AI party to engage another party right away, so live tests can stage a lord chasing a player party.
+    /// </summary>
+    public sealed class EngagePartyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.mobile_party";
+
+        public string Name => "engage_party";
+
+        public string Description => "Orders an AI party to engage another party and reports its short term target.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "AI mobile party name or id; quote names with spaces."),
+            new ExpectedArgs("target_party_id", "Target mobile party name or id; quote names with spaces."),
+        };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns command arguments into game objects.
+        public EngagePartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
+        // Sets the engage order and its short term behavior so the party targets the other party at once.
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
+
+            if (!resolver.TryResolveMobileParty(args[1], out var target, out error))
+                return Failed(error);
+
+            if (party.IsPlayerParty())
+                return Failed($"Party {party.StringId} is a player party, its client drives it.");
+
+            party.SetMoveEngageParty(target, MobileParty.NavigationType.Default);
+            party.RecalculateShortTermBehavior();
+            MessageBroker.Instance.Publish(typeof(PartyCommands), new PartyBehaviorChangeAttempted(party));
+
+            return Succeeded($"ENGAGE_PARTY party={party.StringId} " +
+                $"defaultBehavior={party.DefaultBehavior} shortTermBehavior={party.ShortTermBehavior} " +
+                $"shortTermTarget={party.ShortTermTargetParty?.StringId ?? "none"} " +
+                $"atWar={party.MapFaction.IsAtWarWith(target.MapFaction)}");
+        }
+    }
+
+    /// <summary>
     /// View character ids in a hero's party by full name or hero id.
     /// </summary>
     public sealed class CharacterIdsCoopCommand : ICoopCommand
