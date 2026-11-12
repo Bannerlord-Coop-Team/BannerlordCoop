@@ -24,9 +24,9 @@ public interface IMapEventLoadCleaner
     // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
     void CleanUpLoadedMapEvents();
 
-    // Releases every party still linked to a battle that already ended, calling onReleased for each one
-    // as it is released. A throw from onReleased is logged and the rest are still released. Also run live by coop.unstuck.
-    PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
+    // Releases every party still linked to a battle that already ended, calling onReleased (a throw is only logged) for each,
+    // and returns them with the ids of the battles that failed to release. Also run live by coop.unstuck.
+    (PartyBase[] ReleasedParties, string[] FailedMapEventIds) ReleaseEndedMapEventLinks(Action<PartyBase> onReleased);
 
     // Releases the parties of a battle whose finalize threw after it already ended, and publishes its end for the clients.
     void ReleaseFailedFinalization(MapEvent mapEvent);
@@ -170,9 +170,10 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    public PartyBase[] ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
+    public (PartyBase[] ReleasedParties, string[] FailedMapEventIds) ReleaseEndedMapEventLinks(Action<PartyBase> onReleased)
     {
         var releasedParties = new List<PartyBase>();
+        var failedMapEventIds = new List<string>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
         var endedMapEvents = GetLinkedParties()
             .GroupBy(party => party.MapEventSide.MapEvent)
@@ -207,10 +208,11 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             catch (Exception e)
             {
                 logger.Error(e, "Failed to release the parties of ended map event {MapEventId}", mapEvent.StringId);
+                failedMapEventIds.Add(mapEvent.StringId);
             }
         }
 
-        return releasedParties.ToArray();
+        return (releasedParties.ToArray(), failedMapEventIds.ToArray());
     }
 
     // FinalizeEventAux sets WaitingRemoval before its listeners, the component's OnFinalize and the party

@@ -827,7 +827,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
                 Server.Resolve<IStalledMapEventResolver>());
             var reportedParties = new List<PartyBase>();
 
-            var releasedParties = cleaner.ReleaseEndedMapEventLinks(party =>
+            var (releasedParties, failedMapEventIds) = cleaner.ReleaseEndedMapEventLinks(party =>
             {
                 if (reportedParties.Count == 0)
                 {
@@ -838,6 +838,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
                 reportedParties.Add(party);
             });
 
+            Assert.Empty(failedMapEventIds);
             Assert.Equal(2, releasedParties.Length);
             Assert.Contains(attacker.Party, releasedParties);
             Assert.Contains(defender.Party, releasedParties);
