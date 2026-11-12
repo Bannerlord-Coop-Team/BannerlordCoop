@@ -102,9 +102,12 @@ internal class MercenaryHireHandler : IHandler
             : Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(mercenaryData.TroopType, mainHero).RoundedResultNumber;
         int goldAmount = GetMercenaryHireGoldAmount(data.Count, unitPrice);
         bool availableTroopMatches = mercenaryData?.TroopType == mercenaryTroop;
-        int availableCount = mercenaryData == null
-            ? 0
-            : RecruitmentCampaignBehaviorPatch.GetMercenaryHireLimit(mainHero, mercenaryData.Number);
+        // v1.5 lets a generous hero hire past the listed stock.
+        int availableCount = 0;
+        if (mercenaryData != null)
+        {
+            availableCount = RecruitmentCampaignBehaviorPatch.GetMercenaryHireLimit(mainHero, mercenaryData.Number);
+        }
 
         // The server stock may tick while a client is still in the tavern conversation. Reject those
         // stale requests against the current server stock, then publish the latest stock back below.
