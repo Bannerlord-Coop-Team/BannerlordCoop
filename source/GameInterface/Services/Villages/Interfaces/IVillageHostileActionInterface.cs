@@ -14,7 +14,7 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     void BeginHostileActionPresentation(VillageHostileAction action);
     bool CanStartHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action, out VillageHostileActionDeniedReason reason);
     void ApplyHostileAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
-    bool WillVillageResist(Settlement settlement);
+    bool WillVillageResist(MobileParty mobileParty, Settlement settlement);
     void ApplyUnresistedForceAction(MobileParty mobileParty, Settlement settlement, VillageHostileAction action);
     void ReturnToVillageMenu();
     void ResolveRaidDefenders(MapEvent mapEvent);

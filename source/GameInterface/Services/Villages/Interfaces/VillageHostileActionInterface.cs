@@ -305,9 +305,16 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
-    /// <summary>Vanilla's test: a village resists only with healthy militia or enough friendly parties.</summary>
-    public bool WillVillageResist(Settlement settlement) =>
-        VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
+    /// <summary>
+    /// Vanilla's test: a village resists only with healthy militia or enough friendly parties. With healthy
+    /// militia it compares the village with <see cref="MobileParty.MainParty"/>, which the server does not have
+    /// of its own, so the test runs as the requesting party.
+    /// </summary>
+    public bool WillVillageResist(MobileParty mobileParty, Settlement settlement)
+    {
+        using (new global::GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+            return VillageHostileActionCampaignBehavior.WillVillageResistHostileAction(settlement);
+    }
 
     /// <summary>
     /// v1.5: a village with no defenders gives in. The attacker gains crime rating and loses relations, as

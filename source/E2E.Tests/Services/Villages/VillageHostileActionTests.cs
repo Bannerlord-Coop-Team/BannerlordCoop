@@ -207,6 +207,45 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.False(ConsumeApprovedMapEventStart(mobilePartyId, target.SettlementPartyId, HostileActionFlags(action)).Approved);
     }
 
+    // With healthy militia vanilla's check compares the village with MobileParty.MainParty, which the server
+    // does not have of its own, so the check runs as the requesting party (#4587).
+    [Fact]
+    public void ClientRequestForceAction_VillageWithHealthyMilitia_RunsTheRealCheckAndStartsABattle()
+    {
+        var client = Clients.First();
+        RegisterPeer(client, "PlayerOne");
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        var militiaPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var militiaTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(militiaPartyId, out var militia));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(militiaTroopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                MilitiaPartyComponent.ConvertPartyToMilitiaParty(militia, settlement);
+                militia.MemberRoster.AddToCounts(troop, 50);
+            }
+
+            Assert.Same(militia, settlement.MilitiaPartyComponent?.MobileParty);
+            Campaign.Current.MainParty = null;
+        });
+
+        Server.NetworkSentMessages.Clear();
+
+        RequestHostileAction(client, VillageHostileAction.ForceVolunteers, mobilePartyId, target.SettlementId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>());
+        var started = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>().Single();
+        Assert.False(started.Unresisted);
+        var result = ConsumeApprovedMapEventStart(
+            mobilePartyId, target.SettlementPartyId, HostileActionFlags(VillageHostileAction.ForceVolunteers));
+        Assert.True(result.Approved);
+        Server.Call(() => Assert.Null(MobileParty.MainParty));
+    }
+
     // The test village has no militia, which vanilla's check reads as no resistance.
     private sealed class VillageResistsScope : IDisposable
     {
