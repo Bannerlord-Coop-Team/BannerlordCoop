@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Common.Network;
@@ -30,9 +31,11 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
     private readonly IPlayerManager players;
+    private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
     public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
-        INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players)
+        INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players,
+        IRetreatedMapEventPartyTracker retreatedPartyTracker)
     {
         this.dispatcher = dispatcher;
         this.publisher = publisher;
@@ -40,6 +43,7 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         this.objects = objects;
         this.owners = owners;
         this.players = players;
+        this.retreatedPartyTracker = retreatedPartyTracker;
     }
 
     public void Run(Action<Quest> action)
@@ -69,7 +73,9 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         quest._isCaravanSaved = true;
         Release(quest);
         var ownerParty = MobileParty.MainParty;
-        if (ownerParty == null || !winners.Parties.Any(party => party.Party == ownerParty.Party))
+        // A retreated party stays in the winners list until the event is finalized.
+        if (ownerParty == null || retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) ||
+            !winners.Parties.Any(party => party.Party == ownerParty.Party))
         {
             quest.OnCaravanSurvivedWithoutHelp();
         }

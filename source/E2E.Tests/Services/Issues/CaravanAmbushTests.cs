@@ -11,6 +11,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.OwnerChange;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Players;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
@@ -305,6 +306,29 @@ public class CaravanAmbushTests : IDisposable
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Assert.Equal(ownerParticipated ? 0 : 1, survived.CountFor(Server));
         Assert.Equal(ownerParticipated ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushConversation>().Count());
+    }
+
+    [Fact]
+    public void AnOwnerWhoRetreatedFromTheAmbushBattleDoesNotGetTheRewardConversation()
+    {
+        using var survived = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnCaravanSurvivedWithoutHelp)));
+        Server.Call(() =>
+        {
+            BindParties();
+            var quest = QuestOf(Server);
+            var attacker = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo;
+            var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            battle.Initialize(attacker.Party, quest._banditParty.Party, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.FieldBattle);
+            battle.MapEventVisual = null;
+            quest._caravanParty.Party.MapEventSide = battle.AttackerSide;
+            Server.Resolve<IRetreatedMapEventPartyTracker>().MarkRetreated(battle, attacker.Party);
+            battle.BattleState = BattleState.AttackerVictory;
+            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
+            Assert.True(quest._isCaravanSaved);
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+        Assert.Equal(1, survived.CountFor(Server));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushConversation>());
     }
 
     [Fact]
