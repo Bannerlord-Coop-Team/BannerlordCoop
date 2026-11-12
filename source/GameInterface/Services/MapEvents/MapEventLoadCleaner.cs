@@ -78,28 +78,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // Each stage is caught on its own, so one broken battle cannot stop the server from starting.
     private void CleanUpLoadedPlayerMapEvent(MapEvent mapEvent)
     {
-        MobileParty[] involvedMobileParties;
-        Army[] playerLedArmies;
-        MobileParty[] releasedArmyParties;
+        (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) parties;
 
         try
         {
             RepairPartySideLinks(mapEvent);
-
-            involvedMobileParties = mapEvent.InvolvedParties
-                .Where(party => party.IsMobile && party.MobileParty.IsActive)
-                .Select(party => party.MobileParty)
-                .ToArray();
-            playerLedArmies = involvedMobileParties
-                .Select(mobileParty => mobileParty.Army)
-                .Where(army => army != null && army.LeaderParty.IsPlayerParty())
-                .Distinct()
-                .ToArray();
-            releasedArmyParties = playerLedArmies
-                .SelectMany(army => army.Parties)
-                .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
-                .Distinct()
-                .ToArray();
+            parties = CollectPlayerMapEventParties(mapEvent);
         }
         catch (Exception e)
         {
@@ -119,12 +103,33 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         try
         {
-            ReleasePlayerMapEventParties(mapEvent, involvedMobileParties, playerLedArmies, releasedArmyParties);
+            ReleasePlayerMapEventParties(mapEvent, parties.InvolvedMobileParties, parties.PlayerLedArmies, parties.ReleasedArmyParties);
         }
         catch (Exception e)
         {
             logger.Error(e, "Failed to release parties of loaded player map event {MapEventId}", mapEvent.StringId);
         }
+    }
+
+    // Collected before the finalize detaches the parties, so the release still knows which ones fought.
+    private static (MobileParty[] InvolvedMobileParties, Army[] PlayerLedArmies, MobileParty[] ReleasedArmyParties) CollectPlayerMapEventParties(MapEvent mapEvent)
+    {
+        var involvedMobileParties = mapEvent.InvolvedParties
+            .Where(party => party.IsMobile && party.MobileParty.IsActive)
+            .Select(party => party.MobileParty)
+            .ToArray();
+        var playerLedArmies = involvedMobileParties
+            .Select(mobileParty => mobileParty.Army)
+            .Where(army => army != null && army.LeaderParty.IsPlayerParty())
+            .Distinct()
+            .ToArray();
+        var releasedArmyParties = playerLedArmies
+            .SelectMany(army => army.Parties)
+            .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
+            .Distinct()
+            .ToArray();
+
+        return (involvedMobileParties, playerLedArmies, releasedArmyParties);
     }
 
     private void ReleasePlayerMapEventParties(
