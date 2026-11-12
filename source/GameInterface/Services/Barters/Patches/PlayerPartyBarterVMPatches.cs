@@ -41,8 +41,7 @@ internal class PlayerPartyBarterVMPatches
     static void SendOfferPostfix(BarterVM __instance)
         => PlayerPartyTradeContext.PublishOfferChanged(__instance);
 
-    // v1.5 removed RefreshOfferLabel (the offer label is static now). It ran right before
-    // RefreshCompatibility after every transfer, so the refresh keeps that slot as a prefix.
+    // Runs as a prefix on RefreshCompatibility, which runs after every transfer.
     [HarmonyPatch("RefreshCompatibility")]
     [HarmonyPrefix]
     static void RefreshCompatibilityPrefix()

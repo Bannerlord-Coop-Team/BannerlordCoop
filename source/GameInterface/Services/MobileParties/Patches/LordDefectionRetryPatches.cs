@@ -15,8 +15,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 ///
 ///   <c>conversation_lord_from_ruling_clan_on_condition</c> - the PRE-GATE, and the real blocker. It
 ///                                 refuses while the lord has an unsuccessful attempt that is still in
-///                                 its cooldown (<c>IsPersuiasionAttemptInCooldown</c>, ONE SEASON since
-///                                 v1.5.4), unless the score says to retry or skip to the barter.
+///                                 its cooldown (<c>IsPersuiasionAttemptInCooldown</c>, ONE SEASON),
+///                                 unless the score says to retry or skip to the barter.
 ///                                 It returns before CanAttemptToPersuade is ever consulted.
 ///   <c>CanAttemptToPersuade</c> - the GATE. Refuses while a matching unsuccessful attempt is less than
 ///                                 ONE WEEK old. The active persuasion also reuses it to choose the failed

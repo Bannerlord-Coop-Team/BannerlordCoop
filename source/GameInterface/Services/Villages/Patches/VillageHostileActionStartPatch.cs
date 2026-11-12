@@ -4,7 +4,6 @@ using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -16,25 +15,25 @@ namespace GameInterface.Services.Villages.Patches;
 [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior))]
 internal class VillageHostileActionStartPatch
 {
-    [HarmonyPatch("game_menu_raid_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_raid_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool RaidPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.Raid);
+    private static bool RaidPrefix() => RequestOnServer(VillageHostileAction.Raid);
 
-    [HarmonyPatch("game_menu_force_volunteers_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_volunteers_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceVolunteersPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceVolunteers);
+    private static bool ForceVolunteersPrefix() => RequestOnServer(VillageHostileAction.ForceVolunteers);
 
-    [HarmonyPatch("game_menu_force_supplies_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_supplies_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceSuppliesPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceSupplies);
+    private static bool ForceSuppliesPrefix() => RequestOnServer(VillageHostileAction.ForceSupplies);
 
-    [HarmonyPatch("game_menu_force_volunteers_no_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_volunteers_no_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceVolunteersNoResistPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceVolunteers);
+    private static bool ForceVolunteersNoResistPrefix() => RequestOnServer(VillageHostileAction.ForceVolunteers);
 
-    [HarmonyPatch("game_menu_force_supplies_no_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_supplies_no_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceSuppliesNoResistPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceSupplies);
+    private static bool ForceSuppliesNoResistPrefix() => RequestOnServer(VillageHostileAction.ForceSupplies);
 
     private static bool RequestOnServer(VillageHostileAction action)
     {

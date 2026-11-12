@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +11,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.Clans;
 
 /// <summary>
-/// The v1.5 governor trait effects apply only while the governor is in town. Each transpiler must swap the
+/// The governor trait effects apply only while the governor is in town. Each transpiler must swap the
 /// method's single governor CurrentSettlement read, so a player governor counts as present in their town.
 /// </summary>
 public class CoopClanGovernorPatchesTests
@@ -31,7 +32,7 @@ public class CoopClanGovernorPatchesTests
 
         var heroSettlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
         var staticSettlement = AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.CurrentSettlement));
-        var governorSettlement = AccessTools.Method(typeof(CoopClanGovernorPatches), nameof(CoopClanGovernorPatches.GetGovernorSettlement));
+        var governorSettlement = AccessTools.Method(typeof(HeroExtensions), nameof(HeroExtensions.GetGovernorSettlement));
 
         var original = PatchProcessor.GetOriginalInstructions(target).ToList();
         var patched = ((IEnumerable<CodeInstruction>)transpiler.Invoke(null, new object[] { original.Select(code => code.Clone()).ToList() })).ToList();

@@ -4,9 +4,11 @@ using Common.Network;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Notifications.Messages;
+using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -35,6 +37,11 @@ public interface IHeroRelationsInterface : IGameAbstraction
     /// talks to a notable to get them to stop supporting their clan.
     /// </summary>
     void EndNotableSupportByAgreement(Hero notable);
+
+    /// <summary>
+    /// Applies the relation a player hero's calculating trait gives with a town notable they meet for the first time.
+    /// </summary>
+    void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero);
 }
 
 internal class HeroRelationsInterface : IHeroRelationsInterface
@@ -84,6 +91,19 @@ internal class HeroRelationsInterface : IHeroRelationsInterface
 
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, notable, 5, false);
         });
+    }
+
+    // HeroKnownInformationCampaignBehavior.OnPlayerMetHero only applies this to the server's main hero, so a calculating
+    // player hero loses relation with a town notable here, the first time the session records them meeting.
+    public void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero)
+    {
+        if (!metHero.IsNotable || metHero.CurrentSettlement?.IsTown != true) return;
+
+        var relationChange = (int)TraitEffectHelper.GetTraitEffectBonus(
+            playerHero,
+            DefaultPersonalityTraitEffects.CalculatingNotableRelationEffect);
+        if (relationChange != 0)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, metHero, relationChange, showQuickNotification: false);
     }
 
     private void UpdateRelation(Clan clan, Hero notable)
