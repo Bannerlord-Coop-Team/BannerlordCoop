@@ -24,12 +24,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker?> TrackerField =
         AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker?>("<TroopUpgradeTracker>k__BackingField");
 
-    private readonly ITestOutputHelper output;
-
-    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output)
-    {
-        this.output = output;
-    }
+    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output) { }
 
     private IReadOnlyList<MethodBase> JoinDisabledMethods => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
