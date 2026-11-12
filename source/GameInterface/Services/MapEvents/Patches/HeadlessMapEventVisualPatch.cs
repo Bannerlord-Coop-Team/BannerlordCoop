@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -16,6 +16,16 @@ internal class HeadlessMapEventVisualPatch
     private static void Postfix(VisualCreator __instance, ref IMapEventVisual __result)
     {
         if (__result == null && __instance.MapEventVisualCreator == null)
-            __result = MapEventBattleFactory.HeadlessMapEventVisual.Instance;
+            __result = HeadlessMapEventVisual.Instance;
+    }
+
+    // A map event visual that draws nothing, for a host with no map to draw it on.
+    private sealed class HeadlessMapEventVisual : IMapEventVisual
+    {
+        public static readonly HeadlessMapEventVisual Instance = new HeadlessMapEventVisual();
+
+        public void Initialize(CampaignVec2 position, bool isVisible) { }
+        public void OnMapEventEnd() { }
+        public void SetVisibility(bool isVisible) { }
     }
 }
