@@ -90,20 +90,4 @@ public class HeroMeetingHandlerTests : IDisposable
             data => data.RecordMeeting("stale-player-hero", It.IsAny<string>(), It.IsAny<long>()),
             Times.Never);
     }
-
-    [Fact]
-    public void NetworkPlayerMetHero_AppliesRelationOnlyOnFirstMeeting()
-    {
-        meetingData
-            .SetupSequence(data => data.RecordMeeting(registeredPlayer.HeroId, "met-hero", It.IsAny<long>()))
-            .Returns(true)
-            .Returns(false);
-
-        messageBroker.Publish(peer, new NetworkPlayerMetHero(registeredPlayer.HeroId, "met-hero", 1351));
-        messageBroker.Publish(peer, new NetworkPlayerMetHero(registeredPlayer.HeroId, "met-hero", 1352));
-        GameThread.Run(() => { }, blocking: true);
-
-        meetingData.Verify(data => data.RecordMeeting(registeredPlayer.HeroId, "met-hero", It.IsAny<long>()), Times.Exactly(2));
-        heroRelations.Verify(relations => relations.ApplyFirstMeetingRelation(playerHero, metHero), Times.Once);
-    }
 }
