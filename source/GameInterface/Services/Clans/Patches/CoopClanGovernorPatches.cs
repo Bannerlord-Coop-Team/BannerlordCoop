@@ -89,7 +89,7 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorBonusTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var currentSettlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
-        var governorSettlement = AccessTools.Method(typeof(CoopClanGovernorPatches), nameof(GetGovernorSettlement));
+        var governorSettlement = AccessTools.Method(typeof(HeroExtensions), nameof(HeroExtensions.GetGovernorSettlement));
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(currentSettlement))
@@ -141,8 +141,4 @@ internal class CoopClanGovernorPatches
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> GovernorRebellionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
-
-    /// <summary>A player governor counts as present in the town they govern, wherever they are.</summary>
-    internal static Settlement GetGovernorSettlement(Hero hero)
-        => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 }
