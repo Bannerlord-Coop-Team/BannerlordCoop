@@ -685,7 +685,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     [InlineData(false)]
     public void CleanUpLoadedMapEvents_OneEventThrows_FinalizesTheOthers(bool registerBrokenFirst)
     {
-        var brokenContext = CreateServerMapEvent(commit: false);
+        var brokenContext = CreateServerMapEvent();
         var healthyContext = CreateServerMapEvent(commit: false);
 
         // The player manager does not promise an order, so both registration orders run and one of
@@ -719,13 +719,16 @@ public class MapEventLoadCleanerTests : MapEventTestBase
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
 
-            // A live event the load never restored: the component lost its back-reference to the event,
-            // which FieldBattleEventComponent reads when FinalizeEvent removes the parties.
+            // A listed event whose component lost its back-reference to the event, which FieldBattleEventComponent
+            // reads when FinalizeEvent removes the parties, so its finalize throws.
             var component = Assert.IsType<FieldBattleEventComponent>(broken.Component);
             component.MapEvent = null!;
             Assert.False(broken.IsFinalized);
 
             Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            // FinalizeComponent runs after the party removal, so a finalize that threw leaves the component unfinished.
+            Assert.False(component._isFinished);
 
             Assert.Equal(MapEventState.WaitingRemoval, healthy.State);
             Assert.Null(healthyAttacker.Party.MapEventSide);
