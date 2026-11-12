@@ -19,6 +19,7 @@ using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.GameMenus;
@@ -177,6 +178,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
+        builder.RegisterType<PartyConfigurationService>().As<IPartyConfigurationService>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().SingleInstance();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
@@ -257,13 +259,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<ArmyFormationPositionConvergence>().As<IArmyFormationPositionConvergence>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
-        builder.RegisterType<OrphanedMapEventFinder>().As<IOrphanedMapEventFinder>().InstancePerDependency();
         // Shared so the per tick Update patch reads it from the provider cache.
         builder.RegisterType<StalledMapEventResolver>().As<IStalledMapEventResolver>().InstancePerLifetimeScope();
         builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
-        builder.RegisterType<LoadRepairRegistryReconciler>().As<ILoadRepairRegistryReconciler>().InstancePerDependency();
-        builder.RegisterType<LoadRepairRunner>().As<ILoadRepairRunner>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<MenuOptionsRefresher>().As<IMenuOptionsRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();

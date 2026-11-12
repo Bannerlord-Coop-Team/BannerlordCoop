@@ -21,7 +21,7 @@ internal class MapTrackerProviderUpdatePatches
         __result &= __instance.TrackedObject.IsActive;
     }
 
-    // v1.5 moved tracker eligibility from SandBox's MapTrackerProvider into the campaign's MapTrackerManager.
+    // Tracker eligibility lives in the campaign's MapTrackerManager.
     [HarmonyPatch(typeof(MapTrackerManager), nameof(MapTrackerManager.ShouldAutoAddTrackerForParty))]
     [HarmonyPostfix]
     public static void CanAddMobilePartyPostfix(MobileParty party, ref bool __result)

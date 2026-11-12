@@ -154,7 +154,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
         if (sallyOut)
         {
-            // A v1.5 sally out finalizes through its component, which reads the besieged settlement.
+            // A sally out finalizes through its component, which reads the besieged settlement.
             var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
             foreach (var instance in Clients.Append(Server))
                 instance.Call(() =>
