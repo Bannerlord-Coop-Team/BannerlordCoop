@@ -80,7 +80,7 @@ public class HeirSelectionIssueCancellationTests
                 players, restorer.Object, Mock.Of<IApplyHeirSelectionActionInterface>(), behavior.Object,
                 Mock.Of<ICoopSessionMigrator>(), Mock.Of<ITraitLevelingHelperInterface>(),
                 Mock.Of<IStatisticsCampaignBehaviorInterface>(), server.Resolve<IIssueCancellationCoordinator>(), null, null,
-                Mock.Of<GameInterface.Services.Clans.IPartyConfigurationService>());
+                server.Resolve<GameInterface.Services.Clans.IPartyConfigurationService>());
 
             broker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(owner, heir));
 
