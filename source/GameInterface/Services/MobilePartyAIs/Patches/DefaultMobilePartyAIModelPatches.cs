@@ -172,18 +172,24 @@ internal class DefaultMobilePartyAIModelPatches
     // The radius GetBestInitiativeBehavior searches around the attacker, wider for sea patrols and port defenders.
     private static float NearbyPartySearchRadius(MobileParty mobileParty)
     {
+        const float SeaPatrolRadiusMultiplier = 5f;
+        const float DefaultRadiusMultiplier = 3f;
+
         var joiningRadius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius;
-        if (mobileParty.DefaultBehavior == AiBehavior.DefendSettlement && mobileParty.IsCurrentlyAtSea && mobileParty.IsTargetingPort)
+
+        bool isPortDefenderAtSea = mobileParty.DefaultBehavior == AiBehavior.DefendSettlement && mobileParty.IsCurrentlyAtSea && mobileParty.IsTargetingPort;
+        if (isPortDefenderAtSea)
             return joiningRadius * (Campaign.Current.Models.MobilePartyAIModel.SettlementDefendingNearbyPartyCheckRadius + 1f);
 
-        if (mobileParty.DefaultBehavior == AiBehavior.PatrolAroundPoint && mobileParty.IsCurrentlyAtSea && !mobileParty.AiBehaviorTarget.IsOnLand)
-            return joiningRadius * 5f;
+        bool isSeaPatrol = mobileParty.DefaultBehavior == AiBehavior.PatrolAroundPoint && mobileParty.IsCurrentlyAtSea && !mobileParty.AiBehaviorTarget.IsOnLand;
+        if (isSeaPatrol)
+            return joiningRadius * SeaPatrolRadiusMultiplier;
 
-        return joiningRadius * 3f;
+        return joiningRadius * DefaultRadiusMultiplier;
     }
 
     // Vanilla's stronger main party check and the skips it runs before it, read for an active player party.
-    private static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
+    internal static bool IsStrongerPlayerParty(MobileParty party, MobileParty mobileParty, MobileParty enemyParty)
     {
         if (!party.IsActive || !party.IsPlayerParty()) return false;
         if (party.BesiegedSettlement != null && party.MapFaction == mobileParty.MapFaction) return false;
