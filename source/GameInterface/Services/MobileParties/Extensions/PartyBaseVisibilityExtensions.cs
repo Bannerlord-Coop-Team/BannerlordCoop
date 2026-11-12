@@ -16,12 +16,14 @@ public static class PartyBaseVisibilityExtensions
     /// visibility the party already had, which after a join is the server save's "everything visible".
     /// Settlements only refresh <c>IsInspected</c>: their <c>IsVisible</c> is spotting state.
     /// </summary>
+    /// <param name="mainPartySeeingRange">The seeing range to use; 0 uses the main party's current range.</param>
     public static void UpdateVisibilityAndInspected(this PartyBase party, CampaignVec2 fromPosition, float mainPartySeeingRange = 0f)
     {
         var model = Campaign.Current?.Models?.MapVisibilityModel;
         if (party == null || model == null) return;
 
-        float seeingRange = mainPartySeeingRange == 0f ? MobileParty.MainParty?.SeeingRange ?? 0f : mainPartySeeingRange;
+        float seeingRange = mainPartySeeingRange;
+        if (seeingRange == 0f) seeingRange = MobileParty.MainParty?.SeeingRange ?? 0f;
         if (seeingRange <= 0f) return;
 
         Vec2[] points = { fromPosition.ToVec2() };
