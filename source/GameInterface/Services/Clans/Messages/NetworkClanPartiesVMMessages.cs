@@ -58,3 +58,22 @@ internal readonly struct ChangeClanPartyLeader : ICommand
         MainPartyId = mainPartyId;
     }
 }
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct ChangeEmptyClanPartyLeader : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string MainHeroId;
+
+    [ProtoMember(2)]
+    public readonly string CachedLeaderId;
+
+    [ProtoMember(3)]
+    public readonly string NewLeaderId;
+
+    public ChangeEmptyClanPartyLeader(string mainHeroId, string cachedLeaderId, string newLeaderId)
+    {
+        MainHeroId = mainHeroId;
+        CachedLeaderId = cachedLeaderId;
+        NewLeaderId = newLeaderId;
+    }
+}
