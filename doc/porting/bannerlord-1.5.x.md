@@ -502,6 +502,13 @@ registrations, by two readers and then one checker. Co-op touches these and need
 - `CampaignIncidentEffects.RemovePrisonerTroopsRandomlyWithPredicate`: co-op disables incidents.
 - `LordDefectionCampaignBehavior`, `ExecutionCampaignBehavior`, `TooltipRefresherCollection` and
   `DefaultPersonalityTraitEffects` changed text keys only.
+- `HeadmanNeedsGrainIssueQuest.OnWarDeclared` fails the quest for a crime or hostility war only while
+  the player raids a village of the quest giver's faction; otherwise
+  `QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(..., forceCancel: true)` cancels it.
+  `HeadmanNeedsGrainWorldEventPatches` follows that (#4589). The other synced quests need no change:
+  Escort Merchant Caravan runs vanilla on the server, and Herd and Garrison have no logic change co-op
+  copies. An ArmyOfPoachers raid at the target village now cancels the quest
+  (`QuestCanceledTargetVillageRaided` calls `CompleteQuestWithCancel`).
 
 Open:
 
