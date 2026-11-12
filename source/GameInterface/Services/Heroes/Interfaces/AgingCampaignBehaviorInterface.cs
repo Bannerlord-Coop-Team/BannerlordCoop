@@ -69,7 +69,6 @@ public class AgingCampaignBehaviorInterface : IAgingCampaignBehaviorInterface
 
         if (hero.IsAlive && hero.CanDie(KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge))
         {
-            // v1.5 leaves heroes marked for execution after a battle to the blood feud system.
             var deathMark = hero.DeathMark;
             bool hasDeathMarkToApply = deathMark != KillCharacterAction.KillCharacterActionDetail.None && deathMark != KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent;
             bool isInBattleOrSiege = hero.PartyBelongedTo?.MapEvent != null || hero.PartyBelongedTo?.SiegeEvent != null;

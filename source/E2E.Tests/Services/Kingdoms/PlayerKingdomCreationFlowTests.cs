@@ -4852,8 +4852,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     /// <summary>
-    /// v1.5 replaced SandBox's MapTrackerProvider (which listened to campaign events itself) with the
-    /// campaign's MapTrackerManager, fed by MapTrackerCampaignBehavior and shown through a handler (the
+    /// The campaign's MapTrackerManager is fed by MapTrackerCampaignBehavior and shown through a handler (the
     /// map view). This stands in for that view: it rebuilds from the manager when attached, as the view does.
     /// </summary>
     private sealed class RecordingMapTrackersHandler : IMapTrackersHandler

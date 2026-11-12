@@ -203,7 +203,7 @@ internal sealed class MapEventBattleFactory
 
     private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender, MapEventManager mapEventManager)
     {
-        // v1.5 creates the visual inside Initialize; HeadlessMapEventVisualPatch covers a headless host.
+        // Initialize creates the visual; HeadlessMapEventVisualPatch covers a headless host.
         var mapEvent = new MapEvent();
         mapEvent.Initialize(
             attacker,

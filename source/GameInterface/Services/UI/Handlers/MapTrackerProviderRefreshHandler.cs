@@ -49,7 +49,7 @@ internal class MapTrackerProviderRefreshHandler : IHandler
         messageBroker.Unsubscribe<NetworkMapTrackerPartyRemoved>(Handle_NetworkMapTrackerPartyRemoved);
     }
 
-    // v1.5 keeps the trackers on the campaign (MapTrackerManager) instead of a SandBox view-model provider.
+    // The trackers live on the campaign (MapTrackerManager).
     private static MapTrackerManager Trackers => Campaign.Current?.MapTrackerManager;
 
     private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> payload)

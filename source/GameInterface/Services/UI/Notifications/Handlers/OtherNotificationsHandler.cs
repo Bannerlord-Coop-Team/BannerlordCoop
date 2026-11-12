@@ -54,12 +54,6 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
         messageBroker.Subscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
 
-        messageBroker.Subscribe<NotifyRelationDecreasedByExecution>(Handle_NotifyRelationDecreasedByExecution);
-        messageBroker.Subscribe<NetworkNotifyRelationDecreasedByExecution>(Handle_NetworkNotifyRelationDecreasedByExecution);
-
-        messageBroker.Subscribe<NotifyRelationDecreasedByExecutionSummary>(Handle_NotifyRelationDecreasedByExecutionSummary);
-        messageBroker.Subscribe<NetworkNotifyRelationDecreasedByExecutionSummary>(Handle_NetworkNotifyRelationDecreasedByExecutionSummary);
-
         messageBroker.Subscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Subscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
 
@@ -100,12 +94,6 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyKingdomInfluenceChanged>(Handle_NotifyKingdomInfluenceChanged);
         messageBroker.Unsubscribe<NetworkNotifyKingdomInfluenceChanged>(Handle_NetworkNotifyKingdomInfluenceChanged);
-
-        messageBroker.Unsubscribe<NotifyRelationDecreasedByExecution>(Handle_NotifyRelationDecreasedByExecution);
-        messageBroker.Unsubscribe<NetworkNotifyRelationDecreasedByExecution>(Handle_NetworkNotifyRelationDecreasedByExecution);
-
-        messageBroker.Unsubscribe<NotifyRelationDecreasedByExecutionSummary>(Handle_NotifyRelationDecreasedByExecutionSummary);
-        messageBroker.Unsubscribe<NetworkNotifyRelationDecreasedByExecutionSummary>(Handle_NetworkNotifyRelationDecreasedByExecutionSummary);
 
         messageBroker.Unsubscribe<NotifyRelationsIncreasedWithNotables>(Handle_NotifyRelationsIncreasedWithNotables);
         messageBroker.Unsubscribe<NetworkNotifyRelationsIncreasedWithNotables>(Handle_NetworkNotifyRelationsIncreasedWithNotables);
@@ -268,59 +256,6 @@ internal class OtherNotificationsHandler : IHandler
                 textObject2.SetTextVariable("INFLUENCE", -obj.What.GainedInfluence);
                 InformationManager.DisplayMessage(new InformationMessage(textObject2.ToString()));
             }
-        });
-    }
-
-    private void Handle_NotifyRelationDecreasedByExecution(MessagePayload<NotifyRelationDecreasedByExecution> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
-
-            network.SendAll(new NetworkNotifyRelationDecreasedByExecution(killerId, clanId, obj.What.Value, obj.What.RelationChange));
-        });
-    }
-
-    private void Handle_NetworkNotifyRelationDecreasedByExecution(MessagePayload<NetworkNotifyRelationDecreasedByExecution> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
-            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-
-            if (killer != Hero.MainHero) return;
-
-            TextObject textObject = GameTexts.FindText("str_your_relation_decreased_with_clan", null);
-            textObject.SetTextVariable("CLAN_LEADER", clan.Name);
-            textObject.SetTextVariable("VALUE", obj.What.Value);
-            textObject.SetTextVariable("MAGNITUDE", MathF.Abs(obj.What.RelationChange));
-            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
-        });
-    }
-
-    private void Handle_NotifyRelationDecreasedByExecutionSummary(MessagePayload<NotifyRelationDecreasedByExecutionSummary> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
-
-            network.SendAll(new NetworkNotifyRelationDecreasedByExecutionSummary(killerId, obj.What.NumberOfClans));
-        });
-    }
-
-    private void Handle_NetworkNotifyRelationDecreasedByExecutionSummary(MessagePayload<NetworkNotifyRelationDecreasedByExecutionSummary> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
-
-            if (killer != Hero.MainHero) return;
-
-            TextObject textObject2 = new TextObject("{=oqO9kjeW}The execution has hurt your relations with {COUNT} {?IS_PLURAL}clans{?}clan{\\?}.", null);
-            MBTextManager.SetTextVariable("IS_PLURAL", (obj.What.NumberOfClans > 1) ? 1 : 0);
-            textObject2.SetTextVariable("COUNT", obj.What.NumberOfClans);
-            MBInformationManager.AddQuickInformation(textObject2, 0, null, null, "");
         });
     }
 

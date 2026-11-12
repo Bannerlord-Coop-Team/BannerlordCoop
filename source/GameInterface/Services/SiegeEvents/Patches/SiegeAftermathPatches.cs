@@ -253,11 +253,11 @@ internal class SiegeAftermathPatches
                 }
 
                 __instance._playerEncounterAftermathDamagedBuildings.Clear();
-                // v1.5.7 saves this cache, so a client loads the server's last value; vanilla resets it here.
+                // This cache is saved, so a client loads the server's last value; vanilla resets it here.
                 __instance._settlementProsperityCache = -1f;
                 __instance._besiegerParty = leaderParty;
                 __instance._prevSettlementOwnerClan = settlement.OwnerClan;
-                // Vanilla's army-member test (v1.5.4): in an army the player does not lead.
+                // Vanilla's army-member test: in an army the player does not lead.
                 __instance._wasPlayerArmyMember = leaderParty != MobileParty.MainParty
                     && MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty;
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))

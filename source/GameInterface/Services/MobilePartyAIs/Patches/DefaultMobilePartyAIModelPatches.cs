@@ -137,7 +137,7 @@ internal class DefaultMobilePartyAIModelPatches
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
 
-    // v1.5 zeroes an AI party's attack scores while a main party stronger than itself is near it. The server has
+    // Vanilla zeroes an AI party's attack scores while a main party stronger than itself is near it. The server has
     // no main party on the map, so the same check runs for active player parties; a parked offline party doesn't count.
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.CalculateInitiativeScoresForEnemy))]
     [HarmonyPostfix]

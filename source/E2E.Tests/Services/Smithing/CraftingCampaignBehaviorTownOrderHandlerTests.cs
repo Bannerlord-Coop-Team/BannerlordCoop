@@ -53,7 +53,7 @@ public class CraftingCampaignBehaviorTownOrderHandlerTests : IDisposable
                 client.CreateRegisteredObject<CraftingTemplate>(TemplateId);
                 var order = client.CreateRegisteredObject<CraftingOrder>(OrderId);
 
-                // v1.5.7 passes the town because the owner need not stand in it; this owner stands in another town.
+                // The town is passed because the owner need not stand in it; this owner stands in another town.
                 var ownerSettlement = ObjectHelper.SkipConstructor<Settlement>();
                 using (new AllowedThread())
                 {

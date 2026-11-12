@@ -51,7 +51,7 @@ public class PartiesSellPrisonerCampaignBehaviorInterface : IPartiesSellPrisoner
                     if (prisonerHero.IsPlayerHero()) continue;
                     if (!prisonerHero.MapFaction.IsAtWarWith(settlement.MapFaction)) continue;
 
-                    // v1.5 keeps blood-feud heroes out of other factions' prisons.
+                    // Blood-feud heroes stay out of other factions' prisons.
                     bool isOwnFactionPrison = mobileParty.MapFaction == settlement.MapFaction;
                     if (prisonerHero.Clan?.HasBloodFeudWithPlayer == true && !isOwnFactionPrison) continue;
 

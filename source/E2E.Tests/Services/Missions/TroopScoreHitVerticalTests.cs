@@ -203,7 +203,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
 
         Server.Call(() =>
         {
-            // v1.5.7 hands the captain to the xp model for the captain perk bonus.
+            // The captain goes to the xp model for the captain perk bonus.
             var captain = Server.GetRegisteredObject<CharacterObject>("e2e_captain");
             var xpModel = Assert.IsType<FixedCombatXpModel>(Campaign.Current.Models.CombatXpModel);
             Assert.Same(captain, xpModel.LastCaptain);

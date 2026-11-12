@@ -114,9 +114,8 @@ internal class HeroMeetingHandler : IHandler
         }, context: nameof(Handle));
     }
 
-    // Mirrors v1.5 HeroKnownInformationCampaignBehavior.OnPlayerMetHero, which applies this only for the
-    // server's own main hero: a calculating player hero loses relation with a town notable the first time the
-    // session records that hero meeting them.
+    // HeroKnownInformationCampaignBehavior.OnPlayerMetHero only applies this to the server's main hero, so a calculating
+    // player hero loses relation with a town notable here, the first time the session records them meeting.
     private static void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero)
     {
         if (!metHero.IsNotable || metHero.CurrentSettlement?.IsTown != true) return;

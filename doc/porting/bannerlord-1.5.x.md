@@ -110,7 +110,8 @@ epic #3836 tracks the v1.5 work that remains. Each port commit body lists its ch
 
 ### New v1.5 campaign behaviors
 
-These change synced state, so they run on the server only (`DisableV15CampaignBehaviors.cs`):
+These change synced state, so they run on the server only (`HeroDailyXpCampaignBehaviorPatches`,
+`EmptyClanPartiesCampaignBehaviorPatches` and `PartyConfigurationCampaignBehaviorPatches`):
 `HeroDailyXpCampaignBehavior` (player heroes get no daily xp, as vanilla gives none to the player),
 `EmptyClanPartiesCampaignBehavior` (clients report no empty clan parties, since that list belongs to
 the server's player clan) and `PartyConfigurationCampaignBehavior` (its resets reach clients through
@@ -222,7 +223,7 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
 - v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a
   battle site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server
-  and on clients (`DisableBattleWreckageCampaignBehavior`). Co-op's `MBObjectBasePatches.StringIdPrefix`
+  and on clients (`BattleWreckageCampaignBehaviorPatches`). Co-op's `MBObjectBasePatches.StringIdPrefix`
   drops the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds
   it to the saved list before it reads that id, so a field battle that made a wreckage threw inside
   `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties,

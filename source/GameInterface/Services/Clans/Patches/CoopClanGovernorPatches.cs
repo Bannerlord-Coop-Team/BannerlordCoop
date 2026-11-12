@@ -111,8 +111,6 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorConstructionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
 
-    // v1.5 personality trait effects that apply only while the governor is in town. Each of these
-    // methods reads CurrentSettlement once, on the governor.
     [HarmonyPatch(typeof(DefaultBuildingConstructionModel), nameof(DefaultBuildingConstructionModel.GetBoostCost))]
     [HarmonyTranspiler]
     public static IEnumerable<CodeInstruction> GovernorBoostCostTranspiler(IEnumerable<CodeInstruction> instructions)

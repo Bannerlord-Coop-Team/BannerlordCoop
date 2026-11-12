@@ -22,9 +22,6 @@ internal class DisableCharacterRelationCampaignBehavior
 [HarmonyPatch(typeof(CharacterRelationCampaignBehavior))]
 internal class CharacterRelationCampaignBehaviorPatches
 {
-    // v1.5 moved execution consequences out of this behavior (OnHeroKilled is gone) into the
-    // new blood feud system in ExecutionCampaignBehavior, which is not multiplayer-aware yet.
-
     [HarmonyPatch(nameof(CharacterRelationCampaignBehavior.OnPrisonerDonatedToSettlement))]
     [HarmonyPrefix]
     public static bool OnPrisonerDonatedToSettlementPrefix(MobileParty donatingParty, FlattenedTroopRoster donatedPrisoners, Settlement donatedSettlement)

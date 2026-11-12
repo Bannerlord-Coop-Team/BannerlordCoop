@@ -117,7 +117,6 @@ internal class SettlementInterface : ISettlementInterface
         var leftSettlement = mainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
         if (leftSettlement != null)
         {
-            // v1.5 leaves a party that is at sea at the port, still sailing.
             if (mainParty.IsCurrentlyAtSea)
                 mainParty.SetSailAtPosition(leftSettlement.PortPosition);
             else

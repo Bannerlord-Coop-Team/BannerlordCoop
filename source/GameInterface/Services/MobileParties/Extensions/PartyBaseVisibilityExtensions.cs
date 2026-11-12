@@ -10,12 +10,11 @@ public static class PartyBaseVisibilityExtensions
 {
     /// <summary>
     /// Recomputes one party's fog of war state from <paramref name="fromPosition"/>.
-    /// v1.5 removed <c>PartyBase.UpdateVisibilityAndInspected</c>: visibility is now swept around the
-    /// main party every frame through <see cref="MapVisibilityModel"/>. This keeps the v1.4 entry point
-    /// on top of that model. A party inside a settlement stays hidden unless its leader carries a clan
-    /// banner or it is assaulting the walls, as v1.4 decided; the v1.5 model would keep whatever
+    /// Vanilla sweeps visibility around the main party every frame through <see cref="MapVisibilityModel"/>;
+    /// this recomputes one party on top of that model. A party inside a settlement stays hidden unless its
+    /// leader carries a clan banner or it is assaulting the walls; the model alone would keep whatever
     /// visibility the party already had, which after a join is the server save's "everything visible".
-    /// Settlements only refresh <c>IsInspected</c>: their <c>IsVisible</c> is spotting state in v1.5.
+    /// Settlements only refresh <c>IsInspected</c>: their <c>IsVisible</c> is spotting state.
     /// </summary>
     public static void UpdateVisibilityAndInspected(this PartyBase party, CampaignVec2 fromPosition, float mainPartySeeingRange = 0f)
     {

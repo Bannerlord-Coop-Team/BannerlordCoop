@@ -68,7 +68,6 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         Clan captorClanOfPrisoner = ransomOfferBehavior.GetCaptorClanOfPrisoner(hero);
         if (captorClanOfPrisoner == null) return;
 
-        // v1.5.x vanilla asks listeners whether the prisoner may be released before any offer or barter
         bool canBeReleased = true;
         CampaignEventDispatcher.Instance.CanHeroBeReleased(hero, ref canBeReleased);
         if (!canBeReleased) return;
