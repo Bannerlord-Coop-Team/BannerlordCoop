@@ -256,10 +256,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
     Error, and the remaining events, the other pass and server start still run, where one throw used
     to exit the dedicated server (exit 3). The army disband and party release run even when the
     finalize step throws, but not when the link repair throws.
-  - Both passes run before the server state that lets lifetime patches publish. Each therefore
-    records the campaign's parties first and, in a `finally`, publishes `InstanceDestroyed<MobileParty>`
-    for every one that left the campaign during the pass, including a party destroyed elsewhere by a
-    cascade (a ruler killed in the battle can destroy a kingdom's clans).
+  - Both passes run before the server state that lets lifetime patches publish, as on `development`,
+    so a party, army or battle they end keeps its registry id and an object they create gets none.
   - Checked on 2026-10-22 on a dedicated server with a copy of the damaged save: it released 7
     events (`Created_97`, 139, 141, 149, 171, 187 and 201), unregistered the 7 parties vanilla
     destroyed while releasing them, then loaded, served and autosaved. Not yet checked: that no
@@ -270,9 +268,8 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   - Follow-ups, done: the player pass restores an unlisted live event's unsaved state before it
     finalizes it, so the field battle party removal no longer throws before the component finalizes
     (#4615), and the orphan pass ends an unlisted live event whether or not vanilla set
-    `WaitingRemoval` (the merge below). The missing `MapEventFinalized` and
-    `InstanceDestroyed<MapEvent>` after a successful `FinalizeEvent` in that pass are fixed too; see
-    the merge's review fixes.
+    `WaitingRemoval` (the merge below). A successful `FinalizeEvent` in that pass still publishes no
+    `MapEventFinalized` or `InstanceDestroyed<MapEvent>`, as on `development`.
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).
@@ -362,8 +359,5 @@ exceed the command-line length limit.
 
 `development` at `c8233b09b` was merged in, and the load repair flow follows its API, so the orphan
 pass ends a live event the manager no longer lists. The load repairs run while originals are allowed,
-so lifetime patches publish nothing there; the review fixes "Known gaps" refers to are
-`LoadRepairRunner` and `LoadRepairRegistryReconciler`, which unregister what the repairs removed and
-register what they created, and `LoadRepairMapEventFinalizer`, which announces each battle they
-finalize. When `development` is merged again, diff the Harmony targets it added or changed against
+so lifetime patches publish nothing there, as on `development`. When `development` is merged again, diff the Harmony targets it added or changed against
 v1.5, because copies written on v1.4.8 (the ransom and mercenary offers) still ran v1.4.8 logic.

@@ -119,7 +119,9 @@ internal abstract class TestComponentBase
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IModuleNameProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
-        RegisterMock<ILoadRepairRunner>(builder);
+        RegisterMock<IMapEventLoadCleaner>(builder);
+        RegisterMock<ILeaderlessClanResolver>(builder);
+        RegisterMock<IEmptyLordPartyResetter>(builder);
         RegisterMock<IHideoutResultEncounter>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
