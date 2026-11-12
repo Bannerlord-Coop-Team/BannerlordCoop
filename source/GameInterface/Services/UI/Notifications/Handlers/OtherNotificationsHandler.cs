@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using Helpers;
 using Serilog;
@@ -27,17 +28,20 @@ internal class OtherNotificationsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IFactionInterface factionInterface;
+    private readonly IPlayerManager playerManager;
 
     public OtherNotificationsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IFactionInterface factionInterface)
+        IFactionInterface factionInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.factionInterface = factionInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<NotifyAnimalsSlaughteredToEat>(Handle_NotifyAnimalsSlaughteredToEat);
         messageBroker.Subscribe<NetworkNotifyAnimalsSlaughteredToEat>(Handle_NetworkNotifyAnimalsSlaughteredToEat);
@@ -76,6 +80,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Subscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Subscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Subscribe<NotifyEmptyClanPartyShipsRecovered>(Handle_NotifyEmptyClanPartyShipsRecovered);
+        messageBroker.Subscribe<NetworkNotifyEmptyClanPartyShipsRecovered>(Handle_NetworkNotifyEmptyClanPartyShipsRecovered);
     }
 
     public void Dispose()
@@ -117,6 +124,9 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
         messageBroker.Unsubscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
+
+        messageBroker.Unsubscribe<NotifyEmptyClanPartyShipsRecovered>(Handle_NotifyEmptyClanPartyShipsRecovered);
+        messageBroker.Unsubscribe<NetworkNotifyEmptyClanPartyShipsRecovered>(Handle_NetworkNotifyEmptyClanPartyShipsRecovered);
     }
 
     private void Handle_NotifyAnimalsSlaughteredToEat(MessagePayload<NotifyAnimalsSlaughteredToEat> obj)
@@ -454,6 +464,31 @@ internal class OtherNotificationsHandler : IHandler
 
             MBTextManager.SetTextVariable("RELATION_VALUE", obj.What.RelationValue);
             MBInformationManager.AddQuickInformation(new TextObject("{=o0qwDa0q}Your relation increased by {RELATION_VALUE} with nearby notables.", null), 0, null, null, "");
+        });
+    }
+
+    private void Handle_NotifyEmptyClanPartyShipsRecovered(MessagePayload<NotifyEmptyClanPartyShipsRecovered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(obj.What.PlayerHero, out var player)) return;
+            if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.PartyLeader, out var partyLeaderId)) return;
+
+            network.Send(peer, new NetworkNotifyEmptyClanPartyShipsRecovered(partyLeaderId, obj.What.Gold));
+        });
+    }
+
+    private void Handle_NetworkNotifyEmptyClanPartyShipsRecovered(MessagePayload<NetworkNotifyEmptyClanPartyShipsRecovered> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PartyLeaderId, out var partyLeader)) return;
+
+            MBTextManager.SetTextVariable("GOLD_AMOUNT", obj.What.Gold);
+            MBTextManager.SetTextVariable("LEADER_NAME", partyLeader.Name);
+            MBTextManager.SetTextVariable("GOLD_ICON", "{=!}<img src=\"General\\Icons\\Coin@2x\" extend=\"6\">");
+            MBInformationManager.AddQuickInformation(new TextObject("{=YaSnA9j0}{LEADER_NAME}'s party has disbanded. You recovered {GOLD_AMOUNT}{GOLD_ICON} from its ships."));
         });
     }
 }

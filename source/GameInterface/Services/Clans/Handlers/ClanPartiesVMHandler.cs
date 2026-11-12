@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using GameInterface.Services.Clans.Interfaces;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
@@ -29,6 +30,7 @@ internal class ClanPartiesVMHandler : IHandler
     private readonly ISendCoalescer sendCoalescer;
     private readonly ICoopClanPermissions permissions;
     private readonly IPlayerManager playerManager;
+    private readonly IEmptyClanPartiesCampaignBehaviorInterface emptyClanParties;
 
     public ClanPartiesVMHandler(
         IMessageBroker messageBroker,
@@ -36,6 +38,7 @@ internal class ClanPartiesVMHandler : IHandler
         INetwork network,
         ICoopClanPermissions permissions,
         IPlayerManager playerManager,
+        IEmptyClanPartiesCampaignBehaviorInterface emptyClanParties,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -43,11 +46,14 @@ internal class ClanPartiesVMHandler : IHandler
         this.network = network;
         this.permissions = permissions;
         this.playerManager = playerManager;
+        this.emptyClanParties = emptyClanParties;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyCreated>(Handle_NewClanPartyCreated);
         messageBroker.Subscribe<CreateNewClanParty>(Handle_CreateNewClanParty);
         messageBroker.Subscribe<ClanPartyLeaderChanged>(Handle_ClanPartyLeaderChanged);
         messageBroker.Subscribe<ChangeClanPartyLeader>(Handle_ChangeClanPartyLeader);
+        messageBroker.Subscribe<EmptyClanPartyLeaderChanged>(Handle_EmptyClanPartyLeaderChanged);
+        messageBroker.Subscribe<ChangeEmptyClanPartyLeader>(Handle_ChangeEmptyClanPartyLeader);
     }
 
     public void Dispose()
@@ -56,6 +62,8 @@ internal class ClanPartiesVMHandler : IHandler
         messageBroker.Unsubscribe<CreateNewClanParty>(Handle_CreateNewClanParty);
         messageBroker.Unsubscribe<ClanPartyLeaderChanged>(Handle_ClanPartyLeaderChanged);
         messageBroker.Unsubscribe<ChangeClanPartyLeader>(Handle_ChangeClanPartyLeader);
+        messageBroker.Unsubscribe<EmptyClanPartyLeaderChanged>(Handle_EmptyClanPartyLeaderChanged);
+        messageBroker.Unsubscribe<ChangeEmptyClanPartyLeader>(Handle_ChangeEmptyClanPartyLeader);
     }
 
     private void Handle_NewClanPartyCreated(MessagePayload<NewClanPartyCreated> obj)
@@ -88,21 +96,28 @@ internal class ClanPartiesVMHandler : IHandler
                 return;
             }
 
-            MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, targetClan);
-            if (newLeader.Gold < data.PartyGoldLowerThreshold)
-            {
-                GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, data.PartyGoldLowerThreshold - newLeader.Gold, false);
-            }
-            mobileParty.SetMoveModeHold();
-
-            // Flush troop roster to show actual member count on clients after refresh
-            if (objectManager.TryGetHandle(mobileParty.MemberRoster, out var rosterId))
-            {
-                sendCoalescer?.FlushInstance(rosterId, network);
-            }
+            CreateClanParty(mainHero, newLeader, targetClan, data.PartyGoldLowerThreshold);
 
             messageBroker.Publish(this, new ClanManagementChanged(targetClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
+    }
+
+    private MobileParty CreateClanParty(Hero mainHero, Hero newLeader, Clan clan, int partyGoldLowerThreshold)
+    {
+        MobileParty mobileParty = MobilePartyHelper.CreateNewClanMobileParty(newLeader, clan);
+        if (newLeader.Gold < partyGoldLowerThreshold)
+        {
+            GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
+        }
+        mobileParty.SetMoveModeHold();
+
+        // Flush troop roster to show actual member count on clients after refresh
+        if (objectManager.TryGetHandle(mobileParty.MemberRoster, out var rosterId))
+        {
+            sendCoalescer?.FlushInstance(rosterId, network);
+        }
+
+        return mobileParty;
     }
 
     private void Handle_ClanPartyLeaderChanged(MessagePayload<ClanPartyLeaderChanged> obj)
@@ -198,6 +213,72 @@ internal class ClanPartiesVMHandler : IHandler
             }
 
             messageBroker.Publish(this, new ClanManagementChanged(mainHero.Clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
+        });
+    }
+
+    private void Handle_EmptyClanPartyLeaderChanged(MessagePayload<EmptyClanPartyLeaderChanged> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.CachedLeader, out var cachedLeaderId)) return;
+
+        string newLeaderId = null;
+        if (data.NewLeader != null && !objectManager.TryGetIdWithLogging(data.NewLeader, out newLeaderId)) return;
+
+        network.SendAll(new ChangeEmptyClanPartyLeader(mainHeroId, cachedLeaderId, newLeaderId));
+    }
+
+    private void Handle_ChangeEmptyClanPartyLeader(MessagePayload<ChangeEmptyClanPartyLeader> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.CachedLeaderId, out var cachedLeader)) return;
+
+            Hero newLeader = null;
+            if (data.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out newLeader)) return;
+
+            Clan clan = cachedLeader.Clan;
+            if (!permissions.CanManageClan(mainHero, clan)) return;
+
+            if (newLeader == null)
+            {
+                emptyClanParties.DisbandCachedLordParty(cachedLeader);
+            }
+            else
+            {
+                if (newLeader.IsPlayerHero())
+                {
+                    Logger.Error($"Blocked cached clan party leader change to player hero {newLeader.Name}, {newLeader.StringId}");
+                    return;
+                }
+                if (!permissions.CanManageHero(mainHero, newLeader)) return;
+
+                int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
+                MobileParty newParty;
+
+                // Vanilla moves the ships into the player's party when the new leader is already in it
+                if (newLeader.PartyBelongedTo != null && newLeader.PartyBelongedTo == mainHero.PartyBelongedTo)
+                {
+                    newParty = newLeader.PartyBelongedTo;
+                    if (newLeader.Gold < partyGoldLowerThreshold)
+                    {
+                        GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
+                    }
+                }
+                else
+                {
+                    newParty = CreateClanParty(mainHero, newLeader, clan, partyGoldLowerThreshold);
+                }
+
+                emptyClanParties.TransferCachedLordPartyToNewParty(cachedLeader, newParty.Party);
+            }
+
+            messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 }
