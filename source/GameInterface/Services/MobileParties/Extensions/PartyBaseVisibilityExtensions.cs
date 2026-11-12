@@ -57,5 +57,8 @@ public static class PartyBaseVisibilityExtensions
         Campaign.Current.TrueSight ||
         mobileParty.CurrentSettlement == null ||
         mobileParty.LeaderHero?.ClanBanner != null ||
-        (mobileParty.MapEvent != null && mobileParty.MapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker);
+        IsAssaultingWalls(mobileParty);
+
+    private static bool IsAssaultingWalls(MobileParty mobileParty) =>
+        mobileParty.MapEvent != null && mobileParty.MapEvent.IsSiegeAssault && mobileParty.Party.Side == BattleSideEnum.Attacker;
 }
