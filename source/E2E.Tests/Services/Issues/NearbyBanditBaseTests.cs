@@ -1,14 +1,21 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Network.Messages;
+using Common.Util;
+using Coop.Core.Server.Connections.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.CreationCapture;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using Helpers;
+using LiteNetLib;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -42,6 +49,12 @@ public class NearbyBanditBaseTests : IDisposable
         AccessTools.Method(typeof(QuestHelper), nameof(QuestHelper.AddMapArrowFromPointToTarget)),
         AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
         AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog)),
+    };
+
+    private static readonly MethodBase[] CompanionLogTexts =
+    {
+        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
     };
 
     private static readonly MethodBase[] MapEventMethods =
@@ -311,6 +324,136 @@ public class NearbyBanditBaseTests : IDisposable
 
             Assert.False(issue.CanBeCompletedByAI());
         });
+    }
+
+    [Fact]
+    public void TheOwnerLeavingEndsTheQuestEverywhereAndARejoinDoesNotBringItBack()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default(DisconnectInfo)));
+        }, QuestLogTexts);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        AssertIssueEndedEverywhere();
+
+        TestEnvironment.ConnectRegisteredPlayer(ClientA, "player-A");
+        Server.SimulateMessage(this, new PlayerCampaignEntered(ClientA.NetPeer));
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
+            Assert.Null(headman.Issue);
+            Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, quest => quest is Quest);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ACompanionSentByTheOwnerAppliesTheOutcomeOnceOnTheServerAndTheOwner(bool success)
+    {
+        CreateIssueOnServer();
+        SendCompanionFromClientA();
+
+        var powerBefore = PowerOfHeadman(Server);
+        var prosperityBefore = ProsperityOfTown(Server);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
+            var issue = Assert.IsType<Issue>(headman.Issue);
+            Assert.True(issue.IsSolvingWithAlternative);
+
+            issue._failureChance = success ? -1 : 1;
+            issue.CompleteIssueWithAlternativeSolution();
+        }, CompanionLogTexts);
+
+        var change = success ? 1 : -1;
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.AlternativeSolution, finalized.Outcome);
+        Assert.Equal(powerBefore + (5f * change), PowerOfHeadman(Server));
+        Assert.Equal(powerBefore + (5f * change), PowerOfHeadman(ClientA));
+        Assert.Equal(prosperityBefore + (10f * change), ProsperityOfTown(Server));
+        Assert.Equal(prosperityBefore + (10f * change), ProsperityOfTown(ClientA));
+        AssertIssueEndedEverywhere();
+    }
+
+    private void SendCompanionFromClientA()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(townSettlementId, out var town));
+
+                using (new AllowedThread())
+                {
+                    town.Town.Prosperity = 500f;
+                    owner._partyBelongedTo = party;
+                    owner.CharacterObject.HeroObject = owner;
+                    companion.Clan = owner.Clan;
+                    companion.CharacterObject.HeroObject = companion;
+                    troop.Level = 15;
+                    troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                }
+            });
+        }
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var issue = Assert.IsType<Issue>(headman.Issue);
+
+            Game.Current.PlayerTroop = owner.CharacterObject;
+            using (new AllowedThread())
+            {
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 40);
+            }
+
+            Assert.True(issue.DoTroopsSatisfyAlternativeSolution(issue.AlternativeSolutionSentTroops, out var explanation), explanation?.ToString());
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var serverTroop));
+                Assert.True(Server.ObjectManager.TryGetHandle(serverTroop, out var handle));
+                var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 40, 0, 0) });
+                Server.Resolve<IMessageBroker>().Publish(this, new PartyDoneLogicApplied(ClientA.NetPeer,
+                    PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta, ownerHeroId, headmanId, issue.StringId));
+            });
+
+            issue.StartIssueWithAlternativeSolution();
+        }, CompanionLogTexts);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+    }
+
+    private float ProsperityOfTown(EnvironmentInstance instance)
+    {
+        var prosperity = 0f;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(townSettlementId, out var town));
+            prosperity = town.Town.Prosperity;
+        });
+
+        return prosperity;
     }
 
     private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
