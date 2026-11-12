@@ -393,6 +393,12 @@ A removal breaks only the ropes with an end on the removed hull. Vanilla's `Miss
 any removal and breaks every rope and plank in the battle (R49 B4: one player leaving cut three unrelated boarding ropes);
 `RopeShipRemovalPatch` filters its two rope loops by `NavalRopeRemoval.BreaksOnRemoval` in a coop naval battle.
 
+A weapon breaks a rope in War Sails by destroying the fabric part at the rope's attachment point
+(`ShipAttachmentPointMachine.OnDestructableHitTakenWithImpact`). A client that does not own the rope's source hull would
+cut only its own replica, so `RopeReplicaHitPatch` drops that hit, as vanilla drops a hit on a disabled part (#4597). An
+owned rope still breaks from its owner's hits, and the break replicates as an owner state. Routing a hit on a replica
+rope to its owner is #4607.
+
 Agents may be parked during the removal itself. The swap holds them for the fresh hull, and a removal unparks the ones
 it doesn't withdraw in the same step.
 
@@ -798,7 +804,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     (`NavalEngageResetTracer` and `NavalEngageResetTracePatch`) once the `encounter` preset passes live (G5);
   - the next cut of `NavalShipEngine` is the hull-swap trio (`ParkHullAgents`, `ReplaceHull`, `BoardHullAgents`).
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
-  rope cut from the target side isn't replicated.
+  rope cut from the target side isn't replicated. A weapon hit on another owner's rope does nothing yet (#4607).
 - **Sea raids** still open the land raid scene.
 - **CI** has NavalDLC, so its builds compile and ship `Missions.Naval.dll` and `Coop.Naval.dll`. Release builds still reject
   NavalDLC clients, because only `TESTER` builds turn War Sails on. What ships follows the CI image; pass `-p:CoopNavalDlc=`
