@@ -719,16 +719,13 @@ public class MapEventLoadCleanerTests : MapEventTestBase
 
             Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
 
-            // A listed event whose component lost its back-reference to the event, which FieldBattleEventComponent
-            // reads when FinalizeEvent removes the parties, so its finalize throws.
+            // A half-finalized event whose component lost its back-reference to the event. The cleaner detaches its
+            // parties itself, outside the FinalizeEventAux finalizer patch, so the throw reaches the stage catch.
             var component = Assert.IsType<FieldBattleEventComponent>(broken.Component);
             component.MapEvent = null!;
-            Assert.False(broken.IsFinalized);
+            broken.State = MapEventState.WaitingRemoval;
 
             Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
-
-            // FinalizeComponent runs after the party removal, so a finalize that threw leaves the component unfinished.
-            Assert.False(component._isFinished);
 
             Assert.Equal(MapEventState.WaitingRemoval, healthy.State);
             Assert.Null(healthyAttacker.Party.MapEventSide);
