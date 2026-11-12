@@ -346,17 +346,24 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (component == null)
             return;
 
+        // The steps of the component's AfterLoad, split so only the settlement step is caught.
+        component.MapEvent = mapEvent;
+
         // A settlement that fails to derive, as for a side without a leader party, is only logged.
         // OnAfterLoad still runs, because the detach reads the position lists it builds.
-        try
+        if (!mapEvent.IsFinalized)
         {
-            component.AfterLoad(mapEvent);
+            try
+            {
+                component.UpdateMapEventSettlement();
+            }
+            catch (Exception e)
+            {
+                logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
+            }
         }
-        catch (Exception e)
-        {
-            logger.Warning(e, "Could not derive the settlement of unlisted map event {MapEventId}", mapEvent.StringId);
-            component.OnAfterLoad();
-        }
+
+        component.OnAfterLoad();
     }
 
     private (int RepairedLinks, int RemovedEntries) RepairPartySideLinks(MapEvent mapEvent)
