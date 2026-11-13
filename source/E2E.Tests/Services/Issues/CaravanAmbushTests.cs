@@ -56,6 +56,11 @@ public class CaravanAmbushTests : IDisposable
         scenario.AttachQuest(Owner, CreateQuest);
         Server.Call(() => Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA)));
+        Server.Call(() =>
+        {
+            PlayerHero(QuestScenario.ControllerA);
+            PlayerHero(QuestScenario.ControllerB);
+        });
         Owner.Call(() => QuestOf(Owner).StartQuest());
     }
 
