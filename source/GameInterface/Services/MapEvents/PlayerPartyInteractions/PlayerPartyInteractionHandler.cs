@@ -94,6 +94,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeOfferSender offerSender,
+        // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -811,7 +812,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         => proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
            proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
 
-    // Offers already reached both clients in order as they changed, so a trade state only carries the acceptances.
+    // Only the two traders show the barter screen, and offers already reached them in order, so a trade state only carries the acceptances.
     private void SendTradeStates(PlayerPartyInteractionSession session)
     {
         var options = Array.Empty<PlayerPartyInteractionOption>();
