@@ -6,6 +6,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Utils;
 using Missions.Battles;
 using Missions.Messages;
 using SandBox.GauntletUI.Map;

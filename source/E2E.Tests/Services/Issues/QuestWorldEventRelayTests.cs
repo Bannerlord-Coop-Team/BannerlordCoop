@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Tests.Utils;
 using HarmonyLib;
 using System.Collections.Concurrent;
 using System.Linq;

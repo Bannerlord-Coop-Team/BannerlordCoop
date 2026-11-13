@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Utils;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
