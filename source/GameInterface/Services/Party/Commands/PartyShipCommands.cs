@@ -21,10 +21,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Party.Commands;
 
-/// <summary>
-/// Debug commands for War Sails ships: add_ship gives one to a player's or any party; the others list, damage and remove a
-/// player's ships.
-/// </summary>
+/// <summary>Debug commands for War Sails ships: give or list any party's ships, and damage or remove a player's.</summary>
 public class PartyShipCommands
 {
     internal const string DefaultHullId = "northern_light_ship";
