@@ -2,9 +2,11 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -103,12 +105,7 @@ internal class PartyScreenLogicPatches
         if (flag)
         {
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
-            MessageBroker.Instance.Publish(__instance, new PartyScreenCommitAttempted(
-                __instance,
-                Hero.MainHero,
-                partyScreenMode,
-                isDonating,
-                forceTransferId));
+            MessageBroker.Instance.Publish(__instance, CreateCommitAttempted(__instance, Hero.MainHero, partyScreenMode, isDonating, forceTransferId));
 
             // The server replays the commands and sends the results back, so undo them here.
             using (new AllowedThread())
@@ -181,29 +178,60 @@ internal class PartyScreenLogicPatches
         sentTroops.Add(transferredTroops);
     }
 
-    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
-    [HarmonyPostfix]
-    public static void ResetPostfix(PartyScreenLogic __instance)
+    /// <summary>What the commit needs from the screen, taken before the screen resets.</summary>
+    internal static PartyScreenCommitAttempted CreateCommitAttempted(
+        PartyScreenLogic logic,
+        Hero mainHero,
+        PartyScreenHelper.PartyScreenMode mode,
+        bool isDonating,
+        string forceTransferId)
     {
-        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
-            tracker.Clear(__instance);
+        IReadOnlyList<PartyScreenLogic.PartyCommand> commands = ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker)
+            ? tracker.GetCommands(logic)
+            : Array.Empty<PartyScreenLogic.PartyCommand>();
+        // Copied with Add, because CloneRosterData drops the xp the server seeds a client-only left side with.
+        var initialLeftMembers = TroopRoster.CreateDummyTroopRoster();
+        initialLeftMembers.Add(logic._initialData.LeftMemberRoster);
+        var initialLeftPrisoners = TroopRoster.CreateDummyTroopRoster();
+        initialLeftPrisoners.Add(logic._initialData.LeftPrisonerRoster);
+
+        return new PartyScreenCommitAttempted(
+            mainHero,
+            mode,
+            GetDoneKind(logic),
+            isDonating,
+            logic.DoNotApplyGoldTransactions,
+            forceTransferId,
+            commands,
+            logic.LeftOwnerParty,
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left],
+            initialLeftMembers,
+            initialLeftPrisoners,
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right].CloneRosterData());
     }
 
-    // The troop manager popup saves on open and restores on cancel, so its commands roll back with it.
-    [HarmonyPatch(nameof(PartyScreenLogic.SavePartyScreenData))]
-    [HarmonyPostfix]
-    public static void SavePartyScreenDataPostfix(PartyScreenLogic __instance)
+    // Which vanilla done handler the screen uses decides the done effects the server runs.
+    internal static PartyScreenDoneKind GetDoneKind(PartyScreenLogic logic)
     {
-        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
-            tracker.Save(__instance);
-    }
+        // The closed delegate is an event, so the create clan party screen is told apart by its transferable delegate.
+        var transferable = logic.IsTroopTransferableDelegate?.Method;
+        if (transferable?.DeclaringType == typeof(PartyScreenHelper) &&
+            transferable.Name == nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroTroopTransferableDelegate))
+            return PartyScreenDoneKind.CreateClanParty;
 
-    [HarmonyPatch(nameof(PartyScreenLogic.ResetToLastSavedPartyScreenData))]
-    [HarmonyPostfix]
-    public static void ResetToLastSavedPartyScreenDataPostfix(PartyScreenLogic __instance)
-    {
-        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
-            tracker.RestoreSaved(__instance);
+        var method = logic.PartyPresentationDoneButtonDelegate?.Method;
+        var kind = method?.DeclaringType != typeof(PartyScreenHelper) ? PartyScreenDoneKind.None : method.Name switch
+        {
+            nameof(PartyScreenHelper.DefaultDoneHandler) => PartyScreenDoneKind.Default,
+            nameof(PartyScreenHelper.SellPrisonersDoneHandler) => PartyScreenDoneKind.SellPrisoners,
+            nameof(PartyScreenHelper.DonateGarrisonDoneHandler) => PartyScreenDoneKind.DonateGarrison,
+            nameof(PartyScreenHelper.DonatePrisonersDoneHandler) => PartyScreenDoneKind.DonatePrisoners,
+            nameof(PartyScreenHelper.ManageGarrisonDoneHandler) => PartyScreenDoneKind.ManageGarrison,
+            _ => PartyScreenDoneKind.None,
+        };
+        if (kind == PartyScreenDoneKind.None)
+            Logger.Debug("Party screen done handler {Type}.{Method} has no done effects", method?.DeclaringType?.Name, method?.Name);
+        return kind;
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]

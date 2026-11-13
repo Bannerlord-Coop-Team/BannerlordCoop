@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Party.Patches;
 using SandBox.GauntletUI;
 using Serilog;
 using System;
@@ -171,8 +172,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         try
         {
             // A command that throws can leave a roster half changed, so start over from the baseline without it.
-            int failedIndex;
-            while ((failedIndex = ReplayCommands(logic, commands, savedCount, out reduced)) >= 0)
+            while (!ReplayCommands(logic, commands, savedCount, out reduced, out var failedIndex))
             {
                 failed.Add($"{commands[failedIndex].Character.Name} x{commands[failedIndex].TotalNumber}: no longer possible");
                 commands.RemoveAt(failedIndex);
@@ -194,10 +194,16 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         RefreshRows(logic);
     }
 
-    /// <returns>The index of a command that threw, or -1 when every command replayed.</returns>
-    private int ReplayCommands(PartyScreenLogic logic, List<PartyScreenLogic.PartyCommand> commands, int savedCount, out List<string> reduced)
+    /// <returns>False with the index of the command that threw, true when every command replayed.</returns>
+    private bool ReplayCommands(
+        PartyScreenLogic logic,
+        List<PartyScreenLogic.PartyCommand> commands,
+        int savedCount,
+        out List<string> reduced,
+        out int failedIndex)
     {
         reduced = new List<string>();
+        failedIndex = -1;
         logic.CurrentData.ResetUsing(logic._initialData);
         // After the reset, because the recruit model reads the screen's bound prisoner roster, not the baseline.
         RefreshRecruitablePrisoners(logic);
@@ -206,28 +212,29 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         {
             if (logic._savedData != null && i == savedCount) logic.SavePartyScreenData();
 
-            int recordedBefore = commandTracker.GetCommands(logic).Count;
+            var command = commands[i];
+            int before = PartyScreenCommandRecordingPatches.ReadSource(logic, command).number;
             try
             {
-                logic.AddCommand(ClampToAvailable(logic, commands[i]));
+                logic.AddCommand(ClampToAvailable(logic, command));
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Failed to replay party screen command {Code} {Character}", commands[i].Code, commands[i].Character?.StringId);
-                return i;
+                Logger.Error(e, "Failed to replay party screen command {Code} {Character}", command.Code, command.Character?.StringId);
+                failedIndex = i;
+                return false;
             }
 
-            var recorded = commandTracker.GetCommands(logic);
-            int replayed = recorded.Count > recordedBefore ? recorded[recorded.Count - 1].TotalNumber : 0;
-            if (replayed < commands[i].TotalNumber)
+            int replayed = before - PartyScreenCommandRecordingPatches.ReadSource(logic, command).number;
+            if (replayed < command.TotalNumber)
             {
-                reduced.Add($"{commands[i].Character.Name} x{commands[i].TotalNumber}: " +
-                    (replayed == 0 ? "no longer possible" : $"only {replayed} still possible"));
+                reduced.Add($"{command.Character.Name} x{command.TotalNumber}: " +
+                    (replayed <= 0 ? "no longer possible" : $"only {replayed} still possible"));
             }
         }
 
         if (logic._savedData != null && savedCount >= commands.Count) logic.SavePartyScreenData();
-        return -1;
+        return true;
     }
 
     // Moves what is still there when a change took away part of a stack, instead of dropping the whole command.
@@ -238,22 +245,14 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             command.Code == PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot;
         if (!isTransfer && command.Code != PartyScreenLogic.PartyCommandCode.UpgradeTroop) return command;
 
-        var roster = command.Type == PartyScreenLogic.TroopType.Member
-            ? logic.MemberRosters[(int)command.RosterSide]
-            : logic.PrisonerRosters[(int)command.RosterSide];
-        int index = roster.FindIndexOfTroop(command.Character);
-        if (index < 0) return command;
-
-        var element = roster.GetElementCopyAtIndex(index);
-        int number = Math.Min(command.TotalNumber, element.Number);
+        var source = PartyScreenCommandRecordingPatches.ReadSource(logic, command);
+        int number = Math.Min(command.TotalNumber, source.number);
         if (number <= 0) return command;
 
         var clamped = new PartyScreenLogic.PartyCommand();
         if (isTransfer)
         {
-            int wounded = Math.Max(
-                number - (element.Number - element.WoundedNumber),
-                Math.Min(command.WoundedNumber, Math.Min(number, element.WoundedNumber)));
+            int wounded = PartyScreenCommandProcessor.ClampWounded(command.WoundedNumber, number, source.number, source.wounded);
             if (number == command.TotalNumber && wounded == command.WoundedNumber) return command;
             clamped.FillForTransferTroop(command.RosterSide, command.Type, command.Character, number, wounded, -1);
         }

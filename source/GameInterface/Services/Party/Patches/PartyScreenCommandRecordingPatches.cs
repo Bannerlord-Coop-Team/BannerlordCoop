@@ -51,14 +51,51 @@ internal class PartyScreenCommandRecordingPatches
         tracker.Record(__instance, recorded);
     }
 
-    private static (int number, int wounded) ReadSource(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
-    {
-        TroopRoster roster = command.Type == PartyScreenLogic.TroopType.Member
+    /// <summary>The roster a command takes its troops from, the member or prisoner roster on its side.</summary>
+    internal static TroopRoster GetSourceRoster(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
+        => command.Type == PartyScreenLogic.TroopType.Member
             ? logic.MemberRosters[(int)command.RosterSide]
             : logic.PrisonerRosters[(int)command.RosterSide];
+
+    /// <summary>How many of the command's troop its source roster holds, and how many of those are wounded.</summary>
+    internal static (int number, int wounded) ReadSource(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
+    {
+        var roster = GetSourceRoster(logic, command);
         int index = roster.FindIndexOfTroop(command.Character);
         if (index < 0) return (0, 0);
 
         return (roster.GetElementNumber(index), roster.GetElementWoundedNumber(index));
+    }
+}
+
+/// <summary>
+/// Keeps the recorded commands in step with the screen: a reset clears them, and the troop manager popup saves
+/// on open and restores on cancel, so its commands roll back with it.
+/// </summary>
+[HarmonyPatch(typeof(PartyScreenLogic))]
+internal class PartyScreenCommandTrackerLifecyclePatches
+{
+    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
+    [HarmonyPostfix]
+    public static void ResetPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.Clear(__instance);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.SavePartyScreenData))]
+    [HarmonyPostfix]
+    public static void SavePartyScreenDataPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.Save(__instance);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.ResetToLastSavedPartyScreenData))]
+    [HarmonyPostfix]
+    public static void ResetToLastSavedPartyScreenDataPostfix(PartyScreenLogic __instance)
+    {
+        if (ContainerProvider.TryResolve<IPartyScreenCommandTracker>(out var tracker))
+            tracker.RestoreSaved(__instance);
     }
 }

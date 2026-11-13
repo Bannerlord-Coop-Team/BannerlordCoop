@@ -103,7 +103,7 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
 
     private void Handle_Done(MessagePayload<PartyScreenCommitAttempted> payload)
     {
-        var leftMemberRoster = payload.What.Logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        var leftMemberRoster = payload.What.LeftMemberRoster;
         if (ModInformation.IsClient && leftMemberRoster != null && pickers.TryGetValue(leftMemberRoster, out var picker))
             pickers[leftMemberRoster] = (picker.Issue, null);
     }
@@ -128,11 +128,21 @@ internal class AlternativeSolutionPicker : IAlternativeSolutionPicker, IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            // A picker on screen keeps its rows, the server replays its next Done against the held troops anyway.
-            var picker = pickers.Values.FirstOrDefault(entry => entry.Issue.StringId == data.IssueId &&
-                objects.TryGetId(entry.Issue.IssueOwner, out var giverId) && giverId == data.IssueOwnerId);
-            if (picker.Logic != null && Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic) return;
+            (IssueBase Issue, PartyScreenLogic Logic) picker = default;
+            foreach (var entry in pickers.Values)
+            {
+                if (entry.Issue.StringId != data.IssueId) continue;
+                if (!objects.TryGetId(entry.Issue.IssueOwner, out var giverId) || giverId != data.IssueOwnerId) continue;
+                picker = entry;
+                break;
+            }
             if (picker.Issue == null) return;
+
+            // A picker on screen keeps its rows, the server replays its next Done against the held troops anyway.
+            bool pickerOnScreen = picker.Logic != null &&
+                Game.Current.GameStateManager.ActiveState is PartyState state && state.PartyScreenLogic == picker.Logic;
+            if (pickerOnScreen) return;
+
             var sent = picker.Issue.AlternativeSolutionSentTroops;
             using (new AllowedThread())
             {

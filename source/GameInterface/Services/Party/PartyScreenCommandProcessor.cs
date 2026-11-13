@@ -1,18 +1,11 @@
 ﻿using Common.Logging;
-using Common.Messaging;
-using Common.Network;
-using Common.Network.Coalescing;
-using GameInterface.Services.CampaignService.Statistics.Interfaces;
-using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
-using GameInterface.Services.PlayerCaptivityService.Messages;
-using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using Helpers;
@@ -22,18 +15,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Party;
 
 /// <summary>
 /// Replays a player's party screen commands on the server, applying or rejecting each one on its own,
-/// then runs the effects of the screen's vanilla done handler.
+/// and hands the result to <see cref="IPartyScreenDoneEffects"/>.
 /// </summary>
 internal interface IPartyScreenCommandProcessor : IGameAbstraction
 {
@@ -49,45 +40,36 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenCommandProcessor>();
 
     private readonly IObjectManager objectManager;
-    private readonly IMessageBroker messageBroker;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
-    private readonly IStatisticsCampaignBehaviorInterface statisticsInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly ISessionInventoryPlayerDataInterface sessionInventoryPlayerData;
-    private readonly INetwork network;
-    private readonly ISendCoalescer sendCoalescer;
+    private readonly IPartyScreenDoneEffects doneEffects;
 
     public PartyScreenCommandProcessor(
         IObjectManager objectManager,
-        IMessageBroker messageBroker,
         ITroopRosterInterface troopRosterInterface,
         IRecruitmentSideEffects recruitmentSideEffects,
-        IStatisticsCampaignBehaviorInterface statisticsInterface,
         IVillageHostileActionInterface villageHostileActionInterface,
         IAlternativeSolutionCommitments commitments,
         ISessionInventoryPlayerDataInterface sessionInventoryPlayerData,
-        INetwork network,
-        ISendCoalescer sendCoalescer = null)
+        IPartyScreenDoneEffects doneEffects)
     {
         this.objectManager = objectManager;
-        this.messageBroker = messageBroker;
         this.troopRosterInterface = troopRosterInterface;
         this.recruitmentSideEffects = recruitmentSideEffects;
-        this.statisticsInterface = statisticsInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.commitments = commitments;
         this.sessionInventoryPlayerData = sessionInventoryPlayerData;
-        this.network = network;
-        this.sendCoalescer = sendCoalescer;
+        this.doneEffects = doneEffects;
     }
 
     public IReadOnlyList<string> Apply(Hero mainHero, NetworkCommitPartyScreen message, NetPeer requester)
     {
         if (!TryCreateCommit(mainHero, message, requester, out var commit, out var failure))
         {
-            Logger.Warning("Rejected party screen commit for {Hero}: {Reason}", mainHero.StringId, failure);
+            Logger.Warning("Rejected party screen commit for {Hero}: {Reason}", message.MainHeroId, failure);
             return new[] { failure };
         }
 
@@ -95,34 +77,25 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         {
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(command.CharacterId, out var character)) continue;
 
-            string rejection;
-            try
+            string rejection = command.Code switch
             {
-                rejection = command.Code switch
-                {
-                    PartyScreenLogic.PartyCommandCode.TransferTroop or
-                    PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot => Transfer(commit, command, character),
-                    PartyScreenLogic.PartyCommandCode.UpgradeTroop => commit.IsForceTransfer ? NotOnThisScreen : Upgrade(commit, command, character),
-                    PartyScreenLogic.PartyCommandCode.RecruitTroop => commit.IsForceTransfer ? NotOnThisScreen : Recruit(commit, command, character),
-                    _ => "not supported",
-                };
-            }
-            catch (Exception e)
-            {
-                // One broken command shouldn't drop the rest of the screen, or leave the player without a reason.
-                Logger.Error(e, "Party command {Code} {Character} failed for {Hero}", command.Code, character.StringId, mainHero.StringId);
-                rejection = "failed on the server";
-            }
-
+                _ when commit.IsForceTransfer &&
+                    PartyScreenLogicPatches.IsBlockedOnForceTransferScreen(command.Code, command.Type) => NotOnThisScreen,
+                PartyScreenLogic.PartyCommandCode.TransferTroop or
+                PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot => Transfer(commit, command, character),
+                PartyScreenLogic.PartyCommandCode.UpgradeTroop => Upgrade(commit, command, character),
+                PartyScreenLogic.PartyCommandCode.RecruitTroop => Recruit(commit, command, character),
+                _ => "not supported",
+            };
             if (rejection == null) continue;
 
             Logger.Information(
                 "Party command {Code} {Character} x{Number} for {Hero}: {Rejection}",
-                command.Code, character.StringId, command.Number, mainHero.StringId, rejection);
+                command.Code, character.StringId, command.Number, message.MainHeroId, rejection);
             commit.Rejections.Add($"{character.Name} x{command.Number}: {rejection}");
         }
 
-        Finish(commit, message, requester);
+        doneEffects.Apply(commit);
         return commit.Rejections;
     }
 
@@ -130,7 +103,7 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         Hero mainHero,
         NetworkCommitPartyScreen message,
         NetPeer requester,
-        out Commit commit,
+        out PartyScreenCommit commit,
         out string failure)
     {
         commit = null;
@@ -144,32 +117,19 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
             message.Mode == PartyScreenHelper.PartyScreenMode.PrisonerManage ||
             message.DoneKind == PartyScreenDoneKind.DonateGarrison);
 
-        RosterSide leftMembers;
-        RosterSide leftPrisoners;
-        if (message.LeftPartyId != null)
+        PartyBase leftParty = null;
+        if (message.LeftPartyId != null && !objectManager.TryGetObjectWithLogging(message.LeftPartyId, out leftParty))
         {
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.LeftPartyId, out var leftParty))
-            {
-                failure = "the other party is gone";
-                return false;
-            }
-
-            leftMembers = RosterSide.Real(leftParty.MemberRoster);
-            leftPrisoners = RosterSide.Real(leftParty.PrisonRoster);
-        }
-        else
-        {
-            leftMembers = RosterSide.Virtual(troopRosterInterface.UnpackTroopRosterData(message.LeftMemberSeed));
-            // The prisoner screens edit the settlement's own prison.
-            leftPrisoners = message.Mode == PartyScreenHelper.PartyScreenMode.PrisonerManage && !settlementGone
-                ? RosterSide.Real(settlement.Party.PrisonRoster)
-                : RosterSide.Virtual(troopRosterInterface.UnpackTroopRosterData(message.LeftPrisonerSeed));
+            failure = "the other party is gone";
+            return false;
         }
 
+        // In order of precedence: the volunteers the server set aside are the whole left side, whatever the client
+        // shows, then the troops already picked for a quest, then a real party, then what a client-only side held.
+        PartyScreenRosterSide leftMembers;
         bool isForceTransfer = message.ForceTransferId != null;
         if (isForceTransfer)
         {
-            // The volunteers the server set aside are the whole left side, whatever the client shows.
             if (!objectManager.TryGetId(party, out var partyId) ||
                 !villageHostileActionInterface.TryConsumeForceTransfer(message.ForceTransferId, partyId, out var pool) ||
                 !objectManager.TryGetObjectWithLogging<CharacterObject>(pool.TroopId, out var poolTroop))
@@ -178,45 +138,74 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
                 return false;
             }
 
-            leftMembers = RosterSide.Virtual(new[] { new TroopRosterElement(poolTroop) { _number = pool.TroopCount } });
+            leftMembers = PartyScreenRosterSide.Virtual(new[] { new TroopRosterElement(poolTroop) { _number = pool.TroopCount } });
         }
         else if (!string.IsNullOrEmpty(message.IssueId))
         {
-            // Troops already picked for the quest are tracked here, companions come from the client's picker.
+            // Companions sent on the quest come from the client's picker.
             var selected = commitments.GetSelection(requester, message.IssueOwnerId, message.IssueId);
             var heroes = troopRosterInterface.UnpackTroopRosterData(message.LeftMemberSeed).Where(element => element.Character.IsHero);
-            leftMembers = RosterSide.Virtual(selected.Concat(heroes));
+            leftMembers = PartyScreenRosterSide.Virtual(selected.Concat(heroes));
+        }
+        else if (leftParty != null)
+        {
+            leftMembers = PartyScreenRosterSide.Real(leftParty.MemberRoster);
+        }
+        else
+        {
+            leftMembers = PartyScreenRosterSide.Virtual(troopRosterInterface.UnpackTroopRosterData(message.LeftMemberSeed));
         }
 
-        commit = new Commit(mainHero, message, settlement, leftMembers, leftPrisoners, isForceTransfer, settlementGone);
+        // The prisoner screens edit the settlement's own prison.
+        PartyScreenRosterSide leftPrisoners;
+        if (leftParty != null)
+            leftPrisoners = PartyScreenRosterSide.Real(leftParty.PrisonRoster);
+        else if (message.Mode == PartyScreenHelper.PartyScreenMode.PrisonerManage && !settlementGone)
+            leftPrisoners = PartyScreenRosterSide.Real(settlement.Party.PrisonRoster);
+        else
+            leftPrisoners = PartyScreenRosterSide.Virtual(troopRosterInterface.UnpackTroopRosterData(message.LeftPrisonerSeed));
+
+        commit = new PartyScreenCommit(message, requester, mainHero, settlement, settlementGone, isForceTransfer, leftMembers, leftPrisoners);
+
+        // The companion can be captured or killed while the screen is open, so check before any troop moves.
+        if (message.DoneKind == PartyScreenDoneKind.CreateClanParty)
+        {
+            var leader = commit.ClanPartyLeader;
+            if (leader == null || leader.IsPlayerHero() || leader.PartyBelongedTo != party)
+            {
+                commit = null;
+                failure = "the companion is no longer in your party";
+                return false;
+            }
+        }
+
         return true;
     }
 
-    private static string Transfer(Commit commit, PartyScreenCommandData command, CharacterObject character)
+    private static string Transfer(PartyScreenCommit commit, PartyScreenCommandData command, CharacterObject character)
     {
         if (commit.SettlementGone) return NotInSettlement;
         bool isMember = command.Type == PartyScreenLogic.TroopType.Member;
         var hero = character.HeroObject;
         if (isMember && hero?.IsPlayerHero() == true) return "players can't be moved";
-        if (!isMember && commit.IsForceTransfer) return NotOnThisScreen;
 
         var right = isMember ? commit.RightMembers : commit.RightPrisoners;
         var left = isMember ? commit.LeftMembers : commit.LeftPrisoners;
         bool fromRight = command.Side == PartyScreenLogic.PartyRosterSide.Right;
-        // A prisoner hero leaving for or taken from a client-only left side changes hands in Finish,
-        // through vanilla's release and capture, which move the hero themselves.
-        bool deferred = !isMember && hero != null && left.IsVirtual &&
-            (commit.DoneKind == PartyScreenDoneKind.Default || hero.IsPlayerHero());
+        // Positive moves troops to the left side.
+        int sign = fromRight ? 1 : -1;
+        bool deferred = !isMember && commit.IsDeferred(character);
 
         var available = fromRight ? ReadRight(commit, right, character) : left.Read(character);
-        // A player is released through their captivity, which can still be running after a lost roster entry.
-        if (deferred && fromRight && hero.IsPlayerHero() && hero.IsPrisoner &&
-            (!commit.PendingRightPrisoners.TryGetValue(character, out var pendingRelease) || pendingRelease <= 0))
-            available = (1, 0, 0);
+        // A player prisoner is released through their captivity, which can still be running after their roster entry
+        // was lost, so a release that isn't already pending counts them as there.
+        bool releasesCaptivePlayer = deferred && fromRight && hero.IsPlayerHero() && hero.IsPrisoner &&
+            GetCount(commit.NetPrisonersToLeft, character) <= 0;
+        if (releasesCaptivePlayer) available = (1, 0, 0);
         if (available.number <= 0) return fromRight ? "no longer in the party" : "no longer available";
 
         int number = Math.Min(command.Number, available.number);
-        if (!isMember && fromRight && commit.IsDonating && !left.IsVirtual)
+        if (!isMember && fromRight && commit.Message.IsDonating && !left.IsVirtual)
             number = Math.Min(number, commit.Settlement.Party.PrisonerSizeLimit - left.Roster.TotalManCount);
         if (number <= 0) return "no room left";
 
@@ -224,46 +213,38 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         int xpPerTroop = isMember
             ? GetMaxUpgradeXpCost(commit.Party, character)
             : Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetConformityNeededToRecruitPrisoner(character);
-        int keptXp = (available.number - number) * xpPerTroop;
-        int xp = fromRight
-            ? (available.xp >= keptXp ? available.xp - keptXp : 0)
-            : Math.Min(available.xp, number * xpPerTroop);
+        int xp = TransferredXp(fromRight, number, available.number, available.xp, xpPerTroop);
 
-        int toLeft = fromRight ? number : -number;
         if (deferred)
         {
-            left.Add(character, toLeft, fromRight ? wounded : -wounded, fromRight ? xp : -xp);
-            AddCount(commit.PendingRightPrisoners, character, toLeft);
+            // The hero's own roster entry moves in the done effects, so only the left side's count changes here.
+            left.Add(character, sign * number, sign * wounded, sign * xp);
         }
         else
         {
+            // The source goes first, because a hero leaving a party clears PartyBelongedTo whichever party it is.
             var source = fromRight ? right : left;
             var destination = fromRight ? left : right;
             source.Add(character, -number, -wounded, -xp);
             destination.Add(character, number, wounded, xp);
         }
 
-        AddCount(isMember ? commit.NetMembersToLeft : commit.NetPrisonersToLeft, character, toLeft);
+        AddCount(isMember ? commit.NetMembersToLeft : commit.NetPrisonersToLeft, character, sign * number);
         return number < command.Number ? $"only {number} could be moved" : null;
     }
 
     // Deferred prisoner heroes are still in the right roster, but no longer available to move.
-    private static (int number, int wounded, int xp) ReadRight(Commit commit, RosterSide right, CharacterObject character)
+    private static (int number, int wounded, int xp) ReadRight(PartyScreenCommit commit, PartyScreenRosterSide right, CharacterObject character)
     {
         var state = right.Read(character);
-        if (!ReferenceEquals(right, commit.RightPrisoners) ||
-            !commit.PendingRightPrisoners.TryGetValue(character, out var pending))
-            return state;
+        if (!ReferenceEquals(right, commit.RightPrisoners) || !commit.IsDeferred(character)) return state;
 
-        int number = state.number - pending;
+        int number = state.number - GetCount(commit.NetPrisonersToLeft, character);
         return (number, Math.Min(state.wounded, Math.Max(number, 0)), state.xp);
     }
 
-    private string Upgrade(Commit commit, PartyScreenCommandData command, CharacterObject character)
+    private string Upgrade(PartyScreenCommit commit, PartyScreenCommandData command, CharacterObject character)
     {
-        if (command.Side != PartyScreenLogic.PartyRosterSide.Right) return "only your own troops can be upgraded";
-        if (command.UpgradeTarget < 0 || command.UpgradeTarget >= character.UpgradeTargets.Length) return "no upgrade target";
-
         var party = commit.Party;
         var roster = party.MemberRoster;
         int index = roster.FindIndexOfTroop(character);
@@ -277,27 +258,19 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         int goldCost = character.GetUpgradeGoldCost(party.Party, command.UpgradeTarget);
         var itemCategory = target.UpgradeRequiresItemFromCategory;
 
-        int number = Math.Min(command.Number, element.Number);
-        string shortOf = number < command.Number ? "troops" : null;
-        if (xpCost > 0 && element.Xp / xpCost < number)
-        {
-            number = element.Xp / xpCost;
-            shortOf = "experience";
-        }
-        if (goldCost > 0 && Math.Max(0, commit.MainHero.Gold + commit.GoldChange) / goldCost < number)
-        {
-            number = Math.Max(0, commit.MainHero.Gold + commit.GoldChange) / goldCost;
-            shortOf = "gold";
-        }
-        if (itemCategory != null && CountItems(party.ItemRoster, itemCategory) < number)
-        {
-            number = CountItems(party.ItemRoster, itemCategory);
-            shortOf = itemCategory.GetName().ToString();
-        }
+        var (number, shortOf) = LimitUpgrade(
+            command.Number,
+            element.Number,
+            element.Xp,
+            xpCost,
+            commit.MainHero.Gold + commit.GoldChange,
+            goldCost,
+            itemCategory != null ? CountItems(party.ItemRoster, itemCategory) : null,
+            itemCategory?.GetName().ToString());
         if (number <= 0) return $"not enough {shortOf}";
 
         if (itemCategory != null)
-            RemoveItems(party.ItemRoster, itemCategory, number, sessionInventoryPlayerData.GetInventoryLocks(commit.MainHeroId));
+            RemoveItems(party.ItemRoster, itemCategory, number, sessionInventoryPlayerData.GetInventoryLocks(commit.Message.MainHeroId));
         roster.SetElementXp(index, element.Xp - (xpCost * number));
         commit.GoldChange -= goldCost * number;
 
@@ -310,13 +283,8 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         return number < command.Number ? $"only {number} could be upgraded, not enough {shortOf}" : null;
     }
 
-    private string Recruit(Commit commit, PartyScreenCommandData command, CharacterObject character)
+    private string Recruit(PartyScreenCommit commit, PartyScreenCommandData command, CharacterObject character)
     {
-        if (command.Side != PartyScreenLogic.PartyRosterSide.Right ||
-            command.Type != PartyScreenLogic.TroopType.Prisoner ||
-            character.IsHero)
-            return "can't be recruited";
-
         var party = commit.Party;
         if (party.PrisonRoster.FindIndexOfTroop(character) < 0) return "no longer a prisoner";
 
@@ -334,180 +302,65 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
         return number < command.Number ? $"only {number} could be recruited" : null;
     }
 
-    private void Finish(Commit commit, NetworkCommitPartyScreen message, NetPeer requester)
+    /// <summary>
+    /// How many of the requested upgrades the party can pay for, and what ran out first when that is fewer.
+    /// <paramref name="items"/> is null when the upgrade needs no item.
+    /// </summary>
+    internal static (int number, string shortOf) LimitUpgrade(
+        int requested, int troops, int xp, int xpCost, int gold, int goldCost, int? items, string itemName)
     {
-        var party = commit.Party;
-        var settlement = commit.Settlement;
-
-        // Player prisoners go home through the coop captivity release, which also restores their party.
-        foreach (var entry in commit.PendingRightPrisoners)
+        int number = Math.Min(requested, troops);
+        string shortOf = number < requested ? "troops" : null;
+        if (xpCost > 0 && xp / xpCost < number)
         {
-            if (entry.Value <= 0 || !entry.Key.HeroObject.IsPlayerHero()) continue;
-            var releasePosition = party.CurrentSettlement != null ? party.CurrentSettlement.GatePosition : party.Position;
-            messageBroker.Publish(this, new PlayerCaptivityEndedByServer(
-                entry.Key.HeroObject, EndCaptivityDetail.ReleasedByChoice, null, releasePosition));
+            number = xp / xpCost;
+            shortOf = "experience";
+        }
+        if (goldCost > 0 && Math.Max(0, gold) / goldCost < number)
+        {
+            number = Math.Max(0, gold) / goldCost;
+            shortOf = "gold";
+        }
+        if (items.HasValue && items.Value < number)
+        {
+            number = items.Value;
+            shortOf = itemName;
         }
 
-        var movedLeft = new FlattenedTroopRoster(4);
-        // Players are left out because their captivity ended above.
-        var released = new FlattenedTroopRoster(4);
-        var taken = new FlattenedTroopRoster(4);
-        foreach (var entry in commit.NetPrisonersToLeft)
-        {
-            var hero = entry.Key.HeroObject;
-            if (entry.Value > 0)
-            {
-                movedLeft.Add(entry.Key, entry.Value, 0);
-                if (hero?.IsPlayerHero() != true) released.Add(entry.Key, entry.Value, 0);
-            }
-            else if (entry.Value < 0 && (hero == null || TakePrisonerActionPatches.CanCaptureHero(hero)))
-                taken.Add(entry.Key, -entry.Value, 0);
-        }
-
-        switch (commit.DoneKind)
-        {
-            case PartyScreenDoneKind.Default when commit.LeftPrisoners.IsVirtual:
-                if (!released.IsEmpty<FlattenedTroopRosterElement>())
-                    EndCaptivityAction.ApplyByReleasedByChoice(released);
-                if (!taken.IsEmpty<FlattenedTroopRosterElement>())
-                {
-                    foreach (var character in taken.Troops)
-                    {
-                        if (character.IsHero) TakePrisonerAction.Apply(party.Party, character.HeroObject);
-                    }
-                    CampaignEventDispatcher.Instance.OnPrisonerTaken(taken);
-                    statisticsInterface.OnPrisonersTaken(commit.MainHero, taken.Count());
-                }
-                break;
-            case PartyScreenDoneKind.DonateGarrison when !commit.SettlementGone:
-                DonateToGarrison(commit, settlement);
-                break;
-            case PartyScreenDoneKind.DonatePrisoners:
-                EnterSettlementAsPrisoners(movedLeft, settlement);
-                if (!movedLeft.IsEmpty<FlattenedTroopRosterElement>())
-                    CampaignEventDispatcher.Instance.OnPrisonerDonatedToSettlement(party, movedLeft, settlement);
-                break;
-            case PartyScreenDoneKind.ManageGarrison:
-                EnterSettlementAsPrisoners(movedLeft, settlement);
-                foreach (var entry in commit.NetMembersToLeft)
-                {
-                    if (entry.Value > 0 && entry.Key.IsHero)
-                        EnterSettlementAction.ApplyForCharacterOnly(entry.Key.HeroObject, settlement);
-                }
-                break;
-            case PartyScreenDoneKind.CreateClanParty:
-                CreateClanParty(commit);
-                break;
-        }
-
-        if (settlement != null && !taken.IsEmpty<FlattenedTroopRosterElement>())
-            CampaignEventDispatcher.Instance.OnPrisonersChangeInSettlement(settlement, taken, null, true);
-
-        if (!message.DoNotApplyGoldTransactions && commit.GoldChange != 0)
-            GiveGoldAction.ApplyBetweenCharacters(null, commit.MainHero, commit.GoldChange, false);
-
-        // Vanilla only pays the troop part of the donation influence, prisoners pay through their own event.
-        if (commit.IsDonating)
-        {
-            var model = Campaign.Current.Models.PrisonerDonationModel;
-            float influence = commit.NetMembersToLeft
-                .Where(entry => entry.Value > 0)
-                .Sum(entry => entry.Value * model.CalculateInfluenceGainAfterTroopDonation(party.Party, entry.Key, settlement));
-            if ((int)influence != 0)
-                GainKingdomInfluenceAction.ApplyForLeavingTroopToGarrison(commit.MainHero, (int)influence);
-        }
-
-        if (commit.RecruitedCount > 0)
-            statisticsInterface.OnPrisonersRecruited(commit.MainHero, commit.RecruitedCount);
-
-        if (!string.IsNullOrEmpty(message.IssueId))
-        {
-            messageBroker.Publish(this, new PartyScreenCommitApplied(
-                requester, message.MainHeroId, message.IssueOwnerId, message.IssueId, PackLeftMemberDelta(commit)));
-        }
+        return (number, shortOf);
     }
 
-    private static void DonateToGarrison(Commit commit, Settlement settlement)
+    /// <summary>
+    /// The xp that moves with <paramref name="number"/> troops. A right side stack keeps enough xp for the troops
+    /// it still has, a left side stack gives up to what the moved troops can hold.
+    /// </summary>
+    internal static int TransferredXp(bool fromRight, int number, int available, int availableXp, int xpPerTroop)
     {
-        foreach (var entry in commit.LeftMembers.Entries)
+        if (fromRight)
         {
-            if (entry.Value.number <= 0) continue;
-            if (settlement.Town.GarrisonParty == null) settlement.AddGarrisonParty();
-            settlement.Town.GarrisonParty.AddElementToMemberRoster(entry.Key, entry.Value.number, false);
-            if (entry.Key.IsHero) EnterSettlementAction.ApplyForCharacterOnly(entry.Key.HeroObject, settlement);
+            int keptXp = (available - number) * xpPerTroop;
+            return Math.Max(0, availableXp - keptXp);
         }
+
+        return Math.Min(availableXp, number * xpPerTroop);
     }
 
-    // Vanilla builds the party in OpenScreenAsCreateClanPartyForHeroPartyScreenClosed, from what the screen moved left.
-    private void CreateClanParty(Commit commit)
-    {
-        var leader = commit.LeftMembers.Entries.Select(entry => entry.Key).LastOrDefault(character => character.IsHero)?.HeroObject;
-        // The companion can be captured or killed while the screen is open.
-        if (leader == null || leader.IsPlayerHero() || leader.PartyBelongedTo != commit.Party)
-        {
-            Logger.Error("Blocked clan party creation for {Hero}, the leader is missing, a player or no longer in the party", commit.MainHeroId);
-            return;
-        }
-        // Vanilla only takes the leader out of the main party in a settlement, which a player's party never is on the server.
-        if (leader.CurrentSettlement != null) commit.Party.MemberRoster.RemoveTroop(leader.CharacterObject);
-
-        int partyGoldLowerThreshold = Campaign.Current.Models.ClanFinanceModel.PartyGoldLowerThreshold;
-        if (leader.Gold < partyGoldLowerThreshold)
-            GiveGoldAction.ApplyBetweenCharacters(commit.MainHero, leader, partyGoldLowerThreshold - leader.Gold, false);
-
-        var clanParty = MobilePartyHelper.CreateNewClanMobileParty(leader, leader.Clan);
-        foreach (var entry in commit.LeftMembers.Entries)
-        {
-            if (entry.Key != leader.CharacterObject && entry.Value.number > 0)
-                clanParty.MemberRoster.AddToCounts(entry.Key, entry.Value.number, woundedCount: entry.Value.wounded, xpChange: entry.Value.xp);
-        }
-        // A player prisoner moved here is released by their captivity end instead.
-        foreach (var entry in commit.LeftPrisoners.Entries)
-        {
-            if (entry.Value.number > 0 && entry.Key.HeroObject?.IsPlayerHero() != true)
-                clanParty.PrisonRoster.AddToCounts(entry.Key, entry.Value.number, woundedCount: entry.Value.wounded, xpChange: entry.Value.xp);
-        }
-
-        // Sends the new party's troops now, so the clan screen shows the real count when it refreshes.
-        if (objectManager.TryGetHandle(clanParty.MemberRoster, out var rosterId))
-            sendCoalescer?.FlushInstance(rosterId, network);
-        messageBroker.Publish(this, new ClanManagementChanged(clanParty.ActualClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
-    }
-
-    private static void EnterSettlementAsPrisoners(FlattenedTroopRoster prisoners, Settlement settlement)
-    {
-        foreach (var character in prisoners.Troops)
-        {
-            if (character.IsHero) EnterSettlementAction.ApplyForPrisoner(character.HeroObject, settlement);
-        }
-    }
-
-    private TroopRosterData PackLeftMemberDelta(Commit commit)
-    {
-        var delta = new List<TroopRosterElementData>();
-        foreach (var character in commit.LeftMembers.Entries.Select(entry => entry.Key).Union(commit.LeftMemberSeed.Keys))
-        {
-            var final = commit.LeftMembers.Read(character);
-            commit.LeftMemberSeed.TryGetValue(character, out var seed);
-            if (final == seed || !objectManager.TryGetHandleWithLogging(character, out var handle)) continue;
-            delta.Add(new TroopRosterElementData(handle, final.number - seed.number, final.wounded - seed.wounded, final.xp - seed.xp));
-        }
-
-        return new TroopRosterData(delta);
-    }
-
-    private static void AddCount(Dictionary<CharacterObject, int> counts, CharacterObject character, int count)
-    {
-        counts.TryGetValue(character, out var current);
-        counts[character] = current + count;
-    }
-
-    private static int ClampWounded(int requested, int number, int available, int availableWounded)
+    /// <summary>
+    /// Fits a requested wounded count to a move of <paramref name="number"/> troops out of a stack, so the stack
+    /// never gives more wounded than it has and keeps no more healthy troops than it had.
+    /// </summary>
+    internal static int ClampWounded(int requested, int number, int available, int availableWounded)
     {
         int min = Math.Max(0, number - (available - availableWounded));
         int max = Math.Min(number, availableWounded);
         return Math.Min(Math.Max(requested, min), max);
     }
+
+    private static int GetCount(Dictionary<CharacterObject, int> counts, CharacterObject character)
+        => counts.TryGetValue(character, out var count) ? count : 0;
+
+    private static void AddCount(Dictionary<CharacterObject, int> counts, CharacterObject character, int count)
+        => counts[character] = GetCount(counts, character) + count;
 
     private static int GetMaxUpgradeXpCost(MobileParty party, CharacterObject character)
         => character.UpgradeTargets.Length == 0
@@ -521,7 +374,7 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
             .Sum(item => item.Amount);
 
     // Like vanilla's RemoveItemFromItemRoster: unlocked items before the player's inventory locks, cheapest first.
-    private static void RemoveItems(ItemRoster itemRoster, ItemCategory category, int count, IReadOnlyCollection<string> lockedItemIds)
+    internal static void RemoveItems(ItemRoster itemRoster, ItemCategory category, int count, IReadOnlyCollection<string> lockedItemIds)
     {
         var items = itemRoster
             .Where(item => item.EquipmentElement.Item?.ItemCategory == category)
@@ -538,109 +391,6 @@ internal class PartyScreenCommandProcessor : IPartyScreenCommandProcessor
     }
 
     // Same id the inventory screen saves its locks under, see PartyScreenLogic.GetItemLockStringID.
-    private static string GetItemLockId(EquipmentElement element)
+    internal static string GetItemLockId(EquipmentElement element)
         => element.Item.StringId + (element.ItemModifier?.StringId ?? string.Empty);
-
-    /// <summary>
-    /// One side of the screen: a real roster the server edits, or a roster only the client has, kept as counts.
-    /// </summary>
-    private sealed class RosterSide
-    {
-        private readonly Dictionary<CharacterObject, (int number, int wounded, int xp)> pool;
-
-        private RosterSide(TroopRoster roster, Dictionary<CharacterObject, (int number, int wounded, int xp)> pool)
-        {
-            Roster = roster;
-            this.pool = pool;
-        }
-
-        public TroopRoster Roster { get; }
-        public bool IsVirtual => Roster == null;
-        public IEnumerable<KeyValuePair<CharacterObject, (int number, int wounded, int xp)>> Entries
-            => pool ?? Enumerable.Empty<KeyValuePair<CharacterObject, (int number, int wounded, int xp)>>();
-
-        public static RosterSide Real(TroopRoster roster) => new(roster, null);
-
-        public static RosterSide Virtual(IEnumerable<TroopRosterElement> seed)
-        {
-            var side = new RosterSide(null, new Dictionary<CharacterObject, (int number, int wounded, int xp)>());
-            foreach (var element in seed)
-                side.Add(element.Character, element.Number, element.WoundedNumber, element.Xp);
-            return side;
-        }
-
-        public (int number, int wounded, int xp) Read(CharacterObject character)
-        {
-            if (IsVirtual)
-            {
-                pool.TryGetValue(character, out var pooled);
-                return pooled;
-            }
-
-            int index = Roster.FindIndexOfTroop(character);
-            if (index < 0) return default;
-            var element = Roster.GetElementCopyAtIndex(index);
-            return (element.Number, element.WoundedNumber, element.Xp);
-        }
-
-        public void Add(CharacterObject character, int number, int wounded, int xp)
-        {
-            if (IsVirtual)
-            {
-                pool.TryGetValue(character, out var pooled);
-                pool[character] = (pooled.number + number, pooled.wounded + wounded, pooled.xp + xp);
-                return;
-            }
-
-            Roster.AddToCounts(character, number, woundedCount: wounded, xpChange: xp);
-        }
-    }
-
-    private sealed class Commit
-    {
-        public readonly Hero MainHero;
-        public readonly string MainHeroId;
-        public readonly MobileParty Party;
-        public readonly Settlement Settlement;
-        public readonly PartyScreenDoneKind DoneKind;
-        public readonly bool IsDonating;
-        public readonly bool IsForceTransfer;
-        public readonly bool SettlementGone;
-        public readonly RosterSide RightMembers;
-        public readonly RosterSide RightPrisoners;
-        public readonly RosterSide LeftMembers;
-        public readonly RosterSide LeftPrisoners;
-        public readonly Dictionary<CharacterObject, (int number, int wounded, int xp)> LeftMemberSeed;
-        // Prisoner heroes moved off the right side whose roster change waits for Finish, negative when taken.
-        public readonly Dictionary<CharacterObject, int> PendingRightPrisoners = new();
-        public readonly Dictionary<CharacterObject, int> NetMembersToLeft = new();
-        public readonly Dictionary<CharacterObject, int> NetPrisonersToLeft = new();
-        public readonly List<string> Rejections = new();
-        public int GoldChange;
-        public int RecruitedCount;
-
-        public Commit(
-            Hero mainHero,
-            NetworkCommitPartyScreen message,
-            Settlement settlement,
-            RosterSide leftMembers,
-            RosterSide leftPrisoners,
-            bool isForceTransfer,
-            bool settlementGone)
-        {
-            MainHero = mainHero;
-            MainHeroId = message.MainHeroId;
-            Party = mainHero.PartyBelongedTo;
-            Settlement = settlement;
-            DoneKind = message.DoneKind;
-            IsDonating = message.IsDonating;
-            IsForceTransfer = isForceTransfer;
-            SettlementGone = settlementGone;
-            RightMembers = RosterSide.Real(Party.MemberRoster);
-            RightPrisoners = RosterSide.Real(Party.PrisonRoster);
-            LeftMembers = leftMembers;
-            LeftPrisoners = leftPrisoners;
-            LeftMemberSeed = leftMembers.Entries.ToDictionary(entry => entry.Key, entry => entry.Value);
-        }
-    }
 }

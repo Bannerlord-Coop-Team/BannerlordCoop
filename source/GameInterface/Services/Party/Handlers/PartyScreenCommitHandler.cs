@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
@@ -12,22 +13,23 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Party.Handlers;
 
 internal class PartyScreenCommitHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenCommitHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IPlayerManager playerManager;
     private readonly IAlternativeSolutionPicker picker;
-    private readonly IPartyScreenCommandTracker commandTracker;
     private readonly IPartyScreenCommandProcessor commandProcessor;
 
     public PartyScreenCommitHandler(
@@ -37,7 +39,6 @@ internal class PartyScreenCommitHandler : IHandler
         ITroopRosterInterface troopRosterInterface,
         IPlayerManager playerManager,
         IAlternativeSolutionPicker picker,
-        IPartyScreenCommandTracker commandTracker,
         IPartyScreenCommandProcessor commandProcessor)
     {
         this.messageBroker = messageBroker;
@@ -46,7 +47,6 @@ internal class PartyScreenCommitHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.playerManager = playerManager;
         this.picker = picker;
-        this.commandTracker = commandTracker;
         this.commandProcessor = commandProcessor;
 
         messageBroker.Subscribe<PartyScreenCommitAttempted>(Handle_PartyScreenCommitAttempted);
@@ -62,18 +62,17 @@ internal class PartyScreenCommitHandler : IHandler
     // Client
     private void Handle_PartyScreenCommitAttempted(MessagePayload<PartyScreenCommitAttempted> obj)
     {
-        var logic = obj.What.Logic;
-        var doneKind = GetDoneKind(logic);
+        var attempt = obj.What;
         // A sale only edits clones of the party, and PrisonersSold already sends what was sold.
-        if (doneKind == PartyScreenDoneKind.SellPrisoners) return;
+        if (attempt.DoneKind == PartyScreenDoneKind.SellPrisoners) return;
 
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(attempt.MainHero, out var mainHeroId)) return;
 
         string leftPartyId = null;
-        if (logic.LeftOwnerParty != null && !objectManager.TryGetIdWithLogging(logic.LeftOwnerParty, out leftPartyId)) return;
+        if (attempt.LeftOwnerParty != null && !objectManager.TryGetIdWithLogging(attempt.LeftOwnerParty, out leftPartyId)) return;
 
         var commands = new List<PartyScreenCommandData>();
-        foreach (var command in commandTracker.GetCommands(logic))
+        foreach (var command in attempt.Commands)
         {
             if (!objectManager.TryGetHandleWithLogging(command.Character, out var characterId)) continue;
 
@@ -93,49 +92,27 @@ internal class PartyScreenCommitHandler : IHandler
         TroopRosterData leftPrisonerSeed = default;
         if (leftPartyId == null)
         {
-            leftMemberSeed = troopRosterInterface.PackTroopRosterData(logic._initialData.LeftMemberRoster);
-            if (obj.What.Mode != PartyScreenHelper.PartyScreenMode.PrisonerManage)
-                leftPrisonerSeed = troopRosterInterface.PackTroopRosterData(logic._initialData.LeftPrisonerRoster);
+            leftMemberSeed = troopRosterInterface.PackTroopRosterData(attempt.InitialLeftMembers);
+            if (attempt.Mode != PartyScreenHelper.PartyScreenMode.PrisonerManage)
+                leftPrisonerSeed = troopRosterInterface.PackTroopRosterData(attempt.InitialLeftPrisoners);
         }
 
-        picker.TryGetIssue(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left], out var issueOwnerId, out var issueId);
+        picker.TryGetIssue(attempt.LeftMemberRoster, out var issueOwnerId, out var issueId);
 
         network.SendAll(new NetworkCommitPartyScreen(
             mainHeroId,
-            obj.What.Mode,
-            doneKind,
+            attempt.Mode,
+            attempt.DoneKind,
             commands.ToArray(),
-            troopRosterInterface.PackTroopRosterOrderData(logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]),
+            troopRosterInterface.PackTroopRosterOrderData(attempt.RightMembers),
             leftPartyId,
             leftMemberSeed,
             leftPrisonerSeed,
-            obj.What.IsDonating,
-            logic.DoNotApplyGoldTransactions,
-            obj.What.ForceTransferId,
+            attempt.IsDonating,
+            attempt.DoNotApplyGoldTransactions,
+            attempt.ForceTransferId,
             issueOwnerId,
             issueId));
-    }
-
-    private static PartyScreenDoneKind GetDoneKind(PartyScreenLogic logic)
-    {
-        // The closed delegate is an event, so the screen is told apart by its transferable delegate.
-        var transferable = logic.IsTroopTransferableDelegate?.Method;
-        if (transferable?.DeclaringType == typeof(PartyScreenHelper) &&
-            transferable.Name == nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroTroopTransferableDelegate))
-            return PartyScreenDoneKind.CreateClanParty;
-
-        var method = logic.PartyPresentationDoneButtonDelegate?.Method;
-        if (method?.DeclaringType != typeof(PartyScreenHelper)) return PartyScreenDoneKind.None;
-
-        return method.Name switch
-        {
-            nameof(PartyScreenHelper.DefaultDoneHandler) => PartyScreenDoneKind.Default,
-            nameof(PartyScreenHelper.SellPrisonersDoneHandler) => PartyScreenDoneKind.SellPrisoners,
-            nameof(PartyScreenHelper.DonateGarrisonDoneHandler) => PartyScreenDoneKind.DonateGarrison,
-            nameof(PartyScreenHelper.DonatePrisonersDoneHandler) => PartyScreenDoneKind.DonatePrisoners,
-            nameof(PartyScreenHelper.ManageGarrisonDoneHandler) => PartyScreenDoneKind.ManageGarrison,
-            _ => PartyScreenDoneKind.None,
-        };
     }
 
     // Server
@@ -148,12 +125,26 @@ internal class PartyScreenCommitHandler : IHandler
         {
             if (!playerManager.IsSenderControllingHero(obj.Who, message.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
-            // The party can be gone by now, for example after a capture that landed before this commit.
-            IReadOnlyList<string> rejections = new[] { "you no longer have a party" };
-            if (mainHero.PartyBelongedTo != null)
+
+            IReadOnlyList<string> rejections;
+            try
             {
-                rejections = commandProcessor.Apply(mainHero, message, requester);
-                messageBroker.Publish(this, new ApplyTroopRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData));
+                // The party can be gone by now, for example after a capture that landed before this commit.
+                if (mainHero.PartyBelongedTo == null)
+                {
+                    rejections = new[] { "you no longer have a party" };
+                }
+                else
+                {
+                    rejections = commandProcessor.Apply(mainHero, message, requester);
+                    messageBroker.Publish(this, new ApplyTroopRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData));
+                }
+            }
+            catch (Exception e)
+            {
+                // Changes made before the failure stay, so the player is told rather than left with a silent Done.
+                Logger.Error(e, "Party screen commit failed for {Hero}", message.MainHeroId);
+                rejections = new[] { "something failed on the server, some of them may not have gone through" };
             }
 
             if (rejections.Count > 0 && requester != null)
@@ -161,6 +152,6 @@ internal class PartyScreenCommitHandler : IHandler
                 network.Send(requester, new SendInformationMessage(
                     "Some party changes couldn't be applied: " + string.Join("; ", rejections)));
             }
-        });
+        }, context: nameof(PartyScreenCommitHandler));
     }
 }

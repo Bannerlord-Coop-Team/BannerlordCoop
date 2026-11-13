@@ -851,29 +851,22 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
-    public void CommittedSelectionsAllowReturningWoundedTroopsWithXpUsingCanonicalPlayerIdentity()
+    public void CommittedSelectionsKeepWoundedTroopsWithXpUnderTheCanonicalPlayerIdentity()
     {
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
             var troop = Get<CharacterObject>(Server, troopId);
             troop.UpgradeTargets = Array.Empty<CharacterObject>();
-            Assert.True(Server.ObjectManager.TryGetHandle(troop, out var handle));
-            var broker = Server.Resolve<IMessageBroker>();
             var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
-            var commit = new TroopRosterData(new[] { new TroopRosterElementData(handle, 10, 2, 100) });
-            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyScreenCommitApplied(
-                ClientA.NetPeer, "client_registry_alias", scenario.NotableId, "return_test", commit));
+            commitments.SetSelection(ClientA.NetPeer, scenario.NotableId, "return_test",
+                new[] { new TroopRosterElement(troop) { Number = 10, WoundedNumber = 2, Xp = 100 } });
             var selection = Assert.Single(commitments.GetSelection(ClientA.NetPeer, scenario.NotableId, "return_test"));
             Assert.Equal((10, 2, 100), (selection.Number, selection.WoundedNumber, selection.Xp));
             Assert.Empty(commitments.GetSelection(ClientB.NetPeer, scenario.NotableId, "return_test"));
-            var returned = new TroopRosterData(new[] { new TroopRosterElementData(handle, -2, -1, -30) });
-            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyScreenCommitApplied(
-                ClientA.NetPeer, "client_registry_alias", scenario.NotableId, "return_test", returned));
-            var remaining = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
-            Assert.Equal(8, remaining.Number);
-            Assert.Equal(1, remaining.WoundedNumber);
-            Assert.Equal(70, remaining.Xp);
+            // The selection is stored under the player's hero, not the peer it came from.
+            var consumed = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
+            Assert.Equal((10, 2, 100), (consumed.Number, consumed.WoundedNumber, consumed.Xp));
         });
     }
 
@@ -883,13 +876,10 @@ public class MerchantOutlawsTests : IDisposable
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
-            var broker = Server.Resolve<IMessageBroker>();
             var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
-            Assert.True(Server.ObjectManager.TryGetHandle(Get<CharacterObject>(Server, troopId), out var handle));
-            var delta = new TroopRosterData(new[] { new TroopRosterElementData(handle, 10, 0, 0) });
+            var selection = new[] { new TroopRosterElement(Get<CharacterObject>(Server, troopId)) { Number = 10 } };
             foreach (var issueId in new[] { "pending_x", "accepted_y" })
-                broker.Publish(this, new GameInterface.Services.Party.Messages.PartyScreenCommitApplied(
-                    ClientA.NetPeer, "client_registry_alias", scenario.NotableId, issueId, delta));
+                commitments.SetSelection(ClientA.NetPeer, scenario.NotableId, issueId, selection);
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "accepted_y", null)).Number);
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null)).Number);
             Assert.Empty(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null));

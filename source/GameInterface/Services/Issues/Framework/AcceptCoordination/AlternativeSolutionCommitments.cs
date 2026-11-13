@@ -4,7 +4,6 @@ using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -33,13 +32,11 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         this.rosters = rosters;
         this.players = players;
         this.network = network;
-        broker.Subscribe<PartyScreenCommitApplied>(Handle_Applied);
         broker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
     }
 
     public void Dispose()
     {
-        broker.Unsubscribe<PartyScreenCommitApplied>(Handle_Applied);
         broker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
     }
 
@@ -77,21 +74,18 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         }
     }
 
-    private void Handle_Applied(MessagePayload<PartyScreenCommitApplied> payload)
+    public void SetSelection(NetPeer requester, string issueOwnerId, string issueId, IEnumerable<TroopRosterElement> troops)
     {
-        var data = payload.What;
-        if (ModInformation.IsClient || data.Requester == null || string.IsNullOrEmpty(data.IssueId)) return;
-        if (!players.TryGetPlayer(data.Requester, out var player)) return;
-        var key = (player.HeroId, data.IssueOwnerId, data.IssueId);
-        if (!selections.TryGetValue(key, out var selection))
-            selection = (data.Requester, new Dictionary<CharacterObject, TroopRosterElement>());
-        foreach (var element in rosters.UnpackTroopRosterData(data.MemberDelta))
+        if (requester == null || !players.TryGetPlayer(requester, out var player)) return;
+
+        // Companions stay with the client's picker until the accept.
+        var selection = new Dictionary<CharacterObject, TroopRosterElement>();
+        foreach (var element in troops)
         {
-            if (element.Character.IsHero) continue;
-            Add(selection.Troops, element);
+            if (!element.Character.IsHero) Add(selection, element);
         }
-        selections[key] = (data.Requester, selection.Troops);
-        network.Send(data.Requester, new NetworkAlternativeSolutionSelection(data.IssueOwnerId, data.IssueId, ToData(selection.Troops.Values)));
+        selections[(player.HeroId, issueOwnerId, issueId)] = (requester, selection);
+        network.Send(requester, new NetworkAlternativeSolutionSelection(issueOwnerId, issueId, ToData(selection.Values)));
     }
 
     private void Handle_Disconnected(MessagePayload<PlayerDisconnected> payload)

@@ -49,18 +49,17 @@ public class AlternativeSolutionCommitmentsTests : IDisposable
         server.Call(() =>
         {
             var commitments = server.Resolve<IAlternativeSolutionCommitments>();
-            var broker = server.Resolve<IMessageBroker>();
-            var delta = new TroopRosterData(new[] { new TroopRosterElementData(troopHandle, 4, 1, 20) });
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var selection = new[] { new TroopRosterElement(troop) { Number = 4, WoundedNumber = 1, Xp = 20 } };
             for (var i = 0; i < 200; i++)
             {
-                broker.Publish(this, new PartyScreenCommitApplied(client.NetPeer, heroId, "giver", "issue", delta));
+                commitments.SetSelection(client.NetPeer, "giver", "issue", selection);
                 var consumed = Assert.Single(commitments.Consume(heroId, "giver", "issue", Array.Empty<TroopRosterElementData>()));
                 Assert.Equal((4, 1, 20), (consumed.Number, consumed.WoundedNumber, consumed.Xp));
-                broker.Publish(this, new PartyScreenCommitApplied(client.NetPeer, heroId, "giver", "issue", delta));
+                commitments.SetSelection(client.NetPeer, "giver", "issue", selection);
                 commitments.ReturnForIssue("giver", "issue");
             }
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             Assert.Equal(initialCount + 800, party.MemberRoster.GetTroopCount(troop));
         });
         environment.FlushCoalescer();
