@@ -22,6 +22,8 @@ using Missions.Battles;
 #endif
 #if COOP_NAVAL
 using Missions.Naval;
+using Moq;
+using TaleWorlds.Core;
 #endif
 using System;
 using System.Collections.Generic;
@@ -126,11 +128,13 @@ namespace Coop.Tests.Autofac
             Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
             Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
             // The launcher builds a spawner per side through this factory, with the per-battle arguments typed in.
-            var npcFleets = container.Resolve<Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetRollback, TaleWorlds.Core.BattleSideEnum,
+            var npcFleets = container.Resolve<Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetRollback, BattleSideEnum,
                 INavalNpcFleetSpawner>>();
-            using (var npcFleet = npcFleets(new Moq.Mock<IBattleSession>().Object, new Moq.Mock<IBattleShipReplicator>().Object,
-                new Moq.Mock<INavalNpcFleetRollback>().Object, TaleWorlds.Core.BattleSideEnum.Attacker))
-                Assert.Equal(TaleWorlds.Core.BattleSideEnum.Attacker, npcFleet.Side);
+            using (var npcFleet = npcFleets(Mock.Of<IBattleSession>(), Mock.Of<IBattleShipReplicator>(), Mock.Of<INavalNpcFleetRollback>(),
+                BattleSideEnum.Attacker))
+            {
+                Assert.Equal(BattleSideEnum.Attacker, npcFleet.Side);
+            }
 #if DEBUG
             Assert.IsType<NavalDebugHulls>(container.Resolve<INavalDebugHulls>());
 #endif

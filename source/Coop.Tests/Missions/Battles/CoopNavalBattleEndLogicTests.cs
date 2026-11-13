@@ -3,6 +3,7 @@ using HarmonyLib;
 using Missions.Battles;
 using Missions.Naval;
 using Moq;
+using System.Collections.Generic;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -103,23 +104,20 @@ public class CoopNavalBattleEndLogicTests
             BattleState.DefenderPullBack, BattleSideEnum.Defender));
     }
 
-    // K3: a failed AI fleet never fields its side, which would otherwise hold the end checks, and the battle, open forever. A
-    // side whose spawner just waits (PvP, no AI party yet) holds like any unfielded side.
+    // K3: a failed AI fleet counts its own side as fielded, never the other one; the hold rule itself is the land controller's.
     [Theory]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, true, false, true, BattleSideEnum.Defender)]
-    [InlineData(true, false, true, true, BattleSideEnum.Attacker)]
-    [InlineData(true, true, false, false, BattleSideEnum.Attacker)]
-    [InlineData(false, true, false, false, BattleSideEnum.Defender)]
-    [InlineData(true, false, false, false, BattleSideEnum.Defender)]
-    [InlineData(true, false, false, false, BattleSideEnum.Attacker, BattleSideEnum.Defender)]
-    [InlineData(true, true, false, true, BattleSideEnum.Attacker, BattleSideEnum.Defender)]
-    [InlineData(true, true, true, true)]
-    public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool activated, bool attackerFielded, bool defenderFielded,
-        bool expected, params BattleSideEnum[] failedFleetSides)
+    [InlineData(false, true, true, false, true)]
+    [InlineData(true, false, false, true, true)]
+    [InlineData(true, false, true, false, false)]
+    [InlineData(true, false, true, true, true)]
+    public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool attackerFielded, bool defenderFielded,
+        bool attackerFleetFailed, bool defenderFleetFailed, bool expected)
     {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded,
-            failedFleetSides));
+        var failedFleetSides = new List<BattleSideEnum>();
+        if (attackerFleetFailed) failedFleetSides.Add(BattleSideEnum.Attacker);
+        if (defenderFleetFailed) failedFleetSides.Add(BattleSideEnum.Defender);
+
+        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(true, attackerFielded, defenderFielded, failedFleetSides));
     }
 
     [Fact]

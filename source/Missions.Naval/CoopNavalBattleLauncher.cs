@@ -162,16 +162,16 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
         var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
-        var playerParties = GetPlayerParties();
+        // The player registry the AI share and the spawner read too, so all three agree on who the side's players are.
+        Func<PartyBase, bool> isPlayerParty = party => playerManager.Contains(party.MobileParty);
         deploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
-            sideParties.Select(party => party.Party), PartyBase.MainParty, playerParties.Contains);
-        deploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(
-            sideParties.Select(party => party.Party), playerParties.Contains);
+            sideParties.Select(party => party.Party), PartyBase.MainParty, isPlayerParty);
+        deploymentSlot.PlayerCount = NavalPlayerDeploymentSlot.PlayerCountOf(sideParties.Select(party => party.Party), isPlayerParty);
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
 
         // The battle host's AI share of this side subtracts this same fleet, so both come from the budget.
         var ownFleet = shipBudget.PlayerFleet(sideParties, PartyBase.MainParty);
-        var ownShips = ownFleet.Ships.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build((Ship)ship)).ToMBList();
+        var ownShips = ownFleet.Ships.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build(ship)).ToMBList();
         var captains = OrderOwnCaptains(CoopFieldBattleLauncher.OwnPartyHeroesByPriority(),
             PartyBase.MainParty.LeaderHero?.CharacterObject.StringId, ownShips.Count);
 
@@ -252,19 +252,6 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         return mission;
     }
 
-    // The parties of every connected player that resolve on this client.
-    private HashSet<PartyBase> GetPlayerParties()
-    {
-        var parties = new HashSet<PartyBase>();
-        foreach (var player in playerManager.Players)
-        {
-            if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                parties.Add(party.Party);
-        }
-
-        return parties;
-    }
-
     // The ship services share the attached controller's per-battle session, deployment and mission component.
     private void AttachNavalServices(Mission mission)
     {
@@ -272,15 +259,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         // A spawner per side on every client, so either side's attempt has an owner here, also for an AI party joining later.
         var npcFleets = new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker }
-            .Select(side => npcFleetSpawners(context.Session, services.ShipReplicator,
-                new NavalNpcFleetRollback(services.ShipReplicator), side))
-            .ToList();
+            .ToDictionary(side => side, side => npcFleetSpawners(context.Session, services.ShipReplicator,
+                new NavalNpcFleetRollback(services.ShipReplicator), side));
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleets,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
             ballistaTargets, missionTracker, foreignHulls, ropes, damageGate, deploymentSlot));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
-            npcFleets, services.HullLedger, tallyReader,
+            npcFleets.Values, services.HullLedger, tallyReader,
             new NavalPlayerHeroGrace(context.Session, context.MissionContext, playerManager, objectManager)));
     }
 

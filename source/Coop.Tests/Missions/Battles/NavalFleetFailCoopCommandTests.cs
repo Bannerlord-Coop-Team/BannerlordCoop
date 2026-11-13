@@ -15,6 +15,7 @@ public class NavalFleetFailCoopCommandTests
     [InlineData("later")]
     [InlineData("")]
     [InlineData("before", "crewing")]
+    [InlineData("ally", "enemy")]
     public void BadArguments_ShowUsage(params string[] values)
     {
         var args = new Mock<ICoopCommandArgs>();
@@ -24,19 +25,21 @@ public class NavalFleetFailCoopCommandTests
         var result = new NavalFleetFailCoopCommand().ProcessCommand(args.Object);
 
         Assert.False(result.Succeeded);
-        Assert.Equal("Usage: coop.debug.naval.fleet_fail [before|after_hull|crewing]", result.Output);
+        Assert.Equal("Usage: coop.debug.naval.fleet_fail [enemy|ally] [before|after_hull|crewing]", result.Output);
     }
 
-    // A known stage word passes the argument check and only then needs the mission.
+    // At most one side word and one stage word, in either order, pass the argument check and only then need the mission.
     [Theory]
     [InlineData("before")]
     [InlineData("AFTER_HULL")]
-    [InlineData("crewing")]
-    public void StageWord_PassesTheArgumentCheck(string stage)
+    [InlineData("ally")]
+    [InlineData("crewing", "Ally")]
+    [InlineData("enemy", "before")]
+    public void SideAndStageWords_PassTheArgumentCheck(params string[] values)
     {
         var args = new Mock<ICoopCommandArgs>();
-        args.SetupGet(value => value.Count).Returns(1);
-        args.Setup(value => value[0]).Returns(stage);
+        args.SetupGet(value => value.Count).Returns(values.Length);
+        args.Setup(value => value[It.IsAny<int>()]).Returns((int index) => values[index]);
 
         var result = new NavalFleetFailCoopCommand().ProcessCommand(args.Object);
 

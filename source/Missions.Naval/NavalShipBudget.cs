@@ -5,29 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace Missions.Naval;
-
-/// <summary>A player's own fleet at sea: the campaign ships its launcher fields and the limits vanilla gave its two teams.</summary>
-public readonly struct NavalPlayerFleet
-{
-    public readonly MBList<IShipOrigin> Ships;
-    public readonly NavalShipDeploymentLimit PlayerLimit;
-    public readonly NavalShipDeploymentLimit AllyLimit;
-
-    public NavalPlayerFleet(MBList<IShipOrigin> ships, NavalShipDeploymentLimit playerLimit, NavalShipDeploymentLimit allyLimit)
-    {
-        Ships = ships;
-        PlayerLimit = playerLimit;
-        AllyLimit = allyLimit;
-    }
-
-    /// <summary>How many hulls the fleet puts in the battle: its ships, at most its share of the side.</summary>
-    public int FieldedCount => Math.Min(Ships.Count, PlayerLimit.NetDeploymentLimit);
-}
 
 /// <summary>
 /// Splits a naval battle side's eight ships from campaign data every client holds: each player fields its own share, and the
@@ -43,9 +26,6 @@ public interface INavalShipBudget
 
     /// <summary>[Game thread] The AI parties' share of the side: the eight ships less every player's fleet, at most their own limit.</summary>
     NavalShipDeploymentLimit AiLimit(MBReadOnlyList<MapEventParty> sideParties, MBReadOnlyList<MapEventParty> aiParties);
-
-    /// <summary>Whether no player owns the party, by the player registry the server's fate rule reads.</summary>
-    bool IsAiParty(MapEventParty party);
 }
 
 /// <inheritdoc cref="INavalShipBudget"/>
@@ -68,27 +48,24 @@ public class NavalShipBudget : INavalShipBudget
         var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
         SplitPlayerSideParties(sideParties, playerParty, out var playerMapEventParty, out var playerTeamParties, out var allyTeamParties);
         model.GetShipDeploymentLimitsOfPlayerTeams(playerTeamParties, allyTeamParties, out var playerLimit, out var allyLimit);
-        if (playerMapEventParty == null || playerMapEventParty.Ships.Count == 0)
-            return new NavalPlayerFleet(new MBList<IShipOrigin>(), playerLimit, allyLimit);
+        if (playerMapEventParty.Ships.Count == 0) return new NavalPlayerFleet(Array.Empty<Ship>(), playerLimit, allyLimit);
 
         var ships = new MBList<IShipOrigin> { model.GetSuitablePlayerShip(playerMapEventParty, playerTeamParties) };
         model.FillShipsOfTeamParties(playerTeamParties, playerLimit, ships);
-        return new NavalPlayerFleet(ships, playerLimit, allyLimit);
+        return new NavalPlayerFleet(ships.Cast<Ship>().ToList(), playerLimit, allyLimit);
     }
 
     // Vanilla's team limit for the AI parties, with its net ships cut to what the players left, as vanilla cuts a team's share.
+    // The players' fleets are recomputed from campaign data rather than read from the registered hulls: a peer announces its
+    // hulls only at its own deployment commit, which can come after the host fields the AI. A party joining the side between a
+    // player's mission open and this call can still shift that player's ratio share; late joiners are not handled yet.
     public NavalShipDeploymentLimit AiLimit(MBReadOnlyList<MapEventParty> sideParties, MBReadOnlyList<MapEventParty> aiParties)
     {
         var limit = NavalDLCManager.Instance.GameModels.ShipDeploymentModel.GetTeamShipDeploymentLimit(aiParties);
-        var playerFleets = sideParties.Where(IsPlayerParty)
+        var playerFleets = sideParties.Where(party => playerManager.Contains(party.Party?.MobileParty))
             .Select(party => PlayerFleet(sideParties, party.Party).FieldedCount);
         return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(playerFleets, limit.NetDeploymentLimit));
     }
-
-    public bool IsAiParty(MapEventParty party) => party.Party != null && !playerManager.Contains(party.Party.MobileParty);
-
-    // A party a player owns; the launcher fields its fleet.
-    private bool IsPlayerParty(MapEventParty party) => party.Party != null && playerManager.Contains(party.Party.MobileParty);
 
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>
     internal static int LeftForAi(IEnumerable<int> playerFleets, int aiLimit) =>

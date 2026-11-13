@@ -628,7 +628,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment, IDisp
             Call(() =>
             {
                 var team = formationIndex == null ? null
-                    : Instance.Resolve<IBattleTeamResolver>().ResolveReplicatedTeam(side, isOwn: false);
+                    : Instance.Resolve<IBattleTeamResolver>().ResolveAiFleetTeam(side);
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 hull.CampaignShipId = campaignShipId;
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);

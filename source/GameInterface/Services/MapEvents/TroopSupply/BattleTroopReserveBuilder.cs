@@ -628,8 +628,8 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
     /// <summary>
     /// The controller that owns a party's reserve, or null if no present player does (so the host fields it).
-    /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader on land, and
-    /// <paramref name="atSea"/> to the host, which fields every AI party of a naval side on the ally team.
+    /// A party's own player wins. An AI party (no own player) in a player-led army falls to that army leader on land; when
+    /// <paramref name="atSea"/>, it falls to the host, which fields every AI party of a naval side on the ally team.
     /// An owner in <paramref name="absentControllers"/> (dropped from the battle, not yet returned) resolves
     /// to null: its parties fall to the host until it re-enters, at which point the caller re-issues both
     /// scopes (the returner's grant and the host's shrunk refresh).
@@ -637,7 +637,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController,
         IReadOnlyCollection<string> absentControllers = null, bool atSea = false)
     {
-        var owner = partyOwnerController ?? (atSea ? null : armyLeaderController);
+        if (atSea) armyLeaderController = null;
+
+        var owner = partyOwnerController ?? armyLeaderController;
         if (owner != null && absentControllers != null && absentControllers.Contains(owner))
             return null;
         return owner;

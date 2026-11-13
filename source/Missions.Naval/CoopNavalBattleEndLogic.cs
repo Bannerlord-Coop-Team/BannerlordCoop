@@ -28,7 +28,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
-    private readonly IReadOnlyList<INavalNpcFleetSpawner> npcFleets;
+    private readonly IEnumerable<INavalNpcFleetSpawner> npcFleets;
     private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
@@ -39,7 +39,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     // Takes the battle's session, deployment, committer and AI fleets, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        IReadOnlyList<INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
+        IEnumerable<INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
         INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;

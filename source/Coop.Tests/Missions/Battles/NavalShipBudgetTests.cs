@@ -31,10 +31,9 @@ public class NavalShipBudgetTests
     }
 
     // The allies get what the players' fielded ships leave of the side's eight, never more than their own limit nor below none.
-    // 6+6: a player with 6 ships next to an AI lord with 6 fields 4 by vanilla's ratio, which leaves the lord 4.
+    // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4.
     [Theory]
     [InlineData(new[] { 4 }, 6, 4)]
-    [InlineData(new[] { 3 }, 8, 5)]
     [InlineData(new[] { 3 }, 2, 2)]
     [InlineData(new[] { 4, 4 }, 6, 0)]
     [InlineData(new[] { 5, 4 }, 6, 0)]

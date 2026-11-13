@@ -2,7 +2,8 @@
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
-using TaleWorlds.Core;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
@@ -44,19 +45,23 @@ internal class CopySkippingConnectedShipPatch
         var shipsLogic = __instance._navalShipsLogic;
         if (!NavalForeignHullRegistry.IsCopyFormation(shipsLogic, __result)) return;
 
-        __result = ConnectedOwnShip(shipsLogic, __instance.Team.TeamSide, shipUniqueBitwiseID)?.Formation;
+        var teamShips = new MBList<MissionShip>();
+        shipsLogic.FillTeamShips(__instance.Team.TeamSide, teamShips);
+        __result = PickConnectedShip(teamShips, shipUniqueBitwiseID, NavalForeignHullRegistry.IsCopyHere)?.Formation;
     }
 
-    // NavalShipsLogic.GetConnectedTeamShip without copies: the hull itself if it is on the team, else the last one in its island.
-    private static MissionShip ConnectedOwnShip(NavalShipsLogic shipsLogic, TeamSideEnum teamSide, ulong shipUniqueBitwiseID)
+    /// <summary>
+    /// NavalShipsLogic.GetConnectedTeamShip without copies: the hull itself if it is one of <paramref name="teamShips"/>, else the
+    /// last of them in its island, else none.
+    /// </summary>
+    internal static MissionShip PickConnectedShip(IEnumerable<MissionShip> teamShips, ulong shipUniqueBitwiseID,
+        Func<MissionShip, bool> isCopy)
     {
-        var teamShips = new MBList<MissionShip>();
-        shipsLogic.FillTeamShips(teamSide, teamShips);
-
         MissionShip connected = null;
         foreach (var ship in teamShips)
         {
-            if ((ship.ShipIslandCombinedID & shipUniqueBitwiseID) == 0 || NavalForeignHullRegistry.IsCopyHere(ship)) continue;
+            bool inIsland = (ship.ShipIslandCombinedID & shipUniqueBitwiseID) != 0;
+            if (!inIsland || isCopy(ship)) continue;
             if (ship.ShipUniqueBitwiseID == shipUniqueBitwiseID) return ship;
 
             connected = ship;
