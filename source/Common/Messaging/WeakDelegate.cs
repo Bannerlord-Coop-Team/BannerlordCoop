@@ -9,6 +9,7 @@ namespace Common.Messaging
     public class WeakDelegate
     {
         public bool IsAlive => reference.IsAlive;
+        public object Instance => reference.Target;
 
         public MethodInfo Method => method;
 
@@ -50,6 +51,12 @@ namespace Common.Messaging
             return base.GetHashCode();
         }
 
+        private Delegate ToDelegate()
+        {
+            return Delegate.CreateDelegate(reference.Target.GetType(), method);
+        }
+
         public static implicit operator WeakDelegate(Delegate d) => new WeakDelegate(d);
+        public static implicit operator Delegate(WeakDelegate d) => d.ToDelegate();
     }
 }
