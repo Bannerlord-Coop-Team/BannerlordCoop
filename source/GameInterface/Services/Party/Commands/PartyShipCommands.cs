@@ -35,22 +35,31 @@ public class PartyShipCommands
         new CoopCommandResult(false, output, "command_failed");
 
     // coop.debug.party.add_ship PlayerOne northern_light_ship
-    /// <summary>Gives a player's party one new ship through the vanilla production ownership path.</summary>
+    // coop.debug.party.add_ship lord_1_17_party_1 northern_light_ship
+    /// <summary>Gives a player's or an AI party one new ship through the vanilla production ownership path.</summary>
     public sealed class AddShipCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party";
 
         public string Name => "add_ship";
 
-        public string Description => "Gives a player's party one new ship of the given War Sails hull.";
+        public string Description => "Gives a player's or an AI party one new ship of the given War Sails hull.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("controller_id", "The player whose party receives the ship.", true),
+            new ExpectedArgs("party", "A player's controller id, or a mobile party name or id (an allied AI lord's party).", true),
             new ExpectedArgs("ship_hull_id", $"The hull id, {DefaultHullId} when omitted.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Resolves a party that is not a player's by name or id.
+        public AddShipCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -61,8 +70,9 @@ public class PartyShipCommands
                 return Failed("NavalDLC is not active on the server.");
 
             var hullId = args.Count == 2 ? args[1] : DefaultHullId;
-            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var error))
-                return Failed(error);
+            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var playerError)
+                && (objectManager == null || !resolver.TryResolveMobileParty(args[0], out party, out _)))
+                return Failed($"{playerError} No mobile party matches {args[0]} either.");
 
             var hull = MBObjectManager.Instance.GetObject<ShipHull>(hullId);
             if (hull == null)
@@ -72,7 +82,7 @@ public class PartyShipCommands
             ChangeShipOwnerAction.ApplyByProduction(party.Party, ship);
 
             var shipId = DescribeId(objectManager, ship);
-            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} of player {ControllerId}",
+            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} (asked for {Query})",
                 hullId, shipId, party.StringId, args[0]);
             return Succeeded($"Added {hullId} {shipId} to {party.StringId} (ships={party.Ships.Count}).");
         }

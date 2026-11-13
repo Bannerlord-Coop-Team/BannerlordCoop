@@ -789,7 +789,7 @@ public class NavalScenarioStager : INavalScenarioStager
         Logger.Information("[NavalScenario] Late join of {ControllerId}: {Outcome}", config.LateJoinerControllerId, error ?? "joined");
     }
 
-    // Allied NPC fleets are not fielded yet, so this only records how the battle treats the joined party.
+    // Joins the nearest free allied lord with a ship to the players' side; the battle host fields its fleet on the ally team.
     private string JoinAlliedNpc(MapEvent mapEvent, MobileParty player, MobileParty enemy, ShipHull hull)
     {
         var playerPosition = player.Position.ToVec2();
