@@ -404,7 +404,7 @@ internal class HeroInterface : IHeroInterface
     }
 
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
-        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>("Player");
+        => Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(PlayerCharacterTemplate.JoinedPlayerIdPrefix);
 
     private void RegisterPrimary<T>(T obj, string stringId) where T : MBObjectBase
     {
