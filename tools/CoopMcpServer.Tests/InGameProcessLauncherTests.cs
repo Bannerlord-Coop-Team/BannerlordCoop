@@ -32,6 +32,32 @@ public sealed class InGameProcessLauncherTests
         Assert.DoesNotContain("/coopowner", info.ArgumentList);
     }
 
+    [Theory]
+    [InlineData("Bannerlord.Harmony", true)]
+    [InlineData("TAOM.CoopCompat", true)]
+    [InlineData("Sandbox_Core-2", true)]
+    [InlineData("..", false)]
+    [InlineData(".Hidden", false)]
+    [InlineData("Trailing.", false)]
+    [InlineData("A..B", false)]
+    [InlineData("A/B", false)]
+    public void ModuleIdsMayBeDottedButNeverNameAFolderOutsideModules(string module, bool accepted)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string path = Path.Combine(directory, "Bannerlord.exe");
+            File.WriteAllText(path, "fake, never launched");
+            var profile = new LaunchProfile { Executable = path, Modules = new[] { "Native", module, "Coop" } };
+            if (accepted)
+                profile.Validate(0);
+            else
+                Assert.Throws<ArgumentException>(() => profile.Validate(0));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
     [Fact]
     public void DuplicatePlatformIdsAreRejectedBeforeLaunch()
     {

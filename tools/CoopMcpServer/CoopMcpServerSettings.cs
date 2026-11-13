@@ -62,9 +62,15 @@ public sealed class LaunchProfile
             ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() != ids.Length)
             throw new ArgumentException("All selected platform IDs must be distinct, 1..64 ASCII letters/digits, '-' or '_'.");
         if (Modules == null || Modules.Length == 0 || Modules.Length > 32 ||
-            Modules.Any(m => string.IsNullOrWhiteSpace(m) || m.Length > 128 ||
-                m.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_' && c != '-')) ||
+            Modules.Any(m => !IsModuleId(m)) ||
             !Modules.Contains("Coop", StringComparer.Ordinal))
             throw new ArgumentException("modules must include Coop and contain only module identifiers.");
     }
+
+    // Module ids such as Bannerlord.Harmony contain dots. A dot may only separate two other characters,
+    // so no id can be "..", hidden or empty-segmented.
+    private static bool IsModuleId(string module) =>
+        !string.IsNullOrWhiteSpace(module) && module.Length <= 128 &&
+        module.All(c => char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-' || c == '.') &&
+        module[0] != '.' && module[^1] != '.' && !module.Contains("..", StringComparison.Ordinal);
 }
