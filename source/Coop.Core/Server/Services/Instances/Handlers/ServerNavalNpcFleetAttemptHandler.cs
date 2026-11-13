@@ -82,15 +82,16 @@ public class ServerNavalNpcFleetAttemptHandler : IHandler
     }
 
     // [Game thread] A battle whose last player left keeps its map event (BR-017), and re-engaging it opens a new mission whose
-    // host attempts the fleets again, so the old attempts go with the instance on every machine. PublishDeparture runs on the
-    // game thread, so this runs inline, ahead of any reply the server sends a re-engaging player.
+    // host attempts the fleets again, so the old attempts go with the instance on every machine. Runs inline so the forget goes
+    // out ahead of any later mission start; clients only hold attempts sent from here, so a battle with none sends nothing.
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {
         var departure = payload.What;
         if (!departure.IsInstanceEmpty) return;
+        if (!attempts.Forget(departure.InstanceId)) return;
 
-        attempts.Forget(departure.InstanceId);
         network.SendAll(new NetworkNpcFleetAttemptsForgotten(departure.InstanceId));
+        Logger.Information("[NavalBattle] Forgot the AI fleet attempts of {Instance}: its mission instance emptied", departure.InstanceId);
     }
 
     // [Game thread] A client entering the campaign missed the earlier sends, so it gets every open battle's attempts now.

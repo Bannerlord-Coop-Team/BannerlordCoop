@@ -22,8 +22,11 @@ public interface INavalNpcFleetAttemptTracker
     /// <summary>Every recorded attempt of an open battle.</summary>
     IEnumerable<NetworkNpcFleetAttemptRecorded> All { get; }
 
-    /// <summary>Drops the battle's attempts, once its mission instance is gone while the battle stays open (BR-017).</summary>
-    void Forget(string mapEventId);
+    /// <summary>
+    /// Drops the battle's attempts, once its mission instance is gone while the battle stays open (BR-017); returns whether it
+    /// held any.
+    /// </summary>
+    bool Forget(string mapEventId);
 }
 
 /// <inheritdoc cref="INavalNpcFleetAttemptTracker"/>
@@ -64,10 +67,12 @@ public class NavalNpcFleetAttemptTracker : INavalNpcFleetAttemptTracker
         }
     }
 
-    public void Forget(string mapEventId)
+    public bool Forget(string mapEventId)
     {
-        foreach (var key in attempts.Keys.Where(key => key.MapEventId == mapEventId).ToList())
+        var keys = attempts.Keys.Where(key => key.MapEventId == mapEventId).ToList();
+        foreach (var key in keys)
             attempts.Remove(key);
+        return keys.Count > 0;
     }
 
     // An attempt lives only while its battle is open, on the server and on clients, which never see the finalize event.
