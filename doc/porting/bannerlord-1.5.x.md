@@ -61,8 +61,14 @@ epic #3836 tracks the v1.5 work that remains. Each port commit body lists its ch
 
 - The village behavior's `StartHostileAction` is gone. `WillVillageResistHostileAction` now sends each
   raid or force action into a resist or a no-resist menu, each with its own continue consequence.
-  Co-op intercepts the resist continue consequences and treats every village as resisting, so the
-  encounter path is always used (`VillageHostileActionStartPatch.cs`).
+  Co-op intercepts all four force continue consequences and the raid one, and the server checks
+  resistance again. A force action on a village that gives in gets vanilla's coercion (crime and
+  relations, no war) and the won battle outcome without a map event; the requester gets
+  `NetworkVillageHostileActionStarted` with `Unresisted` set and goes back to the village menu
+  (`VillageHostileActionStartPatch.cs`, `ServerVillageHostileActionHandler.cs`, #4587).
+- `OnGameEarlyLoaded` rewrites a stored v1.4.8 hostile action menu id and finishes the encounter
+  for the old success menus. Co-op reopens no menu from `MapStateData.GameMenuId` and the server
+  drops its stored menu (`SavedMenuLoadPatch`), so this only matters for v1.4.8 saves (#4615).
 - "Forget it" on the hostile action menus returns to the village menu, so it is no longer a
   settlement leave.
 - A party at sea leaves a settlement at its port, still sailing.
@@ -222,7 +228,6 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
 
 ## Known gaps
 
-- Village force actions always take the encounter path; v1.5's no-resist path is not supported yet.
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
   the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
