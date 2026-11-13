@@ -62,7 +62,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalShipDamageGate damageGate;
     private readonly INavalPlayerDeploymentSlotTracker deploymentSlot;
     private readonly INavalShipBudget shipBudget;
-    private readonly Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetRollback, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners;
+    private readonly Func<IBattleSession, IBattleShipReplicator, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -92,7 +92,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalPlayerDeploymentSlotTracker deploymentSlot,
         INavalShipBudget shipBudget,
         // One AI fleet spawner per battle side, over that battle's session and ship replicator.
-        Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetRollback, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners
+        Func<IBattleSession, IBattleShipReplicator, BattleSideEnum, INavalNpcFleetSpawner> npcFleetSpawners
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls,
@@ -259,8 +259,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         // A spawner per side on every client, so either side's attempt has an owner here, also for an AI party joining later.
         var npcFleets = new[] { BattleSideEnum.Defender, BattleSideEnum.Attacker }
-            .ToDictionary(side => side, side => npcFleetSpawners(context.Session, services.ShipReplicator,
-                new NavalNpcFleetRollback(services.ShipReplicator), side));
+            .ToDictionary(side => side, side => npcFleetSpawners(context.Session, services.ShipReplicator, side));
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, steeredCopies, npcFleets,
             mission.GetMissionBehavior<NavalShipsLogic>(), tickFailureLogs(), tickFailureLogs(), lateHullDeployment,
             ballistaTargets, missionTracker, foreignHulls, ropes, damageGate, deploymentSlot));

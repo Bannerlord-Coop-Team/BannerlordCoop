@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -12,6 +13,9 @@ public sealed class NavalNpcFleetAttemptWork
 
     /// <summary>The reserve troops the attempt pulled for its crew.</summary>
     public List<IAgentOriginBase> Troops { get; } = new List<IAgentOriginBase>();
+
+    /// <summary>How many crew vanilla's first batch spawned (diagnostics).</summary>
+    public int FirstCrewBatch { get; set; }
 
     /// <summary>Whether the troops were handed to vanilla's crewing, which then holds the ones not spawned yet.</summary>
     public bool CrewingStarted { get; private set; }
@@ -35,4 +39,18 @@ public sealed class NavalNpcFleetAttemptWork
         CrewSide = side;
         SpawnedOnTickBefore = spawnedOnTickBefore;
     }
+#if DEBUG
+
+    /// <summary>The stage a DEBUG fleet failure throws at in this attempt, if one was armed.</summary>
+    public NavalFleetFailStage? ArmedFailure { get; set; }
+
+    // Throws the armed failure once the attempt reaches its stage, through the attempt's normal failure path.
+    public void ThrowIfArmed(NavalFleetFailStage stage)
+    {
+        if (ArmedFailure != stage) return;
+
+        ArmedFailure = null;
+        throw new InvalidOperationException($"DEBUG fleet_fail: forced AI fleet spawn failure ({stage})");
+    }
+#endif
 }

@@ -1,8 +1,6 @@
 ﻿#if COOP_NAVAL
 using Common;
 using Common.Messaging;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
@@ -45,7 +43,7 @@ public class NavalNpcFleetSpawnerTests
     [InlineData(0, 3, 8, 0)]
     public void ShipCount_FollowsVanillasLimitShipAndFormationCaps(int limit, int ships, int formations, int expected)
     {
-        Assert.Equal(expected, NavalNpcFleetSpawner.ShipCount(limit, ships, formations));
+        Assert.Equal(expected, NavalNpcFleetFielder.ShipCount(limit, ships, formations));
     }
 
     [Theory]
@@ -322,10 +320,7 @@ public class NavalNpcFleetSpawnerTests
             session.SetupGet(s => s.InstanceId).Returns("MapEvent_1");
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
             Spawner = new NavalNpcFleetSpawner(Network.Object, broker ?? new MessageBroker(), session.Object,
-                Mock.Of<IBattleShipReplicator>(), Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(),
-                Mock.Of<IPlayerManager>(),
-                Mock.Of<INavalLateDeploymentPlanTracker>(), Rollback.Object,
-                Mock.Of<IBattleTeamResolver>(), Mock.Of<INavalShipBudget>(), side
+                Mock.Of<IBattleShipReplicator>(), side, (_, _) => Mock.Of<INavalNpcFleetFielder>(), _ => Rollback.Object
 #if DEBUG
                 , ScenarioState(scenarioFailsSpawn)
 #endif

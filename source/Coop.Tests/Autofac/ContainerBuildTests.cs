@@ -128,10 +128,8 @@ namespace Coop.Tests.Autofac
             Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
             Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
             // The launcher builds a spawner per side through this factory, with the per-battle arguments typed in.
-            var npcFleets = container.Resolve<Func<IBattleSession, IBattleShipReplicator, INavalNpcFleetRollback, BattleSideEnum,
-                INavalNpcFleetSpawner>>();
-            using (var npcFleet = npcFleets(Mock.Of<IBattleSession>(), Mock.Of<IBattleShipReplicator>(), Mock.Of<INavalNpcFleetRollback>(),
-                BattleSideEnum.Attacker))
+            var npcFleets = container.Resolve<Func<IBattleSession, IBattleShipReplicator, BattleSideEnum, INavalNpcFleetSpawner>>();
+            using (var npcFleet = npcFleets(Mock.Of<IBattleSession>(), Mock.Of<IBattleShipReplicator>(), BattleSideEnum.Attacker))
             {
                 Assert.Equal(BattleSideEnum.Attacker, npcFleet.Side);
             }

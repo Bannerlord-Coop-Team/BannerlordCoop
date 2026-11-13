@@ -12,8 +12,6 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 #if COOP_NAVAL
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
@@ -222,9 +220,8 @@ public class NavalNpcHullRetractionTests
 #if COOP_NAVAL
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
         public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
-            Replicator, Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
-            Mock.Of<INavalLateDeploymentPlanTracker>(), new NavalNpcFleetRollback(Replicator), Mock.Of<IBattleTeamResolver>(),
-            Mock.Of<INavalShipBudget>(), BattleSideEnum.Defender
+            Replicator, BattleSideEnum.Defender, (_, _) => Mock.Of<INavalNpcFleetFielder>(),
+            replicator => new NavalNpcFleetRollback(replicator)
 #if DEBUG
             , Mock.Of<INavalScenarioState>()
 #endif
