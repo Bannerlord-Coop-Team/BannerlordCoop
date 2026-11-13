@@ -38,6 +38,12 @@ internal sealed class ConversationPartyTracker : IHandler
     private readonly Dictionary<string, object> pvpPeerByPartyId = new Dictionary<string, object>();
     private readonly Dictionary<object, string> pvpPartyIdByPeer = new Dictionary<object, string>(ReferenceObjectComparer.Instance);
 
+    // Each player's party id and the AI parties whose server-detected encounter with them was deferred and logged.
+    // A player's entry drops when their engagement or PvP conversation ends or they leave, and a party leaves every
+    // entry when its holder's engagement ends.
+    private readonly Dictionary<object, (string EngagerPartyId, HashSet<string> PartyIds)> loggedDeferralsByEngager =
+        new Dictionary<object, (string EngagerPartyId, HashSet<string> PartyIds)>(ReferenceObjectComparer.Instance);
+
     private volatile bool isEmpty = true;
     private volatile bool pvpIsEmpty = true;
     private bool disposed;
@@ -70,6 +76,7 @@ internal sealed class ConversationPartyTracker : IHandler
             pvpPartnersByPartyId.Clear();
             pvpPeerByPartyId.Clear();
             pvpPartyIdByPeer.Clear();
+            loggedDeferralsByEngager.Clear();
             isEmpty = true;
             pvpIsEmpty = true;
         }
@@ -214,6 +221,10 @@ internal sealed class ConversationPartyTracker : IHandler
             engagements.Remove(engagerKey);
             shouldReleaseParty = !engagements.Values.Any(x => x.PartyId == endedPartyId);
             isEmpty = engagements.Count == 0;
+
+            loggedDeferralsByEngager.Remove(engagerKey);
+            foreach (var deferrals in loggedDeferralsByEngager.Values)
+                deferrals.PartyIds.Remove(endedPartyId);
             return true;
         }
     }
@@ -276,6 +287,40 @@ internal sealed class ConversationPartyTracker : IHandler
         }
     }
 
+    /// <summary>
+    /// Records a deferred server-detected encounter between the player and <paramref name="partyId"/>. True only the
+    /// first time until the conversation behind the deferral ends, so the caller logs each deferral once.
+    /// </summary>
+    public bool RecordDeferral(object engagerKey, string engagerPartyId, string partyId)
+    {
+        if (engagerKey == null || engagerPartyId == null || partyId == null) return false;
+
+        lock (stateLock)
+        {
+            if (disposed) return false;
+            // A player who switched parties starts a fresh record under the new party.
+            if (!loggedDeferralsByEngager.TryGetValue(engagerKey, out var deferrals) ||
+                deferrals.EngagerPartyId != engagerPartyId)
+            {
+                deferrals = (engagerPartyId, new HashSet<string>());
+                loggedDeferralsByEngager[engagerKey] = deferrals;
+            }
+
+            return deferrals.PartyIds.Add(partyId);
+        }
+    }
+
+    /// <summary>Drops the deferrals logged for a player who left.</summary>
+    public void ForgetDeferrals(object engagerKey)
+    {
+        if (engagerKey == null) return;
+
+        lock (stateLock)
+        {
+            loggedDeferralsByEngager.Remove(engagerKey);
+        }
+    }
+
     /// <summary>Marks two player parties as being in a conversation with each other; only they may interact until it ends.</summary>
     public void BeginPvpConversation(string partyIdA, string partyIdB)
     {
@@ -303,6 +348,13 @@ internal sealed class ConversationPartyTracker : IHandler
                 pvpPartnersByPartyId.Remove(partnerId);
                 RemovePvpPeer(partyId);
                 RemovePvpPeer(partnerId);
+
+                var endedEngagers = loggedDeferralsByEngager
+                    .Where(x => x.Value.EngagerPartyId == partyId || x.Value.EngagerPartyId == partnerId)
+                    .Select(x => x.Key)
+                    .ToList();
+                foreach (var engagerKey in endedEngagers)
+                    loggedDeferralsByEngager.Remove(engagerKey);
             }
 
             pvpIsEmpty = pvpPartnersByPartyId.Count == 0;

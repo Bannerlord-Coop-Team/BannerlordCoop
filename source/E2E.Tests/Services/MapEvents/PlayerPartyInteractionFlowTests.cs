@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -44,6 +45,7 @@ using Helpers;
 using LiteNetLib;
 using Missions.Messages;
 using Moq;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
@@ -3353,6 +3355,54 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
         Server.PumpGameThread();
+    }
+
+    [Fact]
+    public void ServerAiPartyEncounter_RetriedWhilePlayerTalksToAnotherParty_LogsDeferralOnceUntilTheConversationEnds()
+    {
+        var (client1, client2, playerPartyId, otherPlayerPartyId) = CreateTwoPlayerParties();
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+        var thirdAiPartyId = CreateMobilePartyBase();
+        var logs = new ConcurrentQueue<string>();
+        Action<string> capture = logs.Enqueue;
+        // TestLogLevels raises ConversationRequestHandler to Verbose, otherwise this line is never captured.
+        int Deferrals(string aiPartyId) => logs.Count(line =>
+            line.StartsWith("Deferring server-detected conversation") && line.Contains($"AttackerId=\"{aiPartyId}\""));
+
+        StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            // Two parties retry in turn every tick while the player talks to the first one.
+            logs.Clear();
+            for (var tick = 0; tick < 5; tick++)
+            {
+                StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+                StartServerAiPartyEncounter(thirdAiPartyId, playerPartyId);
+            }
+
+            Assert.Equal(1, Deferrals(secondAiPartyId));
+            Assert.Equal(1, Deferrals(thirdAiPartyId));
+
+            // Once the conversation ends, the second party logs again while another player holds it.
+            logs.Clear();
+            client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            Server.PumpGameThread();
+            StartServerAiPartyEncounter(secondAiPartyId, otherPlayerPartyId);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>(), m => m.DefenderId == otherPlayerPartyId);
+            StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+            StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+
+            Assert.Equal(1, Deferrals(secondAiPartyId));
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+            client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+            Server.PumpGameThread();
+        }
     }
 
     [Fact]
