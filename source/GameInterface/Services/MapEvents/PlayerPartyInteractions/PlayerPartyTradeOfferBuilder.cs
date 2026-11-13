@@ -56,12 +56,13 @@ internal class PlayerPartyTradeOfferBuilder : IPlayerPartyTradeOfferBuilder
             if (count <= 0) continue;
 
             var equipment = item.ItemRosterElement.EquipmentElement;
-            if (!objectManager.TryGetId(equipment.Item, out var itemObjectId)) continue;
+            if (!objectManager.TryGetIdWithLogging(equipment.Item, out var itemObjectId)) continue;
 
             string itemModifierId = null;
-            if (equipment.ItemModifier != null && !objectManager.TryGetId(equipment.ItemModifier, out itemModifierId)) continue;
+            var hasModifier = equipment.ItemModifier != null;
+            if (hasModifier && !objectManager.TryGetIdWithLogging(equipment.ItemModifier, out itemModifierId)) continue;
 
-            result.Add(new ItemRosterElementData(new ItemObjectData(itemObjectId, itemModifierId, equipment.ItemModifier == null), count));
+            result.Add(new ItemRosterElementData(new ItemObjectData(itemObjectId, itemModifierId, itemModifierNull: !hasModifier), count));
         }
 
         return result.ToArray();
@@ -103,7 +104,7 @@ internal class PlayerPartyTradeOfferBuilder : IPlayerPartyTradeOfferBuilder
             if (character == null) continue;
             if (!objectManager.TryGetHandleWithLogging(character, out var characterId)) continue;
 
-            result.Add(new TroopRosterElementData(characterId, 1, 0, 0));
+            result.Add(new TroopRosterElementData(characterId, number: 1, woundedNumber: 0, xp: 0));
         }
 
         return result.ToArray();

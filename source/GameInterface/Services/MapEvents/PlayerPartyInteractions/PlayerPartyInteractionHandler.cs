@@ -425,8 +425,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedMarriages);
         session.InitiatorAcceptedTrade = false;
         session.ResponderAcceptedTrade = false;
-        // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
-        SendToTradePeers(session, new NetworkPlayerPartyTradeOfferUpdated(
+        var relayedOffer = new NetworkPlayerPartyTradeOfferUpdated(
             message.SessionId,
             partyId,
             message.OfferedItems,
@@ -435,7 +434,11 @@ internal class PlayerPartyInteractionHandler : IHandler
             message.OfferedFiefs,
             message.OfferedPrisoners,
             offeredPeace,
-            message.OfferedMarriages));
+            message.OfferedMarriages);
+        // Clients clear both acceptances when the offer arrives, so no trade state is sent for it.
+        // A trade only starts once the responder accepted it, which is what records the responder's peer.
+        network.Send(session.InitiatorPeer, relayedOffer);
+        network.Send(session.ResponderPeer, relayedOffer);
     }
 
     private bool CanOfferPeace(PlayerPartyInteractionSession session, string partyId)
@@ -819,13 +822,6 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         network.Send(session.InitiatorPeer, CreateInitiatorState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
         network.Send(session.ResponderPeer, CreateResponderState(session, PlayerPartyInteractionPhase.TradeActive, session.Proposal, options));
-    }
-
-    // A trade only starts once the responder accepted it, which is what records the responder's peer.
-    private void SendToTradePeers(PlayerPartyInteractionSession session, IMessage message)
-    {
-        network.Send(session.InitiatorPeer, message);
-        network.Send(session.ResponderPeer, message);
     }
 
     private void SendInitiatorState(
