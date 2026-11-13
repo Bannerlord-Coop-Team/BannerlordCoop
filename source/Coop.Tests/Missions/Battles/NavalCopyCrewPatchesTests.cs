@@ -99,7 +99,7 @@ public class NavalCopyCrewPatchesTests
         }
     }
 
-    // A constructor-skipped hull's crew record of the team, wanting its full crew of any class, as vanilla's spawn makes it.
+    // A constructor-skipped hull's crew record of the team, wanting its full crew under vanilla's default melee-and-ranged filter.
     private static NavalShipAgents HullAgents(NavalTeamAgents team, int crewCapacity)
     {
         var origin = new Mock<IShipOrigin>();
@@ -110,12 +110,12 @@ public class NavalCopyCrewPatchesTests
         var agents = ShipTestHulls.Uninitialized<NavalShipAgents>();
         agents.Ship = hull;
         agents.DesiredTroopCount = crewCapacity;
-        agents.TroopClassFilter = (TroopTraitsMask)3;
+        agents.TroopClassFilter = TroopTraitsMask.Melee | TroopTraitsMask.Ranged;
         // The readonly collections and team the skipped constructor would have set.
-        SetField(agents, "_teamAgents", team);
-        SetField(agents, "_activeAgents", new MBList<Agent>());
-        SetField(agents, "_reservedTroops", new Dictionary<IAgentOriginBase, NavalTroopAssignment>());
-        SetField(agents, "_reservedOrderedTroops", new MBSortedMultiList<int, NavalTroopAssignment>(true));
+        SetField(agents, nameof(NavalShipAgents._teamAgents), team);
+        SetField(agents, nameof(NavalShipAgents._activeAgents), new MBList<Agent>());
+        SetField(agents, nameof(NavalShipAgents._reservedTroops), new Dictionary<IAgentOriginBase, NavalTroopAssignment>());
+        SetField(agents, nameof(NavalShipAgents._reservedOrderedTroops), new MBSortedMultiList<int, NavalTroopAssignment>(true));
         return agents;
     }
 
