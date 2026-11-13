@@ -3,6 +3,7 @@ using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
 
@@ -14,22 +15,21 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CopySkippingNearestShipPatch
 {
-    // Searches again past the copies when vanilla picked one, with vanilla's afloat filter.
+    // Searches again past the copies when vanilla picked one.
     [HarmonyPostfix]
     private static void Postfix(TeamAINavalComponent __instance, Agent agent, ref Formation __result)
     {
         var shipsLogic = __instance._navalShipsLogic;
-        if (!IsCopyFormation(shipsLogic, __result)) return;
+        if (!NavalForeignHullRegistry.IsCopyFormation(shipsLogic, __result)) return;
 
         var position = agent.Frame.origin;
-        __result = shipsLogic.GetNearestTeamShip(__instance.Team.TeamSide, in position, float.MaxValue,
-            ship => ship.Physics.NavalSinkingState == NavalPhysicsScript.SinkingState.Floating && !ship.BeingAbandoned
-                && !NavalForeignHullRegistry.IsCopyHere(ship))?.Formation;
+        __result = shipsLogic.GetNearestTeamShip(__instance.Team.TeamSide, in position, float.MaxValue, IsAfloatOwnShip)?.Formation;
     }
 
-    /// <summary>Whether <paramref name="formation"/> is a copy's, which no local agent may join.</summary>
-    internal static bool IsCopyFormation(NavalShipsLogic shipsLogic, Formation formation) =>
-        formation != null && shipsLogic.GetShip(formation, out var ship) && NavalForeignHullRegistry.IsCopyHere(ship);
+    // Vanilla's afloat filter (not sinking, not abandoned), on a hull this client simulates.
+    private static bool IsAfloatOwnShip(MissionShip ship) =>
+        ship.Physics.NavalSinkingState == NavalPhysicsScript.SinkingState.Floating && !ship.BeingAbandoned
+            && !NavalForeignHullRegistry.IsCopyHere(ship);
 }
 
 // An agent stepping onto a team hull outside its own hull's island joins that hull's crew; never a copy's.
@@ -37,31 +37,31 @@ internal class CopySkippingNearestShipPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CopySkippingConnectedShipPatch
 {
-    // NavalShipsLogic keeps eleven ship assignment slots per team side.
-    private const int AssignmentSlots = 11;
-
     // Takes a connected own hull of the team instead of a copy, or none, which leaves the agent off any hull as vanilla does.
     [HarmonyPostfix]
     private static void Postfix(TeamAINavalComponent __instance, ulong shipUniqueBitwiseID, ref Formation __result)
     {
         var shipsLogic = __instance._navalShipsLogic;
-        if (!CopySkippingNearestShipPatch.IsCopyFormation(shipsLogic, __result)) return;
+        if (!NavalForeignHullRegistry.IsCopyFormation(shipsLogic, __result)) return;
 
         __result = ConnectedOwnShip(shipsLogic, __instance.Team.TeamSide, shipUniqueBitwiseID)?.Formation;
     }
 
-    // The first team hull in the island of shipUniqueBitwiseID that is not a copy, over vanilla's assignment slots.
+    // NavalShipsLogic.GetConnectedTeamShip without copies: the hull itself if it is on the team, else the last one in its island.
     private static MissionShip ConnectedOwnShip(NavalShipsLogic shipsLogic, TeamSideEnum teamSide, ulong shipUniqueBitwiseID)
     {
-        for (int index = 0; index < AssignmentSlots; index++)
-        {
-            var assignment = shipsLogic.GetShipAssignment(teamSide, (FormationClass)index);
-            if (!assignment.HasMissionShip) continue;
+        var teamShips = new MBList<MissionShip>();
+        shipsLogic.FillTeamShips(teamSide, teamShips);
 
-            var ship = assignment.MissionShip;
-            if ((ship.ShipIslandCombinedID & shipUniqueBitwiseID) != 0 && !NavalForeignHullRegistry.IsCopyHere(ship)) return ship;
+        MissionShip connected = null;
+        foreach (var ship in teamShips)
+        {
+            if ((ship.ShipIslandCombinedID & shipUniqueBitwiseID) == 0 || NavalForeignHullRegistry.IsCopyHere(ship)) continue;
+            if (ship.ShipUniqueBitwiseID == shipUniqueBitwiseID) return ship;
+
+            connected = ship;
         }
 
-        return null;
+        return connected;
     }
 }

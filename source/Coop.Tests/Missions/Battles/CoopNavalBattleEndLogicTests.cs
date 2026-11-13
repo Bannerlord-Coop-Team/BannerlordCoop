@@ -103,20 +103,23 @@ public class CoopNavalBattleEndLogicTests
             BattleState.DefenderPullBack, BattleSideEnum.Defender));
     }
 
-    // K3: a failed AI fleet never fields its side, which would otherwise hold the end checks, and the battle, open forever.
+    // K3: a failed AI fleet never fields its side, which would otherwise hold the end checks, and the battle, open forever. A
+    // side whose spawner just waits (PvP, no AI party yet) holds like any unfielded side.
     [Theory]
-    [InlineData(true, true, false, BattleSideEnum.None, false)]
-    [InlineData(true, true, false, BattleSideEnum.Defender, true)]
-    [InlineData(true, false, true, BattleSideEnum.Attacker, true)]
-    [InlineData(true, true, false, BattleSideEnum.Attacker, false)]
-    [InlineData(false, true, false, BattleSideEnum.Defender, false)]
-    [InlineData(true, false, false, BattleSideEnum.Defender, false)]
-    [InlineData(true, true, true, BattleSideEnum.None, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, false, true, BattleSideEnum.Defender)]
+    [InlineData(true, false, true, true, BattleSideEnum.Attacker)]
+    [InlineData(true, true, false, false, BattleSideEnum.Attacker)]
+    [InlineData(false, true, false, false, BattleSideEnum.Defender)]
+    [InlineData(true, false, false, false, BattleSideEnum.Defender)]
+    [InlineData(true, false, false, false, BattleSideEnum.Attacker, BattleSideEnum.Defender)]
+    [InlineData(true, true, false, true, BattleSideEnum.Attacker, BattleSideEnum.Defender)]
+    [InlineData(true, true, true, true)]
     public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool activated, bool attackerFielded, bool defenderFielded,
-        BattleSideEnum failedFleetSide, bool expected)
+        bool expected, params BattleSideEnum[] failedFleetSides)
     {
         Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded,
-            new[] { failedFleetSide }));
+            failedFleetSides));
     }
 
     [Fact]

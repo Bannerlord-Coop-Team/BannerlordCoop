@@ -241,14 +241,12 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private bool BothSidesFielded()
     {
         CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
-        var failedFleetSides = npcFleets.Select(npcFleet => npcFleet.FailedSide).Where(side => side != BattleSideEnum.None).ToList();
+        var failedFleetSides = npcFleets.Where(npcFleet => npcFleet.AttemptFailed).Select(npcFleet => npcFleet.Side).ToList();
         bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSides);
-        // A failed allied fleet next to fielded players released nothing, so only a side left empty by its failure is logged.
-        var emptyFailedSides = failedFleetSides
-            .Where(side => side == BattleSideEnum.Attacker ? !attackerFielded : !defenderFielded).ToList();
-        if (released && emptyFailedSides.Count > 0)
-            Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Sides} AI fleet failed to field",
-                session.InstanceId, string.Join(", ", emptyFailedSides));
+        // Each spawner warns of its own failure; this records that a failed side may be why the hold released.
+        if (released && failedFleetSides.Count > 0)
+            Logger.Information("[NavalBattle] End checks released for {MapEventId} with failed AI fleets on {Sides}",
+                session.InstanceId, string.Join(", ", failedFleetSides));
         return released;
     }
 

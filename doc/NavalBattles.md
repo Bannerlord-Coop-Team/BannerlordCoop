@@ -105,9 +105,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 ### AI hulls follow the battle host
 
 - The battle host fields each side's AI fleet late, once the NPC reserve reached it and its deployment is over
-  (`Missions.Naval/NavalNpcFleetSpawner.cs`). The launcher builds one spawner for each side with an AI party, so an enemy
+  (`Missions.Naval/NavalNpcFleetSpawner.cs`). The launcher builds a spawner for both sides, so an enemy
   fleet and an allied fleet (AI lords on the players' side) each have their own attempt, outcome
-  (`NetworkNpcFleetAttempted.Side`) and relay to entrants.
+  (`NetworkNpcFleetAttempted.Side`) and relay to entrants. A side with no AI party in the reserve just waits, so one that
+  joins later (`add_allied_ai_party`) is still fielded.
   - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveReplicatedTeam(side, isOwn: false)`):
     the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
     so off-ship AI crew never joins a copy's formation (`NavalCopyCrewLookupPatches`).
@@ -978,9 +979,10 @@ free lord of a third faction and declares the missing wars with `DeclareWarActio
 
 Knobs (`NavalScenarioResolver.Usage`):
 
-- `fleet_fail=1` arms the battle host's AI fleet failure before the scenario presses Ready (default `0`). Use
-  `coop.debug.naval.scenario vs_pirates hulls=3 fleet_fail=1` for item 17; after a host change, a late entrant's
-  `inspect` must still show `npcFleet.spawners.Defender.state=failed` (or `fielded` if an earlier attempt won the race).
+- `fleet_fail=1` arms the battle host's AI fleet failure, on every side with AI parties, before the scenario presses Ready
+  (default `0`). Use `coop.debug.naval.scenario vs_pirates hulls=3 fleet_fail=1` for item 17; after a host change, a late
+  entrant's `inspect` must still show `npcFleet.spawners.Defender.state=failed` (or `fielded` if an earlier attempt won the
+  race).
   The forced exception is caught by the normal spawn attempt, broadcasts its outcome and releases the failed side's hold;
 - `hulls=n` AI hulls;
 - `hull=id` hull type;

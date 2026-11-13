@@ -50,6 +50,11 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalBattleServicesFactory>()
             .As<INavalBattleServicesFactory>()
             .InstancePerDependency();
+        builder.RegisterType<NavalNpcFleetSpawner>()
+            .As<INavalNpcFleetSpawner>()
+            .InstancePerDependency()
+            // Built per battle side through the launcher's factory and disposed with its mission behaviour.
+            .ExternallyOwned();
         builder.RegisterType<NavalShipBudget>()
             .As<INavalShipBudget>()
             .InstancePerDependency();

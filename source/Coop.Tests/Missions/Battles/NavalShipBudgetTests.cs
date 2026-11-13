@@ -30,6 +30,20 @@ public class NavalShipBudgetTests
         Assert.Equal(new[] { otherPlayer }, allyTeamParties);
     }
 
+    // The allies get what the players' fielded ships leave of the side's eight, never more than their own limit nor below none.
+    // 6+6: a player with 6 ships next to an AI lord with 6 fields 4 by vanilla's ratio, which leaves the lord 4.
+    [Theory]
+    [InlineData(new[] { 4 }, 6, 4)]
+    [InlineData(new[] { 3 }, 8, 5)]
+    [InlineData(new[] { 3 }, 2, 2)]
+    [InlineData(new[] { 4, 4 }, 6, 0)]
+    [InlineData(new[] { 5, 4 }, 6, 0)]
+    [InlineData(new int[] { }, 8, 8)]
+    public void LeftForAi_IsWhatThePlayersLeaveOfTheSidesEight_AtMostTheAiLimit(int[] playerFleets, int aiLimit, int expected)
+    {
+        Assert.Equal(expected, NavalShipBudget.LeftForAi(playerFleets, aiLimit));
+    }
+
     private static PartyBase CreateParty() =>
         (PartyBase)RuntimeHelpers.GetUninitializedObject(typeof(PartyBase));
 

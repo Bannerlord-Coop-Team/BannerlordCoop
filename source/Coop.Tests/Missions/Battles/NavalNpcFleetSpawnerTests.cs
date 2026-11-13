@@ -2,7 +2,9 @@
 using Common;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
@@ -69,7 +71,7 @@ public class NavalNpcFleetSpawnerTests
         GameThread.Run(() => { }, blocking: true);
 
         Assert.False(attacker.Spawner.HasAttempt);
-        Assert.Equal(BattleSideEnum.Defender, defender.Spawner.FailedSide);
+        Assert.True(defender.Spawner.AttemptFailed);
 
         attacker.IsLocalHost = true;
         defender.IsLocalHost = true;
@@ -80,8 +82,8 @@ public class NavalNpcFleetSpawnerTests
         defender.Spawner.SendAttemptTo("joiner");
 
         Assert.False(defenderSpawned);
-        Assert.Equal(BattleSideEnum.None, attacker.Spawner.FailedSide);
-        Assert.Equal(BattleSideEnum.Defender, defender.Spawner.FailedSide);
+        Assert.False(attacker.Spawner.AttemptFailed);
+        Assert.True(defender.Spawner.AttemptFailed);
         attacker.Network.Verify(network => network.SendAll(It.Is<NetworkNpcFleetAttempted>(sent =>
             sent.Side == BattleSideEnum.Attacker && !sent.Failed)), Times.Once);
         defender.Network.Verify(network => network.SendAll(It.IsAny<IMessage>()), Times.Never);
@@ -92,7 +94,7 @@ public class NavalNpcFleetSpawnerTests
     }
 
     [Fact]
-    public void AcceptAttempt_OfAFieldedFleet_SettlesWithoutAFailedSide_AndKeepsTheFirstAttempt()
+    public void AcceptAttempt_OfAFieldedFleet_SettlesNotFailed_AndKeepsTheFirstAttempt()
     {
         var harness = new Harness(BattleSideEnum.Defender);
 
@@ -100,7 +102,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Spawner.AcceptAttempt(new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: true));
 
         Assert.True(harness.Spawner.HasAttempt);
-        Assert.Equal(BattleSideEnum.None, harness.Spawner.FailedSide);
+        Assert.False(harness.Spawner.AttemptFailed);
     }
 
     [Theory]
@@ -152,9 +154,9 @@ public class NavalNpcFleetSpawnerTests
     }
 
 #if DEBUG
-    // A forced attempt must take the real catch, broadcast, hold-release and successor/entrant paths.
+    // A forced attempt must take the real catch, broadcast and successor/entrant paths.
     [Fact]
-    public void ForcedFailure_BroadcastsOnce_ReleasesHold_AndSurvivesMigrationAndLateJoin()
+    public void ForcedFailure_BroadcastsOnce_AndSurvivesMigrationAndLateJoin()
     {
         var harness = new Harness(BattleSideEnum.Defender) { IsLocalHost = true };
         Assert.Null(harness.Spawner.FailNextSpawn());
@@ -163,8 +165,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Spawner.AttemptFleet(_ => spawned = true);
 
         Assert.False(spawned);
-        Assert.Equal(BattleSideEnum.Defender, harness.Spawner.FailedSide);
-        Assert.True(CoopNavalBattleEndLogic.ShouldReleaseHold(true, true, false, new[] { harness.Spawner.FailedSide }));
+        Assert.True(harness.Spawner.AttemptFailed);
         harness.Network.Verify(network => network.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.Failed)), Times.Once);
         Assert.NotNull(harness.Spawner.FailNextSpawn());
 
@@ -194,7 +195,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Spawner.AttemptFleet(_ => spawned = true);
 
         Assert.False(spawned);
-        Assert.Equal(BattleSideEnum.Defender, harness.Spawner.FailedSide);
+        Assert.True(harness.Spawner.AttemptFailed);
         harness.Network.Verify(network => network.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.Failed)), Times.Once);
     }
 
@@ -236,7 +237,7 @@ public class NavalNpcFleetSpawnerTests
 
         Assert.Equal(new[] { "rollback:1", "failed" }, order);
         harness.Rollback.Verify(r => r.Rollback(It.Is<NavalNpcFleetAttemptWork>(work => work.Hulls.Single() == hull)), Times.Once);
-        Assert.Equal(BattleSideEnum.Defender, harness.Spawner.FailedSide);
+        Assert.True(harness.Spawner.AttemptFailed);
         var inspect = Newtonsoft.Json.Linq.JObject.FromObject(harness.Spawner.Inspect());
         Assert.Equal(1, (int)inspect["hullsRetracted"]);
     }
@@ -303,7 +304,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Spawner.AttemptFleet(_ => spawnedAgain = true);
 
         Assert.False(spawnedAgain);
-        Assert.Equal(BattleSideEnum.None, harness.Spawner.FailedSide);
+        Assert.False(harness.Spawner.AttemptFailed);
         Assert.Equal(NavalNpcFleetSpawner.TakingBack, (string)Newtonsoft.Json.Linq.JObject.FromObject(harness.Spawner.Inspect())["state"]);
         harness.Network.Verify(n => n.SendAll(It.IsAny<NetworkNpcFleetAttempted>()), Times.Never);
 
@@ -311,7 +312,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Spawner.Tick();
 
         Assert.Equal(3, rollbacks);
-        Assert.Equal(BattleSideEnum.Defender, harness.Spawner.FailedSide);
+        Assert.True(harness.Spawner.AttemptFailed);
         harness.Network.Verify(n => n.SendAll(It.Is<NetworkNpcFleetAttempted>(sent => sent.Failed)), Times.Once);
     }
 
@@ -334,13 +335,25 @@ public class NavalNpcFleetSpawnerTests
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
             Spawner = new NavalNpcFleetSpawner(Network.Object, broker ?? new MessageBroker(), session.Object,
                 Mock.Of<IBattleShipReplicator>(), Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(),
-                Mock.Of<IPlayerManager>(), Mock.Of<INavalLateDeploymentPlanTracker>(), Rollback.Object,
+                Mock.Of<INavalLateDeploymentPlanTracker>(), Rollback.Object,
                 Mock.Of<IBattleTeamResolver>(), Mock.Of<INavalShipBudget>(), side
 #if DEBUG
-                , scenarioFailsSpawn
+                , ScenarioState(scenarioFailsSpawn)
 #endif
                 );
         }
+
+#if DEBUG
+        // A scenario of this battle that fails its AI fleet whenever the check says so, read at each attempt.
+        private static INavalScenarioState ScenarioState(System.Func<bool> failsSpawn)
+        {
+            var scenario = new Mock<INavalScenarioState>();
+            scenario.SetupGet(s => s.Current).Returns(() => failsSpawn?.Invoke() == true
+                ? new NavalScenarioConfig { MapEventId = "MapEvent_1", FailNpcFleet = true }
+                : null);
+            return scenario.Object;
+        }
+#endif
     }
 }
 #endif

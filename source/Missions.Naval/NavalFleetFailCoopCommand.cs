@@ -41,12 +41,9 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
         if (naval == null || mission.PlayerTeam == null)
             return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
 
-        // The enemy side's fleet, the one the fleet presets fail.
+        // The enemy side's fleet; every battle has a spawner for each side.
         var enemySide = mission.PlayerTeam.Side.GetOppositeSide();
-        var spawner = naval.NpcFleetSpawners.FirstOrDefault(npcFleet => npcFleet.Side == enemySide);
-        if (spawner == null)
-            return new CoopCommandResult(false, $"The {enemySide} side has no AI fleet in this battle.", "command_failed");
-
+        var spawner = naval.NpcFleetSpawners.First(npcFleet => npcFleet.Side == enemySide);
         var error = spawner.FailNextSpawn(stage);
         if (error != null) return new CoopCommandResult(false, error, "command_failed");
 

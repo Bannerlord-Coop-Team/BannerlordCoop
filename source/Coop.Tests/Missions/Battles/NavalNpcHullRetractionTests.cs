@@ -165,7 +165,7 @@ public class NavalNpcHullRetractionTests
         });
 
         Assert.Equal(new[] { "removed:0" }, sent);
-        Assert.Equal(BattleSideEnum.None, spawner.FailedSide);
+        Assert.False(spawner.AttemptFailed);
 
         spawner.Tick();
         harness.Replicator.Tick(0.1f);
@@ -173,7 +173,7 @@ public class NavalNpcHullRetractionTests
         spawner.Tick();
 
         Assert.Equal(new[] { "removed:0", "removed:1", "failed" }, sent);
-        Assert.Equal(BattleSideEnum.Defender, spawner.FailedSide);
+        Assert.True(spawner.AttemptFailed);
         Assert.Equal(hulls, removed);
         Assert.Empty(harness.LiveHulls);
     }
@@ -219,7 +219,7 @@ public class NavalNpcHullRetractionTests
 #if COOP_NAVAL
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
         public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
-            Replicator, Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(), Mock.Of<IPlayerManager>(),
+            Replicator, Mock.Of<ICoopShipSnapshotBuilder>(), Mock.Of<IObjectManager>(),
             Mock.Of<INavalLateDeploymentPlanTracker>(), new NavalNpcFleetRollback(Replicator), Mock.Of<IBattleTeamResolver>(),
             Mock.Of<INavalShipBudget>(), BattleSideEnum.Defender);
 #endif

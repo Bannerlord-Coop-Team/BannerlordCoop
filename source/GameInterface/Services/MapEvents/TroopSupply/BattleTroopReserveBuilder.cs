@@ -180,11 +180,9 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             else defenderTotal += entries.Count;
 
             TryGetOwningPlayer(party, absentControllers, presentControllers, out var partyOwnerController);
-            // At sea the battle host fields every AI party on the ally team, a player-led army's members included.
-            string armyLeaderController = null;
-            if (!mapEvent.IsNavalMapEvent)
-                TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out armyLeaderController);
-            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers);
+            TryGetArmyLeaderPlayer(party, absentControllers, presentControllers, out var armyLeaderController);
+            var owningController = ResolveOwningController(partyOwnerController, armyLeaderController, absentControllers,
+                atSea: mapEvent.IsNavalMapEvent);
 
             // Only a present player's own party reserves a player slot. Offline or absent registrations fall
             // to the host and must not reduce the allocation available to the players who entered this battle.
@@ -630,15 +628,16 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
     /// <summary>
     /// The controller that owns a party's reserve, or null if no present player does (so the host fields it).
-    /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader.
+    /// A party's own player wins; an AI party (no own player) in a player-led army falls to that army leader on land, and
+    /// <paramref name="atSea"/> to the host, which fields every AI party of a naval side on the ally team.
     /// An owner in <paramref name="absentControllers"/> (dropped from the battle, not yet returned) resolves
     /// to null: its parties fall to the host until it re-enters, at which point the caller re-issues both
     /// scopes (the returner's grant and the host's shrunk refresh).
     /// </summary>
     internal static string ResolveOwningController(string partyOwnerController, string armyLeaderController,
-        IReadOnlyCollection<string> absentControllers = null)
+        IReadOnlyCollection<string> absentControllers = null, bool atSea = false)
     {
-        var owner = partyOwnerController ?? armyLeaderController;
+        var owner = partyOwnerController ?? (atSea ? null : armyLeaderController);
         if (owner != null && absentControllers != null && absentControllers.Contains(owner))
             return null;
         return owner;
