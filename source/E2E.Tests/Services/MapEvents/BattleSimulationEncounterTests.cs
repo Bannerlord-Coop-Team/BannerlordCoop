@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
@@ -66,7 +67,12 @@ public class BattleSimulationEncounterTests : MapEventTestBase
             Assert.False(simulation.IsSimulationFinished);
             // The view can tick between event destruction and the final playback message.
             // OnTick is protected in the game assembly used by the test project.
-            AccessTools.Method(typeof(SPScoreboardVM), "OnTick").Invoke(scoreboard, new object[] { 1.1f });
+            using var moraleReads = new MethodCallRecorder(Priority.First, true,
+                AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.GetSideMorale)));
+            var tick = AccessTools.Method(typeof(SPScoreboardVM), "OnTick");
+            for (var frame = 0; frame < 200; frame++)
+                tick.Invoke(scoreboard, new object[] { 1.1f });
+            Assert.Equal(0, moraleReads.CountFor(client));
             Assert.True(Game.Current.GameStateManager.GameStates.OfType<MapState>().Single().IsSimulationActive);
         }, MapEventDisabledMethods);
 
