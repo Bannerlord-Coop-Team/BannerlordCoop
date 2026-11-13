@@ -18,8 +18,6 @@ public class MessageAggregationBuffer
     private List<byte[]> payloads = new List<byte[]>();
     private int framedBytes;
 
-    public bool IsEmpty => payloads.Count == 0;
-
     /// <summary>
     /// Bytes one payload takes inside <see cref="Common.PacketHandlers.AggregateMessagePacket.Messages"/>:
     /// the field tag, the varint length and the payload itself.
