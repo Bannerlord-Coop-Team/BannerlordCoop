@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -62,10 +62,10 @@ internal class ChangePlayerCharacterActionPatches
         PartyBase.MainParty.SetVisualAsDirty();
         mainParty.Party.SetVisualAsDirty();
 
-        // Nameplate relations were initialized against the save's previous main hero. The native VM
-        // does not listen for player-character changes, so refresh its cached friendly/enemy state now.
-        if (ContainerProvider.TryResolve<IMapRelationsInterface>(out var mapRelations))
-            mapRelations.RefreshSettlementNameplates();
+        // Map markers and nameplates were drawn against the previous main hero, and the native views
+        // do not listen for player-character changes, so redraw their friendly/enemy state now.
+        if (ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals))
+            stanceVisuals.RedrawStanceVisuals(mainHero?.MapFaction, hero.MapFaction);
 
         return false;
     }

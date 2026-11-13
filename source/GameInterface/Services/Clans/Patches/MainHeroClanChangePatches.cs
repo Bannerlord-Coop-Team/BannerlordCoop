@@ -1,5 +1,5 @@
 ﻿using Common;
-using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.PartyVisuals.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -19,9 +19,10 @@ internal static class MainHeroClanChangePatches
     [HarmonyPostfix]
     public static void HeroChangedClanPostfix(Hero hero, Clan oldClan)
     {
+        // Compares PlayerTroop because Hero.MainHero throws while PlayerTroop is still unset during a join.
         if (ModInformation.IsServer || hero.CharacterObject != Game.Current?.PlayerTroop) return;
-        if (!ContainerProvider.TryResolve<IMapRelationsInterface>(out var mapRelations)) return;
+        if (!ContainerProvider.TryResolve<IMapStanceVisualsInterface>(out var stanceVisuals)) return;
 
-        mapRelations.RefreshRelations(oldClan?.MapFaction, hero.MapFaction);
+        stanceVisuals.RedrawStanceVisuals(oldClan?.MapFaction, hero.MapFaction);
     }
 }

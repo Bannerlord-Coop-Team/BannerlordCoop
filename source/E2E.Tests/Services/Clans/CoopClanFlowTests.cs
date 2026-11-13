@@ -705,6 +705,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
     public void JoinedMember_MapRedrawsTheJoinedClansEnemies()
     {
         var enemyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         foreach (var instance in Clients.Prepend(Server))
@@ -712,36 +713,42 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             instance.Call(() =>
             {
                 using var scope = new AllowedThread();
-                var settlement = Get<Settlement>(instance, settlementId);
-                settlement.SetSettlementComponent(Get<Town>(instance, townId));
-                Get<Town>(instance, townId)._ownerClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+                var town = Get<Town>(instance, townId);
+                var enemyClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+                Get<Settlement>(instance, settlementId).SetSettlementComponent(town);
+                town._ownerClan = enemyClan;
             });
         }
-        Server.Call(() => DeclareWarAction.ApplyByPlayerHostility(
-            Get<Clan>(Server, leader.ClanId), Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan));
+        Server.Call(() =>
+        {
+            var enemyClan = Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan;
+            DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, leader.ClanId), enemyClan);
+        });
         Flush();
         memberClient.Call(() =>
         {
-            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
             var settlement = Get<Settlement>(memberClient, settlementId);
             Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
             // The harness doesn't list created settlements in Settlement.All, which the map walks.
-            Campaign.Current.CampaignObjectManager.Settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>()) { settlement };
-            enemyParty._isVisible = true;
+            var settlements = new MBList<Settlement>(Settlement.All ?? new MBList<Settlement>());
+            settlements.Add(settlement);
+            Campaign.Current.CampaignObjectManager.Settlements = settlements;
             settlement._isVisible = true;
-            enemyParty.Party.OnVisualsUpdated();
-            settlement.Party.OnVisualsUpdated();
+            var parties = new[] { Get<MobileParty>(memberClient, enemyPartyId), Get<MobileParty>(memberClient, neutralPartyId) };
+            foreach (var party in parties) party._isVisible = true;
+            // Clear the dirty flags so the asserts below prove the join redrew them.
+            foreach (var party in parties.Select(party => party.Party).Append(settlement.Party)) party.OnVisualsUpdated();
         });
 
         Join();
 
         memberClient.Call(() =>
         {
-            var enemyParty = Get<MobileParty>(memberClient, enemyPartyId);
             var settlement = Get<Settlement>(memberClient, settlementId);
             Assert.True(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
-            Assert.True(enemyParty.Party.IsVisualDirty);
+            Assert.True(Get<MobileParty>(memberClient, enemyPartyId).Party.IsVisualDirty);
             Assert.True(settlement.Party.IsVisualDirty);
+            Assert.False(Get<MobileParty>(memberClient, neutralPartyId).Party.IsVisualDirty);
         });
     }
 
