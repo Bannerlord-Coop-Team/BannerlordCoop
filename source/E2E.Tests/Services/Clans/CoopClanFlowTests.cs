@@ -709,8 +709,9 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         var neutralPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var markerPartyIds = new[] { enemyPartyId, sharedEnemyPartyId, neutralPartyId };
-        // The settlement is the enemy clan's town, so its marker flips with the enemy party.
+        // The enemy clan rules a kingdom, like Sturgia, and owns the town, so both markers' stance comes from the kingdom.
         foreach (var instance in Clients.Prepend(Server))
         {
             instance.Call(() =>
@@ -718,17 +719,22 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 using var scope = new AllowedThread();
                 var town = Get<Town>(instance, townId);
                 var enemyClan = Get<MobileParty>(instance, enemyPartyId).LeaderHero.Clan;
+                var enemyKingdom = Get<Kingdom>(instance, enemyKingdomId);
+                enemyClan._kingdom = enemyKingdom;
+                enemyKingdom._rulingClan = enemyClan;
+                enemyKingdom._clans ??= new();
+                if (!enemyKingdom._clans.Contains(enemyClan)) enemyKingdom._clans.Add(enemyClan);
                 Get<Settlement>(instance, settlementId).SetSettlementComponent(town);
                 town._ownerClan = enemyClan;
             });
         }
-        // The enemy fights only the joined clan, and the shared enemy fights both clans, so the join rules allow it.
+        // The enemy kingdom fights only the joined clan, and the shared enemy fights both clans, so the join rules allow it.
         Server.Call(() =>
         {
             var joinedClan = Get<Clan>(Server, leader.ClanId);
-            var enemyClan = Get<MobileParty>(Server, enemyPartyId).LeaderHero.Clan;
+            var enemyKingdom = Get<Kingdom>(Server, enemyKingdomId);
             var sharedEnemyClan = Get<MobileParty>(Server, sharedEnemyPartyId).LeaderHero.Clan;
-            DeclareWarAction.ApplyByPlayerHostility(joinedClan, enemyClan);
+            DeclareWarAction.ApplyByPlayerHostility(joinedClan, enemyKingdom);
             DeclareWarAction.ApplyByPlayerHostility(joinedClan, sharedEnemyClan);
             DeclareWarAction.ApplyByPlayerHostility(Get<Clan>(Server, member.ClanId), sharedEnemyClan);
         });
@@ -745,11 +751,14 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Get<MobileParty>(memberClient, id)._isVisible = true;
         });
 
-        // Preconditions: before the join the enemy's town is not at war with the member, and the shared enemy already is.
+        // Preconditions: the enemy markers resolve to the enemy kingdom, which isn't at war with the member yet, and the shared enemy already is.
         memberClient.Call(() =>
         {
             var settlement = Get<Settlement>(memberClient, settlementId);
             var sharedEnemyParty = Get<MobileParty>(memberClient, sharedEnemyPartyId);
+            var enemyKingdom = Get<Kingdom>(memberClient, enemyKingdomId);
+            Assert.Same(enemyKingdom, settlement.MapFaction);
+            Assert.Same(enemyKingdom, Get<MobileParty>(memberClient, enemyPartyId).MapFaction);
             Assert.False(FactionManager.IsAtWarAgainstFaction(settlement.MapFaction, Hero.MainHero.MapFaction));
             Assert.True(FactionManager.IsAtWarAgainstFaction(sharedEnemyParty.MapFaction, Hero.MainHero.MapFaction));
         });
