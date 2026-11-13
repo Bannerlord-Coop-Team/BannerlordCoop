@@ -406,3 +406,9 @@ v1.5, because copies written on v1.4.8 (the ransom and mercenary offers) still r
   `SallyOutFinishEncounterPatch` returns for a client map event with no component; a destroyed
   ship leaves its owner's list on clients (`ShipRegistry.OnClientDestroyed`), because
   `DestroyShipAction.ApplyInternal` runs before the AutoSync patch on `Ship.Owner`.
+
+## Direct merges of development (2026-11-13 on)
+
+`bannerlord-1.5.x` now takes `development` by direct merge, with no PR that only ports a fix
+(`development` at `fcd4df7b0` first, in `aa9284167`). New `development` E2E tests that call
+`SetBattleType`, `SetMapEventSettlement` or `RestoreComponent` need `using GameInterface.Tests.Utils;`.
