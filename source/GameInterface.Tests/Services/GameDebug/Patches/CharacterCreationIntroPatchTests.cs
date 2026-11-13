@@ -42,4 +42,16 @@ public class CharacterCreationIntroPatchTests
     {
         Assert.Equal(expected, DebugCharacterCreationInterface.ChooseCultureIndex(names));
     }
+
+    [Theory]
+    [InlineData(true, false, false, (int)DebugCharacterCreationInterface.SkipEntry.Inline)]
+    [InlineData(false, true, false, (int)DebugCharacterCreationInterface.SkipEntry.NextFrame)]
+    [InlineData(false, true, true, (int)DebugCharacterCreationInterface.SkipEntry.None)]
+    [InlineData(false, false, false, (int)DebugCharacterCreationInterface.SkipEntry.None)]
+    public void ChooseSkipEntry_WaitsAFrameWhenCharacterCreationOpensDirectly(
+        bool inIntro, bool inCharacterCreation, bool skipping, int expected)
+    {
+        // A direct start activates the state before its screen and stage views exist.
+        Assert.Equal((DebugCharacterCreationInterface.SkipEntry)expected, DebugCharacterCreationInterface.ChooseSkipEntry(inIntro, inCharacterCreation, skipping));
+    }
 }

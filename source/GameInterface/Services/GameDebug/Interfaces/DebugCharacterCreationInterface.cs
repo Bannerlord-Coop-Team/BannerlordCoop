@@ -59,13 +59,30 @@ namespace GameInterface.Services.GameDebug.Interfaces
             return 0;
         }
 
+        internal enum SkipEntry { None, Inline, NextFrame }
+
+        /// <summary>
+        /// The intro path runs the skip at once, as it pushes character creation itself. A direct start is seen
+        /// while the state activates, before its screen and stage views exist, so the skip waits a frame.
+        /// </summary>
+        internal static SkipEntry ChooseSkipEntry(bool inIntro, bool inCharacterCreation, bool skipInProgress)
+        {
+            if (skipInProgress) return SkipEntry.None;
+            if (inIntro) return SkipEntry.Inline;
+            return inCharacterCreation ? SkipEntry.NextFrame : SkipEntry.None;
+        }
+
         public void SkipCharacterCreation()
         {
-            // Validation
-            if (InCharacterCreationIntro() == false && InCharacterCreation() == false) return;
-
-            // Logic
-            GameThread.Run(SkipCharacterCreationInternal);
+            switch (ChooseSkipEntry(InCharacterCreationIntro(), InCharacterCreation(), skipping))
+            {
+                case SkipEntry.Inline:
+                    GameThread.Run(SkipCharacterCreationInternal);
+                    break;
+                case SkipEntry.NextFrame:
+                    GameThread.EnqueueSafe(SkipCharacterCreationInternal, "DEBUG character creation skip");
+                    break;
+            }
         }
 
         public void SkipCharacterCreationInternal()
