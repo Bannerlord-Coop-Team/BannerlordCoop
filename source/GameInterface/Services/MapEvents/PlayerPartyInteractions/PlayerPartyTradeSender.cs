@@ -64,23 +64,30 @@ internal class PlayerPartyTradeSender : IPlayerPartyTradeSender
         GameThread.EnqueueSafe(Flush, context: "Send player-party trade offer");
     }
 
-    // The queued flush always clears the pending flag and a failure is kept per trade, so neither carries into the next trade.
     public void Flush()
     {
-        if (!changePending && !HasUnsentOffer) return;
+        var wasChangePending = changePending;
+        // Cleared before the trade check, so a stale flush cant carry into the next trade.
         changePending = false;
         if (!trade.IsActive) return;
+        if (!wasChangePending && !HasUnsentOffer) return;
 
+        bool sent;
         try
         {
-            SendIfChanged();
-            failedSendSessionId = null;
+            sent = SendIfChanged();
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to send the player-party trade offer");
             failedSendSessionId = trade.SessionId;
+            return;
         }
+
+        failedSendSessionId = null;
+        // Clears both acceptances like the server does, outside the try so a refresh failure isnt taken for a failed send.
+        if (sent)
+            trade.ResetAcceptance();
     }
 
     // A pending edit goes out first, because it clears the acceptance this accept is checked against and must reach the server ahead of it.
@@ -110,22 +117,21 @@ internal class PlayerPartyTradeSender : IPlayerPartyTradeSender
         return true;
     }
 
-    // Sends the local offer when it changed since the last one sent for this trade.
-    private void SendIfChanged()
+    // Sends the local offer when it changed since the last one sent for this trade, and returns whether it sent.
+    private bool SendIfChanged()
     {
         var offered = trade.GetLocalOffer();
+        // A new trade has sent nothing yet, so an empty offer is no change and any other offer always sends.
         var isNewTrade = lastSent.SessionId != trade.SessionId;
-        // Nothing was sent for a new trade yet, so it compares against an empty offer and a stack the last trade ended on still counts as a change.
-        if (isNewTrade && offered.Count == 0) return;
+        if (isNewTrade && offered.Count == 0) return false;
 
         var offer = offerBuilder.Build(trade.SessionId, trade.LocalPartyId, offered);
         var serializedOffer = serializer.Serialize(offer);
         // Compared serialized, so a new offer field can't be missed.
-        if (!isNewTrade && serializedOffer.SequenceEqual(lastSent.Offer)) return;
+        if (!isNewTrade && serializedOffer.SequenceEqual(lastSent.Offer)) return false;
 
         network.SendAll(offer);
         lastSent = (trade.SessionId, serializedOffer);
-        // Clears both acceptances like the server does.
-        trade.ResetAcceptance();
+        return true;
     }
 }
