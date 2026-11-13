@@ -1,6 +1,8 @@
 ﻿#if COOP_NAVAL
 using Missions.Naval;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.Library;
@@ -62,69 +64,53 @@ public class NavalPlayerDeploymentSlotTests
         var path = FreePath(2000f, 1000f);
         float bigFleetRange = NavalPlayerDeploymentSlot.LongestTeamRange(new[] { 67.5f });
 
-        float front = NavalPlayerDeploymentSlot.SlotFor(path, 0, 2, Longest, out float frontBase, out _);
-        float behind = NavalPlayerDeploymentSlot.SlotFor(path, 1, 2, Longest, out float behindBase, out _);
+        var front = NavalPlayerDeploymentSlot.SlotFor(path, 0, Longest);
+        var behind = NavalPlayerDeploymentSlot.SlotFor(path, 1, Longest);
 
-        Assert.Equal(frontBase, behindBase, 3);
-        Assert.True(front - bigFleetRange - behind >= NavalPlayerDeploymentSlot.InterTeamGap - 0.01f,
-            $"rank 1 at {behind} is inside vanilla's gap behind rank 0's fleet at {front}");
+        Assert.Equal(SideBase(path), front.Offset, 3);
+        Assert.True(front.Offset - bigFleetRange - behind.Offset >= NavalPlayerDeploymentSlot.InterTeamGap - 0.01f,
+            $"rank 1 at {behind.Offset} is inside vanilla's gap behind rank 0's fleet at {front.Offset}");
+        Assert.True(front.Fits && behind.Fits);
     }
 
-    // R49: the spawn point sat near the path start, so vanilla's side base was the path start and nothing fit behind it.
+    // M11 phase 3: the allied AI fleet goes a gap ahead of rank 0, as vanilla puts allies in front of the player team, and the
+    // ranks go behind over the free segments as vanilla places teams; once the path runs out behind, the next rank goes ahead of
+    // the allies. Rows (one free segment from -1000 or -100 to 1000, base -199 or -100): room behind; the base at the path start
+    // (R49 C2), where rank 0 takes the first room and ranks 1 and 2 go ahead of the allies; the same with the opposing base
+    // close, which holds rank 2 short of it; and a blocked stretch behind the base, which rank 0 skips like vanilla.
     [Theory]
-    [InlineData(100f)]
-    [InlineData(150f)]
-    public void PlaceSideFleets_BaseAtThePathStart_PacksTheFleetsForwardWithoutOverlap(float pivotOffset)
+    [InlineData(new[] { -1000f, 1000f }, -199f, 1000f, -92.75f, new[] { -199f, -305.25f, -411.5f }, true)]
+    [InlineData(new[] { -100f, 1000f }, -100f, 1000f, 80.5f, new[] { -25.75f, 186.75f, 293f }, true)]
+    [InlineData(new[] { -100f, 1000f }, -100f, 250f, 80.5f, new[] { -25.75f, 186.75f, 250f }, false)]
+    [InlineData(new[] { -1000f, -250f, -230f, 1000f }, -199f, 1000f, -143.75f, new[] { -250f, -356.25f }, true)]
+    public void Slots_PutTheAlliesAheadOfRankZero_AndTheRanksBehindThenAhead(float[] freeSegments, float sideBase,
+        float forwardLimit, float expectedAlly, float[] expectedRanks, bool expectedFits)
     {
-        var path = FreePath(2000f, pivotOffset);
+        var segments = Enumerable.Range(0, freeSegments.Length / 2)
+            .Select(index => (freeSegments[2 * index], freeSegments[(2 * index) + 1])).ToList();
 
-        var layout = Layout(path, playerCount: 2);
+        var slots = NavalPlayerDeploymentSlot.Slots(segments, sideBase, forwardLimit, Longest, expectedRanks.Length, out float ally,
+            out bool fits);
 
-        Assert.True(layout[1] - Longest >= -pivotOffset - 0.01f, $"fleet 1 starts {layout[1] - Longest}, before the path");
-        Assert.True(layout[0] - Longest - layout[1] >= NavalPlayerDeploymentSlot.InterTeamGap - 0.01f,
-            $"fleet 0 at {layout[0]} and fleet 1 at {layout[1]} are closer than vanilla's gap");
-        Assert.True(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -pivotOffset));
+        Assert.Equal(expectedAlly, ally, 2);
+        Assert.Equal(expectedRanks, slots.Select(slot => (float)Math.Round(slot, 2)));
+        Assert.Equal(expectedFits, fits);
     }
 
-    [Fact]
-    public void PlaceSideFleets_RoomBehindTheBase_KeepsTheFrontFleetOnVanillasSlot()
+    // R49 C3: a slot depends only on its rank, so a client that counts a late joiner or misses a disconnected player derives the
+    // same slot for an earlier rank, also when the ranks have gone ahead of the allies.
+    [Theory]
+    [InlineData(-1000f, -199f)]
+    [InlineData(-100f, -100f)]
+    public void Slots_OfARank_DoNotDependOnHowManyRanksTheClientCounts(float pathStart, float sideBase)
     {
-        var path = FreePath(2000f, 1000f);
-        float baseOffset = SideBase(path);
-        DefaultBattleMissionAgentSpawnLogic.ComputeTeamDeploymentOffsets(path, baseOffset, NavalPlayerDeploymentSlot.InterTeamGap,
-            new[] { Longest }, out var vanillaSingleTeam);
+        var segments = new List<(float, float)> { (pathStart, 1000f) };
 
-        var layout = Layout(path, playerCount: 3);
+        var fewer = NavalPlayerDeploymentSlot.Slots(segments, sideBase, 1000f, Longest, 2, out _, out _);
+        var more = NavalPlayerDeploymentSlot.Slots(segments, sideBase, 1000f, Longest, 4, out _, out _);
 
-        Assert.Equal(vanillaSingleTeam[0], layout[0], 3);
-        Assert.Equal(layout[0] - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[1], 3);
-        Assert.Equal(layout[1] - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[2], 3);
-        Assert.True(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -1000f));
+        Assert.Equal(fewer, more.Take(2));
     }
-
-    [Fact]
-    public void PlaceSideFleets_BlockedSegmentBehindTheBase_SkipsItLikeVanilla()
-    {
-        var path = Path(2000f, 1000f, (-1000f, -250f), (-230f, 1000f));
-
-        var layout = Layout(path, playerCount: 2);
-
-        Assert.Equal(-250f, layout[0], 3);
-        Assert.Equal(-250f - Longest - NavalPlayerDeploymentSlot.InterTeamGap, layout[1], 3);
-    }
-
-    [Fact]
-    public void FitsPath_PathTooShortForTheFleets_IsFalse()
-    {
-        var path = FreePath(150f, 75f);
-
-        var layout = Layout(path, playerCount: 2);
-
-        Assert.False(NavalPlayerDeploymentSlot.FitsPath(layout, Longest, -75f));
-    }
-
-    private static float[] Layout(SpawnPathData path, int playerCount) =>
-        NavalPlayerDeploymentSlot.PlaceSideFleets(path, SideBase(path), playerCount, Longest);
 
     // The deploying side base SlotFor lays the fleets from, vanilla's base for the shared offset.
     private static float SideBase(SpawnPathData path)

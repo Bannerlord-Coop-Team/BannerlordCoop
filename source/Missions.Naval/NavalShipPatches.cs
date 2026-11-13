@@ -23,7 +23,6 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
 using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
 using static NavalDLC.CampaignBehaviors.NavalOrderOfBattleCampaignBehavior;
 
@@ -193,19 +192,15 @@ internal class PlayerFleetDeploymentSlotPatch
         if (planningSide == null || playerCount <= 1 || rank >= playerCount || mission == null || team != mission.PlayerTeam) return;
 
         var spawnPath = mission.GetInitialSpawnPathData(team.Side);
-        float longestTeamRange = NavalPlayerDeploymentSlot.LongestTeamRange(MBObjectManager.Instance
-            .GetObjectTypeList<MissionShipObject>().Select(ship => ship.DeploymentArea.y));
-        float slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, playerCount, longestTeamRange, out float baseOffset,
-            out bool fits);
-        Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, side base " +
-            "{BaseOffset}, slot {Slot} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
-            baseOffset, slot, spawnPath.PivotOffset, spawnPath.PathLength);
-        if (!fits)
-            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for {PlayerCount} player fleets; " +
-                "fleet {Rank} at {Slot} (vanilla {VanillaOffset}, side base {BaseOffset}, pivot {PivotOffset}) can overlap " +
-                "another player's fleet", spawnPath.PathLength, playerCount, rank, slot, spawnPathOffset, baseOffset,
-                spawnPath.PivotOffset);
-        spawnPathOffset = slot;
+        var slot = NavalPlayerDeploymentSlot.SlotFor(spawnPath, rank, NavalPlayerDeploymentSlot.LongestTeamRangeOfGame());
+        Logger.Information("[NavalBattle] Deployment slot {Rank}/{PlayerCount}: vanilla offset {VanillaOffset}, slot {Slot}, " +
+            "opposing base {TargetOffset} (pivot {PivotOffset} m into a {PathLength} m path)", rank, playerCount, spawnPathOffset,
+            slot.Offset, slot.TargetOffset, spawnPath.PivotOffset, spawnPath.PathLength);
+        if (!slot.Fits)
+            Logger.Warning("[NavalBattle] The {PathLength} m spawn path has no room for fleet {Rank} of {PlayerCount}; it is " +
+                "held at {Slot}, short of the opposing base {TargetOffset}, and can overlap another fleet of its side",
+                spawnPath.PathLength, rank, playerCount, slot.Offset, slot.TargetOffset);
+        spawnPathOffset = slot.Offset;
     }
 }
 

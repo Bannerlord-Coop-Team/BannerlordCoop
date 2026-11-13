@@ -145,9 +145,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
 
         try
         {
-            // The AI team was planned with no ships at deployment start, so its plan is made now, after the fact. Vanilla doesn't
-            // redo a team that already has a plan (MakeDeploymentPlan), so on the host's own side this only plans the ally team.
-            latePlans.MakeForSide(navalLogic, side);
+            PlanLate(navalLogic, planning, side, team, formations, ships);
             SpawnAssignedHulls(shipsLogic, planning, team, formations, ships, parties, work);
         }
         finally
@@ -159,6 +157,26 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
                     shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
             }
         }
+    }
+
+    // The AI team was planned with no ships at deployment start, so its plan is made now. The host's own allies take their slot
+    // ahead of the side's player fleets, planned alone; an enemy fleet takes vanilla's plan for its side, which skips a team
+    // that already has one.
+    private void PlanLate(DefaultNavalMissionLogic navalLogic, NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side,
+        Team team, List<Formation> formations, List<(Ship snapshot, PartyBase owner)> ships)
+    {
+        if (team != Mission.Current.PlayerAllyTeam)
+        {
+            latePlans.MakeForSide(navalLogic, side);
+            return;
+        }
+
+        var aiShips = formations.Select((formation, index) => (formation.FormationIndex, (IShipOrigin)ships[index].snapshot));
+        var slot = latePlans.MakeForAllyTeam(planning, team, aiShips);
+        if (slot.Fits) return;
+
+        Logger.Warning("[NavalBattle] The {Side} spawn path has no room for the allied AI fleet ahead of the player fleets; it is " +
+            "held at {Slot}, short of the opposing base {TargetOffset}", side, slot.Offset, slot.TargetOffset);
     }
 
     // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
