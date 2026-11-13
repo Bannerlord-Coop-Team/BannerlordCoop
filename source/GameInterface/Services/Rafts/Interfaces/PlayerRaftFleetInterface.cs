@@ -131,7 +131,9 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
     public bool PutAshore(MobileParty party)
     {
         // Only a party already on land, so a raft still at sea can't skip washing ashore
-        if (!party.Position.IsOnLand || (!party.IsInRaftState && !party.IsCurrentlyAtSea)) return false;
+        if (!party.Position.IsOnLand) return false;
+        // Nothing to land, neither a raft nor marked at sea
+        if (!party.IsInRaftState && !party.IsCurrentlyAtSea) return false;
 
         if (party.IsTransitionInProgress)
             party.CancelNavigationTransition();
@@ -140,14 +142,16 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         party.SetMoveModeHold();
         party.ResetNavigationToHold();
 
-        // Unlike LeaveRaftAtSea, the fleet keeps the coast anchor ReturnFleet restores, like a landing
         if (party.IsInRaftState)
             EndRaftState(party);
 
+        // Unlike LeaveRaftAtSea, the fleet keeps the coast anchor ReturnFleet restores, like a landing
         ReturnFleet(party);
         return true;
     }
 
+    // RaftStateChangeAction.DeactivateRaftStateForParty without the short-term behavior and AI rethink for a party its client
+    // moves; EnableAi restores vanilla's non-raft value of the synced _isDisabled, which the raft's DisableAi set.
     private static void EndRaftState(MobileParty party)
     {
         party.IsInRaftState = false;

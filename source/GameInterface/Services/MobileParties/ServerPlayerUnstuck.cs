@@ -204,7 +204,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 : $"Ended {resolved} battles left with no healthy troops on one side.";
         });
 
-        // Registered only while War Sails is on
+        // Registered only while War Sails is on, and skipped for a hero still a prisoner because the party stays parked until release
         if (raftFleetInterface != null && (hero == null || !hero.IsPrisoner))
         {
             TryStep(actions, "raft landing", () =>
