@@ -509,8 +509,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (reason != ShipRemovalReason.Retracted) CountDeparted(ship);
         Prune(ship.ShipId);
-        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
-            ship.ShipId, ship.CurrentAuthority, reason);
+        Logger.Information("[NavalSync] Hull {ShipId} of {Owner} removed ({Reason})", ship.ShipId, ship.CurrentAuthority, reason);
     }
 
     // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.

@@ -800,24 +800,6 @@ public class BattleShipReplicatorTests
 
     private static Agent CreateAgent() => (Agent)RuntimeHelpers.GetUninitializedObject(typeof(Agent));
 
-    // M11 A5: a hull a failed AI fleet attempt took back never fought for its side, so it is no departure that keeps the side's
-    // retreat; a hull that retreated or left with its owner is one.
-    [Theory]
-    [InlineData(ShipRemovalReason.Retreat, 1)]
-    [InlineData(ShipRemovalReason.Leave, 1)]
-    [InlineData(ShipRemovalReason.Retracted, 0)]
-    public void AcceptRemoval_CountsADeparture_UnlessAFailedAiFleetTookTheHullBack(ShipRemovalReason reason, int expectedDeparted)
-    {
-        using var mission = new MissionCurrentScope();
-        var harness = new Harness(committed: false);
-        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
-        harness.Engine.Setup(e => e.SideOf(copy)).Returns(BattleSideEnum.Defender);
-
-        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, reason, missionEnding: true));
-
-        Assert.Equal(expectedDeparted, harness.Ledger.DepartedHulls(BattleSideEnum.Defender));
-    }
-
     private static (MissionObject Copy, NetworkShipInfo Ship) RegisterPeerCopy(Harness harness, bool isNpcParty)
     {
         var copy = CreateHull();

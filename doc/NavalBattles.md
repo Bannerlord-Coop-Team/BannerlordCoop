@@ -137,10 +137,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   A take-back that throws is retried every tick, resuming each hull where it stopped, and the failure is reported only once
   it went through. The taken-back hulls go out as `ShipRemovalReason.Retracted`, which no client counts as a departure from
   the side, so a side whose allies failed after spawning hulls never reads as retreating because of them.
-- A failed allied attempt (M11 A5), the players taking all 8 ships (`NoShipsLeft`) included, only means the side has no
-  allies: the end hold counts a failed side as one that may start empty, which on the players' side changes nothing as the
-  players fielded, so it neither ends nor holds the battle; depletion and retreat read the side's remaining hulls and crew,
-  where the taken-back fleet no longer is. D2 (a failed AI fleet as the players' victory) follows from the enemy side's
+- A failed allied attempt (M11 A5), `NoShipsLeft` included, only means the side has no allies. The end hold doesn't change
+  on the players' side because the players fielded. Depletion and retreat read the hulls and crew that remain, and the
+  taken-back fleet isn't among them. D2 (a failed AI fleet as the players' victory) follows from the enemy side's
   depletion, so it only applies there.
 - Every human of a side leaving while its allies fight (M11 A4) is the land behaviour: their hulls leave as departures but
   the allied hulls stay, so the side keeps no retreat and the allies fight on under the battle host's AI; with no human
