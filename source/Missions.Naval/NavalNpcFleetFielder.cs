@@ -99,7 +99,8 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         if (!objectManager.TryGetObject<MapEvent>(session.InstanceId, out var mapEvent)) return "map event not found";
 
         var parties = reserve.Parties;
-        var limit = shipBudget.AiLimit(mapEvent.GetMapEventSide(side).Parties, parties);
+        work.Players = shipBudget.PlayerFleets(mapEvent.GetMapEventSide(side).Parties);
+        var limit = shipBudget.AiLimit(work.Players, parties);
         // The players' fleets can take all of the side's eight ships, which just leaves it no AI fleet.
         if (limit.NetDeploymentLimit == 0) return NoShipsLeft;
 

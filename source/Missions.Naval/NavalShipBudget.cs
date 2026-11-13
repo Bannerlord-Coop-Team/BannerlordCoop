@@ -1,6 +1,10 @@
-﻿using GameInterface.Services.Players;
+﻿using Common.Logging;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 using NavalDLC;
 using NavalDLC.Missions.MissionLogics;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,19 +17,23 @@ using TaleWorlds.Library;
 namespace Missions.Naval;
 
 /// <summary>
-/// Splits a naval battle side's eight ships from campaign data every client holds: each player fields its own share, and the
-/// side's AI parties get what the players leave (M11 A2).
+/// Splits a naval battle side's eight ships: each player fields its own share, the side's AI parties get what the players leave
+/// (M11 A2), and a player who joins after the side's AI fleet attempt gets only what that attempt's record leaves.
 /// </summary>
 public interface INavalShipBudget
 {
     /// <summary>
     /// [Game thread] The fleet <paramref name="playerParty"/> fields: vanilla's best player ship, then its party's ships up to its
-    /// share of the side, against every other party there as its ally team. A party without ships fields none.
+    /// share of the side, against every other party there as its ally team, capped by the side's AI fleet record if it is a later
+    /// joiner. A party without ships fields none.
     /// </summary>
     NavalPlayerFleet PlayerFleet(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty);
 
-    /// <summary>[Game thread] The AI parties' share of the side: the eight ships less every player's fleet, at most their own limit.</summary>
-    NavalShipDeploymentLimit AiLimit(MBReadOnlyList<MapEventParty> sideParties, MBReadOnlyList<MapEventParty> aiParties);
+    /// <summary>[Game thread] Every player's fleet on the side, which the side's AI share leaves room for.</summary>
+    NavalSidePlayerFleets PlayerFleets(MBReadOnlyList<MapEventParty> sideParties);
+
+    /// <summary>[Game thread] The AI parties' share of the side: the eight ships less the players' fleets, at most their own limit.</summary>
+    NavalShipDeploymentLimit AiLimit(NavalSidePlayerFleets players, MBReadOnlyList<MapEventParty> aiParties);
 }
 
 /// <inheritdoc cref="INavalShipBudget"/>
@@ -34,12 +42,18 @@ public class NavalShipBudget : INavalShipBudget
     // GetShipDeploymentLimitsOfPlayerTeams caps a side's player and ally teams at eight ships together.
     internal const int SideShips = 8;
 
-    private readonly IPlayerManager playerManager;
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalShipBudget>();
 
-    // Reads which parties are players' from the player registry.
-    public NavalShipBudget(IPlayerManager playerManager)
+    private readonly IPlayerManager playerManager;
+    private readonly IObjectManager objectManager;
+    private readonly INavalFleetRecords fleetRecords;
+
+    // Reads which parties are players' from the player registry, their ids from the object manager, and the sides' AI fleet records.
+    public NavalShipBudget(IPlayerManager playerManager, IObjectManager objectManager, INavalFleetRecords fleetRecords)
     {
         this.playerManager = playerManager;
+        this.objectManager = objectManager;
+        this.fleetRecords = fleetRecords;
     }
 
     // The launcher's own fleet; every client computes the same for each player, so the AI share below matches it.
@@ -50,24 +64,67 @@ public class NavalShipBudget : INavalShipBudget
         model.GetShipDeploymentLimitsOfPlayerTeams(playerTeamParties, allyTeamParties, out var playerLimit, out var allyLimit);
         if (playerMapEventParty.Ships.Count == 0) return new NavalPlayerFleet(Array.Empty<Ship>(), playerLimit, allyLimit);
 
+        playerLimit = CapLateJoiner(sideParties, playerParty, playerLimit);
         var ships = new MBList<IShipOrigin> { model.GetSuitablePlayerShip(playerMapEventParty, playerTeamParties) };
         model.FillShipsOfTeamParties(playerTeamParties, playerLimit, ships);
         return new NavalPlayerFleet(ships.Cast<Ship>().ToList(), playerLimit, allyLimit);
     }
 
-    // Vanilla's team limit for the AI parties, with its net ships cut to what the players left, as vanilla cuts a team's share.
     // Players' fleets come from campaign data, not registered hulls: a peer announces its hulls only at its deployment commit.
-    public NavalShipDeploymentLimit AiLimit(MBReadOnlyList<MapEventParty> sideParties, MBReadOnlyList<MapEventParty> aiParties)
+    public NavalSidePlayerFleets PlayerFleets(MBReadOnlyList<MapEventParty> sideParties)
+    {
+        var players = sideParties.Where(party => playerManager.Contains(party.Party.MobileParty)).ToList();
+        var partyIds = players.Select(party => objectManager.TryGetId(party.Party.MobileParty, out string id) ? id : null)
+            .Where(id => id != null).ToArray();
+        return new NavalSidePlayerFleets(partyIds, players.Sum(party => PlayerFleet(sideParties, party.Party).FieldedCount));
+    }
+
+    // Vanilla's team limit for the AI parties, with its net ships cut to what the players left, as vanilla cuts a team's share.
+    public NavalShipDeploymentLimit AiLimit(NavalSidePlayerFleets players, MBReadOnlyList<MapEventParty> aiParties)
     {
         var limit = NavalDLCManager.Instance.GameModels.ShipDeploymentModel.GetTeamShipDeploymentLimit(aiParties);
-        var playerFleets = sideParties.Where(party => playerManager.Contains(party.Party.MobileParty))
-            .Select(party => PlayerFleet(sideParties, party.Party).FieldedCount);
-        return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(playerFleets, limit.NetDeploymentLimit));
+        return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(players.Hulls, limit.NetDeploymentLimit));
     }
 
     /// <summary>What the players' fielded ships leave of the side's eight, at most the AI parties' own limit and never below none.</summary>
-    internal static int LeftForAi(IEnumerable<int> playerFleets, int aiLimit) =>
-        Math.Max(0, Math.Min(aiLimit, SideShips - playerFleets.Sum()));
+    internal static int LeftForAi(int playerHulls, int aiLimit) => Math.Max(0, Math.Min(aiLimit, SideShips - playerHulls));
+
+    // A player its side's AI fleet record didn't count joined after the attempt, so it fields at most what the record leaves.
+    private NavalShipDeploymentLimit CapLateJoiner(MBReadOnlyList<MapEventParty> sideParties, PartyBase playerParty,
+        NavalShipDeploymentLimit limit)
+    {
+        if (!objectManager.TryGetId(playerParty.MapEventSide?.MapEvent, out string mapEventId)) return limit;
+        if (!fleetRecords.TryGet(mapEventId, playerParty.Side, out var record)) return limit;
+
+        var counted = record.CountedPartyIds ?? Array.Empty<string>();
+        Func<PartyBase, bool> isUncountedPlayer = party => playerManager.Contains(party.MobileParty)
+            && !(objectManager.TryGetId(party.MobileParty, out string partyId) && counted.Contains(partyId));
+        var model = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
+        int cap = LateJoinerCap(sideParties.Select(party => party.Party), playerParty, isUncountedPlayer,
+            party => MostFielded(party.Ships.Count, model.GetShipDeploymentLimit(party.MobileParty)), record.AiHulls + record.PlayerHulls);
+        if (cap >= limit.NetDeploymentLimit) return limit;
+
+        Logger.Information("[NavalBattle] Capped the fleet joining {MapEventId} after its {Side} AI fleet attempt: " +
+            "cap={Cap} share={Share} aiHulls={AiHulls} playerHulls={PlayerHulls}", mapEventId, playerParty.Side, cap,
+            limit.NetDeploymentLimit, record.AiHulls, record.PlayerHulls);
+        return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, cap);
+    }
+
+    /// <summary>
+    /// A late joiner's cap: the side's eight less the record's hulls and every uncounted player before it in the side's party
+    /// order at the most it can field, and at least one, the player's own ship; a player the record counted keeps the eight.
+    /// </summary>
+    internal static int LateJoinerCap<T>(IEnumerable<T> sideParties, T own, Func<T, bool> isUncountedPlayer, Func<T, int> mostFielded,
+        int recordedHulls) where T : class
+    {
+        if (!isUncountedPlayer(own)) return SideShips;
+
+        int earlierJoiners = sideParties.TakeWhile(party => !ReferenceEquals(party, own)).Where(isUncountedPlayer).Sum(mostFielded);
+        return Math.Max(1, SideShips - recordedHulls - earlierJoiners);
+    }
+
+    /// <summary>The most hulls a party can field, from its ships and perk limit, which casualties never lower as they do its crew.</summary>
+    internal static int MostFielded(int ships, int partyShipLimit) => Math.Min(SideShips, Math.Min(ships, partyShipLimit));
 
     /// <summary>
     /// Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's, which is another

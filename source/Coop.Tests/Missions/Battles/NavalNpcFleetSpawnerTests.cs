@@ -1,13 +1,14 @@
 ﻿#if COOP_NAVAL
 using Common;
 using Common.Messaging;
+using Common.Network;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
+using GameInterface.Services.Ships.Messages;
 using HarmonyLib;
 using Missions;
 using Missions.Battles;
-using Missions.Messages;
 using Missions.Naval;
 using Moq;
 using ProtoBuf;
@@ -66,7 +67,7 @@ public class NavalNpcFleetSpawnerTests
         var broker = new MessageBroker();
         var attacker = new Harness(BattleSideEnum.Attacker, broker: broker);
         var defender = new Harness(BattleSideEnum.Defender, broker: broker);
-        broker.Publish(this, new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: true));
+        broker.Publish(this, Attempted(BattleSideEnum.Defender, failed: true));
         GameThread.Run(() => { }, blocking: true);
 
         Assert.False(attacker.Spawner.HasAttempt);
@@ -86,8 +87,8 @@ public class NavalNpcFleetSpawnerTests
     {
         var harness = new Harness(BattleSideEnum.Defender);
 
-        harness.Spawner.AcceptAttempt(new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: false));
-        harness.Spawner.AcceptAttempt(new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: true));
+        harness.Spawner.AcceptAttempt(Attempted(BattleSideEnum.Defender, failed: false));
+        harness.Spawner.AcceptAttempt(Attempted(BattleSideEnum.Defender, failed: true));
 
         Assert.True(harness.Spawner.HasAttempt);
         Assert.False(harness.Spawner.AttemptFailed);
@@ -102,7 +103,7 @@ public class NavalNpcFleetSpawnerTests
         bool sends)
     {
         var harness = new Harness(BattleSideEnum.Defender) { IsLocalHost = isLocalHost };
-        if (attempted) harness.Spawner.AcceptAttempt(new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: true));
+        if (attempted) harness.Spawner.AcceptAttempt(Attempted(BattleSideEnum.Defender, failed: true));
 
         harness.Spawner.SendAttemptTo(entrant);
 
@@ -113,15 +114,36 @@ public class NavalNpcFleetSpawnerTests
     [Fact]
     public void Attempt_RoundTripsOverTheWire()
     {
-        using var stream = new MemoryStream();
-        Serializer.Serialize(stream, new NetworkNpcFleetAttempted(BattleSideEnum.Attacker, failed: true));
-        stream.Position = 0;
+        var copy = RoundTrip(new NetworkNpcFleetAttempted("MapEvent_1", BattleSideEnum.Attacker, failed: true, aiHulls: 2,
+            playerHulls: 3, countedPartyIds: new[] { "MobileParty_1", "MobileParty_2" }));
 
-        var copy = Serializer.Deserialize<NetworkNpcFleetAttempted>(stream);
-
-        Assert.Equal(BattleSideEnum.Attacker, copy.Side);
-        Assert.True(copy.Failed);
+        Assert.Equal(("MapEvent_1", BattleSideEnum.Attacker, true, 2, 3), (copy.InstanceId, copy.Side, copy.Failed, copy.AiHulls,
+            copy.PlayerHulls));
+        Assert.Equal(new[] { "MobileParty_1", "MobileParty_2" }, copy.CountedPartyIds);
     }
+
+    // protobuf-net writes nothing for an empty array, so an attempt that counted no player arrives with null ids.
+    [Fact]
+    public void Attempt_WithNoCountedPlayer_ArrivesWithNullIds()
+    {
+        var copy = RoundTrip(new NetworkNpcFleetAttempted("MapEvent_1", BattleSideEnum.Defender, failed: true, aiHulls: 0,
+            playerHulls: 0, countedPartyIds: System.Array.Empty<string>()));
+
+        Assert.Null(copy.CountedPartyIds);
+    }
+
+    // Serializes the attempt and reads it back.
+    private static NetworkNpcFleetAttempted RoundTrip(NetworkNpcFleetAttempted attempt)
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, attempt);
+        stream.Position = 0;
+        return Serializer.Deserialize<NetworkNpcFleetAttempted>(stream);
+    }
+
+    // This battle's attempt of the side, counting no player.
+    private static NetworkNpcFleetAttempted Attempted(BattleSideEnum side, bool failed) =>
+        new NetworkNpcFleetAttempted("MapEvent_1", side, failed, aiHulls: 0, playerHulls: 0, countedPartyIds: null);
 
     [Fact]
     public void LatePlanNotificationPatch_BindsAndOnlySilencesTheLatePlan()
@@ -158,7 +180,7 @@ public class NavalNpcFleetSpawnerTests
         Assert.NotNull(harness.Spawner.FailNextSpawn());
 
         var successor = new Harness(BattleSideEnum.Defender) { IsLocalHost = true };
-        successor.Spawner.AcceptAttempt(new NetworkNpcFleetAttempted(BattleSideEnum.Defender, failed: true));
+        successor.Spawner.AcceptAttempt(Attempted(BattleSideEnum.Defender, failed: true));
         successor.Attempt(_ => { spawned = true; return null; });
         successor.Spawner.SendAttemptTo("late_joiner");
 
@@ -311,6 +333,7 @@ public class NavalNpcFleetSpawnerTests
     private sealed class Harness
     {
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
+        public Mock<INetwork> Relay { get; } = new Mock<INetwork>();
         public Mock<INavalNpcFleetRollback> Rollback { get; } = new Mock<INavalNpcFleetRollback>();
         public Mock<INavalNpcFleetFielder> Fielder { get; } = new Mock<INavalNpcFleetFielder>();
         public bool IsLocalHost { get; set; }
@@ -322,7 +345,7 @@ public class NavalNpcFleetSpawnerTests
             session.SetupGet(s => s.IsLocalHost).Returns(() => IsLocalHost);
             session.SetupGet(s => s.InstanceId).Returns("MapEvent_1");
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
-            Spawner = new NavalNpcFleetSpawner(Network.Object, broker ?? new MessageBroker(), session.Object,
+            Spawner = new NavalNpcFleetSpawner(Network.Object, Relay.Object, broker ?? new MessageBroker(), session.Object,
                 Mock.Of<IBattleShipReplicator>(), side, (_, _) => Fielder.Object, _ => Rollback.Object
 #if DEBUG
                 , ScenarioState(scenarioFailsSpawn)

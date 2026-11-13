@@ -116,6 +116,16 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them
     (`NavalShipBudget`). Each player's share is the one its launcher fields, from campaign data every client holds. When the
     players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
+  - Record: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share counted and
+    those players' party ids. The host sends it to the server too, which keeps the side's first one for the battle's life
+    (`INavalFleetRecords`, in `ServerBattleShipFateHandler`, dropped at the battle's finalize) and passes it on to every
+    client, and to a client entering the campaign later. Clients keep it the same way (`NavalFleetRecordHandler`). It
+    travels on the server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher
+    picks ships.
+  - Late joiners: a player the record didn't count fields at most what the side's 8 leave after the record's hulls and
+    every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
+    party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the A2
+    split; a promoted host only latches the record, so nothing is fielded again.
   - Crew: troops are pulled only up to the crew capacity of the hulls that field; the rest stay in the reserve.
   - Reserve: at sea every AI party on a side belongs to the battle host, a player-led army's members included
     (`BattleTroopReserveBuilder.GetOwnedReserves`; on land they go to the army leader). The host gets it with the
@@ -715,10 +725,15 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - an old host that applies a hit just before its own move keeps it only if its next condition goes out first;
   - hits still in the arrivals queue at `Dispose` are cleared. Fates are flushed from the applied state, so results never
     see them.
-- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned. The AI share is computed once, when
-  the host fields the allies, so a player who joins later adds its own share on top and can push the ally team past its 8
-  formations on the older clients. Allied hulls take vanilla's late plan for the ally team, not a reserved slot, so they
-  can start near a player fleet. A failed allied attempt's retracted hulls count as departures from the players' side.
+- **Allied fleets.** Agents refused by a formation with no hull are not re-assigned. Allied hulls take vanilla's late plan
+  for the ally team, not a reserved slot, so they can start near a player fleet. A failed allied attempt's retracted hulls
+  count as departures from the players' side.
+- **Late joiners past the side's 8 ships.** The cap still lets a side pass 8 in three cases, each dropping copies on the
+  older clients' ally team (`BattleShipReplicator`):
+  - a party that joined the side after the host's attempt and opened its mission before the record reached it (about one
+    round trip through the server) fields its full share: up to that share less one copy over on the older clients;
+  - every player fields its own ship, so a second player joining a full side is one copy over;
+  - players who start together keep the A2 split, which can pass 8 with four or more large fleets, as before M11.
 - **Saved Order of Battle layout.** Co-op skips `NavalOrderOfBattleVM.LoadConfigurationShips`, so the player's saved ship
   and formation layout never applies, while vanilla's `SaveConfiguration` still stores the snapshot ships into the
   client's `NavalOrderOfBattleCampaignBehavior` after each battle.

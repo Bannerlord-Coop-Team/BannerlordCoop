@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.Ships.Messages;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -222,7 +224,7 @@ public class NavalNpcHullRetractionTests
         public Mock<INavalNpcFleetFielder> Fielder { get; } = new Mock<INavalNpcFleetFielder>();
 
         // The battle's AI fleet spawner, taking a failed attempt back through the real rollback and this replicator.
-        public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, new MessageBroker(), Session.Object,
+        public NavalNpcFleetSpawner Spawner() => new NavalNpcFleetSpawner(Network.Object, Mock.Of<INetwork>(), new MessageBroker(), Session.Object,
             Replicator, BattleSideEnum.Defender, (_, _) => Fielder.Object,
             replicator => new NavalNpcFleetRollback(replicator)
 #if DEBUG

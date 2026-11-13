@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 #if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
 #endif
+using GameInterface.Services.Ships.Messages;
 using Missions.Battles;
 using Missions.Messages;
 using Serilog;
@@ -68,6 +70,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string TakingBack = "taking_back";
 
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly INavalNpcFleetFielder fielder;
@@ -101,9 +104,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     private int takeBackFailures;
     private string failure;
 
-    // Takes the battle's mesh, session and ship replicator, the side it fields, and builds that battle's fielder and take-back.
+    // Takes the battle's mesh, the server relay, the session and ship replicator, the side it fields, and builds that battle's
+    // fielder and take-back.
     public NavalNpcFleetSpawner(
         IBattleNetwork network,
+        INetwork relayNetwork,
         IMessageBroker messageBroker,
         IBattleSession session,
         IBattleShipReplicator shipReplicator,
@@ -116,6 +121,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         )
     {
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         this.session = session;
         Side = side;
@@ -195,7 +201,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             return;
         }
 
-        Publish(new NetworkNpcFleetAttempted(Side, failed: false));
+        Publish(failed: false);
     }
 
     // Takes back the failed attempt and then settles it as failed; a take-back that throws is retried on the next tick.
@@ -212,7 +218,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         if (HasAttempt) return;
 
         LogNotFielded();
-        Publish(new NetworkNpcFleetAttempted(Side, failed: true));
+        Publish(failed: true);
     }
 
     // Players taking all of the side's ships is a normal outcome, so only a real failure is a warning.
@@ -251,11 +257,15 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         return true;
     }
 
-    // Latches this host's attempt and tells the peers.
-    private void Publish(NetworkNpcFleetAttempted attempted)
+    // Latches this host's attempt, with the hulls it left and the players its share counted, and tells the peers and the server,
+    // which passes it on to every client for a later joiner's cap.
+    private void Publish(bool failed)
     {
-        Settle(attempted);
+        var players = lastAttempt.Players;
+        Settle(new NetworkNpcFleetAttempted(session.InstanceId, Side, failed, failed ? 0 : lastAttempt.Hulls.Count, players.Hulls,
+            players.PartyIds));
         network.SendAll(attempt);
+        relayNetwork.SendAll(attempt);
     }
 
     /// <summary>Whether the side's attempt was made, here or by an earlier host.</summary>
@@ -276,10 +286,10 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     }
 
     // [Game thread] An earlier host's attempt of this side: a promoted client doesn't field it again, and a failed side releases
-    // its hold. The other side's attempt belongs to that side's spawner.
+    // its hold. The other side's attempt belongs to that side's spawner, and the server passes on other battles' too.
     internal void AcceptAttempt(NetworkNpcFleetAttempted attempted)
     {
-        if (HasAttempt || attempted.Side != Side) return;
+        if (HasAttempt || attempted.Side != Side || attempted.InstanceId != session.InstanceId) return;
 
         Settle(attempted);
         Logger.Information("[NavalBattle] The {Side} AI fleet of {MapEventId} was already attempted by a battle host: {Outcome}",

@@ -6,8 +6,8 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] What one AI fleet attempt did so far: the hulls and troops a failed attempt takes back exactly, and its first
-/// crew batch for the inspect output.
+/// [Game thread] What one AI fleet attempt did so far: the hulls and troops a failed attempt takes back exactly, the players its
+/// share counted for the attempt's record, and its first crew batch for the inspect output.
 /// </summary>
 public sealed class NavalNpcFleetAttemptWork
 {
@@ -16,6 +16,9 @@ public sealed class NavalNpcFleetAttemptWork
 
     /// <summary>The reserve troops the attempt pulled for its crew.</summary>
     public List<IAgentOriginBase> Troops { get; } = new List<IAgentOriginBase>();
+
+    /// <summary>The players' fleets the attempt's AI share left room for; none until the fielder worked the share out.</summary>
+    public NavalSidePlayerFleets Players { get; set; } = NavalSidePlayerFleets.None;
 
     /// <summary>How many crew vanilla's first batch spawned (diagnostics).</summary>
     public int FirstCrewBatch { get; set; }

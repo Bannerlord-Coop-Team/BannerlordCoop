@@ -1,5 +1,6 @@
 ﻿#if COOP_NAVAL
 using Missions.Naval;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -33,13 +34,37 @@ public class NavalShipBudgetTests
     // The allies get what the players' fielded ships leave of the side's eight, never more than their own limit nor below none.
     // Row one has the 6+6 shape, with the player's share of 4 given as input: an AI lord limited to 6 gets the other 4.
     [Theory]
-    [InlineData(new[] { 4 }, 6, 4)]
-    [InlineData(new[] { 3 }, 2, 2)]
-    [InlineData(new[] { 4, 4 }, 6, 0)]
-    [InlineData(new[] { 5, 4 }, 6, 0)]
-    public void LeftForAi_IsWhatThePlayersLeaveOfTheSidesEight_AtMostTheAiLimit(int[] playerFleets, int aiLimit, int expected)
+    [InlineData(4, 6, 4)]
+    [InlineData(3, 2, 2)]
+    [InlineData(8, 6, 0)]
+    [InlineData(9, 6, 0)]
+    public void LeftForAi_IsWhatThePlayersLeaveOfTheSidesEight_AtMostTheAiLimit(int playerHulls, int aiLimit, int expected)
     {
-        Assert.Equal(expected, NavalShipBudget.LeftForAi(playerFleets, aiLimit));
+        Assert.Equal(expected, NavalShipBudget.LeftForAi(playerHulls, aiLimit));
+    }
+
+    // A player the side's AI fleet record didn't count gets the eight less the record and every uncounted player before it, at
+    // the most that player can field, and at least its own ship. Rows: the phase 0 joiner onto a full side (3 + 5 AI, then 4),
+    // room the AI left, two joiners in party order, one the record counted (it joined before the attempt) and an uncounted
+    // player after the own one, which counts the own one instead.
+    [Theory]
+    [InlineData("P1 AI J", "P1", "", 8, "J", 1)]
+    [InlineData("P1 AI J", "P1", "", 5, "J", 3)]
+    [InlineData("P1 AI J1 J2", "P1", "J1=2", 5, "J2", 1)]
+    [InlineData("P1 AI J1 J2", "P1 J1", "", 8, "J1", 8)]
+    [InlineData("P1 AI J1 J2", "P1", "J2=3", 5, "J1", 3)]
+    public void LateJoinerCap_IsWhatTheRecordAndTheEarlierJoinersLeave(string side, string counted, string mostFielded,
+        int recordedHulls, string own, int expected)
+    {
+        var parties = side.Split(' ');
+        var countedParties = counted.Split(' ');
+        var fleets = mostFielded.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries)
+            .ToDictionary(entry => entry.Split('=')[0], entry => int.Parse(entry.Split('=')[1]));
+
+        int cap = NavalShipBudget.LateJoinerCap(parties, parties.First(party => party == own),
+            party => party != "AI" && !countedParties.Contains(party), party => fleets[party], recordedHulls);
+
+        Assert.Equal(expected, cap);
     }
 
     private static PartyBase CreateParty() =>
