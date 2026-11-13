@@ -22,7 +22,7 @@ internal class SiegeEngineConstructionProgressRegistry : AutoRegistryBase<SiegeE
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    // An ended siege keeps its engines referenced until the next tick; its destroy already released them.
+    // An ended siege keeps its engines referenced until the next tick, as SiegeEventRegistry skips it.
     public override void RegisterAllObjects()
     {
         foreach (var siegeEvent in SiegeContainerLookup.UnendedSieges())

@@ -238,9 +238,13 @@ internal class MapEventPartyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.AttackedTroop, out var attackedTroopId))
             return;
 
-        // A hit still counts without its captain, so a failed lookup sends the hit with none.
+        // A hit without a captain is normal and TryGetIdWithLogging logs an error on null, so only look one
+        // up when set. A failed lookup still sends the hit, without its captain.
         string captainId = null;
-        if (obj.Captain != null) objectManager.TryGetIdWithLogging(obj.Captain, out captainId);
+        if (obj.Captain != null)
+        {
+            objectManager.TryGetIdWithLogging(obj.Captain, out captainId);
+        }
 
         network.SendAll(new NetworkTroopScoreHit(
             mapEventPartyId,
@@ -273,7 +277,10 @@ internal class MapEventPartyHandler : IHandler
                 return;
 
             CharacterObject captain = null;
-            if (!string.IsNullOrEmpty(obj.CaptainId)) objectManager.TryGetObjectWithLogging(obj.CaptainId, out captain);
+            if (!string.IsNullOrEmpty(obj.CaptainId))
+            {
+                objectManager.TryGetObjectWithLogging(obj.CaptainId, out captain);
+            }
 
             ApplyTroopScoreHit(
                 mapEventParty,

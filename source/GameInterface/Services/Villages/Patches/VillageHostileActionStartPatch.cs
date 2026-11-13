@@ -4,28 +4,26 @@ using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.Villages.Patches;
 
 /// <summary>
-/// v1.5 split the old StartHostileAction(HostileActionType) into one "continue" consequence per
-/// action. Each of them starts the encounter, so each sends the request to the server instead.
+/// Each "continue" consequence starts the encounter, so each sends the request to the server instead.
 /// </summary>
 [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior))]
 internal class VillageHostileActionStartPatch
 {
-    [HarmonyPatch("game_menu_raid_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_raid_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool RaidPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.Raid);
+    private static bool RaidPrefix() => RequestOnServer(VillageHostileAction.Raid);
 
-    [HarmonyPatch("game_menu_force_volunteers_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_volunteers_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceVolunteersPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceVolunteers);
+    private static bool ForceVolunteersPrefix() => RequestOnServer(VillageHostileAction.ForceVolunteers);
 
-    [HarmonyPatch("game_menu_force_supplies_resist_continue_on_consequence")]
+    [HarmonyPatch(nameof(VillageHostileActionCampaignBehavior.game_menu_force_supplies_resist_continue_on_consequence))]
     [HarmonyPrefix]
-    private static bool ForceSuppliesPrefix(MenuCallbackArgs args) => RequestOnServer(VillageHostileAction.ForceSupplies);
+    private static bool ForceSuppliesPrefix() => RequestOnServer(VillageHostileAction.ForceSupplies);
 
     private static bool RequestOnServer(VillageHostileAction action)
     {
@@ -41,11 +39,10 @@ internal class VillageHostileActionStartPatch
 }
 
 /// <summary>
-/// v1.5 lets a village with no defenders give up supplies or recruits without a battle, applied
-/// locally by the menu. Co-op authorizes force actions through the server-side encounter, so every
-/// village resists and the request goes through <see cref="VillageHostileActionStartPatch"/>.
+/// A village with no defenders would hand over supplies or recruits locally from the menu. Every village
+/// resists instead, so force actions go through the server-side encounter like any other.
 /// </summary>
-[HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), "WillVillageResistHostileAction")]
+[HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.WillVillageResistHostileAction))]
 internal class VillageAlwaysResistsHostileActionPatch
 {
     [HarmonyPrefix]

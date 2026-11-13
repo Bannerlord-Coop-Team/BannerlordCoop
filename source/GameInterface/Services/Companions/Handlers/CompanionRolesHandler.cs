@@ -32,6 +32,8 @@ internal class CompanionRolesHandler : IHandler
 {
     private static readonly ILogger logger = LogManager.GetLogger<CompanionRolesHandler>();
 
+    private const int NewClanPartyMinimumSize = 33;
+
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -152,10 +154,9 @@ internal class CompanionRolesHandler : IHandler
                     mobileParty.ActualClan = clan;
                     mobileParty.Party.SetVisualAsDirty();
                 }
-                // v1.5 tops the new clan's party, created or kept, up to 33 men, half basic and half elite.
-                if (mobileParty.MemberRoster.TotalManCount < 33)
+                int missing = NewClanPartyMinimumSize - mobileParty.MemberRoster.TotalManCount;
+                if (missing > 0)
                 {
-                    int missing = 33 - mobileParty.MemberRoster.TotalManCount;
                     int basic = missing / 2;
                     mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, basic, false, 0, 0, true, -1);
                     mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, missing - basic, false, 0, 0, true, -1);

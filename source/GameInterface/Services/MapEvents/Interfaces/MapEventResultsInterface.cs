@@ -212,7 +212,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     playerLootData.LootedPrisoners[winnerPlayerParty] = new();
                 }
 
-                // v1.5 lets the map event component decide what the winners loot (a naval battle the player
+                // The map event component decides what the winners loot (a naval battle the player
                 // disengaged from loots only ships), as vanilla's CalculateAndCommitMapEventResults does.
                 var component = mapEvent.Component;
                 if (component.CanLootDefeatedPartyCasualties())

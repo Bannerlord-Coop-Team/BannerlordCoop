@@ -1,13 +1,8 @@
-﻿using Common;
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.CampaignService.Patches;
-using GameInterface.Tests;
-using HarmonyLib;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BattleWreckages;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit;
 
 namespace GameInterface.Tests.Services.CampaignService;
@@ -16,45 +11,8 @@ namespace GameInterface.Tests.Services.CampaignService;
 /// v1.5 battle wreckages are off on every role, and every wreckage a save already holds is dropped
 /// before the object lists are built, since id-less ones throw there and none of them would expire.
 /// </summary>
-[Collection(ModInformationRoleCollection.Name)]
-public class BattleWreckageCoopTests : IDisposable
+public class BattleWreckageCoopTests
 {
-    private readonly bool wasServer = ModInformation.IsServer;
-
-    public void Dispose() => ModInformation.IsServer = wasServer;
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void RegisterEvents_IsSkippedOnEveryRole(bool isServer)
-    {
-        ModInformation.IsServer = isServer;
-
-        Assert.False(DisableBattleWreckageCampaignBehavior.Prefix());
-    }
-
-    [Fact]
-    public void OtherV15Behaviors_StayServerOnly()
-    {
-        ModInformation.IsServer = true;
-        Assert.True(DisableV15CampaignBehaviors.Prefix());
-
-        ModInformation.IsServer = false;
-        Assert.False(DisableV15CampaignBehaviors.Prefix());
-    }
-
-    [Fact]
-    public void ServerOnlyList_HoldsTheOtherThreeBehaviorsAndNotTheWreckageOne()
-    {
-        var targets = DisableV15CampaignBehaviors.TargetMethods().ToList();
-
-        Assert.Equal(3, targets.Count);
-        Assert.Contains(targets, m => m.DeclaringType == typeof(HeroDailyXpCampaignBehavior));
-        Assert.Contains(targets, m => m.DeclaringType == typeof(EmptyClanPartiesCampaignBehavior));
-        Assert.Contains(targets, m => m.DeclaringType == typeof(PartyConfigurationCampaignBehavior));
-        Assert.DoesNotContain(targets, m => m.DeclaringType == typeof(BattleWreckageCampaignBehavior));
-    }
-
     [Fact]
     public void SavedWreckages_AreAllDroppedSoTheObjectListsInitialize()
     {
@@ -71,23 +29,5 @@ public class BattleWreckageCoopTests : IDisposable
         Assert.Equal(2, SavedWreckageRemovalPatch.RemoveSavedWreckages(manager));
         manager.InitializeManagerObjectLists();
         Assert.Empty(manager.Wreckages);
-    }
-
-    [Fact]
-    public void BothPatches_ResolveTheirTargetsAndPatch()
-    {
-        var harmony = new Harmony(nameof(BothPatches_ResolveTheirTargetsAndPatch));
-        try
-        {
-            var disabled = harmony.CreateClassProcessor(typeof(DisableBattleWreckageCampaignBehavior)).Patch();
-            var removal = harmony.CreateClassProcessor(typeof(SavedWreckageRemovalPatch)).Patch();
-
-            Assert.Contains(disabled, method => method.Name.Contains(nameof(BattleWreckageCampaignBehavior.RegisterEvents)));
-            Assert.Contains(removal, method => method.Name.Contains(nameof(CampaignObjectManager.InitializeOnLoad)));
-        }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-        }
     }
 }

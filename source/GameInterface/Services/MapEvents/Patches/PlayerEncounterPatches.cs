@@ -100,7 +100,7 @@ internal class PlayerEncounterPatches
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
 
-        // v1.5 clears the previous round's result here instead of in ContinueBattle.
+        // The previous round's result is cleared here, not in ContinueBattle.
         __instance._campaignBattleResult = null;
 
         // Approved restarts run under AllowedThread, but clients must still adopt the same server-authoritative
@@ -263,9 +263,14 @@ internal class PlayerEncounterPatches
             mainParty._besiegerCamp = null;
         }
 
-        RecoverEncounterWithoutMapEvent(
+        // Same as vanilla, leave a village but stay in a fortification, then restart the settlement encounter
+        var currentSettlement = mainParty.CurrentSettlement;
+        if (RecoverEncounterWithoutMapEvent(
             encounter,
-            forcePlayerOutFromSettlement: mainParty.CurrentSettlement == null);
+            forcePlayerOutFromSettlement: currentSettlement?.IsFortification == false) && currentSettlement != null)
+        {
+            EncounterManager.StartSettlementEncounter(mainParty, currentSettlement);
+        }
         return false;
     }
 
@@ -602,8 +607,7 @@ internal class PlayerEncounterPatches
 }
 
 /// <summary>
-/// v1.5 moved PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent into the map event components:
-/// StartBattleInternal now calls <see cref="MapEventComponent.AddNearbyPartiesToPlayerMapEvent"/>, which
+/// StartBattleInternal calls <see cref="MapEventComponent.AddNearbyPartiesToPlayerMapEvent"/>, which
 /// each component type overrides. Co-op keeps skipping the local nearby-party pull, so every override is patched.
 /// </summary>
 [HarmonyPatch]

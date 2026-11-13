@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.UI.Patches;
 
 [HarmonyPatch]
-internal class MapTrackerProviderUpdatePatches
+internal class MapTrackerUpdatePatches
 {
     [HarmonyPatch(typeof(MapMobilePartyTrackItemVM), nameof(MapMobilePartyTrackItemVM.IsVisibleOnMap))]
     [HarmonyPostfix]
@@ -21,10 +21,10 @@ internal class MapTrackerProviderUpdatePatches
         __result &= __instance.TrackedObject.IsActive;
     }
 
-    // v1.5 moved tracker eligibility from SandBox's MapTrackerProvider into the campaign's MapTrackerManager.
+    // Tracker eligibility lives in the campaign's MapTrackerManager.
     [HarmonyPatch(typeof(MapTrackerManager), nameof(MapTrackerManager.ShouldAutoAddTrackerForParty))]
     [HarmonyPostfix]
-    public static void CanAddMobilePartyPostfix(MobileParty party, ref bool __result)
+    public static void ShouldAutoAddTrackerForPartyPostfix(MobileParty party, ref bool __result)
     {
         if (!__result && ModInformation.IsClient && party.IsPlayerParty() &&
             ContainerProvider.TryResolve<IPlayerMapTracking>(out var mapTracking) && mapTracking.IsTrackedByLocalPlayer(party))

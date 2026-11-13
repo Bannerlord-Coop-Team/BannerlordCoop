@@ -7,6 +7,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEventSides.Messages;

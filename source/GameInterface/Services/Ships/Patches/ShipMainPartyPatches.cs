@@ -3,7 +3,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 
 namespace GameInterface.Services.Ships.Patches;
@@ -21,13 +20,14 @@ internal class ShipMainPartyPatches
     [HarmonyPrefix]
     public static bool CanHaveUnlockedPiecesSetterPrefix(Ship __instance)
     {
-        return !(ModInformation.IsClient && IsManaged(__instance));
+        if (ModInformation.IsClient && IsManaged(__instance)) return false;
+
+        return true;
     }
 
     /// <summary>
-    /// v1.5 asks this event whether a ship that changed owner keeps unlocked pieces, and War Sails answers with a
-    /// PartyBase.MainParty check. Every player's party counts instead, as for the stash and return details that
-    /// always keep them.
+    /// War Sails decides whether a ship that changed owner keeps unlocked pieces with a PartyBase.MainParty check.
+    /// Every player's party counts instead, as for the stash and return details that always keep them.
     /// </summary>
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.CanHaveUnlockedUpgradePiece))]
     [HarmonyPostfix]

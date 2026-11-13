@@ -8,6 +8,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;

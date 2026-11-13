@@ -10,6 +10,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
@@ -154,7 +155,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
         if (sallyOut)
         {
-            // A v1.5 sally out finalizes through its component, which reads the besieged settlement.
+            // A sally out finalizes through its component, which reads the besieged settlement.
             var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
             foreach (var instance in Clients.Append(Server))
                 instance.Call(() =>

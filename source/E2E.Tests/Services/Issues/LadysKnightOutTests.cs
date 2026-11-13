@@ -4,6 +4,7 @@ using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Tests.Utils;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
