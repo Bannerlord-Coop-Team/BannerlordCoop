@@ -52,4 +52,44 @@ public class NavalNpcFleetAttemptScenarioTests : NavalBattleTestEnvironment
 
         Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkNpcFleetAttemptRecorded>().Count());
     }
+
+    // BR-017: a battle whose last player left stays open, and re-engaging it opens a new mission whose host attempts the fleets
+    // again; that attempt is recorded and sent anew, and replaces the old one on every client.
+    [Fact]
+    public void ReEngagedBattle_RecordsItsNewMissionsAttempt_AndEveryClientReplacesTheOldOne()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        Report(a, battle, aiHulls: 5);
+        foreach (var leaver in new[] { a, b })
+        {
+            Server.Call(() => Server.SimulateMessage(leaver.Instance.NetPeer, new NetworkMissionLeft(leaver.Id, battle.MapEventId)),
+                VictoryConclusionDisabledMethods());
+        }
+
+        Server.PumpGameThread();
+        Server.SimulateMessage(a.Instance.NetPeer, new NetworkMissionEntered(a.Id, battle.MapEventId));
+        Server.NetworkSentMessages.Clear();
+
+        Report(a, battle, aiHulls: 2);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkNpcFleetAttemptRecorded>());
+        foreach (var instance in new[] { Server }.Concat(Clients))
+        {
+            instance.PumpGameThread();
+            instance.Call(() =>
+            {
+                Assert.True(instance.Resolve<INavalNpcFleetAttemptTracker>().TryGet(battle.MapEventId, BattleSideEnum.Attacker,
+                    out var attempt));
+                Assert.Equal(2, attempt.AiHulls);
+            });
+        }
+    }
+
+    // The battle host reports its Attacker AI fleet attempt to the server.
+    private void Report(NavalPeer host, NavalBattle battle, int aiHulls)
+    {
+        Server.Call(() => Server.SimulateMessage(host.Instance.NetPeer, new NetworkNpcFleetAttempted(battle.MapEventId,
+            BattleSideEnum.Attacker, failed: false, aiHulls, playerHulls: 3, countedPartyIds: new[] { "MobileParty_A" })));
+        Server.PumpGameThread();
+    }
 }

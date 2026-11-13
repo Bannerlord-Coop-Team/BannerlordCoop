@@ -8,19 +8,22 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.Ships;
 
 /// <summary>
-/// [Game thread] Each open naval battle side's recorded AI fleet attempt: the server replays it to joining clients and a client's
-/// launcher caps a late joiner against it. The spawner's latch stays the mission's own, set at once on the host.
+/// [Game thread] Each open naval battle side's latest recorded AI fleet attempt: the server replays it to joining clients and a
+/// client's launcher caps a late joiner against it. The spawner's latch stays the mission's own, set at once on the host.
 /// </summary>
 public interface INavalNpcFleetAttemptTracker
 {
-    /// <summary>Keeps the side's first attempt in its battle; returns whether this one was new.</summary>
-    bool Record(NetworkNpcFleetAttemptRecorded attempt);
+    /// <summary>Keeps the attempt as its side's latest in its battle; a re-engaged battle's new mission attempts again.</summary>
+    void Record(NetworkNpcFleetAttemptRecorded attempt);
 
     /// <summary>The side's attempt in the battle, if one was recorded and the battle is still open.</summary>
     bool TryGet(string mapEventId, BattleSideEnum side, out NetworkNpcFleetAttemptRecorded attempt);
 
     /// <summary>Every recorded attempt of an open battle.</summary>
     IEnumerable<NetworkNpcFleetAttemptRecorded> All { get; }
+
+    /// <summary>Drops the battle's attempts, once its mission instance is gone while the battle stays open (BR-017).</summary>
+    void Forget(string mapEventId);
 }
 
 /// <inheritdoc cref="INavalNpcFleetAttemptTracker"/>
@@ -36,14 +39,10 @@ public class NavalNpcFleetAttemptTracker : INavalNpcFleetAttemptTracker
         this.objectManager = objectManager;
     }
 
-    public bool Record(NetworkNpcFleetAttemptRecorded attempt)
+    public void Record(NetworkNpcFleetAttemptRecorded attempt)
     {
         DropEndedBattles();
-        var key = (attempt.InstanceId, attempt.Side);
-        if (attempts.ContainsKey(key)) return false;
-
-        attempts.Add(key, attempt);
-        return true;
+        attempts[(attempt.InstanceId, attempt.Side)] = attempt;
     }
 
     public bool TryGet(string mapEventId, BattleSideEnum side, out NetworkNpcFleetAttemptRecorded attempt)
@@ -59,6 +58,12 @@ public class NavalNpcFleetAttemptTracker : INavalNpcFleetAttemptTracker
             DropEndedBattles();
             return attempts.Values.ToList();
         }
+    }
+
+    public void Forget(string mapEventId)
+    {
+        foreach (var key in attempts.Keys.Where(key => key.MapEventId == mapEventId).ToList())
+            attempts.Remove(key);
     }
 
     // An attempt lives only while its battle is open, on the server and on clients, which never see the finalize event.

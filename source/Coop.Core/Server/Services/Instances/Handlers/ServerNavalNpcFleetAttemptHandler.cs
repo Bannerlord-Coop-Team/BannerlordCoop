@@ -13,8 +13,8 @@ using Serilog;
 namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
-/// [Server] Records each naval battle side's AI fleet attempt its battle host reports and sends it to every client, and to a
-/// client entering the campaign later, so a player who opens that battle afterwards caps its fleet against it.
+/// [Server] Records each naval battle side's AI fleet attempt its battle host reports, for the battle's mission instance, and
+/// sends it to every client and to a client entering the campaign later, so a player who opens that battle caps its fleet.
 /// </summary>
 public class ServerNavalNpcFleetAttemptHandler : IHandler
 {
@@ -38,6 +38,7 @@ public class ServerNavalNpcFleetAttemptHandler : IHandler
 
         messageBroker.Subscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
         messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
     }
 
     // Drops the handler's subscriptions.
@@ -45,6 +46,7 @@ public class ServerNavalNpcFleetAttemptHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkNpcFleetAttempted>(Handle_NetworkNpcFleetAttempted);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Unsubscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
     }
 
     // Resolves the battle host on the poll thread, as its disconnect in the same batch clears its peer before the game thread runs.
@@ -63,20 +65,30 @@ public class ServerNavalNpcFleetAttemptHandler : IHandler
         GameThread.RunSafe(() => Record(controllerId, attempt), context: nameof(Handle_NetworkNpcFleetAttempted));
     }
 
-    // [Game thread] Records the side's first attempt of an open battle and sends it to every client, on the same ordered
-    // channel as any later join, so a client always holds it before it can open that battle's mission.
+    // [Game thread] Records the side's first attempt of the battle's mission instance and sends it to every client, on the same
+    // ordered channel as any later join, so a client always holds it before it can open that battle's mission.
     private void Record(string controllerId, NetworkNpcFleetAttempted reported)
     {
         if (!memberResolver.TryResolve(controllerId, reported.InstanceId, "an AI fleet attempt", out _, out _)) return;
+        if (attempts.TryGet(reported.InstanceId, reported.Side, out _)) return;
 
         var attempt = new NetworkNpcFleetAttemptRecorded(reported.InstanceId, reported.Side, reported.AiHulls, reported.PlayerHulls,
             reported.CountedPartyIds);
-        if (!attempts.Record(attempt)) return;
-
+        attempts.Record(attempt);
         network.SendAll(attempt);
         Logger.Information("[NavalBattle] Recorded the {Side} AI fleet attempt of {Instance} from {Controller}: failed={Failed} " +
             "aiHulls={AiHulls} playerHulls={PlayerHulls}", reported.Side, reported.InstanceId, controllerId, reported.Failed,
             reported.AiHulls, reported.PlayerHulls);
+    }
+
+    // A battle whose last player left keeps its map event (BR-017), and re-engaging it opens a new mission whose host attempts
+    // the fleets again, so the old attempts go with the instance; clients keep theirs until the new ones replace them.
+    private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
+    {
+        var departure = payload.What;
+        if (!departure.IsInstanceEmpty) return;
+
+        GameThread.RunSafe(() => attempts.Forget(departure.InstanceId), context: nameof(Handle_MissionMemberDeparted));
     }
 
     // [Game thread] A client entering the campaign missed the earlier sends, so it gets every open battle's attempts now.

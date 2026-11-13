@@ -120,10 +120,12 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
     players take all 8, the side just has no AI fleet (logged as information, settled like a failed attempt).
   - Recorded attempt: the attempt (`NetworkNpcFleetAttempted`) carries the AI hulls it left, the players' hulls its share
     counted and those players' party ids. The host also reports it to the server (`ServerNavalNpcFleetAttemptHandler`),
-    which records the side's first one while the battle is open (`INavalNpcFleetAttemptTracker`) and sends it to every
-    client as `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients track it the same way
-    (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on the
-    server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher picks ships.
+    which records the side's first one for the battle's mission instance (`INavalNpcFleetAttemptTracker`) and sends it to
+    every client as `NetworkNpcFleetAttemptRecorded`, and to a client entering the campaign later. Clients keep the latest
+    one (`NavalNpcFleetAttemptHandler`); the spawner's own latch stays the mission's, set at once on the host. It travels on
+    the server's ordered channel ahead of any later join reply, so a later joiner holds it before its launcher picks ships.
+    When the instance empties (BR-017) the server forgets the battle's attempts, so re-engaging it records the new
+    mission's attempts, which replace the old ones on every client.
   - Late joiners: a player the attempt didn't count fields at most what the side's 8 leave after the attempt's hulls and
     every uncounted player before it in the side's party order, at the most that player can field (its ships, capped by its
     party's ship limit, which casualties never lower), and always its own ship. Players who start together keep the A2
@@ -142,8 +144,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   taken-back fleet isn't among them. D2 (a failed AI fleet as the players' victory) follows from the enemy side's
   depletion, so it only applies there.
 - Every human of a side leaving while its allies fight (M11 A4) is the land behaviour: their hulls leave as departures but
-  the allied hulls stay, so the side keeps no retreat and the allies fight on under the battle host's AI; with no human
-  left in the mission it empties like a land battle.
+  the allied hulls stay, so the side keeps no retreat and the allies fight on under the battle host's AI. With no human
+  left in the mission the server destroys the instance and the map event stays unresolved at its last state (BR-017),
+  as vanilla returns a player who leaves a battle to the encounter menu with the map event alive: Attack opens a new
+  mission (fresh reserves, a new host election, the AI fleets fielded again) and Send ships simulates it. The staging
+  presets refuse a player still in that map event.
 - Only AI hulls nobody captured have `FollowsBattleHost`. On every host change all clients move them to the new host at the
   same ordered event (`TransferHostHulls`), and their samples carry the host epoch so a stale host's traffic is dropped. A
   player's hull never changes owner unless it is captured: it stays with its player or leaves with it.
