@@ -233,23 +233,23 @@ are registered later, at `CampaignReady` (`MapScreen.OnInitialize`), through
   too. Every later load then
   crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen 2026-10-22 on v1.5.5).
   - What this loses: looter-faction parties no longer head for land battle sites (the only parties that
-    target land wreckages). Players never saw wrecks
-    in co-op anyway, since nothing syncs them (#3837, #3838). Re-enabling needs the wreckage to get an
-    id (a sync registry, or `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after
-    proving `CreateWreckage`'s log entry and map interactable work under co-op).
+    target land wreckages). Players never saw wrecks in co-op anyway, since nothing syncs them (#3837,
+    #3838). Re-enabling needs the wreckage to get an id (a sync registry, or `typeof(BattleWreckage)`
+    in `MBObjectBasePatches.allowedTypes` after proving `CreateWreckage`'s log entry and map
+    interactable work under co-op) and removing `SavedWreckageRemovalPatch` or narrowing it back to
+    id-less entries.
   - Saved wreckage removal: `SavedWreckageRemovalPatch` is a prefix on
     `CampaignObjectManager.InitializeOnLoad` (`OnGameLoaded` fires too late) and removes every saved
     wreckage before the object lists are built, on the server and on clients, logging "Dropped
     {Count} saved battle wreckages" (#4582). Id-less wreckages throw while the lists are built. A
     valid one (for example from a single-player v1.5 campaign) would never expire, because the server
-    no longer registers the hourly tick. Clicking one would open a menu clients never registered.
-    Re-enabling wreckages means removing this patch at the same time, or narrowing it back to id-less
-    entries. The map visuals are built later from `Campaign.Wreckages`, so none are drawn. A dropped wreckage
-    stays only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry) and in the
-    disabled behavior's `_encounteredBattleWreckage`. Saves already written by an affected server
-    load again once the fix is deployed on both sides. Checked live on 2026-10-22, when the patch
-    only dropped id-less wreckages: a server save hit by 7 throws dropped all 7, loaded, and a client
-    that had crashed on it rejoined.
+    no longer registers the hourly tick. Clicking one would open a menu clients never registered. The
+    map visuals are built later from `Campaign.Wreckages`, so none are drawn. A dropped wreckage stays
+    only in its `WreckageCreatedLogEntry` (rumor text, as after a vanilla expiry) and in the disabled
+    behavior's `_encounteredBattleWreckage`. Saves already written by an affected server load again
+    once the fix is deployed on both sides. Checked live on 2026-10-22, when the patch only dropped
+    id-less wreckages: a server save hit by 7 throws dropped all 7, loaded, and a client that had
+    crashed on it rejoined.
   - The wreckage removal does not undo the rest of the damage. A throw skipped the end of
     `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
     AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`

@@ -17,7 +17,8 @@ internal class BattleWreckageCampaignBehaviorPatches
 }
 
 // Goes with BattleWreckageCampaignBehaviorPatches: drops every saved wreckage before the object lists are
-// built, since with RegisterEvents skipped they never expire and their menu is never registered.
+// built, where id-less ones throw (OnGameLoaded is too late). With RegisterEvents skipped the rest would
+// never expire or have a menu.
 [HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
 internal class SavedWreckageRemovalPatch
 {
