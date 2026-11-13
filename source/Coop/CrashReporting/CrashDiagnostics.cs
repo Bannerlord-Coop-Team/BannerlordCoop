@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.Engine;
@@ -8,6 +10,7 @@ namespace Coop.CrashReporting
 {
     internal static class CrashDiagnostics
     {
+        private static readonly ILogger Logger = LogManager.GetLogger(typeof(CrashDiagnostics));
         private const int MaximumPhaseCount = 8;
         private static readonly object SyncRoot = new object();
         private static readonly Queue<string> Phases = new Queue<string>(MaximumPhaseCount);
@@ -32,6 +35,9 @@ namespace Coop.CrashReporting
         {
             lock (SyncRoot)
             {
+                if (value != phase)
+                    Logger.Information("Phase changed to {Phase}", value);
+
                 phase = value;
                 if (Phases.Count == MaximumPhaseCount)
                     Phases.Dequeue();
