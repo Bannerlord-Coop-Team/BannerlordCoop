@@ -1,5 +1,4 @@
 ﻿using LiteNetLib;
-using ProtoBuf;
 using System.Collections.Generic;
 
 namespace Common.PacketHandlers
@@ -45,22 +44,6 @@ namespace Common.PacketHandlers
                     handler.HandlePacket(peer, packet);
                 }
             }
-        }
-    }
-
-    [ProtoContract(SkipConstructor = true)]
-    public readonly struct PacketWrapper : IPacket
-    {
-        public PacketType PacketType => PacketType.PacketWrapper;
-        public DeliveryMethod DeliveryMethod { get; }
-
-        [ProtoMember(1)]
-        public IPacket Packet { get; }
-
-        public PacketWrapper(IPacket packet)
-        {
-            DeliveryMethod = packet.DeliveryMethod;
-            Packet = packet;
         }
     }
 }

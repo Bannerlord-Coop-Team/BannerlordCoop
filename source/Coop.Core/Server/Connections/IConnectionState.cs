@@ -1,12 +1,11 @@
-﻿using Common.LogicStates;
-using System;
+﻿using System;
 
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
 /// Represents the state of a single connection
 /// </summary>
-public interface IConnectionState : IState, IDisposable
+public interface IConnectionState : IDisposable
 {
     /// <summary>
     /// Whether this connection is loading game state.

@@ -1,12 +1,11 @@
-﻿using Common.LogicStates;
-using System;
+﻿using System;
 
 namespace Coop.Core.Client.States;
 
 /// <summary>
 /// Client State Machine Actions
 /// </summary>
-public interface IClientState : IState, IDisposable
+public interface IClientState : IDisposable
 {
     /// <summary>
     /// Connect to Coop Server
