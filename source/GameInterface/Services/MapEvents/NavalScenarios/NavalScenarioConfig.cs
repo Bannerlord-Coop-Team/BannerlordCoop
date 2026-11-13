@@ -103,6 +103,21 @@ public sealed class NavalScenarioConfig
     [ProtoMember(27)]
     public bool FailNpcFleet { get; set; }
 
+    /// <summary>How many ships the allied lord of <see cref="AlliedNpc"/> is topped up to.</summary>
+    [ProtoMember(28)]
+    public int AlliedShips { get; set; }
+
+    /// <summary>
+    /// Every party in the scenario's battle may field vanilla's most ships (8) whatever its perks, as vanilla's
+    /// IgnoreDeploymentLimits gives, on every client that computes the side's split.
+    /// </summary>
+    [ProtoMember(29)]
+    public bool IgnoreShipLimits { get; set; }
+
+    /// <summary>The first player's clan joins the allied lord's kingdom and leads an army with the allied lord as its member.</summary>
+    [ProtoMember(30)]
+    public bool PlayerArmy { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>

@@ -1063,6 +1063,19 @@ Knobs (`NavalScenarioResolver.Usage`):
   carry their whole crew on deck, so the stager swaps plain roomless ships for an `empire_heavy_ship` (40 places below
   deck) until n fit, then tops the healthy troops (wounded don't count) up to the deck crew plus n. A ballista or ram hull
   is never swapped, so `hulls=1 weapons=1 reserve=20` has no room and logs a Warning; add a hull.
+- `allies=n` (1 to 8, `allied_npc` only, default 1) tops the allied lord up to n ships.
+- `ignore_limits=1` lets every party of the scenario's battle field 8 ships, as vanilla's `IgnoreDeploymentLimits` does,
+  on every client (`NavalScenarioShipLimitPatch`), so two players can take all of a side's 8 ships: `allied_npc ships=4
+  ignore_limits=1 reserve=40` fields 4+4 and the allies settle on `NoShipsLeft` (`inspect` shows the Defender spawner
+  `failed` with that reason and the host logs it as Information).
+- `army=1` (`allied_npc` only) has the first player's clan join the allied lord's kingdom and lead an army with the lord as
+  its member, through the vanilla actions the clan and army syncs replicate (M11 A1: at sea the member's reserve goes to
+  the battle host).
+
+`allied_npc` already fields AI on both sides (the allied lord's fleet and the enemy pirates), so it stages both spawners in
+one battle. To sink an allied hull, run `coop.debug.naval.sink <shipId>` on the battle host, which simulates the allied
+hulls; read the lord's ships and casualties on the server before and after with `coop.debug.party.list_ships <party>` and
+`coop.debug.party.list_troops <party>`. The scenario's AI targets (`sink`, boarding, ramming) are enemy AI hulls only.
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.

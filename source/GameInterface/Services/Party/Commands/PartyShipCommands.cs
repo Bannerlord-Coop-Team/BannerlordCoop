@@ -234,6 +234,38 @@ public class PartyShipCommands
         }
     }
 
+    // coop.debug.party.list_troops PlayerOne
+    // coop.debug.party.list_troops MobileParty_lord_1_17_party_1
+    /// <summary>Lists the troops this machine's copy of a party has, healthy and wounded, so a battle's casualties can be read.</summary>
+    public sealed class ListTroopsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.party";
+
+        public string Name => "list_troops";
+
+        public string Description => "Lists the healthy and wounded troops of a party on this machine.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party", "A player controller id, a MobileParty or PartyBase id, or a party or hero name.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetListedParty(args[0], out _, out var party, out var error))
+                return Failed(error);
+
+            var roster = party.MemberRoster;
+            var troops = roster.GetTroopRoster()
+                .Select(element => $"{element.Character?.StringId ?? "none"} x{element.Number} wounded={element.WoundedNumber}")
+                .ToArray();
+            return Succeeded($"{party.Id} troops={roster.TotalManCount} healthy={roster.TotalHealthyCount} " +
+                $"wounded={roster.TotalWounded}" + (troops.Length == 0 ? "" : ": " + string.Join(", ", troops)));
+        }
+    }
+
 #if DEBUG
     // coop.debug.naval.fleet
     // coop.debug.naval.fleet MobileParty_southern_pirates_13

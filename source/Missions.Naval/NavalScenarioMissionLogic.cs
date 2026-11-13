@@ -274,12 +274,13 @@ public class NavalScenarioMissionLogic : MissionLogic
             $"{config.Spacing:0.#} m from AI hull {hulls.ShipIdOf(target)}");
     }
 
-    // The AI hulls still afloat, in a stable order every client shares.
+    // The enemy AI hulls still afloat, in a stable order every client shares; an allied lord's hulls are on the players' side.
     private MissionShip[] AfloatAiHulls() => registry.Ships
         .Where(ship => ship.IsNpcParty)
         .OrderBy(ship => ship.ShipId)
         .Select(ship => ship.Hull as MissionShip)
-        .Where(hull => hull != null && !hull.IsRemoved && !hull.IsSinking)
+        .Where(hull => hull != null && !hull.IsRemoved && !hull.IsSinking && hull.Team != null
+            && hull.Team.IsEnemyOf(Mission.PlayerTeam))
         .ToArray();
 
     // Fails the placement and the rope and helm steps that need it.

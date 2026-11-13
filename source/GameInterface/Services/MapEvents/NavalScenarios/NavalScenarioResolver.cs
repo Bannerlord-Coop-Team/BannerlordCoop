@@ -21,7 +21,8 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [fleet_fail=0|1] [controllerId...]; " +
+        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [fleet_fail=0|1] " +
+        "[allies=n] [ignore_limits=0|1] [army=0|1] [controllerId...]; " +
         "delay counts from this client's deployment end (sink, disconnect, retreat) or, for late_join, from staging";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
@@ -76,6 +77,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         LateJoin = preset.LateJoin,
         Entry = preset.Entry,
         AlliedNpc = preset.AlliedNpc,
+        AlliedShips = preset.AlliedNpc ? 1 : 0,
         RetreatSecondPlayer = preset.RetreatSecondPlayer,
         RammedShipsPerParty = preset.RammedShipsPerParty,
         BlockadeTownId = "",
@@ -134,6 +136,21 @@ public class NavalScenarioResolver : INavalScenarioResolver
             case "fleet_fail":
                 if (value != "0" && value != "1") return "fleet_fail must be 0 or 1.";
                 config.FailNpcFleet = value == "1";
+                return null;
+            case "allies":
+                if (!config.AlliedNpc) return $"{config.Preset} stages no allied lord, so it takes no allies knob.";
+                if (!TryParseInt(value, 1, NavalScenarioPresets.MaxEnemyHulls, out int allies))
+                    return $"allies must be a whole number from 1 to {NavalScenarioPresets.MaxEnemyHulls}.";
+                config.AlliedShips = allies;
+                return null;
+            case "ignore_limits":
+                if (value != "0" && value != "1") return "ignore_limits must be 0 or 1.";
+                config.IgnoreShipLimits = value == "1";
+                return null;
+            case "army":
+                if (!config.AlliedNpc) return $"{config.Preset} stages no allied lord, so it takes no army knob.";
+                if (value != "0" && value != "1") return "army must be 0 or 1.";
+                config.PlayerArmy = value == "1";
                 return null;
             case "reserve":
                 if (!TryParseInt(value, 0, NavalScenarioPresets.MaxReserveTroops, out int reserve))

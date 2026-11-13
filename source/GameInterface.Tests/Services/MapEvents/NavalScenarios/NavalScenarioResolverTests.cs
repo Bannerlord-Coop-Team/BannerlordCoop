@@ -114,6 +114,23 @@ public class NavalScenarioResolverTests
         Assert.Equal("fleet_fail must be 0 or 1.", Refuse("vs_pirates", "fleet_fail=yes"));
     }
 
+    // M11 acceptance fixtures: the allied lord's ship count, the scenario's ship limits and the player-led army reach clients
+    // over the real scenario message contract.
+    [Fact]
+    public void AlliedFixtureKnobs_DefaultToOneAlliedShip_AndRoundTripToTheClients()
+    {
+        var defaults = Resolve("allied_npc");
+        Assert.Equal((1, false, false), (defaults.AlliedShips, defaults.IgnoreShipLimits, defaults.PlayerArmy));
+        Assert.Equal(0, Resolve("vs_pirates").AlliedShips);
+
+        var config = Resolve("allied_npc", "allies=3", "ignore_limits=1", "army=1");
+        using var stream = new System.IO.MemoryStream();
+        ProtoBuf.Serializer.Serialize(stream, config);
+        stream.Position = 0;
+        var copy = ProtoBuf.Serializer.Deserialize<NavalScenarioConfig>(stream);
+        Assert.Equal((3, true, true), (copy.AlliedShips, copy.IgnoreShipLimits, copy.PlayerArmy));
+    }
+
     [Fact]
     public void Resolve_CopiesThePresetValues()
     {
@@ -178,6 +195,11 @@ public class NavalScenarioResolverTests
     [InlineData("drop must be hard or leave.", "migration", "drop=soft")]
     [InlineData("vs_pirates disconnects nobody, so it takes no drop knob.", "vs_pirates", "drop=hard")]
     [InlineData("hull must name a ship hull id.", "solo", "hull=")]
+    [InlineData("vs_pirates stages no allied lord, so it takes no allies knob.", "vs_pirates", "allies=2")]
+    [InlineData("allies must be a whole number from 1 to 8.", "allied_npc", "allies=9")]
+    [InlineData("ignore_limits must be 0 or 1.", "allied_npc", "ignore_limits=yes")]
+    [InlineData("vs_pirates stages no allied lord, so it takes no army knob.", "vs_pirates", "army=1")]
+    [InlineData("army must be 0 or 1.", "allied_npc", "army=2")]
     [InlineData("Player PlayerFour is not connected; coop.debug.players.list shows the current ids.", "vs_pirates", "PlayerFour")]
     [InlineData("Player PlayerOne is listed twice.", "vs_pirates", "PlayerOne", "PlayerOne")]
     [InlineData("solo takes at most 1 players, got 2.", "solo", "PlayerOne", "PlayerTwo")]
