@@ -1,4 +1,7 @@
-﻿using GameInterface.Services.MapEvents.Messages.Conversation;
+﻿using Common.Logging;
+using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.ObjectManager;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +10,6 @@ using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
-using TaleWorlds.Core;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.Library;
 
@@ -34,11 +36,11 @@ internal interface IPlayerPartyTradeContext
     // True while ending the trade closes the barter screen, so its native close messages are hidden.
     bool SuppressNativeCloseMessages { get; }
 
-    // Starts a trade session for the local party with nothing accepted.
-    void Begin(string sessionId, PartyBase localParty, string localPartyId);
+    // Starts a trade session for the local party with nothing accepted and shows the trade overlay.
+    void Begin(string sessionId, PartyBase localParty, string localPartyId, string otherPlayerName);
 
-    // Ends the trade and closes its barter screen, unless another session is the active one.
-    void End(string sessionId, PlayerPartyInteractionOutcomeType outcomeType);
+    // Ends the trade, closes its barter screen and hides the overlay, unless another session is the active one.
+    void End(string sessionId);
 
     // Takes over a barter screen opened for the active trade.
     void SetBarterVM(BarterVM barterVM);
@@ -55,17 +57,8 @@ internal interface IPlayerPartyTradeContext
     // Whether a barter item's offered amount may change, which a server offer always may.
     bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount);
 
-    // Whether the local player may accept the current offers.
-    bool CanAccept();
-
-    // Whether the local player may leave the trade.
-    bool CanCancel();
-
     // Whether the barter screen's reset button may run.
     bool CanReset();
-
-    // Whether the local player may change the offer at all.
-    bool CanModifyOffer();
 
     // Tracks the barter screen's reset button so it stays disabled during a trade.
     void SetResetButton(ButtonWidget buttonWidget);
@@ -92,8 +85,11 @@ internal interface IPlayerPartyTradeContext
 // Scoped per client, so each client's barter patches and trade handler share only that client's trade.
 internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
 {
-    private readonly IPlayerPartyTradeOfferApplier offerApplier;
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyTradeContext>();
+
+    private readonly IPlayerPartyTradeOfferResolver offerResolver;
     private readonly IPlayerPartyTradeOverlayInterface tradeOverlay;
+    private readonly IObjectManager objectManager;
 
     public string SessionId { get; private set; }
     public bool IsActive => SessionId != null;
@@ -110,13 +106,17 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
     private readonly List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)> hiddenMarriageItems =
         new List<(BarterItemVM Item, MBBindingList<BarterItemVM> List)>();
 
-    public PlayerPartyTradeContext(IPlayerPartyTradeOfferApplier offerApplier, IPlayerPartyTradeOverlayInterface tradeOverlay)
+    public PlayerPartyTradeContext(
+        IPlayerPartyTradeOfferResolver offerResolver,
+        IPlayerPartyTradeOverlayInterface tradeOverlay,
+        IObjectManager objectManager)
     {
-        this.offerApplier = offerApplier;
+        this.offerResolver = offerResolver;
         this.tradeOverlay = tradeOverlay;
+        this.objectManager = objectManager;
     }
 
-    public void Begin(string sessionId, PartyBase localParty, string localPartyId)
+    public void Begin(string sessionId, PartyBase localParty, string localPartyId, string otherPlayerName)
     {
         SessionId = sessionId;
         this.localParty = localParty;
@@ -126,9 +126,18 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
         activeBarterVM = null;
         resetButton = null;
         hiddenMarriageItems.Clear();
+
+        try
+        {
+            tradeOverlay.Show(sessionId, otherPlayerName);
+        }
+        catch (NullReferenceException ex)
+        {
+            Logger.Warning(ex, "Unable to open player party trade overlay");
+        }
     }
 
-    public void End(string sessionId, PlayerPartyInteractionOutcomeType outcomeType)
+    public void End(string sessionId)
     {
         if (sessionId != null && SessionId != null && SessionId != sessionId) return;
 
@@ -156,7 +165,7 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
             SuppressNativeCloseMessages = false;
         }
 
-        ShowOutcomeMessage(outcomeType);
+        tradeOverlay.Hide(sessionId);
     }
 
     public void SetBarterVM(BarterVM barterVM)
@@ -199,7 +208,6 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
     public bool CanOffer(Barterable barterable)
     {
         if (!IsActive) return true;
-        if (!CanModifyOffer()) return false;
         if (barterable == null || localParty == null) return false;
         if (hiddenMarriageItems.Any(hidden => hidden.Item.Barterable == barterable)) return false;
         if (barterable is FiefBarterable fiefBarterable)
@@ -216,18 +224,8 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
         return CanOffer(barterable);
     }
 
-    public bool CanAccept()
-        => !IsActive || !LocalAccepted;
-
-    public bool CanCancel()
-        => !IsActive || !LocalAccepted;
-
     public bool CanReset()
         => !IsActive;
-
-    // Offer changes are allowed after acceptance because every valid change clears both confirmations.
-    public bool CanModifyOffer()
-        => true;
 
     public void SetResetButton(ButtonWidget buttonWidget)
     {
@@ -240,7 +238,7 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
     public bool CanOfferTransferAll(BarterVM barterVM, string methodName)
     {
         if (!IsActive) return true;
-        if (barterVM == null || !CanModifyOffer()) return false;
+        if (barterVM == null) return false;
 
         switch (methodName)
         {
@@ -287,17 +285,80 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
             return;
         }
 
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(message.PartyId, out var offeringParty)) return;
+
+        // The flag lets these writes past the amount-setter patch, which otherwise refuses changes to the other party's items.
         isApplyingServerOffer = true;
 
         try
         {
-            offerApplier.Apply(message, activeBarterVM, hiddenMarriageItems);
+            // Back on their lists the offer can reach hidden marriages, and the refresh re-hides the ones that still clash.
+            RestoreHiddenMarriages();
+
+            var offeringItems = GetAllBarterItems()
+                .Where(item => GetOfferingParty(item.Barterable) == offeringParty)
+                .ToArray();
+
+            foreach (var (item, amount) in offerResolver.GetOfferedAmounts(message, offeringItems))
+                ApplyOfferedAmount(item, amount);
+
             RefreshBarterControls();
         }
         finally
         {
             isApplyingServerOffer = false;
         }
+    }
+
+    // Puts the item on its side's offer at the offered amount, or takes it off when none is offered.
+    private void ApplyOfferedAmount(BarterItemVM item, int offeredAmount)
+    {
+        var amount = Math.Max(0, Math.Min(offeredAmount, item.TotalItemCount));
+        var isOffered = amount > 0;
+        item.Barterable.SetIsOffered(isOffered);
+        item.IsOffered = isOffered;
+
+        if (!isOffered)
+        {
+            if (item.IsMultiple)
+                item.CurrentOfferedAmount = 1;
+
+            activeBarterVM.LeftOfferList.Remove(item);
+            activeBarterVM.RightOfferList.Remove(item);
+            return;
+        }
+
+        item.CurrentOfferedAmount = amount;
+
+        var offerList = GetOfferListForItem(item);
+        if (!offerList.Contains(item))
+            offerList.Add(item);
+    }
+
+    // An offered item stays on its group list, so that list's side is the side it offers from.
+    private MBBindingList<BarterItemVM> GetOfferListForItem(BarterItemVM item)
+    {
+        var isLeftItem = activeBarterVM._leftList.Values.Any(list => list.Contains(item));
+
+        return isLeftItem ? activeBarterVM.LeftOfferList : activeBarterVM.RightOfferList;
+    }
+
+    // Every barter item in vanilla's group and offer lists, marriages included.
+    private IEnumerable<BarterItemVM> GetAllBarterItems()
+        => activeBarterVM._barterList
+            .SelectMany(side => side.Values)
+            .Concat(activeBarterVM._offerList)
+            .SelectMany(list => list)
+            .Distinct();
+
+    // Fiefs can have no original party, so they fall back to the party of the hero who holds them.
+    private static PartyBase GetOfferingParty(Barterable barterable)
+    {
+        if (barterable.OriginalParty != null) return barterable.OriginalParty;
+        if (barterable is not FiefBarterable fief) return null;
+
+        return fief.OriginalOwner?.PartyBelongedTo?.Party ??
+               fief.TargetSettlement?.OwnerClan?.Leader?.PartyBelongedTo?.Party;
     }
 
     // Reads both offer columns because the local party can be on either side, keeping what it may offer.
@@ -324,12 +385,7 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
         RefreshHiddenMarriages();
 
         // Hidden marriages are off the screen, and refreshing them first put back the ones that no longer clash.
-        var items = activeBarterVM._barterList
-            .SelectMany(side => side.Values)
-            .Concat(activeBarterVM._offerList)
-            .SelectMany(list => list);
-
-        foreach (var item in items)
+        foreach (var item in GetAllBarterItems())
             item.IsItemTransferrable = CanOffer(item.Barterable);
     }
 
@@ -352,6 +408,15 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
 
         HideBlockedMarriages(activeBarterVM.LeftDiplomaticList, offeredHeroes);
         HideBlockedMarriages(activeBarterVM.RightDiplomaticList, offeredHeroes);
+    }
+
+    // Puts every hidden marriage back on the list it was hidden from.
+    private void RestoreHiddenMarriages()
+    {
+        foreach (var hidden in hiddenMarriageItems)
+            hidden.List.Add(hidden.Item);
+
+        hiddenMarriageItems.Clear();
     }
 
     private void HideBlockedMarriages(MBBindingList<BarterItemVM> items, HashSet<Hero> offeredHeroes)
@@ -400,49 +465,4 @@ internal class PlayerPartyTradeContext : IPlayerPartyTradeContext
 
     private bool CanOfferAny(IEnumerable<BarterItemVM> items)
         => items != null && items.Any(item => CanOffer(item?.Barterable));
-
-    private static void ShowOutcomeMessage(PlayerPartyInteractionOutcomeType outcomeType)
-    {
-        var message = GetOutcomeMessage(outcomeType);
-        if (message == null) return;
-
-        InformationManager.DisplayMessage(new InformationMessage(message));
-    }
-
-    internal static string GetOutcomeMessage(PlayerPartyInteractionOutcomeType outcomeType)
-    {
-        switch (outcomeType)
-        {
-            case PlayerPartyInteractionOutcomeType.TradeAccepted:
-                return "Barter offer accepted.";
-            case PlayerPartyInteractionOutcomeType.TradeDeclined:
-                return "Trade proposal declined.";
-            case PlayerPartyInteractionOutcomeType.ProposalWithdrawn:
-                return GameTexts.FindText("str_coop_player_interaction_withdrawn").ToString();
-            case PlayerPartyInteractionOutcomeType.ClanJoinAccepted:
-                return "Clan service proposal accepted.";
-            case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
-                return "Clan service proposal declined.";
-            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
-                return GameTexts.FindText("str_coop_marriage_accepted").ToString();
-            case PlayerPartyInteractionOutcomeType.MarriageDeclined:
-                return GameTexts.FindText("str_coop_marriage_declined").ToString();
-            case PlayerPartyInteractionOutcomeType.VassalAccepted:
-                return "Vassalage offer accepted.";
-            case PlayerPartyInteractionOutcomeType.VassalDeclined:
-                return "Vassalage offer declined.";
-            case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
-                return "Mercenary offer accepted.";
-            case PlayerPartyInteractionOutcomeType.MercenaryDeclined:
-                return "Mercenary offer declined.";
-            case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
-                return GameTexts.FindText("str_coop_map_tracking_accepted").ToString();
-            case PlayerPartyInteractionOutcomeType.MapTrackingDeclined:
-                return GameTexts.FindText("str_coop_map_tracking_declined").ToString();
-            case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
-                return GameTexts.FindText("str_coop_map_tracking_stopped").ToString();
-            default:
-                return null;
-        }
-    }
 }

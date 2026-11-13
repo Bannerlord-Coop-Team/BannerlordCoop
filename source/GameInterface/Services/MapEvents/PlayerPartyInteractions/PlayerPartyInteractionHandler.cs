@@ -68,7 +68,6 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
     private readonly IPlayerPartyTradeContext trade;
-    private readonly IPlayerPartyTradeOverlayInterface tradeOverlay;
     private readonly ISendCoalescer sendCoalescer;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -95,7 +94,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking,
         IPlayerPartyTradeContext trade,
-        IPlayerPartyTradeOverlayInterface tradeOverlay,
         // Only the server container registers a send coalescer.
         ISendCoalescer sendCoalescer = null)
     {
@@ -111,7 +109,6 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
         this.trade = trade;
-        this.tradeOverlay = tradeOverlay;
         this.sendCoalescer = sendCoalescer;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
@@ -336,8 +333,8 @@ internal class PlayerPartyInteractionHandler : IHandler
 
             endedInteractionSessionIds.Add(message.SessionId);
             PlayerPartyInteractionDialogState.Clear(message.SessionId);
-            trade.End(message.SessionId, message.OutcomeType);
-            tradeOverlay.Hide(message.SessionId);
+            trade.End(message.SessionId);
+            ShowOutcomeMessage(message.OutcomeType);
             var conversationWasOpened = openedConversationSessionIds.Remove(message.SessionId);
 
             var conversationManager = Campaign.Current?.ConversationManager;
@@ -1218,6 +1215,53 @@ internal class PlayerPartyInteractionHandler : IHandler
         return PlayerPartyInteractionOutcomeType.Left;
     }
 
+    // Tells the local player how the interaction ended.
+    private static void ShowOutcomeMessage(PlayerPartyInteractionOutcomeType outcomeType)
+    {
+        var message = GetOutcomeMessage(outcomeType);
+        if (message == null) return;
+
+        InformationManager.DisplayMessage(new InformationMessage(message));
+    }
+
+    // The message an ended interaction shows, or null for outcomes that show none.
+    internal static string GetOutcomeMessage(PlayerPartyInteractionOutcomeType outcomeType)
+    {
+        switch (outcomeType)
+        {
+            case PlayerPartyInteractionOutcomeType.TradeAccepted:
+                return "Barter offer accepted.";
+            case PlayerPartyInteractionOutcomeType.TradeDeclined:
+                return "Trade proposal declined.";
+            case PlayerPartyInteractionOutcomeType.ProposalWithdrawn:
+                return GameTexts.FindText("str_coop_player_interaction_withdrawn").ToString();
+            case PlayerPartyInteractionOutcomeType.ClanJoinAccepted:
+                return "Clan service proposal accepted.";
+            case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
+                return "Clan service proposal declined.";
+            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
+                return GameTexts.FindText("str_coop_marriage_accepted").ToString();
+            case PlayerPartyInteractionOutcomeType.MarriageDeclined:
+                return GameTexts.FindText("str_coop_marriage_declined").ToString();
+            case PlayerPartyInteractionOutcomeType.VassalAccepted:
+                return "Vassalage offer accepted.";
+            case PlayerPartyInteractionOutcomeType.VassalDeclined:
+                return "Vassalage offer declined.";
+            case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
+                return "Mercenary offer accepted.";
+            case PlayerPartyInteractionOutcomeType.MercenaryDeclined:
+                return "Mercenary offer declined.";
+            case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
+                return GameTexts.FindText("str_coop_map_tracking_accepted").ToString();
+            case PlayerPartyInteractionOutcomeType.MapTrackingDeclined:
+                return GameTexts.FindText("str_coop_map_tracking_declined").ToString();
+            case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
+                return GameTexts.FindText("str_coop_map_tracking_stopped").ToString();
+            default:
+                return null;
+        }
+    }
+
     private PlayerPartyInteractionSession FindExistingSession(string partyId)
     {
         if (!sessionsByPartyId.TryGetValue(partyId, out var sessionId))
@@ -1655,16 +1699,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (!objectManager.TryGetObject<PartyBase>(state.PartyId, out var myParty)) return;
         if (!objectManager.TryGetObject<PartyBase>(state.OtherPartyId, out var otherParty)) return;
 
-        trade.Begin(state.SessionId, myParty, state.PartyId);
-
-        try
-        {
-            tradeOverlay.Show(state.SessionId, state.OtherPlayerName);
-        }
-        catch (NullReferenceException ex)
-        {
-            Logger.Warning(ex, "Unable to open player party trade overlay");
-        }
+        trade.Begin(state.SessionId, myParty, state.PartyId, state.OtherPlayerName);
 
         // Item rosters are server authoritative and already replicated, so the screen builds from the local copies.
         try

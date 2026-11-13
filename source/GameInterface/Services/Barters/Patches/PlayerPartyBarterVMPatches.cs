@@ -80,15 +80,6 @@ internal class PlayerPartyBarterVMPatches
         return trade.CanReset();
     }
 
-    [HarmonyPatch(nameof(BarterVM.ExecuteAutoBalance))]
-    [HarmonyPrefix]
-    static bool ExecuteAutoBalancePrefix()
-    {
-        if (!ContainerProvider.TryResolve<IPlayerPartyTradeContext>(out var trade)) return true;
-
-        return trade.CanModifyOffer();
-    }
-
     [HarmonyPatch("TransferItem")]
     [HarmonyPrefix]
     static bool TransferItemPrefix(BarterItemVM item)

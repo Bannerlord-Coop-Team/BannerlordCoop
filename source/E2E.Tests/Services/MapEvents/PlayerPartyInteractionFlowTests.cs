@@ -1468,7 +1468,7 @@ public partial class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.Null(remoteFief.OriginalParty);
 
             var trade = client1.Resolve<IPlayerPartyTradeContext>();
-            trade.Begin("session-1", initiatorParty, initiatorPartyId);
+            trade.Begin("session-1", initiatorParty, initiatorPartyId, "PlayerTwo");
 
             Assert.True(trade.CanOffer(localFief));
             Assert.False(trade.CanOffer(remoteFief));

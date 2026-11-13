@@ -3,7 +3,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
-public class PlayerPartyTradeContextTests
+public class PlayerPartyInteractionHandlerTests
 {
     [Theory]
     [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted, "Barter offer accepted.")]
@@ -16,6 +16,6 @@ public class PlayerPartyTradeContextTests
     [InlineData(PlayerPartyInteractionOutcomeType.MercenaryDeclined, "Mercenary offer declined.")]
     public void OutcomeMessages_UsePlayerPartyInteractionResult(PlayerPartyInteractionOutcomeType outcomeType, string expectedMessage)
     {
-        Assert.Equal(expectedMessage, PlayerPartyTradeContext.GetOutcomeMessage(outcomeType));
+        Assert.Equal(expectedMessage, PlayerPartyInteractionHandler.GetOutcomeMessage(outcomeType));
     }
 }

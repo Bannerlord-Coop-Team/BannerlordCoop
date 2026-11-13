@@ -91,7 +91,7 @@ internal class PlayerPartyTradeSender : IPlayerPartyTradeSender
         Flush();
         // An offer that failed to send isnt accepted, otherwise the server would apply the older offer it still holds.
         if (HasUnsentOffer) return true;
-        if (!trade.CanAccept()) return true;
+        if (trade.LocalAccepted) return true;
 
         trade.SetLocalAccepted();
         network.SendAll(new NetworkPlayerPartyTradeAcceptChanged(trade.SessionId, accepted: true));
@@ -104,7 +104,7 @@ internal class PlayerPartyTradeSender : IPlayerPartyTradeSender
         if (!trade.IsActive) return false;
 
         Flush();
-        if (!trade.CanCancel()) return true;
+        if (trade.LocalAccepted) return true;
 
         network.SendAll(new NetworkSubmitPlayerPartyInteractionOption(trade.SessionId, PlayerPartyInteractionOption.Leave, trade.LocalPartyId));
         return true;
