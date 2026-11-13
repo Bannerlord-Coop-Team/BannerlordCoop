@@ -767,7 +767,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   like the player slots.
 - Known limits: a player who leaves shifts the ranks of the players after it in the side's party order, so a joiner
   that arrives after a departure can take the slot of a player still in the battle. With no room behind the base, a
-  player who joins after the allies were fielded goes ahead of the ranks there were then, where the allies are.
+  player who joins after the allies were fielded goes ahead of the player fleets the side had when the allies were fielded,
+  where the allies are.
 - **R49 freeze (native, no managed guard).** Client1 crashed 29 s into `vs_pirates hulls=1 weapons=1` with an
   AccessViolation in native `Mission.GetNearbyAgentsAux`, called from vanilla `NavalPhysicsAgentCollisionSolver.OnParallelFixedTick`
   on the fixed-tick thread; the watchdog then held the process frozen. The dumps show valid inputs (a finite centre and a

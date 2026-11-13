@@ -129,7 +129,10 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
             count);
         if (count == 0) return "no ship to field";
 
-        AssignAndSpawnHulls(mission, shipsLogic, navalLogic, planning, side, team, formations.Take(count).ToList(), ships, parties, work);
+        int sidePlayers = NavalSideDeploymentSlots.PlayerCountOf(mapEvent.GetMapEventSide(side).Parties.Select(party => party.Party),
+            party => playerManager.Contains(party.MobileParty));
+        AssignAndSpawnHulls(mission, shipsLogic, navalLogic, planning, side, team, formations.Take(count).ToList(), ships, parties,
+            sidePlayers, work);
         if (work.Hulls.Count == 0) return "no hull spawned";
 
         CrewFleet(agentsLogic, team, troops, work);
@@ -140,7 +143,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     // is cleared.
     private void AssignAndSpawnHulls(Mission mission, NavalShipsLogic shipsLogic, DefaultNavalMissionLogic navalLogic,
         NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side, Team team, List<Formation> formations,
-        List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties, NavalNpcFleetAttemptWork work)
+        List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties, int sidePlayers, NavalNpcFleetAttemptWork work)
     {
         var fleet = formations.Zip(ships, (formation, ship) => new FleetShip(formation, ship.snapshot, ship.owner)).ToList();
         foreach (var ship in fleet)
@@ -151,7 +154,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
             // The AI team was planned with no ships at deployment start, so it is planned now: the host's own allies on their
             // own, an enemy fleet with vanilla's plan for its side, which skips a team that already has one.
             if (team == mission.PlayerAllyTeam)
-                PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet, work.Players.PlayerCount);
+                PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet, sidePlayers);
             else
                 latePlans.MakeForSide(navalLogic, side);
             SpawnAssignedHulls(shipsLogic, planning, team, fleet, parties, work);
@@ -167,8 +170,8 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         }
     }
 
-    // Plans the allied AI fleet alone ahead of the front-most of the side's players now, a joiner since the host opened included,
-    // and says if the slot didn't fit.
+    // Plans the allied AI fleet alone a gap ahead of the front-most player fleet the side has at fielding, and logs a slot that
+    // didn't fit.
     private void PlanAllyTeam(Mission mission, NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning,
         BattleSideEnum side, Team team, List<FleetShip> fleet, int playerCount)
     {

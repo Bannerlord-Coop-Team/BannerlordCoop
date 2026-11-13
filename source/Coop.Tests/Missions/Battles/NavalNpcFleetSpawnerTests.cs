@@ -253,7 +253,7 @@ public class NavalNpcFleetSpawnerTests
         {
             work.Troops.AddRange(troops);
             work.Hulls.AddRange(hulls);
-            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P" }, 3, playerCount: 1);
+            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P" }, 3);
             work.BeginCrewing(TeamSideEnum.EnemyTeam, spawnedOnTickBefore: false);
             throw new NullReferenceException("crewing threw");
         });
@@ -277,7 +277,7 @@ public class NavalNpcFleetSpawnerTests
         harness.Attempt(work =>
         {
             work.Hulls.AddRange(new[] { ShipTestHulls.Create(), ShipTestHulls.Create() });
-            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P", "MobileParty_Q" }, 4, playerCount: 2);
+            work.Players = new NavalSidePlayerFleets(new[] { "MobileParty_P", "MobileParty_Q" }, 4);
             return null;
         });
 

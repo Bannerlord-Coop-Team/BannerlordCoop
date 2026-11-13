@@ -84,8 +84,7 @@ public class NavalShipBudget : INavalShipBudget
             hulls += PlayerFleet(sideParties, party.Party).FieldedCount;
         }
 
-        int playerCount = sideParties.Count(party => playerManager.Contains(party.Party.MobileParty));
-        return new NavalSidePlayerFleets(partyIds.ToArray(), hulls, playerCount);
+        return new NavalSidePlayerFleets(partyIds.ToArray(), hulls);
     }
 
     // Vanilla's team limit for the AI parties, with its net ships cut to what the players left, as vanilla cuts a team's share.

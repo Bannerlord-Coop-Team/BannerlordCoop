@@ -15,7 +15,10 @@ public interface INavalPlayerDeploymentSlotTracker
     /// </summary>
     int Rank { get; set; }
 
-    /// <summary>How many player parties fight on the own side, the own one included; one or none keeps vanilla's plan.</summary>
+    /// <summary>
+    /// How many player parties fight on the own side, the own one included, taken once when this client's mission opens and read
+    /// for this client's own slot only; one or none keeps vanilla's plan.
+    /// </summary>
     int PlayerCount { get; set; }
 
     /// <summary>The naval logic whose initial side plan is being made, so the plan patch can read its team range.</summary>

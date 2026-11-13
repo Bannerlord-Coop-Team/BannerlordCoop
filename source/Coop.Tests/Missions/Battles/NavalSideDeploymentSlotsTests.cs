@@ -24,7 +24,7 @@ public class NavalSideDeploymentSlotsTests
     private static readonly float Longest = NavalSideDeploymentSlots.LongestTeamRange(GameShipLengths);
 
     [Fact]
-    public void RankOf_FirstPlayerOfTheSide_IsTheFrontSlot()
+    public void RankOf_FirstPlayerOfTheSide_IsRankZero()
     {
         Assert.Equal(0, NavalSideDeploymentSlots.RankOf(Side, FirstPlayer, Players.Contains));
     }
