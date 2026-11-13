@@ -265,7 +265,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             ballistaTargets, missionTracker, foreignHulls, ropes, damageGate, deploymentSlot));
         var tallyReader = new NavalSideTallyReader(shipEngine, services.ConditionStream, services.MigrationReserveFielder);
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
-            npcFleets.Values, services.HullLedger, tallyReader,
+            npcFleets, services.HullLedger, tallyReader,
             new NavalPlayerHeroGrace(context.Session, context.MissionContext, playerManager, objectManager)));
     }
 

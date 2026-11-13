@@ -109,7 +109,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   fleet and an allied fleet (AI lords on the players' side) each have their own attempt, outcome
   (`NetworkNpcFleetAttempted.Side`) and relay to entrants. A side with no AI party in the reserve just waits, so one that
   joins later (`add_allied_ai_party`) is still fielded.
-  - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveReplicatedTeam(side, isOwn: false)`):
+  - Team: the hulls go where every peer puts their copies (`BattleTeamResolver.ResolveAiFleetTeam(side)`):
     the side's main team, or its ally team on the host's own side. The ally team also holds the other players' copies,
     so off-ship AI crew never joins a copy's formation (`NavalCopyCrewLookupPatches`).
   - Ships: the AI parties get what the players leave of the side's 8 ships, at most vanilla's limit for them

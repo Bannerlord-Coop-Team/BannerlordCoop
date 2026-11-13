@@ -35,19 +35,17 @@ public class NavalCopyCrewLookupPatchesTests
         var ropedHull = Ship(roped, island);
         var alsoRopedHull = Ship(alsoRoped, island);
         var apartHull = Ship(apart, apart);
+        var teamShips = new[] { ropedHull, steppedHull, alsoRopedHull, apartHull };
         var copies = new HashSet<MissionShip>(ReferenceEqualityComparer.Instance);
 
-        Assert.Same(steppedHull, CopySkippingConnectedShipPatch.PickConnectedShip(
-            new[] { ropedHull, steppedHull, alsoRopedHull, apartHull }, stepped, copies.Contains));
+        Assert.Same(steppedHull, CopySkippingConnectedShipPatch.PickConnectedShip(teamShips, stepped, copies.Contains));
 
         copies.Add(steppedHull);
-        copies.Add(alsoRopedHull);
-        Assert.Same(ropedHull, CopySkippingConnectedShipPatch.PickConnectedShip(
-            new[] { ropedHull, steppedHull, alsoRopedHull, apartHull }, stepped, copies.Contains));
+        Assert.Same(alsoRopedHull, CopySkippingConnectedShipPatch.PickConnectedShip(teamShips, stepped, copies.Contains));
 
         copies.Add(ropedHull);
-        Assert.Null(CopySkippingConnectedShipPatch.PickConnectedShip(
-            new[] { ropedHull, steppedHull, alsoRopedHull, apartHull }, stepped, copies.Contains));
+        copies.Add(alsoRopedHull);
+        Assert.Null(CopySkippingConnectedShipPatch.PickConnectedShip(teamShips, stepped, copies.Contains));
     }
 
     // A constructor-skipped hull with only its island bits set.

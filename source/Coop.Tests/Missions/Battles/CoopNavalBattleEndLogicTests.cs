@@ -3,7 +3,6 @@ using HarmonyLib;
 using Missions.Battles;
 using Missions.Naval;
 using Moq;
-using System.Collections.Generic;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -102,22 +101,6 @@ public class CoopNavalBattleEndLogicTests
     {
         Assert.Equal(expected, CoopNavalBattleEndLogic.ReplicatedOutcome(isLocalHost, deploymentFinished: true, hasResolvedState: true,
             BattleState.DefenderPullBack, BattleSideEnum.Defender));
-    }
-
-    // K3: a failed AI fleet counts its own side as fielded, never the other one; the hold rule itself is the land controller's.
-    [Theory]
-    [InlineData(false, true, true, false, true)]
-    [InlineData(true, false, false, true, true)]
-    [InlineData(true, false, true, false, false)]
-    [InlineData(true, false, true, true, true)]
-    public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool attackerFielded, bool defenderFielded,
-        bool attackerFleetFailed, bool defenderFleetFailed, bool expected)
-    {
-        var failedFleetSides = new List<BattleSideEnum>();
-        if (attackerFleetFailed) failedFleetSides.Add(BattleSideEnum.Attacker);
-        if (defenderFleetFailed) failedFleetSides.Add(BattleSideEnum.Defender);
-
-        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(true, attackerFielded, defenderFielded, failedFleetSides));
     }
 
     [Fact]

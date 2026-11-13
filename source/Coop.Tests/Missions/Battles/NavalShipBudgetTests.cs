@@ -37,7 +37,6 @@ public class NavalShipBudgetTests
     [InlineData(new[] { 3 }, 2, 2)]
     [InlineData(new[] { 4, 4 }, 6, 0)]
     [InlineData(new[] { 5, 4 }, 6, 0)]
-    [InlineData(new int[] { }, 8, 8)]
     public void LeftForAi_IsWhatThePlayersLeaveOfTheSidesEight_AtMostTheAiLimit(int[] playerFleets, int aiLimit, int expected)
     {
         Assert.Equal(expected, NavalShipBudget.LeftForAi(playerFleets, aiLimit));

@@ -29,13 +29,6 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
         ["crewing"] = NavalFleetFailStage.DuringCrewing,
     };
 
-    // Whether each side word names the host's own side.
-    private static readonly Dictionary<string, bool> Sides = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["enemy"] = false,
-        ["ally"] = true,
-    };
-
     // Commands already run on the game thread, where the mission's spawner owns its one-shot flag.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
@@ -56,28 +49,25 @@ public sealed class NavalFleetFailCoopCommand : ICoopCommand
             $"npcFleet.spawners.{side}.state, .failure and .hullsRetracted.");
     }
 
-    // Reads up to one side word (enemy by default) and one stage word (before by default), in either order.
-    private static bool TryParse(ICoopCommandArgs args, out bool ally, out NavalFleetFailStage stage)
+    /// <summary>
+    /// Reads the usage by position: an optional side word (enemy by default), then an optional stage word (before by default),
+    /// and nothing after them.
+    /// </summary>
+    internal static bool TryParse(ICoopCommandArgs args, out bool ally, out NavalFleetFailStage stage)
     {
         ally = false;
         stage = NavalFleetFailStage.BeforeSpawn;
-        int sideWords = 0, stageWords = 0;
-        for (int index = 0; index < args.Count; index++)
-        {
-            var word = (args[index] ?? "").Trim();
-            if (Stages.TryGetValue(word, out var stageWord))
-            {
-                stage = stageWord;
-                stageWords++;
-                continue;
-            }
+        int next = 0;
+        if (next < args.Count && IsSideWord((args[next] ?? "").Trim(), out ally)) next++;
+        if (next < args.Count && !Stages.TryGetValue((args[next++] ?? "").Trim(), out stage)) return false;
+        return next == args.Count;
+    }
 
-            if (!Sides.TryGetValue(word, out var allyWord)) return false;
-            ally = allyWord;
-            sideWords++;
-        }
-
-        return sideWords <= 1 && stageWords <= 1;
+    // Whether the word names a side, and whether that side is the host's own.
+    private static bool IsSideWord(string word, out bool ally)
+    {
+        ally = word.Equals("ally", StringComparison.OrdinalIgnoreCase);
+        return ally || word.Equals("enemy", StringComparison.OrdinalIgnoreCase);
     }
 }
 #endif

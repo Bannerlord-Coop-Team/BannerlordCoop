@@ -14,7 +14,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] Fields one side's AI (NPC) fleet late, once per battle and on the battle host only, because the NPC reserve
+/// [Game thread] Fields one side's AI (NPC) fleet late, once per battle side and on the battle host only, because the NPC reserve
 /// reaches the elected host after the mission loaded. Every client keeps the attempt's outcome for that side.
 /// </summary>
 public interface INavalNpcFleetSpawner : IDisposable

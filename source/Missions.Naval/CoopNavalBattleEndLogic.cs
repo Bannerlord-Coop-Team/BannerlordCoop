@@ -28,7 +28,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
-    private readonly IEnumerable<INavalNpcFleetSpawner> npcFleets;
+    private readonly IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> npcFleets;
     private readonly INavalSideHullLedger hullLedger;
     private readonly INavalSideTallyReader tallyReader;
     private readonly INavalPlayerHeroGrace heroGrace;
@@ -39,8 +39,8 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     // Takes the battle's session, deployment, committer and AI fleets, the replicator's departed hulls, the side tally and the
     // player hero grace.
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        IEnumerable<INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger, INavalSideTallyReader tallyReader,
-        INavalPlayerHeroGrace heroGrace)
+        IReadOnlyDictionary<BattleSideEnum, INavalNpcFleetSpawner> npcFleets, INavalSideHullLedger hullLedger,
+        INavalSideTallyReader tallyReader, INavalPlayerHeroGrace heroGrace)
     {
         this.session = session;
         this.deployment = deployment;
@@ -228,25 +228,19 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return KeepsRetreat(hullLedger.DepartedHulls(side), hullsLeft);
     }
 
-    /// <summary>
-    /// The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
-    /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
-    /// </summary>
-    internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
-        IReadOnlyCollection<BattleSideEnum> failedFleetSides) =>
-        CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
-            failedFleetSides.Contains(BattleSideEnum.Attacker), failedFleetSides.Contains(BattleSideEnum.Defender));
-
-    // Whether both sides fielded here, or a side whose AI fleet failed counts as fielded.
+    // Whether both sides fielded here, by the land hold's release rule: a side whose AI fleet failed to field counts like a land
+    // side whose reserve was abandoned, so it may start empty and its depletion ends the battle instead of holding it open.
     private bool BothSidesFielded()
     {
         CoopBattleController.SidesFielded(Mission.Teams, out bool attackerFielded, out bool defenderFielded);
-        var failedFleetSides = npcFleets.Where(npcFleet => npcFleet.AttemptFailed).Select(npcFleet => npcFleet.Side).ToList();
-        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSides);
-        // Each spawner warns of its own failure; this records that a failed side may be why the hold released.
-        if (released && failedFleetSides.Count > 0)
-            Logger.Information("[NavalBattle] End checks released for {MapEventId} with failed AI fleets on {Sides}",
-                session.InstanceId, string.Join(", ", failedFleetSides));
+        bool attackerFleetFailed = npcFleets[BattleSideEnum.Attacker].AttemptFailed;
+        bool defenderFleetFailed = npcFleets[BattleSideEnum.Defender].AttemptFailed;
+        bool released = CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
+            attackerFleetFailed, defenderFleetFailed);
+        // Each spawner warns of its own failure; this records that a failed fleet may be why the hold released.
+        if (released && (attackerFleetFailed || defenderFleetFailed))
+            Logger.Information("[NavalBattle] End checks released for {MapEventId} with failed AI fleets (attacker {Attacker}, " +
+                "defender {Defender})", session.InstanceId, attackerFleetFailed, defenderFleetFailed);
         return released;
     }
 

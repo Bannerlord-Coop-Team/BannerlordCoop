@@ -56,13 +56,11 @@ public class NavalShipBudget : INavalShipBudget
     }
 
     // Vanilla's team limit for the AI parties, with its net ships cut to what the players left, as vanilla cuts a team's share.
-    // The players' fleets are recomputed from campaign data rather than read from the registered hulls: a peer announces its
-    // hulls only at its own deployment commit, which can come after the host fields the AI. A party joining the side between a
-    // player's mission open and this call can still shift that player's ratio share; late joiners are not handled yet.
+    // Players' fleets come from campaign data, not registered hulls: a peer announces its hulls only at its deployment commit.
     public NavalShipDeploymentLimit AiLimit(MBReadOnlyList<MapEventParty> sideParties, MBReadOnlyList<MapEventParty> aiParties)
     {
         var limit = NavalDLCManager.Instance.GameModels.ShipDeploymentModel.GetTeamShipDeploymentLimit(aiParties);
-        var playerFleets = sideParties.Where(party => playerManager.Contains(party.Party?.MobileParty))
+        var playerFleets = sideParties.Where(party => playerManager.Contains(party.Party.MobileParty))
             .Select(party => PlayerFleet(sideParties, party.Party).FieldedCount);
         return new NavalShipDeploymentLimit(limit.PartiesLimit, limit.SkeletalCrewLimit, LeftForAi(playerFleets, limit.NetDeploymentLimit));
     }
