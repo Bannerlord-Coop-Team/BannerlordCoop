@@ -8,8 +8,8 @@ using TaleWorlds.ObjectSystem;
 namespace Missions.Naval;
 
 /// <summary>
-/// The spawn path slot math for a side's fleets: each player's by rank and the allied AI fleet's a gap ahead of rank 0, which
-/// every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>.
+/// The spawn path slot math for a side's fleets: each player's by rank and the allied AI fleet's a gap ahead of the front-most
+/// player, which every client derives alike. Stateless; the own rank lives in <see cref="INavalPlayerDeploymentSlotTracker"/>.
 /// </summary>
 internal static class NavalSideDeploymentSlots
 {
@@ -71,10 +71,7 @@ internal static class NavalSideDeploymentSlots
             behindCursor = behind - range - InterTeamGap;
         }
 
-        if (rank == ranks) return new NavalSideLayout(slots, opposingBase);
-
-        // Past the allies' slot, reserved as deep as any fleet since only the host knows the allies' ships.
-        float aheadRear = AllyAhead(spawnPath, slots[0].Offset, range, forwardLimit).Offset + InterTeamGap;
+        float aheadRear = slots[0].Offset + InterTeamGap;
         for (; rank < ranks; rank++)
         {
             slots[rank] = SlotAhead(spawnPath, aheadRear, range, forwardLimit);
@@ -85,17 +82,19 @@ internal static class NavalSideDeploymentSlots
     }
 
     /// <summary>
-    /// The allied AI fleet's slot and the opposing base it faces: a gap ahead of rank 0's plan, the host's own plan when it is
-    /// rank 0 (a lone player's is vanilla's), otherwise rank 0's shared slot.
+    /// The allied AI fleet's slot and the opposing base it faces: a gap ahead of the front-most of the side's
+    /// <paramref name="playerCount"/> player fleets, with rank 0 on the host's own plan when it is rank 0 (a lone player's is
+    /// vanilla's). Vanilla keeps the allies in front even when its forward packing puts every team ahead of the base.
     /// </summary>
     internal static (NavalSideSlot Slot, float OpposingBase) AllySlot(SpawnPathData spawnPath, int ownRank, float ownPlanOffset,
-        float allyRange, float gameRange)
+        int playerCount, float allyRange, float gameRange)
     {
-        var (sideBase, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
-        float rankZero = ownPlanOffset;
-        if (ownRank != 0) rankZero = FrontSlot(spawnPath, sideBase, gameRange, forwardLimit).Offset;
+        var (_, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
+        var slots = Layout(spawnPath, Math.Max(1, playerCount), gameRange).Slots;
+        float rankZero = ownRank == 0 ? ownPlanOffset : slots[0].Offset;
+        float frontMost = new[] { rankZero }.Concat(slots.Skip(1).Select(slot => slot.Offset)).Max();
 
-        return (AllyAhead(spawnPath, rankZero, allyRange, forwardLimit), opposingBase);
+        return (SlotAhead(spawnPath, frontMost + InterTeamGap, allyRange, forwardLimit), opposingBase);
     }
 
     // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
@@ -105,10 +104,6 @@ internal static class NavalSideDeploymentSlots
             out float sideBase, out float opposingBase);
         return (sideBase, opposingBase, opposingBase - range - InterTeamGap);
     }
-
-    // The allies a gap ahead of rank 0, as vanilla puts them ahead of the player team.
-    private static NavalSideSlot AllyAhead(SpawnPathData spawnPath, float rankZeroOffset, float allyRange, float forwardLimit) =>
-        SlotAhead(spawnPath, rankZeroOffset + InterTeamGap, allyRange, forwardLimit);
 
     // Rank 0 takes vanilla's slot behind the base, or the first room from the path start when the base leaves none behind.
     private static NavalSideSlot FrontSlot(SpawnPathData spawnPath, float sideBase, float range, float forwardLimit)

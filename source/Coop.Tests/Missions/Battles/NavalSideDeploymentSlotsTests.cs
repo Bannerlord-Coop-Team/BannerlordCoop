@@ -57,42 +57,51 @@ public class NavalSideDeploymentSlotsTests
     }
 
     // M11 phase 3, on paths whose base vanilla's ComputeDeploymentBaseOffsets derives from the shared offset. Rank 0 takes
-    // vanilla's slot behind the base, the next ranks go behind it, and once the path runs out behind they go ahead of the
-    // allies' reserved slot, held a fleet and a gap short of the real opposing base; the allies go a gap ahead of rank 0.
+    // vanilla's slot behind the base, the next ranks go behind it, and once the path runs out behind they go ahead of rank 0,
+    // held a fleet and a gap short of the real opposing base; the allies go a gap ahead of the front-most player, as vanilla's
+    // forward packing keeps its allies' team in front of the player team.
     [Theory]
     // Room behind the base: base -199, opposing base 199.
     [InlineData(2000f, 1000f, new float[0], new[] { -199f, -305.25f, -411.5f },
         new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.None }, -92.75f, NavalSlotProblem.None)]
-    // The base at the path start (R49 C2): base -100, opposing base 298, so rank 2 is held short of it.
-    [InlineData(2000f, 100f, new float[0], new[] { -25.75f, 186.75f, 191.75f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 80.5f, NavalSlotProblem.None)]
+    // The base at the path start (R49 C2, live check 2): base -100, opposing base 298; rank 1 goes ahead of rank 0, the allies
+    // ahead of rank 1.
+    [InlineData(2000f, 100f, new float[0], new[] { -25.75f, 80.5f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, 186.75f, NavalSlotProblem.None)]
+    // The same with three ranks: rank 2 still fits, and the allies are held short of the opposing base.
+    [InlineData(2000f, 100f, new float[0], new[] { -25.75f, 80.5f, 186.75f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.None }, 191.75f,
+        NavalSlotProblem.HeldShortOfOpposingBase)]
     // A short path: base -149, opposing base 149.
-    [InlineData(300f, 150f, new float[0], new[] { -75.75f, 42.75f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 30.5f, NavalSlotProblem.None)]
+    [InlineData(300f, 150f, new float[0], new[] { -75.75f, 30.5f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, 42.75f, NavalSlotProblem.HeldShortOfOpposingBase)]
     // A blocked stretch behind the base, which rank 0 skips like vanilla.
     [InlineData(2000f, 1000f, new[] { -1000f, -250f, -230f, 1000f }, new[] { -250f, -356.25f },
         new[] { NavalSlotProblem.None, NavalSlotProblem.None }, -143.75f, NavalSlotProblem.None)]
-    // A blocked stretch just ahead of rank 0: the allies move past it, and rank 1, out of room behind, goes past the allies.
-    [InlineData(2000f, 1000f, new[] { -400f, -250f, -150f, 1000f }, new[] { -250f, 30.5f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, -75.75f, NavalSlotProblem.None)]
-    // Nothing free ahead of rank 0: the allies and rank 1 have no room on the path.
-    [InlineData(2000f, 1000f, new[] { -400f, -250f }, new[] { -250f, -37.5f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.NoRoomOnPath }, -143.75f, NavalSlotProblem.NoRoomOnPath)]
-    // A path too short for the allies: base -99 and opposing base 99 hold the allies and rank 1 at -7.25.
+    // A blocked stretch just ahead of rank 0: rank 1, out of room behind, moves past it, and the allies go ahead of rank 1.
+    [InlineData(2000f, 1000f, new[] { -400f, -250f, -150f, 1000f }, new[] { -250f, -75.75f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, 30.5f, NavalSlotProblem.None)]
+    // Nothing free ahead of rank 0: rank 1 and the allies have no room on the path.
+    [InlineData(2000f, 1000f, new[] { -400f, -250f }, new[] { -250f, -143.75f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.NoRoomOnPath }, -37.5f, NavalSlotProblem.NoRoomOnPath)]
+    // A path too short for two fleets ahead: base -99 and opposing base 99 hold rank 1 and the allies at -7.25.
     [InlineData(200f, 100f, new float[0], new[] { -25.75f, -7.25f },
         new[] { NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, -7.25f, NavalSlotProblem.HeldShortOfOpposingBase)]
-    public void Layout_PutsTheRanksBehindThenAhead_AndTheAlliesAGapAheadOfRankZero(float pathLength, float pivotOffset,
+    public void Layout_PutsTheRanksBehindThenAhead_AndTheAlliesAheadOfTheFrontMostPlayer(float pathLength, float pivotOffset,
         float[] freeSegments, float[] expectedOffsets, NavalSlotProblem[] expectedProblems, float expectedAlly,
         NavalSlotProblem expectedAllyProblem)
     {
         var path = Path(pathLength, pivotOffset, freeSegments);
 
         var layout = NavalSideDeploymentSlots.Layout(path, expectedOffsets.Length, Longest);
-        var (ally, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 1, ownPlanOffset: 0f, Longest, Longest);
+        var (ally, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 1, ownPlanOffset: 0f, playerCount: expectedOffsets.Length,
+            Longest, Longest);
 
         Assert.Equal(expectedOffsets, layout.Slots.Select(slot => (float)Math.Round(slot.Offset, 2)));
         Assert.Equal(expectedProblems, layout.Slots.Select(slot => slot.Problem));
         Assert.Equal((expectedAlly, expectedAllyProblem), ((float)Math.Round(ally.Offset, 2), ally.Problem));
+        Assert.All(layout.Slots, slot =>
+            Assert.True(ally.Offset >= slot.Offset, $"allies at {ally.Offset} behind a player at {slot.Offset}"));
     }
 
     // The allies plan from rank 0's real plan: the host's own when it is rank 0 (a lone player on vanilla's deeper plan for four
@@ -103,7 +112,7 @@ public class NavalSideDeploymentSlotsTests
     public void AllySlot_IsAGapAheadOfRankZerosRealPlan(int ownRank, float ownPlanOffset, float expectedAlly)
     {
         var (ally, opposingBase) = NavalSideDeploymentSlots.AllySlot(FreePath(2000f, 1000f), ownRank, ownPlanOffset,
-            allyRange: 50f, Longest);
+            playerCount: ownRank + 1, allyRange: 50f, Longest);
 
         Assert.Equal((expectedAlly, NavalSlotProblem.None, 199f), ((float)Math.Round(ally.Offset, 2), ally.Problem, opposingBase));
     }

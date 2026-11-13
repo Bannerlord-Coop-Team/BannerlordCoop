@@ -57,7 +57,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     private readonly INavalShipBudget shipBudget;
     private readonly INavalPlayerDeploymentSlotTracker playerSlots;
 
-    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own player slot rank.
+    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own player slot rank and count.
     public NavalNpcFleetFielder(IBattleSession session, IBattleShipReplicator shipReplicator, ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager, IPlayerManager playerManager, INavalLateDeploymentPlanTracker latePlans,
         IBattleTeamResolver teamResolver, INavalShipBudget shipBudget, INavalPlayerDeploymentSlotTracker playerSlots)
@@ -165,7 +165,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         }
     }
 
-    // Plans the allied AI fleet alone at its slot ahead of rank 0's fleet and says if the slot didn't fit.
+    // Plans the allied AI fleet alone at its slot ahead of the front-most player fleet and says if the slot didn't fit.
     private void PlanAllyTeam(Mission mission, NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning,
         BattleSideEnum side, Team team, List<FleetShip> fleet)
     {
@@ -174,6 +174,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         var (slot, opposingBase) = NavalSideDeploymentSlots.AllySlot(mission.GetInitialSpawnPathData(side),
             ownRank: playerSlots.Rank,
             ownPlanOffset: planning.GetSpawnPathOffset(mission.PlayerTeam),
+            playerCount: playerSlots.PlayerCount,
             allyRange: allyRange,
             gameRange: NavalSideDeploymentSlots.LongestTeamRangeOfGame());
         var aiShips = fleet.Select(ship => (ship.Formation.FormationIndex, (IShipOrigin)ship.Snapshot));
