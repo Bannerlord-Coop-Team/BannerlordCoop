@@ -382,9 +382,8 @@ public class CaravanAmbushTests : IDisposable
     {
         Server.Call(() =>
         {
-            BindParties();
-            PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
             var battle = StartAmbushBattle(PlayerHero(QuestScenario.ControllerB).PartyBelongedTo);
+            PlayerHero(QuestScenario.ControllerA)._partyBelongedTo = null;
             battle.IsInvulnerable = true;
             battle._mapEventStartTime = CampaignTime.Now - CampaignTime.Hours(7f);
             CampaignEventDispatcher.Instance.HourlyTick();
@@ -397,7 +396,7 @@ public class CaravanAmbushTests : IDisposable
     {
         Server.Call(BindParties);
         Owner.Call(() => QuestOf(Owner).CompleteQuestWithCancel());
-        Server.Call(() => AssertPartiesReleased(QuestOf(Server)));
+        Server.Call(() => AssertPartiesReleased());
     }
 
     [Theory]
@@ -422,7 +421,7 @@ public class CaravanAmbushTests : IDisposable
                 Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
             }
             Assert.Null(IssueOfHero(Server));
-            AssertPartiesReleased(quest);
+            AssertPartiesReleased();
             Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest));
         });
     }
@@ -551,7 +550,7 @@ public class CaravanAmbushTests : IDisposable
     public void OwnerTimeoutFinalizesTheQuestOnceWithTheTimeoutOutcome()
     {
         var ownerQuest = QuestOf(Owner);
-        Owner.Call(() => ownerQuest.OnTimedOut());
+        Owner.Call(() => ownerQuest.CompleteQuestWithTimeOut());
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
         Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
@@ -627,7 +626,7 @@ public class CaravanAmbushTests : IDisposable
         return battle;
     }
 
-    private void AssertPartiesReleased(Quest quest)
+    private void AssertPartiesReleased()
     {
         Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
         Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
