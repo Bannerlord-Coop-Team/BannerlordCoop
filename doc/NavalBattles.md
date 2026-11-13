@@ -753,8 +753,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   logs the slot and the opposing base on each client. A single player keeps vanilla's own plan.
 - **Allied AI fleet slot.** Vanilla puts the allies' team at the side base and the player team its depth and a gap behind.
   Here the battle host plans the allied AI fleet its own depth and a gap ahead of where rank 0's fleet planned
-  (`NavalSideDeploymentSlots.AllySlot`, from `NavalNpcFleetFielder`): a lone player's own vanilla plan, which deepens with
-  its ships, or rank 0's shared slot with several players. So a lone player keeps vanilla's spot and the allies sit where
+  (`NavalSideDeploymentSlots.AllySlot`, from `NavalNpcFleetFielder`): the host's own plan when it is rank 0 (a lone
+  player's is vanilla's, which deepens with its ships), otherwise rank 0's shared slot. The player ranks that run out of
+  room behind go ahead of this same slot. So a lone player keeps vanilla's spot and the allies sit where
   vanilla's layout puts them relative to it, and the player slots don't move: no client has to know whether the side has
   allies when it opens the mission, and an AI party that joins later (`add_allied_ai_party`, a nearby lord) still lands
   clear of every player fleet. The plan holds the AI hulls only (`INavalLateDeploymentPlanTracker.MakeForAllyTeam`); the

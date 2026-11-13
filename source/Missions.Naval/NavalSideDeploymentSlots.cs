@@ -54,32 +54,27 @@ internal static class NavalSideDeploymentSlots
     internal static float SharedDeploymentOffset(float pathLength) => (-Math.Min(pathLength, SmallBattleSideDistance) / 2f) + 1f;
 
     /// <summary>
-    /// The side's first <paramref name="ranks"/> player slots from vanilla's base for the shared offset, each fleet as deep as
-    /// <paramref name="range"/>, and the opposing base they face.
+    /// The side's first <paramref name="ranks"/> player slots (at least one) from vanilla's base for the shared offset, each fleet
+    /// as deep as <paramref name="range"/>, and the opposing base they face.
     /// </summary>
     internal static NavalSideLayout Layout(SpawnPathData spawnPath, int ranks, float range)
     {
-        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(spawnPath, SharedDeploymentOffset(spawnPath.PathLength),
-            out float sideBase, out float opposingBase);
-        float forwardLimit = opposingBase - range - InterTeamGap;
+        var (sideBase, opposingBase, forwardLimit) = Bounds(spawnPath, range);
         var slots = new NavalSideSlot[ranks];
-        if (ranks == 0) return new NavalSideLayout(slots, opposingBase, forwardLimit);
-
         slots[0] = FrontSlot(spawnPath, sideBase, range, forwardLimit);
-        float behindCursor = slots[0].Offset - range - InterTeamGap;
-        // Past the allied fleet's slot, which is reserved as deep as any fleet since only the host knows the allies' ships.
-        float aheadRear = slots[0].Offset + InterTeamGap + range + InterTeamGap;
-        bool roomBehind = true;
-        for (int rank = 1; rank < ranks; rank++)
-        {
-            if (roomBehind && TryPlaceBehind(spawnPath, behindCursor, range, out float behind))
-            {
-                slots[rank] = new NavalSideSlot(behind, NavalSlotProblem.None);
-                behindCursor = behind - range - InterTeamGap;
-                continue;
-            }
 
-            roomBehind = false;
+        int rank = 1;
+        float behindCursor = slots[0].Offset - range - InterTeamGap;
+        for (; rank < ranks && TryPlaceBehind(spawnPath, behindCursor, range, out float behind); rank++)
+        {
+            slots[rank] = new NavalSideSlot(behind, NavalSlotProblem.None);
+            behindCursor = behind - range - InterTeamGap;
+        }
+
+        // Past the allies' slot, reserved as deep as any fleet since only the host knows the allies' ships.
+        float aheadRear = AllyAhead(spawnPath, slots[0].Offset, range, forwardLimit).Offset + InterTeamGap;
+        for (; rank < ranks; rank++)
+        {
             slots[rank] = SlotAhead(spawnPath, aheadRear, range, forwardLimit);
             aheadRear = slots[rank].Offset + InterTeamGap;
         }
@@ -87,8 +82,28 @@ internal static class NavalSideDeploymentSlots
         return new NavalSideLayout(slots, opposingBase, forwardLimit);
     }
 
-    /// <summary>The allied AI fleet's slot, a gap ahead of where rank 0's fleet planned, as vanilla puts allies ahead.</summary>
-    internal static NavalSideSlot AllySlot(SpawnPathData spawnPath, float rankZeroOffset, float allyRange, float forwardLimit) =>
+    /// <summary>
+    /// The allied AI fleet's slot and the opposing base it faces: a gap ahead of rank 0's plan, the host's own plan when it is
+    /// rank 0 (a lone player's is vanilla's), otherwise rank 0's shared slot.
+    /// </summary>
+    internal static (NavalSideSlot Slot, float OpposingBase) AllySlot(SpawnPathData spawnPath, int ownRank, float ownPlanOffset,
+        float allyRange, float gameRange)
+    {
+        var (_, opposingBase, forwardLimit) = Bounds(spawnPath, gameRange);
+        float rankZero = ownRank == 0 ? ownPlanOffset : Layout(spawnPath, ranks: 1, gameRange).Slots[0].Offset;
+        return (AllyAhead(spawnPath, rankZero, allyRange, forwardLimit), opposingBase);
+    }
+
+    // Vanilla's base and opposing base for the shared offset, and the offset no fleet as deep as the range goes past.
+    private static (float SideBase, float OpposingBase, float ForwardLimit) Bounds(SpawnPathData spawnPath, float range)
+    {
+        DefaultBattleMissionAgentSpawnLogic.ComputeDeploymentBaseOffsets(spawnPath, SharedDeploymentOffset(spawnPath.PathLength),
+            out float sideBase, out float opposingBase);
+        return (sideBase, opposingBase, opposingBase - range - InterTeamGap);
+    }
+
+    // The allies a gap ahead of rank 0, as vanilla puts them ahead of the player team.
+    private static NavalSideSlot AllyAhead(SpawnPathData spawnPath, float rankZeroOffset, float allyRange, float forwardLimit) =>
         SlotAhead(spawnPath, rankZeroOffset + InterTeamGap, allyRange, forwardLimit);
 
     // Rank 0 takes vanilla's slot behind the base, or the first room from the path start when the base leaves none behind.

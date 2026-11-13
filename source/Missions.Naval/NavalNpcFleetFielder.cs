@@ -57,7 +57,7 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     private readonly INavalShipBudget shipBudget;
     private readonly INavalPlayerDeploymentSlotTracker playerSlots;
 
-    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own side's player slot count.
+    // Takes the battle's session and ship replicator, the vanilla spawn helpers and the own player slot rank.
     public NavalNpcFleetFielder(IBattleSession session, IBattleShipReplicator shipReplicator, ICoopShipSnapshotBuilder snapshotBuilder,
         IObjectManager objectManager, IPlayerManager playerManager, INavalLateDeploymentPlanTracker latePlans,
         IBattleTeamResolver teamResolver, INavalShipBudget shipBudget, INavalPlayerDeploymentSlotTracker playerSlots)
@@ -142,31 +142,30 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
         NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side, Team team, List<Formation> formations,
         List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties, NavalNpcFleetAttemptWork work)
     {
-        for (int index = 0; index < formations.Count; index++)
-            shipsLogic.SetShipAssignment(team.TeamSide, formations[index].FormationIndex, ships[index].snapshot);
+        var fleet = formations.Zip(ships, (formation, ship) => new FleetShip(formation, ship.snapshot, ship.owner)).ToList();
+        foreach (var ship in fleet)
+            shipsLogic.SetShipAssignment(team.TeamSide, ship.Formation.FormationIndex, ship.Snapshot);
 
         try
         {
-            PlanLate(mission, shipsLogic, navalLogic, planning, side, team, formations, ships);
-            SpawnAssignedHulls(shipsLogic, planning, team, formations, ships, parties, work);
+            PlanLate(mission, shipsLogic, navalLogic, planning, side, team, fleet);
+            SpawnAssignedHulls(shipsLogic, planning, team, fleet, parties, work);
         }
         finally
         {
             // An assignment without a hull would count as a ship in every later plan and spawn query.
-            foreach (var formation in formations)
+            foreach (var ship in fleet)
             {
-                if (shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShip == null)
-                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
+                if (shipsLogic.GetShipAssignment(team.TeamSide, ship.Formation.FormationIndex).MissionShip == null)
+                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)ship.Formation.FormationIndex);
             }
         }
     }
 
-    // The AI team was planned with no ships at deployment start, so its plan is made now. The host's own allies are planned
-    // alone, a gap ahead of where rank 0's fleet planned; an enemy fleet takes vanilla's plan for its side, which skips a team
-    // that already has one.
+    // The AI team was planned with no ships at deployment start, so it is planned now: an enemy fleet with vanilla's plan for
+    // its side, which skips a team that already has one, and the host's own allies on their own.
     private void PlanLate(Mission mission, NavalShipsLogic shipsLogic, DefaultNavalMissionLogic navalLogic,
-        NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side, Team team, List<Formation> formations,
-        List<(Ship snapshot, PartyBase owner)> ships)
+        NavalMissionDeploymentPlanningLogic planning, BattleSideEnum side, Team team, List<FleetShip> fleet)
     {
         if (team != mission.PlayerAllyTeam)
         {
@@ -174,28 +173,31 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
             return;
         }
 
-        var spawnPath = mission.GetInitialSpawnPathData(side);
-        var layout = NavalSideDeploymentSlots.Layout(spawnPath, 1, NavalSideDeploymentSlots.LongestTeamRangeOfGame());
-        // A lone player keeps vanilla's own plan, which deepens with its ships, so the allies go ahead of that plan, as vanilla
-        // puts them ahead of the player team; with several players rank 0 is on its shared slot.
-        float rankZero = playerSlots.PlayerCount > 1 ? layout.Slots[0].Offset : planning.GetSpawnPathOffset(mission.PlayerTeam);
-        float allyRange = NavalSideDeploymentSlots.LongestTeamRange(formations.Select(formation =>
-            shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShipObject.DeploymentArea.y));
-        var slot = NavalSideDeploymentSlots.AllySlot(spawnPath, rankZero, allyRange, layout.ForwardLimit);
-        var aiShips = formations.Select((formation, index) => (formation.FormationIndex, (IShipOrigin)ships[index].snapshot));
-        latePlans.MakeForAllyTeam(planning, team, aiShips, slot.Offset, layout.OpposingBase);
-        LogUnfitAllySlot(side, slot, layout.OpposingBase);
+        PlanAllyTeam(mission, shipsLogic, planning, side, team, fleet);
     }
 
-    // Says which failure kept the allied fleet's slot from fitting.
-    private static void LogUnfitAllySlot(BattleSideEnum side, NavalSideSlot slot, float opposingBase)
+    // Plans the allied AI fleet alone at its slot ahead of rank 0's fleet and says if the slot didn't fit.
+    private void PlanAllyTeam(Mission mission, NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning,
+        BattleSideEnum side, Team team, List<FleetShip> fleet)
     {
-        if (slot.Problem == NavalSlotProblem.NoRoomOnPath)
-            Logger.Warning("[NavalBattle] The {Side} spawn path has no free room for the allied AI fleet ahead of the player fleets; " +
-                "it is planned at {Slot} and can overlap a player fleet", side, slot.Offset);
-        if (slot.Problem == NavalSlotProblem.HeldShortOfOpposingBase)
-            Logger.Warning("[NavalBattle] The allied AI fleet of the {Side} side would reach the opposing base {OpposingBase}; it " +
-                "is held at {Slot}, closer to the player fleets than the gap", side, opposingBase, slot.Offset);
+        float allyRange = NavalSideDeploymentSlots.LongestTeamRange(fleet.Select(ship =>
+            shipsLogic.GetShipAssignment(team.TeamSide, ship.Formation.FormationIndex).MissionShipObject.DeploymentArea.y));
+        var (slot, opposingBase) = NavalSideDeploymentSlots.AllySlot(mission.GetInitialSpawnPathData(side), playerSlots.Rank,
+            planning.GetSpawnPathOffset(mission.PlayerTeam), allyRange, NavalSideDeploymentSlots.LongestTeamRangeOfGame());
+        var aiShips = fleet.Select(ship => (ship.Formation.FormationIndex, (IShipOrigin)ship.Snapshot));
+        latePlans.MakeForAllyTeam(planning, team, aiShips, slot.Offset, opposingBase);
+
+        switch (slot.Problem)
+        {
+            case NavalSlotProblem.NoRoomOnPath:
+                Logger.Warning("[NavalBattle] The {Side} spawn path has no free room for the allied AI fleet ahead of the player " +
+                    "fleets; it is planned at {Slot} and can overlap a player fleet", side, slot.Offset);
+                break;
+            case NavalSlotProblem.HeldShortOfOpposingBase:
+                Logger.Warning("[NavalBattle] The allied AI fleet of the {Side} side would reach the opposing base {OpposingBase}; " +
+                    "it is held at {Slot}, closer to the player fleets than the gap", side, opposingBase, slot.Offset);
+                break;
+        }
     }
 
     // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
@@ -221,12 +223,11 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
     // Spawns each assigned formation's hull at its plan frame, under AI control, and registers it for the peers. Each hull is
     // recorded as soon as it exists, so a later throw still takes it back.
     private void SpawnAssignedHulls(NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning, Team team,
-        List<Formation> formations, List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties,
-        NavalNpcFleetAttemptWork work)
+        List<FleetShip> fleet, MBList<MapEventParty> parties, NavalNpcFleetAttemptWork work)
     {
-        for (int index = 0; index < formations.Count; index++)
+        foreach (var ship in fleet)
         {
-            var formation = formations[index];
+            var formation = ship.Formation;
             var plan = planning.GetFormationPlan(team, formation.FormationIndex);
             if (!plan.HasFrame())
             {
@@ -241,10 +242,26 @@ public class NavalNpcFleetFielder : INavalNpcFleetFielder
             work.Hulls.Add(hull);
             hull.SetController(NavalDLC.Missions.ShipControl.ShipControllerType.AI);
             formation.SetControlledByAI(true);
-            shipReplicator.RegisterNpcHull(hull, formation, PartyIdOf(parties, ships[index].owner));
+            shipReplicator.RegisterNpcHull(hull, formation, PartyIdOf(parties, ship.Owner));
 #if DEBUG
             work.ThrowIfArmed(NavalFleetFailStage.AfterFirstHull);
 #endif
+        }
+    }
+
+    // One AI formation with the ship snapshot it fields and the party that owns the ship.
+    private readonly struct FleetShip
+    {
+        public readonly Formation Formation;
+        public readonly Ship Snapshot;
+        public readonly PartyBase Owner;
+
+        // Pairs the formation with its ship and owner.
+        public FleetShip(Formation formation, Ship snapshot, PartyBase owner)
+        {
+            Formation = formation;
+            Snapshot = snapshot;
+            Owner = owner;
         }
     }
 

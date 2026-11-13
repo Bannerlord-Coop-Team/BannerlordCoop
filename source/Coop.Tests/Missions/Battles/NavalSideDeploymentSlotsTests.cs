@@ -59,29 +59,54 @@ public class NavalSideDeploymentSlotsTests
     // M11 phase 3, on paths whose base vanilla's ComputeDeploymentBaseOffsets derives from the shared offset. Rank 0 takes
     // vanilla's slot behind the base, the next ranks go behind it, and once the path runs out behind they go ahead of the
     // allies' reserved slot, held a fleet and a gap short of the real opposing base; the allies go a gap ahead of rank 0.
-    // Rows: room behind (base -199, opposing 199); the base at the path start (R49 C2, base -100, opposing 298); a short path
-    // (base -149, opposing 149); a blocked stretch behind the base, which rank 0 skips like vanilla.
     [Theory]
+    // Room behind the base: base -199, opposing base 199.
     [InlineData(2000f, 1000f, new float[0], new[] { -199f, -305.25f, -411.5f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.None }, -92.75f)]
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.None }, -92.75f, NavalSlotProblem.None)]
+    // The base at the path start (R49 C2): base -100, opposing base 298, so rank 2 is held short of it.
     [InlineData(2000f, 100f, new float[0], new[] { -25.75f, 186.75f, 191.75f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 80.5f)]
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 80.5f, NavalSlotProblem.None)]
+    // A short path: base -149, opposing base 149.
     [InlineData(300f, 150f, new float[0], new[] { -75.75f, 42.75f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 30.5f)]
+        new[] { NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, 30.5f, NavalSlotProblem.None)]
+    // A blocked stretch behind the base, which rank 0 skips like vanilla.
     [InlineData(2000f, 1000f, new[] { -1000f, -250f, -230f, 1000f }, new[] { -250f, -356.25f },
-        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, -143.75f)]
-    public void Layout_PutsTheRanksBehindThenAhead_AndAllySlot_IsAGapAheadOfRankZero(float pathLength, float pivotOffset,
-        float[] freeSegments, float[] expectedOffsets, NavalSlotProblem[] expectedProblems, float expectedAlly)
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, -143.75f, NavalSlotProblem.None)]
+    // A blocked stretch just ahead of rank 0: the allies move past it, and rank 1, out of room behind, goes past the allies.
+    [InlineData(2000f, 1000f, new[] { -400f, -250f, -150f, 1000f }, new[] { -250f, 30.5f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.None }, -75.75f, NavalSlotProblem.None)]
+    // Nothing free ahead of rank 0: the allies and rank 1 have no room on the path.
+    [InlineData(2000f, 1000f, new[] { -400f, -250f }, new[] { -250f, -37.5f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.NoRoomOnPath }, -143.75f, NavalSlotProblem.NoRoomOnPath)]
+    // A path too short for the allies: base -99 and opposing base 99 hold the allies and rank 1 at -7.25.
+    [InlineData(200f, 100f, new float[0], new[] { -25.75f, -7.25f },
+        new[] { NavalSlotProblem.None, NavalSlotProblem.HeldShortOfOpposingBase }, -7.25f, NavalSlotProblem.HeldShortOfOpposingBase)]
+    public void Layout_PutsTheRanksBehindThenAhead_AndTheAlliesAGapAheadOfRankZero(float pathLength, float pivotOffset,
+        float[] freeSegments, float[] expectedOffsets, NavalSlotProblem[] expectedProblems, float expectedAlly,
+        NavalSlotProblem expectedAllyProblem)
     {
-        var path = freeSegments.Length == 0 ? FreePath(pathLength, pivotOffset) : Path(pathLength, pivotOffset,
+        var path = Path(pathLength, pivotOffset,
             Enumerable.Range(0, freeSegments.Length / 2).Select(index => (freeSegments[2 * index], freeSegments[(2 * index) + 1])).ToArray());
 
         var layout = NavalSideDeploymentSlots.Layout(path, expectedOffsets.Length, Longest);
-        var ally = NavalSideDeploymentSlots.AllySlot(path, layout.Slots[0].Offset, Longest, layout.ForwardLimit);
+        var (ally, _) = NavalSideDeploymentSlots.AllySlot(path, ownRank: 1, ownPlanOffset: 0f, Longest, Longest);
 
         Assert.Equal(expectedOffsets, layout.Slots.Select(slot => (float)Math.Round(slot.Offset, 2)));
         Assert.Equal(expectedProblems, layout.Slots.Select(slot => slot.Problem));
-        Assert.Equal((expectedAlly, NavalSlotProblem.None), ((float)Math.Round(ally.Offset, 2), ally.Problem));
+        Assert.Equal((expectedAlly, expectedAllyProblem), ((float)Math.Round(ally.Offset, 2), ally.Problem));
+    }
+
+    // The allies plan from rank 0's real plan: the host's own when it is rank 0 (a lone player 72 m behind the shared slot on
+    // vanilla's deeper plan for four ships), else rank 0's shared slot at -199. A 50 m fleet ends its depth and the gap ahead.
+    [Theory]
+    [InlineData(0, -271f, -189f)]
+    [InlineData(1, -305.25f, -117f)]
+    public void AllySlot_IsAGapAheadOfRankZerosRealPlan(int ownRank, float ownPlanOffset, float expectedAlly)
+    {
+        var (ally, opposingBase) = NavalSideDeploymentSlots.AllySlot(FreePath(2000f, 1000f), ownRank, ownPlanOffset,
+            allyRange: 50f, Longest);
+
+        Assert.Equal((expectedAlly, NavalSlotProblem.None, 199f), ((float)Math.Round(ally.Offset, 2), ally.Problem, opposingBase));
     }
 
     // R49 C3: a slot depends only on its rank, so a client that counts a late joiner or misses a disconnected player derives the
@@ -99,21 +124,24 @@ public class NavalSideDeploymentSlotsTests
         Assert.Equal(fewer, more.Take(2));
     }
 
-    private static SpawnPathData FreePath(float pathLength, float pivotOffset) =>
-        Path(pathLength, pivotOffset, (-pivotOffset, pathLength - pivotOffset));
+    // A path with nothing blocked along it.
+    private static SpawnPathData FreePath(float pathLength, float pivotOffset) => Path(pathLength, pivotOffset);
 
-    // SpawnPathData's constructor reads a native Path, so the test sets the fields the placement reads.
+    // SpawnPathData's constructor reads a native Path, so the test sets the fields the placement reads; no segments is a path
+    // free from end to end.
     private static SpawnPathData Path(float pathLength, float pivotOffset, params (float start, float end)[] freeSegments)
     {
         var path = (SpawnPathData)FormatterServices.GetUninitializedObject(typeof(SpawnPathData));
         var segments = new MBList<(float startOffset, float endOffset)>();
         foreach (var segment in freeSegments) segments.Add(segment);
+        if (freeSegments.Length == 0) segments.Add((-pivotOffset, pathLength - pivotOffset));
         SetField(path, nameof(SpawnPathData.PathLength), pathLength);
         SetField(path, nameof(SpawnPathData.PivotOffset), pivotOffset);
         SetField(path, "_freeSegments", segments);
         return path;
     }
 
+    // Sets a readonly SpawnPathData field the constructor would have.
     private static void SetField(SpawnPathData path, string name, object value) =>
         typeof(SpawnPathData).GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .SetValue(path, value);
