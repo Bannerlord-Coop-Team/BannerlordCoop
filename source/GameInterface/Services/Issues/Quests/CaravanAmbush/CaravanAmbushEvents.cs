@@ -19,7 +19,8 @@ internal interface ICaravanAmbushEvents
 {
     void Run(Action<Quest> action);
     void BattleEnded(Quest quest, MapEvent battle);
-    void Release(Quest quest, bool completing = false);
+    void HoldCaravanForReward(Quest quest);
+    void Release(Quest quest);
     void OpenOwnerConversation(Quest quest);
 }
 
@@ -64,14 +65,14 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         var losers = battle.GetMapEventSide(battle.DefeatedSide);
         if (losers.Parties.Any(party => party.Party == quest._caravanParty.Party))
         {
-            Release(quest);
+            HoldCaravanForReward(quest);
             quest.OnCaravanDestroyed(winners.LeaderParty);
             return;
         }
         if (!losers.Parties.Any(party => party.Party == quest._banditParty.Party)) return;
         if (quest._isCaravanSaved) return;
         quest._isCaravanSaved = true;
-        Release(quest);
+        HoldCaravanForReward(quest);
         var ownerParty = MobileParty.MainParty;
         // A retreated party stays in the winners list until the event is finalized.
         if (ownerParty == null || retreatedPartyTracker.IsRetreated(battle, ownerParty.Party) ||
@@ -100,9 +101,9 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
     }
 
-    public void Release(Quest quest, bool completing = false)
+    public void HoldCaravanForReward(Quest quest)
     {
-        if (!completing && quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
+        if (quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
         {
             // Keep the caravan available for the owner's reward conversation.
             quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
@@ -112,6 +113,12 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         {
             ReleaseParty(quest._caravanParty, quest._targetSettlement);
         }
+        ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
+    }
+
+    public void Release(Quest quest)
+    {
+        ReleaseParty(quest._caravanParty, quest._targetSettlement);
         ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
     }
 

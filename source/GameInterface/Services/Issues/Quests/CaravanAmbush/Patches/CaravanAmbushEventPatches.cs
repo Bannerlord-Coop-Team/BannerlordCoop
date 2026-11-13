@@ -8,7 +8,6 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using Issue = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush.Patches;
@@ -21,14 +20,15 @@ internal class CaravanAmbushEventPatches
     [HarmonyPostfix]
     private static void Hourly() => Run(quest =>
     {
-        if (MobileParty.MainParty == null)
+        if (MobileParty.MainParty != null)
         {
-            // A captured owner has no party, but an active ambush must still lose invulnerability after six hours.
-            var battle = quest._caravanParty?.MapEvent;
-            if (battle != null && battle.IsInvulnerable && battle.BattleStartTime.ElapsedHoursUntilNow > 6f)
-                battle.IsInvulnerable = false;
+            quest.HourlyTick();
+            return;
         }
-        else quest.HourlyTick();
+        // A captured owner has no party, but an active ambush must still lose invulnerability after six hours.
+        var battle = quest._caravanParty?.MapEvent;
+        if (battle != null && battle.IsInvulnerable && battle.BattleStartTime.ElapsedHoursUntilNow > 6f)
+            battle.IsInvulnerable = false;
     });
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
@@ -49,11 +49,11 @@ internal class CaravanAmbushEventPatches
     private static void Recruited(MobileParty banditParty)
     {
         // Compare the player troop, because an owner without a party leaves the recruiter's MainParty in place.
-        var recruiter = Game.Current?.PlayerTroop;
+        var recruiter = Game.Current.PlayerTroop;
         Run(quest =>
         {
             if (quest._banditParty != banditParty) return;
-            if (Game.Current?.PlayerTroop == recruiter) quest.OnPlayerHiredBandits();
+            if (Game.Current.PlayerTroop == recruiter) quest.OnPlayerHiredBandits();
             else quest.CompleteQuestWithCancel();
         });
     }
@@ -68,15 +68,6 @@ internal class CaravanAmbushEventPatches
         quest._caravanParty = null;
         quest.CompleteQuestWithCancel();
     });
-
-    // The dedicated server has no player clan; the accept preconditions check war as the requesting player.
-    [HarmonyPatch(typeof(Issue), nameof(Issue.IssueStayAliveConditions))]
-    [HarmonyPrefix]
-    private static bool StayAlive(Issue __instance, ref bool __result)
-    {
-        __result = __instance.IssueOwner != null && __instance.IssueOwner.OwnedCaravans.Count > 0;
-        return false;
-    }
 
     private static void Run(Action<Quest> action)
     {

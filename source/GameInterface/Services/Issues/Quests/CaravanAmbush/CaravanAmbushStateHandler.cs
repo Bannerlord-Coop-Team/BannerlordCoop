@@ -21,6 +21,10 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
 internal class CaravanAmbushStateHandler : IHandler
 {
+    // Vanilla's last proximity warning and the strike that fails the quest, from CaravanAmbushIssueQuest.HourlyTick.
+    private const int FinalWarning = 3;
+    private const int CaughtAt = 4;
+
     private readonly IMessageBroker broker;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
@@ -46,7 +50,7 @@ internal class CaravanAmbushStateHandler : IHandler
         broker.Unsubscribe<NetworkCaravanAmbushState>(Handle);
         broker.Unsubscribe<NetworkCaravanAmbushConversation>(Conversation);
         broker.Unsubscribe<CampaignTick>(Tick);
-        ClearPendingConversation();
+        pendingConversation = null;
     }
 
     private void Conversation(MessagePayload<NetworkCaravanAmbushConversation> payload)
@@ -68,39 +72,29 @@ internal class CaravanAmbushStateHandler : IHandler
 
     private void TryOpenConversation()
     {
-        GameThread.RunSafe(() =>
+        if (!pendingConversation.HasValue) return;
+        var data = pendingConversation.Value;
+        if (data.ControllerId != controller.ControllerId ||
+            !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+            !(issue.IssueQuest is Quest quest) || !quest.IsOngoing ||
+            !objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan) || !caravan.IsActive)
         {
-            if (!pendingConversation.HasValue) return;
-            var data = pendingConversation.Value;
-            if (data.ControllerId != controller.ControllerId ||
-                !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest) || !quest.IsOngoing)
-            {
-                ClearPendingConversation();
-                return;
-            }
-            if (!quest._isCaravanSaved) return;
-            // Battle results can arrive before the owner leaves the mission and loot screens.
-            if (!(GameStateManager.Current?.ActiveState is MapState map) || map.AtMenu || map.IsSimulationActive ||
-                Campaign.Current.ConversationManager.IsConversationInProgress) return;
-            if (!objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan) || !caravan.IsActive)
-            {
-                ClearPendingConversation();
-                return;
-            }
-            var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
-            if (leader == null) return;
-            CampaignMapConversation.OpenConversation(
-                new ConversationCharacterData(Hero.MainHero.CharacterObject),
-                new ConversationCharacterData(leader));
-            ClearPendingConversation();
-        }, context: nameof(CaravanAmbushStateHandler));
-    }
-
-    private void ClearPendingConversation()
-    {
+            pendingConversation = null;
+            return;
+        }
+        if (!quest._isCaravanSaved) return;
+        // Battle results can arrive before the owner leaves the mission and loot screens.
+        if (!IsOwnerFreeOnMap()) return;
+        var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
+        if (leader == null) return;
+        CampaignMapConversation.OpenConversation(
+            new ConversationCharacterData(Hero.MainHero.CharacterObject),
+            new ConversationCharacterData(leader));
         pendingConversation = null;
     }
+
+    private bool IsOwnerFreeOnMap() => GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
+        !map.IsSimulationActive && !Campaign.Current.ConversationManager.IsConversationInProgress;
 
     private void Handle(MessagePayload<NetworkCaravanAmbushState> payload)
     {
@@ -114,27 +108,35 @@ internal class CaravanAmbushStateHandler : IHandler
             quest._caravanParty = caravan;
             quest._banditParty = bandits;
             quest._isCaravanSaved = data.Saved;
-            if (data.Warnings > quest._vicinityCheckFailCounter && data.Warnings < 4)
-            {
-                var warning = data.Warnings == 3
-                    ? new TextObject("{=uD2pfRAh}Get back immediately! If you keep this close to the caravan the ambushers will certainly notice you.")
-                    : new TextObject("{=ki1CWgcP}Warning! You are too close to the caravan. Stay a bit farther away.");
-                MBInformationManager.AddQuickInformation(warning);
-            }
+            ShowProximityWarning(quest._vicinityCheckFailCounter, data.Warnings);
             quest._vicinityCheckFailCounter = data.Warnings;
             foreach (var party in new[] { caravan, bandits })
             {
                 if (party != null && !quest.IsTracked(party)) quest.AddTrackedObject(party);
             }
-            using (new AllowedThread())
-            using (new QuestJournalReplay())
-            {
-                quest._journalEntries.Clear();
-                foreach (var entry in data.Journal ?? Array.Empty<IssueJournalEntry>())
-                    quest._journalEntries.Add(entry.ToJournalLog());
-                CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
-            }
+            ReplayJournal(quest, data.Journal);
         }, data.IssueOwnerId), context: nameof(CaravanAmbushStateHandler));
+    }
+
+    private static void ShowProximityWarning(int previous, int warnings)
+    {
+        if (warnings <= previous || warnings >= CaughtAt) return;
+        var warning = warnings == FinalWarning
+            ? new TextObject("{=uD2pfRAh}Get back immediately! If you keep this close to the caravan the ambushers will certainly notice you.")
+            : new TextObject("{=ki1CWgcP}Warning! You are too close to the caravan. Stay a bit farther away.");
+        MBInformationManager.AddQuickInformation(warning);
+    }
+
+    private static void ReplayJournal(Quest quest, IssueJournalEntry[] journal)
+    {
+        using (new AllowedThread())
+        using (new QuestJournalReplay())
+        {
+            quest._journalEntries.Clear();
+            foreach (var entry in journal ?? Array.Empty<IssueJournalEntry>())
+                quest._journalEntries.Add(entry.ToJournalLog());
+            CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
+        }
     }
 
     private bool TryResolveParty(string id, out MobileParty party)

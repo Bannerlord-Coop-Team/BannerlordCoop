@@ -9,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -26,13 +27,16 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
 
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly IssueOwnershipRegistry registry = new IssueOwnershipRegistry();
+    private readonly MessageBroker broker = new MessageBroker();
+    private readonly List<NetworkIssueFinalized> finalized = new List<NetworkIssueFinalized>();
     private readonly IssueOwnershipSnapshotReceiver receiver;
 
     public IssueOwnershipSnapshotReceiverTests()
     {
         ModInformation.IsServer = false;
         registry.TrySetOwner("hero_1", "issue_1", "stale-player");
-        receiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry,
+        broker.Subscribe<NetworkIssueFinalized>(payload => finalized.Add(payload.What));
+        receiver = new IssueOwnershipSnapshotReceiver(broker, registry,
             Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
     }
 
@@ -70,36 +74,22 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     [Fact]
     public void ARemovedOwnerReplaysCancellationForAClientThatMissedIt()
     {
-        NetworkIssueFinalized? finalized = null;
-        var broker = new MessageBroker();
-        broker.Subscribe<NetworkIssueFinalized>(payload => finalized = payload.What);
-        using var receiverWithObserver = new IssueOwnershipSnapshotReceiver(broker, registry,
-            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
+        Receive(new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()));
 
-        GameThread.Run(() => receiverWithObserver.Handle_NetworkIssueOwnershipSnapshot(
-            new MessagePayload<NetworkIssueOwnershipSnapshot>(this, new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()))), blocking: true);
-
-        Assert.True(finalized.HasValue);
-        Assert.Equal("hero_1", finalized.Value.IssueOwnerId);
-        Assert.Equal("issue_1", finalized.Value.IssueId);
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Value.Outcome);
+        var replayed = Assert.Single(finalized);
+        Assert.Equal("hero_1", replayed.IssueOwnerId);
+        Assert.Equal("issue_1", replayed.IssueId);
+        Assert.Equal(IssueOutcome.QuestCancel, replayed.Outcome);
     }
 
     [Fact]
     public void AChangedControllerDoesNotReplayCancellationForTheSameIssue()
     {
-        var broker = new MessageBroker();
-        NetworkIssueFinalized? finalized = null;
-        broker.Subscribe<NetworkIssueFinalized>(payload => finalized = payload.What);
-        using var receiverWithObserver = new IssueOwnershipSnapshotReceiver(broker, registry,
-            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
-
-        GameThread.Run(() => receiverWithObserver.Handle_NetworkIssueOwnershipSnapshot(new MessagePayload<NetworkIssueOwnershipSnapshot>(this,
-            new NetworkIssueOwnershipSnapshot(new[] { new IssueOwnershipData("hero_1", "issue_1", "new-player") }))), blocking: true);
+        Receive(new NetworkIssueOwnershipSnapshot(new[] { new IssueOwnershipData("hero_1", "issue_1", "new-player") }));
 
         Assert.True(registry.TryGetOwner("hero_1", "issue_1", out var owner));
         Assert.Equal("new-player", owner);
-        Assert.Null(finalized);
+        Assert.Empty(finalized);
     }
 
     [Fact]
